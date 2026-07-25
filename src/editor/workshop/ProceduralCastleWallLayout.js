@@ -27,11 +27,8 @@ function minimumTopAcrossOpening(recipe, centerX, width) {
   const halfSpan = width / 2 + trimAllowance;
   let minimum = Number.POSITIVE_INFINITY;
   for (let index = 0; index <= OPENING_PROFILE_SAMPLES; index += 1) {
-    const x = THREE.MathUtils.lerp(
-      centerX - halfSpan,
-      centerX + halfSpan,
-      index / OPENING_PROFILE_SAMPLES,
-    );
+    const progress = index / OPENING_PROFILE_SAMPLES;
+    const x = centerX - halfSpan + halfSpan * 2 * progress;
     minimum = Math.min(minimum, getCastleWallTopHeight(recipe, x));
   }
   return minimum;
