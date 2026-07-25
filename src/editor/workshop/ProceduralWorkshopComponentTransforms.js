@@ -11,8 +11,8 @@ const IDENTITY_ROTATION = Object.freeze([0, 0, 0]);
 const IDENTITY_SCALE = Object.freeze([1, 1, 1]);
 
 function requireObject(value, field) {
-  if (value == null) return {};
-  if (typeof value !== 'object' || Array.isArray(value)) {
+  if (value === undefined) return {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${field} must be an object.`);
   }
   return value;
@@ -32,7 +32,7 @@ function normalizeAngle(value) {
 }
 
 function normalizeVector(input, field, fallback, minimum, maximum, mapper = strictNumber) {
-  if (input == null) return Object.freeze([...fallback]);
+  if (input === undefined) return Object.freeze([...fallback]);
   if (!Array.isArray(input) || input.length !== 3) {
     throw new Error(`${field} must contain exactly three values.`);
   }
