@@ -38,6 +38,25 @@ function trunk({ height, baseRadius, topRadius, lean = 0 }) {
   return geometry;
 }
 
+/**
+ * Root flare at the trunk base. `attachRootCollar` cannot be reused here: it
+ * merges an indexed cylinder, and these prototypes are de-indexed for faceting,
+ * so the merge would fail and the flare would be dropped.
+ */
+function rootFlare({ baseRadius }) {
+  const radius = Math.max(0.16, baseRadius * 1.5);
+  const height = Math.max(0.18, radius * 0.7);
+  const geometry = new THREE.CylinderGeometry(
+    baseRadius,
+    radius,
+    height,
+    TRUNK_RADIAL_SEGMENTS + 1,
+    1,
+  );
+  geometry.translate(0, height * 0.42, 0);
+  return geometry;
+}
+
 /** Angled limb from the trunk toward a crown lobe, so crowns are not floating. */
 function limb({ fromY, toX, toY, toZ, radius }) {
   const length = Math.hypot(toX, toY - fromY, toZ);
@@ -163,12 +182,15 @@ export function createSpeciesPrototypeGeometry(speciesId) {
     throw new Error(`No procedural archetype is defined for species "${speciesId}".`);
   }
   const lean = (unitRandom(speciesId, 3) - 0.5) * 0.08;
-  const trunkParts = [trunk({
-    height: archetype.trunkHeight,
-    baseRadius: archetype.trunkBase,
-    topRadius: archetype.trunkTop,
-    lean,
-  })];
+  const trunkParts = [
+    trunk({
+      height: archetype.trunkHeight,
+      baseRadius: archetype.trunkBase,
+      topRadius: archetype.trunkTop,
+      lean,
+    }),
+    rootFlare({ baseRadius: archetype.trunkBase }),
+  ];
   const lobes = lobeCluster({
     speciesId,
     count: archetype.lobes,

@@ -151,23 +151,18 @@ export function createCanopyClusterPart(config) {
   };
 }
 
+/**
+ * Deadwood beside `dead` trees. Shrubs used to live here too, tied to saplings at
+ * patch edges — `StylizedBushView` now owns undergrowth as its own clustered
+ * layer, so this is deadwood only.
+ */
 export function createForestUnderstoryPrototypes(config) {
-  const shrubGeometry = new THREE.DodecahedronGeometry(0.5, 0);
-  shrubGeometry.scale(1.15, 0.7, 1);
-  shrubGeometry.translate(0, 0.35, 0);
-  shrubGeometry.computeBoundingBox();
-  shrubGeometry.computeBoundingSphere();
   const logGeometry = new THREE.CylinderGeometry(0.12, 0.17, 1.8, 6, 1);
   logGeometry.rotateZ(Math.PI * 0.5);
   logGeometry.translate(0, 0.14, 0);
   logGeometry.computeBoundingBox();
   logGeometry.computeBoundingSphere();
   return [
-    [{
-      geometry: shrubGeometry,
-      material: makeMaterial(config.trees.leafBottom),
-      kind: 'leaf',
-    }],
     [{
       geometry: logGeometry,
       material: makeMaterial(config.trees.barkTint),

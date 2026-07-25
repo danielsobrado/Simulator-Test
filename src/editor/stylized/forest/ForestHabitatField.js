@@ -42,6 +42,17 @@ function waterWeight(distance, profile) {
   );
 }
 
+/**
+ * Coverage contributed by a shoreline in its own right: `riparianCoverage` at the
+ * waterline, easing to zero by `riparianRange`. Infinite distance means no water
+ * was found within the provider's range, so the belt contributes nothing.
+ */
+function riparianCoverage(distance, profile) {
+  if (profile.riparianCoverage <= 0 || !Number.isFinite(distance)) return 0;
+  return profile.riparianCoverage
+    * (1 - smoothstep(0, profile.riparianRange, distance));
+}
+
 function worldToCell(x, z, tileSize) {
   return {
     cellX: Math.floor(x / tileSize),
@@ -100,6 +111,9 @@ export class ForestHabitatField {
       this.tileSize,
       this.slopeSampleDistance,
       this.patchSampleSpacing,
+      // Acceptance changes the moment a water provider appears, so it belongs in
+      // the signature that invalidates cached manifests.
+      this.waterDistanceAt ? 'riparian' : 'nowater',
       this.patchField.signature,
       forestProfileSignature(this.profiles),
     ].join('|');
@@ -204,6 +218,8 @@ export class ForestHabitatField {
         elevationWeight: 0,
         slopeWeight: 0,
         waterWeight: 0,
+        waterDistance: Number.POSITIVE_INFINITY,
+        riparian: 1,
         suitability: 0,
       }));
     }
@@ -220,9 +236,14 @@ export class ForestHabitatField {
     const slopeFactor = slopeWeight(slope, profile.preferredSlope, profile.maximumSlope);
     const distanceToWater = this.waterDistanceAt?.(x, z) ?? Number.POSITIVE_INFINITY;
     const waterFactor = waterWeight(distanceToWater, profile);
+    const riparian = riparianCoverage(distanceToWater, profile);
+    // A gallery wood along a river is not an upland patch that happens to touch
+    // water — it is its own corridor, so it competes with the patch field for
+    // coverage instead of scaling it.
+    const coverage = Math.max(patch.patchCoverage, riparian);
     const suitability = clamp01(
       profile.density
-      * patch.patchCoverage
+      * coverage
       * elevationFactor
       * slopeFactor
       * waterFactor,
@@ -233,7 +254,11 @@ export class ForestHabitatField {
       profileKey: profile.key,
       structure: profile.structure,
       patchId: patch.patchId,
-      patchCoverage: patch.patchCoverage,
+      // Downstream consumers (forest floor, bush thinning, far-terrain canopy)
+      // treat coverage as "how wooded is this spot", so they must see the
+      // riparian belt too; the raw patch term stays available separately.
+      patchCoverage: coverage,
+      uplandPatchCoverage: patch.patchCoverage,
       patchEdge: patch.patchEdge,
       patchDistance: patch.patchDistance,
       elevation,
@@ -241,6 +266,8 @@ export class ForestHabitatField {
       elevationWeight: elevationFactor,
       slopeWeight: slopeFactor,
       waterWeight: waterFactor,
+      waterDistance: distanceToWater,
+      riparian,
       suitability,
     }));
   }

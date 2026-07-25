@@ -59,7 +59,7 @@ export function rebuildTreeLod({
   const fallback = createInstances(prototypeCount);
   const clusters = [[]];
   const impostors = createInstances(prototypeCount);
-  const understory = createInstances(2);
+  const understory = createInstances(1);
   const active = new Set();
   const ordered = [...plan.entries].sort((left, right) => (
     left.chunkDistance - right.chunkDistance
@@ -134,36 +134,19 @@ export function rebuildTreeLod({
 
       for (const placement of placements) {
         const seed = stableSeed(placement);
-        if (representation.band === 'near') {
-          if (placement.ageClass === 'sapling' && placement.forestPatchEdge > 0.35) {
-            const angle = seed * Math.PI * 2;
-            understory[0].push({
-              matrix: createMatrix({
-                x: placement.x + Math.cos(angle) * 1.2,
-                y: placement.height,
-                z: placement.z + Math.sin(angle) * 1.2,
-                rotationY: angle,
-                scaleX: 0.65 + (placement.crownScale ?? 1) * 0.25,
-              }),
-              fade: representation.fade,
-              seed,
-              colorVariation: 0.9 + (placement.colorSeed ?? seed) * 0.2,
-            });
-          }
-          if (placement.ageClass === 'dead') {
-            understory[1].push({
-              matrix: createMatrix({
-                x: placement.x,
-                y: placement.height,
-                z: placement.z,
-                rotationY: placement.rotationY,
-                scaleX: 0.8 + placement.scale * 0.2,
-              }),
-              fade: representation.fade,
-              seed,
-              colorVariation: 0.82 + (placement.colorSeed ?? seed) * 0.16,
-            });
-          }
+        if (representation.band === 'near' && placement.ageClass === 'dead') {
+          understory[0].push({
+            matrix: createMatrix({
+              x: placement.x,
+              y: placement.height,
+              z: placement.z,
+              rotationY: placement.rotationY,
+              scaleX: 0.8 + placement.scale * 0.2,
+            }),
+            fade: representation.fade,
+            seed,
+            colorVariation: 0.82 + (placement.colorSeed ?? seed) * 0.16,
+          });
         }
         if (representation.band === 'impostor' && impostorBatches.length > 0) {
           const atlas = impostorAtlases[placement.prototypeIndex];

@@ -361,6 +361,24 @@ export function validateEditorConfig(config) {
     if (far.heightBias !== undefined && !Number.isFinite(far.heightBias)) {
       throw new Error('Invalid editor configuration: world.farTerrain.heightBias must be finite.');
     }
+    for (const name of ['radialResolution', 'angularResolution', 'rebuildRowsPerFrame']) {
+      if (far[name] !== undefined && (!Number.isInteger(far[name]) || far[name] < 2)) {
+        throw new Error(`Invalid editor configuration: world.farTerrain.${name} must be an integer >= 2.`);
+      }
+    }
+    for (const name of ['innerRadiusMeters', 'radialFalloff', 'snowFade', 'snowSlopeMax']) {
+      if (far[name] !== undefined && (!Number.isFinite(far[name]) || far[name] <= 0)) {
+        throw new Error(`Invalid editor configuration: world.farTerrain.${name} must be positive.`);
+      }
+    }
+    if (far.innerRadiusMeters !== undefined && far.radiusMeters !== undefined
+        && far.innerRadiusMeters >= far.radiusMeters) {
+      throw new Error('Invalid editor configuration: world.farTerrain.innerRadiusMeters must be inside radiusMeters.');
+    }
+    if (far.rockSlopeStart !== undefined && far.rockSlopeFull !== undefined
+        && far.rockSlopeFull <= far.rockSlopeStart) {
+      throw new Error('Invalid editor configuration: world.farTerrain.rockSlopeFull must exceed rockSlopeStart.');
+    }
   }
 
   if (config.import.azgaarVerticalExaggeration !== undefined

@@ -15,6 +15,18 @@ import {
 } from './forest/ForestRuntimeConfig.js';
 import { ForestSpeciesRegistry } from './forest/ForestSpeciesRegistry.js';
 import { ForestEditStore } from './forest/ForestEditStore.js';
+import { PathClearanceField } from './forest/PathClearanceField.js';
+
+export function createPathClearanceField(terrainView, config) {
+  return new PathClearanceField({
+    tileAt: (cellX, cellZ) => terrainView.tileMap.get(cellX, cellZ),
+    tileSize: terrainView.worldStore.tileSize,
+    chunkSize: terrainView.worldStore.chunkSize,
+    roadTileId: config.path?.tileId ?? 13,
+    clearCells: config.path?.clearCells ?? 0,
+    revisionProvider: () => terrainView.worldStore.revision,
+  });
+}
 
 function createForestField(terrainView, config) {
   const habitat = config.trees.habitat ?? {};
@@ -55,6 +67,7 @@ export class TreeManifestStore {
       prototypeCount,
       prototypeIndexBySpecies,
     });
+    this.pathClearance = createPathClearanceField(terrainView, config);
     this.editStore = new ForestEditStore(terrainView.worldStore.forestEdits);
     this.editDocumentSignature = JSON.stringify(this.editStore.toDocument());
     this.cache = new Map();
@@ -98,6 +111,7 @@ export class TreeManifestStore {
         this.prototypeCount,
         this.forestField?.signature ?? 'uniform',
         this.speciesRegistry.signature,
+        this.pathClearance.signature,
         this.editStore.revision,
       ].join('|'),
     };
@@ -168,6 +182,7 @@ export class TreeManifestStore {
       candidateEvaluator: createForestPlacementEvaluator(this.forestField, counters, {
         speciesRegistry: this.speciesRegistry,
         editStore: this.editStore,
+        exclusionAt: this.pathClearance.exclusion(),
       }),
     });
     const planted = this.editStore.plantedForChunk(

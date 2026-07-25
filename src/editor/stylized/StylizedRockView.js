@@ -15,12 +15,26 @@ import {
   writeInstances,
 } from './lod/StylizedLodRuntime.js';
 import { createRockProxyPrototype } from './lod/StylizedProxyGeometry.js';
+import { ScatterClusterField } from './forest/ScatterClusterField.js';
+import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
+import { createPathClearanceField } from './TreeManifestStore.js';
 
-function cloneMaterial(mesh) {
+const ROCK_CLUSTER_SEED_OFFSET = 0xa7;
+
+/**
+ * Boulders read as dark, hard-faceted stone. `rocks.color` tints the source GLB
+ * material toward that; instance colour variation then spreads each cluster over
+ * a range so a scree field is not a field of clones.
+ */
+function cloneMaterial(mesh, config) {
   const source = materialList(mesh)[0];
   const material = source.clone();
   if ('roughness' in material) material.roughness = 1;
   if ('metalness' in material) material.metalness = 0;
+  if (config?.rocks?.color && 'color' in material) {
+    material.color = new THREE.Color(config.rocks.color);
+    if ('map' in material) material.map = null;
+  }
   material.flatShading = true;
   material.needsUpdate = true;
   return material;
@@ -70,6 +84,7 @@ export class StylizedRockView {
     this.proxyMeshes = [];
     this.placements = [];
     this.placementsByChunk = new Map();
+    this.clusterField = null;
     this.signature = '';
     this.manifestCache = new Map();
     this.chunkLodStates = new Map();
@@ -87,12 +102,21 @@ export class StylizedRockView {
     const extracted = extractRockPrototypes(scene, this.config.assets.rockMaterial);
     this.prototypes = extracted.map(({ geometry, source }) => ({
       geometry,
-      material: cloneMaterial(source),
+      material: cloneMaterial(source, this.config),
       kind: 'rock',
     }));
     if (this.prototypes.length === 0) {
       throw new Error(`No rock meshes use material ${this.config.assets.rockMaterial}.`);
     }
+    this.clusterField = new ScatterClusterField({
+      kind: 'rock',
+      seed: resolveForestSeed(this.terrainView.worldStore),
+      seedOffset: ROCK_CLUSTER_SEED_OFFSET,
+      heightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z),
+      slopeSampleDistance: this.config.trees.habitat?.slopeSampleDistance ?? 4,
+      config: this.config.rocks,
+    });
+    this.pathClearance = createPathClearanceField(this.terrainView, this.config);
 
     const settings = lodSettings(this.config);
     const capacity = instanceCapacity({
@@ -189,10 +213,33 @@ export class StylizedRockView {
     return entries;
   }
 
+  /**
+   * Boulders gather into scree groups instead of scattering evenly: the cluster
+   * field concentrates them into patches, and its slope term thins them on flat
+   * meadow while letting them accumulate on broken ground.
+   */
+  createCandidateEvaluator() {
+    if (!this.clusterField) return null;
+    const blocksPath = this.pathClearance?.exclusion();
+    return (candidate) => {
+      if (blocksPath?.(candidate)) return null;
+      const cluster = this.clusterField.sample(candidate.x, candidate.z);
+      if (candidate.priority >= cluster.density) return null;
+      return {
+        clusterId: cluster.clusterId,
+        rockCoverage: cluster.coverage,
+        rockEdge: cluster.edge,
+        rockSlope: cluster.slope,
+      };
+    };
+  }
+
   manifestForChunk(chunkX, chunkZ) {
     const key = [
       this.revisionTracker.signature(chunkX, chunkZ, 1),
       this.prototypes.length,
+      this.clusterField?.signature ?? 'uniform',
+      this.pathClearance?.signature ?? 'nopath',
     ].join('|');
     const cacheKey = `${chunkX}:${chunkZ}`;
     const cached = this.manifestCache.get(cacheKey);
@@ -215,6 +262,7 @@ export class StylizedRockView {
       minScale: this.config.rocks.minScale,
       maxScale: this.config.rocks.maxScale,
       radiusForScale: (scale) => this.config.rocks.radius * scale,
+      candidateEvaluator: this.createCandidateEvaluator(),
     });
     this.manifestCache.set(cacheKey, { key, placements });
     this.placementsByChunk.set(cacheKey, placements);
@@ -223,6 +271,11 @@ export class StylizedRockView {
 
   rebuild(focus, placementRadius, plan) {
     PerfCounters.inc('rockRebuilds');
+    // Sink each boulder by a fraction of its height so it reads as embedded in
+    // the ground rather than resting on it.
+    const burial = Math.max(0, Number(this.config.rocks.burial) || 0);
+    const colorRange = Math.max(0, Number(this.config.rocks.colorVariation) || 0);
+    const burialFor = (placement) => this.prototypeHeight * placement.scale * burial;
     const near = createInstances(this.prototypes.length);
     const proxy = createInstances(this.prototypes.length);
     const placements = [];
@@ -246,7 +299,7 @@ export class StylizedRockView {
           for (const placement of manifest) {
             const instance = {
               matrix: new THREE.Matrix4().compose(
-                new THREE.Vector3(placement.x, placement.height, placement.z),
+                new THREE.Vector3(placement.x, placement.height - burialFor(placement), placement.z),
                 new THREE.Quaternion().setFromAxisAngle(
                   new THREE.Vector3(0, 1, 0),
                   placement.rotationY,
@@ -255,6 +308,7 @@ export class StylizedRockView {
               ),
               fade: representation.fade,
               seed: placement.priority,
+              colorVariation: 1 - colorRange * 0.5 + placement.priority * colorRange,
             };
             const target = representation.band === 'near' ? near : proxy;
             target[placement.prototypeIndex].push(instance);

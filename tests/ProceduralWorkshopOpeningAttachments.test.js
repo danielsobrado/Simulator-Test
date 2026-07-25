@@ -113,6 +113,31 @@ test('opening layout routes originals and copies to planar and radial hosts', ()
   assert.equal(radial.angle, 0.5);
 });
 
+test('opening layout prevents impossible narrow-radius arches with horizontal shoulders', () => {
+  const layout = resolveWorkshopOpeningLayout({
+    componentTransforms: {},
+    openingAttachments: {},
+  }, [{
+    componentId: 'window-1',
+    componentLabel: 'Window 1',
+    hostId: 'structure-main',
+    centerX: 0,
+    bottom: 2,
+    width: 0.78,
+    springHeight: 0.8,
+    radius: 0.31,
+  }], [{
+    id: 'structure-main',
+    type: 'planar',
+    width: 8,
+    height: 5,
+    radius: 0,
+  }]);
+  const [opening] = layout.get('structure-main');
+  assert.equal(opening.width, 0.78);
+  assert.equal(opening.radius, opening.width / 2);
+});
+
 test('gatehouse generation reparents a door to a tower and preserves host metadata', () => {
   const recipe = normalizeProceduralRecipe({
     archetype: 'gatehouse',

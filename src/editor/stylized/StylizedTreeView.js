@@ -222,7 +222,8 @@ export class StylizedTreeView {
             palette,
           }),
       }));
-      attachRootCollar(parts);
+      // No attachRootCollar here: these prototypes already carry a root flare,
+      // and the collar it merges is indexed while these are de-indexed.
       this.prototypes.push(parts);
     }
     this.speciesPrototypeIndex = createSpeciesPrototypeIndex({
@@ -237,10 +238,18 @@ export class StylizedTreeView {
       this.config.trees.perChunk,
       Math.trunc(this.config.trees.habitat?.maxAcceptedPerChunk) || 0,
     );
-    const capacity = instanceCapacity({
-      residentRadius: settings.impostorRadius + 1,
+    // Each band is sized to its own radius. `clampLodToRadii` guarantees a chunk
+    // can only emit 'near' within meshRadius and 'proxy' within proxyRadius, so
+    // sizing every renderer for the impostor window (as this used to) wasted
+    // several times the instance memory — which matters now that the accepted
+    // budget is high enough for closed forest.
+    const capacityFor = (radius) => instanceCapacity({
+      residentRadius: radius + 1,
       perChunk: acceptedPerChunk,
     });
+    const nearCapacity = capacityFor(settings.meshRadius);
+    const proxyCapacity = capacityFor(settings.proxyRadius);
+    const impostorCapacity = capacityFor(settings.impostorRadius);
     const proxies = this.prototypes.map((parts) => createTreeProxyPrototype(parts, this.config));
     this.proxyPrototypes = proxies.map((prototype) => prototype.proxyParts);
     this.fallbackImpostorPrototypes = proxies.map((prototype) => prototype.fallbackImpostorParts);
@@ -249,21 +258,21 @@ export class StylizedTreeView {
     this.renderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.prototypes,
-      capacity,
+      capacity: nearCapacity,
       name: 'stylized-pine-near',
       castShadow: true,
     });
     this.proxyRenderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.proxyPrototypes,
-      capacity,
+      capacity: proxyCapacity,
       name: 'stylized-pine-proxy',
       castShadow: false,
     });
     this.fallbackImpostorRenderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.fallbackImpostorPrototypes,
-      capacity,
+      capacity: impostorCapacity,
       name: 'stylized-pine-impostor-fallback',
       castShadow: false,
     });
@@ -271,10 +280,7 @@ export class StylizedTreeView {
     this.clusterRenderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.clusterPrototypes,
-      capacity: instanceCapacity({
-        residentRadius: settings.clusterRadius + 1,
-        perChunk: acceptedPerChunk,
-      }),
+      capacity: capacityFor(settings.clusterRadius),
       name: 'stylized-canopy-cluster',
       castShadow: false,
     });
@@ -282,7 +288,8 @@ export class StylizedTreeView {
     this.understoryRenderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.understoryPrototypes,
-      capacity,
+      // Deadwood is emitted from the near band only.
+      capacity: nearCapacity,
       name: 'stylized-forest-understory',
       castShadow: false,
     });
@@ -298,7 +305,7 @@ export class StylizedTreeView {
         // detects `manifestFlush.built > 0` and enqueues one budgeted rebuild.
       },
     });
-    this.impostorReady = this.initializeImpostors(capacity).catch((error) => {
+    this.impostorReady = this.initializeImpostors(impostorCapacity).catch((error) => {
       console.warn('Tree impostor initialization failed; cross-card fallback remains active.', error);
       return null;
     });

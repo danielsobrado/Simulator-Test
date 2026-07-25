@@ -89,6 +89,102 @@ function validateRockBand(rock) {
   assertUnitInterval(rock.hysteresisRatio, 'stylizedSurface.lod.rock.hysteresisRatio');
 }
 
+function validateAerial(aerial) {
+  if (!aerial) return;
+  assertUnitInterval(aerial.strength, 'stylizedSurface.sky.aerial.strength');
+  assertUnitInterval(aerial.heightFalloff, 'stylizedSurface.sky.aerial.heightFalloff');
+  assertPositive(aerial.endDistance, 'stylizedSurface.sky.aerial.endDistance');
+  assertPositive(aerial.farDensityScale, 'stylizedSurface.sky.aerial.farDensityScale');
+  assertFinite(aerial.startDistance, 'stylizedSurface.sky.aerial.startDistance');
+  assertFinite(aerial.heightFloor, 'stylizedSurface.sky.aerial.heightFloor');
+  assertFinite(aerial.heightCeiling, 'stylizedSurface.sky.aerial.heightCeiling');
+  if (aerial.endDistance <= aerial.startDistance) {
+    throw new Error('Invalid editor configuration: aerial endDistance must exceed startDistance.');
+  }
+  if (aerial.heightCeiling <= aerial.heightFloor) {
+    throw new Error('Invalid editor configuration: aerial heightCeiling must exceed heightFloor.');
+  }
+  if (typeof aerial.horizonColor !== 'string' || aerial.horizonColor.length === 0) {
+    throw new Error('Invalid editor configuration: aerial horizonColor is required.');
+  }
+}
+
+/** Shared shape for every clustered scatter layer (bushes, boulders). */
+function validateClusterField(cluster, path) {
+  for (const [name, value] of [
+    ['clusterSupercellSize', cluster.clusterSupercellSize],
+    ['clusterSampleSpacing', cluster.clusterSampleSpacing],
+    ['maximumSlope', cluster.maximumSlope],
+  ]) {
+    if (value !== undefined) assertPositive(value, `${path}.${name}`);
+  }
+  for (const [name, value] of [
+    ['clusterDensity', cluster.clusterDensity],
+    ['clusterEdgeWidth', cluster.clusterEdgeWidth],
+    ['clusterBoundaryWarp', cluster.clusterBoundaryWarp],
+    ['flatBias', cluster.flatBias],
+  ]) {
+    if (value !== undefined) assertUnitInterval(value, `${path}.${name}`);
+  }
+  if (cluster.preferredSlope !== undefined) {
+    assertFinite(cluster.preferredSlope, `${path}.preferredSlope`);
+    if (cluster.preferredSlope < 0) {
+      throw new Error(`Invalid editor configuration: ${path}.preferredSlope must not be negative.`);
+    }
+  }
+  if (cluster.clusterRadiusMin !== undefined && cluster.clusterRadiusMax !== undefined
+      && cluster.clusterRadiusMax < cluster.clusterRadiusMin) {
+    throw new Error(`Invalid editor configuration: ${path}.clusterRadiusMax must cover its minimum.`);
+  }
+  if (cluster.preferredSlope !== undefined && cluster.maximumSlope !== undefined
+      && cluster.maximumSlope <= cluster.preferredSlope) {
+    throw new Error(`Invalid editor configuration: ${path}.maximumSlope must exceed preferredSlope.`);
+  }
+}
+
+function validateBushes(bushes) {
+  if (!bushes) return;
+  assertBoolean(bushes.enabled, 'stylizedSurface.bushes.enabled');
+  if (!bushes.enabled) return;
+  assertNonNegativeInteger(bushes.residentRadius, 'stylizedSurface.bushes.residentRadius');
+  assertPositiveInteger(bushes.perChunk, 'stylizedSurface.bushes.perChunk');
+  if (bushes.perChunk > 512) {
+    throw new Error('Invalid editor configuration: bush perChunk must not exceed 512.');
+  }
+  assertPositive(bushes.minScale, 'stylizedSurface.bushes.minScale');
+  assertPositive(bushes.maxScale, 'stylizedSurface.bushes.maxScale');
+  if (bushes.maxScale < bushes.minScale) {
+    throw new Error('Invalid editor configuration: bush maxScale must cover minScale.');
+  }
+  assertPositive(bushes.radius, 'stylizedSurface.bushes.radius');
+  if (bushes.edgeAffinity !== undefined) {
+    assertFinite(bushes.edgeAffinity, 'stylizedSurface.bushes.edgeAffinity');
+  }
+  if (!Array.isArray(bushes.tileIds) || bushes.tileIds.length === 0) {
+    throw new Error('Invalid editor configuration: stylizedSurface.bushes.tileIds must be a non-empty array.');
+  }
+  for (const name of ['colorLarge', 'colorSmall', 'colorFern']) {
+    if (typeof bushes[name] !== 'string' || bushes[name].length === 0) {
+      throw new Error(`Invalid editor configuration: stylizedSurface.bushes.${name} is required.`);
+    }
+  }
+  validateClusterField(bushes, 'stylizedSurface.bushes');
+}
+
+function validateRockAppearance(rocks) {
+  if (!rocks?.enabled) return;
+  if (rocks.colorVariation !== undefined) {
+    assertUnitInterval(rocks.colorVariation, 'stylizedSurface.rocks.colorVariation');
+  }
+  if (rocks.burial !== undefined) {
+    assertUnitInterval(rocks.burial, 'stylizedSurface.rocks.burial');
+  }
+  if (rocks.color !== undefined && (typeof rocks.color !== 'string' || rocks.color.length === 0)) {
+    throw new Error('Invalid editor configuration: stylizedSurface.rocks.color must be a colour string.');
+  }
+  validateClusterField(rocks, 'stylizedSurface.rocks');
+}
+
 function validateImpostor(impostor) {
   assertBoolean(impostor.enabled, 'stylizedSurface.lod.impostor.enabled');
   assertBoolean(impostor.runtimeBake, 'stylizedSurface.lod.impostor.runtimeBake');
@@ -155,8 +251,22 @@ export function validateStylizedLodConfig(config) {
       habitat.maxAcceptedPerChunk,
       'stylizedSurface.trees.habitat.maxAcceptedPerChunk',
     );
-    if (habitat.candidateBudgetPerChunk > 96) {
-      throw new Error('Invalid editor configuration: forest candidate budget must not exceed 96.');
+    if (habitat.candidateBudgetPerChunk > 384) {
+      throw new Error('Invalid editor configuration: forest candidate budget must not exceed 384.');
+    }
+    if (habitat.patchSampleSpacing !== undefined) {
+      assertPositive(habitat.patchSampleSpacing, 'stylizedSurface.trees.habitat.patchSampleSpacing');
+    }
+    if (habitat.waterRangeMeters !== undefined) {
+      assertFinite(habitat.waterRangeMeters, 'stylizedSurface.trees.habitat.waterRangeMeters');
+      if (habitat.waterRangeMeters < 0) {
+        throw new Error('Invalid editor configuration: stylizedSurface.trees.habitat.waterRangeMeters must not be negative.');
+      }
+      // The chamfer halo scales with this, so a runaway value would make every
+      // manifest build quadratically more expensive.
+      if (habitat.waterRangeMeters > 400) {
+        throw new Error('Invalid editor configuration: stylizedSurface.trees.habitat.waterRangeMeters must not exceed 400.');
+      }
     }
     if (habitat.maxAcceptedPerChunk > habitat.candidateBudgetPerChunk) {
       throw new Error('Invalid editor configuration: forest accepted budget must not exceed its candidate budget.');
@@ -203,10 +313,15 @@ export function validateStylizedLodConfig(config) {
   }
 
   validateGroundCover(surface.groundCover);
+  validateAerial(surface.sky?.aerial);
+  validateBushes(surface.bushes);
+  validateRockAppearance(surface.rocks);
   if (!surface.lod) return config;
   assertBoolean(surface.lod.enabled, 'stylizedSurface.lod.enabled');
   validateTreeBand(surface.lod.tree);
   validateRockBand(surface.lod.rock);
+  // Bushes reuse the rock band shape: mesh + proxy, no impostor or cluster band.
+  if (surface.lod.bush) validateRockBand(surface.lod.bush);
   validateImpostor(surface.lod.impostor);
   assertBoolean(surface.lod.gpuCulling.enabled, 'stylizedSurface.lod.gpuCulling.enabled');
   return config;

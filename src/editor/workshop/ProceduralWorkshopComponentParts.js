@@ -9,6 +9,13 @@ import {
 } from './ProceduralWorkshopComponentTransforms.js';
 import { getWorkshopComponentEditPolicy } from './ProceduralWorkshopEditPolicy.js';
 import { createProceduralWorkshopParts } from './ProceduralWorkshopGenerator.js';
+import { createWorkshopCompositionParts } from './ProceduralWorkshopCompositionGenerator.js';
+import { planWorkshopComposition } from './ProceduralWorkshopComposition.js';
+import {
+  MAX_WORKSHOP_MATERIAL_DRAW_PARTS,
+  resolveWorkshopMaterialRegion,
+  workshopMaterialRegionId,
+} from './ProceduralWorkshopMaterialConfig.js';
 
 const STRUCTURE_MIN_HEIGHT = 1.4;
 const STRUCTURE_MIN_HORIZONTAL = 0.55;
@@ -16,6 +23,8 @@ const OPENING_EXPANSION = Object.freeze({ x: 0.42, y: 0.36, z: 0.52 });
 const OPENING_INSERT_SLOTS = new Set(['wood', 'metal', 'recess']);
 const EMPTY_MATRIX = new THREE.Matrix4();
 const ZERO = new THREE.Vector3();
+const PRESET_TEXTURE_CACHE = new Map();
+const MAX_PRESET_TEXTURE_CACHE = 64;
 
 function compareText(left, right) {
   if (left < right) return -1;
@@ -70,8 +79,113 @@ function geometryEntry(part, index) {
     size,
     volume: Math.max(0, size.x * size.y * size.z),
     componentId: null,
+    materialRegion: null,
+    sourceMaterialRegion: part.materialRegion ?? null,
     semanticHint: geometry.userData?.workshopSemantic ?? null,
   };
+}
+
+function materialRegion(component, slot, recipe, sourceRegion = null) {
+  const region = sourceRegion ?? {
+    id: workshopMaterialRegionId(component.id, slot),
+    componentId: component.id,
+    label: `${component.label} · ${slot === 'mortar' ? 'walls' : slot}`,
+    family: slot,
+    connected: true,
+  };
+  return resolveWorkshopMaterialRegion(recipe, region);
+}
+
+function configurePresetTexture(texture, preset, kind) {
+  texture.colorSpace = kind === 'albedo' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.center.set(0.5, 0.5);
+  texture.repeat.set(preset.repeat, preset.repeat);
+  texture.rotation = THREE.MathUtils.degToRad(preset.rotation);
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function presetTexture(recipe, preset, kind, cache) {
+  if (typeof Image === 'undefined') return null;
+  const sourceId = preset.sources?.[kind];
+  const source = recipe.materialLibrary.sources[sourceId];
+  if (!source) return null;
+  const key = `${kind}|${sourceId}|${preset.mapping}|${preset.repeat}|${preset.rotation}`;
+  if (!cache.has(key)) {
+    if (cache.size >= MAX_PRESET_TEXTURE_CACHE) return null;
+    const image = new Image();
+    const texture = new THREE.Texture(image);
+    image.addEventListener('load', () => {
+      texture.needsUpdate = true;
+    }, { once: true });
+    image.src = source.dataUrl;
+    texture.name = `workshop-pbr-${sourceId}`;
+    texture.userData.sharedSurface = true;
+    cache.set(key, configurePresetTexture(texture, preset, kind));
+  }
+  return cache.get(key);
+}
+
+function applyPreset(material, preset, recipe, textureCache) {
+  if (!preset) return material;
+  const result = material.clone();
+  result.color.set(preset.baseColor).multiply(new THREE.Color(preset.tint));
+  result.roughness = preset.roughness;
+  result.metalness = preset.metalness;
+  if (result.normalScale?.setScalar) result.normalScale.setScalar(preset.normalStrength);
+  if ('bumpScale' in result) result.bumpScale = preset.heightStrength;
+  const albedo = presetTexture(recipe, preset, 'albedo', textureCache);
+  const normal = presetTexture(recipe, preset, 'normal', textureCache);
+  const orm = presetTexture(recipe, preset, 'orm', textureCache);
+  const height = presetTexture(recipe, preset, 'height', textureCache);
+  if (albedo) result.map = albedo;
+  if (normal) result.normalMap = normal;
+  if (height) result.bumpMap = height;
+  if (orm) {
+    result.roughnessMap = orm;
+    result.metalnessMap = orm;
+  }
+  result.userData = {
+    ...material.userData,
+    workshopPresetId: preset.id,
+    workshopMaterialFamily: preset.family,
+  };
+  return result;
+}
+
+function resolveEntryMaterials(entries, components, recipe) {
+  const cache = new Map();
+  for (const entry of entries) {
+    const component = components.get(entry.componentId);
+    entry.materialRegion = materialRegion(
+      component,
+      entry.slot,
+      recipe,
+      entry.sourceMaterialRegion,
+    );
+    const preset = entry.materialRegion.preset;
+    if (!preset) continue;
+    const key = `${entry.slot}|${preset.id}`;
+    if (!cache.has(key)) {
+      cache.set(key, applyPreset(entry.material, preset, recipe, PRESET_TEXTURE_CACHE));
+    }
+    entry.material = cache.get(key);
+  }
+  const drawPartKeys = new Set(entries.map((entry) => (
+    `${entry.slot}|${entry.materialRegion.presetId ?? 'inherited'}`
+  )));
+  if (drawPartKeys.size > MAX_WORKSHOP_MATERIAL_DRAW_PARTS) {
+    for (const material of cache.values()) material.dispose();
+    throw new Error(
+      `This selection would use ${drawPartKeys.size} material draw parts; `
+      + `the workshop limit is ${MAX_WORKSHOP_MATERIAL_DRAW_PARTS}.`,
+    );
+  }
+  return cache;
 }
 
 function unionBounds(entries) {
@@ -410,7 +524,9 @@ function classifyComponents(entries, recipe) {
     const structure = nearestStructure(entry, structures);
     let definition = structure;
     if (entry.slot === 'foliage') {
-      definition = childDefinition(structure, 'foliage', 'Ivy and plants', 'foliage');
+      definition = entry.semanticHint?.kind === 'ivy'
+        ? childDefinition(structure, 'ivy', 'Climbing ivy', 'foliage')
+        : childDefinition(structure, 'foliage', 'Plants and flower boxes', 'foliage');
     } else if (entry.slot === 'roof') {
       definition = childDefinition(structure, 'roof', 'Roof', 'roof');
     } else if (entry.slot === 'wood' || entry.slot === 'recess') {
@@ -538,10 +654,11 @@ function disposeBuiltGeometries(parts) {
 function buildPreviewParts(entries, components, remesh) {
   const groups = new Map();
   for (const entry of entries) {
-    const key = `${entry.componentId}|${entry.slot}`;
+    const key = `${entry.materialRegion.id}|${entry.slot}|${entry.materialRegion.presetId ?? ''}`;
     const group = groups.get(key) ?? {
       component: components.get(entry.componentId),
       material: entry.material,
+      materialRegion: entry.materialRegion,
       geometries: [],
     };
     entry.geometry.translate(
@@ -566,6 +683,7 @@ function buildPreviewParts(entries, components, remesh) {
           material: group.material,
           matrix: new THREE.Matrix4(),
           component: metadata,
+          materialRegion: group.materialRegion,
         });
       } else {
         for (const geometry of group.geometries) {
@@ -574,6 +692,7 @@ function buildPreviewParts(entries, components, remesh) {
             material: group.material,
             matrix: new THREE.Matrix4(),
             component: metadata,
+            materialRegion: group.materialRegion,
           });
         }
       }
@@ -591,12 +710,14 @@ function buildRuntimeParts(entries, components, remesh) {
   for (const entry of entries) {
     const component = components.get(entry.componentId);
     entry.geometry.applyMatrix4(componentGeometryMatrix(component, components, worldMatrices));
-    const group = groups.get(entry.slot) ?? {
+    const key = `${entry.slot}|${entry.materialRegion.presetId ?? 'inherited'}`;
+    const group = groups.get(key) ?? {
       material: entry.material,
+      materialRegion: entry.materialRegion,
       geometries: [],
     };
     group.geometries.push(entry.geometry);
-    groups.set(entry.slot, group);
+    groups.set(key, group);
   }
 
   const parts = [];
@@ -610,10 +731,16 @@ function buildRuntimeParts(entries, components, remesh) {
           ),
           material: group.material,
           matrix: new THREE.Matrix4(),
+          materialRegion: group.materialRegion,
         });
       } else {
         for (const geometry of group.geometries) {
-          parts.push({ geometry, material: group.material, matrix: new THREE.Matrix4() });
+          parts.push({
+            geometry,
+            material: group.material,
+            matrix: new THREE.Matrix4(),
+            materialRegion: group.materialRegion,
+          });
         }
       }
     }
@@ -624,17 +751,37 @@ function buildRuntimeParts(entries, components, remesh) {
   }
 }
 
-function attachMetadata(parts, rawStats, components) {
+function attachMetadata(parts, rawStats, components, plan) {
+  const materialRegions = [...new Map(parts
+    .filter((part) => part.materialRegion)
+    .map((part) => [part.materialRegion.id, part.materialRegion])).values()]
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const materialCount = new Set(parts.map((part) => part.material)).size;
+  const sourceBytes = Object.values(plan.recipe.materialLibrary?.sources ?? {})
+    .reduce((total, source) => total + Math.floor(source.dataUrl.length * 0.75), 0);
+  const textureCount = new Set(parts.flatMap((part) => (
+    Object.values(part.material).filter((value) => value?.isTexture)
+  ))).size;
   const stats = Object.freeze({
     ...rawStats,
     drawParts: parts.length,
     components: components.size,
+    materialCount,
+    materialRegions: materialRegions.length,
+    textureMemoryBytes: textureCount * 512 * 512 * 4,
+    sourceBytes,
   });
   Object.defineProperty(parts, 'stats', { value: stats, enumerable: false });
   Object.defineProperty(parts, 'components', {
     value: Object.freeze([...components.values()].map(componentMetadata)),
     enumerable: false,
   });
+  Object.defineProperty(parts, 'materialRegions', {
+    value: Object.freeze(materialRegions),
+    enumerable: false,
+  });
+  Object.defineProperty(parts, 'plan', { value: plan, enumerable: false });
+  Object.defineProperty(parts, 'semantics', { value: plan.rpg, enumerable: false });
   return Object.freeze(parts);
 }
 
@@ -642,19 +789,42 @@ export function createProceduralWorkshopComponentParts(input, {
   preserveComponents = false,
 } = {}) {
   const recipe = normalizeProceduralRecipe(input);
-  const rawParts = createProceduralWorkshopParts({
-    ...recipe,
-    remesh: false,
-  });
+  const rawParts = recipe.composition.primitives.length > 0
+    ? createWorkshopCompositionParts(recipe)
+    : createProceduralWorkshopParts({
+      ...recipe,
+      remesh: false,
+    });
+  let resolvedMaterials = new Map();
   try {
     const entries = rawParts.map(geometryEntry);
     const components = classifyComponents(entries, recipe);
+    resolvedMaterials = resolveEntryMaterials(entries, components, recipe);
+    const plan = planWorkshopComposition(recipe);
     const parts = preserveComponents
       ? buildPreviewParts(entries, components, recipe.remesh)
       : buildRuntimeParts(entries, components, recipe.remesh);
-    return attachMetadata(parts, rawParts.stats, components);
+    const usedMaterials = new Set(parts.map((part) => part.material));
+    new Set(rawParts.map((part) => part.material)).forEach((material) => {
+      if (!usedMaterials.has(material)) material.dispose();
+    });
+    return attachMetadata(parts, rawParts.stats, components, plan);
   } catch (error) {
+    for (const material of resolvedMaterials.values()) material.dispose();
     disposeModelParts(rawParts);
     throw error;
   }
+}
+
+export function buildWorkshopProducts(plan, quality = {}) {
+  if (!plan || typeof plan !== 'object' || !plan.recipe) {
+    throw new Error('A workshop composition plan is required.');
+  }
+  const detail = quality.detail ?? plan.recipe.detail;
+  return createProceduralWorkshopComponentParts({
+    ...plan.recipe,
+    ...(detail === undefined ? {} : { detail }),
+  }, {
+    preserveComponents: quality.preview === true || quality.preserveComponents === true,
+  });
 }

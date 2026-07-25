@@ -98,14 +98,40 @@ export class ForestSpeciesRegistry {
     return indices?.length > 0 ? indices : this.prototypeIndexBySpecies.fallback;
   }
 
+  /**
+   * Weights a palette by how much each species wants to be near water. Species
+   * with `waterAffinity > 0` gain share on wet ground and lose it on dry, and the
+   * reverse for negative affinity, so a shoreline reads as willow-and-alder while
+   * the slope behind it stays coniferous. Uniform when the habitat carries no
+   * riparian signal, which keeps the pre-water behaviour for callers that pass a
+   * bare habitat.
+   */
+  paletteWeights(usable, habitat) {
+    const wetness = Number.isFinite(habitat.riparian)
+      ? Math.min(1, Math.max(0, habitat.riparian))
+      : 0;
+    if (wetness <= 0) return usable.map(() => 1);
+    return usable.map((id) => {
+      const affinity = this.species.get(id).waterAffinity;
+      return Math.max(0.05, 1 + affinity * wetness * 2);
+    });
+  }
+
   select(candidate, habitat) {
     const configured = this.palettes[habitat.profileKey] ?? ['broadleaf_round'];
     const palette = configured.filter((id) => this.species.has(id));
     const usable = palette.length > 0 ? palette : ['broadleaf_round'];
-    const speciesIndex = Math.min(
-      usable.length - 1,
-      Math.floor(stableUnit(candidate.stableId, 41) * usable.length),
-    );
+    const weights = this.paletteWeights(usable, habitat);
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    let roll = stableUnit(candidate.stableId, 41) * total;
+    let speciesIndex = usable.length - 1;
+    for (let index = 0; index < usable.length; index += 1) {
+      roll -= weights[index];
+      if (roll < 0) {
+        speciesIndex = index;
+        break;
+      }
+    }
     const speciesId = usable[speciesIndex];
     const species = this.species.get(speciesId);
     const ageClass = weightedAge(

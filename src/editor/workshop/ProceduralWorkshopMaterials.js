@@ -352,6 +352,7 @@ export function createWorkshopMaterials(recipe) {
       color: '#4c8a37',
       roughness: 0.9,
       metalness: 0,
+      side: THREE.DoubleSide,
     }), 'foliage'),
     recess: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
       color: '#233b43',

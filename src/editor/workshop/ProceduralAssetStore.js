@@ -10,10 +10,18 @@ import {
   normalizeOpeningAttachments,
   serializeOpeningAttachments,
 } from './ProceduralWorkshopOpeningAttachments.js';
+import {
+  normalizeWorkshopComposition,
+  serializeWorkshopComposition,
+} from './ProceduralWorkshopComposition.js';
+import {
+  normalizeWorkshopMaterialDocument,
+  serializeWorkshopMaterialDocument,
+} from './ProceduralWorkshopMaterialConfig.js';
 
-const ASSET_VERSION = 3;
+const ASSET_VERSION = 4;
 const MAX_ASSETS = 32;
-const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, ASSET_VERSION]);
+const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, 3, ASSET_VERSION]);
 const VALID_ARCHETYPES = new Set(['wall', 'gatehouse', 'tower', 'square-tower', 'manor']);
 const VALID_STYLES = new Set(['granite', 'limestone', 'sandstone']);
 const VALID_TOP_STYLES = new Set(['battlements', 'slate', 'terracotta']);
@@ -113,6 +121,8 @@ export function normalizeProceduralRecipe(input = {}) {
     throw new Error(`Unknown workshop tower position: ${towerSide}.`);
   }
 
+  const surfaceTextures = normalizeSurfaceTextures(source.surfaceTextures);
+  const materialDocument = normalizeWorkshopMaterialDocument(source, { surfaceTextures });
   return Object.freeze({
     archetype,
     style,
@@ -137,7 +147,9 @@ export function normalizeProceduralRecipe(input = {}) {
     ivy: optionalBoolean(source.ivy, 'Procedural ivy', false),
     remesh: optionalBoolean(source.remesh, 'Remeshing', true),
     albedo: optionalBoolean(source.albedo, 'Procedural albedo', true),
-    surfaceTextures: normalizeSurfaceTextures(source.surfaceTextures),
+    composition: normalizeWorkshopComposition(source.composition),
+    surfaceTextures,
+    ...materialDocument,
     componentTransforms: normalizeComponentTransforms(source.componentTransforms),
     openingAttachments: normalizeOpeningAttachments(source.openingAttachments),
   });
@@ -241,6 +253,10 @@ export class ProceduralAssetStore {
       recipe: {
         ...record.recipe,
         surfaceTextures: serializeSurfaceTextures(record.recipe.surfaceTextures),
+        composition: serializeWorkshopComposition(record.recipe.composition),
+        ...serializeWorkshopMaterialDocument(record.recipe, {
+          surfaceTextures: record.recipe.surfaceTextures,
+        }),
         componentTransforms: serializeComponentTransforms(record.recipe.componentTransforms),
         openingAttachments: serializeOpeningAttachments(record.recipe.openingAttachments),
       },

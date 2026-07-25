@@ -52,8 +52,15 @@ test('workshop preview exposes semantic components with structure ownership', ()
     assert.ok([...components.values()].some((component) => component.kind === 'roof'));
     assert.ok([...components.values()].some((component) => component.kind === 'door'));
     assert.ok([...components.values()].some((component) => component.kind === 'window'));
+    assert.ok([...components.values()].some((component) => (
+      component.label.toLowerCase().includes('climbing ivy')
+    )));
     assert.ok(parts.every((part) => part.component?.id));
     assert.equal(parts.stats.components, components.size);
+    assert.ok(parts.materialRegions.length > 0);
+    assert.equal(parts.stats.materialRegions, parts.materialRegions.length);
+    assert.ok(parts.every((part) => part.materialRegion?.id));
+    assert.ok(parts.semantics);
 
     for (const component of components.values()) {
       if (component.kind === 'structure') {

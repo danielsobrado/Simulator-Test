@@ -327,6 +327,7 @@ export class StylizedSurfaceView {
   dispose() {
     this.skyView?.dispose();
     this.flowerView?.dispose();
+    this.bushView?.dispose();
     this.treeView?.dispose();
     this.rockView?.dispose();
     if (this.sharedScenePath) {
@@ -339,6 +340,7 @@ export class StylizedSurfaceView {
     this.flowerBuildQueue.clear();
     this.treeBuildQueue.clear();
     this.rockBuildQueue.clear();
+    this.bushBuildQueue.clear();
     for (const slot of this.waterSlots) slot.dispose();
     this.waterSlots.length = 0;
     for (const slot of this.slots) slot.dispose();

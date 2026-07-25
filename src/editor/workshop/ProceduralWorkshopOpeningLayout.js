@@ -16,7 +16,10 @@ function openingForPlacement(recipe, source, componentId, host, attachment = nul
     0.24,
     Math.max(0.24, host.width * 0.42),
   );
-  const radiusRatio = source.radius / Math.max(0.01, source.width);
+  const radiusRatio = Math.max(
+    0.5,
+    source.radius / Math.max(0.01, source.width),
+  );
   const radius = Math.max(0.1, width * radiusRatio);
   const springHeight = clamp(
     source.springHeight * transform.scale[1],

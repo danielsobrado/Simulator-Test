@@ -21,9 +21,31 @@ import {
   createSurfaceMaskConfig,
   enrichPageRenderPixels,
 } from './world/ChunkRenderPixels.js';
+import { TileDistanceField } from './stylized/forest/TileDistanceField.js';
 
 const PICK_ITERATIONS = 6;
 const PREVIEW_HEIGHT_OFFSET = 0.08;
+
+/**
+ * Riparian distance source for the forest habitat field. `rangeMeters` bounds the
+ * halo the chamfer pass has to cover, so it must be at least the widest water
+ * range any biome profile tests; beyond it, distance reads as Infinity, which
+ * every profile treats as "no water nearby".
+ */
+function createWaterDistanceField(terrainView, stylizedConfig) {
+  const rangeMeters = Number(stylizedConfig?.trees?.habitat?.waterRangeMeters) || 0;
+  if (rangeMeters <= 0) return null;
+  const tileSize = terrainView.worldStore.tileSize;
+  return new TileDistanceField({
+    tileAt: (cellX, cellZ) => terrainView.tileMap.get(cellX, cellZ),
+    tileSize,
+    chunkSize: terrainView.worldStore.chunkSize,
+    targetTileId: stylizedConfig?.water?.tileId ?? 0,
+    maxCells: Math.ceil(rangeMeters / tileSize),
+    label: 'water',
+    revisionProvider: () => terrainView.worldStore.revision,
+  });
+}
 
 function createSlot({ slotIndex, scene, geometry, worldStore, stylizedConfig }) {
   const chunkSize = worldStore.chunkSize;
@@ -145,6 +167,7 @@ export class InfiniteTerrainView {
     this.surfaceMaskConfig = createSurfaceMaskConfig(stylizedConfig);
     this.chunkSize = worldStore.chunkSize;
     this.chunkWorldSize = this.chunkSize * worldStore.tileSize;
+    this.waterDistanceField = createWaterDistanceField(this, stylizedConfig);
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -632,6 +655,17 @@ export class InfiniteTerrainView {
     const cellX = worldX / this.worldStore.tileSize;
     const cellZ = -worldZ / this.worldStore.tileSize;
     return this.heightField.sample(cellX, cellZ);
+  }
+
+  /**
+   * World-unit distance to the nearest water tile, or Infinity past the
+   * configured range. Backs the riparian term in the forest habitat field, which
+   * accepts this as an optional provider. Measured from the canonical tile map so
+   * it cannot vary with chunk residency or approach direction.
+   */
+  getCanonicalWaterDistance(worldX, worldZ) {
+    if (!this.waterDistanceField) return Number.POSITIVE_INFINITY;
+    return this.waterDistanceField.worldDistanceAt(worldX, worldZ);
   }
 
   setPreview(cell, brushSize, color) {

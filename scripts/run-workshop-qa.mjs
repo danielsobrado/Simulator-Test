@@ -242,6 +242,36 @@ async function visibleHostCoverage(page) {
   });
 }
 
+async function frameSemanticComponent(page, kind) {
+  const framed = await page.evaluate((componentKind) => {
+    const workshop = window.__editor.proceduralWorkshop;
+    const controller = workshop.componentController;
+    const group = [...controller.groups.values()].find((candidate) => {
+      const component = candidate.userData?.workshopComponent;
+      return component?.kind === componentKind
+        || component?.id?.endsWith(`-${componentKind}`)
+        || component?.label?.toLowerCase().includes(componentKind);
+    });
+    if (!group) return false;
+    const bounds = new window.__THREE_QA__.Box3().setFromObject(group);
+    if (bounds.isEmpty()) return false;
+    const center = bounds.getCenter(new window.__THREE_QA__.Vector3());
+    const size = bounds.getSize(new window.__THREE_QA__.Vector3());
+    const distance = Math.max(1.8, Math.max(size.x, size.y) * 2.35);
+    workshop.controls.target.copy(center);
+    workshop.camera.position.set(center.x, center.y + size.y * 0.06, center.z + distance);
+    workshop.camera.near = 0.05;
+    workshop.camera.far = 100;
+    workshop.camera.updateProjectionMatrix();
+    workshop.controls.update();
+    return true;
+  }, kind);
+  assert.ok(framed, `Framing failure: no ${kind} semantic component was generated.`);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(
+    () => requestAnimationFrame(resolve),
+  )));
+}
+
 async function clickDom(page, selector) {
   await page.locator(selector).evaluate((element) => {
     if (element.disabled) {
@@ -271,6 +301,61 @@ async function selectOpening(page, { kind = null, id = null } = {}) {
     window.__editor.proceduralWorkshop.componentController.selectedComponentId === expectedId
   ), componentId);
   return componentId;
+}
+
+async function dragBoundaryHandle(page, componentId, axis, side, pixels = 110) {
+  await page.evaluate((selectedId) => {
+    window.__editor.proceduralWorkshop.componentController.selectComponent(selectedId);
+  }, componentId);
+  await page.waitForFunction((expectedId) => (
+    window.__editor.proceduralWorkshop.componentController.selectedComponentId === expectedId
+  ), componentId);
+  const drag = await page.evaluate(({ requestedAxis, requestedSide, distance }) => {
+    const workshop = window.__editor.proceduralWorkshop;
+    const controller = workshop.componentController;
+    controller.updateSelectionHelper();
+    const index = controller.handleMetadata.findIndex(({ axis, side }) => (
+      axis === requestedAxis && side === requestedSide
+    ));
+    if (index < 0) return null;
+    const handle = controller.handleMetadata[index];
+    const projected = controller.projectedAxis(handle.position, handle.direction);
+    const bounds = workshop.renderer.domElement.getBoundingClientRect();
+    const clip = handle.position.clone().project(workshop.camera);
+    return projected
+      ? {
+        start: {
+          x: bounds.left + (clip.x + 1) * bounds.width * 0.5,
+          y: bounds.top + (1 - clip.y) * bounds.height * 0.5,
+        },
+        end: {
+          x: bounds.left + (clip.x + 1) * bounds.width * 0.5 + projected.screenX * distance,
+          y: bounds.top + (1 - clip.y) * bounds.height * 0.5 + projected.screenY * distance,
+        },
+      }
+      : null;
+  }, { requestedAxis: axis, requestedSide: side, distance: pixels });
+  assert.ok(drag, `Expected a visible ${axis.toUpperCase()} boundary arrow for ${componentId}.`);
+  const pointerTarget = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    return element
+      ? `${element.tagName}.${element.className || ''}`
+      : 'none';
+  }, drag.start);
+  await page.mouse.move(drag.start.x, drag.start.y);
+  await page.mouse.down();
+  const started = await page.evaluate(() => Boolean(
+    window.__editor.proceduralWorkshop.componentController.boundaryDrag,
+  ));
+  assert.ok(
+    started,
+    `Pointer-down should grab the ${axis.toUpperCase()} boundary arrow (target: ${pointerTarget}).`,
+  );
+  await page.mouse.move(drag.end.x, drag.end.y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForFunction(() => (
+    !window.__editor.proceduralWorkshop.componentController.boundaryDrag
+  ));
 }
 
 async function waitForAttachmentCount(page, expectedCount) {
@@ -392,7 +477,35 @@ async function runPlanarScenario(page, report) {
   console.log('Workshop QA · planar · generating square keep');
   await setArchetype(page, 'square-tower');
   await setQaCamera(page, [0, 6.5, 19]);
+
+  console.log('Workshop QA · planar · direct boundary reshape');
+  await dragBoundaryHandle(page, 'structure-main', 'x', 1);
+  const reshaped = await page.evaluate(() => (
+    window.__editor.proceduralWorkshop.componentController.toDocument()['structure-main']
+  ));
+  assert.ok(reshaped?.scale[0] > 1, 'Dragging the right edge arrow should increase structure width.');
+  assert.ok(reshaped?.position[0] > 0, 'One-sided resize should move the pivot to anchor the left edge.');
+  await captureCheckpoint(page, report, '00-planar-boundary-reshape');
+  await clickDom(page, '[data-component-action="undo"]');
+  await page.waitForFunction(() => (
+    !window.__editor.proceduralWorkshop.componentController.toDocument()['structure-main']
+  ));
+
   const sourceId = await selectOpening(page, { kind: 'window' });
+  await page.keyboard.down('Shift');
+  await dragBoundaryHandle(page, sourceId, 'y', 1, 140);
+  await page.keyboard.up('Shift');
+  await waitForFinalPreview(page, 'square-tower');
+  const resizedOpening = await page.evaluate((componentId) => (
+    window.__editor.proceduralWorkshop.componentController.toDocument()[componentId]
+  ), sourceId);
+  assert.ok(
+    resizedOpening?.scale[1] > 1,
+    'Facade opening boundary arrows should persist a topology-driven height edit.',
+  );
+  await clickDom(page, '[data-component-action="undo"]');
+  await waitForFinalPreview(page, 'square-tower');
+  await setQaCamera(page, [0, 6.5, 19]);
 
   console.log('Workshop QA · planar · scanning and committing pointer placement');
   await beginPlacement(page);
@@ -467,6 +580,8 @@ async function runPlanarScenario(page, report) {
   );
 
   report.assertions.push(
+    'direct boundary-arrow drag expanded one edge while anchoring its opposite',
+    'facade opening boundary resize survived topology regeneration and undo',
     'planar pointer placement committed to structure-main',
     'duplicate and repeat created deterministic copies',
     'undo, redo, and delete-copy restored the expected attachment counts',
@@ -682,6 +797,13 @@ async function runMaterialScenario(page, report) {
     beforeCancel.material.overrides,
     'Escape must restore the authored appearance without mutation.',
   );
+  await page.evaluate(() => {
+    const workshop = window.__editor.proceduralWorkshop;
+    workshop.materialController.setActive(false);
+    workshop.materialController.inspector.hidden = true;
+  });
+  await frameSemanticComponent(page, 'ivy');
+  await captureCheckpoint(page, report, '09-procedural-ivy-component');
   report.assertions.push(
     'material hover selected a complete semantic region',
     'radial palette stayed within viewport bounds',
@@ -689,6 +811,7 @@ async function runMaterialScenario(page, report) {
     'keyboard navigation committed one undoable full-PBR override',
     'advanced inspector persisted an imported linear normal source',
     'Escape cancelled preview without mutation',
+    'procedural ivy remained a bounded editable semantic component',
   );
 }
 

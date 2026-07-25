@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { vec3 } from 'three/tsl';
+import { attribute, vec3 } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { instanceCapacity } from './scatterMath.js';
 import { buildStableChunkManifest, placementSignature } from './StableScatterManifest.js';
@@ -14,6 +14,7 @@ import { createForestBushPrototypeGeometry } from './forest/ForestBushGeometry.j
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { forestFloorDensity } from './forest/ForestFloor.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
+import { createPathClearanceField } from './TreeManifestStore.js';
 
 const BUSH_CLUSTER_SEED_OFFSET = 0x5b;
 const BUSH_PRIORITY_CHANNEL = 31;
@@ -42,7 +43,7 @@ function createMaterial(color, doubleSided) {
   const material = new THREE.MeshLambertNodeMaterial({
     side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });
-  material.colorNode = vec3(value.r, value.g, value.b);
+  material.colorNode = vec3(value.r, value.g, value.b).mul(attribute('color', 'vec3'));
   material.flatShading = true;
   return material;
 }
@@ -94,6 +95,7 @@ export class StylizedBushView {
       slopeSampleDistance: this.config.trees.habitat?.slopeSampleDistance ?? 4,
       config: bushes,
     });
+    this.pathClearance = createPathClearanceField(this.terrainView, this.config);
 
     const generated = createForestBushPrototypeGeometry();
     this.prototypes = generated.map((prototype, index) => ({
@@ -102,7 +104,7 @@ export class StylizedBushView {
         index === 0 ? bushes.colorLarge : (index === 1 ? bushes.colorSmall : bushes.colorFern),
         prototype.doubleSided,
       ),
-      kind: 'leaf',
+      kind: 'bush',
       height: prototype.height,
       prototypeId: prototype.prototypeId,
     }));
@@ -119,7 +121,7 @@ export class StylizedBushView {
       partsByPrototype,
       capacity,
       name: 'stylized-bush-near',
-      castShadow: false,
+      castShadow: true,
     });
     this.proxyMeshes = createInstancedRenderers({
       root: this.root,
@@ -140,7 +142,9 @@ export class StylizedBushView {
     const bushes = this.config.bushes;
     const forestFloorConfig = this.config.trees.forestFloor ?? {};
     const edgeAffinity = Number.isFinite(bushes.edgeAffinity) ? bushes.edgeAffinity : 0.45;
+    const blocksPath = this.pathClearance?.exclusion();
     return (candidate) => {
+      if (blocksPath?.(candidate)) return null;
       const cluster = this.clusterField.sample(candidate.x, candidate.z);
       if (cluster.density <= 0) return null;
       const forestField = this.forestFieldProvider?.();
@@ -169,6 +173,7 @@ export class StylizedBushView {
       this.prototypes.length,
       this.clusterField.signature,
       this.forestFieldProvider?.()?.signature ?? 'uniform',
+      this.pathClearance?.signature ?? 'nopath',
       blockers.signature,
     ].join('|');
     const cacheKey = `${chunkX}:${chunkZ}`;

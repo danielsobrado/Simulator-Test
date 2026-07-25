@@ -14,6 +14,9 @@ const DEFAULT_PROFILE_DEFINITIONS = Object.freeze({
     elevationFade: 10,
     preferredSlope: 0.45,
     maximumSlope: 1.2,
+    // Sparse groves on open savanna, thickening into gallery woodland along water.
+    riparianCoverage: 0.55,
+    riparianRange: 44,
   }),
   4: Object.freeze({
     key: 'grassland',
@@ -30,6 +33,9 @@ const DEFAULT_PROFILE_DEFINITIONS = Object.freeze({
     elevationFade: 10,
     preferredSlope: 0.5,
     maximumSlope: 1.3,
+    // Rare copses inland; river woods and windbreaks follow the watercourses.
+    riparianCoverage: 0.62,
+    riparianRange: 52,
   }),
   5: Object.freeze({
     key: 'tropical_seasonal_forest',
@@ -126,6 +132,9 @@ const DEFAULT_PROFILE_DEFINITIONS = Object.freeze({
     elevationFade: 12,
     preferredSlope: 0.6,
     maximumSlope: 1.5,
+    // Stunted tundra trees cling to sheltered, damp ground.
+    riparianCoverage: 0.34,
+    riparianRange: 30,
   }),
   12: Object.freeze({
     key: 'wetland',
@@ -142,6 +151,10 @@ const DEFAULT_PROFILE_DEFINITIONS = Object.freeze({
     elevationFade: 5,
     preferredSlope: 0.22,
     maximumSlope: 0.65,
+    // Wetland stands are islands near open water, not a continuous swamp forest,
+    // so this one genuinely suppresses away from the shore rather than boosting.
+    waterMaximum: 70,
+    waterFade: 26,
   }),
 });
 
@@ -195,6 +208,14 @@ function normalizeProfile(tileId, value) {
     waterMinimum: finite(profile.waterMinimum, Number.NEGATIVE_INFINITY),
     waterMaximum: finite(profile.waterMaximum, Number.POSITIVE_INFINITY),
     waterFade: Math.max(0.001, finite(profile.waterFade, 8)),
+    // Riparian corridors are their own spatial structure: they follow the water,
+    // not the upland patch field. `riparianCoverage` is the patch coverage a
+    // shoreline gets in its own right, easing to zero by `riparianRange`, and it
+    // competes with the patch field rather than scaling it — a multiplier could
+    // never create gallery woodland where the patch field says "no patch here".
+    // Zero by default, so profiles that do not opt in are unchanged.
+    riparianCoverage: clamp(finite(profile.riparianCoverage, 0), 0, 1),
+    riparianRange: Math.max(0.001, finite(profile.riparianRange, 40)),
   });
 }
 
@@ -233,6 +254,8 @@ export function forestProfileSignature(profiles) {
       profile.waterMinimum,
       profile.waterMaximum,
       profile.waterFade,
+      profile.riparianCoverage,
+      profile.riparianRange,
     ]);
   return JSON.stringify(values);
 }

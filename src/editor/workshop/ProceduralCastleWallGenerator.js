@@ -3,8 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { disposeModelParts } from '../assets/modelParts.js';
 import {
   beveledBox,
-  leaf,
 } from './ProceduralWorkshopGeometry.js';
+import { buildProceduralFacadeIvy } from './ProceduralWorkshopIvy.js';
 import {
   applyStoneColor,
   createWorkshopMaterials,
@@ -60,15 +60,19 @@ function addStone(target, recipe, params, stableIndex, heightRatio) {
   const rotation = params.rotation ?? [0, 0, 0];
   const shaped = {
     ...params,
-    width: params.width * (1 + signed(0) * 0.018),
-    height: params.height * (1 + signed(8) * 0.014),
-    depth: params.depth * (1 + signed(16) * 0.022),
+    width: params.width * (1 + signed(0) * 0.026),
+    height: params.height * (1 + signed(8) * 0.021),
+    depth: params.depth * (1 + signed(16) * 0.038),
     rotation: [
       rotation[0] + signed(4) * 0.006,
       rotation[1] + signed(12) * 0.008,
-      rotation[2] + signed(20) * 0.006,
+      rotation[2] + signed(20) * 0.011,
     ],
-    bevelRatio: params.bevelRatio ?? (0.048 + ((variation >>> 24) & 15) / 15 * 0.022),
+    bevelRatio: params.bevelRatio ?? (0.06 + ((variation >>> 24) & 15) / 15 * 0.03),
+    skew: params.skew ?? [
+      signed(6) * params.width * 0.022,
+      signed(14) * params.width * 0.018,
+    ],
   };
   target.push(applyStoneColor(
     beveledBox({ ...shaped, detail: recipe.detail }),
@@ -284,26 +288,13 @@ function buildBattlements(sets, recipe) {
 }
 
 function buildIvy(sets, recipe) {
-  if (!recipe.ivy) return;
-  const random = createRandom(mixSeed(recipe.seed, 970));
-  const clusterCount = 24 + recipe.detail * 9;
-  const anchorX = (random() < 0.5 ? -1 : 1) * recipe.width * (0.26 + random() * 0.14);
-
-  for (let index = 0; index < clusterCount; index += 1) {
-    const progress = index / Math.max(1, clusterCount - 1);
-    const x = anchorX + Math.sin(progress * 9 + recipe.seed * 0.01) * recipe.width * 0.07;
-    const localTop = getCastleWallTopHeight(recipe, x);
-    const y = 0.18 + progress * localTop * (0.58 + random() * 0.18);
-    sets.foliage.push(leaf({
-      radius: 0.085 + random() * 0.065,
-      position: [
-        x + (random() - 0.5) * 0.35,
-        y,
-        recipe.depth / 2 + 0.09 + random() * 0.035,
-      ],
-      rotation: [random() * 0.7, random() * 0.6, random() * Math.PI],
-    }));
-  }
+  sets.foliage.push(...buildProceduralFacadeIvy(recipe, {
+    width: recipe.width,
+    height: recipe.height,
+    frontZ: recipe.depth / 2 + 0.09,
+    seedOffset: 970,
+    topAtX: (x) => getCastleWallTopHeight(recipe, x),
+  }));
 }
 
 function disposeMaterial(material) {

@@ -72,7 +72,10 @@ async function startEditor() {
     ? (() => {
       const skyRadius = farTerrainRadius + config.world.floatingOriginThreshold + 8000;
       // FogExp2 ~10% visibility at the backdrop radius, so its far edge fades.
-      return { farPlane: skyRadius + 4000, skyRadius, fogDensity: 1.5 / farTerrainRadius };
+      // farDensityScale tunes how hard that far edge goes; the far-terrain
+      // material layers its own aerial perspective on top of this.
+      const densityScale = config.stylizedSurface?.sky?.aerial?.farDensityScale ?? 1.5;
+      return { farPlane: skyRadius + 4000, skyRadius, fogDensity: densityScale / farTerrainRadius };
     })()
     : null;
 

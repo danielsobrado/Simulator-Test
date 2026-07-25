@@ -21,14 +21,18 @@ import {
   nextOpeningCopyId,
   serializeOpeningAttachments,
 } from './ProceduralWorkshopOpeningAttachments.js';
+import { solveWorkshopBoundaryResize } from './ProceduralWorkshopBoundaryResize.js';
 
 const POINTER_SELECT_DISTANCE = 5;
 const COMPONENT_POSITION_LIMIT = WORKSHOP_COMPONENT_TRANSFORM_LIMITS.position;
 const SELECTION_COLOR = 0xf0d675;
 const INFERENCE_COLOR = 0x7de0cf;
 const HANDLE_COLOR = 0xf3d879;
+const HANDLE_HOVER_COLOR = 0xfff3bd;
 const INFERENCE_THRESHOLD = 0.08;
 const MAX_HISTORY = 80;
+const HANDLE_COUNT = 6;
+const POSITIVE_Y = new THREE.Vector3(0, 1, 0);
 const COMPONENT_KIND_ORDER = Object.freeze({
   structure: 0,
   roof: 1,
@@ -123,23 +127,43 @@ function createInferenceHelper() {
 }
 
 function createArchitecturalHandleHelper() {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(21), 3));
-  geometry.setDrawRange(0, 0);
-  const helper = new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      color: HANDLE_COLOR,
-      size: 0.18,
-      sizeAttenuation: true,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.95,
-    }),
-  );
+  const helper = new THREE.Group();
   helper.name = 'workshop-architectural-handles';
   helper.visible = false;
-  helper.renderOrder = 1001;
+  for (let index = 0; index < HANDLE_COUNT; index += 1) {
+    const handle = new THREE.Group();
+    handle.name = `workshop-boundary-handle-${index}`;
+    handle.visible = false;
+
+    const material = new THREE.MeshBasicMaterial({
+      color: HANDLE_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.98,
+    });
+    const collar = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 6), material);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.38, 10), material);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 12), material);
+    shaft.position.y = 0.24;
+    tip.position.y = 0.59;
+    handle.add(collar, shaft, tip);
+
+    const hitTarget = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.82, 8),
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    );
+    hitTarget.position.y = 0.32;
+    hitTarget.name = 'workshop-boundary-handle-hit-target';
+    handle.add(hitTarget);
+    handle.userData.workshopHandleMaterial = material;
+    for (const child of handle.children) child.renderOrder = 1001;
+    helper.add(handle);
+  }
   return helper;
 }
 
@@ -250,6 +274,9 @@ export class ProceduralWorkshopComponentController {
     this.dragStartTransforms = null;
     this.dragging = false;
     this.pointerStart = null;
+    this.boundaryDrag = null;
+    this.hoveredBoundaryHandle = null;
+    this.externalInteractionActive = false;
     this.attachmentMode = false;
     this.attachmentPreview = null;
     this.raycaster = new THREE.Raycaster();
@@ -279,6 +306,14 @@ export class ProceduralWorkshopComponentController {
             <option value="local">Local</option>
           </select>
         </label>
+        <button
+          type="button"
+          class="workshop-component-details-toggle"
+          data-component-action="toggle-details"
+          title="Show exact transform values and advanced actions"
+          aria-label="Show exact transform values and advanced actions"
+          aria-expanded="false"
+        >+</button>
       </div>
       <div class="workshop-component-actions" role="toolbar" aria-label="Component edit history and constraints">
         <button type="button" data-component-action="undo" title="Undo component edit (Ctrl+Z)">Undo</button>
@@ -321,7 +356,7 @@ export class ProceduralWorkshopComponentController {
         <input type="number" min="0.1" max="4" step="0.025" data-transform-field="scale-2" aria-label="Scale Z" />
       </div>
       <span class="workshop-component-hint" data-role="workshop-component-hint">
-        Click a wall, roof, door, window, tower, or detail in the preview.
+        Select an area, then drag its gold arrows to reshape one edge at a time.
       </span>
       <span class="workshop-component-snap-feedback" data-role="workshop-component-snap-feedback"></span>
     `;
@@ -337,6 +372,7 @@ export class ProceduralWorkshopComponentController {
       '[data-component-action="attach"], [data-component-action="duplicate"], [data-component-action="repeat"]',
     )];
     this.deleteOpeningButton = root.querySelector('[data-component-action="delete-opening"]');
+    this.detailsButton = root.querySelector('[data-component-action="toggle-details"]');
     this.hint = root.querySelector('[data-role="workshop-component-hint"]');
     this.snapFeedback = root.querySelector('[data-role="workshop-component-snap-feedback"]');
 
@@ -353,6 +389,7 @@ export class ProceduralWorkshopComponentController {
       if (action === 'duplicate') this.duplicateSelectedOpening();
       if (action === 'repeat') this.repeatSelectedOpening();
       if (action === 'delete-opening') this.deleteSelectedOpening();
+      if (action === 'toggle-details') this.toggleDetails();
     };
     this.onValueChange = (event) => {
       if (event.target.matches('[data-transform-field]')) this.commitNumericTransform();
@@ -360,6 +397,10 @@ export class ProceduralWorkshopComponentController {
     this.onPointerDown = (event) => this.pointerDown(event);
     this.onPointerMove = (event) => this.pointerMove(event);
     this.onPointerUp = (event) => this.pointerUp(event);
+    this.onPointerCancel = (event) => this.pointerCancel(event);
+    this.onPointerLeave = () => {
+      if (!this.boundaryDrag) this.setHoveredBoundaryHandle(null);
+    };
     this.onDraggingChanged = ({ value }) => {
       this.dragging = value;
       this.orbitControls.enabled = !value;
@@ -387,15 +428,40 @@ export class ProceduralWorkshopComponentController {
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
     renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+    renderer.domElement.addEventListener('pointercancel', this.onPointerCancel);
+    renderer.domElement.addEventListener('pointerleave', this.onPointerLeave);
     transformControls.addEventListener('dragging-changed', this.onDraggingChanged);
     transformControls.addEventListener('objectChange', this.onObjectChange);
     window.addEventListener('keydown', this.onWindowKeyDown);
     window.addEventListener('keyup', this.onWindowKeyUp);
+    this.toggleDetails(true);
     this.updateHistoryButtons();
   }
 
+  toggleDetails(force) {
+    const collapsed = force === undefined
+      ? !this.root.classList.contains('is-collapsed')
+      : Boolean(force);
+    this.root.classList.toggle('is-collapsed', collapsed);
+    this.detailsButton.textContent = collapsed ? '+' : '−';
+    this.detailsButton.title = collapsed
+      ? 'Show exact transform values and advanced actions'
+      : 'Hide exact values for a clearer editing view';
+    this.detailsButton.setAttribute('aria-label', this.detailsButton.title);
+    this.detailsButton.setAttribute('aria-expanded', String(!collapsed));
+    return collapsed;
+  }
+
   pointerDown(event) {
+    if (this.externalInteractionActive) return;
     if (event.button !== 0) return;
+    if (!this.attachmentMode && this.setPointerRay(event)) {
+      const handle = this.intersectBoundaryHandle();
+      if (handle && this.beginBoundaryDrag(event, handle)) {
+        event.preventDefault();
+        return;
+      }
+    }
     this.pointerStart = { x: event.clientX, y: event.clientY };
   }
 
@@ -411,7 +477,17 @@ export class ProceduralWorkshopComponentController {
   }
 
   pointerMove(event) {
-    if (!this.attachmentMode || !this.setPointerRay(event)) return;
+    if (this.externalInteractionActive) return;
+    if (this.boundaryDrag) {
+      this.updateBoundaryDrag(event);
+      event.preventDefault();
+      return;
+    }
+    if (!this.attachmentMode) {
+      if (this.setPointerRay(event)) this.setHoveredBoundaryHandle(this.intersectBoundaryHandle());
+      return;
+    }
+    if (!this.setPointerRay(event)) return;
     const structureMeshes = this.meshes.filter((mesh) => {
       const group = this.groups.get(mesh.userData.workshopComponentId);
       return group?.userData?.workshopComponent?.kind === 'structure';
@@ -427,6 +503,12 @@ export class ProceduralWorkshopComponentController {
   }
 
   pointerUp(event) {
+    if (this.externalInteractionActive) return;
+    if (this.boundaryDrag) {
+      this.finishBoundaryDrag(true, event);
+      event.preventDefault();
+      return;
+    }
     const start = this.pointerStart;
     this.pointerStart = null;
     if (!start || this.dragging || event.button !== 0) return;
@@ -439,18 +521,167 @@ export class ProceduralWorkshopComponentController {
       return;
     }
     if (!this.setPointerRay(event)) return;
-    this.raycaster.params.Points.threshold = 0.24;
-    const handleHit = this.raycaster.intersectObject(this.handleHelper, false)[0];
-    if (handleHit && this.handleMetadata[handleHit.index]) {
-      const handle = this.handleMetadata[handleHit.index];
-      this.setMode(handle.mode);
-      this.setAxisConstraint(handle.axes);
-      this.hint.textContent = `${handle.label} handle armed · drag the highlighted gizmo axis or type an exact value.`;
-      return;
-    }
     const hit = this.raycaster.intersectObjects(this.meshes, false)[0];
     const componentId = hit?.object?.userData?.workshopComponentId;
     if (componentId) this.selectComponent(componentId);
+  }
+
+  pointerCancel(event) {
+    if (this.boundaryDrag) this.finishBoundaryDrag(false, event);
+    this.pointerStart = null;
+  }
+
+  intersectBoundaryHandle() {
+    if (!this.handleHelper.visible) return null;
+    const hit = this.raycaster.intersectObject(this.handleHelper, true)[0];
+    let object = hit?.object ?? null;
+    while (object && object !== this.handleHelper) {
+      if (object.userData.workshopBoundaryHandle) {
+        return object.userData.workshopBoundaryHandle;
+      }
+      object = object.parent;
+    }
+    return null;
+  }
+
+  setHoveredBoundaryHandle(handle) {
+    if (this.hoveredBoundaryHandle === handle) return;
+    for (const slot of this.handleHelper.children) {
+      slot.userData.workshopHandleMaterial?.color.set(
+        slot.userData.workshopBoundaryHandle === handle ? HANDLE_HOVER_COLOR : HANDLE_COLOR,
+      );
+    }
+    this.hoveredBoundaryHandle = handle;
+    this.renderer.domElement.style.cursor = handle ? 'grab' : '';
+    if (handle && !this.boundaryDrag) {
+      this.hint.textContent = `Drag ${handle.label.toLowerCase()} to reshape ${this.selectedComponent()?.label ?? 'this area'} · the opposite edge stays fixed.`;
+    }
+  }
+
+  projectedAxis(worldOrigin, worldDirection) {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const start = worldOrigin.clone().project(this.camera);
+    const end = worldOrigin.clone().add(worldDirection).project(this.camera);
+    const dx = (end.x - start.x) * bounds.width * 0.5;
+    const dy = (start.y - end.y) * bounds.height * 0.5;
+    const pixelsPerWorldUnit = Math.hypot(dx, dy);
+    if (!Number.isFinite(pixelsPerWorldUnit) || pixelsPerWorldUnit < 1) return null;
+    return {
+      screenX: dx / pixelsPerWorldUnit,
+      screenY: dy / pixelsPerWorldUnit,
+      worldPerPixel: 1 / pixelsPerWorldUnit,
+    };
+  }
+
+  beginBoundaryDrag(event, handle) {
+    const group = this.selectedGroup();
+    const localBounds = directMeshBounds(group);
+    if (!group || localBounds.isEmpty() || !this.selectedPolicy().scaleAxes.includes(handle.axis)) {
+      return false;
+    }
+    const center = localBounds.getCenter(new THREE.Vector3());
+    const minimum = center.clone();
+    const maximum = center.clone();
+    minimum[handle.axis] = localBounds.min[handle.axis];
+    maximum[handle.axis] = localBounds.max[handle.axis];
+    const minimumWorld = group.localToWorld(minimum.clone());
+    const maximumWorld = group.localToWorld(maximum.clone());
+    const positiveWorldAxis = maximumWorld.clone().sub(minimumWorld).normalize();
+    const boundaryWorld = handle.side < 0 ? minimumWorld : maximumWorld;
+    const projected = this.projectedAxis(boundaryWorld, positiveWorldAxis);
+    const startSpan = minimumWorld.distanceTo(maximumWorld);
+    if (!projected || startSpan <= Number.EPSILON) {
+      this.hint.textContent = 'Orbit slightly to see this reshape direction, then drag its arrow.';
+      return false;
+    }
+
+    const oppositeLocal = handle.side < 0 ? maximum : minimum;
+    this.boundaryDrag = {
+      axis: handle.axis,
+      side: handle.side,
+      label: handle.label,
+      pointerId: event.pointerId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      projected,
+      startSpan,
+      startScale: group.scale[handle.axis],
+      startScaleVector: group.scale.clone(),
+      startPosition: group.position.clone(),
+      oppositeLocal,
+      oppositeWorld: group.localToWorld(oppositeLocal.clone()),
+      before: this.captureEditState(),
+      transformHelperVisible: this.transformControls.getHelper().visible,
+    };
+    this.pointerStart = null;
+    this.setMode('scale');
+    this.setAxisConstraint(handle.axis);
+    this.transformControls.enabled = false;
+    this.transformControls.getHelper().visible = false;
+    this.orbitControls.enabled = false;
+    this.renderer.domElement.style.cursor = 'grabbing';
+    this.renderer.domElement.setPointerCapture?.(event.pointerId);
+    this.hint.textContent = `Reshaping ${this.selectedComponent()?.label ?? 'area'} · drag ${handle.label.toLowerCase()} · release to apply.`;
+    return true;
+  }
+
+  updateBoundaryDrag(event) {
+    const drag = this.boundaryDrag;
+    const group = this.selectedGroup();
+    if (!drag || !group) return;
+    const pixelDelta = (
+      (event.clientX - drag.pointerX) * drag.projected.screenX
+      + (event.clientY - drag.pointerY) * drag.projected.screenY
+    );
+    const result = solveWorkshopBoundaryResize({
+      startScale: drag.startScale,
+      startSpan: drag.startSpan,
+      pointerDelta: pixelDelta * drag.projected.worldPerPixel,
+      side: drag.side,
+      scaleMin: WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      scaleMax: WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+      scaleSnap: this.selectedPolicy().scaleSnap,
+      snapEnabled: this.snapEnabled !== this.snapInverted,
+    });
+
+    group.position.copy(drag.startPosition);
+    group.scale.copy(drag.startScaleVector);
+    group.scale[drag.axis] = result.scale;
+    group.updateMatrixWorld(true);
+    const oppositeNow = group.localToWorld(drag.oppositeLocal.clone());
+    const correction = drag.oppositeWorld.clone().sub(oppositeNow);
+    const correctedOrigin = group.getWorldPosition(new THREE.Vector3()).add(correction);
+    group.position.copy(group.parent
+      ? group.parent.worldToLocal(correctedOrigin)
+      : correctedOrigin);
+    group.updateMatrixWorld(true);
+    this.constrainSelectedTransform();
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    const axisLabel = { x: 'width', y: 'height', z: 'depth' }[drag.axis];
+    this.hint.textContent = `${this.selectedComponent()?.label ?? 'Area'} ${axisLabel}: ${result.span.toFixed(2)} · opposite edge anchored.`;
+  }
+
+  finishBoundaryDrag(commit, event) {
+    const drag = this.boundaryDrag;
+    if (!drag) return;
+    this.boundaryDrag = null;
+    if (event?.pointerId != null && this.renderer.domElement.hasPointerCapture?.(event.pointerId)) {
+      this.renderer.domElement.releasePointerCapture(event.pointerId);
+    }
+    this.transformControls.enabled = true;
+    this.transformControls.getHelper().visible = drag.transformHelperVisible;
+    this.orbitControls.enabled = true;
+    this.renderer.domElement.style.cursor = '';
+    this.hoveredBoundaryHandle = null;
+    if (commit) {
+      this.commitSelectedTransform(drag.before);
+      this.hint.textContent = `${this.selectedComponent()?.label ?? 'Area'} reshaped · drag another gold arrow or type an exact value.`;
+    } else {
+      this.restoreTransformDocument(drag.before, false);
+      this.hint.textContent = 'Reshape cancelled.';
+    }
   }
 
   beginAttachmentPlacement() {
@@ -463,6 +694,7 @@ export class ProceduralWorkshopComponentController {
     this.attachmentPreview = null;
     this.placementHelper.visible = false;
     this.transformControls.enabled = !this.attachmentMode;
+    this.handleHelper.visible = !this.attachmentMode && this.handleMetadata.length > 0;
     this.attachButton?.classList.toggle('is-active', this.attachmentMode);
     this.hint.textContent = this.attachmentMode
       ? `Place ${component.label} · point at a compatible wall, then click to attach.`
@@ -471,12 +703,30 @@ export class ProceduralWorkshopComponentController {
     return this.attachmentMode;
   }
 
+  setExternalInteractionActive(active) {
+    if (active === true && this.boundaryDrag) this.finishBoundaryDrag(false);
+    this.externalInteractionActive = active === true;
+    if (this.externalInteractionActive) {
+      this.cancelAttachmentPlacement();
+      this.transformControls.detach();
+      this.transformControls.enabled = false;
+      this.selectionHelper.visible = false;
+      this.inferenceHelper.visible = false;
+      this.handleHelper.visible = false;
+      this.placementHelper.visible = false;
+    } else {
+      this.transformControls.enabled = true;
+      if (this.selectedComponentId) this.selectComponent(this.selectedComponentId);
+    }
+  }
+
   cancelAttachmentPlacement() {
     if (!this.attachmentMode) return false;
     this.attachmentMode = false;
     this.attachmentPreview = null;
     this.placementHelper.visible = false;
     this.transformControls.enabled = true;
+    this.updateSelectionHelper();
     this.attachButton?.classList.remove('is-active');
     this.updateSnapFeedback();
     return true;
@@ -662,7 +912,7 @@ export class ProceduralWorkshopComponentController {
   }
 
   keyDown(event) {
-    if (!this.isEditorVisible()) return;
+    if (!this.isEditorVisible() || this.externalInteractionActive) return;
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     const key = event.key.toLowerCase();
     if (key === 'escape' && this.attachmentMode) {
@@ -693,6 +943,7 @@ export class ProceduralWorkshopComponentController {
   }
 
   keyUp(event) {
+    if (this.externalInteractionActive) return;
     if (event.key !== 'Shift' || !this.snapInverted) return;
     this.snapInverted = false;
     this.applySnapSettings();
@@ -852,6 +1103,7 @@ export class ProceduralWorkshopComponentController {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData.workshopComponentId = componentId;
+      mesh.userData.workshopMaterialRegion = part.materialRegion ?? null;
       group.add(mesh);
       this.meshes.push(mesh);
     }
@@ -896,38 +1148,59 @@ export class ProceduralWorkshopComponentController {
 
   updateArchitecturalHandles() {
     const group = this.selectedGroup();
-    const bounds = this.selectionHelper.box;
+    const bounds = directMeshBounds(group);
     if (!group || bounds.isEmpty()) {
       this.handleHelper.visible = false;
       return;
     }
     const policy = this.selectedPolicy();
     const center = bounds.getCenter(new THREE.Vector3());
-    const points = [];
     const metadata = [];
-    const add = (position, mode, axes, label) => {
-      points.push(...position.toArray());
-      metadata.push({ mode, axes, label });
+    const add = (axis, side, label) => {
+      const localPosition = center.clone();
+      localPosition[axis] = side < 0 ? bounds.min[axis] : bounds.max[axis];
+      const worldPosition = group.localToWorld(localPosition.clone());
+      const axisStep = localPosition.clone();
+      axisStep[axis] += side;
+      const worldDirection = group.localToWorld(axisStep).sub(worldPosition).normalize();
+      metadata.push({
+        axis,
+        side,
+        label,
+        position: worldPosition,
+        direction: worldDirection,
+      });
     };
-    add(center, 'translate', 'policy', 'Move');
     if (policy.scaleAxes.includes('x')) {
-      add(new THREE.Vector3(bounds.min.x, center.y, center.z), 'scale', 'x', 'Left boundary');
-      add(new THREE.Vector3(bounds.max.x, center.y, center.z), 'scale', 'x', 'Right boundary');
+      add('x', -1, 'Left edge');
+      add('x', 1, 'Right edge');
     }
     if (policy.scaleAxes.includes('y')) {
-      add(new THREE.Vector3(center.x, bounds.min.y, center.z), 'scale', 'y', 'Lower boundary');
-      add(new THREE.Vector3(center.x, bounds.max.y, center.z), 'scale', 'y', 'Upper boundary');
+      add('y', -1, 'Bottom edge');
+      add('y', 1, 'Top edge');
     }
     if (policy.scaleAxes.includes('z')) {
-      add(new THREE.Vector3(center.x, center.y, bounds.min.z), 'scale', 'z', 'Rear boundary');
-      add(new THREE.Vector3(center.x, center.y, bounds.max.z), 'scale', 'z', 'Front boundary');
+      add('z', -1, 'Back edge');
+      add('z', 1, 'Front edge');
     }
-    const attribute = this.handleHelper.geometry.getAttribute('position');
-    attribute.array.fill(0);
-    attribute.array.set(points);
-    attribute.needsUpdate = true;
-    this.handleHelper.geometry.setDrawRange(0, metadata.length);
-    this.handleHelper.geometry.computeBoundingSphere();
+
+    for (let index = 0; index < this.handleHelper.children.length; index += 1) {
+      const slot = this.handleHelper.children[index];
+      const handle = metadata[index];
+      slot.visible = Boolean(handle);
+      slot.userData.workshopBoundaryHandle = handle ?? null;
+      if (!handle) continue;
+      slot.position.copy(handle.position);
+      slot.quaternion.setFromUnitVectors(POSITIVE_Y, handle.direction);
+      slot.scale.setScalar(THREE.MathUtils.clamp(
+        this.camera.position.distanceTo(handle.position) * 0.055,
+        0.32,
+        0.9,
+      ));
+      slot.userData.workshopHandleMaterial.color.set(
+        handle === this.hoveredBoundaryHandle ? HANDLE_HOVER_COLOR : HANDLE_COLOR,
+      );
+    }
     this.handleMetadata = metadata;
     this.handleHelper.visible = metadata.length > 0;
   }
@@ -957,7 +1230,7 @@ export class ProceduralWorkshopComponentController {
       && this.selectedComponentId.startsWith('copy-')
       && this.openingAttachments[this.selectedComponentId]
     );
-    this.hint.textContent = `${component.label} · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
+    this.hint.textContent = `${component.label} · drag gold edge arrows to reshape · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
   }
 
   setMode(requestedMode) {
@@ -1545,6 +1818,7 @@ export class ProceduralWorkshopComponentController {
   }
 
   clear() {
+    if (this.boundaryDrag) this.finishBoundaryDrag(false);
     const attachedId = this.transformControls.object?.userData?.workshopComponent?.id;
     if (attachedId && this.groups.has(attachedId)) this.transformControls.detach();
     for (const group of this.groups.values()) {
@@ -1558,6 +1832,7 @@ export class ProceduralWorkshopComponentController {
     this.handleHelper.visible = false;
     this.placementHelper.visible = false;
     this.handleMetadata = [];
+    this.hoveredBoundaryHandle = null;
     this.attachmentMode = false;
     this.attachmentPreview = null;
     this.transformControls.enabled = true;
@@ -1575,8 +1850,10 @@ export class ProceduralWorkshopComponentController {
     this.selectionHelper.material.dispose();
     this.inferenceHelper.geometry.dispose();
     this.inferenceHelper.material.dispose();
-    this.handleHelper.geometry.dispose();
-    this.handleHelper.material.dispose();
+    this.handleHelper.traverse((object) => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
     this.placementHelper.geometry.dispose();
     this.placementHelper.material.dispose();
     this.select.removeEventListener('change', this.onSelectChange);
@@ -1588,6 +1865,8 @@ export class ProceduralWorkshopComponentController {
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+    this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
+    this.renderer.domElement.removeEventListener('pointerleave', this.onPointerLeave);
     this.transformControls.removeEventListener('dragging-changed', this.onDraggingChanged);
     this.transformControls.removeEventListener('objectChange', this.onObjectChange);
     window.removeEventListener('keydown', this.onWindowKeyDown);

@@ -11,6 +11,7 @@ import {
   leaf,
   wallRoofPlanes,
 } from './ProceduralWorkshopGeometry.js';
+import { buildProceduralFacadeIvy } from './ProceduralWorkshopIvy.js';
 import {
   applyStoneColor,
   createWorkshopMaterials,
@@ -77,15 +78,19 @@ function addStone(target, recipe, params, stableIndex, heightRatio) {
   const rotation = params.rotation ?? [0, 0, 0];
   const shaped = {
     ...params,
-    width: params.width * (1 + signed(0) * 0.018),
-    height: params.height * (1 + signed(8) * 0.014),
-    depth: params.depth * (1 + signed(16) * 0.022),
+    width: params.width * (1 + signed(0) * 0.026),
+    height: params.height * (1 + signed(8) * 0.021),
+    depth: params.depth * (1 + signed(16) * 0.038),
     rotation: [
       rotation[0] + signed(4) * 0.006,
       rotation[1] + signed(12) * 0.008,
-      rotation[2] + signed(20) * 0.006,
+      rotation[2] + signed(20) * 0.011,
     ],
-    bevelRatio: params.bevelRatio ?? (0.048 + ((variation >>> 24) & 15) / 15 * 0.022),
+    bevelRatio: params.bevelRatio ?? (0.06 + ((variation >>> 24) & 15) / 15 * 0.03),
+    skew: params.skew ?? [
+      signed(6) * params.width * 0.022,
+      signed(14) * params.width * 0.018,
+    ],
   };
   target.push(applyStoneColor(
     beveledBox({ ...shaped, detail: recipe.detail }),
@@ -554,38 +559,18 @@ function buildIvy(sets, recipe, {
   frontZ,
   centerX = 0,
   seedOffset,
+  preferredSide = 0,
+  openings = [],
 }) {
-  if (!recipe.ivy) return;
-  const random = createRandom(mixSeed(recipe.seed, seedOffset));
-  const clusters = 18 + recipe.detail * 7;
-  const side = random() < 0.5 ? -1 : 1;
-  let previous = null;
-  for (let index = 0; index < clusters; index += 1) {
-    const rise = index / Math.max(1, clusters - 1);
-    const x = centerX + side * width * (0.34 + random() * 0.12)
-      + Math.sin(rise * 8 + seedOffset) * width * 0.05;
-    const y = 0.2 + rise * height * (0.55 + random() * 0.25);
-    if (previous && index % 2 === 0) {
-      const deltaX = x - previous.x;
-      const deltaY = y - previous.y;
-      const length = Math.hypot(deltaX, deltaY);
-      sets.foliage.push(beveledBox({
-        width: 0.035,
-        height: Math.max(0.08, length),
-        depth: 0.035,
-        position: [(x + previous.x) / 2, (y + previous.y) / 2, frontZ + 0.035],
-        rotation: [0, 0, -Math.atan2(deltaX, deltaY)],
-        detail: 1,
-        bevelRatio: 0.08,
-      }));
-    }
-    sets.foliage.push(leaf({
-      radius: 0.1 + random() * 0.075,
-      position: [x, y, frontZ + 0.025 + random() * 0.025],
-      rotation: [random() * 0.8, random() * 0.4, random() * Math.PI],
-    }));
-    previous = { x, y };
-  }
+  sets.foliage.push(...buildProceduralFacadeIvy(recipe, {
+    width,
+    height,
+    frontZ,
+    centerX,
+    seedOffset,
+    preferredSide,
+    openings,
+  }));
 }
 
 function createEmptySets() {
@@ -1310,6 +1295,10 @@ function buildManor(recipe) {
     frontZ: depth / 2 + 0.22,
     centerX: 0,
     seedOffset: 830,
+    openings,
+    preferredSide: recipe.towerSide === 'left'
+      ? 1
+      : recipe.towerSide === 'right' ? -1 : 0,
   });
   return sets;
 }

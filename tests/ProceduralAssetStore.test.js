@@ -27,10 +27,30 @@ const recipe = {
   ivy: true,
   remesh: true,
   albedo: true,
+  composition: {
+    version: 1,
+    primitives: [],
+  },
   surfaceTextures: {
     sources: {},
     slots: {},
   },
+  materialLibrary: {
+    sources: {},
+    presets: {},
+  },
+  materialDefaults: {},
+  materialAreaOverrides: {},
+  materialFavorites: [
+    'granite-masonry',
+    'limestone-masonry',
+    'sandstone-masonry',
+    'ochre-plaster',
+    'lime-plaster',
+    'terracotta-tile',
+    'slate-roof',
+    'aged-timber',
+  ],
   componentTransforms: {},
   openingAttachments: {},
 };
@@ -251,7 +271,7 @@ test('procedural asset documents preserve images and semantic component edits', 
     },
   });
   const document = source.toDocument();
-  assert.equal(document[0].version, 3);
+  assert.equal(document[0].version, 4);
   assert.equal(document[0].key, record.key);
   assert.equal('geometry' in document[0], false);
   assert.equal(
@@ -267,15 +287,16 @@ test('procedural asset documents preserve images and semantic component edits', 
   assert.ok(Object.isFrozen(target.list()[0].recipe));
 });
 
-test('version-one and version-two workshop records migrate to version three', () => {
+test('version-one through version-three workshop records migrate to version four', () => {
   const oldRecord = createProceduralAssetRecord({ label: 'Legacy Tower', recipe });
-  for (const version of [1, 2]) {
+  for (const version of [1, 2, 3]) {
     const store = new ProceduralAssetStore();
     store.replaceAll([{ ...oldRecord, version }]);
     const [migrated] = store.toDocument();
-    assert.equal(migrated.version, 3);
+    assert.equal(migrated.version, 4);
     assert.deepEqual(migrated.recipe.surfaceTextures, { sources: {}, slots: {} });
     assert.deepEqual(migrated.recipe.componentTransforms, {});
     assert.deepEqual(migrated.recipe.openingAttachments, {});
+    assert.deepEqual(migrated.recipe.composition, { version: 1, primitives: [] });
   }
 });

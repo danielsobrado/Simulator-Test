@@ -37,8 +37,28 @@ world:
   farTerrain:
     enabled: true
     radiusMeters: 60000
-    resolution: 160
     heightBias: 15
+    # Polar grid, graded toward the camera. A uniform grid at this radius spent
+    # ~750 m per vertex in the near band and made peaks read as blobs; grading
+    # cuts that several-fold for the same vertex budget, with no ring seams.
+    # innerRadiusMeters sits inside the streamed chunk area so no gap shows.
+    innerRadiusMeters: 256
+    radialResolution: 160
+    angularResolution: 256
+    radialFalloff: 2.2
+    # Origin-snap rebuilds are sliced this many rings per frame into a back
+    # buffer, then swapped, so a snap cannot spike a frame or tear the mesh.
+    rebuildRowsPerFrame: 24
+    # Slope reveals rock then bare stone; snow settles above the line but not on
+    # faces too steep to hold it.
+    rockColor: '#8d9195'
+    screeColor: '#6d7175'
+    snowColor: '#e8eef2'
+    snowLine: 26
+    snowFade: 8
+    snowSlopeMax: 0.55
+    rockSlopeStart: 0.18
+    rockSlopeFull: 0.62
 camera:
   viewSize: 180
   minZoom: 0.3
@@ -98,6 +118,7 @@ stylizedSurface:
     flowerBuildsPerFrame: 1
     treeBuildsPerFrame: 1
     rockBuildsPerFrame: 1
+    bushBuildsPerFrame: 1
     heavyBuildBudgetMs: 3
     grassCellsPerBuildSlice: 64
     inactiveReleaseFrames: 30
@@ -125,6 +146,15 @@ stylizedSurface:
       clusterPixels: 0.25
       hysteresisRatio: 0.15
       transitionMs: 240
+    bush:
+      meshRadius: 1
+      proxyRadius: 2
+      nearPixels: 12
+      proxyPixels: 3
+      impostorPixels: 1
+      clusterPixels: 0.5
+      hysteresisRatio: 0.15
+      transitionMs: 220
     impostor:
       enabled: true
       manifest: /assets/impostors/trees/manifest.json
@@ -172,11 +202,23 @@ stylizedSurface:
     bladeBlend: 0.65
   path:
     tileId: 13
-    blendCells: 2.5
+    # Wider, softer shoulder than a hard stripe. vergeWidth splits the blend band
+    # into a bare tread (above it) and a scuffed verge (below it).
+    blendCells: 3.5
+    vergeWidth: 0.45
+    vergeBlend: 0.55
+    rutStrength: 0.16
+    rutScale: 1.6
+    # Trees, bushes and boulders are cleared this many cells from a road tile.
+    # Derived from the canonical tile map, so clearance never depends on which
+    # chunks happen to be resident.
+    clearCells: 3
   rocks:
     enabled: true
     residentRadius: 1
-    perChunk: 5
+    # Boulders gather into scree groups rather than scattering evenly, so the
+    # per-chunk budget is raised while clear ground stays genuinely clear.
+    perChunk: 14
     tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
     minScale: 0.65
     maxScale: 1.2
@@ -184,6 +226,47 @@ stylizedSurface:
     falloff: 0.7
     flatten: 0.85
     bend: 0.25
+    # Dark faceted stone. colorVariation spreads instance brightness so a scree
+    # field is not a field of clones; burial sinks each boulder by a fraction of
+    # its height so it reads as embedded in the ground.
+    color: '#3a3d42'
+    colorVariation: 0.34
+    burial: 0.18
+    # Cluster field: supercells set clump scale, the slope terms decide where
+    # scree accumulates. flatBias keeps flat meadow mostly clear.
+    clusterSupercellSize: 58
+    clusterSampleSpacing: 5
+    clusterDensity: 0.72
+    clusterRadiusMin: 0.22
+    clusterRadiusMax: 0.5
+    clusterEdgeWidth: 0.36
+    clusterBoundaryWarp: 0.24
+    preferredSlope: 0.55
+    maximumSlope: 2.4
+    flatBias: 0.18
+  bushes:
+    enabled: true
+    residentRadius: 1
+    perChunk: 96
+    tileIds: [3, 4, 5, 6, 7, 8, 9, 12, 14]
+    minScale: 0.7
+    maxScale: 1.65
+    radius: 0.55
+    colorLarge: '#6d9a5d'
+    colorSmall: '#79a765'
+    colorFern: '#628e52'
+    # Bushes thicken toward cluster and forest fringes.
+    edgeAffinity: 0.5
+    clusterSupercellSize: 74
+    clusterSampleSpacing: 5
+    clusterDensity: 0.82
+    clusterRadiusMin: 0.26
+    clusterRadiusMax: 0.58
+    clusterEdgeWidth: 0.4
+    clusterBoundaryWarp: 0.26
+    preferredSlope: 0.3
+    maximumSlope: 1.5
+    flatBias: 0.85
   flowers:
     enabled: true
     residentRadius: 1
@@ -210,15 +293,27 @@ stylizedSurface:
     tileIds: [3, 4, 5, 6, 7, 8, 9, 10, 12]
     habitat:
       enabled: true
-      candidateBudgetPerChunk: 48
-      maxAcceptedPerChunk: 24
+      # Closed forest needs real density; the patch field keeps glades open, so
+      # raising these thickens cores rather than filling the world evenly.
+      # Spacing uses a bucket index, so cost is linear in candidates, not squared.
+      candidateBudgetPerChunk: 144
+      maxAcceptedPerChunk: 72
       patchSupercellSize: 384
+      patchSampleSpacing: 12
       slopeSampleDistance: 4
+      # Riparian belts: how far from open water the habitat field still measures a
+      # distance. Beyond this it reports "no water nearby", so it must cover the
+      # widest waterBoostRange/waterMaximum any biome profile uses (52 m today).
+      # It also bounds the chamfer halo, so raising it costs per-chunk work.
+      # Set to 0 to disable the water term entirely.
+      waterRangeMeters: 80
     forestFloor:
       grassCoreDensity: 0.18
       grassEdgeDensity: 0.72
       flowerCoreDensity: 0.08
       flowerEdgeDensity: 0.58
+      bushCoreDensity: 0.22
+      bushEdgeDensity: 0.95
       groundCoreColor: '#273c25'
       groundStrength: 0.68
     minScale: 0.85
@@ -318,8 +413,23 @@ stylizedSurface:
     shadowDistance: 120
     shadowBias: -0.0002
     shadowNormalBias: 0.02
-    fogColor: '#518cb4'
+    # Matched to the sky's horizon band so terrain fades into the sky instead of
+    # meeting it at a visible colour seam.
+    fogColor: '#7fc0e8'
     fogDensity: 0.0015
+    # Aerial perspective on the far-terrain backdrop. Distance hazes toward
+    # horizonColor; heightFalloff lets peaks stay clearer than valley floors, so
+    # ranges layer front-to-back instead of flattening into one silhouette.
+    # farDensityScale replaces the old hardcoded 1.5 / farTerrainRadius.
+    aerial:
+      strength: 0.9
+      horizonColor: '#8ecef2'
+      startDistance: 900
+      endDistance: 42000
+      heightFalloff: 0.55
+      heightFloor: 0
+      heightCeiling: 260
+      farDensityScale: 1.5
 voxelPrototype:
   enabled: true
   visible: true

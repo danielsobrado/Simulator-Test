@@ -65,15 +65,16 @@ export function beveledBox({
   rotation = [0, 0, 0],
   detail = 2,
   bevelRatio = 0.055,
+  skew = [0, 0],
 }) {
   const radius = Math.min(width, height, depth) * bevelRatio;
   const shape = new THREE.Shape();
   const halfWidth = Math.max(0.02, width / 2 - radius);
   const halfHeight = Math.max(0.02, height / 2 - radius);
-  shape.moveTo(-halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, -halfHeight);
-  shape.lineTo(halfWidth, halfHeight);
-  shape.lineTo(-halfWidth, halfHeight);
+  shape.moveTo(-halfWidth + skew[1], -halfHeight);
+  shape.lineTo(halfWidth + skew[1], -halfHeight);
+  shape.lineTo(halfWidth + skew[0], halfHeight);
+  shape.lineTo(-halfWidth + skew[0], halfHeight);
   shape.closePath();
   const extrusionDepth = Math.max(0.02, depth - radius * 2);
   const geometry = new THREE.ExtrudeGeometry(shape, {
@@ -236,8 +237,59 @@ export function leaf({
   position,
   rotation = [0, 0, 0],
 }) {
-  return transformGeometry(
-    normalizeGeometry(new THREE.IcosahedronGeometry(radius, 0)),
-    { position, rotation, scale: [1, 1.35, 0.45] },
+  const positions = new Float32Array([
+    0, -radius * 0.82, 0,
+    -radius * 0.72, -radius * 0.04, 0,
+    0, radius, 0,
+    0, -radius * 0.82, 0,
+    0, radius, 0,
+    radius * 0.72, -radius * 0.04, 0,
+    -radius * 0.72, -radius * 0.04, 0,
+    0, radius, 0,
+    0, radius * 0.08, radius * 0.18,
+    radius * 0.72, -radius * 0.04, 0,
+    0, radius * 0.08, radius * 0.18,
+    0, radius, 0,
+  ]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+    0.5, 0, 0, 0.42, 0.5, 1,
+    0.5, 0, 0.5, 1, 1, 0.42,
+    0, 0.42, 0.5, 1, 0.5, 0.48,
+    1, 0.42, 0.5, 0.48, 0.5, 1,
+  ], 2));
+  geometry.computeVertexNormals();
+  return transformGeometry(geometry, { position, rotation });
+}
+
+export function vineSegment({
+  start,
+  end,
+  radius = 0.026,
+  sides = 5,
+}) {
+  const startPoint = new THREE.Vector3(...start);
+  const endPoint = new THREE.Vector3(...end);
+  const direction = endPoint.clone().sub(startPoint);
+  const length = Math.max(0.01, direction.length());
+  const geometry = normalizeGeometry(new THREE.CylinderGeometry(
+    radius,
+    radius * 1.08,
+    length,
+    sides,
+    1,
+    false,
+  ));
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    direction.normalize(),
   );
+  geometry.applyQuaternion(quaternion);
+  geometry.translate(
+    (startPoint.x + endPoint.x) / 2,
+    (startPoint.y + endPoint.y) / 2,
+    (startPoint.z + endPoint.z) / 2,
+  );
+  return geometry;
 }

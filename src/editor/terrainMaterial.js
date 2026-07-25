@@ -79,7 +79,12 @@ export function createTerrainMaterial({
   const grassCoverage = surface.g;
   const pathMask = surface.r;
   const proceduralDirt = stylizedDirtMask(worldXZ, dirtSettings).mul(grassCoverage);
-  const dirt = max(pathMask, proceduralDirt);
+  // The path mask fades out across its blend band. The tread is the inner, fully
+  // bare part; the remainder is the verge, where grass thins but does not vanish.
+  const pathConfig = stylizedConfig.path ?? {};
+  const treadStart = float(pathConfig.vergeWidth ?? 0.45);
+  const tread = smoothstep(treadStart, 1, pathMask);
+  const dirt = max(tread, proceduralDirt);
   const patch = stylizedPatchMask(worldXZ, patchSettings);
   const grassTint = mix(
     colorNode(stylizedConfig.color.bottom),
@@ -91,7 +96,26 @@ export function createTerrainMaterial({
     stylizedConfig.patch.strength,
   ).mul(stylizedConfig.color.brightness);
   let groundColor = mix(tileColor, grassTint, grassCoverage);
+  // Verge first, then the bare tread on top, so the path reads as a worn centre
+  // with a scuffed margin instead of a hard-edged stripe.
+  const verge = pathMask.sub(tread).max(0);
+  groundColor = mix(
+    groundColor,
+    mix(grassTint, colorNode(stylizedConfig.dirt.color), pathConfig.vergeBlend ?? 0.55),
+    verge,
+  );
   groundColor = mix(groundColor, colorNode(stylizedConfig.dirt.color), dirt);
+  // Ruts: banded noise stretched along the path so wheel tracks follow it.
+  const rutStrength = pathConfig.rutStrength ?? 0;
+  if (rutStrength > 0) {
+    const ruts = stylizedFbm(worldXZ.mul(vec2(
+      pathConfig.rutScale ?? 1.6,
+      (pathConfig.rutScale ?? 1.6) * 0.18,
+    ))).sub(0.5);
+    groundColor = groundColor.mul(
+      float(1).add(ruts.mul(rutStrength).mul(tread)),
+    );
+  }
   const forestFloorConfig = stylizedConfig.trees?.forestFloor ?? {};
   groundColor = mix(
     groundColor,

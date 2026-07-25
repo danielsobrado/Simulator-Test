@@ -1,6 +1,9 @@
 const DEFAULT_CANDIDATE_MULTIPLIER = 2;
 const MAX_CANDIDATE_MULTIPLIER = 8;
-const MAX_CANDIDATE_BUDGET = 256;
+// Closed-forest density needs a higher ceiling than the original 256. Spacing is
+// bucket-indexed and habitat patches are sampled on a coarse grid, so per-chunk
+// manifest cost stays linear in the candidate count.
+const MAX_CANDIDATE_BUDGET = 512;
 
 export function resolveForestSeed(worldStore) {
   const generator = worldStore?.generator;

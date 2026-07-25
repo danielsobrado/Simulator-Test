@@ -4,6 +4,8 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { disposeModelParts } from '../assets/modelParts.js';
 import './ProceduralWorkshopComponentController.css';
 import { ProceduralWorkshopComponentController } from './ProceduralWorkshopComponentController.js';
+import { ProceduralWorkshopMaterialController } from './ProceduralWorkshopMaterialController.js';
+import { ProceduralWorkshopPlannerClient } from './ProceduralWorkshopPlannerClient.js';
 import { createWorkshopStage } from './ProceduralWorkshopStage.js';
 import { ProceduralWorkshopSurfaceEditor } from './ProceduralWorkshopSurfaceEditor.js';
 
@@ -30,6 +32,9 @@ export class ProceduralWorkshopUi {
     this.controls = null;
     this.transformControls = null;
     this.componentController = null;
+    this.materialController = null;
+    this.planner = new ProceduralWorkshopPlannerClient();
+    this.planRevision = 0;
     this.stage = null;
     this.surfaceEditor = null;
     this.resizeObserver = null;
@@ -176,14 +181,16 @@ export class ProceduralWorkshopUi {
                 <button type="button" class="is-active" data-workshop-action="move">Move</button>
                 <button type="button" data-workshop-action="rotate">Rotate</button>
                 <button type="button" data-workshop-action="scale">Scale</button>
+                <button type="button" data-workshop-action="material">Material</button>
                 <button type="button" data-workshop-action="reset-component">Reset part</button>
                 <button type="button" data-workshop-action="reset-all-components">Reset all</button>
                 <button type="button" data-workshop-action="center">Center scene</button>
                 <button type="button" data-workshop-action="frame">Frame</button>
               </div>
               <div class="workshop-canvas" data-role="workshop-canvas"></div>
+              <div class="workshop-material-ui" data-role="workshop-material-ui"></div>
               <div class="workshop-component-editor" data-role="workshop-component-editor"></div>
-              <p>Click a component to edit it · openings can be placed on walls, duplicated, or repeated · drag empty space to orbit.</p>
+              <p>Select an area, then pull its gold edge arrows to reshape it · openings can be placed, duplicated, or repeated · drag empty space to orbit.</p>
             </div>
           </div>
         </section>
@@ -194,6 +201,7 @@ export class ProceduralWorkshopUi {
     this.form = root.querySelector('[data-role="workshop-form"]');
     this.canvasHost = root.querySelector('[data-role="workshop-canvas"]');
     this.componentEditorHost = root.querySelector('[data-role="workshop-component-editor"]');
+    this.materialUiHost = root.querySelector('[data-role="workshop-material-ui"]');
     this.status = root.querySelector('[data-role="workshop-status"]');
     this.surfaceEditor = new ProceduralWorkshopSurfaceEditor({
       root: root.querySelector('[data-role="workshop-surface-editor"]'),
@@ -214,6 +222,7 @@ export class ProceduralWorkshopUi {
       if (action === 'move' || action === 'rotate' || action === 'scale') {
         this.setTransformMode(action);
       }
+      if (action === 'material') this.toggleMaterialMode();
       if (action === 'reset-component') this.componentController?.resetSelected();
       if (action === 'reset-all-components') this.componentController?.resetAll();
       if (action === 'center') this.centerPreview();
@@ -277,6 +286,7 @@ export class ProceduralWorkshopUi {
   }
 
   syncTransformModeButtons(mode) {
+    const materialActive = this.materialController?.active === true;
     const activeAction = actionForTransformMode(mode);
     for (const button of this.overlay.querySelectorAll(
       '[data-workshop-action="move"], [data-workshop-action="rotate"], [data-workshop-action="scale"]',
@@ -284,7 +294,8 @@ export class ProceduralWorkshopUi {
       const requestedMode = button.dataset.workshopAction === 'move'
         ? 'translate'
         : button.dataset.workshopAction;
-      button.disabled = !(this.componentController?.supportsMode(requestedMode) ?? true);
+      button.disabled = materialActive
+        || !(this.componentController?.supportsMode(requestedMode) ?? true);
       button.classList.toggle(
         'is-active',
         button.dataset.workshopAction === activeAction && !button.disabled,
@@ -294,9 +305,28 @@ export class ProceduralWorkshopUi {
 
   setTransformMode(action) {
     if (!this.transformControls) return;
+    if (this.materialController?.active) this.toggleMaterialMode(false);
     const requestedMode = action === 'rotate' ? 'rotate' : action === 'scale' ? 'scale' : 'translate';
     const activeMode = this.componentController?.setMode(requestedMode) ?? requestedMode;
     this.syncTransformModeButtons(activeMode);
+  }
+
+  toggleMaterialMode(force) {
+    if (!this.materialController) return false;
+    const active = this.materialController.setActive(
+      force === undefined ? !this.materialController.active : force,
+    );
+    this.overlay.querySelector('[data-workshop-action="material"]')
+      ?.classList.toggle('is-active', active);
+    for (const action of ['move', 'rotate', 'scale', 'reset-component', 'reset-all-components']) {
+      const button = this.overlay.querySelector(`[data-workshop-action="${action}"]`);
+      if (button) button.disabled = active;
+    }
+    this.status.textContent = active
+      ? 'Material mode · hover a semantic area, then click for full-PBR favorites.'
+      : 'Transform mode restored.';
+    this.status.classList.remove('is-error');
+    return active;
   }
 
   centerPreview() {
@@ -330,6 +360,7 @@ export class ProceduralWorkshopUi {
         remesh: values.get('remesh') === 'on',
         albedo: values.get('albedo') === 'on',
         surfaceTextures: this.surfaceEditor.toDocument(),
+        ...(this.materialController?.toDocument() ?? {}),
         componentTransforms: this.componentController?.toDocument() ?? {},
         openingAttachments: this.componentController?.toOpeningAttachmentsDocument() ?? {},
       },
@@ -355,8 +386,11 @@ export class ProceduralWorkshopUi {
 
   close() {
     this.openRevision += 1;
+    this.planRevision += 1;
+    this.planner.cancel();
     this.overlay.hidden = true;
     this.componentController?.cancelAttachmentPlacement();
+    this.materialController?.setActive(false);
     window.clearTimeout(this.previewTimer);
     window.clearTimeout(this.finalPreviewTimer);
     this.previewTimer = 0;
@@ -448,6 +482,24 @@ export class ProceduralWorkshopUi {
           }
         },
       });
+      this.materialController = new ProceduralWorkshopMaterialController({
+        root: this.materialUiHost,
+        canvasHost: this.canvasHost,
+        previewRoot: this.previewRoot,
+        renderer,
+        camera: this.camera,
+        componentController: this.componentController,
+        onChange: () => this.schedulePreview(0),
+        onStatus: (message, isError) => {
+          this.status.textContent = message;
+          this.status.classList.toggle('is-error', isError);
+        },
+        onActiveChange: (active) => {
+          this.overlay.querySelector('[data-workshop-action="material"]')
+            ?.classList.toggle('is-active', active);
+          this.syncTransformModeButtons(this.componentController?.mode ?? 'translate');
+        },
+      });
 
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(this.canvasHost);
@@ -464,6 +516,8 @@ export class ProceduralWorkshopUi {
     this.resizeObserver = null;
     this.componentController?.dispose();
     this.componentController = null;
+    this.materialController?.dispose();
+    this.materialController = null;
     this.transformControls?.dispose();
     this.transformControls = null;
     this.controls?.dispose();
@@ -492,7 +546,8 @@ export class ProceduralWorkshopUi {
     this.camera.updateProjectionMatrix();
   }
 
-  generatePreview({ draft = false, frame = false } = {}) {
+  async generatePreview({ draft = false, frame = false } = {}) {
+    const revision = ++this.planRevision;
     try {
       if (!this.componentController) {
         throw new Error('The workshop component editor is not ready.');
@@ -505,11 +560,14 @@ export class ProceduralWorkshopUi {
           remesh: true,
         }
         : recipe;
+      await this.planner.plan(previewRecipe);
+      if (revision !== this.planRevision || this.overlay.hidden) return;
       const nextParts = this.manager.createPreviewParts(previewRecipe);
       this.clearPreview();
       this.previewParts = nextParts;
       try {
         this.componentController.replaceParts(nextParts);
+        this.materialController?.replaceParts(nextParts);
       } catch (error) {
         this.componentController.clear();
         disposeModelParts(nextParts);
@@ -523,9 +581,10 @@ export class ProceduralWorkshopUi {
       }
       const stats = nextParts.stats;
       const quality = draft ? 'Interactive proxy' : 'Final preview';
-      this.status.textContent = `${quality} · ${stats.components} editable components · ${stats.stones} stones · ${stats.features} semantic details · ${stats.sourceVertices.toLocaleString()} source vertices · ${stats.drawParts} preview parts.`;
+      this.status.textContent = `${quality} · ${stats.components} editable components · ${stats.materialRegions} semantic material areas · ${stats.materialCount} materials · ${stats.stones} stones · ${stats.features} semantic details · ${stats.sourceVertices.toLocaleString()} source vertices · ${stats.drawParts}/16 preview parts.`;
       this.status.classList.remove('is-error');
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       this.status.textContent = error instanceof Error ? error.message : String(error);
       this.status.classList.add('is-error');
     }
@@ -560,6 +619,7 @@ export class ProceduralWorkshopUi {
   }
 
   clearPreview() {
+    this.materialController?.replaceParts([]);
     if (this.componentController) this.componentController.clear();
     else this.previewRoot.clear();
     disposeModelParts(this.previewParts);
@@ -585,6 +645,7 @@ export class ProceduralWorkshopUi {
     this.releaseRendererState();
     this.surfaceEditor?.dispose();
     this.surfaceEditor = null;
+    this.planner.dispose();
     this.overlay.remove();
   }
 }

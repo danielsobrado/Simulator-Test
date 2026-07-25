@@ -92,6 +92,8 @@ function definitionFor(record, tileSize, parts) {
     allowedTileIds: Object.freeze(TILE_CATALOG.map((tile) => tile.id).filter((id) => id !== 0)),
     allowedTerrainClasses: TERRAIN_CLASSES,
     procedural: true,
+    workshopSemantics: parts.semantics ?? null,
+    workshopStatistics: parts.stats ?? null,
   });
 }
 
