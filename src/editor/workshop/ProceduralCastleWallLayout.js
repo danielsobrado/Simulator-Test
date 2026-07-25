@@ -152,6 +152,18 @@ export function isInsideCastleOpening(opening, x, y, padding = 0) {
   return halfWidth > 0 && Math.abs(x - opening.centerX) < halfWidth + padding;
 }
 
+export function intersectsCastleOpening(opening, x, y, halfWidth = 0, halfHeight = 0) {
+  const openingTop = opening.bottom + opening.springHeight + opening.radius;
+  const overlapBottom = Math.max(opening.bottom, y - halfHeight);
+  const overlapTop = Math.min(openingTop, y + halfHeight);
+  if (overlapBottom >= overlapTop) return false;
+
+  const springY = opening.bottom + opening.springHeight;
+  const widestOverlapY = overlapBottom <= springY ? springY : overlapBottom;
+  const openingHalfWidth = getCastleOpeningHalfWidth(opening, widestOverlapY);
+  return Math.abs(x - opening.centerX) < openingHalfWidth + halfWidth;
+}
+
 export function getCastleWallButtressPositions(recipe, openings) {
   if (openings.length === 0) {
     return Object.freeze([-recipe.width / 2, recipe.width / 2]);
