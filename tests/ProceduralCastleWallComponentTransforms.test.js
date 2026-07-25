@@ -14,6 +14,17 @@ const recipe = Object.freeze({
   componentTransforms: {},
 });
 
+function minimumTopAcrossOpening(sourceRecipe, opening) {
+  const trimAllowance = Math.max(0.2, opening.width * 0.12);
+  const halfSpan = opening.width / 2 + trimAllowance;
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let index = 0; index <= 64; index += 1) {
+    const x = opening.centerX - halfSpan + halfSpan * 2 * index / 64;
+    minimum = Math.min(minimum, getCastleWallTopHeight(sourceRecipe, x));
+  }
+  return minimum;
+}
+
 test('semantic arch edits regenerate opening position and dimensions', () => {
   const base = getCastleWallOpenings(recipe);
   const edited = getCastleWallOpenings({
@@ -53,6 +64,22 @@ test('large arch edits remain inside their bay and wall profile', () => {
   assert.ok(opening.centerX - opening.width / 2 >= bayLeft);
   assert.ok(opening.centerX + opening.width / 2 <= bayRight);
   assert.ok(opening.bottom + opening.springHeight + opening.radius <= top);
+});
+
+test('moved narrow arches remain below the lowest covered top-profile sample', () => {
+  const editedRecipe = {
+    ...recipe,
+    componentTransforms: {
+      'arch-2': {
+        position: [0.75, 20, 0],
+        rotation: [0, 0, 0],
+        scale: [0.6, 4, 1],
+      },
+    },
+  };
+  const opening = getCastleWallOpenings(editedRecipe)[1];
+  const crown = opening.bottom + opening.springHeight + opening.radius;
+  assert.ok(crown <= minimumTopAcrossOpening(editedRecipe, opening));
 });
 
 test('short walls keep transformed arch crowns inside the authored height', () => {
