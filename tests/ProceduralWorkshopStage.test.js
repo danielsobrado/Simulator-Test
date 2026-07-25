@@ -28,3 +28,22 @@ test('procedural workshop stage batches static scenery into a bounded mesh count
   assert.equal(scene.background, null);
   assert.equal(scene.fog, null);
 });
+
+test('procedural workshop stage restores prior scene state and disposes idempotently', () => {
+  const scene = new THREE.Scene();
+  const background = new THREE.Color('#123456');
+  const fog = new THREE.Fog('#654321', 2, 20);
+  scene.background = background;
+  scene.fog = fog;
+
+  const stage = createWorkshopStage(scene);
+  assert.notEqual(scene.background, background);
+  assert.notEqual(scene.fog, fog);
+
+  stage.dispose();
+  stage.dispose();
+
+  assert.equal(scene.background, background);
+  assert.equal(scene.fog, fog);
+  assert.equal(stage.group.parent, null);
+});

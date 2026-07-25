@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented as the first bounded construction-authoring vertical slice. Advanced castle-wall silhouettes, semantic component editing, and the procedural glade preview are implemented.
+Implemented as the first bounded construction-authoring vertical slice. Advanced castle-wall silhouettes, semantic component editing, strict recipe persistence, and the procedural glade preview are implemented.
 
 ## Product boundary
 
@@ -10,11 +10,12 @@ The workshop is a separate editor option with a 16 × 16 metre central authoring
 
 ```text
 bounded workshop recipe
+  -> strict canonical validation
   -> deterministic structural layout
   -> masonry, openings, trim, roofs, vegetation
   -> semantic component hierarchy and transforms
   -> procedural or imported semantic albedo
-  -> merged geometry by material
+  -> validated material-family remesh
   -> reusable instanced object in the world
 ```
 
@@ -51,18 +52,22 @@ The opening count is derived from the authored width, so wider spans gain more b
 - Advanced arches reserve real empty space; they are not dark panels placed over a solid wall.
 - Each advanced opening has deterministic jamb courses, front and rear voussoirs, and a keystone.
 - Edited advanced arches remain inside their bay and below the lowest covered wall-top profile, not only the profile at the opening centre.
+- Complete masonry boxes, not only their centre points, are checked against opening volumes.
+- Classic walls, gatehouses, and towers pass through a validated generation boundary that removes structural stone obstructing their authored openings while retaining shallow trim.
 - Buttresses are placed at ends and between arch bays.
 - The top profile is sampled consistently by wall courses, coping, and battlements.
 - The ruined mode deletes only bounded upper stones and never changes opening authority.
-- The hard stone budget includes wall-body, arch, buttress, coping, and battlement stones.
+- Advanced walls use one complete hard stone budget. Classic medieval builds use conservative preflight, generated-part, masonry-part, and source-vertex limits before remeshing.
 - Classic generated doors and windows own their movable insert geometry; structural arch stones remain with the parent wall.
+- Failed generation and remeshing release all partially created geometry and materials.
 - No generation path uses `Math.random()`.
 
 ## Semantic component contract
 
 - Structures are hierarchy roots. Their roofs, openings, woodwork, metalwork, and vegetation are children and follow parent transforms.
 - Advanced arch edits are stored as two-dimensional opening intent and regenerated into structural geometry.
-- Component transforms are normalized and serialized in canonical component-ID order.
+- Component transforms are finite, bounded, type-checked, and serialized in canonical component-ID order.
+- Equivalent positive and negative half-turn rotations serialize identically.
 - Transforms for components that no longer exist are removed before a new asset is baked.
 - Runtime transforms are applied before material-family remeshing.
 - Placement and foundation footprints are derived from final transformed geometry and retain conservative formula fallbacks.
@@ -75,9 +80,19 @@ The opening count is derived from the authored width, so wider spans gain more b
 - A recipe stores at most four imported sources, with per-source and per-object encoded-size caps.
 - Multiple semantic areas may reference one source without duplicating the encoded image.
 - Source IDs and semantic slots are normalized in canonical order so equivalent recipes produce identical object signatures.
+- Texture names, IDs, mapping modes, repeats, rotations, and tints are strictly typed. Numeric strings and explicit null values are rejected rather than coerced.
 - Tower-house walls use the wall source while masonry structures fall back from **Stone trim** to **Walls** when no explicit stone source is assigned.
 - Imported images replace base colour only. Procedural bump response, roughness, weathering, vertex variation, and geometry remain active.
-- Version-one and version-two workshop records load with compatible defaults and are saved as version three.
+- Version-one and version-two workshop records load with compatible omitted-field defaults and are saved as version three.
+
+## Persistence and lifecycle contract
+
+- Saved records require a valid string key, string label, object recipe, finite numeric dimensions, integer seed/detail, and real booleans.
+- Omitted legacy fields receive documented defaults; explicit nulls, numeric strings, and malformed nested objects fail closed.
+- Recipe identity uses canonical property ordering and normalized rotations before hashing.
+- Targeted installation rollback removes only the failed procedural definition. Full rebuild teardown removes all workshop-owned procedural definitions.
+- WebGPU preview initialization is single-flight and retryable. Closing or disposing the workshop during initialization cannot start a stale render loop.
+- The procedural stage restores prior scene background/fog state and disposes transactionally, including failed construction.
 
 ## Runtime contract
 

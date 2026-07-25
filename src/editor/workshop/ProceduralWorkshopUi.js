@@ -25,14 +25,18 @@ export class ProceduralWorkshopUi {
     this.previewParts = [];
     this.previewRoot = new THREE.Group();
     this.renderer = null;
+    this.rendererPromise = null;
     this.camera = null;
     this.controls = null;
     this.transformControls = null;
     this.componentController = null;
     this.stage = null;
     this.surfaceEditor = null;
+    this.resizeObserver = null;
     this.animationFrame = 0;
     this.previewTimer = 0;
+    this.openRevision = 0;
+    this.disposed = false;
     this.onWindowKeyDown = (event) => {
       if (event.key === 'Escape' && !this.overlay.hidden) this.close();
     };
@@ -244,10 +248,11 @@ export class ProceduralWorkshopUi {
   }
 
   schedulePreview(delay = 60) {
+    if (this.disposed) return;
     window.clearTimeout(this.previewTimer);
     this.previewTimer = window.setTimeout(() => {
       this.previewTimer = 0;
-      this.generatePreview();
+      if (!this.overlay.hidden) this.generatePreview();
     }, delay);
   }
 
@@ -304,18 +309,23 @@ export class ProceduralWorkshopUi {
   }
 
   async open() {
+    if (this.disposed) return;
+    const revision = ++this.openRevision;
     this.overlay.hidden = false;
     try {
       await this.ensureRenderer();
+      if (this.disposed || this.overlay.hidden || revision !== this.openRevision) return;
       this.generatePreview();
-      this.renderLoop();
+      if (this.animationFrame === 0) this.renderLoop();
     } catch (error) {
-      this.status.textContent = error.message;
+      if (revision !== this.openRevision || this.disposed) return;
+      this.status.textContent = error instanceof Error ? error.message : String(error);
       this.status.classList.add('is-error');
     }
   }
 
   close() {
+    this.openRevision += 1;
     this.overlay.hidden = true;
     window.clearTimeout(this.previewTimer);
     this.previewTimer = 0;
@@ -324,74 +334,121 @@ export class ProceduralWorkshopUi {
   }
 
   async ensureRenderer() {
-    if (this.renderer) return;
-    this.renderer = new THREE.WebGPURenderer({
+    if (this.componentController) return;
+    if (this.rendererPromise) return this.rendererPromise;
+    this.rendererPromise = this.initializeRenderer();
+    try {
+      await this.rendererPromise;
+    } finally {
+      this.rendererPromise = null;
+    }
+  }
+
+  async initializeRenderer() {
+    const renderer = new THREE.WebGPURenderer({
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(this.canvasHost.clientWidth, this.canvasHost.clientHeight);
-    this.renderer.setClearColor('#9bc8ec', 1);
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    await this.renderer.init();
-    this.canvasHost.append(this.renderer.domElement);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(this.canvasHost.clientWidth, this.canvasHost.clientHeight);
+    renderer.setClearColor('#9bc8ec', 1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.previewRoot);
-    this.camera = new THREE.PerspectiveCamera(
-      36,
-      this.canvasHost.clientWidth / this.canvasHost.clientHeight,
-      0.1,
-      100,
-    );
-    this.camera.position.set(13, 10, 16);
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 3, 0);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.075;
-    this.controls.screenSpacePanning = false;
-    this.controls.minDistance = 5;
-    this.controls.maxDistance = 52;
-    this.controls.maxPolarAngle = Math.PI * 0.475;
+    try {
+      await renderer.init();
+      if (this.disposed) {
+        renderer.dispose();
+        return;
+      }
+      this.renderer = renderer;
+      this.canvasHost.append(renderer.domElement);
 
-    this.stage = createWorkshopStage(this.scene);
-    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
-    this.transformControls.setTranslationSnap(0.1);
-    this.transformControls.setRotationSnap(THREE.MathUtils.degToRad(15));
-    this.transformControls.setScaleSnap(0.05);
-    this.transformControls.setSize(0.68);
-    this.scene.add(this.transformControls.getHelper());
+      this.scene = new THREE.Scene();
+      this.scene.add(this.previewRoot);
+      this.camera = new THREE.PerspectiveCamera(
+        36,
+        this.canvasHost.clientWidth / this.canvasHost.clientHeight,
+        0.1,
+        100,
+      );
+      this.camera.position.set(13, 10, 16);
+      this.controls = new OrbitControls(this.camera, renderer.domElement);
+      this.controls.target.set(0, 3, 0);
+      this.controls.enableDamping = true;
+      this.controls.dampingFactor = 0.075;
+      this.controls.screenSpacePanning = false;
+      this.controls.minDistance = 5;
+      this.controls.maxDistance = 52;
+      this.controls.maxPolarAngle = Math.PI * 0.475;
 
-    this.componentController = new ProceduralWorkshopComponentController({
-      root: this.componentEditorHost,
-      previewRoot: this.previewRoot,
-      renderer: this.renderer,
-      camera: this.camera,
-      orbitControls: this.controls,
-      transformControls: this.transformControls,
-      onModeChange: (mode) => this.syncTransformModeButtons(mode),
-      onChange: (component) => {
-        this.status.textContent = component
-          ? `${component.label} edit stored in the object recipe.`
-          : 'All component edits were reset.';
-        this.status.classList.remove('is-error');
-        if (!component || component.transformPolicy === 'opening2d') {
-          this.schedulePreview(0);
-        }
-      },
-    });
+      this.stage = createWorkshopStage(this.scene);
+      this.transformControls = new TransformControls(this.camera, renderer.domElement);
+      this.transformControls.setTranslationSnap(0.1);
+      this.transformControls.setRotationSnap(THREE.MathUtils.degToRad(15));
+      this.transformControls.setScaleSnap(0.05);
+      this.transformControls.setSize(0.68);
+      this.scene.add(this.transformControls.getHelper());
 
-    this.resizeObserver = new ResizeObserver(() => this.resize());
-    this.resizeObserver.observe(this.canvasHost);
+      this.componentController = new ProceduralWorkshopComponentController({
+        root: this.componentEditorHost,
+        previewRoot: this.previewRoot,
+        renderer,
+        camera: this.camera,
+        orbitControls: this.controls,
+        transformControls: this.transformControls,
+        onModeChange: (mode) => this.syncTransformModeButtons(mode),
+        onChange: (component) => {
+          this.status.textContent = component
+            ? `${component.label} edit stored in the object recipe.`
+            : 'All component edits were reset.';
+          this.status.classList.remove('is-error');
+          if (!component || component.transformPolicy === 'opening2d') {
+            this.schedulePreview(0);
+          }
+        },
+      });
+
+      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver.observe(this.canvasHost);
+    } catch (error) {
+      const rendererWasOwned = this.renderer === renderer;
+      this.releaseRendererState();
+      if (!rendererWasOwned) renderer.dispose();
+      throw error;
+    }
+  }
+
+  releaseRendererState() {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.componentController?.dispose();
+    this.componentController = null;
+    this.transformControls?.dispose();
+    this.transformControls = null;
+    this.controls?.dispose();
+    this.controls = null;
+    this.stage?.dispose();
+    this.stage = null;
+    this.previewRoot.removeFromParent();
+    this.renderer?.domElement.remove();
+    this.renderer?.dispose();
+    this.renderer = null;
+    this.camera = null;
+    this.scene = null;
   }
 
   resize() {
-    if (!this.renderer || this.canvasHost.clientWidth === 0 || this.canvasHost.clientHeight === 0) {
+    if (
+      !this.renderer
+      || !this.camera
+      || this.canvasHost.clientWidth === 0
+      || this.canvasHost.clientHeight === 0
+    ) {
       return;
     }
     this.renderer.setSize(this.canvasHost.clientWidth, this.canvasHost.clientHeight);
@@ -422,7 +479,7 @@ export class ProceduralWorkshopUi {
       this.status.textContent = `${stats.components} editable components · ${stats.stones} stones · ${stats.features} semantic details · ${stats.sourceVertices.toLocaleString()} source vertices · ${stats.drawParts} preview parts.`;
       this.status.classList.remove('is-error');
     } catch (error) {
-      this.status.textContent = error.message;
+      this.status.textContent = error instanceof Error ? error.message : String(error);
       this.status.classList.add('is-error');
     }
   }
@@ -430,6 +487,7 @@ export class ProceduralWorkshopUi {
   framePreview() {
     if (!this.camera || !this.controls || this.componentController?.groups.size === 0) return;
     const bounds = new THREE.Box3().setFromObject(this.previewRoot);
+    if (bounds.isEmpty()) return;
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
     const distance = Math.max(size.x, size.y, size.z) * 2.85;
@@ -449,7 +507,7 @@ export class ProceduralWorkshopUi {
       this.status.classList.remove('is-error');
       this.onBaked?.(record);
     } catch (error) {
-      this.status.textContent = error.message;
+      this.status.textContent = error instanceof Error ? error.message : String(error);
       this.status.classList.add('is-error');
     }
   }
@@ -462,23 +520,24 @@ export class ProceduralWorkshopUi {
   }
 
   renderLoop() {
-    if (this.overlay.hidden || !this.renderer) return;
+    if (this.overlay.hidden || !this.renderer || !this.controls || !this.scene || !this.camera) {
+      this.animationFrame = 0;
+      return;
+    }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.animationFrame = requestAnimationFrame(() => this.renderLoop());
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.close();
     window.removeEventListener('keydown', this.onWindowKeyDown);
-    this.resizeObserver?.disconnect();
     this.clearPreview();
-    this.componentController?.dispose();
-    this.transformControls?.dispose();
-    this.controls?.dispose();
-    this.stage?.dispose();
+    this.releaseRendererState();
     this.surfaceEditor?.dispose();
-    this.renderer?.dispose();
+    this.surfaceEditor = null;
     this.overlay.remove();
   }
 }

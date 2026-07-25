@@ -24,19 +24,37 @@ const SLOT_BY_KEY = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map((slot) => [slot.k
 const SLOT_ORDER = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map(({ key }, index) => [key, index]));
 
 function requireObject(value, field) {
-  if (value == null) return {};
-  if (typeof value !== 'object' || Array.isArray(value)) {
+  if (value === undefined) return {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${field} must be an object.`);
   }
   return value;
 }
 
-function requireFinite(value, field, minimum, maximum) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < minimum || number > maximum) {
-    throw new Error(`${field} must be between ${minimum} and ${maximum}.`);
+function optionalString(value, field, fallback) {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
   }
-  return number;
+  return value;
+}
+
+function requireString(value, field) {
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
+  }
+  return value;
+}
+
+function valueOrDefault(value, fallback) {
+  return value === undefined ? fallback : value;
+}
+
+function requireFinite(value, field, minimum, maximum) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${field} must be between ${minimum} and ${maximum} and be a finite number.`);
+  }
+  return value;
 }
 
 function compareKey(left, right) {
@@ -83,7 +101,7 @@ function normalizeSource(id, input) {
     throw new Error(`Invalid workshop albedo source id: ${id}.`);
   }
   const source = requireObject(input, `Albedo source ${id}`);
-  const dataUrl = String(source.dataUrl ?? '');
+  const dataUrl = requireString(source.dataUrl, `Albedo source ${id} data URL`);
   const match = VALID_DATA_URL.exec(dataUrl);
   if (!match) {
     throw new Error('Workshop albedo textures must be PNG, JPEG, or WebP images.');
@@ -92,10 +110,10 @@ function normalizeSource(id, input) {
     throw new Error('A workshop albedo texture is too large after processing.');
   }
   validateImageData(dataUrl, match[1].toLowerCase(), match[2]);
-  return Object.freeze({
-    name: String(source.name ?? 'Imported texture').trim().slice(0, 80) || 'Imported texture',
-    dataUrl,
-  });
+  const name = optionalString(source.name, `Albedo source ${id} name`, 'Imported texture')
+    .trim()
+    .slice(0, 80) || 'Imported texture';
+  return Object.freeze({ name, dataUrl });
 }
 
 function normalizeSlot(key, input, sources) {
@@ -103,26 +121,31 @@ function normalizeSlot(key, input, sources) {
     throw new Error(`Unknown workshop material area: ${key}.`);
   }
   const slot = requireObject(input, `Material area ${key}`);
-  const sourceId = String(slot.sourceId ?? '');
+  const sourceId = requireString(slot.sourceId, `Material area ${key} source id`);
   if (!sources[sourceId]) {
     throw new Error(`Material area ${key} references a missing albedo source.`);
   }
-  const mapping = String(slot.mapping ?? 'repeat');
+  const mapping = optionalString(slot.mapping, `Material area ${key} mapping`, 'repeat');
   if (!VALID_MAPPINGS.has(mapping)) {
     throw new Error(`Unknown albedo mapping mode: ${mapping}.`);
   }
-  const rotation = Number(slot.rotation ?? 0);
-  if (!VALID_ROTATIONS.has(rotation)) {
+  const rotation = valueOrDefault(slot.rotation, 0);
+  if (typeof rotation !== 'number' || !VALID_ROTATIONS.has(rotation)) {
     throw new Error('Albedo rotation must be 0, 90, 180, or 270 degrees.');
   }
-  const tint = String(slot.tint ?? '#ffffff').toLowerCase();
+  const tint = optionalString(slot.tint, `Material area ${key} tint`, '#ffffff').toLowerCase();
   if (!VALID_TINT.test(tint)) {
     throw new Error('Albedo tint must be a six-digit hex color.');
   }
   return Object.freeze({
     sourceId,
     mapping,
-    repeat: requireFinite(slot.repeat ?? SLOT_BY_KEY.get(key).repeat, 'Albedo repeat', 0.25, 8),
+    repeat: requireFinite(
+      valueOrDefault(slot.repeat, SLOT_BY_KEY.get(key).repeat),
+      'Albedo repeat',
+      0.25,
+      8,
+    ),
     rotation,
     tint,
   });
@@ -139,7 +162,7 @@ function slotOrder([left], [right]) {
 }
 
 export function createSurfaceTextureSourceId(dataUrl) {
-  const value = String(dataUrl);
+  const value = requireString(dataUrl, 'Workshop albedo data URL');
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);

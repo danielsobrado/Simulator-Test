@@ -17,16 +17,55 @@ const VALID_FINISHES = new Set(['masonry', 'ochre', 'limewash', 'rose']);
 const VALID_SHAPES = new Set(['classic', 'stepped', 'tapered']);
 const VALID_TOWER_SIDES = new Set(['left', 'right', 'none']);
 
+function requireObject(value, field, { allowMissing = false } = {}) {
+  if (value === undefined && allowMissing) return {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${field} must be an object.`);
+  }
+  return value;
+}
+
+function requireString(value, field) {
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
+  }
+  return value;
+}
+
+function optionalString(value, field, fallback) {
+  if (value === undefined) return fallback;
+  return requireString(value, field);
+}
+
+function valueOrDefault(value, fallback) {
+  return value === undefined ? fallback : value;
+}
+
 function requireFinite(value, field, minimum, maximum) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < minimum || number > maximum) {
-    throw new Error(`${field} must be between ${minimum} and ${maximum}.`);
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${field} must be between ${minimum} and ${maximum} and be a finite number.`);
+  }
+  return value;
+}
+
+function requireInteger(value, field, minimum, maximum) {
+  const number = requireFinite(value, field, minimum, maximum);
+  if (!Number.isInteger(number)) {
+    throw new Error(`${field} must be an integer between ${minimum} and ${maximum}.`);
   }
   return number;
 }
 
+function optionalBoolean(value, field, fallback) {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') {
+    throw new Error(`${field} must be true or false.`);
+  }
+  return value;
+}
+
 function slugify(value) {
-  return String(value)
+  return value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -44,12 +83,13 @@ function hashString(value) {
 }
 
 export function normalizeProceduralRecipe(input = {}) {
-  const archetype = String(input.archetype ?? 'wall');
-  const style = String(input.style ?? 'granite');
-  const topStyle = String(input.topStyle ?? 'battlements');
-  const finish = String(input.finish ?? 'masonry');
-  const shape = String(input.shape ?? 'classic');
-  const towerSide = String(input.towerSide ?? 'left');
+  const source = requireObject(input, 'Workshop recipe', { allowMissing: true });
+  const archetype = optionalString(source.archetype, 'Workshop archetype', 'wall');
+  const style = optionalString(source.style, 'Workshop stone style', 'granite');
+  const topStyle = optionalString(source.topStyle, 'Workshop top style', 'battlements');
+  const finish = optionalString(source.finish, 'Workshop wall finish', 'masonry');
+  const shape = optionalString(source.shape, 'Workshop silhouette', 'classic');
+  const towerSide = optionalString(source.towerSide, 'Workshop tower position', 'left');
   if (!VALID_ARCHETYPES.has(archetype)) {
     throw new Error(`Unknown workshop archetype: ${archetype}.`);
   }
@@ -76,29 +116,40 @@ export function normalizeProceduralRecipe(input = {}) {
     finish,
     shape,
     towerSide,
-    width: requireFinite(input.width ?? 8, 'Width', 2, 16),
-    depth: requireFinite(input.depth ?? 2, 'Depth', 1, 12),
-    height: requireFinite(input.height ?? 5, 'Height', 2, 14),
-    roofScale: requireFinite(input.roofScale ?? 1, 'Roof height', 0.55, 2),
-    roofOverhang: requireFinite(input.roofOverhang ?? 0.35, 'Roof overhang', 0.1, 0.9),
-    seed: Math.trunc(requireFinite(input.seed ?? 1, 'Seed', 0, 0x7fffffff)),
-    detail: Math.trunc(requireFinite(input.detail ?? 2, 'Detail', 1, 3)),
-    weathering: requireFinite(input.weathering ?? 0.35, 'Weathering', 0, 1),
-    windows: input.windows !== false,
-    ivy: input.ivy === true,
-    remesh: input.remesh !== false,
-    albedo: input.albedo !== false,
-    surfaceTextures: normalizeSurfaceTextures(input.surfaceTextures),
-    componentTransforms: normalizeComponentTransforms(input.componentTransforms),
+    width: requireFinite(valueOrDefault(source.width, 8), 'Width', 2, 16),
+    depth: requireFinite(valueOrDefault(source.depth, 2), 'Depth', 1, 12),
+    height: requireFinite(valueOrDefault(source.height, 5), 'Height', 2, 14),
+    roofScale: requireFinite(valueOrDefault(source.roofScale, 1), 'Roof height', 0.55, 2),
+    roofOverhang: requireFinite(
+      valueOrDefault(source.roofOverhang, 0.35),
+      'Roof overhang',
+      0.1,
+      0.9,
+    ),
+    seed: requireInteger(valueOrDefault(source.seed, 1), 'Seed', 0, 0x7fffffff),
+    detail: requireInteger(valueOrDefault(source.detail, 2), 'Detail', 1, 3),
+    weathering: requireFinite(valueOrDefault(source.weathering, 0.35), 'Weathering', 0, 1),
+    windows: optionalBoolean(source.windows, 'Doors and windows', true),
+    ivy: optionalBoolean(source.ivy, 'Procedural ivy', false),
+    remesh: optionalBoolean(source.remesh, 'Remeshing', true),
+    albedo: optionalBoolean(source.albedo, 'Procedural albedo', true),
+    surfaceTextures: normalizeSurfaceTextures(source.surfaceTextures),
+    componentTransforms: normalizeComponentTransforms(source.componentTransforms),
   });
 }
 
-export function createProceduralAssetRecord({ label, recipe }, existingKeys = new Set()) {
-  const normalizedLabel = String(label ?? '').trim().slice(0, 48);
+export function createProceduralAssetRecord(input, existingKeys = new Set()) {
+  const source = requireObject(input, 'Procedural game object');
+  const normalizedLabel = requireString(source.label, 'Game-object name').trim().slice(0, 48);
   if (!normalizedLabel) {
     throw new Error('A game-object name is required.');
   }
-  const normalizedRecipe = normalizeProceduralRecipe(recipe);
+  if (!(existingKeys instanceof Set)) {
+    throw new Error('Existing procedural object keys must be a Set.');
+  }
+  const normalizedRecipe = normalizeProceduralRecipe(
+    requireObject(source.recipe, 'Procedural game-object recipe'),
+  );
   const signature = JSON.stringify([normalizedLabel, normalizedRecipe]);
   const baseKey = `workshop-${slugify(normalizedLabel)}-${hashString(signature)}`;
   let key = baseKey;
@@ -116,21 +167,24 @@ export function createProceduralAssetRecord({ label, recipe }, existingKeys = ne
 }
 
 function normalizeRecord(input) {
-  if (!SUPPORTED_ASSET_VERSIONS.has(input?.version)) {
+  const source = requireObject(input, 'Procedural game-object record');
+  if (!SUPPORTED_ASSET_VERSIONS.has(source.version)) {
     throw new Error('Unsupported procedural game-object version.');
   }
-  if (typeof input.key !== 'string' || !/^workshop-[a-z0-9-]+$/.test(input.key)) {
+  if (typeof source.key !== 'string' || !/^workshop-[a-z0-9-]+$/.test(source.key)) {
     throw new Error('Procedural game object has an invalid key.');
   }
-  const label = String(input.label ?? '').trim().slice(0, 48);
+  const label = requireString(source.label, 'Procedural game-object label').trim().slice(0, 48);
   if (!label) {
     throw new Error('Procedural game object has no label.');
   }
   return Object.freeze({
     version: ASSET_VERSION,
-    key: input.key,
+    key: source.key,
     label,
-    recipe: normalizeProceduralRecipe(input.recipe),
+    recipe: normalizeProceduralRecipe(
+      requireObject(source.recipe, 'Procedural game-object recipe'),
+    ),
   });
 }
 
