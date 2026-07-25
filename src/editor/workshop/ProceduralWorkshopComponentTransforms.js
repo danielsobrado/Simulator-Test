@@ -41,6 +41,10 @@ function isNear(left, right) {
   return Math.abs(left - right) <= IDENTITY_EPSILON;
 }
 
+function componentOrder([left], [right]) {
+  return left.localeCompare(right);
+}
+
 export function isIdentityComponentTransform(transform) {
   return transform.position.every((value) => isNear(value, 0))
     && transform.rotation.every((value) => isNear(value, 0))
@@ -85,7 +89,7 @@ export function normalizeComponentTransform(input = {}) {
 
 export function normalizeComponentTransforms(input = {}) {
   const values = requireObject(input, 'Workshop component transforms');
-  const entries = Object.entries(values);
+  const entries = Object.entries(values).sort(componentOrder);
   if (entries.length > MAX_COMPONENT_TRANSFORMS) {
     throw new Error(`The workshop supports at most ${MAX_COMPONENT_TRANSFORMS} edited components.`);
   }
@@ -99,6 +103,15 @@ export function normalizeComponentTransforms(input = {}) {
     if (!isIdentityComponentTransform(transform)) {
       result[componentId] = transform;
     }
+  }
+  return Object.freeze(result);
+}
+
+export function filterComponentTransforms(input = {}, componentIds = new Set()) {
+  const normalized = normalizeComponentTransforms(input);
+  const result = {};
+  for (const [componentId, transform] of Object.entries(normalized)) {
+    if (componentIds.has(componentId)) result[componentId] = transform;
   }
   return Object.freeze(result);
 }
