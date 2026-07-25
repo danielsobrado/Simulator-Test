@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three/webgpu';
 import { disposeModelParts } from '../src/editor/assets/modelParts.js';
-import { createProceduralMedievalWorkshopParts } from '../src/editor/workshop/ProceduralMedievalWorkshopGenerator.js';
+import {
+  createProceduralMedievalWorkshopParts,
+  getProceduralMedievalWorkshopStats,
+} from '../src/editor/workshop/ProceduralMedievalWorkshopGenerator.js';
 
 function recipe(overrides = {}) {
   return {
@@ -99,6 +102,18 @@ test('validated medieval remeshing preserves bounded draw parts and source stats
   } finally {
     disposeModelParts(parts);
   }
+});
+
+test('stats preserve requested remesh draw-part semantics', () => {
+  const source = recipe({ archetype: 'square-tower' });
+  const raw = getProceduralMedievalWorkshopStats({ ...source, remesh: false });
+  const merged = getProceduralMedievalWorkshopStats({ ...source, remesh: true });
+
+  assert.equal(merged.stones, raw.stones);
+  assert.equal(merged.features, raw.features);
+  assert.equal(merged.sourceVertices, raw.sourceVertices);
+  assert.ok(merged.drawParts > 0 && merged.drawParts <= 7);
+  assert.ok(raw.drawParts > merged.drawParts);
 });
 
 test('extreme gatehouse dimensions fail before unbounded masonry generation', () => {
