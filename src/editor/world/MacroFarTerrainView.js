@@ -17,10 +17,17 @@ const FALLBACK_COLOR = '#3b4a57';
  * rebuild when the floating origin snaps (rare, every few km of travel).
  */
 export class MacroFarTerrainView {
-  constructor({ scene, worldStore, floatingOrigin, config }) {
+  constructor({
+    scene,
+    worldStore,
+    floatingOrigin,
+    config,
+    forestFieldProvider = null,
+  }) {
     this.scene = scene;
     this.worldStore = worldStore;
     this.floatingOrigin = floatingOrigin;
+    this.forestFieldProvider = forestFieldProvider;
 
     const farConfig = config.world?.farTerrain ?? {};
     this.enabled = farConfig.enabled !== false;
@@ -39,6 +46,7 @@ export class MacroFarTerrainView {
     this.builtOriginX = null;
     this.builtOriginZ = null;
     this.colorCache = new Map();
+    this.builtForestSignature = null;
 
     const vertexCount = this.resolution * this.resolution;
     this.positions = new Float32Array(vertexCount * 3);
@@ -105,12 +113,51 @@ export class MacroFarTerrainView {
     return color;
   }
 
+  buildForestSignalGrid(originX, originZ) {
+    const field = this.forestFieldProvider?.();
+    if (!field) return null;
+    const stride = 4;
+    const size = Math.ceil((this.resolution - 1) / stride) + 1;
+    const values = new Float32Array(size * size);
+    const step = (2 * this.radius) / (this.resolution - 1);
+    for (let gridZ = 0; gridZ < size; gridZ += 1) {
+      const vertexZ = Math.min(this.resolution - 1, gridZ * stride);
+      const canonicalZ = -this.radius + vertexZ * step + originZ;
+      for (let gridX = 0; gridX < size; gridX += 1) {
+        const vertexX = Math.min(this.resolution - 1, gridX * stride);
+        const canonicalX = -this.radius + vertexX * step + originX;
+        const habitat = field.sample(canonicalX, canonicalZ);
+        values[gridZ * size + gridX] = habitat.patchCoverage
+          * Math.min(1, habitat.suitability * 1.4);
+      }
+    }
+    return { values, size, stride, signature: field.signature };
+  }
+
+  forestSignalAt(grid, x, z) {
+    if (!grid) return 0;
+    const gridX = x / grid.stride;
+    const gridZ = z / grid.stride;
+    const x0 = Math.min(grid.size - 1, Math.floor(gridX));
+    const z0 = Math.min(grid.size - 1, Math.floor(gridZ));
+    const x1 = Math.min(grid.size - 1, x0 + 1);
+    const z1 = Math.min(grid.size - 1, z0 + 1);
+    const tx = gridX - x0;
+    const tz = gridZ - z0;
+    const bottom = grid.values[z0 * grid.size + x0] * (1 - tx)
+      + grid.values[z0 * grid.size + x1] * tx;
+    const top = grid.values[z1 * grid.size + x0] * (1 - tx)
+      + grid.values[z1 * grid.size + x1] * tx;
+    return bottom * (1 - tz) + top * tz;
+  }
+
   rebuild(originX, originZ) {
     const n = this.resolution;
     const radius = this.radius;
     const step = (2 * radius) / (n - 1);
     const tileSize = this.worldStore.tileSize;
     const { positions, colors } = this;
+    const forestGrid = this.buildForestSignalGrid(originX, originZ);
 
     for (let j = 0; j < n; j += 1) {
       const renderZ = -radius + j * step;
@@ -121,12 +168,14 @@ export class MacroFarTerrainView {
         const { height, tileId } = this.generator.sampleMacroColumn(cellX, cellZ);
         const offset = (j * n + i) * 3;
         positions[offset] = renderX;
-        positions[offset + 1] = height - this.heightBias;
+        const forestSignal = this.forestSignalAt(forestGrid, i, j);
+        const canopyRelief = forestSignal * (0.32 + ((i * 17 + j * 31) % 7) / 35);
+        positions[offset + 1] = height - this.heightBias + canopyRelief;
         positions[offset + 2] = renderZ;
         const color = this.colorForTile(tileId);
-        colors[offset] = color.r;
-        colors[offset + 1] = color.g;
-        colors[offset + 2] = color.b;
+        colors[offset] = color.r * (1 - forestSignal * 0.25);
+        colors[offset + 1] = color.g * (1 - forestSignal * 0.14);
+        colors[offset + 2] = color.b * (1 - forestSignal * 0.24);
       }
     }
 
@@ -136,6 +185,7 @@ export class MacroFarTerrainView {
     this.geometry.computeBoundingSphere();
     this.builtOriginX = originX;
     this.builtOriginZ = originZ;
+    this.builtForestSignature = forestGrid?.signature ?? null;
     this.mesh.visible = true;
   }
 
@@ -151,8 +201,9 @@ export class MacroFarTerrainView {
       return;
     }
     const origin = this.floatingOrigin.getState();
+    const forestSignature = this.forestFieldProvider?.()?.signature ?? null;
     if (this.builtOriginX === origin.x && this.builtOriginZ === origin.z) {
-      return;
+      if (this.builtForestSignature === forestSignature) return;
     }
     this.rebuild(origin.x, origin.z);
   }

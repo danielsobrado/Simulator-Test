@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { vec3 } from 'three/tsl';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 function unionBounds(parts, kind = null) {
   const box = new THREE.Box3();
@@ -73,14 +74,30 @@ export function createTreeProxyPrototype(parts, config) {
   const trunkSize = trunkBounds.getSize(new THREE.Vector3());
   const trunkCenter = trunkBounds.getCenter(new THREE.Vector3());
 
-  const canopyGeometry = new THREE.ConeGeometry(
-    Math.max(leafSize.x, leafSize.z) * 0.52,
-    Math.max(0.2, leafSize.y),
-    7,
-    1,
-    false,
-  );
-  canopyGeometry.translate(leafCenter.x, leafCenter.y, leafCenter.z);
+  const crownWidth = Math.max(0.2, Math.max(leafSize.x, leafSize.z));
+  const crownHeight = Math.max(0.2, leafSize.y);
+  const crownLobeGeometries = [
+    [-0.22, -0.08, 0.04, 0.68],
+    [0.2, -0.02, -0.08, 0.72],
+    [0, 0.24, 0.08, 0.62],
+  ].map(([offsetX, offsetY, offsetZ, scale], index) => {
+    const geometry = new THREE.DodecahedronGeometry(0.5, 0);
+    geometry.scale(
+      crownWidth * scale,
+      crownHeight * scale,
+      crownWidth * scale * (index === 2 ? 0.84 : 0.96),
+    );
+    geometry.translate(
+      leafCenter.x + offsetX * crownWidth,
+      leafCenter.y + offsetY * crownHeight,
+      leafCenter.z + offsetZ * crownWidth,
+    );
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    return geometry;
+  });
+  const canopyGeometry = mergeGeometries(crownLobeGeometries, false);
+  crownLobeGeometries.forEach((geometry) => geometry.dispose());
   const trunkGeometry = new THREE.CylinderGeometry(
     Math.max(0.04, Math.max(trunkSize.x, trunkSize.z) * 0.42),
     Math.max(0.05, Math.max(trunkSize.x, trunkSize.z) * 0.55),
@@ -132,6 +149,31 @@ export function createCanopyClusterPart(config) {
     material: makeMaterial(config.trees.leafBottom),
     kind: 'leaf',
   };
+}
+
+export function createForestUnderstoryPrototypes(config) {
+  const shrubGeometry = new THREE.DodecahedronGeometry(0.5, 0);
+  shrubGeometry.scale(1.15, 0.7, 1);
+  shrubGeometry.translate(0, 0.35, 0);
+  shrubGeometry.computeBoundingBox();
+  shrubGeometry.computeBoundingSphere();
+  const logGeometry = new THREE.CylinderGeometry(0.12, 0.17, 1.8, 6, 1);
+  logGeometry.rotateZ(Math.PI * 0.5);
+  logGeometry.translate(0, 0.14, 0);
+  logGeometry.computeBoundingBox();
+  logGeometry.computeBoundingSphere();
+  return [
+    [{
+      geometry: shrubGeometry,
+      material: makeMaterial(config.trees.leafBottom),
+      kind: 'leaf',
+    }],
+    [{
+      geometry: logGeometry,
+      material: makeMaterial(config.trees.barkTint),
+      kind: 'trunk',
+    }],
+  ];
 }
 
 export function createRockProxyPrototype(prototype) {

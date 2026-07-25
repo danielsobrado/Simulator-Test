@@ -44,13 +44,19 @@ export class StylizedSurfaceView {
     this.treeView = this.enabled
       ? new StylizedTreeView({
         terrainView,
+        objectMap,
         config,
         revisionTracker: this.revisionTracker,
         baseUrl,
       })
       : null;
     this.flowerView = this.enabled && !this.impostorBakeMode
-      ? new StylizedFlowerView({ terrainView, config, baseUrl })
+      ? new StylizedFlowerView({
+        terrainView,
+        config,
+        baseUrl,
+        forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+      })
       : null;
     this.ready = this.bootstrapLayers();
     this.bakeRequest = this.ready.then(() => this.maybeHandleImpostorBake());
@@ -64,6 +70,7 @@ export class StylizedSurfaceView {
         objectMap,
         config,
         sunDirection,
+        forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
       }))
       : [];
     this.waterSlots = this.enabled && !this.impostorBakeMode && config.water?.enabled
@@ -184,6 +191,7 @@ export class StylizedSurfaceView {
       void job;
       return this.treeView?.applyPendingRebuild() ?? false;
     });
+    this.updateForestGroundTextures();
     this.flowerView?.update(timestamp);
     for (const slot of this.waterSlots) slot.update(timestamp);
 
@@ -257,6 +265,37 @@ export class StylizedSurfaceView {
 
     this.grassBuildQueue.flush((job) => job.slot.applyPendingRebuild());
     this.flowerBuildQueue.flush((job) => job.slot.applyPendingRebuild());
+  }
+
+  updateForestGroundTextures() {
+    const field = this.treeView?.manifestStore?.forestField;
+    if (!field) return;
+    for (const terrainSlot of this.terrainView.slots) {
+      const descriptor = terrainSlot.descriptor;
+      if (!descriptor) continue;
+      const key = `${descriptor.key}:${terrainSlot.pageRevision}:${field.signature}`;
+      if (terrainSlot.forestFloorKey === key) continue;
+      const size = terrainSlot.forestFloorSize;
+      const half = this.chunkWorldSize * 0.5;
+      for (let z = 0; z < size; z += 1) {
+        const worldZ = descriptor.centerWorldZ + half
+          - (z + 0.5) / size * this.chunkWorldSize;
+        for (let x = 0; x < size; x += 1) {
+          const worldX = descriptor.centerWorldX - half
+            + (x + 0.5) / size * this.chunkWorldSize;
+          const habitat = field.sample(worldX, worldZ);
+          terrainSlot.forestFloorPixels[z * size + x] = Math.round(
+            Math.min(1, habitat.patchCoverage * habitat.suitability * 1.35) * 255,
+          );
+        }
+      }
+      terrainSlot.forestFloorTexture.needsUpdate = true;
+      terrainSlot.forestFloorKey = key;
+      PerfCounters.inc('forestFloorTextureUploads');
+      // Habitat sampling is deliberately budgeted to one low-resolution slot
+      // per frame so chunk streaming cannot trigger an unbounded rebuild burst.
+      return;
+    }
   }
 
   dispose() {

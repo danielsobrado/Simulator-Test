@@ -40,11 +40,12 @@ test('render asset metadata is normalized without changing placement data', () =
   assert.ok(Object.isFrozen(entry.asset.offset));
 });
 
-test('missing or invalid production asset metadata fails closed', () => {
-  assert.throws(
-    () => createObjectRenderCatalog([definition({ asset: undefined })], placementCatalog),
-    /missing its GLB asset/,
-  );
+test('objects without a GLB asset render procedurally and are skipped', () => {
+  assert.deepEqual(createObjectRenderCatalog([definition({ asset: undefined })], placementCatalog), []);
+  assert.deepEqual(createObjectRenderCatalog([definition({ asset: null })], placementCatalog), []);
+});
+
+test('invalid production asset metadata fails closed', () => {
   assert.throws(
     () => createObjectRenderCatalog([definition({ asset: { path: '../cottage.obj' } })], placementCatalog),
     /GLB file/,

@@ -59,8 +59,8 @@ export class CpuTreeImpostorBatch {
     return this.records.length;
   }
 
-  update(camera, origin) {
-    updateImpostorCameraUniforms(this.uniforms, camera);
+  update(camera, origin, timestamp = 0) {
+    updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projectionView);
     const transforms = this.geometry.getAttribute('instanceTransform');

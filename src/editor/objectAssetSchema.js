@@ -41,19 +41,32 @@ function parseAsset(rawAsset, key) {
   });
 }
 
+/**
+ * Builds the GLB side of the object catalog.
+ *
+ * The `asset` block is optional: objects that omit it render from their
+ * procedural model alone and are simply left out of the loader's work list.
+ */
 export function createObjectRenderCatalog(rawDefinitions, placementCatalog) {
   if (!Array.isArray(rawDefinitions)) {
     throw new Error('Object render catalog must be an array.');
   }
   const rawByKey = new Map(rawDefinitions.map((definition) => [definition?.key, definition]));
-  return Object.freeze(placementCatalog.map((definition) => {
+  const entries = [];
+
+  for (const definition of placementCatalog) {
     const rawDefinition = rawByKey.get(definition.key);
     if (!rawDefinition) {
       throw new Error(`Object ${definition.key} is missing from the render catalog.`);
     }
-    return Object.freeze({
+    if (rawDefinition.asset === undefined || rawDefinition.asset === null) {
+      continue;
+    }
+    entries.push(Object.freeze({
       ...definition,
       asset: parseAsset(rawDefinition.asset, definition.key),
-    });
-  }));
+    }));
+  }
+
+  return Object.freeze(entries);
 }

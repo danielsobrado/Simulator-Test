@@ -54,6 +54,9 @@ export function installObjectAssets({ objectView, catalog, tileSize, ui, baseUrl
     if (!active) {
       return report;
     }
+    if (report.total === 0) {
+      return report;
+    }
     if (report.failures.length > 0) {
       console.warn('Some GLB assets failed; procedural fallbacks remain active.', report.failures);
       ui.showToast(

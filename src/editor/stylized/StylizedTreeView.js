@@ -2,7 +2,11 @@ import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList, normalizeBaseUrl, resolveAssetUrl } from '../assets/assetUrl.js';
-import { extractPrototypeParts, findPrototypeRoots } from './StylizedTreePrototypes.js';
+import {
+  attachRootCollar,
+  extractPrototypeParts,
+  findPrototypeRoots,
+} from './StylizedTreePrototypes.js';
 import { createStylizedLeafMaterial, createStylizedTrunkMaterial } from './StylizedTreeMaterials.js';
 import { instanceCapacity } from './scatterMath.js';
 import { TreeManifestStore } from './TreeManifestStore.js';
@@ -13,7 +17,11 @@ import {
   disposeInstancedRenderers,
   pruneStateMap,
 } from './lod/StylizedLodRuntime.js';
-import { createCanopyClusterPart, createTreeProxyPrototype } from './lod/StylizedProxyGeometry.js';
+import {
+  createCanopyClusterPart,
+  createForestUnderstoryPrototypes,
+  createTreeProxyPrototype,
+} from './lod/StylizedProxyGeometry.js';
 import {
   TreeImpostorAssetLoader,
   disposeTreeImpostorAtlases,
@@ -69,10 +77,11 @@ function disposePrototypeParts(prototypes) {
 }
 
 export class StylizedTreeView {
-  constructor({ terrainView, config, revisionTracker, baseUrl = '/' }) {
+  constructor({ terrainView, objectMap = null, config, revisionTracker, baseUrl = '/' }) {
     this.terrainView = terrainView;
     this.config = config;
     this.revisionTracker = revisionTracker;
+    this.objectMap = objectMap;
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.textureLoader = new THREE.TextureLoader();
     this.time = uniform(0);
@@ -84,6 +93,9 @@ export class StylizedTreeView {
     this.proxyRenderers = [];
     this.fallbackImpostorRenderers = [];
     this.clusterRenderers = [];
+    this.understoryRenderers = [];
+    this.clusterPrototypes = [];
+    this.understoryPrototypes = [];
     this.impostorAtlases = [];
     this.impostorBatches = [];
     this.impostorVersion = 0;
@@ -159,6 +171,7 @@ export class StylizedTreeView {
           sourceMap: leafMap,
         };
       });
+      attachRootCollar(parts);
       if (parts.length > 0) this.prototypes.push(parts);
     }
     if (this.prototypes.length === 0) {
@@ -171,9 +184,13 @@ export class StylizedTreeView {
 
   createRenderResources() {
     const settings = lodSettings(this.config);
+    const acceptedPerChunk = Math.max(
+      this.config.trees.perChunk,
+      Math.trunc(this.config.trees.habitat?.maxAcceptedPerChunk) || 0,
+    );
     const capacity = instanceCapacity({
       residentRadius: settings.impostorRadius + 1,
-      perChunk: this.config.trees.perChunk,
+      perChunk: acceptedPerChunk,
     });
     const proxies = this.prototypes.map((parts) => createTreeProxyPrototype(parts, this.config));
     this.proxyPrototypes = proxies.map((prototype) => prototype.proxyParts);
@@ -201,11 +218,23 @@ export class StylizedTreeView {
       name: 'stylized-pine-impostor-fallback',
       castShadow: false,
     });
+    this.clusterPrototypes = [[createCanopyClusterPart(this.config)]];
     this.clusterRenderers = createInstancedRenderers({
       root: this.root,
-      partsByPrototype: [[createCanopyClusterPart(this.config)]],
-      capacity: (settings.clusterRadius * 2 + 3) ** 2,
+      partsByPrototype: this.clusterPrototypes,
+      capacity: instanceCapacity({
+        residentRadius: settings.clusterRadius + 1,
+        perChunk: acceptedPerChunk,
+      }),
       name: 'stylized-canopy-cluster',
+      castShadow: false,
+    });
+    this.understoryPrototypes = createForestUnderstoryPrototypes(this.config);
+    this.understoryRenderers = createInstancedRenderers({
+      root: this.root,
+      partsByPrototype: this.understoryPrototypes,
+      capacity,
+      name: 'stylized-forest-understory',
       castShadow: false,
     });
     this.manifestStore = new TreeManifestStore({
@@ -213,6 +242,7 @@ export class StylizedTreeView {
       config: this.config,
       revisionTracker: this.revisionTracker,
       prototypeCount: this.prototypes.length,
+      objectMap: this.objectMap,
       onBuilt: () => {
         // Newly built manifests need a follow-up LOD write; the update loop
         // detects `manifestFlush.built > 0` and enqueues one budgeted rebuild.
@@ -293,6 +323,7 @@ export class StylizedTreeView {
         transitionStates: this.chunkLodStates,
         timestamp,
         transitionMs: settings.transitionMs,
+        positionForChunk: (chunkX, chunkZ) => this.manifestStore.lodAnchor(chunkX, chunkZ),
       })
       : {
         entries: this.createNearOnlyPlan(focus, radius),
@@ -331,7 +362,7 @@ export class StylizedTreeView {
     const submitted = { cpu: 0, gpu: 0 };
     const known = { cpu: true, gpu: true };
     for (const batch of this.impostorBatches) {
-      const result = batch.update(camera, origin);
+      const result = batch.update(camera, origin, timestamp);
       if (Number.isFinite(result.submitted)) {
         submitted[result.mode] += result.submitted;
       } else {
@@ -362,6 +393,7 @@ export class StylizedTreeView {
       proxyRenderers: this.proxyRenderers,
       fallbackImpostorRenderers: this.fallbackImpostorRenderers,
       clusterRenderers: this.clusterRenderers,
+      understoryRenderers: this.understoryRenderers,
     });
     this.manifestStore.flush();
     return true;
@@ -398,11 +430,14 @@ export class StylizedTreeView {
     disposeInstancedRenderers(this.root, this.proxyRenderers);
     disposeInstancedRenderers(this.root, this.fallbackImpostorRenderers);
     disposeInstancedRenderers(this.root, this.clusterRenderers);
+    disposeInstancedRenderers(this.root, this.understoryRenderers);
     for (const batch of this.impostorBatches) batch.dispose();
     disposeTreeImpostorAtlases(this.impostorAtlases);
     disposePrototypeParts(this.prototypes);
     disposePrototypeParts(this.proxyPrototypes);
     disposePrototypeParts(this.fallbackImpostorPrototypes);
+    disposePrototypeParts(this.clusterPrototypes);
+    disposePrototypeParts(this.understoryPrototypes);
     this.textures.forEach((texture) => texture.dispose());
     this.manifestStore?.dispose();
     this.chunkLodStates.clear();

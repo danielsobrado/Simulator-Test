@@ -42,6 +42,7 @@ export function createTerrainMaterial({
   tileTexture,
   heightTexture,
   surfaceMaskTexture,
+  forestFloorTexture,
   chunkCenter,
   chunkWorldSize,
   width,
@@ -53,6 +54,7 @@ export function createTerrainMaterial({
   const tileColor = texture(tileTexture, terrainUv).rgb;
   const terrainHeight = texture(heightTexture, terrainUv).r;
   const surface = texture(surfaceMaskTexture, terrainUv);
+  const forestFloor = texture(forestFloorTexture, terrainUv).r;
   const cellGrid = gridLine(terrainUv.mul(mapSize), 0.045);
   const heightShade = clamp(
     terrainHeight.mul(HEIGHT_SHADE_SCALE).add(1),
@@ -90,6 +92,12 @@ export function createTerrainMaterial({
   ).mul(stylizedConfig.color.brightness);
   let groundColor = mix(tileColor, grassTint, grassCoverage);
   groundColor = mix(groundColor, colorNode(stylizedConfig.dirt.color), dirt);
+  const forestFloorConfig = stylizedConfig.trees?.forestFloor ?? {};
+  groundColor = mix(
+    groundColor,
+    colorNode(forestFloorConfig.groundCoreColor ?? '#273c25'),
+    forestFloor.mul(forestFloorConfig.groundStrength ?? 0.68),
+  );
 
   const variation = stylizedFbm(worldXZ.mul(stylizedConfig.ground.variationScale)).sub(0.5);
   const grain = stylizedFbm(worldXZ.mul(stylizedConfig.ground.grainScale)).sub(0.5);
@@ -112,6 +120,7 @@ export function createTerrainMaterial({
     const cameraDistance = distance(cameraPosition, positionWorld);
     const farMask = smoothstep(farCover.startDistance, farCover.endDistance, cameraDistance)
       .mul(grassCoverage)
+      .mul(oneMinus(forestFloor))
       .mul(oneMinus(dirt));
     const direction = vec2(farCover.direction[0], farCover.direction[1]);
     const strand = smoothstep(

@@ -11,10 +11,7 @@ const CANDIDATE_AUTHORITY_FIELDS = new Set([
   'x',
   'z',
   'height',
-  'scale',
   'rotationY',
-  'prototypeIndex',
-  'radius',
   'priority',
 ]);
 

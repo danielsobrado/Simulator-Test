@@ -34,9 +34,16 @@ function combineTextures(left, right, colorSpace) {
 }
 
 export class StylizedFlowerView {
-  constructor({ terrainView, config, baseUrl = '/', loader = new THREE.TextureLoader() }) {
+  constructor({
+    terrainView,
+    config,
+    baseUrl = '/',
+    loader = new THREE.TextureLoader(),
+    forestFieldProvider = null,
+  }) {
     this.terrainView = terrainView;
     this.config = config;
+    this.forestFieldProvider = forestFieldProvider;
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.loader = loader;
     this.textures = [];
@@ -82,6 +89,7 @@ export class StylizedFlowerView {
       terrainView: this.terrainView,
       config: this.config,
       textures: atlas,
+      forestFieldProvider: this.forestFieldProvider,
     }));
   }
 

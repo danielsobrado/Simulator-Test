@@ -32,6 +32,8 @@ function createMaterial({ atlas, readTransform, readParameters }) {
   const cameraRight = uniform(new THREE.Vector3(1, 0, 0));
   const cameraUp = uniform(new THREE.Vector3(0, 1, 0));
   const sphericalBlend = uniform(0);
+  const time = uniform(0);
+  const windStrength = uniform(0.03);
   const transform = readTransform();
   const parameters = readParameters();
   const scale = transform.w;
@@ -39,9 +41,13 @@ function createMaterial({ atlas, readTransform, readParameters }) {
   const up = normalize(mix(vec3(0, 1, 0), cameraUp, sphericalBlend));
   const backward = normalize(cross(right, up));
   const local = positionLocal;
+  const canopyOffset = sin(time.mul(0.55).add(parameters.z.mul(TWO_PI)))
+    .mul(windStrength)
+    .mul(scale);
   const worldPosition = transform.xyz
     .add(right.mul(local.x.mul(atlas.width).mul(scale)))
-    .add(up.mul(local.y.mul(atlas.height).mul(scale)));
+    .add(up.mul(local.y.mul(atlas.height).mul(scale)))
+    .add(right.mul(canopyOffset));
 
   const viewDelta = cameraPosition.sub(transform.xyz);
   const localAzimuth = mod(atan(viewDelta.x, viewDelta.z).sub(parameters.x).add(TWO_PI), TWO_PI);
@@ -99,7 +105,7 @@ function createMaterial({ atlas, readTransform, readParameters }) {
   material.fog = true;
   return {
     material,
-    uniforms: { cameraRight, cameraUp, sphericalBlend },
+    uniforms: { cameraRight, cameraUp, sphericalBlend, time, windStrength },
   };
 }
 
@@ -129,11 +135,12 @@ export function createGpuTreeImpostorMaterial({
   });
 }
 
-export function updateImpostorCameraUniforms(uniforms, camera) {
+export function updateImpostorCameraUniforms(uniforms, camera, timestamp = 0) {
   camera.updateMatrixWorld();
   const elements = camera.matrixWorld.elements;
   uniforms.cameraRight.value.set(elements[0], elements[1], elements[2]).normalize();
   uniforms.cameraUp.value.set(elements[4], elements[5], elements[6]).normalize();
   const forwardY = Math.abs(elements[9]);
   uniforms.sphericalBlend.value = THREE.MathUtils.smoothstep(forwardY, 0.35, 0.82);
+  uniforms.time.value = timestamp / 1000;
 }

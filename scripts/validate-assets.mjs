@@ -28,11 +28,13 @@ async function main() {
     if (typeof definition?.key !== 'string' || definition.key.trim() === '') {
       throw new Error('Every object definition must have a key.');
     }
-    if (!definition.asset) {
-      throw new Error(`Object ${definition.key} is missing its production GLB asset.`);
-    }
     if (typeof definition.model !== 'string' || definition.model.trim() === '') {
-      throw new Error(`Object ${definition.key} is missing its procedural fallback model.`);
+      throw new Error(`Object ${definition.key} is missing its procedural model.`);
+    }
+    // The GLB asset is optional: objects without one render procedurally.
+    if (!definition.asset) {
+      console.log(`validated ${definition.key}: procedural model ${definition.model}`);
+      continue;
     }
 
     const filePath = resolvePublicAssetPath(REPOSITORY_ROOT, definition.asset.path);
@@ -54,17 +56,18 @@ async function main() {
     );
   }
 
+  // Unreferenced packs are kept as available art rather than treated as an
+  // error, but they still have to be structurally sound glTF 2 binaries.
   const modelFiles = await listGlbFiles(MODEL_DIRECTORY);
   const unreferenced = modelFiles.filter((filePath) => !referencedFiles.has(path.resolve(filePath)));
-  if (unreferenced.length > 0) {
-    throw new Error(
-      `Unreferenced GLB assets: ${unreferenced.map((filePath) => path.basename(filePath)).join(', ')}.`,
-    );
+  for (const filePath of unreferenced) {
+    validateGlbBuffer(await readFile(filePath), `Unreferenced pack ${path.basename(filePath)}`);
+    console.log(`validated unreferenced pack ${path.basename(filePath)}`);
   }
 
   console.log(
     `validated ${parsed.objects.length} object definitions across `
-    + `${referencedFiles.size} GLB asset packs with procedural fallbacks`,
+    + `${referencedFiles.size} referenced and ${unreferenced.length} unreferenced GLB asset packs`,
   );
 }
 

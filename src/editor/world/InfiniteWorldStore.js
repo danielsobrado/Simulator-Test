@@ -96,6 +96,7 @@ export class InfiniteWorldStore {
     this.baseTerrain = null;
     this.tileOverrides = new Map();
     this.heightOverrides = new Map();
+    this.forestEdits = { version: 1, felled: [], planted: [], patches: [] };
     this.cache = new Map();
     this.clock = 0;
     this.revision = 0;
@@ -413,6 +414,7 @@ export class InfiniteWorldStore {
       tileOverrides: Object.freeze([...this.tileOverrides.entries()]),
       heightOverrides: Object.freeze([...this.heightOverrides.entries()]),
       baseTerrain: this.baseTerrain ? structuredClone(this.baseTerrain) : null,
+      forestEdits: structuredClone(this.forestEdits),
     });
   }
 
@@ -420,6 +422,9 @@ export class InfiniteWorldStore {
     this.setBaseTerrain(snapshot?.baseTerrain ?? null);
     this.tileOverrides = new Map(snapshot?.tileOverrides ?? []);
     this.heightOverrides = new Map(snapshot?.heightOverrides ?? []);
+    this.forestEdits = structuredClone(
+      snapshot?.forestEdits ?? { version: 1, felled: [], planted: [], patches: [] },
+    );
     this.cache.clear();
     this.emit({ kind: 'reset' });
   }
@@ -446,6 +451,7 @@ export class InfiniteWorldStore {
         ...(this.baseTerrain ? { baseTerrain: structuredClone(this.baseTerrain) } : {}),
       },
       chunks,
+      forestEdits: structuredClone(this.forestEdits),
       savedAt: new Date().toISOString(),
     };
   }
@@ -465,6 +471,7 @@ export class InfiniteWorldStore {
     } catch (error) {
       this.tileOverrides = new Map(previous.tileOverrides);
       this.heightOverrides = new Map(previous.heightOverrides);
+      this.forestEdits = structuredClone(previous.forestEdits);
       this.cache.clear();
       throw error;
     }
@@ -503,6 +510,9 @@ export class InfiniteWorldStore {
     }
     this.tileOverrides = tileOverrides;
     this.heightOverrides = heightOverrides;
+    this.forestEdits = structuredClone(
+      document.forestEdits ?? { version: 1, felled: [], planted: [], patches: [] },
+    );
   }
 
   getStats() {

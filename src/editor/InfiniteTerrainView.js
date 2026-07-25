@@ -30,6 +30,8 @@ function createSlot({ slotIndex, scene, geometry, worldStore, stylizedConfig }) 
   const texturePixels = new Uint8Array(chunkSize * chunkSize * 4);
   const surfaceMaskPixels = new Uint8Array(chunkSize * chunkSize * 4);
   const heightPixels = new Float32Array((chunkSize + 1) * (chunkSize + 1));
+  const forestFloorSize = 16;
+  const forestFloorPixels = new Uint8Array(forestFloorSize * forestFloorSize);
   const tileTexture = new THREE.DataTexture(
     texturePixels,
     chunkSize,
@@ -66,11 +68,25 @@ function createSlot({ slotIndex, scene, geometry, worldStore, stylizedConfig }) 
   heightTexture.generateMipmaps = false;
   heightTexture.unpackAlignment = 1;
 
+  const forestFloorTexture = new THREE.DataTexture(
+    forestFloorPixels,
+    forestFloorSize,
+    forestFloorSize,
+    THREE.RedFormat,
+    THREE.UnsignedByteType,
+  );
+  forestFloorTexture.magFilter = THREE.LinearFilter;
+  forestFloorTexture.minFilter = THREE.LinearFilter;
+  forestFloorTexture.generateMipmaps = false;
+  forestFloorTexture.colorSpace = THREE.NoColorSpace;
+  forestFloorTexture.needsUpdate = true;
+
   const chunkCenter = uniform(new THREE.Vector2());
   const material = createTerrainMaterial({
     tileTexture,
     heightTexture,
     surfaceMaskTexture,
+    forestFloorTexture,
     chunkCenter,
     chunkWorldSize: chunkSize * worldStore.tileSize,
     width: chunkSize,
@@ -95,9 +111,13 @@ function createSlot({ slotIndex, scene, geometry, worldStore, stylizedConfig }) 
     texturePixels,
     surfaceMaskPixels,
     heightPixels,
+    forestFloorPixels,
+    forestFloorSize,
     tileTexture,
     surfaceMaskTexture,
     heightTexture,
+    forestFloorTexture,
+    forestFloorKey: null,
     chunkCenter,
     material,
     mesh,
@@ -677,6 +697,7 @@ export class InfiniteTerrainView {
       slot.tileTexture.dispose();
       slot.surfaceMaskTexture.dispose();
       slot.heightTexture.dispose();
+      slot.forestFloorTexture.dispose();
     }
     this.geometry.dispose();
     this.renderer.dispose();

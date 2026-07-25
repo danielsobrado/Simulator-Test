@@ -1,3 +1,9 @@
+# Placeable object catalog.
+#
+# `model` names a procedural model in src/editor/ObjectModelLibrary.js, which
+# builds the object from primitives shaded with the shared procedural surface
+# materials. An optional `asset` block points at a GLB node that replaces the
+# procedural model once it loads; objects without one render procedurally.
 objects:
   - key: cottage
     label: Cottage
@@ -5,12 +11,6 @@ objects:
     category: building
     color: "#b86b3f"
     model: cottage
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "cottage"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 2, depth: 2 }
     foundation:
       mode: terrace
@@ -25,12 +25,6 @@ objects:
     category: building
     color: "#c79432"
     model: farmstead
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "farmstead"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 3, depth: 3 }
     foundation:
       mode: terrace
@@ -45,12 +39,6 @@ objects:
     category: building
     color: "#8f4d34"
     model: inn
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "inn"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 3, depth: 2 }
     foundation:
       mode: terrace
@@ -59,18 +47,68 @@ objects:
       alignToNormal: false
       color: "#65503e"
     allowedTerrain: [savanna, grassland, road, hot_desert, cold_desert, tundra]
+  - key: market_stall
+    label: Market Stall
+    icon: "🏪"
+    category: building
+    color: "#c4703c"
+    model: marketStall
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 12
+      maxDepth: 1.5
+      alignToNormal: false
+      color: "#6b5640"
+    allowedTerrain: [savanna, grassland, road, farm, hot_desert, cold_desert, tundra]
+  - key: blacksmith
+    label: Blacksmith
+    icon: "⚒️"
+    category: building
+    color: "#7a6a63"
+    model: blacksmith
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 14
+      maxDepth: 3
+      alignToNormal: false
+      color: "#5f574e"
+    allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra]
+  - key: chapel
+    label: Chapel
+    icon: "⛪"
+    category: building
+    color: "#a9a79d"
+    model: chapel
+    footprint: { width: 3, depth: 3 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 12
+      maxDepth: 3.5
+      alignToNormal: false
+      color: "#61594e"
+    allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra, glacier]
+  - key: windmill
+    label: Windmill
+    icon: "🌬️"
+    category: building
+    color: "#b0a894"
+    model: windmill
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 12
+      maxDepth: 3
+      alignToNormal: false
+      color: "#635b4e"
+    allowedTerrain: [savanna, grassland, road, farm, hot_desert, cold_desert, tundra]
   - key: wizard_tower
     label: Wizard Tower
     icon: "🧙"
     category: building
     color: "#6750a4"
     model: tower
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "wizard_tower"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 2, depth: 2 }
     foundation:
       mode: terrace
@@ -85,12 +123,6 @@ objects:
     category: defense
     color: "#8b9093"
     model: keep
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "keep"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 4, depth: 4 }
     foundation:
       mode: terrace
@@ -99,18 +131,26 @@ objects:
       alignToNormal: false
       color: "#636769"
     allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra, glacier]
+  - key: watchtower
+    label: Watchtower
+    icon: "🗼"
+    category: defense
+    color: "#8a6a3e"
+    model: watchtower
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 20
+      maxDepth: 2.5
+      alignToNormal: false
+      color: "#5c4a35"
+    allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra, glacier, taiga, wetland]
   - key: wall
     label: Wall Segment
     icon: "🧱"
     category: defense
     color: "#787d80"
     model: wall
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "wall"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 1, depth: 1 }
     foundation:
       mode: terrace
@@ -119,18 +159,110 @@ objects:
       alignToNormal: false
       color: "#5e6264"
     allowedTerrain: [savanna, grassland, road, farm, stone, hot_desert, cold_desert, tundra, glacier]
+  - key: fence
+    label: Fence
+    icon: "🪵"
+    category: defense
+    color: "#9a7648"
+    model: fence
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: conform
+      maxSlopeDegrees: 30
+      maxDepth: 0
+      alignToNormal: true
+      color: "#5e4026"
+    allowedTerrain: [savanna, grassland, road, farm, stone, hot_desert, cold_desert, tundra, taiga, wetland]
+  - key: well
+    label: Village Well
+    icon: "⛲"
+    category: civic
+    color: "#9a978d"
+    model: well
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 16
+      maxDepth: 1.5
+      alignToNormal: false
+      color: "#605a50"
+    allowedTerrain: [savanna, grassland, road, farm, stone, hot_desert, cold_desert, tundra]
+  - key: fountain
+    label: Fountain
+    icon: "⛲"
+    category: civic
+    color: "#a29e94"
+    model: fountain
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 10
+      maxDepth: 2
+      alignToNormal: false
+      color: "#5f594f"
+    allowedTerrain: [savanna, grassland, road, stone]
+  - key: statue
+    label: Statue
+    icon: "🗿"
+    category: civic
+    color: "#a8792f"
+    model: statue
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 14
+      maxDepth: 1.5
+      alignToNormal: false
+      color: "#5f5a50"
+    allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra, glacier, corruption]
+  - key: lamp_post
+    label: Lamp Post
+    icon: "🏮"
+    category: civic
+    color: "#ffd08a"
+    model: lampPost
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: conform
+      maxSlopeDegrees: 26
+      maxDepth: 0
+      alignToNormal: false
+      color: "#4a4e52"
+    allowedTerrain: [savanna, grassland, road, farm, stone, hot_desert, cold_desert, tundra, glacier]
+  - key: campfire
+    label: Campfire
+    icon: "🔥"
+    category: civic
+    color: "#ff9a3c"
+    model: campfire
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: conform
+      maxSlopeDegrees: 24
+      maxDepth: 0
+      alignToNormal: true
+      color: "#4f4740"
+    allowedTerrain: [savanna, grassland, road, stone, hot_desert, cold_desert, tundra, glacier, taiga, temperate_deciduous_forest, temperate_rainforest, wetland]
+  - key: crop_field
+    label: Crop Field
+    icon: "🌱"
+    category: nature
+    color: "#c9a747"
+    model: cropField
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: terrace
+      maxSlopeDegrees: 8
+      maxDepth: 1
+      alignToNormal: false
+      color: "#6f523a"
+    allowedTerrain: [savanna, grassland, farm]
   - key: pine_tree
     label: Pine Tree
     icon: "🌲"
     category: nature
     color: "#2f6b3d"
     model: tree
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "pine_tree"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 1, depth: 1 }
     foundation:
       mode: conform
@@ -139,18 +271,40 @@ objects:
       alignToNormal: false
       color: "#4e4231"
     allowedTerrain: [savanna, grassland, tropical_seasonal_forest, temperate_deciduous_forest, tropical_rainforest, temperate_rainforest, taiga, wetland, tundra]
+  - key: oak_tree
+    label: Oak Tree
+    icon: "🌳"
+    category: nature
+    color: "#4b8a34"
+    model: oakTree
+    footprint: { width: 2, depth: 2 }
+    foundation:
+      mode: conform
+      maxSlopeDegrees: 32
+      maxDepth: 0
+      alignToNormal: false
+      color: "#4e4231"
+    allowedTerrain: [savanna, grassland, farm, tropical_seasonal_forest, temperate_deciduous_forest, tropical_rainforest, temperate_rainforest, wetland]
+  - key: bush
+    label: Bush
+    icon: "🌿"
+    category: nature
+    color: "#487f31"
+    model: bush
+    footprint: { width: 1, depth: 1 }
+    foundation:
+      mode: conform
+      maxSlopeDegrees: 40
+      maxDepth: 0
+      alignToNormal: true
+      color: "#4a4231"
+    allowedTerrain: [savanna, grassland, farm, tropical_seasonal_forest, temperate_deciduous_forest, tropical_rainforest, temperate_rainforest, taiga, wetland, tundra]
   - key: boulder
     label: Boulder
     icon: "🪨"
     category: nature
     color: "#777d7d"
     model: rock
-    asset:
-      path: "assets/models/settlement-core.glb"
-      node: "boulder"
-      scale: 1
-      rotationY: 0
-      offset: [0, 0, 0]
     footprint: { width: 1, depth: 1 }
     foundation:
       mode: conform

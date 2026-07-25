@@ -144,6 +144,26 @@ function validateGroundCover(groundCover) {
 export function validateStylizedLodConfig(config) {
   const surface = config.stylizedSurface;
   if (!surface?.enabled) return config;
+  const habitat = surface.trees?.habitat;
+  if (habitat) {
+    assertBoolean(habitat.enabled, 'stylizedSurface.trees.habitat.enabled');
+    assertPositiveInteger(
+      habitat.candidateBudgetPerChunk,
+      'stylizedSurface.trees.habitat.candidateBudgetPerChunk',
+    );
+    assertPositiveInteger(
+      habitat.maxAcceptedPerChunk,
+      'stylizedSurface.trees.habitat.maxAcceptedPerChunk',
+    );
+    if (habitat.candidateBudgetPerChunk > 96) {
+      throw new Error('Invalid editor configuration: forest candidate budget must not exceed 96.');
+    }
+    if (habitat.maxAcceptedPerChunk > habitat.candidateBudgetPerChunk) {
+      throw new Error('Invalid editor configuration: forest accepted budget must not exceed its candidate budget.');
+    }
+    assertPositive(habitat.patchSupercellSize, 'stylizedSurface.trees.habitat.patchSupercellSize');
+    assertPositive(habitat.slopeSampleDistance, 'stylizedSurface.trees.habitat.slopeSampleDistance');
+  }
 
   if (surface.grass.outerRingDensity !== undefined) {
     assertUnitInterval(surface.grass.outerRingDensity, 'stylizedSurface.grass.outerRingDensity', false);

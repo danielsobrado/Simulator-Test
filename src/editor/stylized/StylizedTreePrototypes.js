@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { materialList } from '../assets/assetUrl.js';
 import {
   bakeWorldGeometry,
@@ -83,4 +84,56 @@ export function extractPrototypeParts(root, config) {
     part.geometry.computeVertexNormals();
   }
   return baked.map(({ geometry, kind, source }) => ({ geometry, kind, source }));
+}
+
+export function createRootCollarGeometry(parts) {
+  const trunkParts = parts.filter((part) => part.kind === 'trunk');
+  if (trunkParts.length === 0) return null;
+  let radius = 0;
+  for (const part of trunkParts) {
+    part.geometry.computeBoundingBox();
+    const box = part.geometry.boundingBox;
+    radius = Math.max(
+      radius,
+      Math.abs(box.min.x),
+      Math.abs(box.max.x),
+      Math.abs(box.min.z),
+      Math.abs(box.max.z),
+    );
+  }
+  radius = Math.max(0.16, radius * 0.32);
+  const height = Math.max(0.18, radius * 0.7);
+  const geometry = new THREE.CylinderGeometry(radius * 1.45, radius, height, 7, 1);
+  geometry.translate(0, height * 0.42, 0);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+export function attachRootCollar(parts) {
+  const trunkPart = parts.find((part) => part.kind === 'trunk');
+  const root = createRootCollarGeometry(parts);
+  if (!trunkPart || !root) return false;
+  const trunk = trunkPart.geometry;
+  for (const name of Object.keys(root.attributes)) {
+    if (!trunk.getAttribute(name)) root.deleteAttribute(name);
+  }
+  for (const [name, attribute] of Object.entries(trunk.attributes)) {
+    if (root.getAttribute(name)) continue;
+    root.setAttribute(name, new THREE.BufferAttribute(
+      new attribute.array.constructor(root.getAttribute('position').count * attribute.itemSize),
+      attribute.itemSize,
+      attribute.normalized,
+    ));
+  }
+  const merged = mergeGeometries([trunk, root], false);
+  root.dispose();
+  if (!merged) return false;
+  trunk.dispose();
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  merged.computeVertexNormals();
+  trunkPart.geometry = merged;
+  return true;
 }

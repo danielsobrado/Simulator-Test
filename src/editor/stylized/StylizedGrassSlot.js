@@ -5,6 +5,7 @@ import { markAttributeRangeUpdated } from './attributeUpload.js';
 import { createStylizedGrassMaterial } from './StylizedGrassMaterial.js';
 import { cellSampleRandom01, sampleHeight } from './scatterMath.js';
 import { clumpsPerCell, densityForDistance } from './grassLodMath.js';
+import { filterScatterByForest } from './forest/ForestFloor.js';
 import {
   compactGrassScatter,
 } from './vegetationScatter.js';
@@ -115,12 +116,20 @@ function encodeDirection(value) {
 }
 
 export class StylizedGrassSlot {
-  constructor({ terrainSlot, terrainView, objectMap, config, sunDirection }) {
+  constructor({
+    terrainSlot,
+    terrainView,
+    objectMap,
+    config,
+    sunDirection,
+    forestFieldProvider = null,
+  }) {
     this.terrainSlot = terrainSlot;
     this.terrainView = terrainView;
     this.objectMap = objectMap;
     this.config = config;
     this.sunDirection = sunDirection;
+    this.forestFieldProvider = forestFieldProvider;
     this.chunkSize = terrainView.worldStore.chunkSize;
     this.tileSize = terrainView.worldStore.tileSize;
     this.chunkWorldSize = this.chunkSize * this.tileSize;
@@ -320,8 +329,16 @@ export class StylizedGrassSlot {
     const workerScatter = job.page.grassScatter;
     if (workerScatter?.base && workerScatter?.parameters) {
       const scatterStartedAt = performance.now();
-      const scatter = compactGrassScatter(workerScatter, job.clumpsPerCell, this.chunkSize)
+      const compacted = compactGrassScatter(workerScatter, job.clumpsPerCell, this.chunkSize)
         ?? workerScatter;
+      const scatter = filterScatterByForest({
+        scatter: compacted,
+        descriptor: job.descriptor,
+        field: this.forestFieldProvider?.(),
+        kind: 'grass',
+        config: this.config.trees.forestFloor,
+        chunkWorldSize: this.chunkWorldSize,
+      });
       this.applyScatter(job, scatter);
       PerfCounters.inc('grassBuildSlices');
       const elapsed = performance.now() - scatterStartedAt;

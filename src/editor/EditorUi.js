@@ -11,6 +11,19 @@ const TERRAIN_MODE_LABELS = Object.freeze({
 const MINIMAP_HEIGHT_SHADE = 0.025;
 const MINIMAP_MINIMUM_SHADE = 0.55;
 const MINIMAP_MAXIMUM_SHADE = 1.25;
+const ALL_CATEGORIES = 'all';
+const CATEGORY_LABELS = Object.freeze({
+  all: 'All',
+  building: 'Buildings',
+  defense: 'Defense',
+  civic: 'Civic',
+  nature: 'Nature',
+  workshop: 'Workshop',
+});
+
+function categoryLabel(category) {
+  return CATEGORY_LABELS[category] ?? category.replace(/^\w/, (first) => first.toUpperCase());
+}
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -43,27 +56,43 @@ export class EditorUi {
     this.minimapCenter = { x: 0, z: 0 };
     this.minimapCells = config.world?.minimapCells ?? MINIMAP_SIZE;
     this.workshop = null;
+    this.objectQuery = '';
+    this.objectCategory = ALL_CATEGORIES;
+    this.selectedObjectKey = null;
 
     root.innerHTML = `
       <div class="editor-shell">
         <aside class="sidebar" aria-label="World editor tools">
           <header class="sidebar-header">
-            <h1>SimCity DnD</h1>
-            <p>Infinite terrain and settlement editor</p>
+            <span class="sidebar-header__mark" aria-hidden="true">⚔️</span>
+            <div class="sidebar-header__text">
+              <h1>SimCity DnD</h1>
+              <p>Infinite terrain and settlement editor</p>
+            </div>
           </header>
 
-          <section class="panel">
-            <h2>Editor mode</h2>
+          <nav class="panel panel--tools" aria-label="Editor mode">
             <div class="tool-row" data-role="tool-row">
-              <button class="tool-button" type="button" data-tool="terrain">Terrain</button>
-              <button class="tool-button" type="button" data-tool="object">Objects</button>
-              <button class="tool-button" type="button" data-tool="select">Select</button>
-              <button class="tool-button tool-button--workshop" type="button" data-tool="workshop">Workshop</button>
+              <button class="tool-button" type="button" data-tool="terrain">
+                <span class="tool-button__icon" aria-hidden="true">⛰️</span>Terrain
+              </button>
+              <button class="tool-button" type="button" data-tool="object">
+                <span class="tool-button__icon" aria-hidden="true">🏠</span>Objects
+              </button>
+              <button class="tool-button" type="button" data-tool="select">
+                <span class="tool-button__icon" aria-hidden="true">🎯</span>Select
+              </button>
+              <button class="tool-button tool-button--workshop" type="button" data-tool="workshop">
+                <span class="tool-button__icon" aria-hidden="true">🛠️</span>Workshop
+              </button>
             </div>
-          </section>
+          </nav>
 
           <section class="panel tool-panel" data-panel="terrain">
-            <h2>Terrain operation</h2>
+            <div class="panel-head">
+              <h2>Terrain operation</h2>
+              <span class="panel-count">strength ${config.terrain.sculptStrength}</span>
+            </div>
             <div class="terrain-mode-row" data-role="terrain-mode-row">
               <button class="tool-button" type="button" data-terrain-mode="paint">Paint</button>
               <button class="tool-button" type="button" data-terrain-mode="raise">Raise</button>
@@ -76,11 +105,25 @@ export class EditorUi {
             </div>
             <h2 class="panel-subheading">Brush size</h2>
             <div class="brush-row" data-role="brush-row"></div>
-            <p class="panel-note">Sculpt strength ${config.terrain.sculptStrength}</p>
           </section>
 
           <section class="panel tool-panel" data-panel="object" hidden>
-            <h2>Place objects</h2>
+            <div class="panel-head">
+              <h2>Place objects</h2>
+              <span class="panel-count" data-role="object-total"></span>
+            </div>
+            <label class="search-field">
+              <span class="search-field__icon" aria-hidden="true">🔍</span>
+              <input
+                class="search-field__input"
+                type="search"
+                data-role="object-search"
+                placeholder="Search objects"
+                aria-label="Search objects"
+                autocomplete="off"
+              />
+            </label>
+            <div class="chip-row" data-role="object-categories"></div>
             <div class="object-palette" data-role="object-palette"></div>
             <button class="action-button action-button--wide" type="button" data-action="rotate-placement">
               Rotate preview <kbd>R</kbd>
@@ -121,8 +164,8 @@ export class EditorUi {
             <p class="panel-note">${this.minimapCells} × ${this.minimapCells} cells around the active view.</p>
           </section>
 
-          <section class="panel">
-            <h2>Controls</h2>
+          <details class="panel panel--collapsible" open>
+            <summary class="panel-summary"><h2>Controls</h2></summary>
             <ul class="help-list">
               <li><kbd>T / O / V</kbd> Terrain, objects, select</li>
               <li><kbd>P / U</kbd> Paint or raise terrain</li>
@@ -136,7 +179,7 @@ export class EditorUi {
               <li><kbd>Wheel</kbd> Zoom</li>
               <li><kbd>1–0</kbd> Select terrain tile</li>
             </ul>
-          </section>
+          </details>
         </aside>
 
         <main class="viewport-shell" data-role="viewport">
@@ -164,6 +207,9 @@ export class EditorUi {
     this.tileTools = root.querySelector('[data-role="tile-tools"]');
     this.palette = root.querySelector('[data-role="tile-palette"]');
     this.objectPalette = root.querySelector('[data-role="object-palette"]');
+    this.objectSearch = root.querySelector('[data-role="object-search"]');
+    this.objectCategories = root.querySelector('[data-role="object-categories"]');
+    this.objectTotal = root.querySelector('[data-role="object-total"]');
     this.brushRow = root.querySelector('[data-role="brush-row"]');
     this.minimap = root.querySelector('[data-role="minimap"]');
     this.toast = root.querySelector('[data-role="toast"]');
@@ -179,6 +225,7 @@ export class EditorUi {
     this.fileInput = root.querySelector('[data-role="file-input"]');
 
     this.renderTileButtons();
+    this.renderCategoryChips();
     this.renderObjectButtons();
     this.renderBrushButtons();
   }
@@ -190,6 +237,7 @@ export class EditorUi {
   setProceduralObjectDefinitions(definitions) {
     this.objectCatalog = [...this.baseObjectCatalog, ...definitions];
     this.objectByKey = new Map(this.objectCatalog.map((definition) => [definition.key, definition]));
+    this.renderCategoryChips();
     this.renderObjectButtons();
   }
 
@@ -215,6 +263,17 @@ export class EditorUi {
     this.objectPalette.addEventListener('click', (event) => {
       const button = event.target.closest('[data-object-key]');
       if (button) controller.selectObjectDefinition(button.dataset.objectKey);
+    });
+    this.objectSearch.addEventListener('input', () => {
+      this.objectQuery = this.objectSearch.value;
+      this.renderObjectButtons();
+    });
+    this.objectCategories.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-object-category]');
+      if (!chip) return;
+      this.objectCategory = chip.dataset.objectCategory;
+      this.applyCategorySelection();
+      this.renderObjectButtons();
     });
     this.brushRow.addEventListener('click', (event) => {
       const button = event.target.closest('[data-brush-size]');
@@ -315,14 +374,91 @@ export class EditorUi {
     return { physicalWidthMeters: widthKm * 1000 };
   }
 
+  matchingObjectDefinitions() {
+    const query = this.objectQuery.trim().toLowerCase();
+    return this.objectCatalog.filter((definition) => {
+      if (this.objectCategory !== ALL_CATEGORIES && definition.category !== this.objectCategory) {
+        return false;
+      }
+      if (query === '') {
+        return true;
+      }
+      return definition.label.toLowerCase().includes(query)
+        || definition.key.toLowerCase().includes(query)
+        || definition.category.toLowerCase().includes(query);
+    });
+  }
+
+  renderCategoryChips() {
+    const categories = [ALL_CATEGORIES, ...new Set(this.objectCatalog.map(({ category }) => category))];
+    if (!categories.includes(this.objectCategory)) {
+      this.objectCategory = ALL_CATEGORIES;
+    }
+    this.objectCategories.innerHTML = categories.map((category) => {
+      const count = category === ALL_CATEGORIES
+        ? this.objectCatalog.length
+        : this.objectCatalog.filter((definition) => definition.category === category).length;
+      return `
+        <button class="chip" type="button" data-object-category="${escapeHtml(category)}">
+          ${escapeHtml(categoryLabel(category))}<span class="chip__count">${count}</span>
+        </button>
+      `;
+    }).join('');
+    this.applyCategorySelection();
+  }
+
+  applyCategorySelection() {
+    for (const chip of this.objectCategories.querySelectorAll('[data-object-category]')) {
+      chip.classList.toggle('is-active', chip.dataset.objectCategory === this.objectCategory);
+    }
+  }
+
   renderObjectButtons() {
-    this.objectPalette.innerHTML = this.objectCatalog.map((definition) => `
-      <button class="object-button" type="button" data-object-key="${escapeHtml(definition.key)}" title="${escapeHtml(definition.label)}">
-        <span class="object-button__swatch" style="background:${escapeHtml(definition.color)}">${escapeHtml(definition.icon)}</span>
-        <span class="object-button__label">${escapeHtml(definition.label)}</span>
-        <span class="object-button__footprint">${definition.footprint.width}×${definition.footprint.depth}</span>
-      </button>
+    const matches = this.matchingObjectDefinitions();
+    this.objectTotal.textContent = matches.length === this.objectCatalog.length
+      ? `${this.objectCatalog.length}`
+      : `${matches.length} / ${this.objectCatalog.length}`;
+
+    if (matches.length === 0) {
+      this.objectPalette.innerHTML = '<p class="palette-empty">No objects match this filter.</p>';
+      return;
+    }
+
+    const groups = new Map();
+    for (const definition of matches) {
+      const group = groups.get(definition.category) ?? [];
+      group.push(definition);
+      groups.set(definition.category, group);
+    }
+
+    this.objectPalette.innerHTML = Array.from(groups, ([category, definitions]) => `
+      <div class="object-group">
+        <h3 class="object-group__title">${escapeHtml(categoryLabel(category))}</h3>
+        <div class="object-grid">
+          ${definitions.map((definition) => `
+            <button
+              class="object-card"
+              type="button"
+              data-object-key="${escapeHtml(definition.key)}"
+              title="${escapeHtml(definition.label)}"
+            >
+              <span class="object-card__icon" style="--object-color:${escapeHtml(definition.color)}">
+                ${escapeHtml(definition.icon)}
+              </span>
+              <span class="object-card__label">${escapeHtml(definition.label)}</span>
+              <span class="object-card__size">${definition.footprint.width}×${definition.footprint.depth}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
     `).join('');
+    this.applyObjectSelection();
+  }
+
+  applyObjectSelection() {
+    for (const button of this.objectPalette.querySelectorAll('[data-object-key]')) {
+      button.classList.toggle('is-active', button.dataset.objectKey === this.selectedObjectKey);
+    }
   }
 
   renderBrushButtons() {
@@ -345,9 +481,8 @@ export class EditorUi {
     for (const button of this.palette.querySelectorAll('[data-tile-id]')) {
       button.classList.toggle('is-active', Number(button.dataset.tileId) === state.selectedTileId);
     }
-    for (const button of this.objectPalette.querySelectorAll('[data-object-key]')) {
-      button.classList.toggle('is-active', button.dataset.objectKey === state.selectedObjectKey);
-    }
+    this.selectedObjectKey = state.selectedObjectKey;
+    this.applyObjectSelection();
     for (const button of this.brushRow.querySelectorAll('[data-brush-size]')) {
       button.classList.toggle('is-active', Number(button.dataset.brushSize) === state.brushSize);
     }

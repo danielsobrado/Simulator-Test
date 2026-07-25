@@ -8,6 +8,7 @@ import {
 } from './projectedLod.js';
 import { createDitheredMaterial } from './StylizedDitheredMaterial.js';
 import { markInstancedMeshRangeUpdated } from '../attributeUpload.js';
+import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 
 function createGeometry(source, capacity) {
   const geometry = source.clone();
@@ -18,6 +19,10 @@ function createGeometry(source, capacity) {
   geometry.setAttribute(
     'instanceStableSeed',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
+  );
+  geometry.setAttribute(
+    'instanceColorVariation',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
   );
   return geometry;
 }
@@ -41,20 +46,33 @@ export function writeInstances(renderers, instancesByPrototype) {
   let total = 0;
   renderers.forEach((parts, prototypeIndex) => {
     const instances = instancesByPrototype[prototypeIndex] ?? [];
-    total += instances.length;
     for (const mesh of parts) {
-      mesh.count = instances.length;
+      const capacity = mesh.instanceMatrix.count;
+      const writableCount = Math.min(instances.length, capacity);
+      const dropped = instances.length - writableCount;
+      if (dropped > 0) PerfCounters.inc('stylizedInstancesDroppedByCapacity', dropped);
+      mesh.count = writableCount;
       const fades = mesh.geometry.getAttribute('instanceLodFade');
       const seeds = mesh.geometry.getAttribute('instanceStableSeed');
-      for (let index = 0; index < instances.length; index += 1) {
+      const colors = mesh.geometry.getAttribute('instanceColorVariation');
+      for (let index = 0; index < writableCount; index += 1) {
         const instance = instances[index];
         mesh.setMatrixAt(index, instance.matrix);
         fades.array[index] = instance.fade;
         seeds.array[index] = instance.seed;
+        if (colors) colors.array[index] = instance.colorVariation ?? 1;
       }
-      markInstancedMeshRangeUpdated(mesh, instances.length, [fades, seeds]);
+      markInstancedMeshRangeUpdated(
+        mesh,
+        writableCount,
+        [fades, seeds, colors].filter(Boolean),
+      );
       mesh.computeBoundingSphere();
     }
+    total += Math.min(
+      instances.length,
+      parts[0]?.instanceMatrix.count ?? instances.length,
+    );
   });
   return total;
 }
@@ -85,6 +103,7 @@ export function buildChunkLodPlan({
   timestamp,
   transitionMs,
   fadeSteps = 8,
+  positionForChunk = null,
 }) {
   const entries = [];
   const signature = [];
@@ -93,11 +112,12 @@ export function buildChunkLodPlan({
   for (let chunkZ = focus.chunkZ - radius; chunkZ <= focus.chunkZ + radius; chunkZ += 1) {
     for (let chunkX = focus.chunkX - radius; chunkX <= focus.chunkX + radius; chunkX += 1) {
       const chunkDistance = Math.max(Math.abs(chunkX - focus.chunkX), Math.abs(chunkZ - focus.chunkZ));
-      const canonicalX = (chunkX + 0.5) * chunkWorldSize;
-      const canonicalZ = -(chunkZ + 0.5) * chunkWorldSize;
+      const anchor = positionForChunk?.(chunkX, chunkZ) ?? null;
+      const canonicalX = anchor?.x ?? (chunkX + 0.5) * chunkWorldSize;
+      const canonicalZ = anchor?.z ?? -(chunkZ + 0.5) * chunkWorldSize;
       const worldPosition = {
         x: canonicalX - origin.x,
-        y: objectHeight * 0.5,
+        y: (anchor?.y ?? 0) + objectHeight * 0.5,
         z: canonicalZ - origin.z,
       };
       const pixels = projectedPixelHeight({
@@ -123,6 +143,7 @@ export function buildChunkLodPlan({
         chunkDistance,
         band: target,
         representations: state.representations,
+        lodAnchor: Object.freeze({ x: canonicalX, y: anchor?.y ?? 0, z: canonicalZ }),
       });
       signature.push([
         key,

@@ -4,6 +4,7 @@ import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { markAttributeRangeUpdated } from './attributeUpload.js';
 import { createStylizedFlowerMaterial } from './StylizedFlowerMaterial.js';
 import { buildFlowerScatter } from './vegetationScatter.js';
+import { filterScatterByForest } from './forest/ForestFloor.js';
 
 function createCrossGeometry(maxInstances) {
   const positions = new Float32Array([
@@ -49,11 +50,12 @@ function setGeometryBounds(geometry, chunkWorldSize, minimumHeight, maximumHeigh
 }
 
 export class StylizedFlowerSlot {
-  constructor({ terrainSlot, terrainView, config, textures }) {
+  constructor({ terrainSlot, terrainView, config, textures, forestFieldProvider = null }) {
     this.terrainSlot = terrainSlot;
     this.terrainView = terrainView;
     this.config = config;
     this.textures = textures;
+    this.forestFieldProvider = forestFieldProvider;
     this.chunkSize = terrainView.worldStore.chunkSize;
     this.tileSize = terrainView.worldStore.tileSize;
     this.chunkWorldSize = this.chunkSize * this.tileSize;
@@ -151,6 +153,14 @@ export class StylizedFlowerSlot {
         maxSize: this.config.flowers.maxSize,
       });
     }
+    scatter = filterScatterByForest({
+      scatter,
+      descriptor,
+      field: this.forestFieldProvider?.(),
+      kind: 'flower',
+      config: this.config.trees.forestFloor,
+      chunkWorldSize: this.chunkWorldSize,
+    });
     PerfCounters.inc('flowerScatterMs', performance.now() - scatterStartedAt);
     PerfCounters.set('flowerScatter', performance.now() - scatterStartedAt);
 

@@ -101,7 +101,7 @@ stylizedSurface:
     heavyBuildBudgetMs: 3
     grassCellsPerBuildSlice: 64
     inactiveReleaseFrames: 30
-    treeManifestBuildsPerFrame: 4
+    treeManifestBuildsPerFrame: 1
     manifestBuildBudgetMs: 3
   lod:
     enabled: true
@@ -207,7 +207,20 @@ stylizedSurface:
     residentRadius: 1
     perChunk: 12
     clearRadius: 3.5
-    tileIds: [5, 6, 7, 8, 9, 12]
+    tileIds: [3, 4, 5, 6, 7, 8, 9, 10, 12]
+    habitat:
+      enabled: true
+      candidateBudgetPerChunk: 48
+      maxAcceptedPerChunk: 24
+      patchSupercellSize: 384
+      slopeSampleDistance: 4
+    forestFloor:
+      grassCoreDensity: 0.18
+      grassEdgeDensity: 0.72
+      flowerCoreDensity: 0.08
+      flowerEdgeDensity: 0.58
+      groundCoreColor: '#273c25'
+      groundStrength: 0.68
     minScale: 0.85
     maxScale: 1.15
     leafBottom: '#1c3b23'

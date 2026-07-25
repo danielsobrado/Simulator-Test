@@ -174,9 +174,9 @@ export class GpuTreeImpostorBatch {
     this.planeBuffer.needsUpdate = true;
   }
 
-  update(camera, origin) {
+  update(camera, origin, timestamp = 0) {
     if (this.disposed) return null;
-    updateImpostorCameraUniforms(this.uniforms, camera);
+    updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.originUniform.value.set(origin.x, 0, origin.z);
     this.updatePlanes(camera);
     if (typeof this.renderer.compute === 'function') {

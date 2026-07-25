@@ -50,3 +50,104 @@ export function aggregateCanopyCluster({
     count,
   });
 }
+
+function connectedComponents(placements, gap) {
+  const remaining = new Set(placements);
+  const components = [];
+  while (remaining.size > 0) {
+    const first = remaining.values().next().value;
+    remaining.delete(first);
+    const component = [first];
+    for (let cursor = 0; cursor < component.length; cursor += 1) {
+      const current = component[cursor];
+      for (const candidate of [...remaining]) {
+        const connection = (current.spacingRadius ?? current.radius ?? gap * 0.5)
+          + (candidate.spacingRadius ?? candidate.radius ?? gap * 0.5)
+          + gap;
+        if (Math.hypot(current.x - candidate.x, current.z - candidate.z) <= connection) {
+          remaining.delete(candidate);
+          component.push(candidate);
+        }
+      }
+    }
+    components.push(component);
+  }
+  return components;
+}
+
+function splitIntoLobes(component, maximumLobes) {
+  const lobeCount = Math.min(maximumLobes, Math.max(1, Math.ceil(component.length / 7)));
+  if (lobeCount === 1) return [component];
+  const minimumX = Math.min(...component.map((placement) => placement.x));
+  const maximumX = Math.max(...component.map((placement) => placement.x));
+  const minimumZ = Math.min(...component.map((placement) => placement.z));
+  const maximumZ = Math.max(...component.map((placement) => placement.z));
+  const axis = maximumX - minimumX >= maximumZ - minimumZ ? 'x' : 'z';
+  const ordered = [...component].sort((left, right) => (
+    left[axis] - right[axis] || left.stableId.localeCompare(right.stableId)
+  ));
+  return Array.from({ length: lobeCount }, (_, index) => (
+    ordered.slice(
+      Math.floor(index * ordered.length / lobeCount),
+      Math.floor((index + 1) * ordered.length / lobeCount),
+    )
+  )).filter((lobe) => lobe.length > 0);
+}
+
+/**
+ * Emits deterministic patch fragments instead of a single chunk-shaped blob.
+ * Patch identity remains canonical across chunks; component/lobe suffixes only
+ * describe the fragment rendered by this owner chunk.
+ */
+export function aggregateCanopyClusters({
+  chunkX,
+  chunkZ,
+  placements,
+  minimumWidth = 8,
+  minimumHeight = 4,
+  connectionGap = 2,
+  maximumLobesPerComponent = 3,
+}) {
+  if (!Array.isArray(placements) || placements.length === 0) return Object.freeze([]);
+  const byPatch = new Map();
+  for (const placement of placements) {
+    const key = placement.patchId ?? `unpatched:${placement.stableId}`;
+    const group = byPatch.get(key) ?? [];
+    group.push(placement);
+    byPatch.set(key, group);
+  }
+  const result = [];
+  for (const [patchId, patchPlacements] of [...byPatch.entries()].sort(([a], [b]) => (
+    a.localeCompare(b)
+  ))) {
+    const components = connectedComponents(patchPlacements, connectionGap);
+    components.forEach((component, componentIndex) => {
+      const lobes = splitIntoLobes(component, maximumLobesPerComponent);
+      lobes.forEach((lobe, lobeIndex) => {
+        const cluster = aggregateCanopyCluster({
+          chunkX,
+          chunkZ,
+          placements: lobe,
+          minimumWidth,
+          minimumHeight,
+        });
+        const averageCrown = lobe.reduce(
+          (total, placement) => total + (placement.crownScale ?? 1),
+          0,
+        ) / lobe.length;
+        result.push(Object.freeze({
+          ...cluster,
+          stableId: `canopy:${patchId}:${chunkX}:${chunkZ}:${componentIndex}:${lobeIndex}`,
+          patchId,
+          componentIndex,
+          lobeIndex,
+          width: cluster.width * averageCrown,
+          depth: cluster.depth * averageCrown,
+          speciesId: lobe[0].speciesId ?? null,
+          speciesColor: lobe[0].speciesColor ?? null,
+        }));
+      });
+    });
+  }
+  return Object.freeze(result);
+}

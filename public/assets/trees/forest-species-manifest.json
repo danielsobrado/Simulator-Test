@@ -1,0 +1,1897 @@
+{
+  "version": 1,
+  "generator": "deterministic-lsystem-offline-v1",
+  "assets": [
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_round/sapling-0-lod0.glb",
+        "lod1": "broadleaf_round/sapling-0-lod1.glb",
+        "impostor": "broadleaf_round/sapling-0-impostor",
+        "metadata": "broadleaf_round/sapling-0.json"
+      },
+      "signature": "04c8e8b3"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/young-0-lod0.glb",
+        "lod1": "broadleaf_round/young-0-lod1.glb",
+        "impostor": "broadleaf_round/young-0-impostor",
+        "metadata": "broadleaf_round/young-0.json"
+      },
+      "signature": "fd713ee5"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/mature-0-lod0.glb",
+        "lod1": "broadleaf_round/mature-0-lod1.glb",
+        "impostor": "broadleaf_round/mature-0-impostor",
+        "metadata": "broadleaf_round/mature-0.json"
+      },
+      "signature": "0f19dc1e"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/ancient-0-lod0.glb",
+        "lod1": "broadleaf_round/ancient-0-lod1.glb",
+        "impostor": "broadleaf_round/ancient-0-impostor",
+        "metadata": "broadleaf_round/ancient-0.json"
+      },
+      "signature": "10a72a54"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/dead-0-lod0.glb",
+        "lod1": "broadleaf_round/dead-0-lod1.glb",
+        "impostor": "broadleaf_round/dead-0-impostor",
+        "metadata": "broadleaf_round/dead-0.json"
+      },
+      "signature": "22ff4936"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_round/sapling-1-lod0.glb",
+        "lod1": "broadleaf_round/sapling-1-lod1.glb",
+        "impostor": "broadleaf_round/sapling-1-impostor",
+        "metadata": "broadleaf_round/sapling-1.json"
+      },
+      "signature": "450feed8"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/young-1-lod0.glb",
+        "lod1": "broadleaf_round/young-1-lod1.glb",
+        "impostor": "broadleaf_round/young-1-impostor",
+        "metadata": "broadleaf_round/young-1.json"
+      },
+      "signature": "dadd0a62"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/mature-1-lod0.glb",
+        "lod1": "broadleaf_round/mature-1-lod1.glb",
+        "impostor": "broadleaf_round/mature-1-impostor",
+        "metadata": "broadleaf_round/mature-1.json"
+      },
+      "signature": "9eb95834"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/ancient-1-lod0.glb",
+        "lod1": "broadleaf_round/ancient-1-lod1.glb",
+        "impostor": "broadleaf_round/ancient-1-impostor",
+        "metadata": "broadleaf_round/ancient-1.json"
+      },
+      "signature": "7495e4e7"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/dead-1-lod0.glb",
+        "lod1": "broadleaf_round/dead-1-lod1.glb",
+        "impostor": "broadleaf_round/dead-1-impostor",
+        "metadata": "broadleaf_round/dead-1.json"
+      },
+      "signature": "a839dcbe"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_round/sapling-2-lod0.glb",
+        "lod1": "broadleaf_round/sapling-2-lod1.glb",
+        "impostor": "broadleaf_round/sapling-2-impostor",
+        "metadata": "broadleaf_round/sapling-2.json"
+      },
+      "signature": "aad59338"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/young-2-lod0.glb",
+        "lod1": "broadleaf_round/young-2-lod1.glb",
+        "impostor": "broadleaf_round/young-2-impostor",
+        "metadata": "broadleaf_round/young-2.json"
+      },
+      "signature": "5dfd17ba"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/mature-2-lod0.glb",
+        "lod1": "broadleaf_round/mature-2-lod1.glb",
+        "impostor": "broadleaf_round/mature-2-impostor",
+        "metadata": "broadleaf_round/mature-2.json"
+      },
+      "signature": "5e3e8b5c"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/ancient-2-lod0.glb",
+        "lod1": "broadleaf_round/ancient-2-lod1.glb",
+        "impostor": "broadleaf_round/ancient-2-impostor",
+        "metadata": "broadleaf_round/ancient-2.json"
+      },
+      "signature": "5c80a59f"
+    },
+    {
+      "speciesId": "broadleaf_round",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 4,
+        "branchAngle": 0.72
+      },
+      "crownAspect": 1.08,
+      "spacing": 3.8,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_round/dead-2-lod0.glb",
+        "lod1": "broadleaf_round/dead-2-lod1.glb",
+        "impostor": "broadleaf_round/dead-2-impostor",
+        "metadata": "broadleaf_round/dead-2.json"
+      },
+      "signature": "f0a10dce"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_tall/sapling-0-lod0.glb",
+        "lod1": "broadleaf_tall/sapling-0-lod1.glb",
+        "impostor": "broadleaf_tall/sapling-0-impostor",
+        "metadata": "broadleaf_tall/sapling-0.json"
+      },
+      "signature": "e91b4656"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/young-0-lod0.glb",
+        "lod1": "broadleaf_tall/young-0-lod1.glb",
+        "impostor": "broadleaf_tall/young-0-impostor",
+        "metadata": "broadleaf_tall/young-0.json"
+      },
+      "signature": "c4f8052c"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/mature-0-lod0.glb",
+        "lod1": "broadleaf_tall/mature-0-lod1.glb",
+        "impostor": "broadleaf_tall/mature-0-impostor",
+        "metadata": "broadleaf_tall/mature-0.json"
+      },
+      "signature": "c7fd6fd3"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/ancient-0-lod0.glb",
+        "lod1": "broadleaf_tall/ancient-0-lod1.glb",
+        "impostor": "broadleaf_tall/ancient-0-impostor",
+        "metadata": "broadleaf_tall/ancient-0.json"
+      },
+      "signature": "4e7fabcd"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/dead-0-lod0.glb",
+        "lod1": "broadleaf_tall/dead-0-lod1.glb",
+        "impostor": "broadleaf_tall/dead-0-impostor",
+        "metadata": "broadleaf_tall/dead-0.json"
+      },
+      "signature": "884b660d"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_tall/sapling-1-lod0.glb",
+        "lod1": "broadleaf_tall/sapling-1-lod1.glb",
+        "impostor": "broadleaf_tall/sapling-1-impostor",
+        "metadata": "broadleaf_tall/sapling-1.json"
+      },
+      "signature": "1b7d9f46"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/young-1-lod0.glb",
+        "lod1": "broadleaf_tall/young-1-lod1.glb",
+        "impostor": "broadleaf_tall/young-1-impostor",
+        "metadata": "broadleaf_tall/young-1.json"
+      },
+      "signature": "670aea3d"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/mature-1-lod0.glb",
+        "lod1": "broadleaf_tall/mature-1-lod1.glb",
+        "impostor": "broadleaf_tall/mature-1-impostor",
+        "metadata": "broadleaf_tall/mature-1.json"
+      },
+      "signature": "ed43465e"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/ancient-1-lod0.glb",
+        "lod1": "broadleaf_tall/ancient-1-lod1.glb",
+        "impostor": "broadleaf_tall/ancient-1-impostor",
+        "metadata": "broadleaf_tall/ancient-1.json"
+      },
+      "signature": "0b840c2a"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/dead-1-lod0.glb",
+        "lod1": "broadleaf_tall/dead-1-lod1.glb",
+        "impostor": "broadleaf_tall/dead-1-impostor",
+        "metadata": "broadleaf_tall/dead-1.json"
+      },
+      "signature": "27ea12aa"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "broadleaf_tall/sapling-2-lod0.glb",
+        "lod1": "broadleaf_tall/sapling-2-lod1.glb",
+        "impostor": "broadleaf_tall/sapling-2-impostor",
+        "metadata": "broadleaf_tall/sapling-2.json"
+      },
+      "signature": "515e91c3"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/young-2-lod0.glb",
+        "lod1": "broadleaf_tall/young-2-lod1.glb",
+        "impostor": "broadleaf_tall/young-2-impostor",
+        "metadata": "broadleaf_tall/young-2.json"
+      },
+      "signature": "bba74ba9"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/mature-2-lod0.glb",
+        "lod1": "broadleaf_tall/mature-2-lod1.glb",
+        "impostor": "broadleaf_tall/mature-2-impostor",
+        "metadata": "broadleaf_tall/mature-2.json"
+      },
+      "signature": "44e4a8cc"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/ancient-2-lod0.glb",
+        "lod1": "broadleaf_tall/ancient-2-lod1.glb",
+        "impostor": "broadleaf_tall/ancient-2-impostor",
+        "metadata": "broadleaf_tall/ancient-2.json"
+      },
+      "signature": "de6a0fc6"
+    },
+    {
+      "speciesId": "broadleaf_tall",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 5,
+        "branchAngle": 0.54
+      },
+      "crownAspect": 0.78,
+      "spacing": 3.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "broadleaf_tall/dead-2-lod0.glb",
+        "lod1": "broadleaf_tall/dead-2-lod1.glb",
+        "impostor": "broadleaf_tall/dead-2-impostor",
+        "metadata": "broadleaf_tall/dead-2.json"
+      },
+      "signature": "1fe9b7fe"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_narrow/sapling-0-lod0.glb",
+        "lod1": "conifer_narrow/sapling-0-lod1.glb",
+        "impostor": "conifer_narrow/sapling-0-impostor",
+        "metadata": "conifer_narrow/sapling-0.json"
+      },
+      "signature": "d712a647"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/young-0-lod0.glb",
+        "lod1": "conifer_narrow/young-0-lod1.glb",
+        "impostor": "conifer_narrow/young-0-impostor",
+        "metadata": "conifer_narrow/young-0.json"
+      },
+      "signature": "e8c5d806"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/mature-0-lod0.glb",
+        "lod1": "conifer_narrow/mature-0-lod1.glb",
+        "impostor": "conifer_narrow/mature-0-impostor",
+        "metadata": "conifer_narrow/mature-0.json"
+      },
+      "signature": "4f18c2de"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/ancient-0-lod0.glb",
+        "lod1": "conifer_narrow/ancient-0-lod1.glb",
+        "impostor": "conifer_narrow/ancient-0-impostor",
+        "metadata": "conifer_narrow/ancient-0.json"
+      },
+      "signature": "ad923491"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/dead-0-lod0.glb",
+        "lod1": "conifer_narrow/dead-0-lod1.glb",
+        "impostor": "conifer_narrow/dead-0-impostor",
+        "metadata": "conifer_narrow/dead-0.json"
+      },
+      "signature": "c822e36a"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_narrow/sapling-1-lod0.glb",
+        "lod1": "conifer_narrow/sapling-1-lod1.glb",
+        "impostor": "conifer_narrow/sapling-1-impostor",
+        "metadata": "conifer_narrow/sapling-1.json"
+      },
+      "signature": "78477426"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/young-1-lod0.glb",
+        "lod1": "conifer_narrow/young-1-lod1.glb",
+        "impostor": "conifer_narrow/young-1-impostor",
+        "metadata": "conifer_narrow/young-1.json"
+      },
+      "signature": "067b3b38"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/mature-1-lod0.glb",
+        "lod1": "conifer_narrow/mature-1-lod1.glb",
+        "impostor": "conifer_narrow/mature-1-impostor",
+        "metadata": "conifer_narrow/mature-1.json"
+      },
+      "signature": "83292453"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/ancient-1-lod0.glb",
+        "lod1": "conifer_narrow/ancient-1-lod1.glb",
+        "impostor": "conifer_narrow/ancient-1-impostor",
+        "metadata": "conifer_narrow/ancient-1.json"
+      },
+      "signature": "c9263958"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/dead-1-lod0.glb",
+        "lod1": "conifer_narrow/dead-1-lod1.glb",
+        "impostor": "conifer_narrow/dead-1-impostor",
+        "metadata": "conifer_narrow/dead-1.json"
+      },
+      "signature": "ca08b5b2"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_narrow/sapling-2-lod0.glb",
+        "lod1": "conifer_narrow/sapling-2-lod1.glb",
+        "impostor": "conifer_narrow/sapling-2-impostor",
+        "metadata": "conifer_narrow/sapling-2.json"
+      },
+      "signature": "51515f58"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/young-2-lod0.glb",
+        "lod1": "conifer_narrow/young-2-lod1.glb",
+        "impostor": "conifer_narrow/young-2-impostor",
+        "metadata": "conifer_narrow/young-2.json"
+      },
+      "signature": "a7d04685"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/mature-2-lod0.glb",
+        "lod1": "conifer_narrow/mature-2-lod1.glb",
+        "impostor": "conifer_narrow/mature-2-impostor",
+        "metadata": "conifer_narrow/mature-2.json"
+      },
+      "signature": "2086169f"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/ancient-2-lod0.glb",
+        "lod1": "conifer_narrow/ancient-2-lod1.glb",
+        "impostor": "conifer_narrow/ancient-2-impostor",
+        "metadata": "conifer_narrow/ancient-2.json"
+      },
+      "signature": "0db6f549"
+    },
+    {
+      "speciesId": "conifer_narrow",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TT",
+        "rule": "T[+b][-b]T",
+        "levels": 6,
+        "branchAngle": 0.42
+      },
+      "crownAspect": 0.48,
+      "spacing": 3.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_narrow/dead-2-lod0.glb",
+        "lod1": "conifer_narrow/dead-2-lod1.glb",
+        "impostor": "conifer_narrow/dead-2-impostor",
+        "metadata": "conifer_narrow/dead-2.json"
+      },
+      "signature": "2c642626"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_wide/sapling-0-lod0.glb",
+        "lod1": "conifer_wide/sapling-0-lod1.glb",
+        "impostor": "conifer_wide/sapling-0-impostor",
+        "metadata": "conifer_wide/sapling-0.json"
+      },
+      "signature": "efb12f71"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/young-0-lod0.glb",
+        "lod1": "conifer_wide/young-0-lod1.glb",
+        "impostor": "conifer_wide/young-0-impostor",
+        "metadata": "conifer_wide/young-0.json"
+      },
+      "signature": "7b005cea"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/mature-0-lod0.glb",
+        "lod1": "conifer_wide/mature-0-lod1.glb",
+        "impostor": "conifer_wide/mature-0-impostor",
+        "metadata": "conifer_wide/mature-0.json"
+      },
+      "signature": "ab2fb9dc"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/ancient-0-lod0.glb",
+        "lod1": "conifer_wide/ancient-0-lod1.glb",
+        "impostor": "conifer_wide/ancient-0-impostor",
+        "metadata": "conifer_wide/ancient-0.json"
+      },
+      "signature": "372ef88a"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/dead-0-lod0.glb",
+        "lod1": "conifer_wide/dead-0-lod1.glb",
+        "impostor": "conifer_wide/dead-0-impostor",
+        "metadata": "conifer_wide/dead-0.json"
+      },
+      "signature": "b042c155"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_wide/sapling-1-lod0.glb",
+        "lod1": "conifer_wide/sapling-1-lod1.glb",
+        "impostor": "conifer_wide/sapling-1-impostor",
+        "metadata": "conifer_wide/sapling-1.json"
+      },
+      "signature": "0852838f"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/young-1-lod0.glb",
+        "lod1": "conifer_wide/young-1-lod1.glb",
+        "impostor": "conifer_wide/young-1-impostor",
+        "metadata": "conifer_wide/young-1.json"
+      },
+      "signature": "92989da2"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/mature-1-lod0.glb",
+        "lod1": "conifer_wide/mature-1-lod1.glb",
+        "impostor": "conifer_wide/mature-1-impostor",
+        "metadata": "conifer_wide/mature-1.json"
+      },
+      "signature": "09ae5414"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/ancient-1-lod0.glb",
+        "lod1": "conifer_wide/ancient-1-lod1.glb",
+        "impostor": "conifer_wide/ancient-1-impostor",
+        "metadata": "conifer_wide/ancient-1.json"
+      },
+      "signature": "e6d751c0"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/dead-1-lod0.glb",
+        "lod1": "conifer_wide/dead-1-lod1.glb",
+        "impostor": "conifer_wide/dead-1-impostor",
+        "metadata": "conifer_wide/dead-1.json"
+      },
+      "signature": "e4b0d74c"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "conifer_wide/sapling-2-lod0.glb",
+        "lod1": "conifer_wide/sapling-2-lod1.glb",
+        "impostor": "conifer_wide/sapling-2-impostor",
+        "metadata": "conifer_wide/sapling-2.json"
+      },
+      "signature": "aa8538c8"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/young-2-lod0.glb",
+        "lod1": "conifer_wide/young-2-lod1.glb",
+        "impostor": "conifer_wide/young-2-impostor",
+        "metadata": "conifer_wide/young-2.json"
+      },
+      "signature": "69eada79"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/mature-2-lod0.glb",
+        "lod1": "conifer_wide/mature-2-lod1.glb",
+        "impostor": "conifer_wide/mature-2-impostor",
+        "metadata": "conifer_wide/mature-2.json"
+      },
+      "signature": "a410e4ad"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/ancient-2-lod0.glb",
+        "lod1": "conifer_wide/ancient-2-lod1.glb",
+        "impostor": "conifer_wide/ancient-2-impostor",
+        "metadata": "conifer_wide/ancient-2.json"
+      },
+      "signature": "b1f8f63d"
+    },
+    {
+      "speciesId": "conifer_wide",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.48
+      },
+      "crownAspect": 0.68,
+      "spacing": 3.7,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "conifer_wide/dead-2-lod0.glb",
+        "lod1": "conifer_wide/dead-2-lod1.glb",
+        "impostor": "conifer_wide/dead-2-impostor",
+        "metadata": "conifer_wide/dead-2.json"
+      },
+      "signature": "300b62e3"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "tropical_tall/sapling-0-lod0.glb",
+        "lod1": "tropical_tall/sapling-0-lod1.glb",
+        "impostor": "tropical_tall/sapling-0-impostor",
+        "metadata": "tropical_tall/sapling-0.json"
+      },
+      "signature": "842b7492"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/young-0-lod0.glb",
+        "lod1": "tropical_tall/young-0-lod1.glb",
+        "impostor": "tropical_tall/young-0-impostor",
+        "metadata": "tropical_tall/young-0.json"
+      },
+      "signature": "484a355a"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/mature-0-lod0.glb",
+        "lod1": "tropical_tall/mature-0-lod1.glb",
+        "impostor": "tropical_tall/mature-0-impostor",
+        "metadata": "tropical_tall/mature-0.json"
+      },
+      "signature": "19f36e21"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/ancient-0-lod0.glb",
+        "lod1": "tropical_tall/ancient-0-lod1.glb",
+        "impostor": "tropical_tall/ancient-0-impostor",
+        "metadata": "tropical_tall/ancient-0.json"
+      },
+      "signature": "cd7e23d1"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/dead-0-lod0.glb",
+        "lod1": "tropical_tall/dead-0-lod1.glb",
+        "impostor": "tropical_tall/dead-0-impostor",
+        "metadata": "tropical_tall/dead-0.json"
+      },
+      "signature": "02a4a004"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "tropical_tall/sapling-1-lod0.glb",
+        "lod1": "tropical_tall/sapling-1-lod1.glb",
+        "impostor": "tropical_tall/sapling-1-impostor",
+        "metadata": "tropical_tall/sapling-1.json"
+      },
+      "signature": "0f100baf"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/young-1-lod0.glb",
+        "lod1": "tropical_tall/young-1-lod1.glb",
+        "impostor": "tropical_tall/young-1-impostor",
+        "metadata": "tropical_tall/young-1.json"
+      },
+      "signature": "ff002dea"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/mature-1-lod0.glb",
+        "lod1": "tropical_tall/mature-1-lod1.glb",
+        "impostor": "tropical_tall/mature-1-impostor",
+        "metadata": "tropical_tall/mature-1.json"
+      },
+      "signature": "ee2cf655"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/ancient-1-lod0.glb",
+        "lod1": "tropical_tall/ancient-1-lod1.glb",
+        "impostor": "tropical_tall/ancient-1-impostor",
+        "metadata": "tropical_tall/ancient-1.json"
+      },
+      "signature": "86e77d3a"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/dead-1-lod0.glb",
+        "lod1": "tropical_tall/dead-1-lod1.glb",
+        "impostor": "tropical_tall/dead-1-impostor",
+        "metadata": "tropical_tall/dead-1.json"
+      },
+      "signature": "0d8ffb66"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "tropical_tall/sapling-2-lod0.glb",
+        "lod1": "tropical_tall/sapling-2-lod1.glb",
+        "impostor": "tropical_tall/sapling-2-impostor",
+        "metadata": "tropical_tall/sapling-2.json"
+      },
+      "signature": "4861f681"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/young-2-lod0.glb",
+        "lod1": "tropical_tall/young-2-lod1.glb",
+        "impostor": "tropical_tall/young-2-impostor",
+        "metadata": "tropical_tall/young-2.json"
+      },
+      "signature": "851cfe63"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/mature-2-lod0.glb",
+        "lod1": "tropical_tall/mature-2-lod1.glb",
+        "impostor": "tropical_tall/mature-2-impostor",
+        "metadata": "tropical_tall/mature-2.json"
+      },
+      "signature": "ea5fbabe"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/ancient-2-lod0.glb",
+        "lod1": "tropical_tall/ancient-2-lod1.glb",
+        "impostor": "tropical_tall/ancient-2-impostor",
+        "metadata": "tropical_tall/ancient-2.json"
+      },
+      "signature": "076985f7"
+    },
+    {
+      "speciesId": "tropical_tall",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTTTB",
+        "rule": "T[+B][-B]T",
+        "levels": 5,
+        "branchAngle": 0.62
+      },
+      "crownAspect": 0.72,
+      "spacing": 4.1,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "tropical_tall/dead-2-lod0.glb",
+        "lod1": "tropical_tall/dead-2-lod1.glb",
+        "impostor": "tropical_tall/dead-2-impostor",
+        "metadata": "tropical_tall/dead-2.json"
+      },
+      "signature": "05462b0a"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 0,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "wetland_sparse/sapling-0-lod0.glb",
+        "lod1": "wetland_sparse/sapling-0-lod1.glb",
+        "impostor": "wetland_sparse/sapling-0-impostor",
+        "metadata": "wetland_sparse/sapling-0.json"
+      },
+      "signature": "a435d41d"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 0,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/young-0-lod0.glb",
+        "lod1": "wetland_sparse/young-0-lod1.glb",
+        "impostor": "wetland_sparse/young-0-impostor",
+        "metadata": "wetland_sparse/young-0.json"
+      },
+      "signature": "75fdbee9"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 0,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/mature-0-lod0.glb",
+        "lod1": "wetland_sparse/mature-0-lod1.glb",
+        "impostor": "wetland_sparse/mature-0-impostor",
+        "metadata": "wetland_sparse/mature-0.json"
+      },
+      "signature": "84729edf"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 0,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/ancient-0-lod0.glb",
+        "lod1": "wetland_sparse/ancient-0-lod1.glb",
+        "impostor": "wetland_sparse/ancient-0-impostor",
+        "metadata": "wetland_sparse/ancient-0.json"
+      },
+      "signature": "d4dc6b68"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 0,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/dead-0-lod0.glb",
+        "lod1": "wetland_sparse/dead-0-lod1.glb",
+        "impostor": "wetland_sparse/dead-0-impostor",
+        "metadata": "wetland_sparse/dead-0.json"
+      },
+      "signature": "ce4842a3"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 1,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "wetland_sparse/sapling-1-lod0.glb",
+        "lod1": "wetland_sparse/sapling-1-lod1.glb",
+        "impostor": "wetland_sparse/sapling-1-impostor",
+        "metadata": "wetland_sparse/sapling-1.json"
+      },
+      "signature": "869a675f"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 1,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/young-1-lod0.glb",
+        "lod1": "wetland_sparse/young-1-lod1.glb",
+        "impostor": "wetland_sparse/young-1-impostor",
+        "metadata": "wetland_sparse/young-1.json"
+      },
+      "signature": "dc1f0429"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 1,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/mature-1-lod0.glb",
+        "lod1": "wetland_sparse/mature-1-lod1.glb",
+        "impostor": "wetland_sparse/mature-1-impostor",
+        "metadata": "wetland_sparse/mature-1.json"
+      },
+      "signature": "c2d95bc7"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 1,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/ancient-1-lod0.glb",
+        "lod1": "wetland_sparse/ancient-1-lod1.glb",
+        "impostor": "wetland_sparse/ancient-1-impostor",
+        "metadata": "wetland_sparse/ancient-1.json"
+      },
+      "signature": "9d8f135e"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 1,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/dead-1-lod0.glb",
+        "lod1": "wetland_sparse/dead-1-lod1.glb",
+        "impostor": "wetland_sparse/dead-1-impostor",
+        "metadata": "wetland_sparse/dead-1.json"
+      },
+      "signature": "57a2c0fd"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 2,
+      "ageClass": "sapling",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": false,
+      "outputs": {
+        "lod0": "wetland_sparse/sapling-2-lod0.glb",
+        "lod1": "wetland_sparse/sapling-2-lod1.glb",
+        "impostor": "wetland_sparse/sapling-2-impostor",
+        "metadata": "wetland_sparse/sapling-2.json"
+      },
+      "signature": "73a55e73"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 2,
+      "ageClass": "young",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/young-2-lod0.glb",
+        "lod1": "wetland_sparse/young-2-lod1.glb",
+        "impostor": "wetland_sparse/young-2-impostor",
+        "metadata": "wetland_sparse/young-2.json"
+      },
+      "signature": "49bd0e57"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 2,
+      "ageClass": "mature",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/mature-2-lod0.glb",
+        "lod1": "wetland_sparse/mature-2-lod1.glb",
+        "impostor": "wetland_sparse/mature-2-impostor",
+        "metadata": "wetland_sparse/mature-2.json"
+      },
+      "signature": "a1b8264a"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 2,
+      "ageClass": "ancient",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/ancient-2-lod0.glb",
+        "lod1": "wetland_sparse/ancient-2-lod1.glb",
+        "impostor": "wetland_sparse/ancient-2-impostor",
+        "metadata": "wetland_sparse/ancient-2.json"
+      },
+      "signature": "12fe2e88"
+    },
+    {
+      "speciesId": "wetland_sparse",
+      "seed": 2,
+      "ageClass": "dead",
+      "rules": {
+        "axiom": "TTB",
+        "rule": "T[+B]T[-B]",
+        "levels": 4,
+        "branchAngle": 0.66
+      },
+      "crownAspect": 0.82,
+      "spacing": 4.4,
+      "rootCollar": true,
+      "outputs": {
+        "lod0": "wetland_sparse/dead-2-lod0.glb",
+        "lod1": "wetland_sparse/dead-2-lod1.glb",
+        "impostor": "wetland_sparse/dead-2-impostor",
+        "metadata": "wetland_sparse/dead-2.json"
+      },
+      "signature": "8c429dd8"
+    }
+  ],
+  "signature": "ee9f560b"
+}

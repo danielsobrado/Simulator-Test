@@ -190,6 +190,7 @@ async function startEditor() {
     worldStore,
     floatingOrigin,
     config,
+    forestFieldProvider: () => stylizedSurface.treeView?.manifestStore?.forestField ?? null,
   });
 
   const editorCamera = new EditorCamera({

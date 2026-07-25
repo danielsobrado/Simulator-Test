@@ -54,6 +54,7 @@ export class ForestHabitatField {
     tileAt,
     heightAt,
     waterDistanceAt = null,
+    revisionProvider = null,
     config = {},
   }) {
     if (!Number.isFinite(tileSize) || tileSize <= 0) {
@@ -69,6 +70,11 @@ export class ForestHabitatField {
     this.tileAt = tileAt;
     this.heightAt = heightAt;
     this.waterDistanceAt = typeof waterDistanceAt === 'function' ? waterDistanceAt : null;
+    this.revisionProvider = typeof revisionProvider === 'function' ? revisionProvider : null;
+    this.cacheRevision = this.revisionProvider?.() ?? 0;
+    this.cacheLimit = Math.max(256, Math.trunc(config.cacheSamples) || 32768);
+    this.sampleCache = new Map();
+    this.stats = { builds: 0, cacheHits: 0 };
     this.slopeSampleDistance = Math.max(
       tileSize,
       Number(config.slopeSampleDistance) || DEFAULT_SLOPE_SAMPLE_DISTANCE,
@@ -96,11 +102,22 @@ export class ForestHabitatField {
   }
 
   sample(x, z) {
+    const revision = this.revisionProvider?.() ?? this.cacheRevision;
+    if (revision !== this.cacheRevision) {
+      this.sampleCache.clear();
+      this.cacheRevision = revision;
+    }
+    const cacheKey = `${x}:${z}`;
+    const cached = this.sampleCache.get(cacheKey);
+    if (cached) {
+      this.stats.cacheHits += 1;
+      return cached;
+    }
     const { cellX, cellZ } = worldToCell(x, z, this.tileSize);
     const tileId = this.tileAt(cellX, cellZ);
     const profile = this.enabled ? this.profiles.get(tileId) : null;
     if (!profile) {
-      return Object.freeze({
+      return this.cacheSample(cacheKey, Object.freeze({
         tileId,
         profileKey: null,
         structure: null,
@@ -114,7 +131,7 @@ export class ForestHabitatField {
         slopeWeight: 0,
         waterWeight: 0,
         suitability: 0,
-      });
+      }));
     }
 
     const elevation = this.heightAt(x, z);
@@ -137,7 +154,7 @@ export class ForestHabitatField {
       * waterFactor,
     );
 
-    return Object.freeze({
+    return this.cacheSample(cacheKey, Object.freeze({
       tileId,
       profileKey: profile.key,
       structure: profile.structure,
@@ -151,20 +168,34 @@ export class ForestHabitatField {
       slopeWeight: slopeFactor,
       waterWeight: waterFactor,
       suitability,
-    });
+    }));
+  }
+
+  cacheSample(key, sample) {
+    if (this.sampleCache.size >= this.cacheLimit) {
+      this.sampleCache.delete(this.sampleCache.keys().next().value);
+    }
+    this.sampleCache.set(key, sample);
+    this.stats.builds += 1;
+    return sample;
   }
 }
 
-export function createForestPlacementEvaluator(field, counters = null) {
+export function createForestPlacementEvaluator(field, counters = null, {
+  speciesRegistry = null,
+  editStore = null,
+  exclusionAt = null,
+} = {}) {
   if (!field) return null;
   return (candidate) => {
     counters && (counters.evaluated += 1);
     const habitat = field.sample(candidate.x, candidate.z);
-    if (candidate.priority >= habitat.suitability) {
+    if (candidate.priority >= habitat.suitability || exclusionAt?.(candidate, habitat)) {
       counters && (counters.rejectedHabitat += 1);
       return null;
     }
-    return {
+    const ecological = speciesRegistry?.select(candidate, habitat) ?? {};
+    const record = {
       patchId: habitat.patchId,
       forestProfileKey: habitat.profileKey,
       forestStructure: habitat.structure,
@@ -173,7 +204,14 @@ export function createForestPlacementEvaluator(field, counters = null) {
       forestPatchEdge: habitat.patchEdge,
       forestSlope: habitat.slope,
       forestElevation: habitat.elevation,
+      forestWaterWeight: habitat.waterWeight,
+      ...ecological,
     };
+    if (editStore && !editStore.allows({ ...candidate, ...record })) {
+      counters && (counters.rejectedEdits = (counters.rejectedEdits ?? 0) + 1);
+      return null;
+    }
+    return record;
   };
 }
 

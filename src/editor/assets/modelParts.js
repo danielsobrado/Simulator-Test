@@ -5,6 +5,10 @@ export function cloneMaterial(material) {
   return material.clone();
 }
 
+function isShared(resource) {
+  return resource?.userData?.sharedSurface === true;
+}
+
 export function disposeModelParts(parts) {
   const geometries = new Set();
   const materials = new Set();
@@ -13,9 +17,14 @@ export function disposeModelParts(parts) {
   for (const part of parts) {
     geometries.add(part.geometry);
     for (const material of Array.isArray(part.material) ? part.material : [part.material]) {
+      // Procedural surface materials and their textures are shared across the
+      // whole catalog, so only this part's own resources may be released.
+      if (isShared(material)) {
+        continue;
+      }
       materials.add(material);
       for (const value of Object.values(material)) {
-        if (value?.isTexture) {
+        if (value?.isTexture && !isShared(value)) {
           textures.add(value);
         }
       }
