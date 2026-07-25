@@ -38,7 +38,7 @@ function normalizeVector(input, field, fallback, minimum, maximum, mapper = stri
   }
   const values = input.map((value) => mapper(value));
   if (values.some((value) => !Number.isFinite(value) || value < minimum || value > maximum)) {
-    throw new Error(`${field} values must be finite numbers between ${minimum} and ${maximum}.`);
+    throw new Error(`${field} values must be between ${minimum} and ${maximum} and be finite numbers.`);
   }
   return Object.freeze(values);
 }
