@@ -19,6 +19,38 @@ export function normalizeGeometry(input) {
   return ensureUv(geometry);
 }
 
+/**
+ * Give every geometry in a merge group the same `color` attribute presence.
+ *
+ * `mergeGeometries` refuses a group whose members disagree on attributes. Since
+ * 2026-07-25 the stone and roof families carry baked per-unit vertex colours
+ * (see `applyUnitShading`), but plain structural geometry — roof decks, eaves
+ * caps, ridge cylinders — is pushed into those same families unshaded.
+ *
+ * Pass `required` when the target material declares `vertexColors`, so the
+ * attribute is present even if no member of the group happened to be shaded —
+ * a material that reads vertex colours from a geometry that has none renders
+ * black. Otherwise only mixed groups are touched, so families that use no
+ * vertex colours at all do not pay for an unused attribute.
+ *
+ * Fills with white, the identity for a multiplied vertex colour.
+ */
+export function harmonizeVertexColors(geometries, { required = false } = {}) {
+  let withColor = 0;
+  for (const geometry of geometries) {
+    if (geometry.getAttribute('color')) withColor += 1;
+  }
+  if (withColor === geometries.length) return geometries;
+  if (withColor === 0 && !required) return geometries;
+  for (const geometry of geometries) {
+    if (geometry.getAttribute('color')) continue;
+    const count = geometry.getAttribute('position').count;
+    const colors = new Float32Array(count * 3).fill(1);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  }
+  return geometries;
+}
+
 export function transformGeometry(geometry, {
   position = [0, 0, 0],
   rotation = [0, 0, 0],

@@ -158,6 +158,80 @@ Captured against local Vite (`?qa=chunk-cross&warmup=2&duration=12&speed=run&hit
 | `src/editor/stylized/vegetationScatter.js` | Worker/main grass + flower scatter builders |
 | `src/editor/stylized/attributeUpload.js` | Partial attribute upload ranges |
 
+### Harness must run on real hardware
+
+`run-perf-qa.mjs` launches Chromium with `--ignore-gpu-blocklist --use-angle=default
+--enable-gpu-rasterization` plus `--disable-gpu-vsync --disable-frame-rate-limit`, and
+aborts with exit code 2 if WebGPU resolves to a software adapter.
+
+Both matter:
+
+- With only `--enable-unsafe-webgpu`, headless Chromium quietly falls back to a
+  software adapter. Runs then report ~1 FPS regardless of code quality, and a
+  scenario can collapse to a single multi-second frame — the report still writes,
+  so the numbers look real.
+- With vsync on, everything above the refresh rate reads as a flat 60 FPS, so a
+  regression stays invisible until it drops under the cap.
+
+The adapter is recorded as `adapter` in the report. Treat any run without it, or
+with `fallback: true`, as void.
+
+### Fix landed: canonical distance fields were regenerating terrain per lookup
+
+**Symptom:** player-mode movement fell to ~13 FPS (`diagonal`, p50 dt 83 ms) while
+standing still stayed at ~183 FPS. `stylized` averaged 69 ms/frame; `render` stayed
+under 2 ms, so this was never a GPU or draw-call problem.
+
+**Root cause:** `TileDistanceField.chunkField` scans a chunk plus a halo through
+`tileAt`, and `InfiniteWorldStore.getTile` had no memo, so every cell ran
+`sampleTile` → `fractalNoise` + climate sampling. At `waterRangeMeters: 80` and
+`tileSize: 2` the halo is 41 cells, making each field build 146² ≈ 21k procedural
+samples, of which only 19% are the chunk's own cells — neighbouring chunks
+re-generated the same halo. A CPU profile put 55% of all samples in `fractalNoise`.
+
+This is the same class of bug as the original `writeSurfaceMaskPixels` storm,
+reintroduced through the water/path clearance fields.
+
+**Current path:**
+
+1. `InfiniteWorldStore` memoizes generated tiles in per-chunk `Uint8Array` blocks
+   with a `filled` mask (`generatedTileBlocks`, capped at 512 blocks). A lone
+   lookup still costs one sample; contiguous scans reuse their neighbours' work.
+   Only `setBaseTerrain` can stale it, since overrides are consulted first.
+2. `getTile` skips building the string cell key entirely when there are no tile
+   overrides — the distance fields make millions of lookups per frame.
+3. `ScatterClusterField` caches slope on its sample grid and interpolates it,
+   instead of taking four procedural height lookups per candidate.
+4. `placementSignature` is an order-independent sum of per-placement hashes, with
+   no sort and no `localeCompare`.
+5. `TreeManifestStore.context` compares the forest-edit document by reference
+   rather than re-serializing it per chunk build.
+6. Tree, rock and bush build queues share a per-frame ceiling
+   (`streaming.stylizedFrameBudgetMs`, default 6 ms) so three separately budgeted
+   queues cannot stack into one stall.
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| `diagonal` avg FPS | 13.5 | ~113–121 |
+| `diagonal` p50 dt | 83 ms | ~6 ms |
+| `chunk-cross` avg FPS | — | ~113 |
+| Hitches (`diagonal`) | 89 | ~22 |
+
+**Still open:** a handful of single `stylized` jobs cost ~57 ms because a full tree
+LOD rebuild rewrites instances for every visible chunk, and `plan.signature`
+changes each frame while LOD bands cross-fade, so the rebuild is re-triggered.
+Slicing that rebuild per chunk is the next win. There is also one reproducible
+~676 ms hitch whose `stylized` phase is only ~3.6 ms, i.e. async GPU/pipeline work
+outside the marked loop.
+
+### Renderer GPU preference
+
+`InfiniteTerrainView` requests `powerPreference: 'high-performance'`
+(`renderer.powerPreference`, default `high-performance`). Without it the browser may
+place the world view on integrated graphics on hybrid machines, which costs an order
+of magnitude for identical scene content. The workshop preview renderer already
+asked for it; the world renderer did not.
+
 ### Instrumented sub-phases
 
 Counters (last-sample gauges + cumulative `*Ms` / byte totals where noted):

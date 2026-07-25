@@ -151,6 +151,10 @@ export class ProceduralWorkshopUi {
                 <label for="workshop-weathering">Age and weathering <output data-output-for="weathering">35%</output></label>
                 <input id="workshop-weathering" name="weathering" type="range" min="0" max="1" step="0.05" value="0.35" />
               </span>
+              <span class="workshop-range">
+                <label for="workshop-irregularity">Hand-built irregularity <output data-output-for="irregularity">45%</output></label>
+                <input id="workshop-irregularity" name="irregularity" type="range" min="0" max="1" step="0.05" value="0.45" />
+              </span>
               <div class="workshop-option-grid">
                 <label class="workshop-check">
                   <input name="windows" type="checkbox" checked />
@@ -261,6 +265,7 @@ export class ProceduralWorkshopUi {
       roofScale: `${Number(this.form.elements.roofScale.value).toFixed(2)}×`,
       roofOverhang: `${Number(this.form.elements.roofOverhang.value).toFixed(2)} m`,
       weathering: `${Math.round(Number(this.form.elements.weathering.value) * 100)}%`,
+      irregularity: `${Math.round(Number(this.form.elements.irregularity.value) * 100)}%`,
     };
     for (const [name, value] of Object.entries(values)) {
       const output = this.form.querySelector(`[data-output-for="${name}"]`);
@@ -355,6 +360,7 @@ export class ProceduralWorkshopUi {
         detail: Number(values.get('detail')),
         seed: Number(values.get('seed')),
         weathering: Number(values.get('weathering')),
+        irregularity: Number(values.get('irregularity')),
         windows: values.get('windows') === 'on',
         ivy: values.get('ivy') === 'on',
         remesh: values.get('remesh') === 'on',

@@ -191,9 +191,14 @@ export class InfiniteTerrainView {
     });
     this.pendingFetches = new Set();
 
+    // Ask for the discrete GPU explicitly. Without this the browser is free to
+    // place the world view on integrated graphics on hybrid machines, which
+    // costs an order of magnitude of frame rate for identical scene content.
+    // The workshop preview renderer already requests high-performance.
     this.renderer = new THREE.WebGPURenderer({
       antialias: rendererConfig.antialias,
       forceWebGL: rendererConfig.forceWebGL,
+      powerPreference: rendererConfig.powerPreference ?? 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, rendererConfig.maxPixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

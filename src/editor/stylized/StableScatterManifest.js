@@ -79,18 +79,29 @@ function mixHash(seed, value) {
   return hash32(seed ^ hash32(value));
 }
 
+/**
+ * Order-independent digest of a placement set, used purely as an in-memory
+ * change-detection key.
+ *
+ * Each placement is hashed on its own and the hashes are summed, so the result
+ * cannot depend on iteration order. The previous version got that property by
+ * sorting on `stableId` with `localeCompare` on every call; blocker sets span a
+ * 3x3 chunk halo, so that sort ran tens of thousands of slow locale comparisons
+ * per manifest rebuild. This is O(n) with no copy and no comparisons.
+ */
 export function placementSignature(placements) {
-  let result = 0x811c9dc5;
-  const ordered = [...placements].sort((left, right) => (
-    String(left.stableId ?? '').localeCompare(String(right.stableId ?? ''))
-  ));
-  for (const placement of ordered) {
-    result = mixHash(result, quantize(placement.x));
-    result = mixHash(result, quantize(placement.z));
-    result = mixHash(result, quantize(placement.radius ?? 0));
-    result = mixHash(result, placement.prototypeIndex ?? 0);
+  let accumulator = 0;
+  let count = 0;
+  for (const placement of placements) {
+    let hash = 0x811c9dc5;
+    hash = mixHash(hash, quantize(placement.x));
+    hash = mixHash(hash, quantize(placement.z));
+    hash = mixHash(hash, quantize(placement.radius ?? 0));
+    hash = mixHash(hash, placement.prototypeIndex ?? 0);
+    accumulator = (accumulator + hash) >>> 0;
+    count += 1;
   }
-  return `${ordered.length}:${result.toString(16).padStart(8, '0')}`;
+  return `${count}:${accumulator.toString(16).padStart(8, '0')}`;
 }
 
 export function blockersForChunk({

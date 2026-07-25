@@ -69,7 +69,10 @@ export class TreeManifestStore {
     });
     this.pathClearance = createPathClearanceField(terrainView, config);
     this.editStore = new ForestEditStore(terrainView.worldStore.forestEdits);
-    this.editDocumentSignature = JSON.stringify(this.editStore.toDocument());
+    // The world store only ever replaces this document wholesale, so identity is
+    // a sound change signal — and unlike a JSON round-trip it costs nothing to
+    // check once per chunk manifest build.
+    this.editDocumentRef = terrainView.worldStore.forestEdits ?? null;
     this.cache = new Map();
     this.pendingKeys = new Set();
     this.activeKeys = new Set();
@@ -80,10 +83,10 @@ export class TreeManifestStore {
   }
 
   context(chunkX, chunkZ, rockSource) {
-    const editDocumentSignature = JSON.stringify(this.terrainView.worldStore.forestEdits ?? {});
-    if (editDocumentSignature !== this.editDocumentSignature) {
-      this.editStore.loadDocument(this.terrainView.worldStore.forestEdits);
-      this.editDocumentSignature = JSON.stringify(this.editStore.toDocument());
+    const editDocument = this.terrainView.worldStore.forestEdits ?? null;
+    if (editDocument !== this.editDocumentRef) {
+      this.editStore.loadDocument(editDocument);
+      this.editDocumentRef = editDocument;
     }
     const clearRadius = this.config.trees.clearRadius ?? this.terrainView.worldStore.tileSize;
     const rocks = Array.isArray(rockSource)
@@ -282,7 +285,7 @@ export class TreeManifestStore {
     const changed = this.editStore.fell(stableId);
     if (changed) {
       this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
-      this.editDocumentSignature = JSON.stringify(this.terrainView.worldStore.forestEdits);
+      this.editDocumentRef = this.terrainView.worldStore.forestEdits;
       this.cache.clear();
     }
     return changed;
@@ -291,7 +294,7 @@ export class TreeManifestStore {
   plant(record) {
     const planted = this.editStore.plant(record);
     this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
-    this.editDocumentSignature = JSON.stringify(this.terrainView.worldStore.forestEdits);
+    this.editDocumentRef = this.terrainView.worldStore.forestEdits;
     this.cache.clear();
     return planted;
   }
@@ -299,7 +302,7 @@ export class TreeManifestStore {
   setPatchState(patchId, state, progress = 0) {
     this.editStore.setPatchState(patchId, state, progress);
     this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
-    this.editDocumentSignature = JSON.stringify(this.terrainView.worldStore.forestEdits);
+    this.editDocumentRef = this.terrainView.worldStore.forestEdits;
     this.cache.clear();
   }
 

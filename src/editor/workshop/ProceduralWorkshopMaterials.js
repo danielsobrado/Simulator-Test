@@ -3,10 +3,68 @@ import { createSurfaceTexturePixels } from '../assets/proceduralTexturePixels.js
 import { mixSeed } from './ProceduralRandom.js';
 import { getSurfaceTexture } from './ProceduralWorkshopTextureConfig.js';
 
+/**
+ * `base`/`warm`/`color` drive the shared material colour and mortar tint.
+ *
+ * `ramp` and `outlier` drive per-stone vertex colour. Each ramp is centred on
+ * `base` and stays inside one stone family, with a rare desaturated `outlier`
+ * so a few blocks read as distinctly different stone. This is the "stable
+ * per-stone tint" layer of 05-…md §8, deliberately narrow: the section warns
+ * that strong uncoordinated variation makes a wall unreadable.
+ */
 export const STONE_PALETTES = Object.freeze({
-  granite: Object.freeze({ base: [137, 143, 146], warm: [165, 154, 136], color: '#91979a' }),
-  limestone: Object.freeze({ base: [194, 180, 148], warm: [220, 202, 154], color: '#c4b794' }),
-  sandstone: Object.freeze({ base: [187, 122, 78], warm: [220, 159, 98], color: '#bd8056' }),
+  granite: Object.freeze({
+    base: [137, 143, 146],
+    warm: [165, 154, 136],
+    color: '#91979a',
+    ramp: Object.freeze([
+      [137, 143, 146], [152, 150, 141], [124, 130, 134], [143, 148, 138],
+    ]),
+    outlier: [110, 116, 112],
+    outlierChance: 0.1,
+  }),
+  limestone: Object.freeze({
+    base: [194, 180, 148],
+    warm: [220, 202, 154],
+    color: '#c4b794',
+    ramp: Object.freeze([
+      [194, 180, 148], [214, 198, 156], [178, 166, 140], [196, 188, 160],
+    ]),
+    outlier: [162, 158, 132],
+    outlierChance: 0.1,
+  }),
+  sandstone: Object.freeze({
+    base: [187, 122, 78],
+    warm: [220, 159, 98],
+    color: '#bd8056',
+    ramp: Object.freeze([
+      [187, 122, 78], [214, 155, 96], [170, 110, 72], [192, 140, 96],
+    ]),
+    outlier: [150, 132, 96],
+    outlierChance: 0.12,
+  }),
+});
+
+/**
+ * Per-tile roof colour ramps. Before 2026-07-25 the roof material carried no
+ * vertex colours at all, so every tile was one flat hue and the geometry could
+ * not read as separate tiles.
+ */
+export const ROOF_PALETTES = Object.freeze({
+  terracotta: Object.freeze({
+    ramp: Object.freeze([
+      [188, 96, 58], [208, 120, 68], [166, 82, 52], [198, 142, 88],
+    ]),
+    outlier: [128, 132, 88],
+    outlierChance: 0.14,
+  }),
+  slate: Object.freeze({
+    ramp: Object.freeze([
+      [92, 104, 96], [78, 88, 86], [108, 116, 104], [86, 96, 110],
+    ]),
+    outlier: [120, 112, 96],
+    outlierChance: 0.12,
+  }),
 });
 
 export const PLASTER_PALETTES = Object.freeze({
@@ -211,22 +269,182 @@ function tagWorkshopMaterial(material, slot) {
   return material;
 }
 
-export function applyStoneColor(geometry, recipe, stableIndex, heightRatio = 0.5) {
-  const palette = STONE_PALETTES[recipe.style];
-  const tint = (mixSeed(recipe.seed, stableIndex) & 255) / 255;
+const IMPORTED_ALBEDO_CACHE = new WeakMap();
+
+/**
+ * Whether a material family will be painted by an imported albedo image.
+ *
+ * Mirrors the slot resolution inside `createWorkshopMaterials` exactly,
+ * including its `typeof Image` guard, so a generator writing vertex colours and
+ * the material consuming them can never disagree — in headless runs neither
+ * sees an import.
+ *
+ * Memoized per recipe: recipes are frozen and stable for one generation pass,
+ * and this is consulted once per masonry unit.
+ */
+export function hasImportedAlbedoFamily(recipe, family) {
+  if (typeof Image === 'undefined') return false;
+  let byFamily = IMPORTED_ALBEDO_CACHE.get(recipe);
+  if (!byFamily) {
+    byFamily = new Map();
+    IMPORTED_ALBEDO_CACHE.set(recipe, byFamily);
+  }
+  const cached = byFamily.get(family);
+  if (cached !== undefined) return cached;
+
+  const slot = (key) => Boolean(getSurfaceTexture(recipe.surfaceTextures, key));
+  let resolved = false;
+  if (family === 'roof') {
+    resolved = slot('roof');
+  } else {
+    const wallsAreStone = recipe.archetype !== 'manor' || recipe.finish === 'masonry';
+    resolved = slot('stone') || (wallsAreStone && slot('walls'));
+  }
+  byFamily.set(family, resolved);
+  return resolved;
+}
+
+/**
+ * Baked crevice occlusion strengths.
+ *
+ * Implements the "AO-like joint emphasis" of
+ * docs/plans/procedural-medieval-construction/05-geometry-materials-and-stylized-realism.md
+ * §9, and the per-stone "local AO strength" attribute of 04-…md §13, without a
+ * screen-space pass. Layers combine multiplicatively so the total stays bounded
+ * and no single term can crush the albedo — 05-…md §8 ("limit each layer").
+ */
+const OCCLUSION = Object.freeze({
+  /** Darkening at a unit's own underside. Draws the line beneath every brick. */
+  down: 0.34,
+  /** Downward-facing surfaces sit in their neighbour's shadow. */
+  face: 0.22,
+  /** Sky contribution on upward-facing surfaces. */
+  sky: 0.07,
+  /** Lower courses receive less bounce light. */
+  base: 0.16,
+  /** Units pushed back behind the wall plane lose more light. */
+  recess: 0.18,
+  /** Metres over which the ground-contact gradient fades out. */
+  baseHeight: 1.2,
+});
+
+function paletteStop(stops, index) {
+  return stops[index % stops.length];
+}
+
+/**
+ * Pick a per-unit base colour from a curated ramp.
+ *
+ * A ramp plus a rare outlier keeps variation coherent; sampling raw RGB noise
+ * instead is what 05-…md §8 warns makes a wall unreadable.
+ */
+function rampColor(palette, tintLane, outlierLane, channel) {
+  if (palette.outlier && outlierLane < palette.outlierChance) {
+    return palette.outlier[channel] / 255;
+  }
+  const stops = palette.ramp;
+  const scaled = tintLane * stops.length;
+  const index = Math.min(stops.length - 1, Math.floor(scaled));
+  const next = Math.min(stops.length - 1, index + 1);
+  return THREE.MathUtils.lerp(
+    paletteStop(stops, index)[channel] / 255,
+    paletteStop(stops, next)[channel] / 255,
+    scaled - index,
+  );
+}
+
+function unitPalette(recipe, family) {
+  if (family === 'roof') {
+    return ROOF_PALETTES[recipe.topStyle] ?? ROOF_PALETTES.terracotta;
+  }
+  return STONE_PALETTES[recipe.style] ?? STONE_PALETTES.granite;
+}
+
+/**
+ * Write per-unit vertex colours: curated hue variation plus baked crevice
+ * occlusion.
+ *
+ * @param {THREE.BufferGeometry} geometry a single already-transformed unit
+ * @param {object} recipe normalized workshop recipe
+ * @param {object} options
+ * @param {number} options.stableIndex seed-local identity of this unit (04-…md §14)
+ * @param {number} [options.heightRatio] 0..1 position up the structure, for weathering
+ * @param {'stone'|'roof'} [options.family] which palette to sample
+ * @param {number} [options.protrusion] signed out-of-plane offset; negative recesses
+ * @param {number} [options.depth] unit depth, to normalize `protrusion`
+ * @param {boolean} [options.neutral] write occlusion only, preserving an imported
+ *   albedo's hue. Defaults to whether this family actually has an import, which
+ *   is what lets vertex variation survive an imported image (15-…md line 89).
+ */
+export function applyUnitShading(geometry, recipe, {
+  stableIndex,
+  heightRatio = 0.5,
+  family = 'stone',
+  protrusion = 0,
+  depth = 0.3,
+  neutral = hasImportedAlbedoFamily(recipe, family),
+} = {}) {
+  const palette = unitPalette(recipe, family);
+  const hash = mixSeed(recipe.seed, stableIndex);
+  const tintLane = (hash & 255) / 255;
+  const outlierLane = ((hash >>> 8) & 255) / 255;
   const weather = recipe.weathering * (1 - heightRatio) * 0.14;
-  const colors = new Float32Array(geometry.getAttribute('position').count * 3);
-  for (let index = 0; index < colors.length; index += 3) {
+
+  const position = geometry.getAttribute('position');
+  if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
+  const normal = geometry.getAttribute('normal');
+
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  const spanY = Math.max(1e-4, bounds.max.y - bounds.min.y);
+
+  // Uniform across the unit: a recessed stone is evenly deeper in shadow.
+  const recessShade = OCCLUSION.recess
+    * THREE.MathUtils.clamp(-protrusion / Math.max(1e-4, depth), 0, 1);
+
+  const unit = new Float32Array(3);
+  if (!neutral) {
     for (let channel = 0; channel < 3; channel += 1) {
-      const base = palette.base[channel] / 255;
-      const warm = palette.warm[channel] / 255;
-      colors[index + channel] = THREE.MathUtils.clamp(
-        THREE.MathUtils.lerp(base, warm, tint * 0.24) * (0.9 + tint * 0.16) - weather,
+      // Narrower than the pre-ramp 0.9..1.06 brightness spread, because the
+      // ramp now carries most of the per-unit variation.
+      unit[channel] = rampColor(palette, tintLane, outlierLane, channel)
+        * (0.94 + tintLane * 0.1);
+    }
+  }
+
+  const colors = new Float32Array(position.count * 3);
+  for (let vertex = 0; vertex < position.count; vertex += 1) {
+    const localY = (position.getY(vertex) - bounds.min.y) / spanY;
+    const normalY = normal.getY(vertex);
+
+    // Cubed so only the lowest slice of each unit darkens, giving a crisp joint
+    // line rather than a gradient washing over the whole face.
+    const downShade = OCCLUSION.down * ((1 - localY) ** 3);
+    const faceShade = OCCLUSION.face * Math.max(0, -normalY);
+    const skyLift = OCCLUSION.sky * Math.max(0, normalY);
+    const baseShade = OCCLUSION.base * THREE.MathUtils.clamp(
+      1 - position.getY(vertex) / OCCLUSION.baseHeight,
+      0,
+      1,
+    );
+
+    const shade = (1 - downShade)
+      * (1 - faceShade)
+      * (1 - baseShade)
+      * (1 - recessShade)
+      * (1 + skyLift);
+
+    const offset = vertex * 3;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const albedo = neutral ? 1 : unit[channel];
+      colors[offset + channel] = THREE.MathUtils.clamp(
+        albedo * shade - weather,
         0,
         1,
       );
     }
   }
+
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }
@@ -292,7 +510,12 @@ export function createWorkshopMaterials(recipe) {
     normalMap: stoneNormal,
     normalScale: new THREE.Vector2(0.55, 0.55),
     roughnessMap: stoneRoughness,
-    vertexColors: !stoneAlbedo,
+    // Always on. Before 2026-07-25 an imported albedo disabled vertex colours
+    // entirely, which contradicted 15-…md line 89 and threw away the baked
+    // crevice occlusion. `applyUnitShading` switches to a neutral grey
+    // occlusion-only term when an import is present, so the imported hue
+    // survives while joints stay dark.
+    vertexColors: true,
     roughness: 1,
     metalness: 0,
     envMapIntensity: 0.72,
@@ -305,6 +528,7 @@ export function createWorkshopMaterials(recipe) {
     normalMap: roofNormal,
     normalScale: new THREE.Vector2(0.68, 0.68),
     roughnessMap: roofRoughness,
+    vertexColors: true,
     roughness: 1,
     metalness: 0,
     envMapIntensity: 0.82,

@@ -90,6 +90,15 @@ export class StylizedSurfaceView {
       }))
       : [];
     for (const slot of this.slots) slot.mesh.receiveShadow = true;
+    // Shared per-frame ceiling for the heavy scatter rebuilds. Rocks, trees and
+    // bushes each flush in the same update, so once the frame has already spent
+    // this much on rebuilds the remaining queues wait for the next one instead
+    // of compounding into a visible stall.
+    this.frameBudgetMs = config.streaming?.stylizedFrameBudgetMs ?? 6;
+    this.frameStartedAt = 0;
+    const shouldYield = () => (
+      this.frameStartedAt > 0 && performance.now() - this.frameStartedAt > this.frameBudgetMs
+    );
     this.grassBuildQueue = new StylizedBuildQueue({
       buildsPerFrame: config.streaming?.grassBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
@@ -99,14 +108,17 @@ export class StylizedSurfaceView {
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
     this.treeBuildQueue = new StylizedBuildQueue({
+      shouldYield,
       buildsPerFrame: config.streaming?.treeBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
     this.rockBuildQueue = new StylizedBuildQueue({
+      shouldYield,
       buildsPerFrame: config.streaming?.rockBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
     this.bushBuildQueue = new StylizedBuildQueue({
+      shouldYield,
       buildsPerFrame: config.streaming?.bushBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
@@ -187,6 +199,7 @@ export class StylizedSurfaceView {
 
   update(timestamp, camera) {
     if (!this.enabled || this.impostorBakeMode) return;
+    this.frameStartedAt = performance.now();
     this.updateRendererCounters();
     this.skyView?.update(timestamp, camera);
     this.rockView?.update(timestamp, camera);

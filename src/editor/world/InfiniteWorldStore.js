@@ -98,6 +98,10 @@ export class InfiniteWorldStore {
     this.heightOverrides = new Map();
     this.forestEdits = { version: 1, felled: [], planted: [], patches: [] };
     this.cache = new Map();
+    // Generated-tile memo, one small typed-array block per chunk. Bounded by
+    // block count rather than by cell count so it costs no per-cell bookkeeping.
+    this.generatedTileBlocks = new Map();
+    this.generatedTileBlockLimit = 512;
     this.clock = 0;
     this.revision = 0;
     this.listeners = new Set();
@@ -116,9 +120,56 @@ export class InfiniteWorldStore {
     }
   }
 
+  /**
+   * Memoized procedural tile lookup.
+   *
+   * `sampleTile` runs fractal noise plus a climate sample per call, and the
+   * canonical distance fields scan a chunk plus a wide halo, so neighbouring
+   * chunks re-request the same halo cells. Caching the *generated* value is
+   * safe without edit invalidation: it depends only on the generator, and
+   * overrides are consulted ahead of it. Only replacing the generator
+   * (`setBaseTerrain`) can stale it.
+   *
+   * Cells are memoized in per-chunk typed-array blocks with a `filled` mask, so
+   * a lone lookup still costs one sample while a contiguous scan reuses
+   * everything its neighbours already generated.
+   */
+  generatedTileBlock(blockX, blockZ) {
+    const key = chunkKey(blockX, blockZ);
+    let block = this.generatedTileBlocks.get(key);
+    if (block) return block;
+    const size = this.chunkSize;
+    block = { tiles: new Uint8Array(size * size), filled: new Uint8Array(size * size) };
+    if (this.generatedTileBlocks.size >= this.generatedTileBlockLimit) {
+      const oldest = this.generatedTileBlocks.keys().next().value;
+      this.generatedTileBlocks.delete(oldest);
+    }
+    this.generatedTileBlocks.set(key, block);
+    return block;
+  }
+
+  generatedTile(cellX, cellZ) {
+    const size = this.chunkSize;
+    const blockX = Math.floor(cellX / size);
+    const blockZ = Math.floor(cellZ / size);
+    const block = this.generatedTileBlock(blockX, blockZ);
+    const index = (cellZ - blockZ * size) * size + (cellX - blockX * size);
+    if (block.filled[index]) return block.tiles[index];
+    const tileId = this.generator.sampleTile(cellX, cellZ);
+    block.tiles[index] = tileId;
+    block.filled[index] = 1;
+    return tileId;
+  }
+
   getTile(cellX, cellZ) {
-    const key = cellKey(cellX, cellZ);
-    return this.tileOverrides.get(key) ?? this.generator.sampleTile(cellX, cellZ);
+    // Building the string cell key costs an allocation per lookup, and the
+    // canonical distance fields make millions of them per frame. An unedited
+    // world has no overrides to consult, so skip the key entirely.
+    if (this.tileOverrides.size > 0) {
+      const override = this.tileOverrides.get(cellKey(cellX, cellZ));
+      if (override !== undefined) return override;
+    }
+    return this.generatedTile(cellX, cellZ);
   }
 
   setBaseTerrain(baseTerrain) {
@@ -126,6 +177,7 @@ export class InfiniteWorldStore {
     this.generator = createWorldGenerator(this.generator.toMetadata(), cloned);
     this.baseTerrain = cloned;
     this.cache.clear();
+    this.generatedTileBlocks.clear();
   }
 
   getHeight(vertexX, vertexZ) {

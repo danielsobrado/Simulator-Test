@@ -54,6 +54,19 @@ function assertBoolean(config, path) {
   }
 }
 
+const POWER_PREFERENCES = Object.freeze(['high-performance', 'low-power']);
+
+/** Optional: omitting it leaves the choice to the browser. */
+function assertPowerPreference(config) {
+  const value = config.renderer?.powerPreference;
+  if (value === undefined) return;
+  if (!POWER_PREFERENCES.includes(value)) {
+    throw new Error(
+      `Invalid editor configuration: renderer.powerPreference must be one of ${POWER_PREFERENCES.join(', ')}.`,
+    );
+  }
+}
+
 function assertNonNegativeInteger(config, path) {
   const value = readPath(config, path);
   if (!Number.isInteger(value) || value < 0) {
@@ -296,6 +309,7 @@ export function validateEditorConfig(config) {
 
   for (const path of REQUIRED_POSITIVE_PATHS) assertPositiveNumber(config, path);
   for (const path of REQUIRED_BOOLEAN_PATHS) assertBoolean(config, path);
+  assertPowerPreference(config);
   assertNonNegativeInteger(config, ['world', 'loadRadius']);
   assertNonNegativeInteger(config, ['world', 'unloadRadius']);
 

@@ -18,10 +18,14 @@ import {
   normalizeWorkshopMaterialDocument,
   serializeWorkshopMaterialDocument,
 } from './ProceduralWorkshopMaterialConfig.js';
+import {
+  DEFAULT_IRREGULARITY,
+  LEGACY_IRREGULARITY,
+} from './ProceduralWorkshopIrregularity.js';
 
-const ASSET_VERSION = 4;
+const ASSET_VERSION = 5;
 const MAX_ASSETS = 32;
-const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, 3, ASSET_VERSION]);
+const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, 3, 4, ASSET_VERSION]);
 const VALID_ARCHETYPES = new Set(['wall', 'gatehouse', 'tower', 'square-tower', 'manor']);
 const VALID_STYLES = new Set(['granite', 'limestone', 'sandstone']);
 const VALID_TOP_STYLES = new Set(['battlements', 'slate', 'terracotta']);
@@ -143,6 +147,12 @@ export function normalizeProceduralRecipe(input = {}) {
     seed: requireInteger(valueOrDefault(source.seed, 1), 'Seed', 0, 0x7fffffff),
     detail: requireInteger(valueOrDefault(source.detail, 2), 'Detail', 1, 3),
     weathering: requireFinite(valueOrDefault(source.weathering, 0.35), 'Weathering', 0, 1),
+    irregularity: requireFinite(
+      valueOrDefault(source.irregularity, DEFAULT_IRREGULARITY),
+      'Irregularity',
+      0,
+      1,
+    ),
     windows: optionalBoolean(source.windows, 'Doors and windows', true),
     ivy: optionalBoolean(source.ivy, 'Procedural ivy', false),
     remesh: optionalBoolean(source.remesh, 'Remeshing', true),
@@ -183,6 +193,21 @@ export function createProceduralAssetRecord(input, existingKeys = new Set()) {
   });
 }
 
+/**
+ * Version-aware recipe defaults.
+ *
+ * A field added in version N must not silently restyle assets baked under an
+ * earlier version. `irregularity` arrived in version 5 (2026-07-25) with a
+ * default of 0.45, which is deliberately rougher than the jitter that was
+ * hard-coded before it existed — so records at version 4 or below are pinned to
+ * `LEGACY_IRREGULARITY` and keep the look they were authored with. An explicit
+ * value in the record always wins.
+ */
+function applyLegacyRecipeDefaults(recipe, version) {
+  if (version > 4 || recipe.irregularity !== undefined) return recipe;
+  return { ...recipe, irregularity: LEGACY_IRREGULARITY };
+}
+
 function normalizeRecord(input) {
   const source = requireObject(input, 'Procedural game-object record');
   if (!SUPPORTED_ASSET_VERSIONS.has(source.version)) {
@@ -200,7 +225,10 @@ function normalizeRecord(input) {
     key: source.key,
     label,
     recipe: normalizeProceduralRecipe(
-      requireObject(source.recipe, 'Procedural game-object recipe'),
+      applyLegacyRecipeDefaults(
+        requireObject(source.recipe, 'Procedural game-object recipe'),
+        source.version,
+      ),
     ),
   });
 }

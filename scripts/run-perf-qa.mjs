@@ -60,18 +60,63 @@ const fs = require('fs');
 (async () => {
   const browser = await chromium.launch({
     headless: ${hasFlag('headed') ? 'false' : 'true'},
-    args: ['--enable-unsafe-webgpu'],
+    // Without the blocklist bypass Chromium quietly hands WebGPU a software
+    // adapter, and every number below then describes a CPU rasterizer rather
+    // than the GPU path players use. Frame rates come out ~100x too low.
+    // vsync is also disabled: a 60 Hz cap hides all headroom above the refresh
+    // rate, so a regression is invisible until it drops under the cap.
+    args: [
+      '--enable-unsafe-webgpu',
+      '--ignore-gpu-blocklist',
+      '--use-angle=default',
+      '--enable-gpu-rasterization',
+      '--disable-gpu-vsync',
+      '--disable-frame-rate-limit',
+    ],
   });
   const page = await browser.newPage();
   page.setDefaultTimeout(${timeoutMs});
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
+
+  // Refuse to report timings from a software adapter.
+  const adapter = await page.evaluate(async () => {
+    if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
+    const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!found) return { ok: false, reason: 'no WebGPU adapter' };
+    const flags = found.info ?? {};
+    return {
+      ok: true,
+      vendor: flags.vendor ?? null,
+      architecture: flags.architecture ?? null,
+      description: flags.description ?? null,
+      fallback: Boolean(found.isFallbackAdapter),
+    };
+  });
+  const softwareHint = [adapter.vendor, adapter.architecture, adapter.description]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const isSoftware = !adapter.ok
+    || adapter.fallback
+    || /swiftshader|lavapipe|basic render|microsoft basic|llvmpipe|warp/.test(softwareHint);
+  if (isSoftware) {
+    console.error('Perf QA aborted: WebGPU is running on a software adapter.');
+    console.error(JSON.stringify(adapter, null, 2));
+    console.error('Timings from a CPU rasterizer are not comparable to the GPU path.');
+    await browser.close();
+    process.exit(2);
+  }
+  console.log('WebGPU adapter: ' + JSON.stringify(adapter));
+
   await page.waitForFunction(() => window.__perfQa && window.__perfQa.status === 'done', null, {
     timeout: ${timeoutMs},
   });
   const report = await page.evaluate(() => window.__perfQa.getReport());
+  report.adapter = adapter;
   fs.writeFileSync(${JSON.stringify(outPath.replace(/\\/g, '/'))}, JSON.stringify(report, null, 2) + '\\n');
   console.log(JSON.stringify({
     outPath: ${JSON.stringify(outPath.replace(/\\/g, '/'))},
+    adapter,
     scenario: report.scenario?.id,
     avgFps: report.summary.avgFps,
     hitchCount: report.summary.hitchCount,

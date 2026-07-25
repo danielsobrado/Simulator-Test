@@ -8,6 +8,7 @@ import {
   getComponentTransform,
 } from './ProceduralWorkshopComponentTransforms.js';
 import { getWorkshopComponentEditPolicy } from './ProceduralWorkshopEditPolicy.js';
+import { harmonizeVertexColors } from './ProceduralWorkshopGeometry.js';
 import { createProceduralWorkshopParts } from './ProceduralWorkshopGenerator.js';
 import { createWorkshopCompositionParts } from './ProceduralWorkshopCompositionGenerator.js';
 import { planWorkshopComposition } from './ProceduralWorkshopComposition.js';
@@ -674,6 +675,9 @@ function buildPreviewParts(entries, components, remesh) {
   try {
     for (const group of groups.values()) {
       const metadata = componentMetadata(group.component);
+      harmonizeVertexColors(group.geometries, {
+        required: group.material.vertexColors === true,
+      });
       if (remesh) {
         parts.push({
           geometry: mergedGeometry(
@@ -723,6 +727,9 @@ function buildRuntimeParts(entries, components, remesh) {
   const parts = [];
   try {
     for (const group of groups.values()) {
+      harmonizeVertexColors(group.geometries, {
+        required: group.material.vertexColors === true,
+      });
       if (remesh) {
         parts.push({
           geometry: mergedGeometry(

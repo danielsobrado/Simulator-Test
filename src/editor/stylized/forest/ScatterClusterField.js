@@ -111,17 +111,26 @@ export class ScatterClusterField {
       this.stats.cacheHits += 1;
       return cached;
     }
-    const sample = this.patchField.sample(
-      nodeX * this.sampleSpacing,
-      nodeZ * this.sampleSpacing,
-      this.shape,
-    );
+    const worldX = nodeX * this.sampleSpacing;
+    const worldZ = nodeZ * this.sampleSpacing;
+    const patch = this.patchField.sample(worldX, worldZ, this.shape);
+    // Slope belongs on the grid for the same reason coverage does: sampling it
+    // per candidate costs four procedural height lookups (sixteen noise
+    // evaluations) and made cost scale with the candidate budget rather than
+    // with area. Terrain slope varies smoothly at this spacing, so caching it
+    // per node and interpolating is both far cheaper and still canonical.
+    const node = {
+      patchId: patch.patchId,
+      patchCoverage: patch.patchCoverage,
+      patchEdge: patch.patchEdge,
+      slope: this.slopeAt(worldX, worldZ),
+    };
     if (this.cache.size >= this.cacheLimit) {
       this.cache.delete(this.cache.keys().next().value);
     }
-    this.cache.set(key, sample);
+    this.cache.set(key, node);
     this.stats.builds += 1;
-    return sample;
+    return node;
   }
 
   /**
@@ -168,14 +177,22 @@ export class ScatterClusterField {
       tx,
       tz,
     ));
-    const slope = this.slopeAt(x, z);
+    const slope = Math.max(0, bilinear(
+      bottomLeft.slope,
+      bottomRight.slope,
+      topLeft.slope,
+      topRight.slope,
+      tx,
+      tz,
+    ));
+    const slopeWeight = this.slopeWeight(slope);
     return {
       clusterId: nearest.patchId,
       coverage,
       edge,
       slope,
-      slopeWeight: this.slopeWeight(slope),
-      density: clamp01(coverage * this.slopeWeight(slope)),
+      slopeWeight,
+      density: clamp01(coverage * slopeWeight),
     };
   }
 }

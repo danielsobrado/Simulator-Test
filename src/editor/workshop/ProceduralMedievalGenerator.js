@@ -8,12 +8,14 @@ import {
   cylinder,
   flagGeometry,
   gablePanel,
+  harmonizeVertexColors,
   leaf,
   wallRoofPlanes,
 } from './ProceduralWorkshopGeometry.js';
 import { buildProceduralFacadeIvy } from './ProceduralWorkshopIvy.js';
+import { stoneJitter } from './ProceduralWorkshopIrregularity.js';
 import {
-  applyStoneColor,
+  applyUnitShading,
   createWorkshopMaterials,
 } from './ProceduralWorkshopMaterials.js';
 import { resolveWorkshopOpeningLayout } from './ProceduralWorkshopOpeningLayout.js';
@@ -72,31 +74,17 @@ function tagStructureGeometry(geometry, surface) {
   return geometry;
 }
 
-function addStone(target, recipe, params, stableIndex, heightRatio) {
-  const variation = mixSeed(recipe.seed ^ 0x5f3759df, stableIndex);
-  const signed = (shift) => (((variation >>> shift) & 255) / 255 - 0.5) * 2;
-  const rotation = params.rotation ?? [0, 0, 0];
-  const shaped = {
-    ...params,
-    width: params.width * (1 + signed(0) * 0.026),
-    height: params.height * (1 + signed(8) * 0.021),
-    depth: params.depth * (1 + signed(16) * 0.038),
-    rotation: [
-      rotation[0] + signed(4) * 0.006,
-      rotation[1] + signed(12) * 0.008,
-      rotation[2] + signed(20) * 0.011,
-    ],
-    bevelRatio: params.bevelRatio ?? (0.06 + ((variation >>> 24) & 15) / 15 * 0.03),
-    skew: params.skew ?? [
-      signed(6) * params.width * 0.022,
-      signed(14) * params.width * 0.018,
-    ],
-  };
-  target.push(applyStoneColor(
-    beveledBox({ ...shaped, detail: recipe.detail }),
+function addStone(target, recipe, params, stableIndex, heightRatio, category = 'field') {
+  const shaped = stoneJitter(recipe, params, stableIndex, category);
+  target.push(applyUnitShading(
+    beveledBox({ ...params, ...shaped, detail: recipe.detail }),
     recipe,
-    stableIndex,
-    heightRatio,
+    {
+      stableIndex,
+      heightRatio,
+      protrusion: shaped.protrusion,
+      depth: shaped.depth,
+    },
   ));
 }
 
@@ -181,7 +169,7 @@ function buildArchTrim(recipe, opening, {
           y,
           frontZ,
         ],
-      }, stableIndex, y / recipe.height);
+      }, stableIndex, y / recipe.height, 'ashlar');
       stableIndex += 1;
     }
   }
@@ -198,7 +186,7 @@ function buildArchTrim(recipe, opening, {
       depth,
       position: [x, y, frontZ],
       rotation: [0, 0, angle - Math.PI / 2],
-    }, stableIndex, y / recipe.height);
+    }, stableIndex, y / recipe.height, 'voussoir');
     stableIndex += 1;
   }
   return stones;
@@ -1319,6 +1307,10 @@ function createPartsForSet(geometries, material, remesh) {
     material.dispose();
     return [];
   }
+  // Before branching: the un-remeshed path renders these geometries directly
+  // with the same material, so a missing `color` attribute would render black
+  // there too, not only break the merge.
+  harmonizeVertexColors(geometries, { required: material.vertexColors === true });
   if (!remesh) {
     return geometries.map((geometry) => ({
       geometry,

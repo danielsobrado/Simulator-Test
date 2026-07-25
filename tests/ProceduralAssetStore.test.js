@@ -23,6 +23,7 @@ const recipe = {
   seed: 1848,
   detail: 2,
   weathering: 0.35,
+  irregularity: 0.45,
   windows: true,
   ivy: true,
   remesh: true,
@@ -122,6 +123,7 @@ test('older workshop recipes receive compatible quality, texture, and component 
   assert.equal(normalized.roofScale, 1);
   assert.equal(normalized.roofOverhang, 0.35);
   assert.equal(normalized.weathering, 0.35);
+  assert.equal(normalized.irregularity, 0.45);
   assert.equal(normalized.windows, true);
   assert.equal(normalized.ivy, false);
   assert.deepEqual(normalized.surfaceTextures, { sources: {}, slots: {} });
@@ -271,7 +273,7 @@ test('procedural asset documents preserve images and semantic component edits', 
     },
   });
   const document = source.toDocument();
-  assert.equal(document[0].version, 4);
+  assert.equal(document[0].version, 5);
   assert.equal(document[0].key, record.key);
   assert.equal('geometry' in document[0], false);
   assert.equal(
@@ -287,16 +289,54 @@ test('procedural asset documents preserve images and semantic component edits', 
   assert.ok(Object.isFrozen(target.list()[0].recipe));
 });
 
-test('version-one through version-three workshop records migrate to version four', () => {
+test('version-one through version-four workshop records migrate to version five', () => {
   const oldRecord = createProceduralAssetRecord({ label: 'Legacy Tower', recipe });
-  for (const version of [1, 2, 3]) {
+  for (const version of [1, 2, 3, 4]) {
     const store = new ProceduralAssetStore();
     store.replaceAll([{ ...oldRecord, version }]);
     const [migrated] = store.toDocument();
-    assert.equal(migrated.version, 4);
+    assert.equal(migrated.version, 5);
     assert.deepEqual(migrated.recipe.surfaceTextures, { sources: {}, slots: {} });
     assert.deepEqual(migrated.recipe.componentTransforms, {});
     assert.deepEqual(migrated.recipe.openingAttachments, {});
     assert.deepEqual(migrated.recipe.composition, { version: 1, primitives: [] });
   }
+});
+
+test('records predating version five keep the legacy irregularity they were authored with', () => {
+  const { irregularity, ...recipeWithoutIrregularity } = recipe;
+  assert.equal(irregularity, 0.45);
+  const legacyRecord = createProceduralAssetRecord({
+    label: 'Legacy Tower',
+    recipe: recipeWithoutIrregularity,
+  });
+
+  for (const version of [1, 2, 3, 4]) {
+    const store = new ProceduralAssetStore();
+    store.replaceAll([{ ...legacyRecord, version, recipe: recipeWithoutIrregularity }]);
+    const [migrated] = store.toDocument();
+    assert.equal(
+      migrated.recipe.irregularity,
+      0.25,
+      `version ${version} must not be restyled by the new default`,
+    );
+  }
+
+  // An explicit value always wins, at any version.
+  const pinned = new ProceduralAssetStore();
+  pinned.replaceAll([{
+    ...legacyRecord,
+    version: 3,
+    recipe: { ...recipeWithoutIrregularity, irregularity: 0.8 },
+  }]);
+  assert.equal(pinned.toDocument()[0].recipe.irregularity, 0.8);
+
+  // Newly authored records take the current default.
+  assert.equal(
+    createProceduralAssetRecord({
+      label: 'Fresh Tower',
+      recipe: recipeWithoutIrregularity,
+    }).recipe.irregularity,
+    0.45,
+  );
 });

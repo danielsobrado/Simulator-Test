@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { disposeModelParts } from '../assets/modelParts.js';
 import { normalizeProceduralRecipe } from './ProceduralAssetStore.js';
 import { createProceduralMedievalParts } from './ProceduralMedievalGenerator.js';
+import { harmonizeVertexColors } from './ProceduralWorkshopGeometry.js';
 
 const MAX_SOURCE_PARTS = 7_500;
 const MAX_STONE_PARTS = 6_500;
@@ -317,6 +318,7 @@ function mergeParts(parts) {
   try {
     for (const [material, group] of groupPartsByMaterial(parts)) {
       const geometries = group.map(cloneTransformedGeometry);
+      harmonizeVertexColors(geometries, { required: material.vertexColors === true });
       let merged = null;
       try {
         merged = mergeGeometries(geometries, false);
