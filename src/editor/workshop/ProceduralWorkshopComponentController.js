@@ -12,6 +12,10 @@ import {
   getWorkshopComponentEditPolicy,
   supportsWorkshopTransformMode,
 } from './ProceduralWorkshopEditPolicy.js';
+import {
+  isWorkshopArchitecturalOpening,
+  solveWorkshopArchitecturalSnap,
+} from './ProceduralWorkshopArchitecturalSnapping.js';
 
 const POINTER_SELECT_DISTANCE = 5;
 const COMPONENT_POSITION_LIMIT = WORKSHOP_COMPONENT_TRANSFORM_LIMITS.position;
@@ -155,6 +159,35 @@ function isOpening2d(component) {
   return component?.transformPolicy === 'opening2d';
 }
 
+function directMeshBounds(group) {
+  const bounds = new THREE.Box3();
+  bounds.makeEmpty();
+  for (const child of group?.children ?? []) {
+    if (!child.isMesh || !child.geometry) continue;
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    if (!child.geometry.boundingBox) continue;
+    child.updateMatrix();
+    bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrix));
+  }
+  return bounds;
+}
+
+function openingDescriptor(group) {
+  const bounds = directMeshBounds(group);
+  if (bounds.isEmpty()) return null;
+  const baseSize = bounds.getSize(new THREE.Vector3());
+  return {
+    kind: group.userData.workshopComponent.kind,
+    label: group.userData.workshopComponent.label,
+    position: { x: group.position.x, y: group.position.y },
+    size: {
+      x: baseSize.x * Math.abs(group.scale.x),
+      y: baseSize.y * Math.abs(group.scale.y),
+    },
+    baseSize,
+  };
+}
+
 export class ProceduralWorkshopComponentController {
   constructor({
     root,
@@ -220,7 +253,7 @@ export class ProceduralWorkshopComponentController {
         <button type="button" data-component-action="mirror" title="Mirror the selected area across the workshop centre">Mirror X</button>
         <label class="workshop-component-snap">
           <input type="checkbox" data-role="workshop-component-snap" checked />
-          Snap
+          Smart snap
         </label>
         <label class="workshop-component-axis">
           Axes
@@ -253,6 +286,7 @@ export class ProceduralWorkshopComponentController {
       <span class="workshop-component-hint" data-role="workshop-component-hint">
         Click a wall, roof, door, window, tower, or detail in the preview.
       </span>
+      <span class="workshop-component-snap-feedback" data-role="workshop-component-snap-feedback"></span>
     `;
     this.select = root.querySelector('[data-role="workshop-component-select"]');
     this.spaceSelect = root.querySelector('[data-role="workshop-component-space"]');
@@ -262,6 +296,7 @@ export class ProceduralWorkshopComponentController {
     this.undoButton = root.querySelector('[data-component-action="undo"]');
     this.redoButton = root.querySelector('[data-component-action="redo"]');
     this.hint = root.querySelector('[data-role="workshop-component-hint"]');
+    this.snapFeedback = root.querySelector('[data-role="workshop-component-snap-feedback"]');
 
     this.onSelectChange = () => this.selectComponent(this.select.value);
     this.onSpaceChange = () => this.setSpace(this.spaceSelect.value);
@@ -617,6 +652,7 @@ export class ProceduralWorkshopComponentController {
     this.setMode(this.mode);
     this.updateSelectionHelper();
     this.updateNumericFields();
+    this.updateSnapFeedback();
     const component = group.userData.workshopComponent;
     this.hint.textContent = `${component.label} · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
   }
@@ -672,6 +708,7 @@ export class ProceduralWorkshopComponentController {
   setSnapEnabled(enabled) {
     this.snapEnabled = Boolean(enabled);
     this.snapInput.checked = this.snapEnabled;
+    if (!this.snapEnabled) this.updateSnapFeedback();
     this.applySnapSettings();
   }
 
@@ -709,6 +746,76 @@ export class ProceduralWorkshopComponentController {
       }
     }
     return snappedAxes;
+  }
+
+  architecturalSnapContext(group) {
+    const component = group?.userData?.workshopComponent;
+    const parent = group?.parent;
+    if (
+      !component?.editPolicy?.adaptivePlacement
+      || !isWorkshopArchitecturalOpening(component)
+      || !parent?.userData?.workshopComponent
+    ) {
+      return null;
+    }
+    const wallBounds = directMeshBounds(parent);
+    const selected = openingDescriptor(group);
+    if (wallBounds.isEmpty() || !selected) return null;
+    const siblings = [];
+    for (const sibling of parent.children) {
+      if (sibling === group || !isWorkshopArchitecturalOpening(
+        sibling.userData?.workshopComponent,
+      )) {
+        continue;
+      }
+      const descriptor = openingDescriptor(sibling);
+      if (descriptor) siblings.push(descriptor);
+    }
+    return {
+      selected,
+      siblings,
+      wallBounds: {
+        minX: wallBounds.min.x,
+        maxX: wallBounds.max.x,
+        minY: wallBounds.min.y,
+        maxY: wallBounds.max.y,
+      },
+    };
+  }
+
+  snapSelectedArchitecturally(group, policy) {
+    const context = this.architecturalSnapContext(group);
+    if (!context) return null;
+    const enabled = this.snapEnabled !== this.snapInverted;
+    const result = solveWorkshopArchitecturalSnap({
+      kind: group.userData.workshopComponent.kind,
+      mode: this.mode,
+      position: context.selected.position,
+      size: context.selected.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+      enabled,
+      threshold: Math.max(0.14, policy.translationSnap * 4),
+      edgeInset: Math.max(0.04, policy.translationSnap),
+      neighborGap: Math.max(0.12, policy.translationSnap * 3),
+    });
+    if (this.mode === 'scale') {
+      for (const axis of policy.scaleAxes) {
+        const baseSize = context.selected.baseSize[axis];
+        if (baseSize > 0) group.scale[axis] = result.size[axis] / baseSize;
+      }
+    }
+    group.position.x = result.position.x;
+    group.position.y = result.position.y;
+    return result;
+  }
+
+  updateSnapFeedback(guides = []) {
+    if (!this.snapFeedback) return;
+    const reasons = [...new Set(guides.map((guide) => guide.reason))];
+    this.snapFeedback.textContent = reasons.length > 0
+      ? `Smart snap · ${reasons.slice(0, 2).join(' · ')}`
+      : '';
   }
 
   updateInferenceHelper(snappedAxes = new Set()) {
@@ -782,7 +889,11 @@ export class ProceduralWorkshopComponentController {
       if (!policy.rotateAxes.includes(axis)) group.rotation[axis] = 0;
       if (!policy.scaleAxes.includes(axis)) group.scale[axis] = 1;
     }
-    const snappedAxes = this.snapSelectedToInferences(group, basePosition, policy.translateAxes);
+    const architectural = this.snapSelectedArchitecturally(group, policy);
+    const snappedAxes = architectural
+      ? new Set(architectural.guides.map((guide) => guide.axis))
+      : this.snapSelectedToInferences(group, basePosition, policy.translateAxes);
+    this.updateSnapFeedback(architectural?.guides);
     this.updateInferenceHelper(snappedAxes);
   }
 
@@ -950,6 +1061,7 @@ export class ProceduralWorkshopComponentController {
     this.inferenceHelper.visible = false;
     this.handleHelper.visible = false;
     this.handleMetadata = [];
+    this.updateSnapFeedback();
   }
 
   dispose() {

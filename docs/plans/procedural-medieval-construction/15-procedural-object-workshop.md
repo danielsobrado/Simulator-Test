@@ -67,6 +67,7 @@ The opening count is derived from the authored width, so wider spans gain more b
 - Structures are hierarchy roots. Their roofs, openings, woodwork, metalwork, and vegetation are children and follow parent transforms.
 - Door, window, and advanced arch edits are stored as two-dimensional opening intent. Coursed masonry generators regenerate their structural geometry; plastered manor façades regenerate their inserts and trim against the continuous plaster shell.
 - Each component exposes a generator-authored architectural edit policy covering handle type, legal axes, preferred orientation, snap precision, and inference mode.
+- Doors, windows, and arches use wall-aware smart snapping: they remain inside their parent façade, magnetize to wall margins and floor lines, align rows and edges with nearby openings, preserve repeated spacing, and match neighboring opening sizes while scaling.
 - Component transforms are finite, bounded, type-checked, normalized, and serialized in canonical component-ID order.
 - Equivalent positive and negative half-turn rotations serialize identically.
 - Transforms for components that no longer exist are removed before a new asset is baked.

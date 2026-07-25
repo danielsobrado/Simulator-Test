@@ -144,6 +144,14 @@
   line-height: 1.35;
 }
 
+.workshop-component-snap-feedback {
+  min-height: 0.8rem;
+  color: #7de0cf;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .workshop-gizmo-tools {
   max-width: calc(100% - 56px);
   flex-wrap: wrap;

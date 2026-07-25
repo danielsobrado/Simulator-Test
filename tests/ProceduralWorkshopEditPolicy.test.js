@@ -18,6 +18,7 @@ test('structural openings expose only facade-plane architectural edits', () => {
   assert.equal(axesForWorkshopMode(policy, 'rotate'), '');
   assert.equal(axesForWorkshopMode(policy, 'scale'), 'xy');
   assert.equal(supportsWorkshopTransformMode(policy, 'rotate'), false);
+  assert.equal(policy.adaptivePlacement, true);
 });
 
 test('roof editing defaults to parent space with fine architectural snapping', () => {

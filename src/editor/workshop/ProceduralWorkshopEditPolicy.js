@@ -34,6 +34,7 @@ const POLICY_BY_KIND = Object.freeze({
     rotationSnapDegrees: 5,
     scaleSnap: 0.025,
     inference: 'facade',
+    adaptivePlacement: true,
   }),
   window: Object.freeze({
     handle: 'facade-opening',
@@ -46,6 +47,7 @@ const POLICY_BY_KIND = Object.freeze({
     rotationSnapDegrees: 5,
     scaleSnap: 0.025,
     inference: 'facade',
+    adaptivePlacement: true,
   }),
   opening: Object.freeze({
     handle: 'facade-opening',
@@ -58,6 +60,7 @@ const POLICY_BY_KIND = Object.freeze({
     rotationSnapDegrees: 5,
     scaleSnap: 0.025,
     inference: 'bay',
+    adaptivePlacement: true,
   }),
   woodwork: Object.freeze({
     handle: 'attached-detail',
@@ -125,4 +128,3 @@ export function describeWorkshopEditPolicy(policy) {
   if (policy.scaleAxes) actions.push(`scale ${policy.scaleAxes.toUpperCase()}`);
   return `${policy.label} · ${actions.join(' · ')}`;
 }
-
