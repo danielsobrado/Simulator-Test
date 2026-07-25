@@ -14,10 +14,16 @@ function disposeRenderer(objectView, renderer) {
   disposeModelParts(renderer.parts);
 }
 
+function disposePreviewMaterial(material) {
+  for (const candidate of Array.isArray(material) ? material : [material]) {
+    candidate?.dispose?.();
+  }
+}
+
 function clearPreview(objectView, definitionKeys) {
   if (!definitionKeys.has(objectView.previewDefinitionKey)) return;
   for (const child of objectView.previewGroup.children) {
-    child.material.dispose();
+    disposePreviewMaterial(child.material);
   }
   objectView.previewGroup.clear();
   objectView.previewGroup.visible = false;
@@ -32,18 +38,35 @@ function requireProceduralDefinition(key, definition) {
   }
 }
 
-export function collectProceduralDefinitionKeys({ objectMap, objectView, definitionKeys = [] }) {
-  const keys = new Set(definitionKeys);
+function allProceduralDefinitionKeys(objectMap, objectView) {
+  const keys = new Set();
   for (const [key, definition] of objectMap.definitionByKey) {
     if (definition.procedural === true) keys.add(key);
   }
   for (const [key, definition] of objectView.definitionByKey) {
     if (definition.procedural === true) keys.add(key);
   }
+  for (const [key, renderer] of objectView.renderers) {
+    if (renderer.definition?.procedural === true) keys.add(key);
+  }
   return keys;
 }
 
-export function unregisterProceduralDefinitions({ objectMap, objectView, definitionKeys = [] }) {
+export function collectProceduralDefinitionKeys({
+  objectMap,
+  objectView,
+  definitionKeys = null,
+}) {
+  return definitionKeys == null
+    ? allProceduralDefinitionKeys(objectMap, objectView)
+    : new Set(definitionKeys);
+}
+
+export function unregisterProceduralDefinitions({
+  objectMap,
+  objectView,
+  definitionKeys = null,
+}) {
   const keys = collectProceduralDefinitionKeys({ objectMap, objectView, definitionKeys });
   if (keys.size === 0) return;
 
