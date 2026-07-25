@@ -14,7 +14,7 @@ import {
   getCastleWallButtressPositions,
   getCastleWallOpenings,
   getCastleWallTopHeight,
-  isInsideCastleOpening,
+  intersectsCastleOpening,
 } from './ProceduralCastleWallLayout.js';
 
 const MAX_STONES = 1800;
@@ -43,9 +43,12 @@ function createGeometrySets() {
   };
 }
 
+function disposeGeometries(geometries) {
+  new Set(geometries).forEach((geometry) => geometry.dispose());
+}
+
 function disposeGeometrySets(sets) {
-  const geometries = new Set(MATERIAL_SLOTS.flatMap((slot) => sets[slot]));
-  geometries.forEach((geometry) => geometry.dispose());
+  disposeGeometries(MATERIAL_SLOTS.flatMap((slot) => sets[slot]));
 }
 
 function addStone(target, recipe, params, stableIndex, heightRatio) {
@@ -89,8 +92,12 @@ function buildWallBody(sets, recipe, openings) {
       const clippedWidth = right - left;
       const x = (left + right) / 2;
       const localTop = getCastleWallTopHeight(recipe, x);
-      const openingHit = openings.some((opening) => (
-        isInsideCastleOpening(opening, x, y, clippedWidth * 0.36)
+      const openingHit = openings.some((opening) => intersectsCastleOpening(
+        opening,
+        x,
+        y,
+        clippedWidth / 2 + 0.018,
+        actualCourseHeight / 2 + 0.012,
       ));
 
       if (
@@ -304,31 +311,46 @@ function createPartsForSet(geometries, material, remesh) {
     }));
   }
 
-  const merged = mergeGeometries(geometries, false);
-  geometries.forEach((geometry) => geometry.dispose());
-  if (!merged) {
+  let merged = null;
+  try {
+    merged = mergeGeometries(geometries, false);
+    if (!merged) {
+      throw new Error('The workshop could not merge the castle wall geometry.');
+    }
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
+    return [{ geometry: merged, material, matrix: new THREE.Matrix4() }];
+  } catch (error) {
+    merged?.dispose();
     disposeMaterial(material);
-    throw new Error('The workshop could not merge the castle wall geometry.');
+    throw error;
+  } finally {
+    disposeGeometries(geometries);
   }
-  merged.computeBoundingBox();
-  merged.computeBoundingSphere();
-  return [{ geometry: merged, material, matrix: new THREE.Matrix4() }];
+}
+
+function disposeUnprocessedSlots(sets, materials, startIndex) {
+  for (let index = startIndex; index < MATERIAL_SLOTS.length; index += 1) {
+    const slot = MATERIAL_SLOTS[index];
+    disposeGeometries(sets[slot]);
+    disposeMaterial(materials[slot]);
+  }
 }
 
 function buildParts(recipe, sets) {
   const materials = createWorkshopMaterials(recipe);
   const parts = [];
-  try {
-    for (const slot of MATERIAL_SLOTS) {
+  for (let index = 0; index < MATERIAL_SLOTS.length; index += 1) {
+    const slot = MATERIAL_SLOTS[index];
+    try {
       parts.push(...createPartsForSet(sets[slot], materials[slot], recipe.remesh));
+    } catch (error) {
+      disposeModelParts(parts);
+      disposeUnprocessedSlots(sets, materials, index + 1);
+      throw error;
     }
-    return parts;
-  } catch (error) {
-    disposeModelParts(parts);
-    disposeGeometrySets(sets);
-    MATERIAL_SLOTS.forEach((slot) => disposeMaterial(materials[slot]));
-    throw error;
   }
+  return parts;
 }
 
 function buildStats(recipe, sets) {
