@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { disposeModelParts } from '../assets/modelParts.js';
 import {
   beveledBox,
   leaf,
@@ -20,6 +21,15 @@ const MAX_STONES = 1800;
 const MIN_STONE_WIDTH = 0.26;
 const ARCH_BLOCK_HEIGHT = 0.27;
 const COPING_HEIGHT = 0.16;
+const MATERIAL_SLOTS = Object.freeze([
+  'stone',
+  'mortar',
+  'wood',
+  'roof',
+  'metal',
+  'foliage',
+  'recess',
+]);
 
 function createGeometrySets() {
   return {
@@ -31,6 +41,11 @@ function createGeometrySets() {
     foliage: [],
     recess: [],
   };
+}
+
+function disposeGeometrySets(sets) {
+  const geometries = new Set(MATERIAL_SLOTS.flatMap((slot) => sets[slot]));
+  geometries.forEach((geometry) => geometry.dispose());
 }
 
 function addStone(target, recipe, params, stableIndex, heightRatio) {
@@ -302,20 +317,23 @@ function createPartsForSet(geometries, material, remesh) {
 
 function buildParts(recipe, sets) {
   const materials = createWorkshopMaterials(recipe);
-  return [
-    ...createPartsForSet(sets.stone, materials.stone, recipe.remesh),
-    ...createPartsForSet(sets.mortar, materials.mortar, recipe.remesh),
-    ...createPartsForSet(sets.wood, materials.wood, recipe.remesh),
-    ...createPartsForSet(sets.roof, materials.roof, recipe.remesh),
-    ...createPartsForSet(sets.metal, materials.metal, recipe.remesh),
-    ...createPartsForSet(sets.foliage, materials.foliage, recipe.remesh),
-    ...createPartsForSet(sets.recess, materials.recess, recipe.remesh),
-  ];
+  const parts = [];
+  try {
+    for (const slot of MATERIAL_SLOTS) {
+      parts.push(...createPartsForSet(sets[slot], materials[slot], recipe.remesh));
+    }
+    return parts;
+  } catch (error) {
+    disposeModelParts(parts);
+    disposeGeometrySets(sets);
+    MATERIAL_SLOTS.forEach((slot) => disposeMaterial(materials[slot]));
+    throw error;
+  }
 }
 
 function buildStats(recipe, sets) {
-  const allGeometry = Object.values(sets).flat();
-  const populatedSets = Object.values(sets).filter((geometries) => geometries.length > 0);
+  const allGeometry = MATERIAL_SLOTS.flatMap((slot) => sets[slot]);
+  const populatedSets = MATERIAL_SLOTS.filter((slot) => sets[slot].length > 0);
   return Object.freeze({
     stones: sets.stone.length,
     features: allGeometry.length - sets.stone.length,
@@ -329,14 +347,19 @@ function buildStats(recipe, sets) {
 
 function buildCastleWall(recipe) {
   const sets = createGeometrySets();
-  const openings = getCastleWallOpenings(recipe);
-  buildWallBody(sets, recipe, openings);
-  buildOpenings(sets, recipe, openings);
-  buildButtresses(sets, recipe, openings);
-  buildCoping(sets, recipe);
-  buildBattlements(sets, recipe);
-  buildIvy(sets, recipe);
-  return sets;
+  try {
+    const openings = getCastleWallOpenings(recipe);
+    buildWallBody(sets, recipe, openings);
+    buildOpenings(sets, recipe, openings);
+    buildButtresses(sets, recipe, openings);
+    buildCoping(sets, recipe);
+    buildBattlements(sets, recipe);
+    buildIvy(sets, recipe);
+    return sets;
+  } catch (error) {
+    disposeGeometrySets(sets);
+    throw error;
+  }
 }
 
 export function createProceduralCastleWallParts(recipe) {
@@ -350,6 +373,6 @@ export function createProceduralCastleWallParts(recipe) {
 export function getProceduralCastleWallStats(recipe) {
   const sets = buildCastleWall(recipe);
   const stats = buildStats(recipe, sets);
-  Object.values(sets).flat().forEach((geometry) => geometry.dispose());
+  disposeGeometrySets(sets);
   return stats;
 }
