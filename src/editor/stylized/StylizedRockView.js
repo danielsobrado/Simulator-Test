@@ -17,6 +17,15 @@ import {
 import { createRockProxyPrototype } from './lod/StylizedProxyGeometry.js';
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
+
+// Reused across a rebuild: `compose` reads out of these, so only the matrix
+// itself has to be a fresh object per instance.
+const ROCK_UP = new THREE.Vector3(0, 1, 0);
+const ROCK_SCRATCH = {
+  position: new THREE.Vector3(),
+  quaternion: new THREE.Quaternion(),
+  scale: new THREE.Vector3(),
+};
 import { createPathClearanceField } from './TreeManifestStore.js';
 
 const ROCK_CLUSTER_SEED_OFFSET = 0xa7;
@@ -87,6 +96,9 @@ export class StylizedRockView {
     this.clusterField = null;
     this.signature = '';
     this.manifestCache = new Map();
+    // Chunks other scatter layers asked about since the last prune. Bounded by
+    // their request windows, which are a few hundred chunks of ~14 placements.
+    this.blockerRequests = new Set();
     this.chunkLodStates = new Map();
     this.lastUpdateKey = null;
     this.pendingRebuild = null;
@@ -299,12 +311,13 @@ export class StylizedRockView {
           for (const placement of manifest) {
             const instance = {
               matrix: new THREE.Matrix4().compose(
-                new THREE.Vector3(placement.x, placement.height - burialFor(placement), placement.z),
-                new THREE.Quaternion().setFromAxisAngle(
-                  new THREE.Vector3(0, 1, 0),
-                  placement.rotationY,
+                ROCK_SCRATCH.position.set(
+                  placement.x,
+                  placement.height - burialFor(placement),
+                  placement.z,
                 ),
-                new THREE.Vector3(placement.scale, placement.scale, placement.scale),
+                ROCK_SCRATCH.quaternion.setFromAxisAngle(ROCK_UP, placement.rotationY),
+                ROCK_SCRATCH.scale.setScalar(placement.scale),
               ),
               fade: representation.fade,
               seed: placement.priority,
@@ -326,22 +339,38 @@ export class StylizedRockView {
     PerfCounters.set('rockPlacementInstances', placements.length);
 
     for (const key of this.manifestCache.keys()) {
-      if (!activeChunks.has(key)) {
+      if (!activeChunks.has(key) && !this.blockerRequests.has(key)) {
         this.manifestCache.delete(key);
         this.placementsByChunk.delete(key);
       }
     }
+    // Consumers re-request every frame, so a fresh window is rebuilt before the
+    // next prune; anything that stops being asked about is dropped then.
+    this.blockerRequests.clear();
   }
 
   getPlacements() {
     return this.placements;
   }
 
+  /**
+   * Boulder blockers for a chunk and its halo, consumed by tree and bush
+   * placement.
+   *
+   * Trees ask about chunks far outside the boulder render window (their cluster
+   * band reaches much further than `proxyRadius`), so every requested chunk is
+   * recorded here. Without that, `rebuild` would prune those manifests as
+   * "inactive" and they would be rebuilt from scratch on the very next frame —
+   * a continuous rebuild of the same far chunks.
+   */
   getBlockersForChunk(chunkX, chunkZ, halo = 1) {
     const placements = [];
     for (let offsetZ = -halo; offsetZ <= halo; offsetZ += 1) {
       for (let offsetX = -halo; offsetX <= halo; offsetX += 1) {
-        placements.push(...this.manifestForChunk(chunkX + offsetX, chunkZ + offsetZ));
+        const neighbourX = chunkX + offsetX;
+        const neighbourZ = chunkZ + offsetZ;
+        this.blockerRequests.add(`${neighbourX}:${neighbourZ}`);
+        placements.push(...this.manifestForChunk(neighbourX, neighbourZ));
       }
     }
     return placements;

@@ -202,7 +202,14 @@ export class InfiniteTerrainView {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, rendererConfig.maxPixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Match the workshop preview renderer. Until 2026-07-25 the world used no
+    // tone mapping at all while buildings were authored under ACES at 1.12
+    // exposure, so a bake never looked the way it did in the workshop and bright
+    // greens and limewash clipped on placement.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = rendererConfig.toneMappingExposure ?? 1.12;
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.domElement.setAttribute('aria-label', 'SimCity DnD infinite world editor viewport');
     container.append(this.renderer.domElement);
 

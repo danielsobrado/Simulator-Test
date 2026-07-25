@@ -306,6 +306,17 @@ async function startEditor() {
 
   await stylizedSurface.ready;
 
+  // Warm render pipelines before the first frame. WebGPU compiles a pipeline the
+  // first time a material/geometry pair is actually drawn, and that compile blocks
+  // in the GPU process — it shows up as a ~90 ms hitch on whichever frame a new
+  // LOD band first becomes visible, with every phase timer on that frame cheap.
+  // Doing it here moves the cost into load, where a stall is not a stutter.
+  try {
+    await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);
+  } catch (error) {
+    console.warn('Render pipeline pre-warm failed; pipelines will compile on demand.', error);
+  }
+
   const perfQa = PerfQaHarness.fromLocation({
     viewModeController,
     playerController,

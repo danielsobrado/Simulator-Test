@@ -67,6 +67,17 @@ function assertPowerPreference(config) {
   }
 }
 
+/** Optional: omitting it falls back to parity with the workshop preview. */
+function assertToneMappingExposure(config) {
+  const value = config.renderer?.toneMappingExposure;
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value <= 0 || value > 4) {
+    throw new Error(
+      'Invalid editor configuration: renderer.toneMappingExposure must be a finite number in (0, 4].',
+    );
+  }
+}
+
 function assertNonNegativeInteger(config, path) {
   const value = readPath(config, path);
   if (!Number.isInteger(value) || value < 0) {
@@ -199,6 +210,7 @@ function validateStylizedSurface(config) {
     ['stylizedSurface', 'sky', 'cloudRimStrength'],
     ['stylizedSurface', 'sky', 'shadowBias'],
     ['stylizedSurface', 'sky', 'shadowNormalBias'],
+    ['stylizedSurface', 'sky', 'shadowRadius'],
     ['stylizedSurface', 'sky', 'fogDensity'],
   ];
   for (const path of finitePaths) assertFiniteNumber(config, path);
@@ -310,6 +322,7 @@ export function validateEditorConfig(config) {
   for (const path of REQUIRED_POSITIVE_PATHS) assertPositiveNumber(config, path);
   for (const path of REQUIRED_BOOLEAN_PATHS) assertBoolean(config, path);
   assertPowerPreference(config);
+  assertToneMappingExposure(config);
   assertNonNegativeInteger(config, ['world', 'loadRadius']);
   assertNonNegativeInteger(config, ['world', 'unloadRadius']);
 

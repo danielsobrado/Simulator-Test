@@ -68,13 +68,18 @@ export class TreeImpostorAssetLoader {
   constructor({
     baseUrl = '/',
     loader = new THREE.TextureLoader(),
-    fetchImpl = fetch,
+    fetchImpl = null,
     expectedPrototypeCount = null,
     expectedSourceSignature = null,
   } = {}) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     this.loader = loader;
-    this.fetchImpl = fetchImpl;
+    // `fetch` must run with the global object as its receiver. Storing the bare
+    // reference and calling it as `this.fetchImpl(...)` makes the receiver this
+    // loader, which browsers reject with "Illegal invocation" — that failure was
+    // caught and downgraded to a warning, so every session silently discarded the
+    // prebaked atlases and re-baked all of them on the main thread instead.
+    this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.expectedPrototypeCount = expectedPrototypeCount;
     this.expectedSourceSignature = expectedSourceSignature;
   }

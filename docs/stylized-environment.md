@@ -32,6 +32,15 @@ stylizedSurface:
 
 ## Rendering architecture
 
+- **`StylizedSkyView` is the scene's single lighting authority (2026-07-25).** It
+  evicts any scene child tagged `userData.fallbackLighting` when it is
+  constructed. `ObjectView` adds such a hemisphere/directional pair for the
+  configurations where the sky rig never runs — `stylizedSurface.enabled: false`,
+  `sky.enabled: false`, or an impostor bake — so those still render lit. Before
+  this, the pair was added unconditionally and the world ran two hemisphere
+  lights and two directional suns from different directions; the extra unshadowed
+  fill flattened buildings. Anything adding scene lighting should either tag it as
+  fallback or own the eviction.
 - Ground color, dirt, lush/dry variation, path blending and cloud animation use TSL.
 - Grass blades are deterministic streamed instances. Wind, blade shortening, color,
   rock trampling, and sun-based translucency run in the WebGPU material.

@@ -1,5 +1,25 @@
 # Masonry and Stone Generation Plan
 
+## Implementation status (2026-07-25)
+
+Partially implemented by the workshop generators. Distinguishing what exists from
+what is still aspirational:
+
+| Section | Status |
+|---|---|
+| §8 stone shape generation | **Implemented** — `ProceduralWorkshopIrregularity.stoneJitter` supplies controlled corner offsets, orientation and bevel; §8's "stronger irregularity for rubble than ashlar, reduced at structural dressings" is the `IRREGULARITY_CATEGORY_SCALE` table |
+| §12 mortar | **Implemented** as gaps plus vertex-attribute darkening near stone edges (`applyUnitShading`); no per-joint mesh strips, as the section requires |
+| §13 stone attributes | **Partial** — per-stone tint and local AO strength are baked into vertex colours; the remaining attributes are not packed yet |
+| §14 seed locality | **Implemented** — every unit's shape derives only from its own stable index |
+| §15 budgets | **Implemented** for roof tiles: target tile size grows when a roof exceeds budget, per this section's "increase target stone size" |
+| §4 course solver | Partial — exact fill without drift (`packCourse` normalizes candidate widths to the span), but no bounded candidate *heights* and no reserved foundation courses |
+| §5 joint staggering | **Implemented** — `ProceduralWorkshopCoursePacker` carries forbidden joint bands from the course below and relocates joints out of them by interval subtraction. No backtracking: when bands cover the whole legal window it takes the documented deterministic fallback instead |
+| §6 interval packing | **Implemented** — candidate widths are drawn then normalized to fit the interval exactly, so nothing is clipped; sub-minimum stones are dissolved into a neighbour rather than emitted as slivers, and coverage is validated |
+| §7 stone categories | Categories exist as an irregularity scale only, not as distinct archetypes |
+| §11 openings | **Implemented** without boolean subtraction, as the section requires: stones intersecting an opening volume are never generated |
+| §9 two faces and core | **Not implemented** |
+| §10 corner quoins | **Not implemented** |
+
 ## 1. Objective
 
 Generate believable stylized medieval masonry as deterministic constrained layouts inside structural regions.

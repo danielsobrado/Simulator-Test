@@ -264,10 +264,21 @@ export function flagGeometry({
   return transformGeometry(geometry, { position });
 }
 
+/**
+ * Vertex-colour gradient along a leaf, from base to tip.
+ *
+ * Real foliage is darkest where it is shaded by the mass behind it and lightest
+ * at the free tip. Baking this per leaf is what stops a clump of ivy reading as
+ * one flat green silhouette.
+ */
+const LEAF_BASE_SHADE = 0.72;
+const LEAF_TIP_SHADE = 1.08;
+
 export function leaf({
   radius,
   position,
   rotation = [0, 0, 0],
+  color = null,
 }) {
   const positions = new Float32Array([
     0, -radius * 0.82, 0,
@@ -292,6 +303,19 @@ export function leaf({
     1, 0.42, 0.5, 0.48, 0.5, 1,
   ], 2));
   geometry.computeVertexNormals();
+  if (color) {
+    // Sampled before the transform, while the leaf still runs along its own
+    // local Y from base (-radius * 0.82) to tip (+radius).
+    const colors = new Float32Array(positions.length);
+    for (let vertex = 0; vertex < positions.length; vertex += 3) {
+      const along = (positions[vertex + 1] + radius * 0.82) / (radius * 1.82);
+      const shade = LEAF_BASE_SHADE + (LEAF_TIP_SHADE - LEAF_BASE_SHADE) * along;
+      colors[vertex] = color[0] * shade;
+      colors[vertex + 1] = color[1] * shade;
+      colors[vertex + 2] = color[2] * shade;
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  }
   return transformGeometry(geometry, { position, rotation });
 }
 

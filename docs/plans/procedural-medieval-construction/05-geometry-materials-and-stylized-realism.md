@@ -1,5 +1,18 @@
 # Geometry, Materials, and Stylized Realism Plan
 
+## Implementation status (2026-07-25)
+
+| Section | Status |
+|---|---|
+| §5 stylized stone shape | **Implemented** — `beveledBox` is the bevelled prism; controlled corner offsets come from `stoneJitter`'s skew and rotation lanes. The section's warning against global shader vertex noise still holds: all shaping happens at generation time, on whole units |
+| §8 colour hierarchy | **Partial** — style palette, stable per-stone tint (a curated ramp with a rare outlier), upward lightening and lower-wall dampness are baked into vertex colours. Stone category, world-space geological variation, moss and damage layers are not |
+| §9 mortar rendering | **Implemented** for the near case — AO-like joint emphasis via baked per-vertex occlusion |
+| §13 edge outlines | **Followed** — no inverted hulls. Readability comes from bevel lighting plus the baked contact occlusion this section prefers. A scene-wide outline or AO post effect remains explicitly optional |
+| §14 lighting | **Implemented** — metalness 0, high varied roughness, restrained normals, no fake emissive. The duplicate second sun that contradicted "walls must work with the existing scene light setup" was removed |
+| §6 material architecture | **Not implemented** — the workshop still uses `MeshStandardMaterial`, not `MeshStandardNodeMaterial` with the named TSL nodes. None of `StoneBaseColorNode` … `DamageExposureNode` exist |
+| §7 material inputs | **Partial** — per-stone randomness and AO reach the shader as vertex colours rather than as packed attributes |
+| §2 LOD representations | **Not implemented** — the workshop bakes one representation per asset |
+
 ## 1. Objective
 
 Compile structural and masonry descriptions into efficient Three.js geometry and a reusable WebGPU-first stylized stone material.

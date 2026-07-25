@@ -57,9 +57,21 @@ export class ObjectView {
     this.selectionOverlay = this.createOverlay(SELECTION_COLOR, 0.24);
     terrainView.scene.add(this.footprintPreview, this.selectionOverlay);
 
+    // Fallback lighting only, for when the stylized sky rig is disabled
+    // (`stylizedSurface.enabled` or `sky.enabled` off, or an impostor bake).
+    //
+    // Until 2026-07-25 these were added unconditionally, so the normal world ran
+    // two hemisphere lights and two directional suns from different directions.
+    // The extra unshadowed fill flattened buildings and contradicted 05-…md §14
+    // ("walls must work with the existing scene light setup"). `StylizedSkyView`
+    // now evicts anything tagged `fallbackLighting` when it takes over as the
+    // single lighting authority.
     const hemisphere = new THREE.HemisphereLight('#dce8ff', '#293326', 1.45);
     const sun = new THREE.DirectionalLight('#fff1cf', 2.1);
     sun.position.set(80, 120, 60);
+    hemisphere.userData.fallbackLighting = true;
+    sun.userData.fallbackLighting = true;
+    this.fallbackLights = [hemisphere, sun];
     terrainView.scene.add(hemisphere, sun);
 
     for (const definition of objectCatalog) {

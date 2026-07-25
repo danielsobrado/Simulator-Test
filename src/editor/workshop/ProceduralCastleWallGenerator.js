@@ -6,6 +6,8 @@ import {
   harmonizeVertexColors,
 } from './ProceduralWorkshopGeometry.js';
 import { buildProceduralFacadeIvy } from './ProceduralWorkshopIvy.js';
+import { packCourse } from './ProceduralWorkshopCoursePacker.js';
+import { createSurfaceRelief } from './ProceduralWorkshopSurfaceRelief.js';
 import { stoneJitter } from './ProceduralWorkshopIrregularity.js';
 import {
   applyUnitShading,
@@ -53,6 +55,7 @@ function disposeGeometrySets(sets) {
   disposeGeometries(MATERIAL_SLOTS.flatMap((slot) => sets[slot]));
 }
 
+/** Returns the shaped parameters so callers can record surface relief. */
 function addStone(target, recipe, params, stableIndex, heightRatio, category = 'field') {
   if (target.length >= MAX_STONES) {
     throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
@@ -68,6 +71,7 @@ function addStone(target, recipe, params, stableIndex, heightRatio, category = '
       depth: shaped.depth,
     },
   ));
+  return shaped;
 }
 
 function shouldDropRuinStone(recipe, random, x, y, localTop) {
@@ -78,7 +82,7 @@ function shouldDropRuinStone(recipe, random, x, y, localTop) {
   return random() < 0.12 + edgeRatio * 0.2;
 }
 
-function buildWallBody(sets, recipe, openings) {
+function buildWallBody(sets, recipe, openings, relief = null) {
   const random = createRandom(mixSeed(recipe.seed, 910));
   const courseHeight = 0.5 - recipe.detail * 0.045;
   const courseCount = Math.max(3, Math.ceil(recipe.height / courseHeight));
@@ -86,36 +90,41 @@ function buildWallBody(sets, recipe, openings) {
   const targetStoneWidth = 0.92 - recipe.detail * 0.07;
   let stableIndex = 9_100_000;
 
+  // Joints of the course below, so this course breaks bond against them
+  // (04-…md §5). Replaces the old fixed `rowOffset`, which shifted the cursor
+  // outside the wall span and produced clipped part-stones at both ends.
+  let previousJoints = [];
+
   for (let course = 0; course < courseCount; course += 1) {
     const y = (course + 0.5) * actualCourseHeight;
-    const rowOffset = course % 2 === 0 ? 0 : targetStoneWidth * 0.42;
-    let cursor = -recipe.width / 2 - rowOffset;
+    const { stones, joints } = packCourse({
+      span: recipe.width,
+      targetWidth: targetStoneWidth,
+      minWidth: MIN_STONE_WIDTH,
+      random,
+      forbiddenJoints: previousJoints,
+    });
+    previousJoints = joints;
 
-    while (cursor < recipe.width / 2 - 0.001) {
-      const desired = targetStoneWidth * (0.72 + random() * 0.54);
-      const stoneWidth = Math.max(MIN_STONE_WIDTH, desired);
-      const left = Math.max(-recipe.width / 2, cursor);
-      const right = Math.min(recipe.width / 2, cursor + stoneWidth);
-      const clippedWidth = right - left;
-      const x = (left + right) / 2;
+    for (const stone of stones) {
+      const x = stone.center;
       const localTop = getCastleWallTopHeight(recipe, x);
       const openingHit = openings.some((opening) => intersectsCastleOpening(
         opening,
         x,
         y,
-        clippedWidth / 2 + 0.018,
+        stone.width / 2 + 0.018,
         actualCourseHeight / 2 + 0.012,
       ));
 
       if (
-        clippedWidth >= MIN_STONE_WIDTH * 0.7
-        && y <= localTop
+        y <= localTop
         && !openingHit
         && !shouldDropRuinStone(recipe, random, x, y, localTop)
       ) {
         const inset = 0.012 + random() * 0.018;
-        addStone(sets.stone, recipe, {
-          width: Math.max(0.12, clippedWidth - inset),
+        const shaped = addStone(sets.stone, recipe, {
+          width: Math.max(0.12, stone.width - inset),
           height: Math.max(0.12, actualCourseHeight - inset * 0.7),
           depth: recipe.depth * (0.95 + random() * 0.035),
           position: [
@@ -129,9 +138,9 @@ function buildWallBody(sets, recipe, openings) {
             (random() - 0.5) * 0.01,
           ],
         }, stableIndex, y / recipe.height);
+        relief?.record(x, y, shaped.protrusion);
       }
 
-      cursor += stoneWidth;
       stableIndex += 1;
     }
   }
@@ -279,13 +288,14 @@ function buildBattlements(sets, recipe) {
   }
 }
 
-function buildIvy(sets, recipe) {
+function buildIvy(sets, recipe, relief = null) {
   sets.foliage.push(...buildProceduralFacadeIvy(recipe, {
     width: recipe.width,
     height: recipe.height,
     frontZ: recipe.depth / 2 + 0.09,
     seedOffset: 970,
     topAtX: (x) => getCastleWallTopHeight(recipe, x),
+    relief,
   }));
 }
 
@@ -370,12 +380,13 @@ function buildCastleWall(recipe) {
   const sets = createGeometrySets();
   try {
     const openings = getCastleWallOpenings(recipe);
-    buildWallBody(sets, recipe, openings);
+    const relief = createSurfaceRelief();
+    buildWallBody(sets, recipe, openings, relief);
     buildOpenings(sets, recipe, openings);
     buildButtresses(sets, recipe, openings);
     buildCoping(sets, recipe);
     buildBattlements(sets, recipe);
-    buildIvy(sets, recipe);
+    buildIvy(sets, recipe, relief);
     return sets;
   } catch (error) {
     disposeGeometrySets(sets);

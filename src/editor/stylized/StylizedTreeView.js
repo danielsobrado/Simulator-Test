@@ -452,7 +452,11 @@ export class StylizedTreeView {
       clusterRenderers: this.clusterRenderers,
       understoryRenderers: this.understoryRenderers,
     });
-    this.manifestStore.flush();
+    // Deliberately no second manifest flush here. `update` already flushed the
+    // queue this frame; flushing again put a full chunk manifest build — fractal
+    // noise, habitat sampling and boulder blockers — inside the same frame as the
+    // instance rebuild, which is what made these frames 12-18 ms. Chunks scheduled
+    // during the rebuild are picked up by the next frame's flush.
     return true;
   }
 

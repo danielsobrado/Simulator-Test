@@ -13,6 +13,14 @@ function stableSeed(placement) {
   return hash32(placement.index ?? 0) / 0xffffffff;
 }
 
+// A full rebuild composes a matrix for every visible tree across every resident
+// chunk. `compose` copies out of its arguments, so only the returned matrix has to
+// be fresh — reusing the intermediates drops four allocations per instance.
+const scratchPosition = new THREE.Vector3();
+const scratchQuaternion = new THREE.Quaternion();
+const scratchScale = new THREE.Vector3();
+const scratchEuler = new THREE.Euler();
+
 function createMatrix({
   x,
   y,
@@ -25,9 +33,9 @@ function createMatrix({
   scaleZ = scaleX,
 }) {
   return new THREE.Matrix4().compose(
-    new THREE.Vector3(x, y, z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(rotationX, rotationY, rotationZ)),
-    new THREE.Vector3(scaleX, scaleY, scaleZ),
+    scratchPosition.set(x, y, z),
+    scratchQuaternion.setFromEuler(scratchEuler.set(rotationX, rotationY, rotationZ)),
+    scratchScale.set(scaleX, scaleY, scaleZ),
   );
 }
 
@@ -80,12 +88,22 @@ export function rebuildTreeLod({
     for (const representation of entry.representations) {
       if (representation.band === 'culled' || representation.fade <= 0) continue;
       if (representation.band === 'cluster') {
-        const patchClusters = aggregateCanopyClusters({
+        const minimumWidth = prototypeWidth * 1.6;
+        const minimumHeight = prototypeHeight * 0.55;
+        // Prefer the store's memo; fall back for callers that pass a bare
+        // placement source (the impostor unit test does).
+        const aggregate = manifestStore.canopyAggregate?.(
+          entry.chunkX,
+          entry.chunkZ,
+          minimumWidth,
+          minimumHeight,
+        ) ?? null;
+        const patchClusters = aggregate?.clusters ?? aggregateCanopyClusters({
           chunkX: entry.chunkX,
           chunkZ: entry.chunkZ,
           placements,
-          minimumWidth: prototypeWidth * 1.6,
-          minimumHeight: prototypeHeight * 0.55,
+          minimumWidth,
+          minimumHeight,
         });
         for (const cluster of patchClusters) {
           clusters[0].push({
@@ -103,13 +121,15 @@ export function rebuildTreeLod({
             colorVariation: 0.9 + cluster.seed * 0.2,
           });
         }
-        const emergentCount = Math.max(0, Math.round(placements.length * 0.04));
-        const emergent = [...placements]
-          .sort((left, right) => (
-            (right.heightScale ?? right.scale) - (left.heightScale ?? left.scale)
-            || left.stableId.localeCompare(right.stableId)
-          ))
-          .slice(0, emergentCount);
+        const emergent = aggregate?.emergent ?? (() => {
+          const emergentCount = Math.max(0, Math.round(placements.length * 0.04));
+          return [...placements]
+            .sort((left, right) => (
+              (right.heightScale ?? right.scale) - (left.heightScale ?? left.scale)
+              || left.stableId.localeCompare(right.stableId)
+            ))
+            .slice(0, emergentCount);
+        })();
         for (const placement of emergent) {
           const atlas = impostorAtlases[placement.prototypeIndex];
           if (!atlas || !impostorBatches[placement.prototypeIndex]) continue;

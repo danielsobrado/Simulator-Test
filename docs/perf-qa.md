@@ -2,6 +2,11 @@
 
 Deterministic harness for reproducing and measuring player-mode stutter while moving across the streamed world.
 
+> The 2026-07-25 collapse to 3 FPS and its fixes are written up in
+> [perf-investigation-2026-07-25.md](perf-investigation-2026-07-25.md), including
+> the two harness defects that made earlier numbers untrustworthy. Read that before
+> comparing against any report captured before that date.
+
 ## Quick start
 
 ```bash
@@ -210,12 +215,15 @@ reintroduced through the water/path clearance fields.
    (`streaming.stylizedFrameBudgetMs`, default 6 ms) so three separately budgeted
    queues cannot stack into one stall.
 
+Measured on the real WebGPU backend (`--headed`), `diagonal`,
+`--warmup 8 --duration 14`:
+
 | Scenario | Before | After |
 |----------|--------|-------|
-| `diagonal` avg FPS | 13.5 | ~113–121 |
-| `diagonal` p50 dt | 83 ms | ~6 ms |
-| `chunk-cross` avg FPS | — | ~113 |
-| Hitches (`diagonal`) | 89 | ~22 |
+| `diagonal` avg FPS | 13.5 | ~174 |
+| `diagonal` p50 dt | 83 ms | 5.1 ms |
+| `diagonal` p95 dt | ~150 ms | 7.8 ms |
+| Hitches (`diagonal`) | 89 | 9 |
 
 **Still open:** a handful of single `stylized` jobs cost ~57 ms because a full tree
 LOD rebuild rewrites instances for every visible chunk, and `plan.signature`
@@ -231,6 +239,39 @@ outside the marked loop.
 place the world view on integrated graphics on hybrid machines, which costs an order
 of magnitude for identical scene content. The workshop preview renderer already
 asked for it; the world renderer did not.
+
+### Fix landed: ACES tone mapping and soft shadows in the world renderer (2026-07-25)
+
+`InfiniteTerrainView` gained ACES tone mapping at exposure 1.12 and
+`PCFSoftShadowMap`, and `ObjectView`'s duplicate unshadowed directional light
+became a fallback that `StylizedSkyView` evicts. The world previously ran two
+suns from different directions and no tone mapping at all, while buildings were
+authored in the workshop preview under ACES at 1.12 — so a baked asset never
+looked the way it did while authoring.
+
+A/B on the same machine and session, `--headed --qa diagonal --warmup 8
+--duration 14 --speed run`, real WebGPU backend:
+
+| Shadow filter | Avg FPS | dt p50 / p95 | Hitches |
+|---|---|---|---|
+| `PCFSoftShadowMap` (shipped), run 1 | 178.6 | — | 10 |
+| `PCFSoftShadowMap` (shipped), run 2 | 163.8 | 5.4 / 8.7 ms | 9 |
+| `PCFShadowMap` (previous) | 182.0 | 5.0 / 7.4 ms | 11 |
+
+The concern was that a wider shadow filter kernel would cost frame time. It does
+not, but note *why* the conclusion is safe: **run-to-run variance on the shipped
+configuration alone (163.8–178.6 FPS, ~9%) is larger than its gap to hard shadows
+(3.4 FPS, ~2%), and the hitch counts overlap.** A single pair of runs would not
+have supported that claim in either direction. Removing the second directional
+light plausibly offsets the wider kernel.
+
+If you re-measure this, run the shipped configuration at least twice before
+comparing anything to it.
+
+> An earlier revision of this section reported 146.2 vs 134.3 FPS from a
+> **headless** run. Those numbers measured the WebGL backend, not WebGPU — see
+> [Harness must run on real hardware](#harness-must-run-on-real-hardware) — and
+> have been replaced by the headed figures above.
 
 ### Instrumented sub-phases
 

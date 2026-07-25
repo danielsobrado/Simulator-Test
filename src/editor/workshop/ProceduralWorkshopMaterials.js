@@ -417,9 +417,14 @@ export function applyUnitShading(geometry, recipe, {
     const localY = (position.getY(vertex) - bounds.min.y) / spanY;
     const normalY = normal.getY(vertex);
 
-    // Cubed so only the lowest slice of each unit darkens, giving a crisp joint
-    // line rather than a gradient washing over the whole face.
-    const downShade = OCCLUSION.down * ((1 - localY) ** 3);
+    // Cubed so only a thin slice of each unit darkens, giving a crisp joint line
+    // rather than a gradient washing over the whole face.
+    //
+    // Masonry darkens at its underside, where the course below shades it. A roof
+    // tile is the other way up: its high edge is the one tucked under the course
+    // above, and its low edge is the exposed lip that catches light.
+    const occludedEnd = family === 'roof' ? localY : 1 - localY;
+    const downShade = OCCLUSION.down * (occludedEnd ** 3);
     const faceShade = OCCLUSION.face * Math.max(0, -normalY);
     const skyLift = OCCLUSION.sky * Math.max(0, normalY);
     const baseShade = OCCLUSION.base * THREE.MathUtils.clamp(
@@ -574,6 +579,9 @@ export function createWorkshopMaterials(recipe) {
     }), 'metal'),
     foliage: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
       color: '#4c8a37',
+      // Per-leaf tint and a base-to-tip gradient, baked by `leaf()`. Vines carry
+      // no colour of their own and are filled white at merge time.
+      vertexColors: true,
       roughness: 0.9,
       metalness: 0,
       side: THREE.DoubleSide,

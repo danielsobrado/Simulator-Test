@@ -102,6 +102,16 @@ export class InfiniteWorldStore {
     // block count rather than by cell count so it costs no per-cell bookkeeping.
     this.generatedTileBlocks = new Map();
     this.generatedTileBlockLimit = 512;
+    // Heights are 8 bytes per vertex, so this cap is lower than the tile one.
+    this.generatedHeightBlocks = new Map();
+    this.generatedHeightBlockLimit = 256;
+    // Last block touched, to keep string-key lookups off the hot path.
+    this.lastTileBlock = null;
+    this.lastTileBlockX = 0;
+    this.lastTileBlockZ = 0;
+    this.lastHeightBlock = null;
+    this.lastHeightBlockX = 0;
+    this.lastHeightBlockZ = 0;
     this.clock = 0;
     this.revision = 0;
     this.listeners = new Set();
@@ -135,16 +145,25 @@ export class InfiniteWorldStore {
    * everything its neighbours already generated.
    */
   generatedTileBlock(blockX, blockZ) {
+    if (this.lastTileBlock !== null
+        && blockX === this.lastTileBlockX
+        && blockZ === this.lastTileBlockZ) {
+      return this.lastTileBlock;
+    }
     const key = chunkKey(blockX, blockZ);
     let block = this.generatedTileBlocks.get(key);
-    if (block) return block;
-    const size = this.chunkSize;
-    block = { tiles: new Uint8Array(size * size), filled: new Uint8Array(size * size) };
-    if (this.generatedTileBlocks.size >= this.generatedTileBlockLimit) {
-      const oldest = this.generatedTileBlocks.keys().next().value;
-      this.generatedTileBlocks.delete(oldest);
+    if (!block) {
+      const size = this.chunkSize;
+      block = { tiles: new Uint8Array(size * size), filled: new Uint8Array(size * size) };
+      if (this.generatedTileBlocks.size >= this.generatedTileBlockLimit) {
+        const oldest = this.generatedTileBlocks.keys().next().value;
+        this.generatedTileBlocks.delete(oldest);
+      }
+      this.generatedTileBlocks.set(key, block);
     }
-    this.generatedTileBlocks.set(key, block);
+    this.lastTileBlockX = blockX;
+    this.lastTileBlockZ = blockZ;
+    this.lastTileBlock = block;
     return block;
   }
 
@@ -178,11 +197,65 @@ export class InfiniteWorldStore {
     this.baseTerrain = cloned;
     this.cache.clear();
     this.generatedTileBlocks.clear();
+    this.generatedHeightBlocks.clear();
+    this.lastTileBlock = null;
+    this.lastHeightBlock = null;
+  }
+
+  /**
+   * Height counterpart to `generatedTile`. Slope sampling asks for four heights
+   * around every candidate, and each of those bilinearly interpolates four
+   * vertices, so a single scatter candidate can drive sixteen `sampleHeight`
+   * calls — with heavy overlap between neighbouring candidates. Float64 storage
+   * keeps values bit-identical to the generator's output.
+   */
+  generatedHeightBlock(blockX, blockZ) {
+    // Terrain access is strongly spatially coherent, and the Map lookup needs a
+    // string key. Remembering the last block keeps that allocation off the hot
+    // path — without it, the key churn costs more than the memo saves.
+    if (this.lastHeightBlock !== null
+        && blockX === this.lastHeightBlockX
+        && blockZ === this.lastHeightBlockZ) {
+      return this.lastHeightBlock;
+    }
+    const key = chunkKey(blockX, blockZ);
+    let block = this.generatedHeightBlocks.get(key);
+    if (!block) {
+      const size = this.chunkSize;
+      block = { heights: new Float64Array(size * size), filled: new Uint8Array(size * size) };
+      if (this.generatedHeightBlocks.size >= this.generatedHeightBlockLimit) {
+        const oldest = this.generatedHeightBlocks.keys().next().value;
+        this.generatedHeightBlocks.delete(oldest);
+      }
+      this.generatedHeightBlocks.set(key, block);
+    }
+    this.lastHeightBlockX = blockX;
+    this.lastHeightBlockZ = blockZ;
+    this.lastHeightBlock = block;
+    return block;
+  }
+
+  generatedHeight(vertexX, vertexZ) {
+    const size = this.chunkSize;
+    const blockX = Math.floor(vertexX / size);
+    const blockZ = Math.floor(vertexZ / size);
+    const block = this.generatedHeightBlock(blockX, blockZ);
+    const index = (vertexZ - blockZ * size) * size + (vertexX - blockX * size);
+    if (block.filled[index]) return block.heights[index];
+    const height = this.generator.sampleHeight(vertexX, vertexZ);
+    block.heights[index] = height;
+    block.filled[index] = 1;
+    return height;
   }
 
   getHeight(vertexX, vertexZ) {
-    const key = cellKey(vertexX, vertexZ);
-    return this.heightOverrides.get(key) ?? this.generator.sampleHeight(vertexX, vertexZ);
+    // Same reasoning as `getTile`: an unedited world has no overrides, so skip
+    // building the string key on a path that runs millions of times per frame.
+    if (this.heightOverrides.size > 0) {
+      const override = this.heightOverrides.get(cellKey(vertexX, vertexZ));
+      if (override !== undefined) return override;
+    }
+    return this.generatedHeight(vertexX, vertexZ);
   }
 
   sampleHeight(cellX, cellZ) {
@@ -192,10 +265,14 @@ export class InfiniteWorldStore {
     const z1 = z0 + 1;
     const tx = cellX - x0;
     const tz = cellZ - z0;
-    const north = this.getHeight(x0, z0)
-      + (this.getHeight(x1, z0) - this.getHeight(x0, z0)) * tx;
-    const south = this.getHeight(x0, z1)
-      + (this.getHeight(x1, z1) - this.getHeight(x0, z1)) * tx;
+    // Four distinct corners, read once each — the previous form asked for two of
+    // them twice.
+    const northWest = this.getHeight(x0, z0);
+    const northEast = this.getHeight(x1, z0);
+    const southWest = this.getHeight(x0, z1);
+    const southEast = this.getHeight(x1, z1);
+    const north = northWest + (northEast - northWest) * tx;
+    const south = southWest + (southEast - southWest) * tx;
     return north + (south - north) * tz;
   }
 

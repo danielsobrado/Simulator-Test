@@ -118,6 +118,14 @@ export class StylizedSkyView {
     this.mesh.name = 'stylized-sky-dome';
     terrainView.scene.add(this.mesh);
 
+    // This rig is the scene's single lighting authority. Evict any fallback
+    // lighting added before it was constructed (see `ObjectView`), otherwise the
+    // world runs a second unshadowed sun from a different direction and every
+    // building reads flat.
+    for (const child of [...terrainView.scene.children]) {
+      if (child.userData?.fallbackLighting) terrainView.scene.remove(child);
+    }
+
     this.hemisphere = new THREE.HemisphereLight(
       config.sky.highColor,
       config.sky.groundLightColor,
@@ -131,6 +139,7 @@ export class StylizedSkyView {
     this.directional.shadow.mapSize.set(config.sky.shadowMapSize, config.sky.shadowMapSize);
     this.directional.shadow.bias = config.sky.shadowBias;
     this.directional.shadow.normalBias = config.sky.shadowNormalBias;
+    this.directional.shadow.radius = config.sky.shadowRadius ?? 2.4;
     this.directional.shadow.camera.near = 1;
     this.directional.shadow.camera.far = config.sky.shadowDistance * 2;
     const extent = config.sky.shadowDistance;

@@ -13,7 +13,14 @@ import {
   wallRoofPlanes,
 } from './ProceduralWorkshopGeometry.js';
 import { buildProceduralFacadeIvy } from './ProceduralWorkshopIvy.js';
+import { packCourse } from './ProceduralWorkshopCoursePacker.js';
+import { createSurfaceRelief } from './ProceduralWorkshopSurfaceRelief.js';
 import { stoneJitter } from './ProceduralWorkshopIrregularity.js';
+import {
+  shingledConeGeometries,
+  shingledSlopeGeometries,
+  shinglesEnabled,
+} from './ProceduralWorkshopShingles.js';
 import {
   applyUnitShading,
   createWorkshopMaterials,
@@ -22,6 +29,9 @@ import { resolveWorkshopOpeningLayout } from './ProceduralWorkshopOpeningLayout.
 import { createRandom, mixSeed } from './ProceduralRandom.js';
 
 const TAU = Math.PI * 2;
+
+/** Smallest field stone a packed course may emit, before mortar inset. */
+const MIN_COURSE_STONE_WIDTH = 0.28;
 
 function shortAngle(value) {
   return Math.atan2(Math.sin(value), Math.cos(value));
@@ -74,6 +84,7 @@ function tagStructureGeometry(geometry, surface) {
   return geometry;
 }
 
+/** Returns the shaped parameters so callers can record surface relief. */
 function addStone(target, recipe, params, stableIndex, heightRatio, category = 'field') {
   const shaped = stoneJitter(recipe, params, stableIndex, category);
   target.push(applyUnitShading(
@@ -86,6 +97,7 @@ function addStone(target, recipe, params, stableIndex, heightRatio, category = '
       depth: shaped.depth,
     },
   ));
+  return shaped;
 }
 
 function buildWallCourses(recipe, {
@@ -97,6 +109,7 @@ function buildWallCourses(recipe, {
   openings = [],
   seedOffset = 0,
   yaw = 0,
+  relief = null,
 } = {}) {
   const random = createRandom(mixSeed(recipe.seed, seedOffset));
   const geometries = [];
@@ -106,40 +119,46 @@ function buildWallCourses(recipe, {
   const targetStoneWidth = 0.94 - recipe.detail * 0.08;
   let stableIndex = seedOffset * 10000;
 
+  // Joints of the course below, so this course can break bond against them
+  // (04-…md §5) instead of faking a running bond by shrinking one stone.
+  let previousJoints = [];
+
   for (let course = 0; course < courses; course += 1) {
     const y = (course + 0.5) * actualCourseHeight;
-    let cursor = -width / 2;
-    let stoneIndex = 0;
-    while (cursor < width / 2 - 0.001) {
-      const remaining = width / 2 - cursor;
-      const bondScale = stoneIndex === 0 && course % 2 === 1 ? 0.56 : 1;
-      const desired = targetStoneWidth * bondScale * (0.72 + random() * 0.56);
-      const stoneWidth = Math.min(remaining, Math.max(0.28, desired));
-      const stoneCenter = cursor + stoneWidth / 2;
+    const { stones, joints } = packCourse({
+      span: width,
+      targetWidth: targetStoneWidth,
+      minWidth: MIN_COURSE_STONE_WIDTH,
+      random,
+      forbiddenJoints: previousJoints,
+    });
+    previousJoints = joints;
+
+    if (stones.length > 256) {
+      throw new Error('Workshop stone packing exceeded its safety budget.');
+    }
+
+    for (const stone of stones) {
       const insideOpening = openings.some((opening) => (
-        isInsideOpening(opening, stoneCenter, y, stoneWidth / 2)
+        isInsideOpening(opening, stone.center, y, stone.width / 2)
       ));
       if (!insideOpening) {
         const inset = 0.014 + random() * 0.016;
-        const localX = stoneCenter;
-        addStone(geometries, recipe, {
-          width: Math.max(0.12, stoneWidth - inset),
+        const shaped = addStone(geometries, recipe, {
+          width: Math.max(0.12, stone.width - inset),
           height: Math.max(0.12, actualCourseHeight - inset * 0.72),
           depth: depth * (0.96 + random() * 0.025),
           position: [
-            centerX + Math.cos(yaw) * localX,
+            centerX + Math.cos(yaw) * stone.center,
             y + (random() - 0.5) * 0.028,
-            centerZ - Math.sin(yaw) * localX,
+            centerZ - Math.sin(yaw) * stone.center,
           ],
           rotation: [0, yaw + (random() - 0.5) * 0.012, 0],
         }, stableIndex, y / height);
+        // Facade space on a planar wall is simply the along-wall coordinate.
+        relief?.record(stone.center, y, shaped.protrusion);
       }
-      cursor += stoneWidth;
-      stoneIndex += 1;
       stableIndex += 1;
-      if (stoneIndex > 256) {
-        throw new Error('Workshop stone packing exceeded its safety budget.');
-      }
     }
   }
   return geometries;
@@ -309,6 +328,7 @@ function buildTowerBody(recipe, {
   centerZ = 0,
   seedOffset,
   openings = [],
+  relief = null,
 }) {
   const random = createRandom(mixSeed(recipe.seed, seedOffset));
   const stones = [];
@@ -328,7 +348,7 @@ function buildTowerBody(recipe, {
       if (!openings.some((opening) => (
         towerOpeningAt(opening, angle, radius, y, blockWidth / 2)
       ))) {
-        addStone(stones, recipe, {
+        const shaped = addStone(stones, recipe, {
           width: blockWidth * 1.035,
           height: actualHeight * 0.975,
           depth,
@@ -339,6 +359,9 @@ function buildTowerBody(recipe, {
           ],
           rotation: [0, angle, 0],
         }, stableIndex, y / height);
+        // Facade space on a round host is arc length, matching the convention in
+        // `ProceduralWorkshopIvy` and the radial attachment surfaces.
+        relief?.record(angle * radius, y, shaped.protrusion);
       }
       stableIndex += 1;
     }
@@ -439,13 +462,22 @@ function addTowerTop(sets, recipe, {
     });
   } else {
     const roofHeight = Math.min(5.2, Math.max(0.9, radius * 1.25 * recipe.roofScale));
+    const towerRoofRadius = radius + depth * 0.52 + recipe.roofOverhang;
     sets.roof.push(coneRoof({
-      radius: radius + depth * 0.52 + recipe.roofOverhang,
+      radius: towerRoofRadius,
       height: roofHeight,
       y: height + 0.06,
       centerX,
       centerZ,
       sides: recipe.detail === 3 ? 28 : 20,
+    }));
+    sets.roof.push(...shingledConeGeometries(recipe, {
+      radius: towerRoofRadius,
+      height: roofHeight,
+      baseY: height + 0.06,
+      centerX,
+      centerZ,
+      seedOffset: 4100,
     }));
     sets.roof.push(cylinder({
       radius: radius + depth * 0.9,
@@ -546,18 +578,26 @@ function buildIvy(sets, recipe, {
   height,
   frontZ,
   centerX = 0,
+  centerZ = 0,
   seedOffset,
   preferredSide = 0,
   openings = [],
+  radius = 0,
+  surfaceType = 'planar',
+  relief = null,
 }) {
   sets.foliage.push(...buildProceduralFacadeIvy(recipe, {
     width,
     height,
     frontZ,
     centerX,
+    centerZ,
     seedOffset,
     preferredSide,
     openings,
+    radius,
+    surfaceType,
+    relief,
   }));
 }
 
@@ -595,7 +635,8 @@ function buildWall(recipe) {
     }))
     : [];
   const openings = resolveWorkshopOpeningLayout(recipe, baseOpenings, [host]).get(host.id);
-  sets.stone.push(...buildWallCourses(recipe, { openings, seedOffset: 10 }));
+  const relief = createSurfaceRelief();
+  sets.stone.push(...buildWallCourses(recipe, { openings, seedOffset: 10, relief }));
   sets.mortar.push(tagStructureGeometry(beveledBox({
     width: recipe.width * 0.995,
     height: recipe.height * 0.995,
@@ -618,20 +659,30 @@ function buildWall(recipe) {
       seedOffset: 50,
     });
   } else {
+    const wallRoofHeight = Math.min(3.8, recipe.depth * 0.65 * recipe.roofScale);
     sets.roof.push(...wallRoofPlanes({
       width: recipe.width,
       depth: recipe.depth,
       y: recipe.height,
-      height: Math.min(3.8, recipe.depth * 0.65 * recipe.roofScale),
+      height: wallRoofHeight,
       detail: recipe.detail,
       overhang: recipe.roofOverhang,
     }));
+    addSlopeShingles(sets, recipe, {
+      width: recipe.width,
+      depth: recipe.depth,
+      baseY: recipe.height,
+      height: wallRoofHeight,
+      seedOffset: 4200,
+    });
   }
   buildIvy(sets, recipe, {
     width: recipe.width,
     height: recipe.height,
     frontZ: recipe.depth / 2,
     seedOffset: 60,
+    openings,
+    relief,
   });
   return sets;
 }
@@ -653,12 +704,14 @@ function buildTower(recipe) {
     hostId: host.id,
   });
   const openings = resolveWorkshopOpeningLayout(recipe, baseOpenings, [host]).get(host.id);
+  const relief = createSurfaceRelief();
   sets.stone.push(...buildTowerBody(recipe, {
     radius,
     depth,
     height: recipe.height,
     seedOffset: 100,
     openings,
+    relief,
   }));
   sets.mortar.push(tagStructureGeometry(cylinder({
     radius: Math.max(0.2, radius - depth * 0.46),
@@ -682,10 +735,15 @@ function buildTower(recipe) {
     seedOffset: 140,
   });
   buildIvy(sets, recipe, {
-    width: radius * 1.6,
+    width: host.width,
     height: recipe.height,
-    frontZ: radius + depth * 0.56,
+    // Round host: strands wrap the tower in arc-length space rather than sliding
+    // off a single tangent plane, so `radius` replaces `frontZ` as the surface.
+    surfaceType: 'round',
+    radius: radius + depth * 0.56,
     seedOffset: 170,
+    openings,
+    relief,
   });
   return sets;
 }
@@ -717,8 +775,9 @@ function addSquareTowerTop(sets, recipe, {
     });
   } else {
     const roofHeight = Math.min(5, Math.max(0.9, width * 0.38 * recipe.roofScale));
+    const pyramidRadius = width / Math.sqrt(2) + recipe.roofOverhang;
     const roof = coneRoof({
-      radius: width / Math.sqrt(2) + recipe.roofOverhang,
+      radius: pyramidRadius,
       height: roofHeight,
       y: height + 0.06,
       sides: 4,
@@ -726,6 +785,15 @@ function addSquareTowerTop(sets, recipe, {
     });
     roof.scale(1, 1, depth / width);
     sets.roof.push(roof);
+    sets.roof.push(...shingledConeGeometries(recipe, {
+      radius: pyramidRadius,
+      height: roofHeight,
+      baseY: height + 0.06,
+      sides: 4,
+      rotationY: Math.PI / 4,
+      depthScale: depth / width,
+      seedOffset: 4300,
+    }));
     sets.roof.push(beveledBox({
       width: width + recipe.roofOverhang * 2,
       height: 0.13,
@@ -964,6 +1032,36 @@ function buildGatehouse(recipe) {
   return sets;
 }
 
+/**
+ * Lay real tiles over both pitches of a gabled roof.
+ *
+ * Overhang is folded in so tiles cover the eaves the deck already oversails.
+ * Returns silently below Ultra detail; `shingledSlopeGeometries` owns that gate.
+ */
+function addSlopeShingles(sets, recipe, {
+  width,
+  depth,
+  baseY,
+  height,
+  centerX = 0,
+  centerZ = 0,
+  seedOffset,
+}) {
+  const roofDepth = depth + recipe.roofOverhang * 2;
+  for (const side of [-1, 1]) {
+    sets.roof.push(...shingledSlopeGeometries(recipe, {
+      width: width + recipe.roofOverhang * 2,
+      height,
+      roofDepth,
+      baseY,
+      side,
+      centerX,
+      centerZ,
+      seedOffset: side < 0 ? seedOffset : seedOffset + 5,
+    }));
+  }
+}
+
 function addRoofCourseLips(sets, recipe, {
   width,
   depth,
@@ -972,6 +1070,9 @@ function addRoofCourseLips(sets, recipe, {
   centerX = 0,
   centerZ = 0,
 }) {
+  // At Ultra detail individual tiles replace these battens outright; keeping
+  // both would double the course relief.
+  if (shinglesEnabled(recipe)) return;
   const roofDepth = depth + recipe.roofOverhang * 2;
   const angle = Math.atan2(height, roofDepth / 2);
   const rows = Math.max(5, Math.round(height * 3.2));
@@ -1224,6 +1325,13 @@ function buildManor(recipe) {
     y: height,
     height: roofHeight,
   });
+  addSlopeShingles(sets, recipe, {
+    width,
+    depth,
+    baseY: height,
+    height: roofHeight,
+    seedOffset: 4400,
+  });
   for (const endX of [-width / 2 - 0.04, width / 2 + 0.04]) {
     addSteppedGableCoping(sets, recipe, {
       endX,
@@ -1267,6 +1375,14 @@ function buildManor(recipe) {
         height: 0.11,
         position: [towerX, towerHeight + 0.04, towerZ],
         sides: recipe.detail === 3 ? 40 : 28,
+      }),
+      ...shingledConeGeometries(recipe, {
+        radius: towerRadius + recipe.roofOverhang,
+        height: towerRoofHeight,
+        baseY: towerHeight + 0.04,
+        centerX: towerX,
+        centerZ: towerZ,
+        seedOffset: 4500,
       }),
     );
     sets.metal.push(cylinder({

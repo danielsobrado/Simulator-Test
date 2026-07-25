@@ -13,6 +13,7 @@ import {
   resolveForestCandidateBudget,
   resolveForestSeed,
 } from './forest/ForestRuntimeConfig.js';
+import { aggregateCanopyClusters } from './lod/canopyCluster.js';
 import { ForestSpeciesRegistry } from './forest/ForestSpeciesRegistry.js';
 import { ForestEditStore } from './forest/ForestEditStore.js';
 import { PathClearanceField } from './forest/PathClearanceField.js';
@@ -129,20 +130,69 @@ export class TreeManifestStore {
       : null;
   }
 
+  /**
+   * Centroid of a chunk's trees, used to project its LOD band. The LOD plan asks
+   * for this once per chunk per frame while the placements it averages only change
+   * when the manifest is rebuilt, so the result is memoized on the cache entry.
+   */
   lodAnchor(chunkX, chunkZ) {
-    const placements = this.cache.get(`${chunkX}:${chunkZ}`)?.placements;
+    const entry = this.cache.get(`${chunkX}:${chunkZ}`);
+    const placements = entry?.placements;
     if (!placements || placements.length === 0) return null;
-    const total = placements.reduce((sum, placement) => {
-      sum.x += placement.x;
-      sum.y += placement.height;
-      sum.z += placement.z;
-      return sum;
-    }, { x: 0, y: 0, z: 0 });
-    return {
-      x: total.x / placements.length,
-      y: total.y / placements.length,
-      z: total.z / placements.length,
-    };
+    if (entry.anchor !== undefined) return entry.anchor;
+    let sumX = 0;
+    let sumY = 0;
+    let sumZ = 0;
+    for (const placement of placements) {
+      sumX += placement.x;
+      sumY += placement.height;
+      sumZ += placement.z;
+    }
+    entry.anchor = Object.freeze({
+      x: sumX / placements.length,
+      y: sumY / placements.length,
+      z: sumZ / placements.length,
+    });
+    return entry.anchor;
+  }
+
+  /**
+   * Canopy clusters and emergent trees for a chunk's distant band, memoized on the
+   * cache entry.
+   *
+   * Both derive only from the chunk's placements, but the LOD rebuild recomputed
+   * them every time it ran — a connected-components pass plus a full sort of the
+   * placements to keep the tallest 4%. Together that was the largest share of the
+   * rebuild after terrain sampling. Cache entries are replaced wholesale on
+   * rebuild, so the memo cannot outlive its placements.
+   */
+  canopyAggregate(chunkX, chunkZ, minimumWidth, minimumHeight) {
+    const entry = this.cache.get(`${chunkX}:${chunkZ}`);
+    if (!entry) return null;
+    const shapeKey = `${minimumWidth}:${minimumHeight}`;
+    if (entry.canopyShapeKey === shapeKey) return entry.canopy;
+    const placements = entry.placements;
+    const emergentCount = Math.max(0, Math.round(placements.length * 0.04));
+    const emergent = placements.length === 0 || emergentCount === 0
+      ? []
+      : [...placements]
+        .sort((left, right) => (
+          (right.heightScale ?? right.scale) - (left.heightScale ?? left.scale)
+          || (left.stableId < right.stableId ? -1 : (left.stableId > right.stableId ? 1 : 0))
+        ))
+        .slice(0, emergentCount);
+    entry.canopy = Object.freeze({
+      clusters: aggregateCanopyClusters({
+        chunkX,
+        chunkZ,
+        placements,
+        minimumWidth,
+        minimumHeight,
+      }),
+      emergent,
+    });
+    entry.canopyShapeKey = shapeKey;
+    return entry.canopy;
   }
 
   build(chunkX, chunkZ, rockSource) {

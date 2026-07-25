@@ -67,15 +67,18 @@ export class IndexedDbWorldContentProvider {
 }
 
 export class UrlWorldContentProvider {
-  constructor({ baseUrl, fetchImpl = globalThis.fetch } = {}) {
+  constructor({ baseUrl, fetchImpl = null } = {}) {
     if (typeof baseUrl !== 'string' || !baseUrl.trim()) {
       throw new Error('World content URL provider requires a base URL.');
     }
-    if (typeof fetchImpl !== 'function') {
+    // Bound to the global: called as `this.fetchImpl(...)`, an unbound `fetch`
+    // would get this provider as its receiver and throw "Illegal invocation".
+    const resolved = fetchImpl ?? globalThis.fetch?.bind(globalThis);
+    if (typeof resolved !== 'function') {
       throw new Error('World content URL provider requires fetch.');
     }
     this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = resolved;
   }
 
   async getChunk(worldId, chunkX, chunkZ) {

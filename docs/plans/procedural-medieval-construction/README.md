@@ -61,6 +61,12 @@ Generated stones are derived data. They are never authoritative world objects.
 15. [Open questions](14-open-questions.md)
 16. [Implementation notes](IMPLEMENTATION-NOTES.md)
 17. [Procedural object workshop](15-procedural-object-workshop.md)
+18. [Arbitrary-footprint roofs (straight skeleton)](16-arbitrary-footprint-roofs.md) — planned
+19. [Masonry LOD and far representation](17-masonry-lod-and-far-representation.md) — planned, evidence-gated
+
+Docs 16 and 17 were added 2026-07-25. Both are plans only; neither is
+implemented. Doc 17 opens with a measurement phase that is explicitly permitted to
+conclude that the rest should not be built.
 
 ## Terminology
 
@@ -80,6 +86,7 @@ The plan uses a controlled combination of established procedural approaches:
 - split and shape grammars for hierarchical architecture;
 - context-sensitive rules for doors, corners, towers, and intersections;
 - constrained interval packing for masonry courses;
+- straight skeletons for roofs over arbitrary footprints (see doc 16);
 - example/model-synthesis ideas only for local decorative choices;
 - deterministic derived-data compilation;
 - hierarchical LOD and chunk streaming.
@@ -91,6 +98,8 @@ Wave Function Collapse is not the structural authority. It may later be used for
 - Wonka et al., *Instant Architecture*: https://doi.org/10.1145/882262.882324
 - Müller et al., *Procedural Modeling of Buildings*: https://doi.org/10.1145/1179352.1141931
 - Merrell, *Example-Based Model Synthesis*: https://doi.org/10.1145/1230100.1230119
+- Aichholzer & Aurenhammer, *Straight Skeletons for General Polygonal Figures*: https://doi.org/10.1007/3-540-61332-3_144
+- `tylermorganwall/raybevel` — straight-skeleton beveling reference: https://github.com/tylermorganwall/raybevel
 - Three.js TSL specification: https://threejs.org/docs/TSL.html
 - Three.js NodeMaterial documentation: https://threejs.org/docs/pages/NodeMaterial.html
 - Three.js WebGPURenderer documentation: https://threejs.org/docs/pages/WebGPURenderer.html

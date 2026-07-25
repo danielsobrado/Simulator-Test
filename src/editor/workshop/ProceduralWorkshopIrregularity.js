@@ -86,7 +86,7 @@ function offsetAlongLocalZ(rotation, distance) {
  * along +Z would slide it up and down the slope instead of lifting it proud of
  * its neighbours.
  */
-function offsetAlongLocalY(rotation, distance) {
+export function offsetAlongLocalY(rotation, distance) {
   const sinX = Math.sin(rotation[0]);
   const cosX = Math.cos(rotation[0]);
   const sinY = Math.sin(rotation[1]);
@@ -160,9 +160,14 @@ export function stoneJitter(recipe, params, stableIndex, category = 'field', {
   // silhouette cue in hand-built masonry and it must follow the unit's own
   // orientation, so a rotated tower block protrudes radially rather than along
   // world +Z.
+  //
+  // Scaled by the *smallest* face dimension, not by depth. A tower block's depth
+  // is the whole wall thickness — around 1.7 m — so scaling by depth threw
+  // 0.3 m-wide blocks a third of a metre clear of the wall and they read as
+  // detached rubble instead of bonded stone (04-…md §19).
   const protrusion = laneSigned(rotationHash, 24)
     * AMPLITUDE.protrusion
-    * params.depth
+    * Math.min(params.width, params.depth)
     * amount;
   let jitteredPosition = position;
   if (protrusion !== 0) {

@@ -19,6 +19,14 @@ import { createPathClearanceField } from './TreeManifestStore.js';
 const BUSH_CLUSTER_SEED_OFFSET = 0x5b;
 const BUSH_PRIORITY_CHANNEL = 31;
 
+// Reused across a rebuild; see the matching note in StylizedRockView.
+const BUSH_UP = new THREE.Vector3(0, 1, 0);
+const BUSH_SCRATCH = {
+  position: new THREE.Vector3(),
+  quaternion: new THREE.Quaternion(),
+  scale: new THREE.Vector3(),
+};
+
 function lodSettings(config) {
   const bush = config.lod?.bush ?? {};
   const meshRadius = bush.meshRadius ?? config.bushes.residentRadius;
@@ -321,12 +329,9 @@ export class StylizedBushView {
           for (const placement of manifest) {
             target[placement.prototypeIndex].push({
               matrix: new THREE.Matrix4().compose(
-                new THREE.Vector3(placement.x, placement.height, placement.z),
-                new THREE.Quaternion().setFromAxisAngle(
-                  new THREE.Vector3(0, 1, 0),
-                  placement.rotationY,
-                ),
-                new THREE.Vector3(placement.scale, placement.scale, placement.scale),
+                BUSH_SCRATCH.position.set(placement.x, placement.height, placement.z),
+                BUSH_SCRATCH.quaternion.setFromAxisAngle(BUSH_UP, placement.rotationY),
+                BUSH_SCRATCH.scale.setScalar(placement.scale),
               ),
               fade: representation.fade,
               seed: placement.priority,

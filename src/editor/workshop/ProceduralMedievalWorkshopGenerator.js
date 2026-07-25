@@ -4,6 +4,7 @@ import { disposeModelParts } from '../assets/modelParts.js';
 import { normalizeProceduralRecipe } from './ProceduralAssetStore.js';
 import { createProceduralMedievalParts } from './ProceduralMedievalGenerator.js';
 import { harmonizeVertexColors } from './ProceduralWorkshopGeometry.js';
+import { estimateConeShingles, shinglesEnabled } from './ProceduralWorkshopShingles.js';
 
 const MAX_SOURCE_PARTS = 7_500;
 const MAX_STONE_PARTS = 6_500;
@@ -92,8 +93,25 @@ function estimatedStoneParts(recipe) {
     + (recipe.shape === 'classic' ? 0 : Math.ceil(roofHeight / 0.38) * 4);
 }
 
+/**
+ * Conservative roof-tile estimate.
+ *
+ * Deliberately does not mirror each archetype's internal roof formulas; those
+ * would drift out of step with the generator. It bounds the count from the
+ * recipe's own outer limits instead, so it over-estimates rather than letting an
+ * over-budget roof through, and doubles the figure to allow for an attached
+ * tower roof. The per-roof ceiling is enforced by `MAX_SHINGLES` at generation
+ * time, and tile size adapts before that ceiling is reached.
+ */
+function estimatedRoofTileParts(recipe) {
+  if (!shinglesEnabled(recipe)) return 0;
+  const radius = recipe.width / 2 + recipe.roofOverhang;
+  const height = Math.min(5.4, Math.max(0.85, recipe.depth * 2.2 * 0.47 * recipe.roofScale));
+  return estimateConeShingles(recipe, { radius, height }) * 2;
+}
+
 function preflightComplexity(recipe) {
-  const estimate = estimatedStoneParts(recipe);
+  const estimate = estimatedStoneParts(recipe) + estimatedRoofTileParts(recipe);
   if (estimate > MAX_STONE_PARTS) {
     throw new Error(
       `This medieval object would require about ${estimate} masonry parts; reduce its width, depth, height, or detail.`,
