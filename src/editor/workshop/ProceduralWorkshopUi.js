@@ -416,8 +416,9 @@ export class ProceduralWorkshopUi {
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(this.canvasHost);
     } catch (error) {
+      const rendererWasOwned = this.renderer === renderer;
       this.releaseRendererState();
-      if (this.renderer !== renderer) renderer.dispose();
+      if (!rendererWasOwned) renderer.dispose();
       throw error;
     }
   }
@@ -433,6 +434,7 @@ export class ProceduralWorkshopUi {
     this.controls = null;
     this.stage?.dispose();
     this.stage = null;
+    this.previewRoot.removeFromParent();
     this.renderer?.domElement.remove();
     this.renderer?.dispose();
     this.renderer = null;
