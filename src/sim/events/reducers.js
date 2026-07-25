@@ -29,26 +29,23 @@ export function applyEvent(state, event) {
   state.revision += 1;
 }
 
-function upsertEnvelope(state, kind, id, tick, data, status = 'active', tags = []) {
+registerReducer('entity.upserted', (state, event) => {
+  const { kind, id, data, status = 'active', tags = [] } = event.payload;
   const existing = getEntity(state, kind, id);
   if (existing) {
-    upsertEntity(state, bumpEntity(existing, tick, data, status));
+    // Idempotent rematerialization: replace data rather than failing on duplicates.
+    upsertEntity(state, bumpEntity(existing, event.tick, data, status));
     return;
   }
   putEntity(state, createEntityEnvelope({
     id,
     kind,
-    createdAtTick: tick,
-    updatedAtTick: tick,
+    createdAtTick: event.tick,
+    updatedAtTick: event.tick,
     status,
     tags,
     data,
   }));
-}
-
-registerReducer('entity.upserted', (state, event) => {
-  const { kind, id, data, status = 'active', tags = [] } = event.payload;
-  upsertEnvelope(state, kind, id, event.tick, data, status, tags);
 });
 
 registerReducer('entity.destroyed', (state, event) => {

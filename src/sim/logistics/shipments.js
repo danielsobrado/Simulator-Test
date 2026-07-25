@@ -393,14 +393,18 @@ export function matchTradeOffers(state, definition, { commandId, config, ordinal
           config,
         });
         events.push(...planned.events);
+        const buyRemaining = buy.data.quantity - quantity;
+        const sellRemaining = sell.data.quantity - quantity;
+        buy.data.quantity = buyRemaining;
+        sell.data.quantity = sellRemaining;
         events.push({
           type: 'entity.patched',
           entityIds: [buy.id],
           payload: {
             kind: 'tradeOffer',
             id: buy.id,
-            status: 'inactive',
-            dataPatch: { quantity: buy.data.quantity - quantity },
+            status: buyRemaining > 0 ? 'active' : 'inactive',
+            dataPatch: { quantity: buyRemaining },
           },
         });
         events.push({
@@ -409,12 +413,12 @@ export function matchTradeOffers(state, definition, { commandId, config, ordinal
           payload: {
             kind: 'tradeOffer',
             id: sell.id,
-            status: 'inactive',
-            dataPatch: { quantity: sell.data.quantity - quantity },
+            status: sellRemaining > 0 ? 'active' : 'inactive',
+            dataPatch: { quantity: sellRemaining },
           },
         });
-        used.add(buy.id);
-        used.add(sell.id);
+        if (buyRemaining <= 0) used.add(buy.id);
+        if (sellRemaining <= 0) used.add(sell.id);
         shipments.push(planned.shipmentId);
         reasonCodes.push({
           code: 'trade_matched',
@@ -422,6 +426,8 @@ export function matchTradeOffers(state, definition, { commandId, config, ordinal
           sellOfferId: sell.id,
           shipmentId: planned.shipmentId,
           quantity,
+          buyRemaining,
+          sellRemaining,
         });
         ordinal += 3;
         break;

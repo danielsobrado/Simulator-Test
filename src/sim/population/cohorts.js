@@ -1,5 +1,5 @@
 import { generatedEntityId } from '../model/ids.js';
-import { getEntity, listEntities } from '../model/worldState.js';
+import { getEntity, listEntities, createAndPutEntity } from '../model/worldState.js';
 import { createSeededRng, hashString } from '../util/seededRng.js';
 
 const AGE_BANDS = Object.freeze(['child', 'working', 'elder']);
@@ -87,6 +87,7 @@ export function runMonthlyPopulation(state, definition, config) {
   const deathRate = config.population?.deathRatePerMonth ?? 0.0015;
   const migrationThreshold = config.population?.migrationThreshold ?? 0.4;
 
+  // Apply demography to working state first so later migration sees updated counts.
   for (const settlement of listEntities(state, 'settlement', { includeDestroyed: false })) {
     const market = settlement.data.marketId
       ? getEntity(state, 'market', settlement.data.marketId)
@@ -104,18 +105,9 @@ export function runMonthlyPopulation(state, definition, config) {
       const deaths = Math.floor(count * deathRate * (2 - foodSecurity));
       count = Math.max(0, count + births - deaths);
       total += count;
-      events.push({
-        type: 'entity.patched',
-        entityIds: [cohort.id],
-        payload: {
-          kind: 'populationCohort',
-          id: cohort.id,
-          dataPatch: {
-            count,
-            health: Math.max(0.1, Math.min(1, (cohort.data.health ?? 1) * (0.9 + 0.1 * foodSecurity))),
-          },
-        },
-      });
+      const health = Math.max(0.1, Math.min(1, (cohort.data.health ?? 1) * (0.9 + 0.1 * foodSecurity)));
+      cohort.data.count = count;
+      cohort.data.health = health;
       if (deaths > 0) {
         reasonCodes.push({ code: 'cohort_deaths', cohortId: cohort.id, deaths });
       }
@@ -150,6 +142,42 @@ export function runMonthlyPopulation(state, definition, config) {
       });
     }
 
+    settlement.data.population = total;
+    settlement.data.housingCapacity = housing.housingCapacity;
+    settlement.data.social = {
+      happiness: Math.max(0, Math.min(1, foodSecurity * 0.8 + (1 - unrest) * 0.2)),
+      unrest,
+      foodPressure,
+      migrationPressure,
+      housingPressure: housing.housingPressure,
+      diseasePressure: housing.diseasePressure,
+    };
+  }
+
+  const migration = migrateBetweenSettlements(state, definition, config);
+  reasonCodes.push(...migration.reasonCodes);
+
+  // Creates must precede patches so new destination cohorts exist when patched.
+  events.push(...(migration.createEvents ?? []));
+
+  // Emit final authoritative patches after demography + migration.
+  for (const cohort of listEntities(state, 'populationCohort', { includeDestroyed: false })) {
+    events.push({
+      type: 'entity.patched',
+      entityIds: [cohort.id],
+      payload: {
+        kind: 'populationCohort',
+        id: cohort.id,
+        dataPatch: {
+          count: cohort.data.count,
+          health: cohort.data.health,
+        },
+      },
+    });
+  }
+  for (const settlement of listEntities(state, 'settlement', { includeDestroyed: false })) {
+    const total = settlementPopulationTotal(state, settlement.id);
+    settlement.data.population = total;
     events.push({
       type: 'entity.patched',
       entityIds: [settlement.id],
@@ -158,23 +186,12 @@ export function runMonthlyPopulation(state, definition, config) {
         id: settlement.id,
         dataPatch: {
           population: total,
-          housingCapacity: housing.housingCapacity,
-          social: {
-            happiness: Math.max(0, Math.min(1, foodSecurity * 0.8 + (1 - unrest) * 0.2)),
-            unrest,
-            foodPressure,
-            migrationPressure,
-            housingPressure: housing.housingPressure,
-            diseasePressure: housing.diseasePressure,
-          },
+          housingCapacity: settlement.data.housingCapacity,
+          social: settlement.data.social,
         },
       },
     });
   }
-
-  const migration = migrateBetweenSettlements(state, definition, config);
-  events.push(...migration.events);
-  reasonCodes.push(...migration.reasonCodes);
 
   return { events, reasonCodes };
 }
@@ -245,9 +262,11 @@ export function applyHousingAndDisease(state, settlement, foodSecurity, config) 
 
 export function migrateBetweenSettlements(state, definition, config) {
   const events = [];
+  const createEvents = [];
   const reasonCodes = [];
   const settlements = listEntities(state, 'settlement', { includeDestroyed: false });
   const threshold = config.population?.migrationThreshold ?? 0.4;
+  let createOrdinal = 0;
 
   for (const from of settlements) {
     const pressure = from.data.social?.migrationPressure ?? 0;
@@ -261,13 +280,11 @@ export function migrateBetweenSettlements(state, definition, config) {
       .sort((a, b) => b.score - a.score || a.settlement.id.localeCompare(b.settlement.id));
     if (candidates.length === 0) continue;
     const to = candidates[0].settlement;
-    // Require a graph path if graph exists
     const fromNode = listEntities(state, 'graphNode', { includeDestroyed: false })
       .find((n) => n.data.settlementId === from.id);
     const toNode = listEntities(state, 'graphNode', { includeDestroyed: false })
       .find((n) => n.data.settlementId === to.id);
     if (fromNode && toNode) {
-      // soft check: if no edges from fromNode, skip
       const hasEdge = listEntities(state, 'graphEdge', { includeDestroyed: false })
         .some((e) => e.data.fromNodeId === fromNode.id && e.data.accessPolicy !== 'closed');
       if (!hasEdge) {
@@ -281,32 +298,51 @@ export function migrateBetweenSettlements(state, definition, config) {
     if (fromCohorts.length === 0) continue;
     const movers = Math.min(5, Math.floor(fromCohorts[0].data.count * 0.05) || 1);
     const source = fromCohorts[0];
-    const destCohort = listEntities(state, 'populationCohort', { includeDestroyed: false })
+    let destCohort = listEntities(state, 'populationCohort', { includeDestroyed: false })
       .find((c) => c.data.settlementId === to.id
         && c.data.ageBand === source.data.ageBand
         && c.data.role === source.data.role);
-    events.push({
-      type: 'entity.patched',
-      entityIds: [source.id],
-      payload: {
-        kind: 'populationCohort',
-        id: source.id,
-        dataPatch: { count: source.data.count - movers },
-      },
-    });
+
     source.data.count -= movers;
-    if (destCohort) {
-      events.push({
-        type: 'entity.patched',
-        entityIds: [destCohort.id],
-        payload: {
-          kind: 'populationCohort',
-          id: destCohort.id,
-          dataPatch: { count: destCohort.data.count + movers },
+
+    if (!destCohort) {
+      const id = generatedEntityId(
+        'populationCohort',
+        definition.worldId,
+        `migrate:${state.calendar.tick}`,
+        createOrdinal,
+      );
+      createOrdinal += 1;
+      destCohort = createAndPutEntity(state, {
+        id,
+        kind: 'populationCohort',
+        createdAtTick: state.calendar.tick,
+        updatedAtTick: state.calendar.tick,
+        data: {
+          settlementId: to.id,
+          cultureId: source.data.cultureId ?? null,
+          religionId: source.data.religionId ?? null,
+          ageBand: source.data.ageBand,
+          role: source.data.role,
+          wealthBand: source.data.wealthBand,
+          count: 0,
+          health: source.data.health ?? 1,
+          education: source.data.education ?? 0.3,
+          loyalty: source.data.loyalty ?? 0.7,
         },
       });
-      destCohort.data.count += movers;
+      createEvents.push({
+        type: 'entity.upserted',
+        entityIds: [id],
+        payload: {
+          kind: 'populationCohort',
+          id,
+          data: { ...destCohort.data },
+        },
+      });
     }
+    destCohort.data.count += movers;
+
     reasonCodes.push({
       code: 'migration_moved',
       fromSettlementId: from.id,
@@ -315,5 +351,6 @@ export function migrateBetweenSettlements(state, definition, config) {
       routeRisk: true,
     });
   }
-  return { events, reasonCodes };
+  return { events, createEvents, reasonCodes };
 }
+
