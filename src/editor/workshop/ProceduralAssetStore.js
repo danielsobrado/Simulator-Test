@@ -6,6 +6,10 @@ import {
   normalizeSurfaceTextures,
   serializeSurfaceTextures,
 } from './ProceduralWorkshopTextureConfig.js';
+import {
+  normalizeOpeningAttachments,
+  serializeOpeningAttachments,
+} from './ProceduralWorkshopOpeningAttachments.js';
 
 const ASSET_VERSION = 3;
 const MAX_ASSETS = 32;
@@ -135,6 +139,7 @@ export function normalizeProceduralRecipe(input = {}) {
     albedo: optionalBoolean(source.albedo, 'Procedural albedo', true),
     surfaceTextures: normalizeSurfaceTextures(source.surfaceTextures),
     componentTransforms: normalizeComponentTransforms(source.componentTransforms),
+    openingAttachments: normalizeOpeningAttachments(source.openingAttachments),
   });
 }
 
@@ -237,6 +242,7 @@ export class ProceduralAssetStore {
         ...record.recipe,
         surfaceTextures: serializeSurfaceTextures(record.recipe.surfaceTextures),
         componentTransforms: serializeComponentTransforms(record.recipe.componentTransforms),
+        openingAttachments: serializeOpeningAttachments(record.recipe.openingAttachments),
       },
     }));
   }

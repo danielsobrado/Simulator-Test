@@ -15,7 +15,7 @@ import {
   applyStoneColor,
   createWorkshopMaterials,
 } from './ProceduralWorkshopMaterials.js';
-import { getComponentTransform } from './ProceduralWorkshopComponentTransforms.js';
+import { resolveWorkshopOpeningLayout } from './ProceduralWorkshopOpeningLayout.js';
 import { createRandom, mixSeed } from './ProceduralRandom.js';
 
 const TAU = Math.PI * 2;
@@ -43,47 +43,24 @@ function tagOpeningGeometry(geometry, opening, door) {
     id: opening.componentId,
     label: opening.componentLabel ?? (door ? 'Door' : 'Window'),
     kind: door ? 'door' : 'window',
+    hostId: opening.hostId,
   });
   return geometry;
 }
 
-function applyOpeningIntent(recipe, opening, {
-  width,
-  height,
-}) {
-  if (!opening.componentId) return opening;
-  const transform = getComponentTransform(recipe.componentTransforms, opening.componentId);
-  const openingWidth = THREE.MathUtils.clamp(
-    opening.width * transform.scale[0],
-    0.24,
-    Math.max(0.24, width * 0.42),
-  );
-  const radiusRatio = opening.radius / Math.max(0.01, opening.width);
-  const radius = Math.max(0.1, openingWidth * radiusRatio);
-  const maximumCenter = Math.max(0, width / 2 - openingWidth / 2 - 0.12);
-  const centerX = THREE.MathUtils.clamp(
-    opening.centerX + transform.position[0],
-    -maximumCenter,
-    maximumCenter,
-  );
-  const springHeight = THREE.MathUtils.clamp(
-    opening.springHeight * transform.scale[1],
-    0.32,
-    Math.max(0.32, height - radius - 0.25),
-  );
-  const bottom = THREE.MathUtils.clamp(
-    opening.bottom + transform.position[1],
-    0,
-    Math.max(0, height - springHeight - radius - 0.25),
-  );
-  return {
-    ...opening,
-    centerX,
-    bottom,
-    width: openingWidth,
-    radius,
-    springHeight,
-  };
+function tagStructureGeometry(geometry, surface) {
+  geometry.userData.workshopSemantic = Object.freeze({
+    id: surface.id,
+    label: surface.label,
+    kind: 'structure',
+    attachmentSurface: Object.freeze({
+      type: surface.type,
+      width: surface.width,
+      height: surface.height,
+      radius: surface.radius ?? 0,
+    }),
+  });
+  return geometry;
 }
 
 function addStone(target, recipe, params, stableIndex, heightRatio) {
@@ -494,6 +471,7 @@ function towerOpenings(recipe, height, {
   includeDoor,
   doorId = 'door-1',
   windowId = 'window-1',
+  hostId = 'structure-main',
 } = {}) {
   const openings = [];
   if (includeDoor) {
@@ -508,6 +486,7 @@ function towerOpenings(recipe, height, {
       door: true,
       componentId: doorId,
       componentLabel: 'Door',
+      hostId,
     });
   }
   if (recipe.windows && height >= 3.6) {
@@ -521,12 +500,10 @@ function towerOpenings(recipe, height, {
       door: false,
       componentId: windowId,
       componentLabel: 'Window',
+      hostId,
     });
   }
-  return openings.map((opening) => applyOpeningIntent(recipe, opening, {
-    width: recipe.width,
-    height,
-  }));
+  return openings;
 }
 
 function addTowerOpeningDetails(sets, recipe, openings, {
@@ -538,14 +515,28 @@ function addTowerOpeningDetails(sets, recipe, openings, {
 }) {
   const frontZ = centerZ + radius + depth * 0.55;
   openings.forEach((opening, index) => {
+    const starts = Object.fromEntries(Object.entries(sets).map(([slot, geometries]) => (
+      [slot, geometries.length]
+    )));
     addOpeningDetails(sets, recipe, {
       ...opening,
-      centerX: centerX + opening.centerX,
+      centerX,
     }, {
       frontZ,
       seedOffset: seedOffset + index,
       door: opening.door,
     });
+    if (Math.abs(opening.angle ?? 0) > 1e-7) {
+      const matrix = new THREE.Matrix4()
+        .makeTranslation(centerX, 0, centerZ)
+        .multiply(new THREE.Matrix4().makeRotationY(opening.angle))
+        .multiply(new THREE.Matrix4().makeTranslation(-centerX, 0, -centerZ));
+      for (const [slot, geometries] of Object.entries(sets)) {
+        for (let geometryIndex = starts[slot]; geometryIndex < geometries.length; geometryIndex += 1) {
+          geometries[geometryIndex].applyMatrix4(matrix);
+        }
+      }
+    }
   });
 }
 
@@ -603,7 +594,14 @@ function createEmptySets() {
 
 function buildWall(recipe) {
   const sets = createEmptySets();
-  const openings = recipe.windows && recipe.height >= 3.4
+  const host = {
+    id: 'structure-main',
+    label: 'Main wall',
+    type: 'planar',
+    width: recipe.width,
+    height: recipe.height,
+  };
+  const baseOpenings = recipe.windows && recipe.height >= 3.4
     ? [-1, 1].map((side, index) => ({
       centerX: side * recipe.width * 0.23,
       bottom: recipe.height * 0.43,
@@ -612,20 +610,19 @@ function buildWall(recipe) {
       radius: 0.22,
       componentId: `window-${index + 1}`,
       componentLabel: `Window ${index + 1}`,
-    })).map((opening) => applyOpeningIntent(recipe, opening, {
-      width: recipe.width,
-      height: recipe.height,
+      hostId: host.id,
     }))
     : [];
+  const openings = resolveWorkshopOpeningLayout(recipe, baseOpenings, [host]).get(host.id);
   sets.stone.push(...buildWallCourses(recipe, { openings, seedOffset: 10 }));
-  sets.mortar.push(beveledBox({
+  sets.mortar.push(tagStructureGeometry(beveledBox({
     width: recipe.width * 0.995,
     height: recipe.height * 0.995,
     depth: recipe.depth * 0.86,
     position: [0, recipe.height / 2, 0],
     detail: 1,
     bevelRatio: 0.012,
-  }));
+  }), host));
   openings.forEach((opening, index) => {
     addOpeningDetails(sets, recipe, opening, {
       frontZ: recipe.depth / 2 + 0.07,
@@ -662,7 +659,19 @@ function buildTower(recipe) {
   const sets = createEmptySets();
   const depth = Math.max(0.5, recipe.depth * 0.58);
   const radius = Math.max(1, recipe.width / 2 - depth * 0.22);
-  const openings = towerOpenings(recipe, recipe.height, { includeDoor: recipe.windows });
+  const host = {
+    id: 'structure-main',
+    label: 'Round tower',
+    type: 'round',
+    width: Math.PI * 2 * radius,
+    height: recipe.height,
+    radius,
+  };
+  const baseOpenings = towerOpenings(recipe, recipe.height, {
+    includeDoor: recipe.windows,
+    hostId: host.id,
+  });
+  const openings = resolveWorkshopOpeningLayout(recipe, baseOpenings, [host]).get(host.id);
   sets.stone.push(...buildTowerBody(recipe, {
     radius,
     depth,
@@ -670,12 +679,12 @@ function buildTower(recipe) {
     seedOffset: 100,
     openings,
   }));
-  sets.mortar.push(cylinder({
+  sets.mortar.push(tagStructureGeometry(cylinder({
     radius: Math.max(0.2, radius - depth * 0.46),
     height: recipe.height * 0.995,
     position: [0, recipe.height / 2, 0],
     sides: recipe.detail === 3 ? 64 : 48,
-  }));
+  }), host));
   addTowerOpeningDetails(sets, recipe, openings, {
     centerX: 0,
     centerZ: 0,
@@ -764,7 +773,14 @@ function buildSquareTower(recipe) {
   const width = recipe.width;
   const depth = Math.max(2.8, Math.min(recipe.width * 0.82, recipe.depth * 2.3));
   const wallThickness = Math.max(0.46, Math.min(0.82, recipe.depth * 0.34));
-  const openings = recipe.windows
+  const host = {
+    id: 'structure-main',
+    label: 'Square tower',
+    type: 'planar',
+    width,
+    height: recipe.height,
+  };
+  const baseOpenings = recipe.windows
     ? [
       {
         centerX: 0,
@@ -775,6 +791,7 @@ function buildSquareTower(recipe) {
         door: true,
         componentId: 'door-1',
         componentLabel: 'Door',
+        hostId: host.id,
       },
       ...(recipe.height >= 4.4 ? [{
         centerX: 0,
@@ -785,12 +802,11 @@ function buildSquareTower(recipe) {
         door: false,
         componentId: 'window-1',
         componentLabel: 'Window',
+        hostId: host.id,
       }] : []),
-    ].map((opening) => applyOpeningIntent(recipe, opening, {
-      width,
-      height: recipe.height,
-    }))
+    ]
     : [];
+  const openings = resolveWorkshopOpeningLayout(recipe, baseOpenings, [host]).get(host.id);
 
   sets.stone.push(
     ...buildWallCourses(recipe, {
@@ -825,14 +841,14 @@ function buildSquareTower(recipe) {
       seedOffset: 530,
     }),
   );
-  sets.mortar.push(beveledBox({
+  sets.mortar.push(tagStructureGeometry(beveledBox({
     width: width - wallThickness * 0.76,
     height: recipe.height * 0.995,
     depth: depth - wallThickness * 0.76,
     position: [0, recipe.height / 2, 0],
     detail: 1,
     bevelRatio: 0.01,
-  }));
+  }), host));
   openings.forEach((opening, index) => {
     addOpeningDetails(sets, recipe, opening, {
       frontZ: depth / 2 + wallThickness * 0.56,
@@ -858,37 +874,65 @@ function buildSquareTower(recipe) {
 function buildGatehouse(recipe) {
   const sets = createEmptySets();
   const gateWidth = Math.min(recipe.width * 0.32, 2.8);
-  const gate = applyOpeningIntent(recipe, {
+  const towerDepth = Math.max(0.48, recipe.depth * 0.55);
+  const towerRadius = Math.max(1.05, recipe.depth * 0.72);
+  const towerHeight = recipe.height * 1.16;
+  const hosts = [
+    {
+      id: 'structure-main',
+      label: 'Gatehouse wall',
+      type: 'planar',
+      width: recipe.width,
+      height: recipe.height,
+    },
+    ...[-1, 1].map((side) => ({
+      id: side < 0 ? 'structure-left' : 'structure-right',
+      label: side < 0 ? 'Left tower' : 'Right tower',
+      type: 'round',
+      width: Math.PI * 2 * towerRadius,
+      height: towerHeight,
+      radius: towerRadius,
+    })),
+  ];
+  const baseOpenings = recipe.windows ? [{
     centerX: 0,
     bottom: 0,
     width: gateWidth,
     springHeight: Math.min(2.15, recipe.height * 0.46),
     radius: gateWidth / 2,
+    door: true,
     componentId: 'door-1',
     componentLabel: 'Gate',
-  }, {
-    width: recipe.width,
-    height: recipe.height,
-  });
+    hostId: 'structure-main',
+  }] : [];
+  for (const [index, hostId] of ['structure-left', 'structure-right'].entries()) {
+    baseOpenings.push(...towerOpenings(recipe, towerHeight, {
+      includeDoor: false,
+      windowId: `window-${index + 1}`,
+      hostId,
+    }));
+  }
+  const openingsByHost = resolveWorkshopOpeningLayout(recipe, baseOpenings, hosts);
+  const mainOpenings = openingsByHost.get('structure-main');
   sets.stone.push(...buildWallCourses(recipe, {
-    openings: recipe.windows ? [gate] : [],
+    openings: mainOpenings,
     seedOffset: 200,
   }));
-  sets.mortar.push(beveledBox({
+  sets.mortar.push(tagStructureGeometry(beveledBox({
     width: recipe.width * 0.995,
     height: recipe.height * 0.995,
     depth: recipe.depth * 0.86,
     position: [0, recipe.height / 2, 0],
     detail: 1,
     bevelRatio: 0.012,
-  }));
-  if (recipe.windows) {
-    addOpeningDetails(sets, recipe, gate, {
+  }), hosts[0]));
+  mainOpenings.forEach((opening, index) => {
+    addOpeningDetails(sets, recipe, opening, {
       frontZ: recipe.depth / 2 + 0.08,
-      seedOffset: 220,
-      door: true,
+      seedOffset: 220 + index,
+      door: opening.door,
     });
-  }
+  });
   buildBattlementLine(sets, recipe, {
     width: recipe.width,
     depth: recipe.depth,
@@ -896,15 +940,10 @@ function buildGatehouse(recipe) {
     seedOffset: 240,
   });
 
-  const towerDepth = Math.max(0.48, recipe.depth * 0.55);
-  const towerRadius = Math.max(1.05, recipe.depth * 0.72);
-  const towerHeight = recipe.height * 1.16;
   for (const [index, side] of [-1, 1].entries()) {
     const centerX = side * recipe.width * 0.39;
-    const openings = towerOpenings(recipe, towerHeight, {
-      includeDoor: false,
-      windowId: `window-${index + 1}`,
-    });
+    const host = hosts[index + 1];
+    const openings = openingsByHost.get(host.id);
     sets.stone.push(...buildTowerBody(recipe, {
       radius: towerRadius,
       depth: towerDepth,
@@ -913,12 +952,12 @@ function buildGatehouse(recipe) {
       seedOffset: 260 + index * 80,
       openings,
     }));
-    sets.mortar.push(cylinder({
+    sets.mortar.push(tagStructureGeometry(cylinder({
       radius: Math.max(0.2, towerRadius - towerDepth * 0.46),
       height: towerHeight * 0.995,
       position: [centerX, towerHeight / 2, 0],
       sides: recipe.detail === 3 ? 64 : 48,
-    }));
+    }), host));
     addTowerOpeningDetails(sets, recipe, openings, {
       centerX,
       centerZ: 0,
@@ -1036,7 +1075,7 @@ function addFlowerBox(sets, recipe, {
   }
 }
 
-function createManorFacadeOpenings(recipe, width, height, hasTower) {
+function createManorFacadeOpenings(recipe, width, height, hasTower, hostId = 'structure-main') {
   if (!recipe.windows) return [];
   const bayCount = Math.max(3, Math.min(6, Math.round(width / 1.8)));
   const bayWidth = width / bayCount;
@@ -1054,6 +1093,7 @@ function createManorFacadeOpenings(recipe, width, height, hasTower) {
     door: true,
     componentId: 'door-1',
     componentLabel: 'Main entrance',
+    hostId,
   }];
   for (let floor = 1; floor < floorCount; floor += 1) {
     for (let bay = 0; bay < bayCount; bay += 1) {
@@ -1069,10 +1109,11 @@ function createManorFacadeOpenings(recipe, width, height, hasTower) {
         door: false,
         componentId: `window-${currentWindow}`,
         componentLabel: `Window ${currentWindow}`,
+        hostId,
       });
     }
   }
-  return openings.map((opening) => applyOpeningIntent(recipe, opening, { width, height }));
+  return openings;
 }
 
 function buildManor(recipe) {
@@ -1082,15 +1123,70 @@ function buildManor(recipe) {
   const height = recipe.height;
   const roofHeight = Math.min(5.4, Math.max(0.85, depth * 0.47 * recipe.roofScale));
   const wallDepth = 0.34;
+  const hasTower = recipe.towerSide !== 'none';
+  const towerSide = recipe.towerSide === 'left' ? -1 : 1;
+  const towerRadius = Math.max(1.25, Math.min(2.15, width * 0.22));
+  const towerHeight = Math.min(13.2, height * 1.2);
+  const towerX = towerSide * (width / 2 - towerRadius * 0.42);
+  const towerZ = depth * 0.32;
+  const towerHostId = towerSide < 0 ? 'structure-left' : 'structure-right';
+  const hosts = [{
+    id: 'structure-main',
+    label: 'Main house wall',
+    type: 'planar',
+    width,
+    height,
+  }];
+  if (hasTower) {
+    hosts.push({
+      id: towerHostId,
+      label: towerSide < 0 ? 'Left tower' : 'Right tower',
+      type: 'round',
+      width: Math.PI * 2 * towerRadius,
+      height: towerHeight,
+      radius: towerRadius,
+    });
+  }
+  const mainBaseOpenings = createManorFacadeOpenings(recipe, width, height, hasTower);
+  const mainWindowCount = mainBaseOpenings.filter((opening) => !opening.door).length;
+  const towerBaseOpenings = recipe.windows && hasTower
+    ? [
+      {
+        centerX: 0,
+        bottom: towerHeight * 0.31,
+        width: 0.56,
+        springHeight: 0.68,
+        radius: 0.22,
+        componentId: 'window-1',
+        componentLabel: 'Tower window 1',
+        hostId: towerHostId,
+      },
+      {
+        centerX: 0,
+        bottom: towerHeight * 0.63,
+        width: 0.52,
+        springHeight: 0.64,
+        radius: 0.2,
+        componentId: `window-${mainWindowCount + 2}`,
+        componentLabel: 'Tower window 2',
+        hostId: towerHostId,
+      },
+    ]
+    : [];
+  const openingsByHost = resolveWorkshopOpeningLayout(
+    recipe,
+    [...mainBaseOpenings, ...towerBaseOpenings],
+    hosts,
+  );
 
-  sets.mortar.push(beveledBox({
+  sets.mortar.push(tagStructureGeometry(beveledBox({
     width,
     height,
     depth,
     position: [0, height / 2, 0],
     detail: recipe.detail,
     bevelRatio: 0.018,
-  }));
+  }), hosts[0]));
   sets.mortar.push(
     gablePanel({
       width: depth,
@@ -1116,8 +1212,7 @@ function buildManor(recipe) {
     seedOffset: 710,
   }));
 
-  const hasTower = recipe.towerSide !== 'none';
-  const openings = createManorFacadeOpenings(recipe, width, height, hasTower);
+  const openings = openingsByHost.get('structure-main');
   openings.forEach((opening, index) => {
     addOpeningDetails(sets, recipe, opening, {
       frontZ: depth / 2 + 0.2,
@@ -1159,43 +1254,16 @@ function buildManor(recipe) {
   }
 
   if (hasTower) {
-    const side = recipe.towerSide === 'left' ? -1 : 1;
-    const towerRadius = Math.max(1.25, Math.min(2.15, width * 0.22));
-    const towerHeight = Math.min(13.2, height * 1.2);
-    const towerX = side * (width / 2 - towerRadius * 0.42);
-    const towerZ = depth * 0.32;
     const tapered = recipe.shape === 'tapered';
-    sets.mortar.push(cylinder({
+    sets.mortar.push(tagStructureGeometry(cylinder({
       radius: towerRadius,
       radiusTop: tapered ? towerRadius * 0.87 : towerRadius,
       radiusBottom: towerRadius * 1.02,
       height: towerHeight,
       position: [towerX, towerHeight / 2, towerZ],
       sides: recipe.detail === 3 ? 48 : 36,
-    }));
-    const mainWindowCount = openings.filter((opening) => !opening.door).length;
-    const towerOpeningsList = recipe.windows
-      ? [
-        {
-          centerX: 0,
-          bottom: towerHeight * 0.31,
-          width: 0.56,
-          springHeight: 0.68,
-          radius: 0.22,
-          componentId: 'window-1',
-          componentLabel: 'Tower window 1',
-        },
-        {
-          centerX: 0,
-          bottom: towerHeight * 0.63,
-          width: 0.52,
-          springHeight: 0.64,
-          radius: 0.2,
-          componentId: `window-${mainWindowCount + 2}`,
-          componentLabel: 'Tower window 2',
-        },
-      ]
-      : [];
+    }), hosts[1]));
+    const towerOpeningsList = openingsByHost.get(towerHostId);
     addTowerOpeningDetails(sets, recipe, towerOpeningsList, {
       centerX: towerX,
       centerZ: towerZ,

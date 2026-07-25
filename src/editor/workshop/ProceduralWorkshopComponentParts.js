@@ -104,6 +104,44 @@ function createFallbackStructure(entries) {
 }
 
 function createStructureAnchors(entries) {
+  const hintedGroups = new Map();
+  for (const entry of entries) {
+    const hint = entry.semanticHint;
+    if (hint?.kind !== 'structure') continue;
+    const group = hintedGroups.get(hint.id) ?? {
+      id: hint.id,
+      label: hint.label,
+      kind: 'structure',
+      parentId: null,
+      entries: [],
+      attachmentSurface: hint.attachmentSurface ?? null,
+    };
+    group.entries.push(entry);
+    hintedGroups.set(hint.id, group);
+  }
+  if (hintedGroups.size > 0) {
+    return [...hintedGroups.values()].map((group) => {
+      const bounds = unionBounds(group.entries);
+      const sourceEntry = group.entries
+        .slice()
+        .sort((left, right) => right.volume - left.volume || left.index - right.index)[0];
+      return {
+        id: group.id,
+        label: group.label,
+        kind: group.kind,
+        parentId: null,
+        bounds,
+        center: bounds.getCenter(new THREE.Vector3()),
+        size: bounds.getSize(new THREE.Vector3()),
+        sourceEntry,
+        attachmentSurface: group.attachmentSurface,
+      };
+    }).sort((left, right) => (
+      (left.id === 'structure-main' ? -1 : 0)
+      - (right.id === 'structure-main' ? -1 : 0)
+      || left.id.localeCompare(right.id)
+    ));
+  }
   const candidates = entries
     .filter((entry) => (
       entry.slot === 'mortar'
@@ -206,7 +244,9 @@ function inferredOpeningAnchors(entries, structures) {
       id: group.id,
       label: group.label,
       kind: group.kind,
-      parentId: nearestStructure(sourceEntry, structures).id,
+      parentId: structures.some(({ id }) => id === group.entries[0].semanticHint?.hostId)
+        ? group.entries[0].semanticHint.hostId
+        : nearestStructure(sourceEntry, structures).id,
       bounds,
       center: bounds.getCenter(new THREE.Vector3()),
       size: bounds.getSize(new THREE.Vector3()),
@@ -272,8 +312,8 @@ function castleOpeningAnchors(recipe) {
       ),
     );
     return {
-      id: `arch-${index + 1}`,
-      label: `Arch ${index + 1}`,
+      id: opening.componentId ?? `arch-${index + 1}`,
+      label: opening.componentLabel ?? `Arch ${index + 1}`,
       kind: 'opening',
       parentId: 'structure-main',
       bounds,
@@ -323,6 +363,7 @@ function ensureComponent(components, definition) {
       label: definition.label,
       kind: definition.kind,
       parentId: definition.parentId ?? null,
+      attachmentSurface: definition.attachmentSurface ?? null,
       entries: [],
     });
   }
@@ -414,6 +455,7 @@ function componentMetadata(component) {
     storedTransform: component.storedTransform,
     transformPolicy: component.transformPolicy,
     editPolicy: getWorkshopComponentEditPolicy(component),
+    attachmentSurface: component.attachmentSurface,
   });
 }
 

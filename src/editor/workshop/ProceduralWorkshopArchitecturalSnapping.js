@@ -273,3 +273,41 @@ export function solveWorkshopArchitecturalSnap({
 
   return { position: nextPosition, size, guides };
 }
+
+export function validateWorkshopOpeningPlacement({
+  position,
+  size: rawSize,
+  wallBounds: rawWallBounds,
+  siblings = [],
+  edgeInset = DEFAULT_EDGE_INSET,
+  clearance = 0.08,
+}) {
+  const wall = normalizedBounds(rawWallBounds);
+  const size = normalizedSize(rawSize);
+  if (!wall) return Object.freeze({ valid: false, reasons: Object.freeze(['No compatible wall surface']) });
+  const halfX = size.x / 2;
+  const halfY = size.y / 2;
+  const reasons = [];
+  if (
+    position.x - halfX < wall.minX + edgeInset - EPSILON
+    || position.x + halfX > wall.maxX - edgeInset + EPSILON
+    || position.y - halfY < wall.minY + edgeInset - EPSILON
+    || position.y + halfY > wall.maxY - edgeInset + EPSILON
+  ) {
+    reasons.push('Opening crosses a wall edge');
+  }
+  for (const sibling of siblings) {
+    const rect = openingRect(sibling);
+    const overlapsX = position.x + halfX + clearance > rect.left
+      && position.x - halfX - clearance < rect.right;
+    const overlapsY = position.y + halfY + clearance > rect.bottom
+      && position.y - halfY - clearance < rect.top;
+    if (overlapsX && overlapsY) {
+      reasons.push(`Too close to ${rect.label}`);
+    }
+  }
+  return Object.freeze({
+    valid: reasons.length === 0,
+    reasons: Object.freeze(reasons),
+  });
+}

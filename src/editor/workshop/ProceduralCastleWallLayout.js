@@ -34,13 +34,21 @@ function minimumTopAcrossOpening(recipe, centerX, width) {
   return minimum;
 }
 
-function transformOpening(recipe, opening, index) {
-  const transform = getComponentTransform(recipe.componentTransforms, `arch-${index + 1}`);
+function transformOpening(recipe, opening, index, componentId = `arch-${index + 1}`, attachment = null) {
+  const transform = attachment
+    ? {
+      position: [attachment.position[0], attachment.position[1], 0],
+      scale: [attachment.scale[0], attachment.scale[1], 1],
+    }
+    : getComponentTransform(recipe.componentTransforms, componentId);
   const bayLeft = -recipe.width / 2 + opening.bayWidth * index;
   const bayRight = bayLeft + opening.bayWidth;
   const maximumWidth = Math.min(
     MAX_OPENING_WIDTH,
-    Math.max(MIN_OPENING_WIDTH, opening.bayWidth - OPENING_SIDE_CLEARANCE * 2),
+    Math.max(
+      MIN_OPENING_WIDTH,
+      (attachment ? recipe.width : opening.bayWidth) - OPENING_SIDE_CLEARANCE * 2,
+    ),
   );
   const width = clamp(
     opening.width * transform.scale[0],
@@ -49,9 +57,9 @@ function transformOpening(recipe, opening, index) {
   );
   const centerClearance = width / 2 + OPENING_SIDE_CLEARANCE;
   const centerX = clamp(
-    opening.centerX + transform.position[0],
-    bayLeft + centerClearance,
-    bayRight - centerClearance,
+    attachment ? transform.position[0] : opening.centerX + transform.position[0],
+    attachment ? -recipe.width / 2 + centerClearance : bayLeft + centerClearance,
+    attachment ? recipe.width / 2 - centerClearance : bayRight - centerClearance,
   );
   const radius = width / 2;
   const minimumProfileTop = minimumTopAcrossOpening(recipe, centerX, width);
@@ -85,6 +93,11 @@ function transformOpening(recipe, opening, index) {
     springHeight,
     bottom,
     bayWidth: opening.bayWidth,
+    componentId,
+    componentLabel: componentId === opening.componentId
+      ? opening.componentLabel
+      : 'Arch copy',
+    hostId: 'structure-main',
   });
 }
 
@@ -114,17 +127,41 @@ export function getCastleWallOpenings(recipe) {
     maximumSpringHeight,
   );
 
-  return Object.freeze(Array.from({ length: count }, (_, index) => transformOpening(
-    recipe,
-    Object.freeze({
+  const baseOpenings = Array.from({ length: count }, (_, index) => Object.freeze({
       centerX: -recipe.width / 2 + bayWidth * (index + 0.5),
       width,
       radius,
       springHeight,
       bottom: 0,
       bayWidth,
-    }),
+      componentId: `arch-${index + 1}`,
+      componentLabel: `Arch ${index + 1}`,
+      hostId: 'structure-main',
+    }));
+  const baseIds = new Set(baseOpenings.map(({ componentId }) => componentId));
+  const sourceMap = new Map(baseOpenings.map((opening) => [opening.componentId, opening]));
+  const openings = baseOpenings.map((opening, index) => transformOpening(
+    recipe,
+    opening,
     index,
+    opening.componentId,
+    recipe.openingAttachments?.[opening.componentId],
+  ));
+  for (const [componentId, attachment] of Object.entries(recipe.openingAttachments ?? {})) {
+    if (openings.length >= MAX_OPENINGS) break;
+    if (baseIds.has(componentId) || attachment.hostId !== 'structure-main') continue;
+    const source = sourceMap.get(attachment.sourceId);
+    if (!source) continue;
+    openings.push(transformOpening(
+      recipe,
+      source,
+      baseOpenings.indexOf(source),
+      componentId,
+      attachment,
+    ));
+  }
+  return Object.freeze(openings.sort((left, right) => (
+    left.centerX - right.centerX || left.componentId.localeCompare(right.componentId)
   )));
 }
 

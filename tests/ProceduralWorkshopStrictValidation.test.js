@@ -95,6 +95,10 @@ test('explicit null recipe values are rejected instead of becoming defaults', ()
     () => normalizeProceduralRecipe(recipe({ componentTransforms: null })),
     /Workshop component transforms must be an object/,
   );
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ openingAttachments: null })),
+    /Opening attachments must be an object/,
+  );
 });
 
 test('component vectors reject coerced values and canonicalize equivalent half turns', () => {

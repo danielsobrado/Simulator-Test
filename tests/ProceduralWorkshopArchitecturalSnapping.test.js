@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   isWorkshopArchitecturalOpening,
   solveWorkshopArchitecturalSnap,
+  validateWorkshopOpeningPlacement,
 } from '../src/editor/workshop/ProceduralWorkshopArchitecturalSnapping.js';
 
 const WALL = Object.freeze({
@@ -97,4 +98,31 @@ test('only architectural opening kinds use wall-aware snapping', () => {
   assert.equal(isWorkshopArchitecturalOpening({ kind: 'window' }), true);
   assert.equal(isWorkshopArchitecturalOpening({ kind: 'opening' }), true);
   assert.equal(isWorkshopArchitecturalOpening({ kind: 'roof' }), false);
+});
+
+test('placement validation rejects overlaps and accepts clear wall sockets', () => {
+  const sibling = {
+    kind: 'window',
+    label: 'Window 1',
+    position: { x: 0, y: 2.5 },
+    size: { x: 1, y: 1.4 },
+  };
+  assert.deepEqual(validateWorkshopOpeningPlacement({
+    position: { x: 0.6, y: 2.5 },
+    size: { x: 1, y: 1.4 },
+    wallBounds: WALL,
+    siblings: [sibling],
+  }), {
+    valid: false,
+    reasons: ['Too close to Window 1'],
+  });
+  assert.deepEqual(validateWorkshopOpeningPlacement({
+    position: { x: 2, y: 2.5 },
+    size: { x: 1, y: 1.4 },
+    wallBounds: WALL,
+    siblings: [sibling],
+  }), {
+    valid: true,
+    reasons: [],
+  });
 });

@@ -176,7 +176,7 @@ export class ProceduralWorkshopUi {
               </div>
               <div class="workshop-canvas" data-role="workshop-canvas"></div>
               <div class="workshop-component-editor" data-role="workshop-component-editor"></div>
-              <p>Click a component, then move, rotate, or scale it · drag empty space to orbit · wheel to zoom.</p>
+              <p>Click a component to edit it · openings can be placed on walls, duplicated, or repeated · drag empty space to orbit.</p>
             </div>
           </div>
         </section>
@@ -324,6 +324,7 @@ export class ProceduralWorkshopUi {
         albedo: values.get('albedo') === 'on',
         surfaceTextures: this.surfaceEditor.toDocument(),
         componentTransforms: this.componentController?.toDocument() ?? {},
+        openingAttachments: this.componentController?.toOpeningAttachmentsDocument() ?? {},
       },
     };
   }
@@ -348,6 +349,7 @@ export class ProceduralWorkshopUi {
   close() {
     this.openRevision += 1;
     this.overlay.hidden = true;
+    this.componentController?.cancelAttachmentPlacement();
     window.clearTimeout(this.previewTimer);
     window.clearTimeout(this.finalPreviewTimer);
     this.previewTimer = 0;
@@ -430,7 +432,9 @@ export class ProceduralWorkshopUi {
             ? `${component.label} edit stored in the object recipe.`
             : meta?.reason === 'history'
               ? 'Component edit history restored.'
-              : 'All component edits were reset.';
+              : meta?.reason === 'attachments'
+                ? 'Opening layout regenerated from its wall attachments.'
+                : 'All component edits were reset.';
           this.status.classList.remove('is-error');
           if (!component || component.transformPolicy === 'opening2d') {
             this.schedulePreview(0);

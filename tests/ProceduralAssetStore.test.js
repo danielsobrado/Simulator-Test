@@ -32,6 +32,7 @@ const recipe = {
     slots: {},
   },
   componentTransforms: {},
+  openingAttachments: {},
 };
 
 function importedSurfaceTextures() {
@@ -105,6 +106,7 @@ test('older workshop recipes receive compatible quality, texture, and component 
   assert.equal(normalized.ivy, false);
   assert.deepEqual(normalized.surfaceTextures, { sources: {}, slots: {} });
   assert.deepEqual(normalized.componentTransforms, {});
+  assert.deepEqual(normalized.openingAttachments, {});
 });
 
 test('component transforms are normalized, sparse, and bounded', () => {
@@ -238,6 +240,14 @@ test('procedural asset documents preserve images and semantic component edits', 
           scale: [1.2, 1.4, 1],
         },
       },
+      openingAttachments: {
+        'door-1': {
+          sourceId: 'door-1',
+          hostId: 'structure-left',
+          position: [0.5, 0],
+          scale: [1.2, 1.4],
+        },
+      },
     },
   });
   const document = source.toDocument();
@@ -249,6 +259,7 @@ test('procedural asset documents preserve images and semantic component edits', 
     PNG_DATA_URL,
   );
   assert.deepEqual(document[0].recipe.componentTransforms['door-1'].position, [0.75, 0, 0]);
+  assert.deepEqual(document[0].recipe.openingAttachments['door-1'].position, [0.5, 0]);
 
   const target = new ProceduralAssetStore();
   target.replaceAll(document);
@@ -265,5 +276,6 @@ test('version-one and version-two workshop records migrate to version three', ()
     assert.equal(migrated.version, 3);
     assert.deepEqual(migrated.recipe.surfaceTextures, { sources: {}, slots: {} });
     assert.deepEqual(migrated.recipe.componentTransforms, {});
+    assert.deepEqual(migrated.recipe.openingAttachments, {});
   }
 });

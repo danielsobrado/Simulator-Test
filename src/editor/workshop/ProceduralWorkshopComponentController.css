@@ -72,6 +72,12 @@
   background: #2a3928;
 }
 
+.workshop-component-actions button.is-active {
+  border-color: #7de0cf;
+  background: #1d4037;
+  color: #dffff7;
+}
+
 .workshop-component-actions button:disabled {
   opacity: 0.42;
   cursor: default;

@@ -15,7 +15,12 @@ import {
 import {
   isWorkshopArchitecturalOpening,
   solveWorkshopArchitecturalSnap,
+  validateWorkshopOpeningPlacement,
 } from './ProceduralWorkshopArchitecturalSnapping.js';
+import {
+  nextOpeningCopyId,
+  serializeOpeningAttachments,
+} from './ProceduralWorkshopOpeningAttachments.js';
 
 const POINTER_SELECT_DISTANCE = 5;
 const COMPONENT_POSITION_LIMIT = WORKSHOP_COMPONENT_TRANSFORM_LIMITS.position;
@@ -138,6 +143,24 @@ function createArchitecturalHandleHelper() {
   return helper;
 }
 
+function createPlacementHelper() {
+  const helper = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x7de0cf,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+    }),
+  );
+  helper.name = 'workshop-opening-placement-preview';
+  helper.visible = false;
+  helper.renderOrder = 1002;
+  helper.raycast = () => {};
+  return helper;
+}
+
 function copyTransformDocument(input = {}) {
   return Object.fromEntries(
     Object.entries(serializeComponentTransforms(input)).map(([componentId, transform]) => [
@@ -151,7 +174,7 @@ function copyTransformDocument(input = {}) {
   );
 }
 
-function sameTransformDocument(left, right) {
+function sameEditDocument(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
@@ -176,15 +199,20 @@ function openingDescriptor(group) {
   const bounds = directMeshBounds(group);
   if (bounds.isEmpty()) return null;
   const baseSize = bounds.getSize(new THREE.Vector3());
+  const baseCenter = bounds.getCenter(new THREE.Vector3());
   return {
     kind: group.userData.workshopComponent.kind,
     label: group.userData.workshopComponent.label,
-    position: { x: group.position.x, y: group.position.y },
+    position: {
+      x: group.position.x + baseCenter.x * group.scale.x,
+      y: group.position.y + baseCenter.y * group.scale.y,
+    },
     size: {
       x: baseSize.x * Math.abs(group.scale.x),
       y: baseSize.y * Math.abs(group.scale.y),
     },
     baseSize,
+    baseCenter,
   };
 }
 
@@ -208,6 +236,7 @@ export class ProceduralWorkshopComponentController {
     this.onChange = onChange;
     this.onModeChange = onModeChange;
     this.transforms = {};
+    this.openingAttachments = {};
     this.groups = new Map();
     this.meshes = [];
     this.selectedComponentId = null;
@@ -221,16 +250,20 @@ export class ProceduralWorkshopComponentController {
     this.dragStartTransforms = null;
     this.dragging = false;
     this.pointerStart = null;
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.selectionHelper = createSelectionHelper();
     this.inferenceHelper = createInferenceHelper();
     this.handleHelper = createArchitecturalHandleHelper();
+    this.placementHelper = createPlacementHelper();
     this.handleMetadata = [];
     this.selectionRoot = previewRoot.parent ?? previewRoot;
     this.selectionRoot.add(this.selectionHelper);
     this.selectionRoot.add(this.inferenceHelper);
     this.selectionRoot.add(this.handleHelper);
+    this.selectionRoot.add(this.placementHelper);
 
     root.innerHTML = `
       <div class="workshop-component-heading">
@@ -251,6 +284,10 @@ export class ProceduralWorkshopComponentController {
         <button type="button" data-component-action="undo" title="Undo component edit (Ctrl+Z)">Undo</button>
         <button type="button" data-component-action="redo" title="Redo component edit (Ctrl+Y)">Redo</button>
         <button type="button" data-component-action="mirror" title="Mirror the selected area across the workshop centre">Mirror X</button>
+        <button type="button" data-component-action="attach" title="Place the selected opening on another compatible wall" disabled>Place on wall</button>
+        <button type="button" data-component-action="duplicate" title="Duplicate the selected opening beside itself" disabled>Duplicate</button>
+        <button type="button" data-component-action="repeat" title="Create a row of three evenly spaced openings" disabled>Repeat ×3</button>
+        <button type="button" data-component-action="delete-opening" title="Delete a duplicated opening" disabled>Delete copy</button>
         <label class="workshop-component-snap">
           <input type="checkbox" data-role="workshop-component-snap" checked />
           Smart snap
@@ -295,6 +332,11 @@ export class ProceduralWorkshopComponentController {
     this.valueFields = [...root.querySelectorAll('[data-transform-field]')];
     this.undoButton = root.querySelector('[data-component-action="undo"]');
     this.redoButton = root.querySelector('[data-component-action="redo"]');
+    this.attachButton = root.querySelector('[data-component-action="attach"]');
+    this.openingActionButtons = [...root.querySelectorAll(
+      '[data-component-action="attach"], [data-component-action="duplicate"], [data-component-action="repeat"]',
+    )];
+    this.deleteOpeningButton = root.querySelector('[data-component-action="delete-opening"]');
     this.hint = root.querySelector('[data-role="workshop-component-hint"]');
     this.snapFeedback = root.querySelector('[data-role="workshop-component-snap-feedback"]');
 
@@ -307,17 +349,22 @@ export class ProceduralWorkshopComponentController {
       if (action === 'undo') this.undo();
       if (action === 'redo') this.redo();
       if (action === 'mirror') this.mirrorSelected();
+      if (action === 'attach') this.beginAttachmentPlacement();
+      if (action === 'duplicate') this.duplicateSelectedOpening();
+      if (action === 'repeat') this.repeatSelectedOpening();
+      if (action === 'delete-opening') this.deleteSelectedOpening();
     };
     this.onValueChange = (event) => {
       if (event.target.matches('[data-transform-field]')) this.commitNumericTransform();
     };
     this.onPointerDown = (event) => this.pointerDown(event);
+    this.onPointerMove = (event) => this.pointerMove(event);
     this.onPointerUp = (event) => this.pointerUp(event);
     this.onDraggingChanged = ({ value }) => {
       this.dragging = value;
       this.orbitControls.enabled = !value;
       if (value) {
-        this.dragStartTransforms = copyTransformDocument(this.transforms);
+        this.dragStartTransforms = this.captureEditState();
       } else {
         this.commitSelectedTransform(this.dragStartTransforms);
         this.dragStartTransforms = null;
@@ -338,6 +385,7 @@ export class ProceduralWorkshopComponentController {
     this.root.addEventListener('click', this.onRootClick);
     this.root.addEventListener('change', this.onValueChange);
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
+    renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     renderer.domElement.addEventListener('pointerup', this.onPointerUp);
     transformControls.addEventListener('dragging-changed', this.onDraggingChanged);
     transformControls.addEventListener('objectChange', this.onObjectChange);
@@ -351,6 +399,33 @@ export class ProceduralWorkshopComponentController {
     this.pointerStart = { x: event.clientX, y: event.clientY };
   }
 
+  setPointerRay(event) {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return false;
+    this.pointer.set(
+      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+      -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return true;
+  }
+
+  pointerMove(event) {
+    if (!this.attachmentMode || !this.setPointerRay(event)) return;
+    const structureMeshes = this.meshes.filter((mesh) => {
+      const group = this.groups.get(mesh.userData.workshopComponentId);
+      return group?.userData?.workshopComponent?.kind === 'structure';
+    });
+    const hit = this.raycaster.intersectObjects(structureMeshes, false)[0];
+    if (!hit) {
+      this.attachmentPreview = null;
+      this.placementHelper.visible = false;
+      this.updateSnapFeedback([{ reason: 'Point at a compatible wall' }]);
+      return;
+    }
+    this.updateAttachmentPreview(hit);
+  }
+
   pointerUp(event) {
     const start = this.pointerStart;
     this.pointerStart = null;
@@ -359,13 +434,11 @@ export class ProceduralWorkshopComponentController {
       return;
     }
 
-    const bounds = this.renderer.domElement.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0) return;
-    this.pointer.set(
-      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-      -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(this.pointer, this.camera);
+    if (this.attachmentMode) {
+      if (this.attachmentPreview?.valid) this.commitAttachmentPlacement();
+      return;
+    }
+    if (!this.setPointerRay(event)) return;
     this.raycaster.params.Points.threshold = 0.24;
     const handleHit = this.raycaster.intersectObject(this.handleHelper, false)[0];
     if (handleHit && this.handleMetadata[handleHit.index]) {
@@ -380,6 +453,178 @@ export class ProceduralWorkshopComponentController {
     if (componentId) this.selectComponent(componentId);
   }
 
+  beginAttachmentPlacement() {
+    const component = this.selectedComponent();
+    if (!isWorkshopArchitecturalOpening(component)) {
+      this.hint.textContent = 'Select a door, window, or arch before placing it on a wall.';
+      return false;
+    }
+    this.attachmentMode = !this.attachmentMode;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = !this.attachmentMode;
+    this.attachButton?.classList.toggle('is-active', this.attachmentMode);
+    this.hint.textContent = this.attachmentMode
+      ? `Place ${component.label} · point at a compatible wall, then click to attach.`
+      : `${component.label} placement cancelled.`;
+    this.updateSnapFeedback();
+    return this.attachmentMode;
+  }
+
+  cancelAttachmentPlacement() {
+    if (!this.attachmentMode) return false;
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = true;
+    this.attachButton?.classList.remove('is-active');
+    this.updateSnapFeedback();
+    return true;
+  }
+
+  attachmentHostContext(hostGroup, selected) {
+    const component = hostGroup.userData.workshopComponent;
+    const localBounds = directMeshBounds(hostGroup);
+    if (localBounds.isEmpty()) return null;
+    const surface = component.attachmentSurface ?? {
+      type: 'planar',
+      width: localBounds.max.x - localBounds.min.x,
+      height: localBounds.max.y - localBounds.min.y,
+      radius: 0,
+    };
+    const wallBounds = surface.type === 'round'
+      ? {
+        minX: -Math.PI * surface.radius,
+        maxX: Math.PI * surface.radius,
+        minY: localBounds.min.y,
+        maxY: localBounds.max.y,
+      }
+      : {
+        minX: localBounds.min.x,
+        maxX: localBounds.max.x,
+        minY: localBounds.min.y,
+        maxY: localBounds.max.y,
+      };
+    const siblings = [];
+    for (const sibling of hostGroup.children) {
+      if (sibling === this.selectedGroup()) continue;
+      if (!isWorkshopArchitecturalOpening(sibling.userData?.workshopComponent)) continue;
+      const descriptor = openingDescriptor(sibling);
+      if (descriptor) siblings.push(descriptor);
+    }
+    return { component, localBounds, surface, wallBounds, siblings, selected };
+  }
+
+  updateAttachmentPreview(hit) {
+    const selectedGroup = this.selectedGroup();
+    const selected = openingDescriptor(selectedGroup);
+    const hostGroup = this.groups.get(hit.object.userData.workshopComponentId);
+    const context = selected && hostGroup
+      ? this.attachmentHostContext(hostGroup, selected)
+      : null;
+    if (!context) {
+      this.attachmentPreview = null;
+      this.placementHelper.visible = false;
+      return;
+    }
+    if (context.surface.type === 'planar' && hit.face?.normal) {
+      const worldNormal = hit.face.normal.clone().applyNormalMatrix(
+        new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld),
+      );
+      const hostQuaternion = hostGroup.getWorldQuaternion(new THREE.Quaternion()).invert();
+      const hostNormal = worldNormal.applyQuaternion(hostQuaternion);
+      if (hostNormal.z < 0.45) {
+        this.attachmentPreview = null;
+        this.placementHelper.visible = false;
+        this.updateSnapFeedback([{ reason: 'Choose the highlighted front façade' }]);
+        return;
+      }
+    }
+    const localPoint = hostGroup.worldToLocal(hit.point.clone());
+    const surfaceX = context.surface.type === 'round'
+      ? Math.atan2(localPoint.x, localPoint.z) * context.surface.radius
+      : localPoint.x;
+    const result = solveWorkshopArchitecturalSnap({
+      kind: selected.kind,
+      mode: 'translate',
+      position: { x: surfaceX, y: localPoint.y },
+      size: selected.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+      enabled: this.snapEnabled !== this.snapInverted,
+      threshold: Math.max(0.16, this.selectedPolicy().translationSnap * 4),
+    });
+    const validation = validateWorkshopOpeningPlacement({
+      position: result.position,
+      size: result.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+    });
+    const localCenter = context.surface.type === 'round'
+      ? new THREE.Vector3(
+        Math.sin(result.position.x / context.surface.radius) * (context.surface.radius + 0.12),
+        result.position.y,
+        Math.cos(result.position.x / context.surface.radius) * (context.surface.radius + 0.12),
+      )
+      : new THREE.Vector3(
+        result.position.x,
+        result.position.y,
+        context.localBounds.max.z + 0.12,
+      );
+    const worldCenter = hostGroup.localToWorld(localCenter);
+    const orientation = hostGroup.getWorldQuaternion(new THREE.Quaternion());
+    if (context.surface.type === 'round') {
+      orientation.multiply(new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        result.position.x / context.surface.radius,
+      ));
+    }
+    this.placementHelper.position.copy(worldCenter);
+    this.placementHelper.quaternion.copy(orientation);
+    this.placementHelper.scale.set(result.size.x, result.size.y, 0.24);
+    this.placementHelper.material.color.set(validation.valid ? 0x7de0cf : 0xef6f68);
+    this.placementHelper.visible = true;
+    const existing = this.openingAttachments[this.selectedComponentId];
+    const stored = selectedGroup.userData.workshopStoredTransform;
+    this.attachmentPreview = {
+      valid: validation.valid,
+      componentId: this.selectedComponentId,
+      attachment: {
+        sourceId: existing?.sourceId ?? this.selectedComponentId,
+        hostId: context.component.id,
+        position: [
+          result.position.x,
+          result.position.y - result.size.y / 2,
+        ],
+        scale: existing?.scale
+          ? [...existing.scale]
+          : [stored.scale[0], stored.scale[1]],
+      },
+    };
+    this.updateSnapFeedback(validation.valid
+      ? [...result.guides, { reason: `Ready on ${context.component.label}` }]
+      : validation.reasons.map((reason) => ({ reason })));
+  }
+
+  commitAttachmentPlacement() {
+    const preview = this.attachmentPreview;
+    if (!preview?.valid) return false;
+    const before = this.captureEditState();
+    this.openingAttachments = {
+      ...this.openingAttachments,
+      [preview.componentId]: preview.attachment,
+    };
+    delete this.transforms[preview.componentId];
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = true;
+    this.attachButton?.classList.remove('is-active');
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
   isEditorVisible() {
     const overlay = this.root.closest('[data-role="workshop-overlay"]');
     return !overlay?.hidden;
@@ -389,6 +634,10 @@ export class ProceduralWorkshopComponentController {
     if (!this.isEditorVisible()) return;
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     const key = event.key.toLowerCase();
+    if (key === 'escape' && this.attachmentMode) {
+      this.beginAttachmentPlacement();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && key === 'z') {
       event.preventDefault();
       if (event.shiftKey) this.redo();
@@ -440,10 +689,17 @@ export class ProceduralWorkshopComponentController {
     if (this.redoButton) this.redoButton.disabled = this.future.length === 0;
   }
 
+  captureEditState() {
+    return {
+      componentTransforms: copyTransformDocument(this.transforms),
+      openingAttachments: serializeOpeningAttachments(this.openingAttachments),
+    };
+  }
+
   recordHistory(before) {
     if (!before) return;
-    const after = copyTransformDocument(this.transforms);
-    if (sameTransformDocument(before, after)) return;
+    const after = this.captureEditState();
+    if (sameEditDocument(before, after)) return;
     this.history.push(before);
     if (this.history.length > MAX_HISTORY) this.history.shift();
     this.future = [];
@@ -451,11 +707,15 @@ export class ProceduralWorkshopComponentController {
   }
 
   restoreTransformDocument(document, notify = true) {
+    const state = document?.componentTransforms
+      ? document
+      : { componentTransforms: document, openingAttachments: {} };
     this.transforms = Object.fromEntries(
-      Object.entries(copyTransformDocument(document)).filter(([componentId]) => (
+      Object.entries(copyTransformDocument(state.componentTransforms)).filter(([componentId]) => (
         this.groups.has(componentId)
       )),
     );
+    this.openingAttachments = serializeOpeningAttachments(state.openingAttachments);
     const identity = createIdentityComponentTransform();
     for (const [componentId, group] of this.groups) {
       const transform = this.transforms[componentId] ?? identity;
@@ -476,7 +736,7 @@ export class ProceduralWorkshopComponentController {
   undo() {
     const previous = this.history.pop();
     if (!previous) return false;
-    this.future.push(copyTransformDocument(this.transforms));
+    this.future.push(this.captureEditState());
     this.restoreTransformDocument(previous);
     this.updateHistoryButtons();
     return true;
@@ -485,7 +745,7 @@ export class ProceduralWorkshopComponentController {
   redo() {
     const next = this.future.pop();
     if (!next) return false;
-    this.history.push(copyTransformDocument(this.transforms));
+    this.history.push(this.captureEditState());
     this.restoreTransformDocument(next);
     this.updateHistoryButtons();
     return true;
@@ -494,6 +754,11 @@ export class ProceduralWorkshopComponentController {
   pruneTransforms(definitions) {
     for (const componentId of Object.keys(this.transforms)) {
       if (!definitions.has(componentId)) delete this.transforms[componentId];
+    }
+    for (const componentId of Object.keys(this.openingAttachments)) {
+      if (componentId.startsWith('copy-') && !definitions.has(componentId)) {
+        delete this.openingAttachments[componentId];
+      }
     }
   }
 
@@ -654,6 +919,13 @@ export class ProceduralWorkshopComponentController {
     this.updateNumericFields();
     this.updateSnapFeedback();
     const component = group.userData.workshopComponent;
+    const openingSelected = isWorkshopArchitecturalOpening(component);
+    for (const button of this.openingActionButtons) button.disabled = !openingSelected;
+    this.deleteOpeningButton.disabled = !(
+      openingSelected
+      && this.selectedComponentId.startsWith('copy-')
+      && this.openingAttachments[this.selectedComponentId]
+    );
     this.hint.textContent = `${component.label} · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
   }
 
@@ -805,8 +1077,8 @@ export class ProceduralWorkshopComponentController {
         if (baseSize > 0) group.scale[axis] = result.size[axis] / baseSize;
       }
     }
-    group.position.x = result.position.x;
-    group.position.y = result.position.y;
+    group.position.x = result.position.x - context.selected.baseCenter.x * group.scale.x;
+    group.position.y = result.position.y - context.selected.baseCenter.y * group.scale.y;
     return result;
   }
 
@@ -897,16 +1169,49 @@ export class ProceduralWorkshopComponentController {
     this.updateInferenceHelper(snappedAxes);
   }
 
-  commitSelectedTransform(before = copyTransformDocument(this.transforms)) {
+  commitSelectedTransform(before = this.captureEditState()) {
     const group = this.groups.get(this.selectedComponentId);
     if (!group) return;
     this.constrainSelectedTransform();
     const delta = componentTransformFromGroup(group);
     const topologyDriven = isOpening2d(group.userData.workshopComponent);
-    const transform = topologyDriven
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    const transform = topologyDriven && !attachment
       ? combineComponentTransforms(group.userData.workshopStoredTransform, delta)
       : delta;
-    if (isIdentityComponentTransform(transform)) {
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [
+            THREE.MathUtils.clamp(
+              attachment.position[0] + delta.position[0],
+              -COMPONENT_POSITION_LIMIT,
+              COMPONENT_POSITION_LIMIT,
+            ),
+            THREE.MathUtils.clamp(
+              attachment.position[1] + delta.position[1],
+              0,
+              COMPONENT_POSITION_LIMIT,
+            ),
+          ],
+          scale: [
+            THREE.MathUtils.clamp(
+              attachment.scale[0] * delta.scale[0],
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+            ),
+            THREE.MathUtils.clamp(
+              attachment.scale[1] * delta.scale[1],
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+            ),
+          ],
+        },
+      };
+      delete this.transforms[this.selectedComponentId];
+    } else if (isIdentityComponentTransform(transform)) {
       delete this.transforms[this.selectedComponentId];
     } else {
       this.transforms[this.selectedComponentId] = transform;
@@ -924,8 +1229,15 @@ export class ProceduralWorkshopComponentController {
     const group = this.selectedGroup();
     if (!group) return;
     const component = group.userData.workshopComponent;
-    const transform = isOpening2d(component)
-      ? group.userData.workshopStoredTransform
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    const transform = attachment
+      ? {
+        position: [attachment.position[0], attachment.position[1], 0],
+        rotation: [0, 0, 0],
+        scale: [attachment.scale[0], attachment.scale[1], 1],
+      }
+      : isOpening2d(component)
+        ? group.userData.workshopStoredTransform
       : componentTransformFromGroup(group);
     const policy = this.selectedPolicy();
     for (const field of this.valueFields) {
@@ -948,7 +1260,7 @@ export class ProceduralWorkshopComponentController {
   commitNumericTransform() {
     const group = this.selectedGroup();
     if (!group) return;
-    const before = copyTransformDocument(this.transforms);
+    const before = this.captureEditState();
     const values = { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
     for (const field of this.valueFields) {
       const [kind, indexText] = field.dataset.transformField.split('-');
@@ -978,6 +1290,25 @@ export class ProceduralWorkshopComponentController {
       );
     }
     const transform = normalizeComponentTransform(values);
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [transform.position[0], transform.position[1]],
+          scale: [transform.scale[0], transform.scale[1]],
+        },
+      };
+      delete this.transforms[this.selectedComponentId];
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(group.userData.workshopComponent, transform);
+      return;
+    }
     if (isIdentityComponentTransform(transform)) delete this.transforms[this.selectedComponentId];
     else this.transforms[this.selectedComponentId] = transform;
     group.userData.workshopStoredTransform = transform;
@@ -996,8 +1327,21 @@ export class ProceduralWorkshopComponentController {
   mirrorSelected() {
     const group = this.selectedGroup();
     if (!group) return;
-    const before = copyTransformDocument(this.transforms);
+    const before = this.captureEditState();
     const component = group.userData.workshopComponent;
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [-attachment.position[0], attachment.position[1]],
+        },
+      };
+      this.recordHistory(before);
+      this.onChange?.(component, createIdentityComponentTransform());
+      return;
+    }
     const source = isOpening2d(component)
       ? group.userData.workshopStoredTransform
       : componentTransformFromGroup(group);
@@ -1016,11 +1360,122 @@ export class ProceduralWorkshopComponentController {
     this.onChange?.(component, transform);
   }
 
+  createOpeningCopies(count) {
+    const group = this.selectedGroup();
+    const component = group?.userData?.workshopComponent;
+    const context = this.architecturalSnapContext(group);
+    if (!group || !isWorkshopArchitecturalOpening(component) || !context) {
+      this.hint.textContent = 'Select a door, window, or arch with a compatible host wall.';
+      return 0;
+    }
+    const before = this.captureEditState();
+    const existing = this.openingAttachments[this.selectedComponentId];
+    const sourceId = existing?.sourceId ?? this.selectedComponentId;
+    const scale = existing?.scale
+      ? [...existing.scale]
+      : [
+        group.userData.workshopStoredTransform.scale[0],
+        group.userData.workshopStoredTransform.scale[1],
+      ];
+    const siblings = [...context.siblings, context.selected];
+    let attachments = { ...this.openingAttachments };
+    let created = 0;
+    let lastId = null;
+    const step = context.selected.size.x + 0.16;
+    const rightRoom = context.wallBounds.maxX - context.selected.position.x;
+    const leftRoom = context.selected.position.x - context.wallBounds.minX;
+    const preferredDirection = rightRoom >= leftRoom ? 1 : -1;
+    for (let index = 1; index <= count; index += 1) {
+      let placement = null;
+      for (const direction of [preferredDirection, -preferredDirection]) {
+        const result = solveWorkshopArchitecturalSnap({
+          kind: component.kind,
+          position: {
+            x: context.selected.position.x + direction * step * index,
+            y: context.selected.position.y,
+          },
+          size: context.selected.size,
+          wallBounds: context.wallBounds,
+          siblings,
+          enabled: true,
+        });
+        const validation = validateWorkshopOpeningPlacement({
+          position: result.position,
+          size: result.size,
+          wallBounds: context.wallBounds,
+          siblings,
+        });
+        if (validation.valid) {
+          placement = result;
+          break;
+        }
+      }
+      if (!placement) continue;
+      const componentId = nextOpeningCopyId(sourceId, attachments);
+      attachments[componentId] = {
+        sourceId,
+        hostId: group.parent.userData.workshopComponent.id,
+        position: [
+          placement.position.x,
+          placement.position.y - placement.size.y / 2,
+        ],
+        scale: [...scale],
+      };
+      siblings.push({
+        kind: component.kind,
+        label: `${component.label} copy`,
+        position: placement.position,
+        size: placement.size,
+      });
+      lastId = componentId;
+      created += 1;
+    }
+    if (created === 0) {
+      this.updateSnapFeedback([{ reason: 'No collision-free wall space for another opening' }]);
+      return 0;
+    }
+    this.openingAttachments = attachments;
+    this.selectedComponentId = lastId;
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return created;
+  }
+
+  duplicateSelectedOpening() {
+    return this.createOpeningCopies(1);
+  }
+
+  repeatSelectedOpening() {
+    return this.createOpeningCopies(2);
+  }
+
+  deleteSelectedOpening() {
+    if (
+      !this.selectedComponentId?.startsWith('copy-')
+      || !this.openingAttachments[this.selectedComponentId]
+    ) {
+      return false;
+    }
+    const before = this.captureEditState();
+    const next = { ...this.openingAttachments };
+    delete next[this.selectedComponentId];
+    this.openingAttachments = next;
+    delete this.transforms[this.selectedComponentId];
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
   resetSelected() {
     const group = this.groups.get(this.selectedComponentId);
     if (!group) return;
-    const before = copyTransformDocument(this.transforms);
+    const before = this.captureEditState();
     delete this.transforms[this.selectedComponentId];
+    if (this.openingAttachments[this.selectedComponentId]) {
+      const next = { ...this.openingAttachments };
+      delete next[this.selectedComponentId];
+      this.openingAttachments = next;
+    }
     const identity = createIdentityComponentTransform();
     group.userData.workshopStoredTransform = identity;
     applyTransform(group, identity);
@@ -1031,8 +1486,9 @@ export class ProceduralWorkshopComponentController {
   }
 
   resetAll() {
-    const before = copyTransformDocument(this.transforms);
+    const before = this.captureEditState();
     this.transforms = {};
+    this.openingAttachments = {};
     const identity = createIdentityComponentTransform();
     for (const group of this.groups.values()) {
       group.userData.workshopStoredTransform = identity;
@@ -1048,6 +1504,10 @@ export class ProceduralWorkshopComponentController {
     return serializeComponentTransforms(this.transforms);
   }
 
+  toOpeningAttachmentsDocument() {
+    return serializeOpeningAttachments(this.openingAttachments);
+  }
+
   clear() {
     const attachedId = this.transformControls.object?.userData?.workshopComponent?.id;
     if (attachedId && this.groups.has(attachedId)) this.transformControls.detach();
@@ -1060,7 +1520,12 @@ export class ProceduralWorkshopComponentController {
     this.selectionHelper.visible = false;
     this.inferenceHelper.visible = false;
     this.handleHelper.visible = false;
+    this.placementHelper.visible = false;
     this.handleMetadata = [];
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.transformControls.enabled = true;
+    this.attachButton?.classList.remove('is-active');
     this.updateSnapFeedback();
   }
 
@@ -1069,12 +1534,15 @@ export class ProceduralWorkshopComponentController {
     this.selectionRoot.remove(this.selectionHelper);
     this.selectionRoot.remove(this.inferenceHelper);
     this.selectionRoot.remove(this.handleHelper);
+    this.selectionRoot.remove(this.placementHelper);
     this.selectionHelper.geometry.dispose();
     this.selectionHelper.material.dispose();
     this.inferenceHelper.geometry.dispose();
     this.inferenceHelper.material.dispose();
     this.handleHelper.geometry.dispose();
     this.handleHelper.material.dispose();
+    this.placementHelper.geometry.dispose();
+    this.placementHelper.material.dispose();
     this.select.removeEventListener('change', this.onSelectChange);
     this.spaceSelect.removeEventListener('change', this.onSpaceChange);
     this.axisSelect.removeEventListener('change', this.onAxisChange);
@@ -1082,6 +1550,7 @@ export class ProceduralWorkshopComponentController {
     this.root.removeEventListener('click', this.onRootClick);
     this.root.removeEventListener('change', this.onValueChange);
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
+    this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
     this.transformControls.removeEventListener('dragging-changed', this.onDraggingChanged);
     this.transformControls.removeEventListener('objectChange', this.onObjectChange);
