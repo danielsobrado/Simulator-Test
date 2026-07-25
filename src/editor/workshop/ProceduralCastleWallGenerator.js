@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { disposeModelParts } from '../assets/modelParts.js';
 import {
   beveledBox,
   leaf,
@@ -13,13 +14,22 @@ import {
   getCastleWallButtressPositions,
   getCastleWallOpenings,
   getCastleWallTopHeight,
-  isInsideCastleOpening,
+  intersectsCastleOpening,
 } from './ProceduralCastleWallLayout.js';
 
 const MAX_STONES = 1800;
 const MIN_STONE_WIDTH = 0.26;
 const ARCH_BLOCK_HEIGHT = 0.27;
 const COPING_HEIGHT = 0.16;
+const MATERIAL_SLOTS = Object.freeze([
+  'stone',
+  'mortar',
+  'wood',
+  'roof',
+  'metal',
+  'foliage',
+  'recess',
+]);
 
 function createGeometrySets() {
   return {
@@ -33,7 +43,18 @@ function createGeometrySets() {
   };
 }
 
+function disposeGeometries(geometries) {
+  new Set(geometries).forEach((geometry) => geometry.dispose());
+}
+
+function disposeGeometrySets(sets) {
+  disposeGeometries(MATERIAL_SLOTS.flatMap((slot) => sets[slot]));
+}
+
 function addStone(target, recipe, params, stableIndex, heightRatio) {
+  if (target.length >= MAX_STONES) {
+    throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
+  }
   target.push(applyStoneColor(
     beveledBox({ ...params, detail: recipe.detail }),
     recipe,
@@ -57,7 +78,6 @@ function buildWallBody(sets, recipe, openings) {
   const actualCourseHeight = recipe.height / courseCount;
   const targetStoneWidth = 0.92 - recipe.detail * 0.07;
   let stableIndex = 9_100_000;
-  let stoneCount = 0;
 
   for (let course = 0; course < courseCount; course += 1) {
     const y = (course + 0.5) * actualCourseHeight;
@@ -72,8 +92,12 @@ function buildWallBody(sets, recipe, openings) {
       const clippedWidth = right - left;
       const x = (left + right) / 2;
       const localTop = getCastleWallTopHeight(recipe, x);
-      const openingHit = openings.some((opening) => (
-        isInsideCastleOpening(opening, x, y, clippedWidth * 0.36)
+      const openingHit = openings.some((opening) => intersectsCastleOpening(
+        opening,
+        x,
+        y,
+        clippedWidth / 2 + 0.018,
+        actualCourseHeight / 2 + 0.012,
       ));
 
       if (
@@ -98,14 +122,10 @@ function buildWallBody(sets, recipe, openings) {
             (random() - 0.5) * 0.01,
           ],
         }, stableIndex, y / recipe.height);
-        stoneCount += 1;
       }
 
       cursor += stoneWidth;
       stableIndex += 1;
-      if (stoneCount > MAX_STONES) {
-        throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
-      }
     }
   }
 }
@@ -219,9 +239,15 @@ function buildCoping(sets, recipe) {
       detail: recipe.detail,
       bevelRatio: 0.12,
     });
-    target.push(recipe.topStyle === 'battlements'
-      ? applyStoneColor(geometry, recipe, 9_800_000 + index, 1)
-      : geometry);
+    if (recipe.topStyle === 'battlements') {
+      if (target.length >= MAX_STONES) {
+        geometry.dispose();
+        throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
+      }
+      target.push(applyStoneColor(geometry, recipe, 9_800_000 + index, 1));
+    } else {
+      target.push(geometry);
+    }
   }
 }
 
@@ -285,33 +311,51 @@ function createPartsForSet(geometries, material, remesh) {
     }));
   }
 
-  const merged = mergeGeometries(geometries, false);
-  geometries.forEach((geometry) => geometry.dispose());
-  if (!merged) {
+  let merged = null;
+  try {
+    merged = mergeGeometries(geometries, false);
+    if (!merged) {
+      throw new Error('The workshop could not merge the castle wall geometry.');
+    }
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
+    return [{ geometry: merged, material, matrix: new THREE.Matrix4() }];
+  } catch (error) {
+    merged?.dispose();
     disposeMaterial(material);
-    throw new Error('The workshop could not merge the castle wall geometry.');
+    throw error;
+  } finally {
+    disposeGeometries(geometries);
   }
-  merged.computeBoundingBox();
-  merged.computeBoundingSphere();
-  return [{ geometry: merged, material, matrix: new THREE.Matrix4() }];
+}
+
+function disposeUnprocessedSlots(sets, materials, startIndex) {
+  for (let index = startIndex; index < MATERIAL_SLOTS.length; index += 1) {
+    const slot = MATERIAL_SLOTS[index];
+    disposeGeometries(sets[slot]);
+    disposeMaterial(materials[slot]);
+  }
 }
 
 function buildParts(recipe, sets) {
   const materials = createWorkshopMaterials(recipe);
-  return [
-    ...createPartsForSet(sets.stone, materials.stone, recipe.remesh),
-    ...createPartsForSet(sets.mortar, materials.mortar, recipe.remesh),
-    ...createPartsForSet(sets.wood, materials.wood, recipe.remesh),
-    ...createPartsForSet(sets.roof, materials.roof, recipe.remesh),
-    ...createPartsForSet(sets.metal, materials.metal, recipe.remesh),
-    ...createPartsForSet(sets.foliage, materials.foliage, recipe.remesh),
-    ...createPartsForSet(sets.recess, materials.recess, recipe.remesh),
-  ];
+  const parts = [];
+  for (let index = 0; index < MATERIAL_SLOTS.length; index += 1) {
+    const slot = MATERIAL_SLOTS[index];
+    try {
+      parts.push(...createPartsForSet(sets[slot], materials[slot], recipe.remesh));
+    } catch (error) {
+      disposeModelParts(parts);
+      disposeUnprocessedSlots(sets, materials, index + 1);
+      throw error;
+    }
+  }
+  return parts;
 }
 
 function buildStats(recipe, sets) {
-  const allGeometry = Object.values(sets).flat();
-  const populatedSets = Object.values(sets).filter((geometries) => geometries.length > 0);
+  const allGeometry = MATERIAL_SLOTS.flatMap((slot) => sets[slot]);
+  const populatedSets = MATERIAL_SLOTS.filter((slot) => sets[slot].length > 0);
   return Object.freeze({
     stones: sets.stone.length,
     features: allGeometry.length - sets.stone.length,
@@ -325,14 +369,19 @@ function buildStats(recipe, sets) {
 
 function buildCastleWall(recipe) {
   const sets = createGeometrySets();
-  const openings = getCastleWallOpenings(recipe);
-  buildWallBody(sets, recipe, openings);
-  buildOpenings(sets, recipe, openings);
-  buildButtresses(sets, recipe, openings);
-  buildCoping(sets, recipe);
-  buildBattlements(sets, recipe);
-  buildIvy(sets, recipe);
-  return sets;
+  try {
+    const openings = getCastleWallOpenings(recipe);
+    buildWallBody(sets, recipe, openings);
+    buildOpenings(sets, recipe, openings);
+    buildButtresses(sets, recipe, openings);
+    buildCoping(sets, recipe);
+    buildBattlements(sets, recipe);
+    buildIvy(sets, recipe);
+    return sets;
+  } catch (error) {
+    disposeGeometrySets(sets);
+    throw error;
+  }
 }
 
 export function createProceduralCastleWallParts(recipe) {
@@ -346,6 +395,6 @@ export function createProceduralCastleWallParts(recipe) {
 export function getProceduralCastleWallStats(recipe) {
   const sets = buildCastleWall(recipe);
   const stats = buildStats(recipe, sets);
-  Object.values(sets).flat().forEach((geometry) => geometry.dispose());
+  disposeGeometrySets(sets);
   return stats;
 }

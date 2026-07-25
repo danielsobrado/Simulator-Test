@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mixSeed } from './ProceduralRandom.js';
 
 const STAGE_SEED = 4_817;
@@ -353,6 +354,73 @@ function createWildflowers() {
   );
 }
 
+function bucketForMesh(buckets, mesh) {
+  let materialBuckets = buckets.get(mesh.material);
+  if (!materialBuckets) {
+    materialBuckets = new Map();
+    buckets.set(mesh.material, materialBuckets);
+  }
+  const key = `${mesh.castShadow ? 1 : 0}:${mesh.receiveShadow ? 1 : 0}`;
+  let bucket = materialBuckets.get(key);
+  if (!bucket) {
+    bucket = {
+      material: mesh.material,
+      castShadow: mesh.castShadow,
+      receiveShadow: mesh.receiveShadow,
+      meshes: [],
+    };
+    materialBuckets.set(key, bucket);
+  }
+  bucket.meshes.push(mesh);
+}
+
+function mergeStaticMeshes(group) {
+  const buckets = new Map();
+  group.updateMatrixWorld(true);
+  for (const child of group.children) {
+    if (child.isMesh && !Array.isArray(child.material)) bucketForMesh(buckets, child);
+  }
+
+  const replacements = [];
+  const consumed = [];
+  try {
+    for (const materialBuckets of buckets.values()) {
+      for (const bucket of materialBuckets.values()) {
+        if (bucket.meshes.length < 2) continue;
+        const geometries = bucket.meshes.map((mesh) => {
+          mesh.updateMatrix();
+          return mesh.geometry.clone().applyMatrix4(mesh.matrix);
+        });
+        let merged;
+        try {
+          merged = mergeGeometries(geometries, false);
+        } finally {
+          geometries.forEach((geometry) => geometry.dispose());
+        }
+        if (!merged) throw new Error('The workshop could not batch its procedural background.');
+        merged.computeBoundingBox();
+        merged.computeBoundingSphere();
+        const replacement = new THREE.Mesh(merged, bucket.material);
+        replacement.castShadow = bucket.castShadow;
+        replacement.receiveShadow = bucket.receiveShadow;
+        replacements.push(replacement);
+        consumed.push(...bucket.meshes);
+      }
+    }
+  } catch (error) {
+    replacements.forEach((mesh) => mesh.geometry.dispose());
+    throw error;
+  }
+
+  const sourceGeometries = new Set();
+  for (const mesh of consumed) {
+    sourceGeometries.add(mesh.geometry);
+    group.remove(mesh);
+  }
+  sourceGeometries.forEach((geometry) => geometry.dispose());
+  replacements.forEach((mesh) => group.add(mesh));
+}
+
 function disposeGroup(group) {
   const geometries = new Set();
   const materials = new Set();
@@ -383,6 +451,7 @@ export function createWorkshopStage(scene) {
   addTrees(group, materials);
   addRocks(group, materials);
   addClouds(group, materials);
+  mergeStaticMeshes(group);
 
   const hemisphere = new THREE.HemisphereLight('#d9edff', '#5c7047', 2.25);
   group.add(hemisphere);

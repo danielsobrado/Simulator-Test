@@ -21,6 +21,7 @@ export const WORKSHOP_SURFACE_TEXTURE_SLOTS = Object.freeze([
 
 const SLOT_KEYS = new Set(WORKSHOP_SURFACE_TEXTURE_SLOTS.map(({ key }) => key));
 const SLOT_BY_KEY = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map((slot) => [slot.key, slot]));
+const SLOT_ORDER = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map(({ key }, index) => [key, index]));
 
 function requireObject(value, field) {
   if (value == null) return {};
@@ -36,6 +37,12 @@ function requireFinite(value, field, minimum, maximum) {
     throw new Error(`${field} must be between ${minimum} and ${maximum}.`);
   }
   return number;
+}
+
+function compareKey(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function decodeBase64(payload) {
@@ -121,6 +128,16 @@ function normalizeSlot(key, input, sources) {
   });
 }
 
+function sourceOrder([left], [right]) {
+  return compareKey(left, right);
+}
+
+function slotOrder([left], [right]) {
+  return (SLOT_ORDER.get(left) ?? Number.MAX_SAFE_INTEGER)
+    - (SLOT_ORDER.get(right) ?? Number.MAX_SAFE_INTEGER)
+    || compareKey(left, right);
+}
+
 export function createSurfaceTextureSourceId(dataUrl) {
   const value = String(dataUrl);
   let hash = 2166136261;
@@ -149,7 +166,7 @@ export function normalizeSurfaceTextures(input = {}) {
   const sourceInputs = requireObject(config.sources, 'Workshop albedo sources');
   const slotInputs = requireObject(config.slots, 'Workshop material areas');
 
-  const rawSourceEntries = Object.entries(sourceInputs);
+  const rawSourceEntries = Object.entries(sourceInputs).sort(sourceOrder);
   if (rawSourceEntries.length > MAX_SOURCE_INPUT_COUNT) {
     throw new Error('The workshop albedo source library contains too many entries.');
   }
@@ -161,7 +178,7 @@ export function normalizeSurfaceTextures(input = {}) {
 
   const slots = {};
   const usedSourceIds = new Set();
-  for (const [key, slotInput] of Object.entries(slotInputs)) {
+  for (const [key, slotInput] of Object.entries(slotInputs).sort(slotOrder)) {
     const slot = normalizeSlot(key, slotInput, allSources);
     slots[key] = slot;
     usedSourceIds.add(slot.sourceId);
@@ -172,7 +189,7 @@ export function normalizeSurfaceTextures(input = {}) {
   }
   const sources = {};
   let totalLength = 0;
-  for (const sourceId of usedSourceIds) {
+  for (const sourceId of [...usedSourceIds].sort(compareKey)) {
     const source = allSources[sourceId];
     totalLength += source.dataUrl.length;
     sources[sourceId] = source;

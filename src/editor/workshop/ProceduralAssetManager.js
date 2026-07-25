@@ -4,6 +4,7 @@ import { disposeModelParts } from '../assets/modelParts.js';
 import { unregisterProceduralDefinitions } from './ProceduralDefinitionLifecycle.js';
 import { ProceduralAssetStore } from './ProceduralAssetStore.js';
 import { createProceduralWorkshopComponentParts } from './ProceduralWorkshopComponentParts.js';
+import { filterComponentTransforms } from './ProceduralWorkshopComponentTransforms.js';
 
 const CASTLE_WALL_WIDTH_PADDING = 0.7;
 const CASTLE_WALL_DEPTH_FACTOR = 2.3;
@@ -94,6 +95,10 @@ function definitionFor(record, tileSize, parts) {
   });
 }
 
+function validComponentIds(parts) {
+  return new Set((parts.components ?? []).map(({ id }) => id));
+}
+
 export class ProceduralAssetManager {
   constructor({ tileSize, objectMap, objectView, ui }) {
     this.tileSize = tileSize;
@@ -104,15 +109,46 @@ export class ProceduralAssetManager {
     this.definitions = new Map();
   }
 
+  prepareCreate(input) {
+    const source = input ?? {};
+    const sourceRecipe = source.recipe ?? {};
+    const parts = createProceduralWorkshopComponentParts(sourceRecipe);
+    try {
+      return {
+        input: {
+          ...source,
+          recipe: {
+            ...sourceRecipe,
+            componentTransforms: filterComponentTransforms(
+              sourceRecipe.componentTransforms,
+              validComponentIds(parts),
+            ),
+          },
+        },
+        parts,
+      };
+    } catch (error) {
+      disposeModelParts(parts);
+      throw error;
+    }
+  }
+
   create(input) {
     const previous = this.store.toDocument();
+    const prepared = this.prepareCreate(input);
+    let record = null;
+    let unownedParts = prepared.parts;
     try {
-      const record = this.store.add(input);
-      this.install(record);
+      record = this.store.add(prepared.input);
+      const ownedParts = unownedParts;
+      unownedParts = null;
+      this.install(record, ownedParts);
       this.syncUi();
       return record;
     } catch (error) {
-      this.restore(previous, error);
+      if (unownedParts) disposeModelParts(unownedParts);
+      if (record) this.restore(previous, error);
+      throw error;
     }
   }
 
@@ -141,8 +177,8 @@ export class ProceduralAssetManager {
     disposeModelParts(parts);
   }
 
-  install(record) {
-    const parts = createProceduralWorkshopComponentParts(record.recipe);
+  install(record, preparedParts = null) {
+    const parts = preparedParts ?? createProceduralWorkshopComponentParts(record.recipe);
     let definition;
     try {
       definition = definitionFor(record, this.tileSize, parts);

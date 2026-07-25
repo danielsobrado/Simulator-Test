@@ -6,6 +6,7 @@ const MAX_OPENING_WIDTH = 2.5;
 const MIN_SPRING_HEIGHT = 1.15;
 const MIN_EDITED_SPRING_HEIGHT = 0.45;
 const OPENING_SIDE_CLEARANCE = 0.12;
+const OPENING_PROFILE_SAMPLES = 16;
 const TOP_CLEARANCE = 0.72;
 
 function clamp(value, minimum, maximum) {
@@ -19,6 +20,18 @@ function openingTargetWidth(shape) {
 export function getCastleWallOpeningCount(recipe) {
   if (!recipe.windows) return 0;
   return clamp(Math.round(recipe.width / openingTargetWidth(recipe.shape)), 1, MAX_OPENINGS);
+}
+
+function minimumTopAcrossOpening(recipe, centerX, width) {
+  const trimAllowance = Math.max(0.2, width * 0.12);
+  const halfSpan = width / 2 + trimAllowance;
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let index = 0; index <= OPENING_PROFILE_SAMPLES; index += 1) {
+    const progress = index / OPENING_PROFILE_SAMPLES;
+    const x = centerX - halfSpan + halfSpan * 2 * progress;
+    minimum = Math.min(minimum, getCastleWallTopHeight(recipe, x));
+  }
+  return minimum;
 }
 
 function transformOpening(recipe, opening, index) {
@@ -41,9 +54,10 @@ function transformOpening(recipe, opening, index) {
     bayRight - centerClearance,
   );
   const radius = width / 2;
+  const minimumProfileTop = minimumTopAcrossOpening(recipe, centerX, width);
   const maximumOpeningTop = Math.max(
     MIN_EDITED_SPRING_HEIGHT + radius,
-    getCastleWallTopHeight(recipe, centerX) - TOP_CLEARANCE,
+    minimumProfileTop - TOP_CLEARANCE,
   );
   const springHeight = clamp(
     opening.springHeight * transform.scale[1],
@@ -136,6 +150,18 @@ export function getCastleOpeningHalfWidth(opening, y) {
 export function isInsideCastleOpening(opening, x, y, padding = 0) {
   const halfWidth = getCastleOpeningHalfWidth(opening, y);
   return halfWidth > 0 && Math.abs(x - opening.centerX) < halfWidth + padding;
+}
+
+export function intersectsCastleOpening(opening, x, y, halfWidth = 0, halfHeight = 0) {
+  const openingTop = opening.bottom + opening.springHeight + opening.radius;
+  const overlapBottom = Math.max(opening.bottom, y - halfHeight);
+  const overlapTop = Math.min(openingTop, y + halfHeight);
+  if (overlapBottom >= overlapTop) return false;
+
+  const springY = opening.bottom + opening.springHeight;
+  const widestOverlapY = overlapBottom <= springY ? springY : overlapBottom;
+  const openingHalfWidth = getCastleOpeningHalfWidth(opening, widestOverlapY);
+  return Math.abs(x - opening.centerX) < openingHalfWidth + halfWidth;
 }
 
 export function getCastleWallButtressPositions(recipe, openings) {

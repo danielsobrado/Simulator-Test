@@ -12,6 +12,7 @@ import { createProceduralWorkshopParts } from './ProceduralWorkshopGenerator.js'
 const STRUCTURE_MIN_HEIGHT = 1.4;
 const STRUCTURE_MIN_HORIZONTAL = 0.55;
 const OPENING_EXPANSION = Object.freeze({ x: 0.42, y: 0.36, z: 0.52 });
+const OPENING_INSERT_SLOTS = new Set(['wood', 'metal', 'recess']);
 const EMPTY_MATRIX = new THREE.Matrix4();
 const ZERO = new THREE.Vector3();
 
@@ -241,7 +242,10 @@ function createOpeningAnchors(entries, recipe, structures) {
 }
 
 function openingScore(entry, opening) {
-  if (entry === opening.sourceEntry) return -1;
+  if (opening.sourceEntry) {
+    if (entry === opening.sourceEntry) return -1;
+    if (!OPENING_INSERT_SLOTS.has(entry.slot)) return Number.POSITIVE_INFINITY;
+  }
   if (!opening.bounds.containsPoint(entry.center)) return Number.POSITIVE_INFINITY;
   const delta = entry.center.clone().sub(opening.center);
   const scale = opening.size.clone().max(new THREE.Vector3(0.25, 0.25, 0.25));
@@ -420,6 +424,11 @@ function mergedGeometry(geometries, errorMessage) {
   return merged;
 }
 
+function disposeBuiltGeometries(parts) {
+  const geometries = new Set(parts.map((part) => part.geometry));
+  geometries.forEach((geometry) => geometry.dispose());
+}
+
 function buildPreviewParts(entries, components, remesh) {
   const groups = new Map();
   for (const entry of entries) {
@@ -439,30 +448,35 @@ function buildPreviewParts(entries, components, remesh) {
   }
 
   const parts = [];
-  for (const group of groups.values()) {
-    const metadata = componentMetadata(group.component);
-    if (remesh) {
-      parts.push({
-        geometry: mergedGeometry(
-          group.geometries,
-          `The workshop could not merge editable component ${metadata.label}.`,
-        ),
-        material: group.material,
-        matrix: new THREE.Matrix4(),
-        component: metadata,
-      });
-    } else {
-      for (const geometry of group.geometries) {
+  try {
+    for (const group of groups.values()) {
+      const metadata = componentMetadata(group.component);
+      if (remesh) {
         parts.push({
-          geometry,
+          geometry: mergedGeometry(
+            group.geometries,
+            `The workshop could not merge editable component ${metadata.label}.`,
+          ),
           material: group.material,
           matrix: new THREE.Matrix4(),
           component: metadata,
         });
+      } else {
+        for (const geometry of group.geometries) {
+          parts.push({
+            geometry,
+            material: group.material,
+            matrix: new THREE.Matrix4(),
+            component: metadata,
+          });
+        }
       }
     }
+    return parts;
+  } catch (error) {
+    disposeBuiltGeometries(parts);
+    throw error;
   }
-  return parts;
 }
 
 function buildRuntimeParts(entries, components, remesh) {
@@ -480,23 +494,28 @@ function buildRuntimeParts(entries, components, remesh) {
   }
 
   const parts = [];
-  for (const group of groups.values()) {
-    if (remesh) {
-      parts.push({
-        geometry: mergedGeometry(
-          group.geometries,
-          'The workshop could not merge transformed component geometry.',
-        ),
-        material: group.material,
-        matrix: new THREE.Matrix4(),
-      });
-    } else {
-      for (const geometry of group.geometries) {
-        parts.push({ geometry, material: group.material, matrix: new THREE.Matrix4() });
+  try {
+    for (const group of groups.values()) {
+      if (remesh) {
+        parts.push({
+          geometry: mergedGeometry(
+            group.geometries,
+            'The workshop could not merge transformed component geometry.',
+          ),
+          material: group.material,
+          matrix: new THREE.Matrix4(),
+        });
+      } else {
+        for (const geometry of group.geometries) {
+          parts.push({ geometry, material: group.material, matrix: new THREE.Matrix4() });
+        }
       }
     }
+    return parts;
+  } catch (error) {
+    disposeBuiltGeometries(parts);
+    throw error;
   }
-  return parts;
 }
 
 function attachMetadata(parts, rawStats, components) {

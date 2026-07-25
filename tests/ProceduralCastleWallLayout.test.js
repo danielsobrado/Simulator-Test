@@ -5,6 +5,7 @@ import {
   getCastleWallOpeningCount,
   getCastleWallOpenings,
   getCastleWallTopHeight,
+  intersectsCastleOpening,
   isInsideCastleOpening,
 } from '../src/editor/workshop/ProceduralCastleWallLayout.js';
 
@@ -33,6 +34,38 @@ test('castle wall arches are open below the crown and closed above it', () => {
     false,
   );
   assert.equal(isInsideCastleOpening(opening, opening.centerX + opening.width, 0.5), false);
+});
+
+test('stone boxes intersecting an opening edge are reserved from wall masonry', () => {
+  const [opening] = getCastleWallOpenings(recipe);
+  const stoneHalfWidth = 0.45;
+  const stoneHalfHeight = 0.24;
+  const overlappingX = opening.centerX + opening.width / 2 + stoneHalfWidth * 0.7;
+
+  assert.equal(
+    isInsideCastleOpening(opening, overlappingX, 0.8),
+    false,
+  );
+  assert.equal(
+    intersectsCastleOpening(
+      opening,
+      overlappingX,
+      0.8,
+      stoneHalfWidth,
+      stoneHalfHeight,
+    ),
+    true,
+  );
+  assert.equal(
+    intersectsCastleOpening(
+      opening,
+      overlappingX,
+      opening.bottom + opening.springHeight + opening.radius + 1,
+      stoneHalfWidth,
+      stoneHalfHeight,
+    ),
+    false,
+  );
 });
 
 test('castle wall top profile remains bounded and buttresses cover ends and piers', () => {

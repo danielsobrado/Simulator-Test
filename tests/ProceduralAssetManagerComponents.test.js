@@ -83,3 +83,34 @@ test('baked placement footprint includes moved and scaled components', () => {
     disposeModelParts(fixture.objectView.parts ?? []);
   }
 });
+
+test('new baked records prune transforms for components absent from generated geometry', () => {
+  const fixture = managerFixture();
+  try {
+    const record = fixture.manager.create({
+      label: 'Pruned wall',
+      recipe: recipe({
+        componentTransforms: {
+          'removed-window': {
+            position: [2, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1.2, 1, 1],
+          },
+          'structure-main': {
+            position: [1, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1.1, 1, 1],
+          },
+        },
+      }),
+    });
+
+    assert.deepEqual(Object.keys(record.recipe.componentTransforms), ['structure-main']);
+    assert.deepEqual(
+      Object.keys(fixture.manager.toDocument()[0].recipe.componentTransforms),
+      ['structure-main'],
+    );
+  } finally {
+    disposeModelParts(fixture.objectView.parts ?? []);
+  }
+});
