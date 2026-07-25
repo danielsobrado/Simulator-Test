@@ -41,8 +41,14 @@ function isNear(left, right) {
   return Math.abs(left - right) <= IDENTITY_EPSILON;
 }
 
+function compareKey(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function componentOrder([left], [right]) {
-  return left.localeCompare(right);
+  return compareKey(left, right);
 }
 
 export function isIdentityComponentTransform(transform) {
