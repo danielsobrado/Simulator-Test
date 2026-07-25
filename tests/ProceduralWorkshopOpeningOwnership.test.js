@@ -57,7 +57,14 @@ test('classic opening components own inserts but not structural arch stones', ()
   }
 });
 
-test('moving a classic door insert does not move structural masonry', () => {
+function slotPositionFingerprint(parts, slot) {
+  return parts
+    .filter((part) => part.material.userData.workshopSlot === slot)
+    .flatMap((part) => Array.from(part.geometry.getAttribute('position').array))
+    .reduce((hash, value) => Math.imul(hash ^ Math.round(value * 1000), 16777619), 2166136261);
+}
+
+test('moving a classic door regenerates its structural masonry cut-out', () => {
   const base = createProceduralWorkshopComponentParts(recipe());
   const edited = createProceduralWorkshopComponentParts(recipe({
     componentTransforms: {
@@ -71,8 +78,15 @@ test('moving a classic door insert does not move structural masonry', () => {
   try {
     const baseStone = slotBounds(base, 'stone');
     const editedStone = slotBounds(edited, 'stone');
-    assert.deepEqual(editedStone.min.toArray(), baseStone.min.toArray());
-    assert.deepEqual(editedStone.max.toArray(), baseStone.max.toArray());
+    assert.notEqual(
+      slotPositionFingerprint(edited, 'stone'),
+      slotPositionFingerprint(base, 'stone'),
+    );
+    assert.equal(editedStone.min.x, baseStone.min.x);
+    assert.equal(editedStone.max.x, baseStone.max.x);
+    assert.equal(editedStone.min.z, baseStone.min.z);
+    assert.equal(editedStone.max.z, baseStone.max.z);
+    assert.ok(editedStone.max.y <= baseStone.max.y + 0.01);
   } finally {
     disposeModelParts(base);
     disposeModelParts(edited);

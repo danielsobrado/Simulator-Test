@@ -26,6 +26,9 @@ function normalizeAngle(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error('Component rotation values must be finite numbers.');
   }
+  if (Math.abs(Math.abs(value) - Math.PI) <= ANGLE_EPSILON) return Math.PI;
+  if (Math.abs(value) <= ANGLE_EPSILON) return 0;
+  if (value > -Math.PI && value < Math.PI) return value;
   const angle = Math.atan2(Math.sin(value), Math.cos(value));
   if (Math.abs(Math.abs(angle) - Math.PI) <= ANGLE_EPSILON) return Math.PI;
   return Math.abs(angle) <= ANGLE_EPSILON ? 0 : angle;

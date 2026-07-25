@@ -516,6 +516,10 @@ button, input { font: inherit; }
   font-size: 11px;
 }
 .workshop-gizmo-tools button:hover { background: rgb(255 255 255 / 10%); }
+.workshop-gizmo-tools button:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
 .workshop-gizmo-tools button.is-active {
   border-color: #ead176;
   background: #514a28;

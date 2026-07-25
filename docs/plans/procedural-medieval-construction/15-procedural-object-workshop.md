@@ -29,8 +29,8 @@ This complements rather than replaces the proposed live wall-path system. Use th
 4. Optionally import PNG, JPEG, or WebP albedo images for **Walls**, **Stone trim**, **Roof**, and **Doors & wood**.
 5. For each imported image, choose repeat, mirrored repeat, or single-image mapping; adjust repeat, rotate in 90-degree steps, tint it, or copy the same source and settings to other areas.
 6. Preview the result in a deterministic procedural glade with rolling terrain, a curved path, distant hills, mixed tree silhouettes, rocks, wildflowers, cloud clusters, ACES tone mapping, soft shadows, and atmospheric depth.
-7. Select semantic components in the preview. Move, rotate, or scale structures, roofs, woodwork, metalwork, vegetation, and generated door/window inserts. Advanced castle arches use constrained in-plane edits that regenerate the real structural cut-out, trim, and buttress layout.
-8. Reset one component or all component edits, then use **Center scene** and **Frame** to recover the authored view.
+7. Select semantic components in the grouped area picker or directly in the preview. Architectural handles, smart axis constraints, World/Parent/Local orientation, sibling inference, numeric transforms, mirroring, and keyboard modes adapt to structures, roofs, openings, and attached details. Masonry doors, windows, and advanced castle arches use constrained in-plane edits that regenerate their structural cut-outs and trim.
+8. Undo or redo component edits, reset one component or all edits, then use **Center scene** and **Frame** to recover the authored view. Regeneration preserves the current camera unless framing is explicitly requested.
 9. Enable remeshing to consolidate each material family into one runtime mesh after component transforms are applied.
 10. Leave procedural stone albedo enabled to fill masonry and trim without an imported image.
 11. Bake the asset; it appears in the normal Objects palette and is selected for placement.
@@ -65,8 +65,9 @@ The opening count is derived from the authored width, so wider spans gain more b
 ## Semantic component contract
 
 - Structures are hierarchy roots. Their roofs, openings, woodwork, metalwork, and vegetation are children and follow parent transforms.
-- Advanced arch edits are stored as two-dimensional opening intent and regenerated into structural geometry.
-- Component transforms are finite, bounded, type-checked, and serialized in canonical component-ID order.
+- Door, window, and advanced arch edits are stored as two-dimensional opening intent. Coursed masonry generators regenerate their structural geometry; plastered manor façades regenerate their inserts and trim against the continuous plaster shell.
+- Each component exposes a generator-authored architectural edit policy covering handle type, legal axes, preferred orientation, snap precision, and inference mode.
+- Component transforms are finite, bounded, type-checked, normalized, and serialized in canonical component-ID order.
 - Equivalent positive and negative half-turn rotations serialize identically.
 - Transforms for components that no longer exist are removed before a new asset is baked.
 - Runtime transforms are applied before material-family remeshing.
@@ -110,7 +111,7 @@ The opening count is derived from the authored width, so wider spans gain more b
 
 - Assets live inside the world document rather than an external cross-world library.
 - The workshop produces reusable bounded assets, not editable world-space wall paths.
-- Only advanced castle arches regenerate structural cut-outs from component edits. Classic doors and windows expose movable insert geometry while their generated masonry opening remains part of the parent structure.
+- Plastered manor façades still use a continuous wall shell behind regenerated door and window inserts rather than boolean-cut plaster openings.
 - Curved plan paths, intersections, terrain-stepped foundations, live gates, breaches, collision portals, and navigation updates remain work for the authoritative construction system.
 - Imported textures currently affect albedo only. Authored normal, roughness, ambient-occlusion, height, and LOD texture baking remain follow-up work.
 - Runtime collision still uses the existing object footprint/foundation contract.

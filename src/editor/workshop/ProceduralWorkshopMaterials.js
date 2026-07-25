@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { createSurfaceTexturePixels } from '../assets/proceduralTexturePixels.js';
 import { mixSeed } from './ProceduralRandom.js';
 import { getSurfaceTexture } from './ProceduralWorkshopTextureConfig.js';
 
@@ -37,8 +38,32 @@ function createTexture(size, pixel, { colorSpace = THREE.SRGBColorSpace } = {}) 
   texture.wrapT = THREE.RepeatWrapping;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 8;
   texture.needsUpdate = true;
   return texture;
+}
+
+function createByteTexture(data, size, colorSpace = THREE.NoColorSpace) {
+  const texture = new THREE.DataTexture(
+    data,
+    size,
+    size,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType,
+  );
+  texture.colorSpace = colorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function proceduralNormalTexture(kind, seed) {
+  const pixels = createSurfaceTexturePixels(kind, { size: 128, seed });
+  return createByteTexture(pixels.normal, pixels.size);
 }
 
 function stoneTexture(recipe) {
@@ -59,6 +84,24 @@ function surfaceBumpTexture(seed, scale = 1) {
     const fine = mixSeed(seed + y * 719, x * 313) & 255;
     const broad = mixSeed(seed + Math.floor(y / 5), Math.floor(x / 5)) & 255;
     const value = 112 + (fine - 127) * 0.16 * scale + (broad - 127) * 0.13 * scale;
+    return [value, value, value];
+  }, { colorSpace: THREE.NoColorSpace });
+}
+
+function surfaceRoughnessTexture(seed, {
+  base = 220,
+  variation = 24,
+  broadScale = 9,
+} = {}) {
+  return createTexture(128, (x, y) => {
+    const fine = (mixSeed(seed + y * 433, x * 271) & 255) / 255 - 0.5;
+    const broad = (
+      (mixSeed(
+        seed + Math.floor(y / broadScale) * 97,
+        Math.floor(x / broadScale) * 53,
+      ) & 255) / 255 - 0.5
+    );
+    const value = base + fine * variation * 0.45 + broad * variation;
     return [value, value, value];
   }, { colorSpace: THREE.NoColorSpace });
 }
@@ -200,22 +243,71 @@ export function createWorkshopMaterials(recipe) {
   const stoneBump = surfaceBumpTexture(recipe.seed, 1);
   const roofBump = roofBumpTexture(recipe.seed);
   const plasterBump = surfaceBumpTexture(recipe.seed + 913, 0.72);
+  const stoneRoughness = surfaceRoughnessTexture(recipe.seed + 101, {
+    base: 226,
+    variation: 26,
+  });
+  const mortarRoughness = surfaceRoughnessTexture(recipe.seed + 211, {
+    base: 242,
+    variation: 15,
+    broadScale: 13,
+  });
+  const woodRoughness = surfaceRoughnessTexture(recipe.seed + 307, {
+    base: 208,
+    variation: 32,
+    broadScale: 6,
+  });
+  const roofRoughness = surfaceRoughnessTexture(recipe.seed + 401, {
+    base: recipe.topStyle === 'slate' ? 210 : 194,
+    variation: 36,
+    broadScale: 10,
+  });
+  const highQuality = recipe.detail >= 2;
+  const stoneNormal = highQuality
+    ? proceduralNormalTexture(
+      recipe.style === 'granite' ? 'granite' : 'stoneBlock',
+      recipe.seed + 503,
+    )
+    : null;
+  const plasterNormal = highQuality
+    ? proceduralNormalTexture(
+      recipe.finish === 'masonry' ? 'rubble' : 'plaster',
+      recipe.seed + 601,
+    )
+    : null;
+  const woodNormal = highQuality
+    ? proceduralNormalTexture('timber', recipe.seed + 701)
+    : null;
+  const roofNormal = highQuality
+    ? proceduralNormalTexture(
+      recipe.topStyle === 'terracotta' ? 'roofTile' : 'shingle',
+      recipe.seed + 809,
+    )
+    : null;
   const stone = tagWorkshopMaterial(new THREE.MeshStandardMaterial({
     color: stoneAlbedo?.tint ?? (recipe.albedo ? '#ffffff' : STONE_PALETTES[recipe.style].color),
     map: stoneAlbedo?.texture ?? (recipe.albedo ? stoneTexture(recipe) : null),
     bumpMap: stoneBump,
     bumpScale: 0.055,
+    normalMap: stoneNormal,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    roughnessMap: stoneRoughness,
     vertexColors: !stoneAlbedo,
-    roughness: 0.88,
+    roughness: 1,
     metalness: 0,
+    envMapIntensity: 0.72,
   }), 'stone');
   const roof = tagWorkshopMaterial(new THREE.MeshStandardMaterial({
     color: roofAlbedo?.tint ?? '#ffffff',
     map: roofAlbedo?.texture ?? roofTexture(recipe.topStyle, recipe.seed),
     bumpMap: roofBump,
     bumpScale: 0.095,
-    roughness: 0.8,
+    normalMap: roofNormal,
+    normalScale: new THREE.Vector2(0.68, 0.68),
+    roughnessMap: roofRoughness,
+    roughness: 1,
     metalness: 0,
+    envMapIntensity: 0.82,
   }), 'roof');
   return Object.freeze({
     stone,
@@ -230,16 +322,24 @@ export function createWorkshopMaterials(recipe) {
       map: wallAlbedo?.texture ?? (recipe.finish === 'masonry' ? null : plasterTexture(recipe)),
       bumpMap: plasterBump,
       bumpScale: recipe.finish === 'masonry' ? 0.025 : 0.075,
-      roughness: 0.96,
+      normalMap: plasterNormal,
+      normalScale: new THREE.Vector2(0.48, 0.48),
+      roughnessMap: mortarRoughness,
+      roughness: 1,
       metalness: 0,
+      envMapIntensity: 0.66,
     }), 'mortar'),
     wood: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
       color: woodAlbedo?.tint ?? '#ffffff',
       map: woodAlbedo?.texture ?? woodTexture(recipe.seed),
       bumpMap: surfaceBumpTexture(recipe.seed + 317, 0.5),
       bumpScale: 0.035,
-      roughness: 0.82,
+      normalMap: woodNormal,
+      normalScale: new THREE.Vector2(0.6, 0.6),
+      roughnessMap: woodRoughness,
+      roughness: 1,
       metalness: 0,
+      envMapIntensity: 0.78,
     }), 'wood'),
     roof,
     metal: tagWorkshopMaterial(new THREE.MeshStandardMaterial({

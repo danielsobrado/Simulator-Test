@@ -52,6 +52,23 @@ test('procedural masonry is deterministic and remeshed', () => {
   }
 });
 
+test('workshop materials expose deterministic PBR detail and projected UVs', () => {
+  const parts = createProceduralMedievalParts({ ...recipe, remesh: true });
+  try {
+    const stone = parts.find((part) => part.material.userData.workshopSlot === 'stone');
+    assert.ok(stone.material.normalMap);
+    assert.ok(stone.material.roughnessMap);
+    assert.equal(stone.material.normalMap.colorSpace, '');
+    assert.equal(stone.material.roughness, 1);
+    const uv = stone.geometry.getAttribute('uv');
+    assert.ok(uv);
+    assert.ok(Array.from(uv.array).every(Number.isFinite));
+    assert.ok(Array.from(uv.array).some((value) => Math.abs(value) > 0.01));
+  } finally {
+    disposeModelParts(parts);
+  }
+});
+
 test('albedo baking creates a reusable sRGB data texture', () => {
   const parts = createProceduralMedievalParts(recipe);
   try {

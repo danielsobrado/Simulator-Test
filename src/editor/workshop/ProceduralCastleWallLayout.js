@@ -59,15 +59,23 @@ function transformOpening(recipe, opening, index) {
     MIN_EDITED_SPRING_HEIGHT + radius,
     minimumProfileTop - TOP_CLEARANCE,
   );
-  const springHeight = clamp(
-    opening.springHeight * transform.scale[1],
+  const growthFloor = transform.scale[1] > 1
+    ? opening.springHeight * 1.01
+    : MIN_EDITED_SPRING_HEIGHT;
+  const reservedSpringHeight = clamp(
+    growthFloor,
     MIN_EDITED_SPRING_HEIGHT,
     Math.max(MIN_EDITED_SPRING_HEIGHT, maximumOpeningTop - radius),
   );
   const bottom = clamp(
     transform.position[1],
     0,
-    Math.max(0, maximumOpeningTop - springHeight - radius),
+    Math.max(0, maximumOpeningTop - reservedSpringHeight - radius),
+  );
+  const springHeight = clamp(
+    opening.springHeight * transform.scale[1],
+    MIN_EDITED_SPRING_HEIGHT,
+    Math.max(MIN_EDITED_SPRING_HEIGHT, maximumOpeningTop - radius - bottom),
   );
 
   return Object.freeze({

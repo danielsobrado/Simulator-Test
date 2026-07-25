@@ -55,8 +55,23 @@ function addStone(target, recipe, params, stableIndex, heightRatio) {
   if (target.length >= MAX_STONES) {
     throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
   }
+  const variation = mixSeed(recipe.seed ^ 0x5f3759df, stableIndex);
+  const signed = (shift) => (((variation >>> shift) & 255) / 255 - 0.5) * 2;
+  const rotation = params.rotation ?? [0, 0, 0];
+  const shaped = {
+    ...params,
+    width: params.width * (1 + signed(0) * 0.018),
+    height: params.height * (1 + signed(8) * 0.014),
+    depth: params.depth * (1 + signed(16) * 0.022),
+    rotation: [
+      rotation[0] + signed(4) * 0.006,
+      rotation[1] + signed(12) * 0.008,
+      rotation[2] + signed(20) * 0.006,
+    ],
+    bevelRatio: params.bevelRatio ?? (0.048 + ((variation >>> 24) & 15) / 15 * 0.022),
+  };
   target.push(applyStoneColor(
-    beveledBox({ ...params, detail: recipe.detail }),
+    beveledBox({ ...shaped, detail: recipe.detail }),
     recipe,
     stableIndex,
     heightRatio,

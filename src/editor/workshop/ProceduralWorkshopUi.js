@@ -37,6 +37,8 @@ export class ProceduralWorkshopUi {
     this.previewTimer = 0;
     this.openRevision = 0;
     this.disposed = false;
+    this.finalPreviewTimer = 0;
+    this.hasFramedPreview = false;
     this.onWindowKeyDown = (event) => {
       if (event.key === 'Escape' && !this.overlay.hidden) this.close();
     };
@@ -222,13 +224,16 @@ export class ProceduralWorkshopUi {
       this.bake();
     });
     this.form.addEventListener('change', (event) => {
-      if (event.target.name === 'archetype') this.componentController?.resetAll();
-      this.schedulePreview(40);
+      if (event.target.name === 'archetype') {
+        this.componentController?.resetAll();
+        this.hasFramedPreview = false;
+      }
+      this.schedulePreview(50);
     });
     this.form.addEventListener('input', (event) => {
       if (event.target.matches('input[type="range"]')) {
         this.syncRangeOutputs();
-        this.schedulePreview(90);
+        this.schedulePreview(32, { draft: true });
       }
     });
     window.addEventListener('keydown', this.onWindowKeyDown);
@@ -247,13 +252,21 @@ export class ProceduralWorkshopUi {
     }
   }
 
-  schedulePreview(delay = 60) {
+  schedulePreview(delay = 60, { draft = false } = {}) {
     if (this.disposed) return;
     window.clearTimeout(this.previewTimer);
+    if (!draft) window.clearTimeout(this.finalPreviewTimer);
     this.previewTimer = window.setTimeout(() => {
       this.previewTimer = 0;
-      if (!this.overlay.hidden) this.generatePreview();
+      if (!this.disposed && !this.overlay.hidden) this.generatePreview({ draft });
     }, delay);
+    if (draft) {
+      window.clearTimeout(this.finalPreviewTimer);
+      this.finalPreviewTimer = window.setTimeout(() => {
+        this.finalPreviewTimer = 0;
+        if (!this.disposed && !this.overlay.hidden) this.generatePreview();
+      }, Math.max(260, delay + 180));
+    }
   }
 
   syncTransformModeButtons(mode) {
@@ -261,7 +274,14 @@ export class ProceduralWorkshopUi {
     for (const button of this.overlay.querySelectorAll(
       '[data-workshop-action="move"], [data-workshop-action="rotate"], [data-workshop-action="scale"]',
     )) {
-      button.classList.toggle('is-active', button.dataset.workshopAction === activeAction);
+      const requestedMode = button.dataset.workshopAction === 'move'
+        ? 'translate'
+        : button.dataset.workshopAction;
+      button.disabled = !(this.componentController?.supportsMode(requestedMode) ?? true);
+      button.classList.toggle(
+        'is-active',
+        button.dataset.workshopAction === activeAction && !button.disabled,
+      );
     }
   }
 
@@ -315,7 +335,8 @@ export class ProceduralWorkshopUi {
     try {
       await this.ensureRenderer();
       if (this.disposed || this.overlay.hidden || revision !== this.openRevision) return;
-      this.generatePreview();
+      this.hasFramedPreview = false;
+      this.generatePreview({ frame: true });
       if (this.animationFrame === 0) this.renderLoop();
     } catch (error) {
       if (revision !== this.openRevision || this.disposed) return;
@@ -328,7 +349,9 @@ export class ProceduralWorkshopUi {
     this.openRevision += 1;
     this.overlay.hidden = true;
     window.clearTimeout(this.previewTimer);
+    window.clearTimeout(this.finalPreviewTimer);
     this.previewTimer = 0;
+    this.finalPreviewTimer = 0;
     cancelAnimationFrame(this.animationFrame);
     this.animationFrame = 0;
   }
@@ -402,10 +425,12 @@ export class ProceduralWorkshopUi {
         orbitControls: this.controls,
         transformControls: this.transformControls,
         onModeChange: (mode) => this.syncTransformModeButtons(mode),
-        onChange: (component) => {
+        onChange: (component, _transform, meta) => {
           this.status.textContent = component
             ? `${component.label} edit stored in the object recipe.`
-            : 'All component edits were reset.';
+            : meta?.reason === 'history'
+              ? 'Component edit history restored.'
+              : 'All component edits were reset.';
           this.status.classList.remove('is-error');
           if (!component || component.transformPolicy === 'opening2d') {
             this.schedulePreview(0);
@@ -456,13 +481,20 @@ export class ProceduralWorkshopUi {
     this.camera.updateProjectionMatrix();
   }
 
-  generatePreview() {
+  generatePreview({ draft = false, frame = false } = {}) {
     try {
       if (!this.componentController) {
         throw new Error('The workshop component editor is not ready.');
       }
       const { recipe } = this.readInput();
-      const nextParts = this.manager.createPreviewParts(recipe);
+      const previewRecipe = draft
+        ? {
+          ...recipe,
+          detail: 1,
+          remesh: true,
+        }
+        : recipe;
+      const nextParts = this.manager.createPreviewParts(previewRecipe);
       this.clearPreview();
       this.previewParts = nextParts;
       try {
@@ -474,9 +506,13 @@ export class ProceduralWorkshopUi {
         throw error;
       }
       this.syncTransformModeButtons(this.componentController.mode);
-      this.framePreview();
+      if (frame || !this.hasFramedPreview) {
+        this.framePreview();
+        this.hasFramedPreview = true;
+      }
       const stats = nextParts.stats;
-      this.status.textContent = `${stats.components} editable components · ${stats.stones} stones · ${stats.features} semantic details · ${stats.sourceVertices.toLocaleString()} source vertices · ${stats.drawParts} preview parts.`;
+      const quality = draft ? 'Interactive proxy' : 'Final preview';
+      this.status.textContent = `${quality} · ${stats.components} editable components · ${stats.stones} stones · ${stats.features} semantic details · ${stats.sourceVertices.toLocaleString()} source vertices · ${stats.drawParts} preview parts.`;
       this.status.classList.remove('is-error');
     } catch (error) {
       this.status.textContent = error instanceof Error ? error.message : String(error);

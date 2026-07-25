@@ -62,6 +62,12 @@ test('workshop preview exposes semantic components with structure ownership', ()
         assert.equal(components.get(component.parentId)?.kind, 'structure');
       }
     }
+    const opening = [...components.values()].find((component) => (
+      component.kind === 'door' || component.kind === 'window'
+    ));
+    assert.equal(opening.transformPolicy, 'opening2d');
+    assert.equal(opening.editPolicy.handle, 'facade-opening');
+    assert.equal(opening.editPolicy.defaultSpace, 'parent');
   } finally {
     disposeModelParts(parts);
   }

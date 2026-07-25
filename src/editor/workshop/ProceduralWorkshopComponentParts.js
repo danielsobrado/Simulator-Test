@@ -7,6 +7,7 @@ import {
   createIdentityComponentTransform,
   getComponentTransform,
 } from './ProceduralWorkshopComponentTransforms.js';
+import { getWorkshopComponentEditPolicy } from './ProceduralWorkshopEditPolicy.js';
 import { createProceduralWorkshopParts } from './ProceduralWorkshopGenerator.js';
 
 const STRUCTURE_MIN_HEIGHT = 1.4;
@@ -69,6 +70,7 @@ function geometryEntry(part, index) {
     size,
     volume: Math.max(0, size.x * size.y * size.z),
     componentId: null,
+    semanticHint: geometry.userData?.workshopSemantic ?? null,
   };
 }
 
@@ -182,9 +184,38 @@ function openingCandidate(entry) {
 }
 
 function inferredOpeningAnchors(entries, structures) {
+  const hintedGroups = new Map();
+  for (const entry of entries) {
+    const hint = entry.semanticHint;
+    if (!hint || !['door', 'window'].includes(hint.kind)) continue;
+    const group = hintedGroups.get(hint.id) ?? {
+      id: hint.id,
+      label: hint.label,
+      kind: hint.kind,
+      entries: [],
+    };
+    group.entries.push(entry);
+    hintedGroups.set(hint.id, group);
+  }
+  const hinted = [...hintedGroups.values()].map((group) => {
+    const bounds = expandedBounds(unionBounds(group.entries));
+    const sourceEntry = group.entries.find((entry) => (
+      group.kind === 'door' ? entry.slot === 'wood' : entry.slot === 'recess'
+    )) ?? group.entries[0];
+    return {
+      id: group.id,
+      label: group.label,
+      kind: group.kind,
+      parentId: nearestStructure(sourceEntry, structures).id,
+      bounds,
+      center: bounds.getCenter(new THREE.Vector3()),
+      size: bounds.getSize(new THREE.Vector3()),
+      sourceEntry,
+    };
+  });
   const candidates = entries
     .map((entry) => ({ entry, kind: openingCandidate(entry) }))
-    .filter(({ kind }) => Boolean(kind))
+    .filter(({ entry, kind }) => Boolean(kind) && !entry.semanticHint)
     .sort((left, right) => (
       compareText(left.kind, right.kind)
       || left.entry.center.y - right.entry.center.y
@@ -193,7 +224,11 @@ function inferredOpeningAnchors(entries, structures) {
       || left.entry.index - right.entry.index
     ));
   const counts = new Map();
-  return candidates.map(({ entry, kind }) => {
+  for (const opening of hinted) {
+    const suffix = Number(opening.id.match(/-(\d+)$/)?.[1] ?? 0);
+    counts.set(opening.kind, Math.max(counts.get(opening.kind) ?? 0, suffix));
+  }
+  const inferred = candidates.map(({ entry, kind }) => {
     const count = (counts.get(kind) ?? 0) + 1;
     counts.set(kind, count);
     const label = kind === 'door'
@@ -210,6 +245,13 @@ function inferredOpeningAnchors(entries, structures) {
       sourceEntry: entry,
     };
   });
+  return [...hinted, ...inferred].sort((left, right) => (
+    left.kind.localeCompare(right.kind)
+    || left.center.y - right.center.y
+    || left.center.x - right.center.x
+    || left.center.z - right.center.z
+    || left.id.localeCompare(right.id)
+  ));
 }
 
 function castleOpeningAnchors(recipe) {
@@ -297,9 +339,10 @@ function childDefinition(structure, suffix, label, kind) {
 }
 
 function isTopologyDrivenOpening(recipe, component) {
-  return recipe.archetype === 'wall'
-    && recipe.shape !== 'classic'
-    && component.kind === 'opening';
+  if (component.kind === 'opening') {
+    return recipe.archetype === 'wall' && recipe.shape !== 'classic';
+  }
+  return component.kind === 'door' || component.kind === 'window';
 }
 
 function classifyComponents(entries, recipe) {
@@ -351,9 +394,7 @@ function classifyComponents(entries, recipe) {
     );
     component.storedTransform = getComponentTransform(recipe.componentTransforms, componentId);
     component.transformPolicy = isTopologyDrivenOpening(recipe, component) ? 'opening2d' : 'free';
-    component.transform = component.transformPolicy === 'opening2d'
-      ? createIdentityComponentTransform()
-      : component.storedTransform;
+    component.transform = component.storedTransform;
     if (component.parentId && !components.has(component.parentId)) {
       throw new Error(`Workshop component ${componentId} has a missing parent.`);
     }
@@ -372,6 +413,7 @@ function componentMetadata(component) {
     transform: component.transform,
     storedTransform: component.storedTransform,
     transformPolicy: component.transformPolicy,
+    editPolicy: getWorkshopComponentEditPolicy(component),
   });
 }
 
@@ -379,7 +421,9 @@ function componentLocalMatrix(component, components) {
   const parentPivot = component.parentId
     ? components.get(component.parentId).pivot
     : ZERO;
-  const transform = component.transform;
+  const transform = component.transformPolicy === 'opening2d'
+    ? createIdentityComponentTransform()
+    : component.transform;
   const position = component.pivot
     .clone()
     .sub(parentPivot)

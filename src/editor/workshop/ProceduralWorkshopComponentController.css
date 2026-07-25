@@ -4,8 +4,8 @@
   bottom: 52px;
   z-index: 5;
   display: grid;
-  gap: 6px;
-  width: min(300px, calc(100% - 36px));
+  gap: 8px;
+  width: min(470px, calc(100% - 36px));
   padding: 10px 12px;
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 10px;
@@ -14,24 +14,128 @@
   backdrop-filter: blur(8px);
 }
 
+.workshop-component-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px;
+  gap: 8px;
+}
+
 .workshop-component-select {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
+  gap: 4px;
   color: #dce5dc;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-.workshop-component-select select {
+.workshop-component-select select,
+.workshop-component-space select,
+.workshop-component-axis select {
   min-width: 0;
   padding: 6px 28px 6px 8px;
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 7px;
   color: #f3f6ef;
   background: #14231b;
+}
+
+.workshop-component-space,
+.workshop-component-axis {
+  display: grid;
+  gap: 4px;
+  color: #b8c7bb;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.workshop-component-actions {
+  display: flex;
+  gap: 5px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.workshop-component-actions button {
+  min-height: 29px;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 6px;
+  background: #1b2c22;
+  color: #e4ece5;
+  cursor: pointer;
+  font-size: 0.68rem;
+}
+
+.workshop-component-actions button:hover:not(:disabled) {
+  border-color: #d4b65e;
+  background: #2a3928;
+}
+
+.workshop-component-actions button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.workshop-component-snap {
+  display: flex;
+  min-height: 29px;
+  gap: 5px;
+  align-items: center;
+  padding: 0 6px;
+  color: #cbd7cd;
+  font-size: 0.68rem;
+}
+
+.workshop-component-snap input {
+  accent-color: #d4b65e;
+}
+
+.workshop-component-axis {
+  grid-template-columns: auto 78px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.workshop-component-values {
+  display: grid;
+  grid-template-columns: 48px repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+}
+
+.workshop-component-values > b {
+  color: #86a292;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.workshop-component-values > label {
+  color: #afbeb2;
+  font-size: 0.66rem;
+}
+
+.workshop-component-values input {
+  width: 100%;
+  min-width: 0;
+  height: 27px;
+  padding: 4px 5px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 5px;
+  outline: none;
+  background: #101b15;
+  color: #edf3ee;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.workshop-component-values input:focus {
+  border-color: #d4b65e;
+}
+
+.workshop-component-values input:disabled {
+  opacity: 0.35;
 }
 
 .workshop-component-hint {
@@ -55,6 +159,10 @@
     bottom: 48px;
     left: 12px;
     width: calc(100% - 24px);
+  }
+
+  .workshop-component-heading {
+    grid-template-columns: minmax(0, 1fr) 100px;
   }
 
   .workshop-gizmo-tools {

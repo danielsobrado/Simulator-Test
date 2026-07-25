@@ -33,6 +33,30 @@ export function transformGeometry(geometry, {
   return geometry;
 }
 
+export function applyWorkshopProjectedUv(geometry, density = 0.58) {
+  if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  const uv = new Float32Array(position.count * 2);
+  for (let index = 0; index < position.count; index += 1) {
+    const normalX = Math.abs(normal.getX(index));
+    const normalY = Math.abs(normal.getY(index));
+    const normalZ = Math.abs(normal.getZ(index));
+    if (normalX >= normalY && normalX >= normalZ) {
+      uv[index * 2] = position.getZ(index) * density;
+      uv[index * 2 + 1] = position.getY(index) * density;
+    } else if (normalY >= normalX && normalY >= normalZ) {
+      uv[index * 2] = position.getX(index) * density;
+      uv[index * 2 + 1] = position.getZ(index) * density;
+    } else {
+      uv[index * 2] = position.getX(index) * density;
+      uv[index * 2 + 1] = position.getY(index) * density;
+    }
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
+
 export function beveledBox({
   width,
   height,
@@ -61,7 +85,9 @@ export function beveledBox({
     bevelSegments: detail >= 3 ? 2 : 1,
   });
   geometry.translate(0, 0, -extrusionDepth / 2);
-  return transformGeometry(normalizeGeometry(geometry), { position, rotation });
+  return applyWorkshopProjectedUv(
+    transformGeometry(normalizeGeometry(geometry), { position, rotation }),
+  );
 }
 
 export function archedPanel({
@@ -88,7 +114,9 @@ export function archedPanel({
     bevelSegments: detail >= 3 ? 2 : 1,
   });
   geometry.translate(0, 0, -depth / 2);
-  return transformGeometry(normalizeGeometry(geometry), { position });
+  return applyWorkshopProjectedUv(
+    transformGeometry(normalizeGeometry(geometry), { position }),
+  );
 }
 
 export function coneRoof({
@@ -175,7 +203,9 @@ export function gablePanel({
     bevelEnabled: false,
   });
   geometry.translate(0, 0, -depth / 2);
-  return transformGeometry(normalizeGeometry(geometry), { position, rotation });
+  return applyWorkshopProjectedUv(
+    transformGeometry(normalizeGeometry(geometry), { position, rotation }),
+  );
 }
 
 export function flagGeometry({
