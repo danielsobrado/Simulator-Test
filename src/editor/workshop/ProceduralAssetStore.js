@@ -27,7 +27,7 @@ function requireObject(value, field, { allowMissing = false } = {}) {
 
 function requireFinite(value, field, minimum, maximum) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
-    throw new Error(`${field} must be a finite number between ${minimum} and ${maximum}.`);
+    throw new Error(`${field} must be between ${minimum} and ${maximum} and be a finite number.`);
   }
   return value;
 }
