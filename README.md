@@ -26,19 +26,18 @@ The editor now runs on an effectively unbounded logical world rather than one fi
 - Selectable Edit / Orbit and first-person Player modes.
 - Terrain painting, raise, lower, and smooth brushes.
 - Slope-aware building placement with foundations.
-- Instanced GLB settlement rendering with procedural fallbacks.
+- Instanced settlement rendering from procedurally textured models.
 - Rolling average FPS in the title area.
 
 Run it with:
 
 ```bash
 npm install
-npm run generate:assets
 npm run verify
 npm run dev
 ```
 
-Three.js is pinned to r185.1. World generation, streaming, player movement, rendering, terrain limits, and editor settings are in `editor.config.yaml`. Object definitions and asset metadata are in `config/objects.yaml`.
+Three.js is pinned to r185.1. World generation, streaming, player movement, rendering, terrain limits, and editor settings are in `editor.config.yaml`. Object definitions are in `config/objects.yaml`.
 
 ## Infinite terrain streaming
 
@@ -239,16 +238,18 @@ sparse SDF stamps
 
 Generated density, triangle counts, positions, normals, and draw commands are never downloaded to JavaScript during normal operation.
 
-## GLB assets
+## Object visuals
 
-Production visuals are loaded from `public/assets/models/settlement-core.glb`. Procedural models remain visible until each configured GLB node passes runtime validation.
+Placeable objects are generated in code. Models are assembled from primitives in
+`src/editor/ObjectModelLibrary.js` and shaded with procedurally synthesized
+colour, normal, and roughness maps, so there is no art build step and no GLB
+pack to keep in sync.
 
 ```bash
-npm run generate:assets
 npm run validate:assets
 ```
 
-See `docs/asset-pipeline.md` for the authoring contract.
+See `docs/object-pipeline.md` for the authoring contract.
 
 ## Current limits
 

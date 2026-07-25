@@ -2,8 +2,7 @@
 #
 # `model` names a procedural model in src/editor/ObjectModelLibrary.js, which
 # builds the object from primitives shaded with the shared procedural surface
-# materials. An optional `asset` block points at a GLB node that replaces the
-# procedural model once it loads; objects without one render procedurally.
+# materials. See docs/object-pipeline.md for the authoring contract.
 objects:
   - key: cottage
     label: Cottage

@@ -1,10 +1,3 @@
-export function cloneMaterial(material) {
-  if (Array.isArray(material)) {
-    return material.map((entry) => entry.clone());
-  }
-  return material.clone();
-}
-
 function isShared(resource) {
   return resource?.userData?.sharedSurface === true;
 }

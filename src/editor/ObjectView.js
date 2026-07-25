@@ -196,6 +196,11 @@ export class ObjectView {
   }
 
   ensureCapacity(renderer, required) {
+    // Definitions with nothing placed stay unallocated, so a large catalog does
+    // not put hundreds of empty instanced meshes in front of the renderer.
+    if (required === 0) {
+      return;
+    }
     if (renderer.capacity >= Math.max(1, required)) {
       return;
     }

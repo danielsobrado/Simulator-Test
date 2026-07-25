@@ -4,7 +4,6 @@ import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';
 import './editor/map/worldMap.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
-import { installObjectAssets } from './editor/assets/installObjectAssets.js';
 import { EditorCamera } from './editor/EditorCamera.js';
 import { EditorUi } from './editor/EditorUi.js';
 import { InfiniteTerrainView } from './editor/InfiniteTerrainView.js';
@@ -16,7 +15,6 @@ import { ProceduralWorkshopUi } from './editor/workshop/ProceduralWorkshopUi.js'
 import { ObjectMap } from './editor/ObjectMap.js';
 import { ObjectView } from './editor/ObjectView.js';
 import { OBJECT_CATALOG } from './editor/objectCatalog.js';
-import { OBJECT_RENDER_CATALOG } from './editor/objectRenderCatalog.js';
 import { FrameRateDisplay } from './editor/performance/FrameRateDisplay.js';
 import { FrameRateMeter } from './editor/performance/FrameRateMeter.js';
 import { FRAME_RATE_DISPLAY_INTERVAL_MS } from './editor/performance/frameRateConstants.js';
@@ -286,14 +284,6 @@ async function startEditor() {
       proceduralWorkshop,
     };
   }
-  const assetPipeline = installObjectAssets({
-    objectView,
-    catalog: OBJECT_RENDER_CATALOG,
-    tileSize: tileMap.tileSize,
-    ui,
-    baseUrl: import.meta.env.BASE_URL,
-  });
-
   const voxelPrototype = new GpuVoxelWorld({
     terrainView,
     layout: voxelWorldLayout,
@@ -439,7 +429,6 @@ async function startEditor() {
     voxelPrototypeUi.dispose();
     voxelPrototype.dispose();
     stylizedSurface.dispose();
-    assetPipeline.dispose();
     worldMapUi.dispose();
     worldMapController.dispose();
     macroFarTerrain.dispose();

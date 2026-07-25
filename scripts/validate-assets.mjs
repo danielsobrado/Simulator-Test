@@ -1,20 +1,14 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { resolvePublicAssetPath, validateGlbBuffer } from './lib/glb-validation.mjs';
+import { OBJECT_MODEL_NAMES } from '../src/editor/ObjectModelLibrary.js';
+import { createObjectCatalog } from '../src/editor/objectCatalogSchema.js';
+import { TILE_BY_KEY } from '../src/editor/tileCatalog.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SCRIPT_DIR, '..');
 const OBJECT_CONFIG_PATH = path.join(REPOSITORY_ROOT, 'config', 'objects.yaml');
-const MODEL_DIRECTORY = path.join(REPOSITORY_ROOT, 'public', 'assets', 'models');
-
-async function listGlbFiles(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.glb'))
-    .map((entry) => path.join(directory, entry.name));
-}
 
 async function main() {
   const parsed = yaml.load(await readFile(OBJECT_CONFIG_PATH, 'utf8'));
@@ -22,52 +16,32 @@ async function main() {
     throw new Error('config/objects.yaml must contain object definitions.');
   }
 
-  const referencedFiles = new Set();
-  const validationByFile = new Map();
-  for (const definition of parsed.objects) {
-    if (typeof definition?.key !== 'string' || definition.key.trim() === '') {
-      throw new Error('Every object definition must have a key.');
-    }
-    if (typeof definition.model !== 'string' || definition.model.trim() === '') {
-      throw new Error(`Object ${definition.key} is missing its procedural model.`);
-    }
-    // The GLB asset is optional: objects without one render procedurally.
-    if (!definition.asset) {
-      console.log(`validated ${definition.key}: procedural model ${definition.model}`);
-      continue;
-    }
+  // Running the definitions through the real schema keeps this gate honest:
+  // footprints, foundations, and terrain keys fail here rather than at runtime.
+  const catalog = createObjectCatalog(parsed.objects, TILE_BY_KEY);
+  const modelNames = new Set(OBJECT_MODEL_NAMES);
+  const usedModels = new Set();
 
-    const filePath = resolvePublicAssetPath(REPOSITORY_ROOT, definition.asset.path);
-    const resolvedFile = path.resolve(filePath);
-    let result = validationByFile.get(resolvedFile);
-    if (!result) {
-      result = validateGlbBuffer(await readFile(filePath), `Asset pack ${definition.asset.path}`);
-      validationByFile.set(resolvedFile, result);
-    }
-    if (definition.asset.node && !result.nodeNames.includes(definition.asset.node)) {
+  for (const definition of catalog) {
+    if (!modelNames.has(definition.model)) {
       throw new Error(
-        `Object ${definition.key} references missing GLB node ${definition.asset.node}.`,
+        `Object ${definition.key} references unknown procedural model ${definition.model}.`,
       );
     }
-    referencedFiles.add(resolvedFile);
-    console.log(
-      `validated ${definition.key}: ${path.relative(REPOSITORY_ROOT, filePath)}`
-      + `${definition.asset.node ? `#${definition.asset.node}` : ''}`,
-    );
+    usedModels.add(definition.model);
+    console.log(`validated ${definition.key}: ${definition.model} `
+      + `(${definition.footprint.width}×${definition.footprint.depth}, ${definition.category})`);
   }
 
-  // Unreferenced packs are kept as available art rather than treated as an
-  // error, but they still have to be structurally sound glTF 2 binaries.
-  const modelFiles = await listGlbFiles(MODEL_DIRECTORY);
-  const unreferenced = modelFiles.filter((filePath) => !referencedFiles.has(path.resolve(filePath)));
-  for (const filePath of unreferenced) {
-    validateGlbBuffer(await readFile(filePath), `Unreferenced pack ${path.basename(filePath)}`);
-    console.log(`validated unreferenced pack ${path.basename(filePath)}`);
+  const unused = OBJECT_MODEL_NAMES.filter((model) => !usedModels.has(model));
+  if (unused.length > 0) {
+    throw new Error(`Procedural models are not placeable from the catalog: ${unused.join(', ')}.`);
   }
 
+  const categories = new Set(catalog.map((definition) => definition.category));
   console.log(
-    `validated ${parsed.objects.length} object definitions across `
-    + `${referencedFiles.size} referenced and ${unreferenced.length} unreferenced GLB asset packs`,
+    `validated ${catalog.length} object definitions across ${categories.size} categories `
+    + `and ${usedModels.size} procedural models`,
   );
 }
 

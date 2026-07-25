@@ -439,9 +439,11 @@ function chapel(size) {
   return [
     box(width * 1.1, plinth, depth * 1.05, 'rubble', null, [0, plinth / 2, 0]),
     box(width, wallHeight, depth, 'stoneBlock', '#b0aea4', [0, plinth + wallHeight / 2, 0]),
+    // Yawed a quarter turn so the ridge runs down the long axis of the nave:
+    // the ridge spans `depth` and the slopes cover `width`.
     ...gableRoof({
-      width,
-      depth,
+      width: depth,
+      depth: width,
       height: size * 0.6,
       surface: 'roofTile',
       tint: null,

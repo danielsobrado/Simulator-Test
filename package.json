@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate:assets": "python scripts/generate-placeholder-models.py",
     "generate:forest-assets": "node scripts/generate-forest-assets.mjs",
     "validate:forest-assets": "node scripts/validate-forest-assets.mjs",
     "bake:impostors": "node scripts/bake-tree-impostors.mjs",
