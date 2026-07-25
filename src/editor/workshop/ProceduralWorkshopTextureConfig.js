@@ -31,12 +31,26 @@ function requireObject(value, field) {
   return value;
 }
 
-function requireFinite(value, field, minimum, maximum) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < minimum || number > maximum) {
-    throw new Error(`${field} must be between ${minimum} and ${maximum}.`);
+function optionalString(value, field, fallback) {
+  if (value == null) return fallback;
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
   }
-  return number;
+  return value;
+}
+
+function requireString(value, field) {
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
+  }
+  return value;
+}
+
+function requireFinite(value, field, minimum, maximum) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${field} must be between ${minimum} and ${maximum} and be a finite number.`);
+  }
+  return value;
 }
 
 function compareKey(left, right) {
@@ -83,7 +97,7 @@ function normalizeSource(id, input) {
     throw new Error(`Invalid workshop albedo source id: ${id}.`);
   }
   const source = requireObject(input, `Albedo source ${id}`);
-  const dataUrl = String(source.dataUrl ?? '');
+  const dataUrl = requireString(source.dataUrl, `Albedo source ${id} data URL`);
   const match = VALID_DATA_URL.exec(dataUrl);
   if (!match) {
     throw new Error('Workshop albedo textures must be PNG, JPEG, or WebP images.');
@@ -92,10 +106,10 @@ function normalizeSource(id, input) {
     throw new Error('A workshop albedo texture is too large after processing.');
   }
   validateImageData(dataUrl, match[1].toLowerCase(), match[2]);
-  return Object.freeze({
-    name: String(source.name ?? 'Imported texture').trim().slice(0, 80) || 'Imported texture',
-    dataUrl,
-  });
+  const name = optionalString(source.name, `Albedo source ${id} name`, 'Imported texture')
+    .trim()
+    .slice(0, 80) || 'Imported texture';
+  return Object.freeze({ name, dataUrl });
 }
 
 function normalizeSlot(key, input, sources) {
@@ -103,19 +117,19 @@ function normalizeSlot(key, input, sources) {
     throw new Error(`Unknown workshop material area: ${key}.`);
   }
   const slot = requireObject(input, `Material area ${key}`);
-  const sourceId = String(slot.sourceId ?? '');
+  const sourceId = requireString(slot.sourceId, `Material area ${key} source id`);
   if (!sources[sourceId]) {
     throw new Error(`Material area ${key} references a missing albedo source.`);
   }
-  const mapping = String(slot.mapping ?? 'repeat');
+  const mapping = optionalString(slot.mapping, `Material area ${key} mapping`, 'repeat');
   if (!VALID_MAPPINGS.has(mapping)) {
     throw new Error(`Unknown albedo mapping mode: ${mapping}.`);
   }
-  const rotation = Number(slot.rotation ?? 0);
-  if (!VALID_ROTATIONS.has(rotation)) {
+  const rotation = slot.rotation ?? 0;
+  if (typeof rotation !== 'number' || !VALID_ROTATIONS.has(rotation)) {
     throw new Error('Albedo rotation must be 0, 90, 180, or 270 degrees.');
   }
-  const tint = String(slot.tint ?? '#ffffff').toLowerCase();
+  const tint = optionalString(slot.tint, `Material area ${key} tint`, '#ffffff').toLowerCase();
   if (!VALID_TINT.test(tint)) {
     throw new Error('Albedo tint must be a six-digit hex color.');
   }
@@ -139,7 +153,7 @@ function slotOrder([left], [right]) {
 }
 
 export function createSurfaceTextureSourceId(dataUrl) {
-  const value = String(dataUrl);
+  const value = requireString(dataUrl, 'Workshop albedo data URL');
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
