@@ -16,6 +16,12 @@ const OPENING_INSERT_SLOTS = new Set(['wood', 'metal', 'recess']);
 const EMPTY_MATRIX = new THREE.Matrix4();
 const ZERO = new THREE.Vector3();
 
+function compareText(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function materialSlot(material) {
   if (material?.userData?.workshopSlot) return material.userData.workshopSlot;
   if ((material?.metalness ?? 0) >= 0.4) return 'metal';
@@ -180,7 +186,7 @@ function inferredOpeningAnchors(entries, structures) {
     .map((entry) => ({ entry, kind: openingCandidate(entry) }))
     .filter(({ kind }) => Boolean(kind))
     .sort((left, right) => (
-      left.kind.localeCompare(right.kind)
+      compareText(left.kind, right.kind)
       || left.entry.center.y - right.entry.center.y
       || left.entry.center.x - right.entry.center.x
       || left.entry.center.z - right.entry.center.z
@@ -416,11 +422,17 @@ function componentGeometryMatrix(component, components, cache) {
 
 function mergedGeometry(geometries, errorMessage) {
   if (geometries.length === 1) return geometries[0];
-  const merged = mergeGeometries(geometries, false);
-  if (!merged) throw new Error(errorMessage);
+  let merged = null;
+  try {
+    merged = mergeGeometries(geometries, false);
+    if (!merged) throw new Error(errorMessage);
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
+  } catch (error) {
+    merged?.dispose();
+    throw error;
+  }
   geometries.forEach((geometry) => geometry.dispose());
-  merged.computeBoundingBox();
-  merged.computeBoundingSphere();
   return merged;
 }
 
