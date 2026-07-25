@@ -230,6 +230,8 @@ function inferredOpeningAnchors(entries, structures) {
       id: hint.id,
       label: hint.label,
       kind: hint.kind,
+      attachmentPosition: hint.attachmentPosition ?? null,
+      attachmentSize: hint.attachmentSize ?? null,
       entries: [],
     };
     group.entries.push(entry);
@@ -251,6 +253,8 @@ function inferredOpeningAnchors(entries, structures) {
       center: bounds.getCenter(new THREE.Vector3()),
       size: bounds.getSize(new THREE.Vector3()),
       sourceEntry,
+      attachmentPosition: group.attachmentPosition,
+      attachmentSize: group.attachmentSize,
     };
   });
   const candidates = entries
@@ -364,6 +368,8 @@ function ensureComponent(components, definition) {
       kind: definition.kind,
       parentId: definition.parentId ?? null,
       attachmentSurface: definition.attachmentSurface ?? null,
+      attachmentPosition: definition.attachmentPosition ?? null,
+      attachmentSize: definition.attachmentSize ?? null,
       entries: [],
     });
   }
@@ -456,6 +462,8 @@ function componentMetadata(component) {
     transformPolicy: component.transformPolicy,
     editPolicy: getWorkshopComponentEditPolicy(component),
     attachmentSurface: component.attachmentSurface,
+    attachmentPosition: component.attachmentPosition,
+    attachmentSize: component.attachmentSize,
   });
 }
 

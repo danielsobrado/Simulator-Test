@@ -509,10 +509,41 @@ export class ProceduralWorkshopComponentController {
     for (const sibling of hostGroup.children) {
       if (sibling === this.selectedGroup()) continue;
       if (!isWorkshopArchitecturalOpening(sibling.userData?.workshopComponent)) continue;
-      const descriptor = openingDescriptor(sibling);
+      const descriptor = this.openingDescriptorOnSurface(sibling, surface);
       if (descriptor) siblings.push(descriptor);
     }
-    return { component, localBounds, surface, wallBounds, siblings, selected };
+    return {
+      component,
+      localBounds,
+      surface,
+      wallBounds,
+      siblings,
+      selected: this.openingDescriptorOnSurface(this.selectedGroup(), surface) ?? selected,
+    };
+  }
+
+  openingDescriptorOnSurface(group, surface) {
+    const descriptor = openingDescriptor(group);
+    const component = group?.userData?.workshopComponent;
+    if (!descriptor || surface?.type !== 'round' || !component?.attachmentPosition) {
+      return descriptor;
+    }
+    const size = component.attachmentSize
+      ? {
+        x: component.attachmentSize[0],
+        y: component.attachmentSize[1],
+      }
+      : descriptor.size;
+    return {
+      ...descriptor,
+      position: {
+        x: component.attachmentPosition[0],
+        y: component.attachmentPosition[1] + size.y / 2,
+      },
+      size,
+      baseSize: { ...size },
+      baseCenter: { x: 0, y: size.y / 2 },
+    };
   }
 
   updateAttachmentPreview(hit) {
@@ -1363,7 +1394,12 @@ export class ProceduralWorkshopComponentController {
   createOpeningCopies(count) {
     const group = this.selectedGroup();
     const component = group?.userData?.workshopComponent;
-    const context = this.architecturalSnapContext(group);
+    const hostGroup = group?.parent;
+    const hostSurface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    const selected = this.openingDescriptorOnSurface(group, hostSurface);
+    const context = hostGroup && selected
+      ? this.attachmentHostContext(hostGroup, selected)
+      : null;
     if (!group || !isWorkshopArchitecturalOpening(component) || !context) {
       this.hint.textContent = 'Select a door, window, or arch with a compatible host wall.';
       return 0;

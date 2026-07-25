@@ -17,6 +17,8 @@
     "test": "node --test",
     "qa:perf": "node scripts/run-perf-qa.mjs",
     "qa:perf:parse": "node scripts/parse-perf-qa.mjs tmp/perf-qa-latest.json",
+    "qa:workshop:install": "playwright install chromium",
+    "qa:workshop": "node scripts/run-workshop-qa.mjs",
     "verify": "npm run validate:assets:production && npm test && npm run build"
   },
   "dependencies": {
@@ -24,6 +26,7 @@
     "three": "0.185.1"
   },
   "devDependencies": {
+    "playwright": "1.62.0",
     "vite": "8.1.5"
   },
   "engines": {

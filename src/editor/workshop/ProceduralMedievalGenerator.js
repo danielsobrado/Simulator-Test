@@ -44,6 +44,14 @@ function tagOpeningGeometry(geometry, opening, door) {
     label: opening.componentLabel ?? (door ? 'Door' : 'Window'),
     kind: door ? 'door' : 'window',
     hostId: opening.hostId,
+    attachmentPosition: Object.freeze([
+      opening.surfaceX ?? opening.centerX ?? 0,
+      opening.bottom,
+    ]),
+    attachmentSize: Object.freeze([
+      opening.width,
+      opening.springHeight + opening.radius,
+    ]),
   });
   return geometry;
 }

@@ -135,6 +135,9 @@ test('gatehouse generation reparents a door to a tower and preserves host metada
     const leftTower = parts.components.find(({ id }) => id === 'structure-left');
     assert.equal(door.parentId, 'structure-left');
     assert.equal(leftTower.attachmentSurface.type, 'round');
+    assert.deepEqual(door.attachmentPosition, [0.4, 0]);
+    assert.ok(door.attachmentSize[0] > 0);
+    assert.ok(door.attachmentSize[1] > door.attachmentSize[0]);
   } finally {
     disposeModelParts(parts);
   }

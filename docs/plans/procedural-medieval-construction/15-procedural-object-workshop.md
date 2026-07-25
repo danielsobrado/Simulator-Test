@@ -96,6 +96,9 @@ The opening count is derived from the authored width, so wider spans gain more b
 - Recipe identity uses canonical property ordering and normalized rotations before hashing.
 - Targeted installation rollback removes only the failed procedural definition. Full rebuild teardown removes all workshop-owned procedural definitions.
 - WebGPU preview initialization is single-flight and retryable. Closing or disposing the workshop during initialization cannot start a stale render loop.
+- `npm run qa:workshop` starts an isolated Vite server and drives the real WebGPU workshop UI in Chromium. It verifies planar and radial pointer placement, duplicate/repeat/delete, undo/redo, regeneration, bake persistence, and red/green placement feedback.
+- Run `npm run qa:workshop:install` once on a new machine to install the pinned Chromium runtime used by the screenshot harness.
+- Workshop browser QA writes deterministic 1600 × 1000 screenshots and a machine-readable report to `tmp/workshop-qa/`. Behavioral and canonical-state assertions are the gate; screenshots are retained for visual inspection without relying on fragile exact-pixel equality.
 - The procedural stage restores prior scene background/fog state and disposes transactionally, including failed construction.
 
 ## Runtime contract

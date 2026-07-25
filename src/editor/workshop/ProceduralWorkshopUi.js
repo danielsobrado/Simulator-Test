@@ -40,7 +40,14 @@ export class ProceduralWorkshopUi {
     this.finalPreviewTimer = 0;
     this.hasFramedPreview = false;
     this.onWindowKeyDown = (event) => {
-      if (event.key === 'Escape' && !this.overlay.hidden) this.close();
+      if (
+        event.key === 'Escape'
+        && !this.overlay.hidden
+        && !this.componentController?.attachmentMode
+        && !this.materialController?.active
+      ) {
+        this.close();
+      }
     };
 
     root.insertAdjacentHTML('beforeend', `
