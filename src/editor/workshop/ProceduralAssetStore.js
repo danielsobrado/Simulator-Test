@@ -18,8 +18,8 @@ const VALID_SHAPES = new Set(['classic', 'stepped', 'tapered']);
 const VALID_TOWER_SIDES = new Set(['left', 'right', 'none']);
 
 function requireObject(value, field, { allowMissing = false } = {}) {
-  if (value == null && allowMissing) return {};
-  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+  if (value === undefined && allowMissing) return {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${field} must be an object.`);
   }
   return value;
@@ -33,8 +33,12 @@ function requireString(value, field) {
 }
 
 function optionalString(value, field, fallback) {
-  if (value == null) return fallback;
+  if (value === undefined) return fallback;
   return requireString(value, field);
+}
+
+function valueOrDefault(value, fallback) {
+  return value === undefined ? fallback : value;
 }
 
 function requireFinite(value, field, minimum, maximum) {
@@ -53,7 +57,7 @@ function requireInteger(value, field, minimum, maximum) {
 }
 
 function optionalBoolean(value, field, fallback) {
-  if (value == null) return fallback;
+  if (value === undefined) return fallback;
   if (typeof value !== 'boolean') {
     throw new Error(`${field} must be true or false.`);
   }
@@ -112,14 +116,19 @@ export function normalizeProceduralRecipe(input = {}) {
     finish,
     shape,
     towerSide,
-    width: requireFinite(source.width ?? 8, 'Width', 2, 16),
-    depth: requireFinite(source.depth ?? 2, 'Depth', 1, 12),
-    height: requireFinite(source.height ?? 5, 'Height', 2, 14),
-    roofScale: requireFinite(source.roofScale ?? 1, 'Roof height', 0.55, 2),
-    roofOverhang: requireFinite(source.roofOverhang ?? 0.35, 'Roof overhang', 0.1, 0.9),
-    seed: requireInteger(source.seed ?? 1, 'Seed', 0, 0x7fffffff),
-    detail: requireInteger(source.detail ?? 2, 'Detail', 1, 3),
-    weathering: requireFinite(source.weathering ?? 0.35, 'Weathering', 0, 1),
+    width: requireFinite(valueOrDefault(source.width, 8), 'Width', 2, 16),
+    depth: requireFinite(valueOrDefault(source.depth, 2), 'Depth', 1, 12),
+    height: requireFinite(valueOrDefault(source.height, 5), 'Height', 2, 14),
+    roofScale: requireFinite(valueOrDefault(source.roofScale, 1), 'Roof height', 0.55, 2),
+    roofOverhang: requireFinite(
+      valueOrDefault(source.roofOverhang, 0.35),
+      'Roof overhang',
+      0.1,
+      0.9,
+    ),
+    seed: requireInteger(valueOrDefault(source.seed, 1), 'Seed', 0, 0x7fffffff),
+    detail: requireInteger(valueOrDefault(source.detail, 2), 'Detail', 1, 3),
+    weathering: requireFinite(valueOrDefault(source.weathering, 0.35), 'Weathering', 0, 1),
     windows: optionalBoolean(source.windows, 'Doors and windows', true),
     ivy: optionalBoolean(source.ivy, 'Procedural ivy', false),
     remesh: optionalBoolean(source.remesh, 'Remeshing', true),
