@@ -24,15 +24,15 @@ const SLOT_BY_KEY = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map((slot) => [slot.k
 const SLOT_ORDER = new Map(WORKSHOP_SURFACE_TEXTURE_SLOTS.map(({ key }, index) => [key, index]));
 
 function requireObject(value, field) {
-  if (value == null) return {};
-  if (typeof value !== 'object' || Array.isArray(value)) {
+  if (value === undefined) return {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${field} must be an object.`);
   }
   return value;
 }
 
 function optionalString(value, field, fallback) {
-  if (value == null) return fallback;
+  if (value === undefined) return fallback;
   if (typeof value !== 'string') {
     throw new Error(`${field} must be a string.`);
   }
@@ -44,6 +44,10 @@ function requireString(value, field) {
     throw new Error(`${field} must be a string.`);
   }
   return value;
+}
+
+function valueOrDefault(value, fallback) {
+  return value === undefined ? fallback : value;
 }
 
 function requireFinite(value, field, minimum, maximum) {
@@ -125,7 +129,7 @@ function normalizeSlot(key, input, sources) {
   if (!VALID_MAPPINGS.has(mapping)) {
     throw new Error(`Unknown albedo mapping mode: ${mapping}.`);
   }
-  const rotation = slot.rotation ?? 0;
+  const rotation = valueOrDefault(slot.rotation, 0);
   if (typeof rotation !== 'number' || !VALID_ROTATIONS.has(rotation)) {
     throw new Error('Albedo rotation must be 0, 90, 180, or 270 degrees.');
   }
@@ -136,7 +140,12 @@ function normalizeSlot(key, input, sources) {
   return Object.freeze({
     sourceId,
     mapping,
-    repeat: requireFinite(slot.repeat ?? SLOT_BY_KEY.get(key).repeat, 'Albedo repeat', 0.25, 8),
+    repeat: requireFinite(
+      valueOrDefault(slot.repeat, SLOT_BY_KEY.get(key).repeat),
+      'Albedo repeat',
+      0.25,
+      8,
+    ),
     rotation,
     tint,
   });
