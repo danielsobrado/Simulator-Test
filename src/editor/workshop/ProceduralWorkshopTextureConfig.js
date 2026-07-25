@@ -39,6 +39,12 @@ function requireFinite(value, field, minimum, maximum) {
   return number;
 }
 
+function compareKey(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function decodeBase64(payload) {
   if (payload.length % 4 === 1) {
     throw new Error('Workshop albedo image data is not valid base64.');
@@ -123,13 +129,13 @@ function normalizeSlot(key, input, sources) {
 }
 
 function sourceOrder([left], [right]) {
-  return left.localeCompare(right);
+  return compareKey(left, right);
 }
 
 function slotOrder([left], [right]) {
   return (SLOT_ORDER.get(left) ?? Number.MAX_SAFE_INTEGER)
     - (SLOT_ORDER.get(right) ?? Number.MAX_SAFE_INTEGER)
-    || left.localeCompare(right);
+    || compareKey(left, right);
 }
 
 export function createSurfaceTextureSourceId(dataUrl) {
@@ -183,7 +189,7 @@ export function normalizeSurfaceTextures(input = {}) {
   }
   const sources = {};
   let totalLength = 0;
-  for (const sourceId of [...usedSourceIds].sort()) {
+  for (const sourceId of [...usedSourceIds].sort(compareKey)) {
     const source = allSources[sourceId];
     totalLength += source.dataUrl.length;
     sources[sourceId] = source;
