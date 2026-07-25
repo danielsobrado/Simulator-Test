@@ -38,6 +38,7 @@ export class TreeManifestStore {
     config,
     revisionTracker,
     prototypeCount,
+    prototypeIndexBySpecies = null,
     objectMap = null,
     onBuilt,
   }) {
@@ -52,6 +53,7 @@ export class TreeManifestStore {
       species: config.trees.species,
       palettes: config.trees.speciesPalettes,
       prototypeCount,
+      prototypeIndexBySpecies,
     });
     this.editStore = new ForestEditStore(terrainView.worldStore.forestEdits);
     this.editDocumentSignature = JSON.stringify(this.editStore.toDocument());
@@ -140,7 +142,13 @@ export class TreeManifestStore {
       )
       : perChunk;
     const counters = { evaluated: 0, rejectedHabitat: 0, rejectedEdits: 0 };
-    const fieldStatsBefore = { ...(this.forestField?.stats ?? { builds: 0, cacheHits: 0 }) };
+    const fieldStatsBefore = {
+      builds: 0,
+      cacheHits: 0,
+      patchBuilds: 0,
+      patchCacheHits: 0,
+      ...(this.forestField?.stats ?? {}),
+    };
     const generated = buildStableChunkManifest({
       kind: 'tree',
       chunkX,
@@ -234,6 +242,14 @@ export class TreeManifestStore {
     PerfCounters.inc(
       'forestFieldCacheHits',
       (this.forestField?.stats.cacheHits ?? 0) - fieldStatsBefore.cacheHits,
+    );
+    PerfCounters.inc(
+      'forestPatchGridBuilds',
+      (this.forestField?.stats.patchBuilds ?? 0) - fieldStatsBefore.patchBuilds,
+    );
+    PerfCounters.inc(
+      'forestPatchGridCacheHits',
+      (this.forestField?.stats.patchCacheHits ?? 0) - fieldStatsBefore.patchCacheHits,
     );
     PerfCounters.set('forestLastChunkPatchCount', new Set(
       placements.map((placement) => placement.patchId).filter(Boolean),

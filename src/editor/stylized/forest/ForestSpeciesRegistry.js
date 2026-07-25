@@ -60,7 +60,12 @@ function weightedAge(edge, coverage, random) {
 }
 
 export class ForestSpeciesRegistry {
-  constructor({ species = {}, palettes = {}, prototypeCount = 1 } = {}) {
+  constructor({
+    species = {},
+    palettes = {},
+    prototypeCount = 1,
+    prototypeIndexBySpecies = null,
+  } = {}) {
     this.species = new Map();
     for (const [id, definition] of Object.entries({ ...DEFAULT_SPECIES, ...species })) {
       this.species.set(id, Object.freeze({
@@ -73,11 +78,24 @@ export class ForestSpeciesRegistry {
     }
     this.palettes = { ...DEFAULT_PALETTES, ...palettes };
     this.prototypeCount = Math.max(1, Math.trunc(prototypeCount) || 1);
+    // Without an explicit mapping every species draws from the whole prototype
+    // range, so `speciesId` carries no geometry — the pre-species behaviour.
+    this.prototypeIndexBySpecies = prototypeIndexBySpecies ?? null;
     this.signature = JSON.stringify({
       species: [...this.species.values()],
       palettes: this.palettes,
       prototypeCount: this.prototypeCount,
+      prototypeIndices: this.prototypeIndexBySpecies
+        ? [...this.prototypeIndexBySpecies.map.entries()]
+        : null,
     });
+  }
+
+  /** Prototype indices able to render `speciesId`, in ascending order. */
+  prototypesFor(speciesId) {
+    if (!this.prototypeIndexBySpecies) return null;
+    const indices = this.prototypeIndexBySpecies.map.get(speciesId);
+    return indices?.length > 0 ? indices : this.prototypeIndexBySpecies.fallback;
   }
 
   select(candidate, habitat) {
@@ -97,10 +115,17 @@ export class ForestSpeciesRegistry {
     );
     const age = AGE_CLASSES[ageClass];
     const individualVariation = 0.9 + stableUnit(candidate.stableId, 47) * 0.2;
-    const prototypeIndex = Math.min(
-      this.prototypeCount - 1,
-      Math.floor(stableUnit(`${speciesId}:${candidate.stableId}`, 53) * this.prototypeCount),
-    );
+    const speciesPrototypes = this.prototypesFor(speciesId);
+    const prototypeRoll = stableUnit(`${speciesId}:${candidate.stableId}`, 53);
+    const prototypeIndex = speciesPrototypes
+      ? speciesPrototypes[Math.min(
+        speciesPrototypes.length - 1,
+        Math.floor(prototypeRoll * speciesPrototypes.length),
+      )]
+      : Math.min(
+        this.prototypeCount - 1,
+        Math.floor(prototypeRoll * this.prototypeCount),
+      );
     const heightScale = candidate.scale * age.height * individualVariation;
     const crownScale = age.crown * (0.92 + stableUnit(candidate.stableId, 59) * 0.16);
     const trunkScale = age.trunk * (0.94 + stableUnit(candidate.stableId, 61) * 0.12);

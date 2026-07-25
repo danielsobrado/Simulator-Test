@@ -1,17 +1,29 @@
+import { bilinearSample } from './bilinearGrid.js';
+
 function clamp01(value) {
   return Math.min(1, Math.max(0, value));
 }
+
+/**
+ * Fraction of a ground-cover layer that survives under canopy. Suppressed in
+ * dense patch cores, restored toward the patch edge. `bush` keeps most of its
+ * density at the fringe — thickets ring a wood rather than carpeting its floor.
+ */
+const FLOOR_DEFAULTS = Object.freeze({
+  grass: Object.freeze({ core: 0.18, edge: 0.72 }),
+  flower: Object.freeze({ core: 0.08, edge: 0.58 }),
+  bush: Object.freeze({ core: 0.22, edge: 0.95 }),
+});
+
+export const FOREST_FLOOR_KINDS = Object.freeze(Object.keys(FLOOR_DEFAULTS));
 
 export function forestFloorDensity(habitat, kind, config = {}) {
   if (!habitat?.patchId || habitat.patchCoverage <= 0) return 1;
   const coverage = clamp01(habitat.patchCoverage);
   const edge = clamp01(habitat.patchEdge);
-  const coreDensity = clamp01(Number(
-    kind === 'flower' ? config.flowerCoreDensity : config.grassCoreDensity,
-  ) || (kind === 'flower' ? 0.08 : 0.18));
-  const edgeDensity = clamp01(Number(
-    kind === 'flower' ? config.flowerEdgeDensity : config.grassEdgeDensity,
-  ) || (kind === 'flower' ? 0.58 : 0.72));
+  const defaults = FLOOR_DEFAULTS[kind] ?? FLOOR_DEFAULTS.grass;
+  const coreDensity = clamp01(Number(config[`${kind}CoreDensity`]) || defaults.core);
+  const edgeDensity = clamp01(Number(config[`${kind}EdgeDensity`]) || defaults.edge);
   const woodedDensity = coreDensity + (edgeDensity - coreDensity) * edge;
   return clamp01(1 - coverage * (1 - woodedDensity));
 }
@@ -41,21 +53,12 @@ export function filterScatterByForest({
       );
     }
   }
-  const densityAt = (localX, localZ) => {
-    const gridX = clamp01((localX + half) / worldSize) * (size - 1);
-    const gridZ = clamp01((half - localZ) / worldSize) * (size - 1);
-    const x0 = Math.floor(gridX);
-    const z0 = Math.floor(gridZ);
-    const x1 = Math.min(size - 1, x0 + 1);
-    const z1 = Math.min(size - 1, z0 + 1);
-    const tx = gridX - x0;
-    const tz = gridZ - z0;
-    const bottom = densityGrid[z0 * size + x0] * (1 - tx)
-      + densityGrid[z0 * size + x1] * tx;
-    const top = densityGrid[z1 * size + x0] * (1 - tx)
-      + densityGrid[z1 * size + x1] * tx;
-    return bottom * (1 - tz) + top * tz;
-  };
+  const densityAt = (localX, localZ) => bilinearSample(
+    densityGrid,
+    size,
+    clamp01((localX + half) / worldSize) * (size - 1),
+    clamp01((half - localZ) / worldSize) * (size - 1),
+  );
   const base = new Float32Array(scatter.base.length);
   const parameters = new Float32Array(scatter.parameters.length);
   let count = 0;

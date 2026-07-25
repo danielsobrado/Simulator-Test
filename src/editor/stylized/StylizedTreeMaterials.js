@@ -19,7 +19,23 @@ function colorNode(value) {
   return vec3(color.r, color.g, color.b);
 }
 
-export function createStylizedLeafMaterial({ source, leafMap, bounds, time, config }) {
+/**
+ * Per-species colour overrides. Generated broadleaf prototypes each own their
+ * materials, so a palette here reads as a distinct species without needing a
+ * second material pipeline.
+ */
+function paletteValue(palette, config, key) {
+  return palette?.[key] ?? config.trees[key];
+}
+
+export function createStylizedLeafMaterial({
+  source,
+  leafMap,
+  bounds,
+  time,
+  config,
+  palette = null,
+}) {
   const normalizedHeight = clamp(
     positionLocal.y.sub(bounds.minY).div(Math.max(0.001, bounds.maxY - bounds.minY)),
     0,
@@ -45,8 +61,8 @@ export function createStylizedLeafMaterial({ source, leafMap, bounds, time, conf
 
   const gradient = pow(normalizedHeight, config.trees.gradientPower);
   const baseColor = mix(
-    colorNode(config.trees.leafBottom),
-    colorNode(config.trees.leafTop),
+    colorNode(paletteValue(palette, config, 'leafBottom')),
+    colorNode(paletteValue(palette, config, 'leafTop')),
     gradient,
   );
   const variation = stylizedFbm(
@@ -54,13 +70,13 @@ export function createStylizedLeafMaterial({ source, leafMap, bounds, time, conf
   ).sub(0.5);
   const leafColor = max(
     baseColor.add(
-      colorNode(config.trees.variationColor)
+      colorNode(paletteValue(palette, config, 'variationColor'))
         .sub(baseColor)
         .mul(variation)
         .mul(config.trees.variationStrength),
     ),
     vec3(0),
-  ).mul(config.trees.brightness);
+  ).mul(paletteValue(palette, config, 'brightness'));
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = finalPosition;
@@ -74,15 +90,15 @@ export function createStylizedLeafMaterial({ source, leafMap, bounds, time, conf
   return material;
 }
 
-export function createStylizedTrunkMaterial({ textures, config }) {
+export function createStylizedTrunkMaterial({ textures, config, palette = null }) {
   const bark = texture(textures.color, uv().mul(config.trees.barkScale)).rgb;
   const ao = texture(textures.ao, uv().mul(config.trees.barkScale)).r;
   const relief = texture(textures.height, uv().mul(config.trees.barkScale)).r;
-  const tint = colorNode(config.trees.barkTint);
-  const barkColor = mix(bark, tint, config.trees.barkTintStrength)
+  const tint = colorNode(paletteValue(palette, config, 'barkTint'));
+  const barkColor = mix(bark, tint, paletteValue(palette, config, 'barkTintStrength'))
     .mul(mix(1, ao, config.trees.barkAoStrength))
     .mul(mix(0.82, 1.18, relief.mul(config.trees.barkRelief)))
-    .mul(config.trees.barkBrightness);
+    .mul(paletteValue(palette, config, 'barkBrightness'));
   const material = new THREE.MeshLambertNodeMaterial();
   material.colorNode = barkColor;
   return material;

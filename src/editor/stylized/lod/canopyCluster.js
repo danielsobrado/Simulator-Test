@@ -51,22 +51,55 @@ export function aggregateCanopyCluster({
   });
 }
 
+function connectionRadius(placement, gap) {
+  return placement.spacingRadius ?? placement.radius ?? gap * 0.5;
+}
+
+/**
+ * Bucketed flood fill. The previous form copied the whole remaining set per
+ * visited node, which is fine at a couple of dozen trees per chunk and a frame
+ * spike at a couple of hundred. Buckets are sized by the largest connection
+ * distance so any connected pair shares a bucket or one of its eight
+ * neighbours; component membership is unchanged.
+ */
 function connectedComponents(placements, gap) {
+  let maximumReach = 0;
+  for (const placement of placements) {
+    maximumReach = Math.max(maximumReach, connectionRadius(placement, gap));
+  }
+  const cellSize = Math.max(1e-6, maximumReach * 2 + gap);
+  const buckets = new Map();
+  for (const placement of placements) {
+    const key = `${Math.floor(placement.x / cellSize)}:${Math.floor(placement.z / cellSize)}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(placement);
+    else buckets.set(key, [placement]);
+  }
+
   const remaining = new Set(placements);
   const components = [];
-  while (remaining.size > 0) {
-    const first = remaining.values().next().value;
-    remaining.delete(first);
-    const component = [first];
+  for (const seed of placements) {
+    if (!remaining.has(seed)) continue;
+    remaining.delete(seed);
+    const component = [seed];
     for (let cursor = 0; cursor < component.length; cursor += 1) {
       const current = component[cursor];
-      for (const candidate of [...remaining]) {
-        const connection = (current.spacingRadius ?? current.radius ?? gap * 0.5)
-          + (candidate.spacingRadius ?? candidate.radius ?? gap * 0.5)
-          + gap;
-        if (Math.hypot(current.x - candidate.x, current.z - candidate.z) <= connection) {
-          remaining.delete(candidate);
-          component.push(candidate);
+      const cellX = Math.floor(current.x / cellSize);
+      const cellZ = Math.floor(current.z / cellSize);
+      for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          const bucket = buckets.get(`${cellX + offsetX}:${cellZ + offsetZ}`);
+          if (!bucket) continue;
+          for (const candidate of bucket) {
+            if (!remaining.has(candidate)) continue;
+            const connection = connectionRadius(current, gap)
+              + connectionRadius(candidate, gap)
+              + gap;
+            if (Math.hypot(current.x - candidate.x, current.z - candidate.z) <= connection) {
+              remaining.delete(candidate);
+              component.push(candidate);
+            }
+          }
         }
       }
     }

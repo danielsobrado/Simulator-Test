@@ -8,6 +8,12 @@ import {
   findPrototypeRoots,
 } from './StylizedTreePrototypes.js';
 import { createStylizedLeafMaterial, createStylizedTrunkMaterial } from './StylizedTreeMaterials.js';
+import {
+  FOREST_GENERATED_SPECIES,
+  FOREST_SPECIES_PALETTES,
+  createForestSpeciesPrototypeGeometry,
+  createSpeciesPrototypeIndex,
+} from './forest/ForestSpeciesGeometry.js';
 import { instanceCapacity } from './scatterMath.js';
 import { TreeManifestStore } from './TreeManifestStore.js';
 import { rebuildTreeLod } from './TreeLodAssembler.js';
@@ -87,6 +93,7 @@ export class StylizedTreeView {
     this.time = uniform(0);
     this.prototypes = [];
     this.prototypeSignature = null;
+    this.speciesPrototypeIndex = null;
     this.proxyPrototypes = [];
     this.fallbackImpostorPrototypes = [];
     this.renderers = [];
@@ -178,8 +185,50 @@ export class StylizedTreeView {
       throw new Error('Pine prototype extraction produced no upright renderable parts.');
     }
 
+    this.appendGeneratedSpeciesPrototypes(barkTextures);
     this.prototypeSignature = createTreeImpostorSourceSignature(this.prototypes, this.config);
     this.createRenderResources();
+  }
+
+  /**
+   * The source GLB only contains conifers, so broadleaf species are generated.
+   * They append after the GLB prototypes, which keeps existing baked impostor
+   * indices aligned with the GLB range.
+   */
+  appendGeneratedSpeciesPrototypes(barkTextures) {
+    const glbPrototypeCount = this.prototypes.length;
+    const generated = createForestSpeciesPrototypeGeometry(FOREST_GENERATED_SPECIES);
+    for (const prototype of generated) {
+      const palette = FOREST_SPECIES_PALETTES[prototype.speciesId] ?? null;
+      const parts = prototype.parts.map((part) => ({
+        geometry: part.geometry,
+        kind: part.kind,
+        sourceMap: null,
+        material: part.kind === 'leaf'
+          ? createStylizedLeafMaterial({
+            source: null,
+            leafMap: null,
+            bounds: {
+              minY: part.geometry.boundingBox.min.y,
+              maxY: part.geometry.boundingBox.max.y,
+            },
+            time: this.time,
+            config: this.config,
+            palette,
+          })
+          : createStylizedTrunkMaterial({
+            textures: barkTextures,
+            config: this.config,
+            palette,
+          }),
+      }));
+      attachRootCollar(parts);
+      this.prototypes.push(parts);
+    }
+    this.speciesPrototypeIndex = createSpeciesPrototypeIndex({
+      glbPrototypeCount,
+      generatedSpeciesIds: generated.map((prototype) => prototype.speciesId),
+    });
   }
 
   createRenderResources() {
@@ -242,6 +291,7 @@ export class StylizedTreeView {
       config: this.config,
       revisionTracker: this.revisionTracker,
       prototypeCount: this.prototypes.length,
+      prototypeIndexBySpecies: this.speciesPrototypeIndex ?? null,
       objectMap: this.objectMap,
       onBuilt: () => {
         // Newly built manifests need a follow-up LOD write; the update loop

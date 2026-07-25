@@ -7,6 +7,7 @@ import {
   rocksInfluencingChunk,
 } from './chunkRockSignature.js';
 import { isTreeImpostorBakeMode } from './impostorBakeMode.js';
+import { StylizedBushView } from './StylizedBushView.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import { StylizedChunkRevisionTracker } from './StylizedChunkRevisionTracker.js';
 import { StylizedFlowerView } from './StylizedFlowerView.js';
@@ -58,6 +59,14 @@ export class StylizedSurfaceView {
         forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
       })
       : null;
+    this.bushView = this.enabled && !this.impostorBakeMode && config.bushes?.enabled
+      ? new StylizedBushView({
+        terrainView,
+        config,
+        revisionTracker: this.revisionTracker,
+        forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+      })
+      : null;
     this.ready = this.bootstrapLayers();
     this.bakeRequest = this.ready.then(() => this.maybeHandleImpostorBake());
     this.bakeRequest.catch((error) => {
@@ -97,6 +106,10 @@ export class StylizedSurfaceView {
       buildsPerFrame: config.streaming?.rockBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
+    this.bushBuildQueue = new StylizedBuildQueue({
+      buildsPerFrame: config.streaming?.bushBuildsPerFrame ?? 1,
+      budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
+    });
     this.chunkWorldSize = terrainView.worldStore.chunkSize * terrainView.worldStore.tileSize;
     this.tileSize = terrainView.worldStore.tileSize;
   }
@@ -116,6 +129,9 @@ export class StylizedSurfaceView {
         this.treeView?.buildFromScene(sharedScene),
         this.flowerView?.ready,
       ].filter(Boolean));
+      // Bush prototypes are procedural, so they need no scene — but they read the
+      // forest field, which only exists once the tree manifest store is built.
+      this.bushView?.build();
       return null;
     } catch (error) {
       console.warn('Some stylized assets failed to load; remaining layers stay active.', error);
@@ -190,6 +206,16 @@ export class StylizedSurfaceView {
     this.treeBuildQueue.flush((job) => {
       void job;
       return this.treeView?.applyPendingRebuild() ?? false;
+    });
+    // Bushes run after rocks and trees so boulder blockers and the forest field
+    // are already current for this frame.
+    this.bushView?.update(timestamp, camera, this.rockView);
+    if (this.bushView?.pendingRebuild) {
+      this.bushBuildQueue.enqueue(this.bushView.pendingRebuild);
+    }
+    this.bushBuildQueue.flush((job) => {
+      void job;
+      return this.bushView?.applyPendingRebuild() ?? false;
     });
     this.updateForestGroundTextures();
     this.flowerView?.update(timestamp);

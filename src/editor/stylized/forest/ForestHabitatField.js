@@ -6,8 +6,10 @@ import {
   FOREST_PATCH_DEFAULT_SUPERCELL_SIZE,
   ForestPatchField,
 } from './ForestPatchField.js';
+import { bilinear } from './bilinearGrid.js';
 
 const DEFAULT_SLOPE_SAMPLE_DISTANCE = 4;
+const DEFAULT_PATCH_SAMPLE_SPACING = 12;
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value));
@@ -74,10 +76,18 @@ export class ForestHabitatField {
     this.cacheRevision = this.revisionProvider?.() ?? 0;
     this.cacheLimit = Math.max(256, Math.trunc(config.cacheSamples) || 32768);
     this.sampleCache = new Map();
-    this.stats = { builds: 0, cacheHits: 0 };
+    this.patchCache = new Map();
+    this.stats = { builds: 0, cacheHits: 0, patchBuilds: 0, patchCacheHits: 0 };
     this.slopeSampleDistance = Math.max(
       tileSize,
       Number(config.slopeSampleDistance) || DEFAULT_SLOPE_SAMPLE_DISTANCE,
+    );
+    // Patch coverage varies over tens of metres, so it is evaluated on a coarse
+    // grid and interpolated. Unlike the exact-position cache this is reused
+    // heavily across neighbouring candidates and overlapping chunk halos.
+    this.patchSampleSpacing = Math.max(
+      tileSize,
+      Number(config.patchSampleSpacing) || DEFAULT_PATCH_SAMPLE_SPACING,
     );
     this.profiles = createForestBiomeProfiles(config.profiles);
     this.patchField = new ForestPatchField({
@@ -89,9 +99,71 @@ export class ForestHabitatField {
       this.seed,
       this.tileSize,
       this.slopeSampleDistance,
+      this.patchSampleSpacing,
       this.patchField.signature,
       forestProfileSignature(this.profiles),
     ].join('|');
+  }
+
+  patchNodeAt(nodeX, nodeZ, profile) {
+    const key = `${profile.tileId}:${nodeX}:${nodeZ}`;
+    const cached = this.patchCache.get(key);
+    if (cached) {
+      this.stats.patchCacheHits += 1;
+      return cached;
+    }
+    const sample = this.patchField.sample(
+      nodeX * this.patchSampleSpacing,
+      nodeZ * this.patchSampleSpacing,
+      profile,
+    );
+    if (this.patchCache.size >= this.cacheLimit) {
+      this.patchCache.delete(this.patchCache.keys().next().value);
+    }
+    this.patchCache.set(key, sample);
+    this.stats.patchBuilds += 1;
+    return sample;
+  }
+
+  /**
+   * Interpolated patch terms. `patchId` is discrete so it snaps to the nearest
+   * grid node — patches span hundreds of metres, so a node-sized boundary
+   * quantization is not visible, and grove identity stays stable across chunks.
+   */
+  patchAt(x, z, profile) {
+    const gridX = x / this.patchSampleSpacing;
+    const gridZ = z / this.patchSampleSpacing;
+    const nodeX = Math.floor(gridX);
+    const nodeZ = Math.floor(gridZ);
+    const tx = gridX - nodeX;
+    const tz = gridZ - nodeZ;
+    const bottomLeft = this.patchNodeAt(nodeX, nodeZ, profile);
+    const bottomRight = this.patchNodeAt(nodeX + 1, nodeZ, profile);
+    const topLeft = this.patchNodeAt(nodeX, nodeZ + 1, profile);
+    const topRight = this.patchNodeAt(nodeX + 1, nodeZ + 1, profile);
+    const nearest = [bottomLeft, bottomRight, topLeft, topRight][
+      (tz < 0.5 ? 0 : 2) + (tx < 0.5 ? 0 : 1)
+    ];
+    return {
+      patchId: nearest.patchId,
+      patchCoverage: bilinear(
+        bottomLeft.patchCoverage,
+        bottomRight.patchCoverage,
+        topLeft.patchCoverage,
+        topRight.patchCoverage,
+        tx,
+        tz,
+      ),
+      patchEdge: bilinear(
+        bottomLeft.patchEdge,
+        bottomRight.patchEdge,
+        topLeft.patchEdge,
+        topRight.patchEdge,
+        tx,
+        tz,
+      ),
+      patchDistance: nearest.patchDistance,
+    };
   }
 
   slopeAt(x, z) {
@@ -104,6 +176,8 @@ export class ForestHabitatField {
   sample(x, z) {
     const revision = this.revisionProvider?.() ?? this.cacheRevision;
     if (revision !== this.cacheRevision) {
+      // patchCache depends only on seed, supercell size and profile — never on
+      // terrain heights or tiles — so world edits cannot stale it.
       this.sampleCache.clear();
       this.cacheRevision = revision;
     }
@@ -136,7 +210,7 @@ export class ForestHabitatField {
 
     const elevation = this.heightAt(x, z);
     const slope = this.slopeAt(x, z);
-    const patch = this.patchField.sample(x, z, profile);
+    const patch = this.patchAt(x, z, profile);
     const elevationFactor = rangeWeight(
       elevation,
       profile.elevationMin,

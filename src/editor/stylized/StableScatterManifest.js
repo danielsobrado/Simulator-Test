@@ -31,6 +31,42 @@ function candidateOverlaps(left, right) {
   return deltaX * deltaX + deltaZ * deltaZ < clear * clear;
 }
 
+/**
+ * Uniform bucket index over candidate positions. Buckets are sized by the
+ * largest candidate radius so any overlapping pair shares a bucket or sits in
+ * one of the eight neighbours — the spacing rule itself is unchanged, only the
+ * pairs visited shrink from O(n²) to O(n · localDensity).
+ */
+function createSpacingIndex(candidates) {
+  let maximumRadius = 0;
+  for (const candidate of candidates) {
+    if (candidate.radius > maximumRadius) maximumRadius = candidate.radius;
+  }
+  // Zero-radius candidates never overlap, so the bucket size is irrelevant.
+  const cellSize = maximumRadius > 0 ? maximumRadius * 2 : 1;
+  const buckets = new Map();
+  for (const candidate of candidates) {
+    const cellX = Math.floor(candidate.x / cellSize);
+    const cellZ = Math.floor(candidate.z / cellSize);
+    const key = `${cellX}:${cellZ}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(candidate);
+    else buckets.set(key, [candidate]);
+  }
+  return {
+    *neighbours(candidate) {
+      const cellX = Math.floor(candidate.x / cellSize);
+      const cellZ = Math.floor(candidate.z / cellSize);
+      for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          const bucket = buckets.get(`${cellX + offsetX}:${cellZ + offsetZ}`);
+          if (bucket) yield* bucket;
+        }
+      }
+    },
+  };
+}
+
 function stableId(kind, chunkX, chunkZ, index) {
   return `${kind}:${chunkX}:${chunkZ}:${index}`;
 }
@@ -244,9 +280,10 @@ export function buildStableChunkManifest({
   }
 
   const authoritativeCandidates = limitCandidatesByOwner(candidates, acceptedLimit);
+  const spacingIndex = createSpacingIndex(authoritativeCandidates);
   const accepted = authoritativeCandidates.filter((candidate) => {
     if (overlaps(candidate.x, candidate.z, blockers, candidate.radius)) return false;
-    for (const other of authoritativeCandidates) {
+    for (const other of spacingIndex.neighbours(candidate)) {
       if (other === candidate || !candidateWins(other, candidate)) continue;
       if (candidateOverlaps(candidate, other)) return false;
     }
