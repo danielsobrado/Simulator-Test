@@ -85,10 +85,8 @@ function estimatedStoneParts(recipe) {
     return wallCourseEstimate(recipe.width, recipe.height, recipe.detail) + tower * 2;
   }
 
-  const roofHeight = Math.min(
-    5.4,
-    Math.max(0.85, Math.max(3.2, Math.min(7.5, recipe.depth * 2.2)) * 0.47 * recipe.roofScale),
-  );
+  const depth = Math.max(3.2, Math.min(7.5, recipe.depth * 2.2));
+  const roofHeight = Math.min(5.4, Math.max(0.85, depth * 0.47 * recipe.roofScale));
   return wallCourseEstimate(recipe.width, 0.62, recipe.detail)
     + (recipe.shape === 'classic' ? 0 : Math.ceil(roofHeight / 0.38) * 4);
 }
@@ -126,7 +124,7 @@ function openingIntersectsBounds(opening, bounds) {
   ) {
     return false;
   }
-  if (opening.frontZ == null) return true;
+  if (opening.frontZ === undefined) return true;
   return !(
     bounds.max.z < opening.frontZ - opening.frontTolerance
     || bounds.min.z > opening.frontZ + opening.frontTolerance
@@ -322,14 +320,17 @@ function mergeParts(parts) {
       let merged = null;
       try {
         merged = mergeGeometries(geometries, false);
+        if (!merged) {
+          throw new Error('The workshop could not merge the validated medieval geometry.');
+        }
+        merged.computeBoundingBox();
+        merged.computeBoundingSphere();
+      } catch (error) {
+        merged?.dispose();
+        throw error;
       } finally {
         geometries.forEach((geometry) => geometry.dispose());
       }
-      if (!merged) {
-        throw new Error('The workshop could not merge the validated medieval geometry.');
-      }
-      merged.computeBoundingBox();
-      merged.computeBoundingSphere();
       mergedParts.push({ geometry: merged, material, matrix: new THREE.Matrix4() });
     }
     return mergedParts;
@@ -347,6 +348,15 @@ function disposeUnusedMaterials(rawParts, keptParts) {
   }
 }
 
+function partitionParts(rawParts, openings) {
+  const kept = [];
+  const removed = [];
+  for (const part of rawParts) {
+    (obstructsPassage(part, openings) ? removed : kept).push(part);
+  }
+  return { kept, removed };
+}
+
 function attachStats(parts, stats) {
   Object.defineProperty(parts, 'stats', { value: stats, enumerable: false });
   return Object.freeze(parts);
@@ -358,22 +368,21 @@ export function createProceduralMedievalWorkshopParts(input) {
   const rawParts = createProceduralMedievalParts({ ...recipe, remesh: false });
   try {
     validateSourceParts(rawParts);
-    const openings = structuralOpenings(recipe);
-    const keptParts = rawParts.filter((part) => !obstructsPassage(part, openings));
-    const stats = buildStats(keptParts, recipe.remesh
-      ? new Set(keptParts.map((part) => part.material)).size
-      : keptParts.length);
+    const { kept, removed } = partitionParts(rawParts, structuralOpenings(recipe));
+    const drawParts = recipe.remesh
+      ? new Set(kept.map((part) => part.material)).size
+      : kept.length;
+    const stats = buildStats(kept, drawParts);
 
     if (!recipe.remesh) {
-      const removedParts = rawParts.filter((part) => !keptParts.includes(part));
-      disposePartGeometries(removedParts);
-      disposeUnusedMaterials(rawParts, keptParts);
-      return attachStats(keptParts, stats);
+      disposePartGeometries(removed);
+      disposeUnusedMaterials(rawParts, kept);
+      return attachStats(kept, stats);
     }
 
-    const mergedParts = mergeParts(keptParts);
+    const mergedParts = mergeParts(kept);
     disposePartGeometries(rawParts);
-    disposeUnusedMaterials(rawParts, keptParts);
+    disposeUnusedMaterials(rawParts, kept);
     return attachStats(mergedParts, stats);
   } catch (error) {
     disposeModelParts(rawParts);
@@ -382,12 +391,13 @@ export function createProceduralMedievalWorkshopParts(input) {
 }
 
 export function getProceduralMedievalWorkshopStats(input) {
-  const parts = createProceduralMedievalWorkshopParts({
-    ...normalizeProceduralRecipe(input),
-    remesh: false,
-  });
+  const recipe = normalizeProceduralRecipe(input);
+  const parts = createProceduralMedievalWorkshopParts({ ...recipe, remesh: false });
   try {
-    return parts.stats;
+    const drawParts = recipe.remesh
+      ? new Set(parts.map((part) => part.material)).size
+      : parts.length;
+    return Object.freeze({ ...parts.stats, drawParts });
   } finally {
     disposeModelParts(parts);
   }
