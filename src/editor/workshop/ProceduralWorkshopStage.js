@@ -421,13 +421,26 @@ function mergeStaticMeshes(group) {
   replacements.forEach((mesh) => group.add(mesh));
 }
 
-function disposeGroup(group) {
+function collectStageMaterials(materials) {
+  return [
+    materials.trunk,
+    materials.conifer,
+    materials.broadleaf,
+    materials.brightLeaf,
+    materials.rock,
+    materials.cloud,
+    ...materials.hills,
+  ];
+}
+
+function disposeGroup(group, additionalMaterials = []) {
   const geometries = new Set();
-  const materials = new Set();
+  const materials = new Set(additionalMaterials);
   group.traverse((object) => {
     if (object.geometry) geometries.add(object.geometry);
     if (Array.isArray(object.material)) object.material.forEach((material) => materials.add(material));
     else if (object.material) materials.add(object.material);
+    object.shadow?.map?.dispose?.();
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => {
@@ -439,50 +452,67 @@ function disposeGroup(group) {
 }
 
 export function createWorkshopStage(scene) {
+  const previousBackground = scene.background;
+  const previousFog = scene.fog;
   const group = new THREE.Group();
   const materials = createMaterials();
+  const sky = createSkyTexture();
+  const fog = new THREE.Fog('#bdd8b5', 38, 88);
+  let disposed = false;
+
   group.name = 'workshop-stage';
   scene.add(group);
-  scene.background = createSkyTexture();
-  scene.fog = new THREE.Fog('#bdd8b5', 38, 88);
+  scene.background = sky;
+  scene.fog = fog;
 
-  group.add(createTerrain(), createPath(), createBoundary(), createWildflowers());
-  addDistantHills(group, materials);
-  addTrees(group, materials);
-  addRocks(group, materials);
-  addClouds(group, materials);
-  mergeStaticMeshes(group);
+  try {
+    group.add(createTerrain(), createPath(), createBoundary(), createWildflowers());
+    addDistantHills(group, materials);
+    addTrees(group, materials);
+    addRocks(group, materials);
+    addClouds(group, materials);
+    mergeStaticMeshes(group);
 
-  const hemisphere = new THREE.HemisphereLight('#d9edff', '#5c7047', 2.25);
-  group.add(hemisphere);
+    const hemisphere = new THREE.HemisphereLight('#d9edff', '#5c7047', 2.25);
+    group.add(hemisphere);
 
-  const sun = new THREE.DirectionalLight('#fff1bd', 4.35);
-  sun.position.set(-11, 19, 13);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -18;
-  sun.shadow.camera.right = 18;
-  sun.shadow.camera.top = 18;
-  sun.shadow.camera.bottom = -18;
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 60;
-  sun.shadow.bias = -0.00035;
-  sun.shadow.normalBias = 0.035;
-  sun.shadow.radius = 2.4;
-  sun.target.position.set(0, 3, 0);
-  group.add(sun, sun.target);
+    const sun = new THREE.DirectionalLight('#fff1bd', 4.35);
+    sun.position.set(-11, 19, 13);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -18;
+    sun.shadow.camera.right = 18;
+    sun.shadow.camera.top = 18;
+    sun.shadow.camera.bottom = -18;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 60;
+    sun.shadow.bias = -0.00035;
+    sun.shadow.normalBias = 0.035;
+    sun.shadow.radius = 2.4;
+    sun.target.position.set(0, 3, 0);
+    group.add(sun, sun.target);
 
-  const fill = new THREE.DirectionalLight('#9dc9ff', 0.92);
-  fill.position.set(11, 8, -11);
-  group.add(fill);
+    const fill = new THREE.DirectionalLight('#9dc9ff', 0.92);
+    fill.position.set(11, 8, -11);
+    group.add(fill);
+  } catch (error) {
+    disposeGroup(group, collectStageMaterials(materials));
+    group.removeFromParent();
+    sky.dispose();
+    if (scene.background === sky) scene.background = previousBackground;
+    if (scene.fog === fog) scene.fog = previousFog;
+    throw error;
+  }
 
   return {
     group,
     dispose() {
-      scene.background?.dispose?.();
-      scene.background = null;
-      scene.fog = null;
-      disposeGroup(group);
+      if (disposed) return;
+      disposed = true;
+      if (scene.background === sky) scene.background = previousBackground;
+      if (scene.fog === fog) scene.fog = previousFog;
+      sky.dispose();
+      disposeGroup(group, collectStageMaterials(materials));
       group.removeFromParent();
     },
   };
