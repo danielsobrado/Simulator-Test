@@ -34,6 +34,9 @@ function createGeometrySets() {
 }
 
 function addStone(target, recipe, params, stableIndex, heightRatio) {
+  if (target.length >= MAX_STONES) {
+    throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
+  }
   target.push(applyStoneColor(
     beveledBox({ ...params, detail: recipe.detail }),
     recipe,
@@ -57,7 +60,6 @@ function buildWallBody(sets, recipe, openings) {
   const actualCourseHeight = recipe.height / courseCount;
   const targetStoneWidth = 0.92 - recipe.detail * 0.07;
   let stableIndex = 9_100_000;
-  let stoneCount = 0;
 
   for (let course = 0; course < courseCount; course += 1) {
     const y = (course + 0.5) * actualCourseHeight;
@@ -98,14 +100,10 @@ function buildWallBody(sets, recipe, openings) {
             (random() - 0.5) * 0.01,
           ],
         }, stableIndex, y / recipe.height);
-        stoneCount += 1;
       }
 
       cursor += stoneWidth;
       stableIndex += 1;
-      if (stoneCount > MAX_STONES) {
-        throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
-      }
     }
   }
 }
@@ -219,9 +217,15 @@ function buildCoping(sets, recipe) {
       detail: recipe.detail,
       bevelRatio: 0.12,
     });
-    target.push(recipe.topStyle === 'battlements'
-      ? applyStoneColor(geometry, recipe, 9_800_000 + index, 1)
-      : geometry);
+    if (recipe.topStyle === 'battlements') {
+      if (target.length >= MAX_STONES) {
+        geometry.dispose();
+        throw new Error(`Castle wall generation exceeded ${MAX_STONES} stones.`);
+      }
+      target.push(applyStoneColor(geometry, recipe, 9_800_000 + index, 1));
+    } else {
+      target.push(geometry);
+    }
   }
 }
 
