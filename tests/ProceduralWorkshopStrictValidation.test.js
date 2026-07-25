@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createProceduralAssetRecord,
   normalizeProceduralRecipe,
   ProceduralAssetStore,
 } from '../src/editor/workshop/ProceduralAssetStore.js';
@@ -71,6 +72,29 @@ test('workshop recipes reject numeric and boolean string coercion', () => {
     () => normalizeProceduralRecipe(recipe({ detail: 2.5 })),
     /Detail must be an integer/,
   );
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ archetype: 1 })),
+    /Workshop archetype must be a string/,
+  );
+});
+
+test('explicit null recipe values are rejected instead of becoming defaults', () => {
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ width: null })),
+    /Width must be between/,
+  );
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ windows: null })),
+    /Doors and windows must be true or false/,
+  );
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ surfaceTextures: null })),
+    /Workshop surface textures must be an object/,
+  );
+  assert.throws(
+    () => normalizeProceduralRecipe(recipe({ componentTransforms: null })),
+    /Workshop component transforms must be an object/,
+  );
 });
 
 test('component vectors reject coerced values and canonicalize equivalent half turns', () => {
@@ -82,6 +106,10 @@ test('component vectors reject coerced values and canonicalize equivalent half t
     () => normalizeComponentTransform({ scale: [null, 1, 1] }),
     /Component scale values must be between/,
   );
+  assert.throws(
+    () => normalizeComponentTransform(null),
+    /Component transform must be an object/,
+  );
 
   const positive = normalizeComponentTransform({ rotation: [0, Math.PI, 0] });
   const negative = normalizeComponentTransform({ rotation: [0, -Math.PI, 0] });
@@ -89,7 +117,7 @@ test('component vectors reject coerced values and canonicalize equivalent half t
   assert.equal(positive.rotation[1], Math.PI);
 });
 
-test('semantic texture recipes reject numeric and string coercion', () => {
+test('semantic texture recipes reject numeric, string, and null coercion', () => {
   assert.throws(
     () => normalizeProceduralRecipe(texturedRecipe({ repeat: '2' })),
     /Albedo repeat must be between/,
@@ -97,6 +125,10 @@ test('semantic texture recipes reject numeric and string coercion', () => {
   assert.throws(
     () => normalizeProceduralRecipe(texturedRecipe({ rotation: '90' })),
     /Albedo rotation must be/,
+  );
+  assert.throws(
+    () => normalizeProceduralRecipe(texturedRecipe({ tint: null })),
+    /tint must be a string/,
   );
   assert.throws(
     () => normalizeProceduralRecipe(texturedRecipe({}, { dataUrl: 123 })),
@@ -113,5 +145,13 @@ test('malformed saved records fail with controlled validation errors', () => {
   assert.throws(
     () => store.replaceAll({}),
     /payload must be an array/,
+  );
+  assert.throws(
+    () => store.replaceAll([{ version: 3, key: 'workshop-missing-recipe', label: 'Missing' }]),
+    /Procedural game-object recipe must be an object/,
+  );
+  assert.throws(
+    () => createProceduralAssetRecord({ label: 123, recipe: recipe() }),
+    /Game-object name must be a string/,
   );
 });
