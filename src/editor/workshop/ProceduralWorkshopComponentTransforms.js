@@ -4,6 +4,7 @@ const POSITION_LIMIT = 32;
 const SCALE_MIN = 0.1;
 const SCALE_MAX = 4;
 const IDENTITY_EPSILON = 1e-6;
+const ANGLE_EPSILON = 1e-12;
 
 const IDENTITY_POSITION = Object.freeze([0, 0, 0]);
 const IDENTITY_ROTATION = Object.freeze([0, 0, 0]);
@@ -17,22 +18,27 @@ function requireObject(value, field) {
   return value;
 }
 
-function normalizeAngle(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    throw new Error('Component rotation values must be finite.');
-  }
-  return Math.atan2(Math.sin(number), Math.cos(number));
+function strictNumber(value) {
+  return typeof value === 'number' ? value : Number.NaN;
 }
 
-function normalizeVector(input, field, fallback, minimum, maximum, mapper = Number) {
+function normalizeAngle(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('Component rotation values must be finite numbers.');
+  }
+  const angle = Math.atan2(Math.sin(value), Math.cos(value));
+  if (Math.abs(Math.abs(angle) - Math.PI) <= ANGLE_EPSILON) return Math.PI;
+  return Math.abs(angle) <= ANGLE_EPSILON ? 0 : angle;
+}
+
+function normalizeVector(input, field, fallback, minimum, maximum, mapper = strictNumber) {
   if (input == null) return Object.freeze([...fallback]);
   if (!Array.isArray(input) || input.length !== 3) {
     throw new Error(`${field} must contain exactly three values.`);
   }
   const values = input.map((value) => mapper(value));
   if (values.some((value) => !Number.isFinite(value) || value < minimum || value > maximum)) {
-    throw new Error(`${field} values must be between ${minimum} and ${maximum}.`);
+    throw new Error(`${field} values must be finite numbers between ${minimum} and ${maximum}.`);
   }
   return Object.freeze(values);
 }
