@@ -61,6 +61,8 @@ test('bush materials retain authored texture channels and use cutout rendering',
   const material = cloneBushMaterial(source);
 
   assert.notEqual(material, source);
+  assert.equal(material.isNodeMaterial, true);
+  assert.ok(material.colorNode);
   assert.equal(material.map, map);
   assert.equal(material.alphaMap, alphaMap);
   assert.equal(material.normalMap, normalMap);
