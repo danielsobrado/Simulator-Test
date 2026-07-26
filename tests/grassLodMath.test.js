@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  bladeLengthFraction,
   clumpSpacing,
-  clumpWorldRadius,
   clumpsFormCarpet,
   clumpsPerCell,
   densityForDistance,
@@ -39,21 +39,69 @@ test('the far blade band is a fifth of the near band per blade', () => {
 
 test('the shipped clump radius overlaps clumps into continuous cover', () => {
   // Regression guard for grass reading as separate tufts on bare ground. Values
-  // mirror editor.config.yaml: tileSize 2, blades 192/32, width 0.06, and
-  // CLUMP_RADIUS 12.5 in StylizedGrassSlot.
+  // mirror editor.config.yaml: tileSize 2, blades 576/96, clumpRadius 0.75 m.
   const tileSize = 2;
-  const clumps = clumpsPerCell(192, 32);
-  const meanWidth = 0.06;
+  const clumps = clumpsPerCell(576, 96);
 
   const spacing = clumpSpacing(clumps, tileSize);
   assert.ok(Math.abs(spacing - 0.8165) < 0.001, `spacing ${spacing}`);
-  assert.ok(clumpsFormCarpet(12.5, meanWidth, clumps, tileSize), 'clumps leave gaps');
-  assert.ok(clumpWorldRadius(12.5, meanWidth) > spacing * 0.9);
+  assert.ok(clumpsFormCarpet(0.75, clumps, tileSize), 'clumps leave gaps');
 
-  // The old radius is what produced the tufts, and must still read as such —
-  // otherwise this test is not measuring anything.
-  assert.equal(clumpsFormCarpet(3.55, meanWidth, clumps, tileSize), false);
-  assert.ok(Math.abs(clumpWorldRadius(3.55, meanWidth) - 0.213) < 0.001);
+  // Half that radius must still read as tufts — otherwise this test is not
+  // measuring anything.
+  assert.equal(clumpsFormCarpet(0.36, clumps, tileSize), false);
+});
+
+test('clump footprint no longer moves with blade width', () => {
+  // The radius used to be expressed in blade-widths and resolved against the
+  // instance width, so narrowing the blades to stop them reading as ribbons also
+  // shrank every clump. At the shipped 0.023 m mean width the old model gave
+  // 12.5 * 0.023 = 0.29 m — inside the tuft range this same test rejects above.
+  const tileSize = 2;
+  const clumps = clumpsPerCell(576, 96);
+  assert.equal(clumpsFormCarpet(12.5 * 0.023, clumps, tileSize), false);
+  // The metre-denominated radius is unmoved by the same narrowing, which is the
+  // whole point of separating the two.
+  assert.ok(clumpsFormCarpet(0.75, clumps, tileSize));
+});
+
+test('the shipped length skew gives a mostly-short sward with a tall minority', () => {
+  // Pins the split editor.config.yaml documents. A flat roll over 0.10–0.32 puts
+  // most blades near 0.21 m, which reads as a mown lawn; sward is mostly short.
+  const minLength = 0.10;
+  const maxLength = 0.32;
+  const skew = 5.0;
+  const samples = 100000;
+  let short = 0;
+  let medium = 0;
+  let tall = 0;
+  let total = 0;
+  for (let index = 0; index < samples; index += 1) {
+    const length = minLength
+      + bladeLengthFraction((index + 0.5) / samples, skew) * (maxLength - minLength);
+    total += length;
+    if (length < 0.16) short += 1;
+    else if (length < 0.24) medium += 1;
+    else tall += 1;
+  }
+  const percent = (count) => (count / samples) * 100;
+  assert.ok(percent(short) > 70 && percent(short) < 80, `short ${percent(short)}%`);
+  assert.ok(percent(medium) > 10 && percent(medium) < 20, `medium ${percent(medium)}%`);
+  assert.ok(percent(tall) > 5 && percent(tall) < 12, `tall ${percent(tall)}%`);
+  // The mean matters as much as the split: it is what apparent coverage scales
+  // with, and it is why the config points at bladesPerCell as the compensation.
+  assert.ok(Math.abs(total / samples - 0.137) < 0.005, `mean ${total / samples}`);
+});
+
+test('an unskewed roll is the flat distribution the skew replaces', () => {
+  assert.equal(bladeLengthFraction(0.5), 0.5);
+  assert.equal(bladeLengthFraction(0.5, 1), 0.5);
+  // Monotone, which is what lets blade width keep correlating against the raw rank
+  // instead of the skewed value.
+  assert.ok(bladeLengthFraction(0.8, 5) > bladeLengthFraction(0.3, 5));
+  // Clamped, so a roll that lands slightly outside [0, 1] cannot invert a blade.
+  assert.equal(bladeLengthFraction(-0.2, 5), 0);
+  assert.equal(bladeLengthFraction(1.4, 5), 1);
 });
 
 test('chunks switch to the cheap blade band past the near radius', () => {

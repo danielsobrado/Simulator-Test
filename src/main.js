@@ -257,6 +257,7 @@ async function startEditor() {
     biomeAssetPalette,
   });
   ui.attachGodRays(terrainView.godRays);
+  ui.attachGrassTuning(stylizedSurface.grassTuning);
   ui.attachGrassBladeProfiles(stylizedSurface.bladeProfiles);
   // The list has to be redrawn once the manifest lands: before that every set
   // resolves to the generated taper and would be labelled as unbaked.

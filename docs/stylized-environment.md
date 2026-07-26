@@ -120,9 +120,24 @@ All style and density values live under `stylizedSurface` in `editor.config.yaml
 
 Grass density vs upstream: the GrassField demo uses **300 blades / world-unit²** on a
 tiny patch. Here `bladesPerCell` is per terrain cell (`tileSize × tileSize` area), so
-areal density is `bladesPerCell / tileSize²` (default ≈ 12/u²). Blade width/length
-defaults match the upstream Spring preset so the field reads dense without the demo’s
-full instance count.
+areal density is `bladesPerCell / tileSize²` (144/u² at the shipped 576 over a 2 m cell).
+
+Blade *dimensions* no longer follow the upstream Spring preset. Its 0.06 m width was
+kept while the length was adapted down to world scale, which left a 3:1 strip and made
+the foreground read as green ribbons; blades are 1.4–3.2 cm now, near 9:1. Three
+constraints govern that number:
+
+- **Clump footprint is independent of it.** `grass.clumpRadius` is in metres.
+  It used to be denominated in blade-widths and resolved against the instance width in
+  the shader, so narrowing blades shrank every clump by the same factor and broke the
+  carpet into tufts. `clumpsFormCarpet` guards the relationship and
+  `validateEditorConfig` fails the build if a config edit violates it.
+- **Width varies per blade, not per clump.** `instanceParams.x` is the clump's roll;
+  `grass.bladeWidthSpread` spreads the blades inside it and
+  `grass.widthLengthCorrelation` leans that spread against each blade's own length, so
+  long blades come out slender.
+- **Narrowing is a fragment saving, not a cost.** Overdraw falls from roughly 1.7 to
+  0.7 blade-areas per m², which is the budget to spend if `bladesPerCell` goes up.
 
 Density is patch-driven: `trees.habitat.candidateBudgetPerChunk` and `maxAcceptedPerChunk`
 raise how dense a forest *core* can get, while the patch field keeps glades open. Two things

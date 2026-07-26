@@ -317,6 +317,74 @@ export class EditorUi {
             </div>
 
             <div class="panel-head">
+              <h2>Grass tuning</h2>
+              <span class="panel-count">live preview</span>
+            </div>
+            <p>
+              Shared uniforms, so every chunk updates without a rebuild. Values baked
+              into the clump mesh or the worker scatter — tilt, clump radius, blades
+              per cell, the blade width range — are not here, because they cannot
+              change without re-paging. Use <strong>Width scale</strong> to find a
+              gauge, then fold it into <code>minWidth</code>/<code>maxWidth</code>.
+            </p>
+
+            <div class="settings-group" data-grass-section="shape">
+              <h3>Shape</h3>
+              ${this.grassRange('Min length', 'minLength', 0.02, 0.6, 0.005, 3)}
+              ${this.grassRange('Max length', 'maxLength', 0.02, 1.2, 0.005, 3)}
+              ${this.grassRange('Length skew', 'lengthSkew', 1, 10, 0.1, 2)}
+              ${this.grassRange('Width scale', 'widthScale', 0.2, 3, 0.02, 2)}
+              ${this.grassRange('Width spread', 'bladeWidthSpread', 0, 1, 0.01, 2)}
+              ${this.grassRange('Width vs length', 'widthLengthCorrelation', 0, 1, 0.01, 2)}
+            </div>
+
+            <div class="settings-group" data-grass-section="lighting">
+              <h3>Lighting</h3>
+              ${this.grassRange('Brightness', 'brightness', 0.1, 2, 0.01, 2)}
+              ${this.grassRange('Blade normal', 'bladeNormalStrength', 0, 1, 0.01, 2)}
+              ${this.grassRange('Normal fade start', 'bladeNormalFadeStart', 1, 200, 1, 0)}
+              ${this.grassRange('Normal fade end', 'bladeNormalFadeEnd', 2, 400, 1, 0)}
+              ${this.grassRange('Root shade', 'rootShadeStrength', 0, 1, 0.01, 2)}
+              ${this.grassRange('Root shade height', 'rootShadeHeight', 0.02, 1, 0.01, 2)}
+              ${this.grassRange('Blade variation', 'bladeVariationStrength', 0, 1, 0.01, 2)}
+              ${this.grassRange('Blade shade spread', 'bladeVariationShade', 0, 1, 0.01, 2)}
+              ${this.grassRange('Patch strength', 'patchStrength', 0, 1, 0.01, 2)}
+              ${this.grassRange('Backlight', 'translucencyStrength', 0, 4, 0.02, 2)}
+              ${this.grassRange('Backlight focus', 'translucencyPower', 0.5, 16, 0.1, 1)}
+              ${this.grassRange('Backlight tip bias', 'translucencyTipBias', 0, 1, 0.01, 2)}
+            </div>
+
+            <div class="settings-group" data-grass-section="colors">
+              <h3>Colours</h3>
+              ${this.grassColor('Base', 'colorBottom')}
+              ${this.grassColor('Tip', 'colorTop')}
+              ${this.grassColor('Variation cool', 'variationCool')}
+              ${this.grassColor('Variation warm', 'variationWarm')}
+              ${this.grassColor('Patch lush', 'patchLush')}
+              ${this.grassColor('Patch dry', 'patchDry')}
+              ${this.grassColor('Backlight', 'translucencyColor')}
+            </div>
+
+            <div class="settings-group" data-grass-section="wind">
+              <h3>Wind</h3>
+              ${this.grassRange('Strength', 'windStrength', 0, 0.6, 0.005, 3)}
+              ${this.grassRange('Speed', 'windSpeed', 0, 5, 0.05, 2)}
+              ${this.grassRange('Frequency', 'windFrequency', 0.02, 2, 0.01, 2)}
+              ${this.grassRange('Turbulence', 'windTurbulence', 0, 0.5, 0.005, 3)}
+              ${this.grassRange('Lean', 'windLean', 0, 0.5, 0.005, 3)}
+              ${this.grassRange('Stiffness spread', 'windStiffnessRange', 0, 1, 0.01, 2)}
+              ${this.grassRange('Tip flutter', 'flutterStrength', 0, 0.2, 0.001, 3)}
+              ${this.grassRange('Flutter height', 'flutterHeightStart', 0, 1, 0.01, 2)}
+              ${this.grassRange('Flutter fade start', 'flutterFadeStart', 1, 150, 1, 0)}
+              ${this.grassRange('Flutter fade end', 'flutterFadeEnd', 2, 300, 1, 0)}
+            </div>
+
+            <div class="action-grid">
+              <button class="action-button" type="button" data-action="copy-grass-tuning">Copy YAML</button>
+              <button class="action-button" type="button" data-action="reset-grass-tuning">Reset</button>
+            </div>
+
+            <div class="panel-head">
               <h2>God rays</h2>
               <span class="panel-count">live preview</span>
             </div>
@@ -512,6 +580,8 @@ export class EditorUi {
       ...root.querySelectorAll('[data-god-rays-section]'),
     ];
     this.godRaysEffect = null;
+    this.grassControls = [...root.querySelectorAll('[data-grass-setting]')];
+    this.grassTuning = null;
 
     this.renderTileButtons();
     this.renderCategoryChips();
@@ -630,6 +700,32 @@ export class EditorUi {
     return `${this.config.storage.key}:biome-assets`;
   }
 
+  grassRange(label, setting, minimum, maximum, step, precision) {
+    return `
+      <label class="settings-range">
+        <span>${label}</span>
+        <output data-grass-output="${setting}">—</output>
+        <input
+          type="range"
+          min="${minimum}"
+          max="${maximum}"
+          step="${step}"
+          data-grass-setting="${setting}"
+          data-precision="${precision}"
+        />
+      </label>
+    `;
+  }
+
+  grassColor(label, setting) {
+    return `
+      <label class="settings-select">
+        <span>${label}</span>
+        <input type="color" data-grass-setting="${setting}" data-grass-color="1" />
+      </label>
+    `;
+  }
+
   rangeControl(label, setting, minimum, maximum, step, precision) {
     return `
       <label class="settings-range">
@@ -707,6 +803,29 @@ export class EditorUi {
     }
   }
 
+  attachGrassTuning(tuning) {
+    this.grassTuning = tuning;
+    this.syncGrassTuning(tuning?.getSettings?.());
+  }
+
+  syncGrassTuning(settings) {
+    if (!settings) return;
+    for (const control of this.grassControls) {
+      const value = settings[control.dataset.grassSetting];
+      if (value === undefined) continue;
+      control.value = String(value);
+      this.updateGrassOutput(control);
+    }
+  }
+
+  updateGrassOutput(control) {
+    const output = this.root.querySelector(
+      `[data-grass-output="${control.dataset.grassSetting}"]`,
+    );
+    if (!output) return;
+    output.value = Number(control.value).toFixed(Number(control.dataset.precision ?? 2));
+  }
+
   updateGodRaysOutput(control) {
     const output = this.root.querySelector(
       `[data-god-rays-output="${control.dataset.godRaysSetting}"]`,
@@ -752,6 +871,34 @@ export class EditorUi {
       if (!this.grassBladeProfiles?.select(this.grassBladeProfileSelect.value)) return;
       this.updateGrassBladeReadout();
     });
+    this.godRaysPanel.addEventListener('input', (event) => {
+      const control = event.target.closest('[data-grass-setting]');
+      if (control && this.grassTuning) {
+        this.grassTuning.setSettings({
+          [control.dataset.grassSetting]: control.dataset.grassColor
+            ? control.value
+            : Number(control.value),
+        });
+        if (!control.dataset.grassColor) this.updateGrassOutput(control);
+      }
+    });
+    this.godRaysPanel.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action="copy-grass-tuning"], [data-action="reset-grass-tuning"]');
+      if (!button || !this.grassTuning) return;
+      if (button.dataset.action === 'reset-grass-tuning') {
+        this.syncGrassTuning(this.grassTuning.reset());
+        this.showToast('Grass tuning reset to the config values.');
+        return;
+      }
+      // Tuning lives in uniforms, so it is gone on reload. The YAML fragment is how
+      // a session at the sliders becomes a config change rather than a lost hour.
+      navigator.clipboard?.writeText(this.grassTuning.toYaml()).then(
+        () => this.showToast('Grass tuning YAML copied.'),
+        () => this.showToast('Could not reach the clipboard.', true),
+      );
+    });
+    // Separate listener rather than a branch: the god-rays selector simply does not
+    // match a grass control, so each ignores the other's events.
     this.godRaysPanel.addEventListener('input', (event) => {
       const control = event.target.closest('[data-god-rays-setting]');
       if (!control || !this.godRaysEffect) return;
