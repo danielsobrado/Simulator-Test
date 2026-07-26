@@ -18,6 +18,8 @@ import {
 
 export const SCENE_SETTINGS_BROWSER_PREFIX = 'simcity-dnd:scene-setting:';
 export const LOCAL_ASSET_BROWSER_PREFIX = 'simcity-dnd:local-glb:';
+export const SCENE_SETTINGS_RELOAD_WORLD_KEY = 'simcity-dnd:pending-scene-settings-world';
+export const SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY = 'simcity-dnd:pending-scene-settings-world-key';
 
 function slug(value) {
   return String(value)
@@ -30,6 +32,19 @@ function slug(value) {
 
 function resolveDocumentBase(reference, locationValue) {
   return new URL(reference, locationValue.href).href;
+}
+
+function stageWorldSettings(worldDocument, settings) {
+  if (!worldDocument || typeof worldDocument !== 'object' || Array.isArray(worldDocument)) {
+    throw new Error('A world document is required for the settings reload handoff.');
+  }
+  const staged = structuredClone(worldDocument);
+  staged.visualConfig = {
+    ...(staged.visualConfig ?? {}),
+    biomeAssets: settings.biomeAssets,
+    sceneSettings: settings,
+  };
+  return staged;
 }
 
 export async function loadBootSceneSettings({
@@ -46,6 +61,7 @@ export async function loadBootSceneSettings({
       document: normalizeSceneSettings(JSON.parse(serialized)),
       sourceUrl: locationValue.href,
       reference,
+      pendingWorldKey: session?.getItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY) ?? null,
     };
   }
   const sourceUrl = resolveDocumentBase(reference, locationValue);
@@ -53,19 +69,37 @@ export async function loadBootSceneSettings({
     document: normalizeSceneSettings(await loadJsonFromUrl(sourceUrl)),
     sourceUrl,
     reference,
+    pendingWorldKey: null,
   };
 }
 
-export function activateSceneSettings(document, {
+export async function activateSceneSettings(document, {
   locationValue = globalThis.location,
   session = globalThis.sessionStorage,
+  worldDocument = null,
+  saveBrowserDocument = saveToBrowser,
 } = {}) {
   const normalized = normalizeSceneSettings(document);
+  if (!locationValue || !session) {
+    throw new Error('Scene settings activation requires browser location and session storage.');
+  }
+  if (worldDocument) {
+    await saveBrowserDocument(
+      SCENE_SETTINGS_RELOAD_WORLD_KEY,
+      stageWorldSettings(worldDocument, normalized),
+    );
+  }
   try {
     session.setItem(SCENE_SETTINGS_SESSION_KEY, JSON.stringify(normalized));
+    if (worldDocument) {
+      session.setItem(
+        SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY,
+        SCENE_SETTINGS_RELOAD_WORLD_KEY,
+      );
+    } else {
+      session.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
+    }
   } catch (error) {
-    // sessionStorage tops out around 5 MB, so an inlined Azgaar export never
-    // fits. Say so instead of surfacing a bare QuotaExceededError.
     throw new Error(
       normalized.map?.document
         ? 'These settings inline a full map export, which is too large for the session handoff.'
@@ -95,6 +129,8 @@ export class SceneSettingsRuntime {
     boot = null,
     resolveAzgaarOptions = null,
     afterMapLoad = null,
+    loadBrowserDocument = loadFromBrowser,
+    session = globalThis.sessionStorage,
   }) {
     this.controller = controller;
     this.biomeAssetPalette = biomeAssetPalette;
@@ -102,6 +138,9 @@ export class SceneSettingsRuntime {
     this.config = config;
     this.resolveAzgaarOptions = resolveAzgaarOptions;
     this.afterMapLoad = afterMapLoad;
+    this.loadBrowserDocument = loadBrowserDocument;
+    this.session = session;
+    this.pendingWorldKey = boot?.pendingWorldKey ?? null;
     this.document = boot?.document
       ? normalizeSceneSettings(boot.document)
       : createSceneSettingsDocument({
@@ -134,6 +173,18 @@ export class SceneSettingsRuntime {
 
   async applyInitialRuntime() {
     this.applyVisualSettings(this.document);
+    if (this.pendingWorldKey) {
+      const worldDocument = await this.loadBrowserDocument(this.pendingWorldKey);
+      if (!worldDocument) {
+        throw new Error('The pending world reload document has expired.');
+      }
+      this.controller.loadDocument(worldDocument);
+      this.mapSource = this.document.map;
+      await this.afterMapLoad?.(worldDocument);
+      this.session?.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
+      this.pendingWorldKey = null;
+      return;
+    }
     // A reference-only embedded map has no source to replay; the world document
     // that shipped with it already carries the terrain.
     if (isLoadableMap(this.document.map)) {
@@ -173,6 +224,13 @@ export class SceneSettingsRuntime {
         resolveAzgaarOptions: this.resolveAzgaarOptions,
       });
       resolvedMap = map;
+    }
+    const savedSettings = worldDocument?.visualConfig?.sceneSettings
+      ? normalizeSceneSettings(worldDocument.visualConfig.sceneSettings)
+      : null;
+    if (savedSettings?.assets.length > 0) {
+      await this.activate(savedSettings, { worldDocument });
+      return worldDocument;
     }
     this.controller.loadDocument(worldDocument);
     // A world save carries its own look and `loadDocument` has already applied
@@ -220,8 +278,8 @@ export class SceneSettingsRuntime {
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 
-  activate(document) {
-    activateSceneSettings(document);
+  async activate(document, { worldDocument = null } = {}) {
+    return activateSceneSettings(document, { worldDocument });
   }
 
   activateUrl(url) {
@@ -241,7 +299,7 @@ export class SceneSettingsRuntime {
       scale,
       ...(tileIds?.length ? { tileIds } : {}),
     });
-    this.activate(document);
+    await this.activate(document, { worldDocument: this.controller.toDocument() });
   }
 
   async addLocalAsset({ layer, file, label, scale = 1, tileIds = undefined }) {
@@ -262,6 +320,6 @@ export class SceneSettingsRuntime {
       scale,
       ...(tileIds?.length ? { tileIds } : {}),
     });
-    this.activate(document);
+    await this.activate(document, { worldDocument: this.controller.toDocument() });
   }
 }
