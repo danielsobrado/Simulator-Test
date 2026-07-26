@@ -123,21 +123,35 @@ export function sampleCubicBezierPath(input, {
 } = {}) {
   const path = normalizeConstructionPath(input);
   if (path.type !== 'cubicBezier') throw new Error('Expected a cubic Bézier path.');
-  if (!(chordError > 0) || !(maxSpacing > 0) || !Number.isInteger(maxDepth) || maxDepth < 1) {
+  if (
+    !(chordError > 0)
+    || !(maxSpacing > 0)
+    || !Number.isInteger(maxDepth)
+    || maxDepth < 1
+    || !Number.isInteger(maxSamples)
+    || maxSamples < 2
+  ) {
     throw new Error('Cubic Bézier sampling options are invalid.');
   }
   const result = [];
   let cumulativeDistance = 0;
   for (const segment of path.segments) {
+    const remainingSamples = maxSamples - result.length;
+    if (remainingSamples < 1) {
+      throw new Error(`Cubic Bézier sampling exceeded ${maxSamples} points.`);
+    }
     const segmentSamples = sampleSegment(path, segment, {
       chordError,
       maxSpacing,
       maxDepth,
-      maxSamples,
+      maxSamples: remainingSamples + (result.length > 0 ? 1 : 0),
     });
     let segmentDistance = 0;
     for (let index = 0; index < segmentSamples.length; index += 1) {
       if (index === 0 && result.length > 0) continue;
+      if (result.length >= maxSamples) {
+        throw new Error(`Cubic Bézier sampling exceeded ${maxSamples} points.`);
+      }
       const current = segmentSamples[index];
       const previous = index > 0 ? segmentSamples[index - 1] : null;
       if (previous) {
