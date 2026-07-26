@@ -80,7 +80,7 @@ test('bush materials retain authored texture channels and use cutout rendering',
   normalMap.dispose();
 });
 
-test('bush proxies fit the authored bounds with a fixed low triangle budget', () => {
+test('bush proxies use crossed foliage silhouettes fitted to authored bounds', () => {
   const geometry = new THREE.SphereGeometry(1, 24, 12);
   geometry.scale(1.4, 0.8, 0.9);
   geometry.translate(0, 0.8, 0);
@@ -101,7 +101,9 @@ test('bush proxies fit the authored bounds with a fixed low triangle budget', ()
   assert.equal(triangleCount(proxy.geometry), BUSH_PROXY_TRIANGLES);
   assert.ok(triangleCount(proxy.geometry) < triangleCount(geometry));
   assert.ok(proxySize.distanceTo(sourceSize) < 1e-6);
+  assert.equal(proxy.geometry.userData.proxyKind, 'crossed-foliage-cards');
   assert.ok(proxy.material.colorNode);
+  assert.ok(proxy.material.normalNode);
   assert.equal(BUSH_CAST_SHADOW, false);
 
   proxy.geometry.dispose();
