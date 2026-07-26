@@ -1,24 +1,5 @@
 import { StylizedSurfaceView as StylizedSurfaceViewBase } from './StylizedSurfaceViewBase.js';
-
-async function loadOptionalTreeVariants(view) {
-  const definitions = view.config.assets.treeVariants ?? [];
-  const settled = await Promise.allSettled(definitions.map(async (definition) => ({
-    definition,
-    scene: await view.sceneAssets.acquire(definition.scene),
-  })));
-  const variants = [];
-  for (let index = 0; index < settled.length; index += 1) {
-    const result = settled[index];
-    const definition = definitions[index];
-    if (result.status === 'fulfilled') {
-      view.treeVariantPaths.push(definition.scene);
-      variants.push(result.value);
-      continue;
-    }
-    console.warn(`Optional tree variant ${definition.scene} failed to load.`, result.reason);
-  }
-  return variants;
-}
+import { loadOptionalTreeVariants } from './loadOptionalTreeVariants.js';
 
 export class StylizedSurfaceView extends StylizedSurfaceViewBase {
   async bootstrapLayers() {
@@ -31,7 +12,11 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
         sharedScene = await this.sceneAssets.acquire(this.sharedScenePath);
       }
       const treeVariants = this.config.trees.enabled
-        ? await loadOptionalTreeVariants(this)
+        ? await loadOptionalTreeVariants({
+          definitions: this.config.assets.treeVariants ?? [],
+          acquire: (scene) => this.sceneAssets.acquire(scene),
+          onLoaded: (scene) => this.treeVariantPaths.push(scene),
+        })
         : [];
       await Promise.all([
         this.treeView?.buildFromScene(sharedScene, treeVariants),
