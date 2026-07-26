@@ -1,9 +1,4 @@
 import * as THREE from 'three/webgpu';
-import {
-  texture,
-  uv,
-  vec3,
-} from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
 import { instanceCapacity } from './scatterMath.js';
@@ -22,6 +17,11 @@ import { createPathClearanceField } from './TreeManifestStore.js';
 import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
+import {
+  BUSH_CAST_SHADOW,
+  cloneBushMaterial,
+  createBushProxyPrototype,
+} from './BushRenderAssets.js';
 
 const BUSH_CLUSTER_SEED_OFFSET = 0x5b;
 const BUSH_PRIORITY_CHANNEL = 31;
@@ -53,23 +53,12 @@ function lodSettings(config) {
   });
 }
 
-function createMaterial(source) {
-  const map = source?.map ?? null;
-  const value = new THREE.Color(source?.color ?? '#ffffff');
-  const material = new THREE.MeshLambertNodeMaterial({
-    side: source?.side ?? THREE.DoubleSide,
-  });
-  const baseColor = vec3(value.r, value.g, value.b);
-  material.colorNode = map
-    ? texture(map, uv()).rgb.mul(baseColor)
-    : baseColor;
-  if (map) {
-    material.opacityNode = texture(map, uv()).a;
-    material.alphaTest = source?.alphaTest > 0 ? source.alphaTest : 0.35;
+function disposePrototypes(prototypes) {
+  for (const prototype of prototypes) {
+    prototype.geometry?.dispose();
+    prototype.material?.dispose();
   }
-  material.transparent = false;
-  material.depthWrite = true;
-  return material;
+  prototypes.length = 0;
 }
 
 /**
@@ -109,6 +98,7 @@ export class StylizedBushView {
     this.prototypeRevision = 0;
     this.enabled = Boolean(config.bushes?.enabled);
     this.prototypes = [];
+    this.proxyPrototypes = [];
     this.meshes = [];
     this.proxyMeshes = [];
     this.placements = [];
@@ -174,14 +164,27 @@ export class StylizedBushView {
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
     });
-    const newPrototypes = extracted.map(({ geometry, source }, index) => ({
-      geometry,
-      material: createMaterial(materialList(source)[0]),
-      kind: 'bush',
-      height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
-      prototypeId: `authored-bush-${firstNewPrototype + index}`,
-    }));
+    const newPrototypes = extracted.map(({ geometry, source }, index) => {
+      const sourceMaterial = materialList(source)[0];
+      if (!sourceMaterial) {
+        geometry.dispose();
+        throw new Error(`Bush prototype ${source.name || index} has no material.`);
+      }
+      return {
+        geometry,
+        material: cloneBushMaterial(sourceMaterial),
+        kind: 'bush',
+        height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
+        prototypeId: `authored-bush-${firstNewPrototype + index}`,
+      };
+    });
+    const proxyColor = bushes.proxyColor ?? bushes.colorLarge;
+    const newProxyPrototypes = newPrototypes.map((prototype) => createBushProxyPrototype(
+      prototype,
+      { color: proxyColor },
+    ));
     this.prototypes.push(...newPrototypes);
+    this.proxyPrototypes.push(...newProxyPrototypes);
     this.prototypeHeight = Math.max(...this.prototypes.map((prototype) => prototype.height));
 
     const settings = lodSettings(this.config);
@@ -189,20 +192,19 @@ export class StylizedBushView {
       residentRadius: settings.proxyRadius + 1,
       perChunk: bushes.perChunk,
     });
-    const partsByPrototype = newPrototypes.map((prototype) => [prototype]);
     this.meshes.push(...createInstancedRenderers({
       root: this.root,
-      partsByPrototype,
+      partsByPrototype: newPrototypes.map((prototype) => [prototype]),
       capacity,
       name: `stylized-bush-near-${firstNewPrototype}`,
-      castShadow: true,
+      castShadow: BUSH_CAST_SHADOW,
     }));
     this.proxyMeshes.push(...createInstancedRenderers({
       root: this.root,
-      partsByPrototype,
+      partsByPrototype: newProxyPrototypes.map((prototype) => [prototype]),
       capacity,
       name: `stylized-bush-proxy-${firstNewPrototype}`,
-      castShadow: false,
+      castShadow: BUSH_CAST_SHADOW,
     }));
     this.prototypeRevision += 1;
   }
@@ -396,7 +398,7 @@ export class StylizedBushView {
   rebuild(focus, placementRadius, plan, rockSource) {
     PerfCounters.inc('bushRebuilds');
     const near = this.prototypes.map(() => []);
-    const proxy = this.prototypes.map(() => []);
+    const proxy = this.proxyPrototypes.map(() => []);
     const placements = [];
     const activeChunks = new Set();
     const planByChunk = new Map(
@@ -462,11 +464,8 @@ export class StylizedBushView {
     this.terrainView.scene.remove(this.root);
     disposeInstancedRenderers(this.root, this.meshes);
     disposeInstancedRenderers(this.root, this.proxyMeshes);
-    for (const prototype of this.prototypes) {
-      prototype.geometry?.dispose();
-      prototype.material?.dispose();
-    }
-    this.prototypes.length = 0;
+    disposePrototypes(this.prototypes);
+    disposePrototypes(this.proxyPrototypes);
     this.prototypeIndicesByAsset.clear();
     this.placements.length = 0;
     this.manifestCache.clear();
