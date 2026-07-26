@@ -10,6 +10,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * and Sketchfab world scale — then sit the AABB on y = 0.
  */
 
+export function ensureVertexNormals(geometry) {
+  if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
+  return geometry;
+}
+
 export function groundGeometry(geometry) {
   geometry.computeBoundingBox();
   const bounds = geometry.boundingBox;
@@ -18,7 +23,7 @@ export function groundGeometry(geometry) {
   geometry.translate(-centerX, -bounds.min.y, -centerZ);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  geometry.computeVertexNormals();
+  ensureVertexNormals(geometry);
   return geometry;
 }
 
@@ -112,12 +117,15 @@ function mergePartsByMaterial(parts) {
   }
   return [...buckets.values()].flatMap((bucket) => {
     if (bucket.length === 1) return bucket;
-    const geometry = mergeGeometries(bucket.map((part) => part.geometry), false);
+    const geometry = mergeGeometries(
+      bucket.map((part) => ensureVertexNormals(part.geometry)),
+      false,
+    );
     if (!geometry) return bucket;
     for (const part of bucket) part.geometry.dispose();
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
-    geometry.computeVertexNormals();
+    ensureVertexNormals(geometry);
     return [{ geometry, source: bucket[0].source }];
   });
 }
@@ -156,7 +164,7 @@ export function extractAuthoredGroupedPrototypes(
       part.geometry.translate(-centerX, -bounds.min.y, -centerZ);
       part.geometry.computeBoundingBox();
       part.geometry.computeBoundingSphere();
-      part.geometry.computeVertexNormals();
+      ensureVertexNormals(part.geometry);
     }
     return mergePartsByMaterial(parts);
   });
