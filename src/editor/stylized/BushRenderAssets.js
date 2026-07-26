@@ -88,6 +88,20 @@ function proxyColor(sourceMaterial, fallbackColor) {
   return looksLikeDefaultWhite ? fallback : source.clone();
 }
 
+function expandedProxyBounds(sourceGeometry) {
+  sourceGeometry.computeBoundingBox();
+  const sourceBounds = sourceGeometry.boundingBox;
+  const center = sourceBounds.getCenter(new THREE.Vector3());
+  const size = sourceBounds.getSize(new THREE.Vector3());
+  size.set(
+    Math.max(size.x, MIN_PROXY_EXTENT),
+    Math.max(size.y, MIN_PROXY_EXTENT),
+    Math.max(size.z, MIN_PROXY_EXTENT),
+  );
+  const half = size.multiplyScalar(0.5);
+  return new THREE.Box3(center.clone().sub(half), center.clone().add(half));
+}
+
 function appendProxyCard({ positions, indices, bounds, angle }) {
   const sourceSize = bounds.getSize(new THREE.Vector3());
   const sourceCenter = bounds.getCenter(new THREE.Vector3());
@@ -117,21 +131,11 @@ export function createBushProxyGeometry(sourceGeometry) {
   if (!sourceGeometry?.isBufferGeometry) {
     throw new Error('Bush proxy generation requires buffer geometry.');
   }
-  sourceGeometry.computeBoundingBox();
-  const sourceBounds = sourceGeometry.boundingBox;
-  const sourceSize = sourceBounds.getSize(new THREE.Vector3());
-  if (
-    sourceSize.x < MIN_PROXY_EXTENT
-    || sourceSize.y < MIN_PROXY_EXTENT
-    || sourceSize.z < MIN_PROXY_EXTENT
-  ) {
-    throw new Error('Bush proxy generation requires non-degenerate authored bounds.');
-  }
-
+  const proxyBounds = expandedProxyBounds(sourceGeometry);
   const positions = [];
   const indices = [];
   for (const angle of PROXY_CARD_ANGLES) {
-    appendProxyCard({ positions, indices, bounds: sourceBounds, angle });
+    appendProxyCard({ positions, indices, bounds: proxyBounds, angle });
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -170,8 +174,7 @@ export function createBushProxyPrototype(prototype, options = {}) {
   if (!prototype?.geometry || !prototype?.material) {
     throw new Error('Bush proxy generation requires a complete prototype.');
   }
-  prototype.geometry.computeBoundingBox();
-  const bounds = prototype.geometry.boundingBox;
+  const bounds = expandedProxyBounds(prototype.geometry);
   return {
     geometry: createBushProxyGeometry(prototype.geometry),
     material: createBushProxyMaterial(prototype.material, {
