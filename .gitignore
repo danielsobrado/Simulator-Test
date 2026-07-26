@@ -4,5 +4,3 @@ dist/
 tmp/
 debug.log
 **/debug.log
-*.glb
-
