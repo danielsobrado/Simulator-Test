@@ -1,5 +1,6 @@
 export const CONSTRUCTION_RECORD_VERSION = 1;
 export const CUBIC_BEZIER_PATH_VERSION = 2;
+export const MAX_CONSTRUCTION_PATH_POINTS = 512;
 
 const ID_PATTERN = /^[a-z][a-z0-9-]{0,95}$/;
 const PATH_TYPES = new Set(['polyline', 'cubicBezier']);
@@ -86,6 +87,11 @@ function normalizePolylinePath(source) {
   if (!Array.isArray(source.points) || source.points.length < 2) {
     throw new Error('A polyline construction path requires at least two points.');
   }
+  if (source.points.length > MAX_CONSTRUCTION_PATH_POINTS) {
+    throw new Error(
+      `A polyline construction path supports at most ${MAX_CONSTRUCTION_PATH_POINTS} points.`,
+    );
+  }
   const points = source.points.map((value, index) => {
     const point = requireObject(value, `Path point ${index + 1}`);
     return Object.freeze({
@@ -114,6 +120,11 @@ function normalizeCubicBezierPath(source) {
   }
   if (!Array.isArray(source.anchors) || source.anchors.length < 2) {
     throw new Error('A cubic Bézier construction path requires at least two anchors.');
+  }
+  if (source.anchors.length > MAX_CONSTRUCTION_PATH_POINTS) {
+    throw new Error(
+      `A cubic Bézier construction path supports at most ${MAX_CONSTRUCTION_PATH_POINTS} anchors.`,
+    );
   }
   const anchors = source.anchors.map((value, index) => {
     const anchor = requireObject(value, `Path anchor ${index + 1}`);
@@ -200,4 +211,3 @@ export function normalizeConstructionRecord(input) {
     features: path.features,
   });
 }
-
