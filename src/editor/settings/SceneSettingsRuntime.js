@@ -20,6 +20,7 @@ export const SCENE_SETTINGS_BROWSER_PREFIX = 'simcity-dnd:scene-setting:';
 export const LOCAL_ASSET_BROWSER_PREFIX = 'simcity-dnd:local-glb:';
 export const SCENE_SETTINGS_RELOAD_WORLD_KEY = 'simcity-dnd:pending-scene-settings-world';
 export const SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY = 'simcity-dnd:pending-scene-settings-world-key';
+export const SCENE_SETTINGS_SOURCE_URL_SESSION_KEY = 'simcity-dnd:pending-scene-settings-source-url';
 
 function slug(value) {
   return String(value)
@@ -59,7 +60,7 @@ export async function loadBootSceneSettings({
     if (!serialized) throw new Error('The pending local settings document has expired.');
     return {
       document: normalizeSceneSettings(JSON.parse(serialized)),
-      sourceUrl: locationValue.href,
+      sourceUrl: session?.getItem(SCENE_SETTINGS_SOURCE_URL_SESSION_KEY) ?? locationValue.href,
       reference,
       pendingWorldKey: session?.getItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY) ?? null,
     };
@@ -78,6 +79,7 @@ export async function activateSceneSettings(document, {
   session = globalThis.sessionStorage,
   worldDocument = null,
   saveBrowserDocument = saveToBrowser,
+  sourceUrl = locationValue?.href,
 } = {}) {
   const normalized = normalizeSceneSettings(document);
   if (!locationValue || !session) {
@@ -91,6 +93,7 @@ export async function activateSceneSettings(document, {
   }
   try {
     session.setItem(SCENE_SETTINGS_SESSION_KEY, JSON.stringify(normalized));
+    session.setItem(SCENE_SETTINGS_SOURCE_URL_SESSION_KEY, sourceUrl ?? locationValue.href);
     if (worldDocument) {
       session.setItem(
         SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY,
@@ -229,7 +232,10 @@ export class SceneSettingsRuntime {
       ? normalizeSceneSettings(worldDocument.visualConfig.sceneSettings)
       : null;
     if (savedSettings?.assets.length > 0) {
-      await this.activate(savedSettings, { worldDocument });
+      await this.activate(savedSettings, {
+        worldDocument,
+        sourceUrl: map.kind === 'url' ? resolvedMap.url : baseUrl,
+      });
       return worldDocument;
     }
     this.controller.loadDocument(worldDocument);
@@ -278,8 +284,11 @@ export class SceneSettingsRuntime {
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 
-  async activate(document, { worldDocument = null } = {}) {
-    return activateSceneSettings(document, { worldDocument });
+  async activate(document, {
+    worldDocument = null,
+    sourceUrl = globalThis.location?.href,
+  } = {}) {
+    return activateSceneSettings(document, { worldDocument, sourceUrl });
   }
 
   activateUrl(url) {
@@ -303,7 +312,7 @@ export class SceneSettingsRuntime {
   }
 
   async addLocalAsset({ layer, file, label, scale = 1, tileIds = undefined }) {
-    if (!(file instanceof Blob)) throw new Error('Choose a local GLB first.');
+    if (!(file instanceof Blob)) throw new Eror('Choose a local GLB first.');
     const id = `local-${slug(label || file.name)}-${Date.now().toString(36)}`;
     await saveToBrowser(`${LOCAL_ASSET_BROWSER_PREFIX}${id}`, {
       kind: 'simcity-dnd-local-glb',
