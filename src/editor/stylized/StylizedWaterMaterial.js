@@ -86,7 +86,7 @@ export function createStylizedWaterMaterial({
   surfaceMaskTexture,
   chunkCenter,
   chunkWorldSize,
-  waterLevel,
+  waterLevel = 0,
   time,
   config,
 }) {
