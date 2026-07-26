@@ -22,6 +22,7 @@ import {
   stylizedNaturalTrailMask,
   stylizedPathWearMask,
 } from './StylizedNoiseNodes.js';
+import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -48,6 +49,7 @@ export function createStylizedFlowerMaterial({
   );
   const worldXZ = base.xz.add(chunkCenter);
   const surface = texture(surfaceMaskTexture, localUv);
+  const surfaceClass = createSurfaceClassNodes(surface);
   const naturalTrailConfig = config.path?.naturalTrail;
   const naturalTrail = naturalTrailConfig?.enabled
     ? stylizedNaturalTrailMask(worldXZ, {
@@ -56,7 +58,7 @@ export function createStylizedFlowerMaterial({
       width: float(naturalTrailConfig.width),
       softness: float(naturalTrailConfig.softness),
       warp: float(naturalTrailConfig.warp),
-    }).mul(surface.g)
+    }).mul(surfaceClass.grass)
     : float(0);
   const pathWear = stylizedPathWearMask(max(surface.r, naturalTrail), worldXZ, {
     vergeWidth: float(config.path?.vergeWidth ?? 0.45),
@@ -70,7 +72,7 @@ export function createStylizedFlowerMaterial({
     softness: float(config.dirt.softness),
     warp: float(config.dirt.warp),
   }));
-  const alive = oneMinus(step(config.flowers.dirtMax, dirt));
+  const alive = oneMinus(step(config.flowers.dirtMax, dirt)).mul(surfaceClass.landGrass);
 
   const angle = parameters.x;
   const size = parameters.y;
