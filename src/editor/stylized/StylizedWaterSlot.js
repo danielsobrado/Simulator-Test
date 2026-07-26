@@ -2,6 +2,15 @@ import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
 
+const DEFAULT_WATER_LEVEL = 0;
+
+export function resolveWaterSurfaceHeight(terrainView) {
+  const generatorLevel = terrainView?.worldStore?.generator?.toMetadata?.().seaLevel;
+  if (Number.isFinite(generatorLevel)) return generatorLevel;
+  const configuredLevel = terrainView?.streamingConfig?.seaLevel;
+  return Number.isFinite(configuredLevel) ? configuredLevel : DEFAULT_WATER_LEVEL;
+}
+
 export class StylizedWaterSlot {
   constructor({ terrainSlot, terrainView, config }) {
     this.terrainSlot = terrainSlot;
@@ -9,10 +18,10 @@ export class StylizedWaterSlot {
     this.config = config;
     this.time = uniform(0);
     this.material = createStylizedWaterMaterial({
-      heightTexture: terrainSlot.heightTexture,
       surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
       chunkCenter: terrainSlot.chunkCenter,
       chunkWorldSize: terrainView.chunkWorldSize,
+      waterLevel: resolveWaterSurfaceHeight(terrainView),
       time: this.time,
       config,
     });
