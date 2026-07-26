@@ -20,6 +20,12 @@ const SCENARIOS = Object.freeze({
     keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
     defaults: { duration: 20, speed: 'run' },
   },
+  'object-town': {
+    id: 'object-town',
+    label: 'Masonry town threshold sweep',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: { duration: 14, speed: 'run', warmup: 8 },
+  },
 });
 
 function readNumber(params, key, fallback) {
@@ -78,7 +84,7 @@ export function parseQaParams(search = '') {
     }),
     yawDegrees: readNumber(params, 'yaw', 0),
     pitchDegrees: readNumber(params, 'pitch', 0),
-    warmupSeconds: Math.max(0, readNumber(params, 'warmup', 2)),
+    warmupSeconds: Math.max(0, readNumber(params, 'warmup', defaults.warmup ?? 2)),
     durationSeconds: Math.max(0.5, readNumber(params, 'duration', defaults.duration ?? 12)),
     speed,
     running,
@@ -86,6 +92,9 @@ export function parseQaParams(search = '') {
     autostart: readBoolean(params, 'autostart', true),
     download: readBoolean(params, 'download', true),
     keys: Object.freeze(scenario.keys({ running })),
+    buildingCount: scenario.id === 'object-town'
+      ? Math.max(1, Math.min(256, Math.floor(readNumber(params, 'buildings', 64))))
+      : null,
   });
 }
 

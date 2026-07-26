@@ -25,6 +25,12 @@ RTX 40-series (Lovelace):
 Run-to-run spread is now small (186–190 FPS across three consecutive runs), where
 mid-investigation builds swung between 116 and 176.
 
+**These absolute figures were captured before the leaf-tint / grove-mix work landed**,
+which measures ~148–154 FPS on the same scenario. That is feature cost, not a
+regression in anything here. Where a fix below is justified by numbers, prefer the
+same-session A/B comparisons — they are the part that stays valid as the scene
+changes.
+
 [^1]: The ACES/soft-shadow A/B already recorded in `perf-qa.md`, same protocol and
 machine. It is the closest like-for-like reference; the "144 FPS yesterday" figure
 was never captured as a report.
@@ -165,6 +171,7 @@ backend at `--warmup 8`.
 | Memoized canopy clusters + emergent trees | `TreeManifestStore`, `TreeLodAssembler` | removes 12.7% of the rebuild subtree |
 | Memoized heights, deduped corner reads | `InfiniteWorldStore` | with the cache below: 176 → 189 FPS |
 | One-entry last-block cache, tiles and heights | `InfiniteWorldStore` | required — without it the height memo *cost* 40 FPS |
+| Dirty-subrange instance uploads | `StylizedLodRuntime`, `attributeUpload` | +8% FPS, p95 9.9 → 8.4 ms; did **not** reduce hitches |
 
 One change was **reverted** rather than kept: coalescing the tree LOD rebuild until
 the manifest queue drained measured flat (113.1 vs 113.9 FPS) and would have
@@ -259,15 +266,44 @@ would cut max dt further. Note this is a **different problem** from the tree LOD
 slicing previously named as next: `stylized` now averages 2.16 ms with a p95 of
 2.9 ms, so the CPU rebuild path is no longer a meaningful cost.
 
-### Instance buffer uploads
+### Instance buffer uploads — partially addressed, and the per-chunk-range idea is dead
 
-Two frames show `attributeBytesUploaded` of 64 KB and 459 KB on tree/bush rebuild
-frames, at dt 42–48 ms with cheap phase timers — the upload completes
-asynchronously between frames. *This* is where per-chunk instance ranges would
-actually pay off: uploading only the chunks whose band changed rather than the
-whole written range. It is worth about 2 of the 6 remaining hitches, so it is a
-real but modest win, and should be judged against the regression risk of
-restructuring `writeInstances`.
+`writeInstances` re-uploaded `[0, count)` for the instance matrix *and* all three
+companion attributes on every rebuild, even though the usual trigger is an LOD
+cross-fade that changes only `fade` and leaves every matrix byte-identical. It now
+compares before writing and uploads only the dirty subrange
+(`markAttributeSubrangeUpdated`), skipping `needsUpdate` entirely when an attribute
+is untouched, and skipping `computeBoundingSphere` unless matrices moved or the draw
+count changed.
+
+Measured A/B, `diagonal --warmup 8 --duration 14`, two runs each:
+
+| | Full uploads | Dirty subranges |
+|---|---|---|
+| Avg FPS | 150.3 / 163.0 | **170.7 / 173.5** |
+| dt p95 | 10.5 / 9.2 ms | **8.6 / 8.2 ms** |
+| dt p99 | 16.9 / 15.4 ms | **14.5 / 14.6 ms** |
+| Bytes uploaded | 45.5 / 46.2 MB | 44.5 / 44.7 MB |
+| Hitches / max dt | 9 / 6, ~69 ms | 6 / 9, ~69 ms |
+
+Read that carefully: throughput and both tail percentiles improved, but **the hitch
+count and max dt did not move.** The change did not fix the hitches it was aimed at.
+
+Bytes fell only ~3%, which explains why: the dirty range is almost always nearly the
+whole buffer. Instances are packed contiguously in plan order, so when a chunk
+changes band its instances leave one array and enter another, shifting every
+instance after it; and the plan is sorted by distance from the focus chunk, so
+crossing a chunk boundary permutes the order outright. A third A/B (dirty ranges but
+always recomputing the bounding sphere: 167.8 FPS, p95 8.9 ms) shows the sphere skip
+is worth only ~3-6 FPS of the gain — most of it comes from not writing and not
+flagging unchanged attributes.
+
+**So the "stable per-chunk instance ranges" fix previously recommended here should
+not be built.** Making ranges tight requires each chunk to own a fixed slot range,
+which means padding every chunk to its worst-case instance count and drawing the
+gaps as degenerate instances — tens of thousands of them against ~700 live trees.
+That trade is clearly bad. The remaining upload hitches are the price of compaction,
+and compaction is the right call.
 
 ## Reproducing
 

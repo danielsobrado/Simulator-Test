@@ -507,7 +507,7 @@ export function createWorkshopMaterials(recipe) {
       recipe.seed + 809,
     )
     : null;
-  const stone = tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+  const stone = tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
     color: stoneAlbedo?.tint ?? (recipe.albedo ? '#ffffff' : STONE_PALETTES[recipe.style].color),
     map: stoneAlbedo?.texture ?? (recipe.albedo ? stoneTexture(recipe) : null),
     bumpMap: stoneBump,
@@ -525,7 +525,7 @@ export function createWorkshopMaterials(recipe) {
     metalness: 0,
     envMapIntensity: 0.72,
   }), 'stone');
-  const roof = tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+  const roof = tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
     color: roofAlbedo?.tint ?? '#ffffff',
     map: roofAlbedo?.texture ?? roofTexture(recipe.topStyle, recipe.seed),
     bumpMap: roofBump,
@@ -540,7 +540,7 @@ export function createWorkshopMaterials(recipe) {
   }), 'roof');
   return Object.freeze({
     stone,
-    mortar: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+    mortar: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: wallAlbedo?.tint ?? (recipe.finish === 'masonry'
         ? new THREE.Color(
           STONE_PALETTES[recipe.style].base[0] / 255 * 0.66,
@@ -558,7 +558,7 @@ export function createWorkshopMaterials(recipe) {
       metalness: 0,
       envMapIntensity: 0.66,
     }), 'mortar'),
-    wood: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+    wood: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: woodAlbedo?.tint ?? '#ffffff',
       map: woodAlbedo?.texture ?? woodTexture(recipe.seed),
       bumpMap: surfaceBumpTexture(recipe.seed + 317, 0.5),
@@ -571,13 +571,13 @@ export function createWorkshopMaterials(recipe) {
       envMapIntensity: 0.78,
     }), 'wood'),
     roof,
-    metal: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+    metal: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: '#b38a35',
       roughness: 0.48,
       metalness: 0.55,
       side: THREE.DoubleSide,
     }), 'metal'),
-    foliage: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+    foliage: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: '#4c8a37',
       // Per-leaf tint and a base-to-tip gradient, baked by `leaf()`. Vines carry
       // no colour of their own and are filled white at merge time.
@@ -586,7 +586,7 @@ export function createWorkshopMaterials(recipe) {
       metalness: 0,
       side: THREE.DoubleSide,
     }), 'foliage'),
-    recess: tagWorkshopMaterial(new THREE.MeshStandardMaterial({
+    recess: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: '#233b43',
       roughness: 0.62,
       metalness: 0.05,

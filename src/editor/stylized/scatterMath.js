@@ -29,6 +29,34 @@ export function cellSampleRandom01(chunkX, chunkZ, cellIndex, sampleIndex, chann
   return hash32(seed) / 0xffffffff;
 }
 
+function radicalInverse(index, base) {
+  let value = index;
+  let inverseBase = 1 / base;
+  let result = 0;
+  while (value > 0) {
+    result += (value % base) * inverseBase;
+    value = Math.floor(value / base);
+    inverseBase /= base;
+  }
+  return result;
+}
+
+/**
+ * Low-discrepancy clump position inside one terrain cell.
+ *
+ * Independent random points often bunch six clumps into two or three visible
+ * tufts. A scrambled Halton prefix keeps every density band evenly distributed
+ * while the per-cell rotation prevents a world-aligned grid from appearing.
+ */
+export function grassClumpCellOffset(chunkX, chunkZ, cellIndex, clumpIndex) {
+  const rotationX = cellSampleRandom01(chunkX, chunkZ, cellIndex, 0, 6);
+  const rotationZ = cellSampleRandom01(chunkX, chunkZ, cellIndex, 0, 7);
+  return {
+    x: (radicalInverse(clumpIndex + 1, 2) + rotationX) % 1,
+    z: (radicalInverse(clumpIndex + 1, 3) + rotationZ) % 1,
+  };
+}
+
 export function overlaps(x, z, placements, radius) {
   for (const placement of placements) {
     const dx = placement.x - x;

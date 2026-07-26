@@ -1,6 +1,73 @@
 # Arbitrary-Footprint Roofs (Straight Skeleton)
 
-Status: **planned, not implemented.** Written 2026-07-25.
+Status: **implemented.** Written and implemented 2026-07-25.
+
+## Implementation outcome
+
+The implementation keeps the plan's geometry contract but deliberately replaces
+its two riskiest bespoke algorithms:
+
+- `polygon-clipping` performs rotated-rectangle Boolean unions, including
+  coincident edges, containment, and multi-component output. The proposed
+  midpoint-classification/chaining algorithm was removed because coincident
+  edges and partial shared edges make its keep/discard rule ambiguous.
+- `straight-skeleton` v1 supplies the synchronous wavefront kernel. The local
+  `ProceduralStraightSkeleton.js` adapter canonicalises input, strips collinear
+  vertices, converts third-party objects to frozen plain data, and rejects any
+  result whose projected face area does not equal the footprint area.
+- Roof faces use ear-clipping through `THREE.ShapeUtils.triangulateShape`; the
+  proposed fan triangulation was unsafe for concave or tower-clipped faces.
+- Ultra detail now tiles arbitrary skeleton faces with eave-parallel scanlines.
+  The same even/odd scan handles concavity and tower holes, and the existing
+  `MAX_SHINGLES` budget remains the hard ceiling.
+- A true gable is implemented for a single rectangular component. A connected
+  multi-rectangle group with authored `gable` edges resolves to one coherent hip
+  roof and increments `roofGableDowngrades`; defining a useful weighted gable for
+  an arbitrary L/T footprint needs authored ridge intent, not a guess based on
+  "shortest opposite edges."
+- Corner-touching rectangles remain separate roof components before overhang is
+  applied, so eaves cannot bridge a real gap. Free-standing wall polylines stay
+  unroofed; rectangle volumes are the roof-group authority.
+- Recipe format 6 adds `roofPitch`. Versions 1–5 receive the former nominal
+  40-degree pitch; new recipes default to 38 degrees.
+
+The implementation is in `ProceduralWorkshopFootprint.js`,
+`ProceduralStraightSkeleton.js`, `ProceduralWorkshopSkeletonRoof.js`, and the
+arbitrary-face path in `ProceduralWorkshopShingles.js`.
+
+### Code-review corrections, 2026-07-26
+
+- **A failure part-way through a roof component produced two roofs.** The main
+  roof was pushed into `parts` before tiles were generated, and tile generation
+  can throw on the budget guard; the catch then appended fallback cones *beside*
+  the roof already emitted, and never disposed it — contrary to 15-…md's "failed
+  generation releases all partially created geometry". Components are now staged
+  and pushed only once complete, and the catch disposes the staged geometry.
+  (Latent rather than active: probed L and cross footprints at maximum legal
+  dimensions, with and without tower clipping, and adaptive tile sizing never let
+  the budget guard fire.)
+- **Pyramid shingles were rotated a half facet off their deck.** A tile is built
+  facing local +Z, so tile facets sat at theta 0/90/180/270 while `ConeGeometry`
+  centres its facets between vertices at 45/135/225/315 — on a square tower, a
+  full 45°. The roof's measured horizontal extent was 1.27 m wider than the deck
+  it covers. Fixed with a half-facet offset; the extent now matches the deck
+  exactly.
+- **`depthScale` was applied in the wrong frame.** It was passed through
+  `transformGeometry`, which composes `T · R · S`, so the depth squash of a
+  non-square tower applied *before* the yaw and landed on world X for the facets
+  facing ±X. It is now applied in world space after the yaw, exactly as the deck
+  does with `roof.scale(1, 1, depth / width)`.
+- **The eaves oversail is now bounded** to 0.18 m. It was 35% of tile length, and
+  tile length grows adaptively to hold the tile budget, so large roofs oversailed
+  by over a metre. An eaves overhang is an architectural dimension and does not
+  scale with how coarsely a roof is tiled.
+- A connected group that cannot honour an authored `flat` alongside a pitched
+  neighbour now increments `roofFlatDowngrades`; only the gable downgrade was
+  reported before.
+
+Together the first three corrections took the square tower's near→coarse roof
+envelope error from 1.266 m to 0.154 m — the residual being the legitimate eaves
+oversail — which is also what unblocked the LOD ladder for shingled archetypes.
 
 ## 1. Objective
 

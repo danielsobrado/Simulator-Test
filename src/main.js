@@ -18,14 +18,28 @@ import { OBJECT_CATALOG } from './editor/objectCatalog.js';
 import { FrameRateDisplay } from './editor/performance/FrameRateDisplay.js';
 import { FrameRateMeter } from './editor/performance/FrameRateMeter.js';
 import { FRAME_RATE_DISPLAY_INTERVAL_MS } from './editor/performance/frameRateConstants.js';
+import { assetStartupTelemetry } from './editor/performance/AssetStartupTelemetry.js';
 import { PerfCounters } from './editor/performance/qa/PerfCounters.js';
 import { PerfQaHarness } from './editor/performance/qa/PerfQaHarness.js';
+import { createObjectTownQaScene } from './editor/performance/qa/ObjectTownQaScene.js';
+import { parseQaParams } from './editor/performance/qa/parseQaParams.js';
 import { PlayerController } from './editor/player/PlayerController.js';
 import { ViewModeController } from './editor/player/ViewModeController.js';
 import { ViewModeUi } from './editor/player/ViewModeUi.js';
 import { isTreeImpostorBakeMode } from './editor/stylized/impostorBakeMode.js';
 import { StylizedSurfaceView } from './editor/stylized/StylizedSurfaceView.js';
+import { BiomeAssetPalette } from './editor/stylized/BiomeAssetPalette.js';
+import { applySceneAssetSettings } from './editor/settings/SceneSettings.js';
+import {
+  loadBootSceneSettings,
+  resolveLocalGlb,
+  SceneSettingsRuntime,
+} from './editor/settings/SceneSettingsRuntime.js';
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
+import { ConstructionStore } from './editor/construction/ConstructionStore.js';
+import { ConstructionSpatialIndex } from './editor/construction/ConstructionSpatialIndex.js';
+import { ConstructionCompilerClient } from './editor/construction/compile/ConstructionCompilerClient.js';
+import { ConstructionView } from './editor/construction/render/ConstructionView.js';
 import { TILE_BY_KEY, TILE_CATALOG } from './editor/tileCatalog.js';
 import { GpuVoxelWorld } from './editor/voxel/GpuVoxelWorld.js';
 import { VoxelPrototypeUi } from './editor/voxel/VoxelPrototypeUi.js';
@@ -48,7 +62,34 @@ import {
 const TERRAIN_PREFETCH_REFRESH_MS = 200;
 
 async function startEditor() {
+  // A `?settings=` reference is user-supplied and can go stale — the session
+  // handoff is gone in a duplicated tab, a preset URL can 404, a hand-edited
+  // document can be invalid. None of that should stop the editor from booting,
+  // so it degrades to the built-in look and reports why once the UI exists.
+  let bootSceneSettings = null;
+  let bootSceneSettingsError = null;
+  try {
+    bootSceneSettings = await loadBootSceneSettings();
+  } catch (error) {
+    bootSceneSettingsError = error;
+  }
   const config = loadEditorConfig();
+  const localAssetObjectUrls = [];
+  if (bootSceneSettings) {
+    try {
+      await applySceneAssetSettings(config, bootSceneSettings.document, {
+        baseUrl: bootSceneSettings.sourceUrl,
+        resolveLocalAsset: async (assetId) => {
+          const url = await resolveLocalGlb(assetId);
+          localAssetObjectUrls.push(url);
+          return url;
+        },
+      });
+    } catch (error) {
+      bootSceneSettings = null;
+      bootSceneSettingsError = error;
+    }
+  }
   const impostorBakeMode = isTreeImpostorBakeMode();
   const defaultTile = TILE_BY_KEY.get(config.map.defaultTile);
   if (!defaultTile) {
@@ -118,6 +159,19 @@ async function startEditor() {
   const tileMap = new ChunkedTileMap({ worldStore, defaultTileId: defaultTile.id });
   const heightField = new ChunkedHeightField({ worldStore });
   const objectMap = new ObjectMap({ tileMap, objectCatalog: OBJECT_CATALOG });
+  let biomeAssetPalette;
+  try {
+    biomeAssetPalette = new BiomeAssetPalette({
+      stylizedConfig: config.stylizedSurface,
+      document: bootSceneSettings?.document.biomeAssets ?? null,
+    });
+  } catch (error) {
+    // Biome selections name assets by key, so a preset written against a
+    // different asset set can reference keys this build has no variant for.
+    // Fall back to the automatic mix rather than refusing to start.
+    bootSceneSettingsError = error;
+    biomeAssetPalette = new BiomeAssetPalette({ stylizedConfig: config.stylizedSurface });
+  }
   const floatingOrigin = new FloatingOrigin({
     threshold: config.world.floatingOriginThreshold,
     snapSize: config.world.chunkSize * config.map.tileSize,
@@ -139,6 +193,7 @@ async function startEditor() {
     objectCatalog: OBJECT_CATALOG,
     objectMap,
   });
+  ui.attachBiomeAssetPalette(biomeAssetPalette);
   const frameRateDisplay = new FrameRateDisplay({ root });
   const frameRateMeter = new FrameRateMeter();
 
@@ -168,18 +223,44 @@ async function startEditor() {
     objectMap,
     objectCatalog: OBJECT_CATALOG,
   });
+  const constructionStore = new ConstructionStore();
+  const constructionSpatialIndex = new ConstructionSpatialIndex({
+    chunkWorldSize: config.world.chunkSize * config.map.tileSize,
+  });
+  constructionStore.subscribe((change) => {
+    if (change.kind === 'clear' || change.kind === 'replace') {
+      constructionSpatialIndex.clear();
+      for (const record of constructionStore.list()) constructionSpatialIndex.update(record);
+      return;
+    }
+    if (change.after) constructionSpatialIndex.update(change.after);
+    else if (change.id) constructionSpatialIndex.remove(change.id);
+  });
+  const constructionCompiler = new ConstructionCompilerClient();
+  const constructionView = new ConstructionView({
+    terrainView,
+    store: constructionStore,
+    compilerClient: constructionCompiler,
+  });
   const proceduralAssetManager = new ProceduralAssetManager({
     tileSize: tileMap.tileSize,
     objectMap,
     objectView,
     ui,
+    lodConfig: config.objects?.lod,
   });
   const stylizedSurface = new StylizedSurfaceView({
     terrainView,
     objectMap,
     config: config.stylizedSurface,
     baseUrl: import.meta.env.BASE_URL,
+    biomeAssetPalette,
   });
+  ui.attachGodRays(terrainView.godRays);
+  ui.attachGrassBladeProfiles(stylizedSurface.bladeProfiles);
+  // The list has to be redrawn once the manifest lands: before that every set
+  // resolves to the generated taper and would be labelled as unbaked.
+  stylizedSurface.bladeProfiles.ready.then(() => ui.renderGrassBladeProfiles());
 
   if (impostorBakeMode) {
     await stylizedSurface.bakeRequest;
@@ -229,6 +310,7 @@ async function startEditor() {
     editorCamera,
     playerController,
     terrainView,
+    objectView,
   });
 
   controller = new TerrainAwareEditorController({
@@ -245,13 +327,51 @@ async function startEditor() {
     terrainConfig: config.terrain,
     voxelStampStore,
     proceduralAssetManager,
+    constructionStore,
+    constructionView,
+    biomeAssetPalette,
   });
   controller.focusProvider = () => {
     const renderFocus = viewModeController.getFocusWorld();
     return floatingOrigin.toCanonical(renderFocus.x, renderFocus.z);
   };
 
+  const sceneSettingsRuntime = new SceneSettingsRuntime({
+    controller,
+    biomeAssetPalette,
+    godRays: terrainView.godRays,
+    config,
+    boot: bootSceneSettings,
+    resolveAzgaarOptions: (summary) => ui.resolveAzgaarImportOptions(summary),
+    afterMapLoad: async (worldDocument) => {
+      ui.syncImportedBiomeTiles(worldDocument);
+      ui.minimapCenter = controller.getFocusCell?.() ?? ui.minimapCenter;
+      ui.updateMinimap();
+    },
+  });
+  controller.sceneSettingsProvider = () => sceneSettingsRuntime.capture();
+  controller.sceneSettingsConsumer = (document) => {
+    sceneSettingsRuntime.applyVisualSettings(document);
+    ui.syncGodRaysSettings(terrainView.godRays.getSettings());
+  };
   ui.bind(controller);
+  ui.attachSceneSettings(sceneSettingsRuntime).catch((error) => {
+    ui.showToast(`Settings library unavailable: ${error.message}`, true);
+  });
+  if (bootSceneSettingsError) {
+    ui.showToast(
+      `Requested world look ignored: ${bootSceneSettingsError.message}`,
+      true,
+    );
+  }
+  try {
+    await sceneSettingsRuntime.applyInitialRuntime();
+  } catch (error) {
+    // The preset's map may be unreachable. The generated world is already live,
+    // so keep it and say the map did not load.
+    ui.showToast(`Preset map not loaded: ${error.message}`, true);
+  }
+  ui.syncGodRaysSettings(terrainView.godRays.getSettings());
   const proceduralWorkshop = new ProceduralWorkshopUi({
     root,
     manager: proceduralAssetManager,
@@ -285,6 +405,12 @@ async function startEditor() {
       config,
       ui,
       proceduralWorkshop,
+      constructionStore,
+      constructionView,
+      constructionSpatialIndex,
+      godRays: terrainView.godRays,
+      stylizedSurface,
+      sceneSettingsRuntime,
     };
   }
   const voxelPrototype = new GpuVoxelWorld({
@@ -305,6 +431,17 @@ async function startEditor() {
   }
 
   await stylizedSurface.ready;
+  assetStartupTelemetry.markAssetsReady();
+
+  const perfQaConfig = parseQaParams(window.location.search);
+  if (perfQaConfig?.scenarioId === 'object-town') {
+    createObjectTownQaScene({
+      target: perfQaConfig.buildingCount,
+      proceduralAssetManager,
+      objectMap,
+      objectView,
+    });
+  }
 
   // Warm render pipelines before the first frame. WebGPU compiles a pipeline the
   // first time a material/geometry pair is actually drawn, and that compile blocks
@@ -313,6 +450,7 @@ async function startEditor() {
   // Doing it here moves the cost into load, where a stall is not a stutter.
   try {
     await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);
+    terrainView.prewarmPostProcessing(playerController.camera);
   } catch (error) {
     console.warn('Render pipeline pre-warm failed; pipelines will compile on demand.', error);
   }
@@ -321,6 +459,7 @@ async function startEditor() {
     viewModeController,
     playerController,
     terrainView,
+    objectView,
     stylizedSurface,
     voxelPrototype,
     editorConfig: config,
@@ -363,6 +502,15 @@ async function startEditor() {
     const averageFps = frameRateMeter.record(frameTimestamp);
     if (frameTimestamp >= nextFrameRateDisplayAt) {
       frameRateDisplay.update(averageFps);
+      // Same cadence as the FPS display: the grass readout is there to be compared
+      // against a profile switch, and both numbers have to come from the same
+      // window or the comparison is between a settled figure and an instant one.
+      ui.updateGrassBladeReadout({
+        clumps: PerfCounters.get('grassLastChunkClumps'),
+        blades: PerfCounters.get('grassLastChunkEffectiveBlades'),
+        triangles: PerfCounters.get('grassLastChunkTriangles'),
+        fps: averageFps,
+      });
       nextFrameRateDisplayAt = frameTimestamp + FRAME_RATE_DISPLAY_INTERVAL_MS;
     }
 
@@ -378,6 +526,7 @@ async function startEditor() {
       PerfCounters.inc('floatingOriginSnaps');
       viewModeController.shiftWorld(rebase.shiftX, rebase.shiftZ);
       controller.refreshObjects();
+      constructionView.refreshAll();
       renderFocus = viewModeController.getFocusWorld();
     }
     if (profiling) perfQa.mark('floatingOrigin');
@@ -406,6 +555,9 @@ async function startEditor() {
     stylizedSurface.update(frameTimestamp, viewModeController.camera);
     if (profiling) perfQa.mark('stylized');
 
+    objectView.update(frameTimestamp, viewModeController.camera);
+    if (profiling) perfQa.mark('objects');
+
     voxelPrototype.update(canonicalFocus);
     if (profiling) perfQa.mark('voxel');
 
@@ -414,6 +566,7 @@ async function startEditor() {
       nextStreamingStatusAt = frameTimestamp + 250;
     }
     terrainView.render(viewModeController.camera);
+    assetStartupTelemetry.markFirstFrame();
     if (profiling) {
       perfQa.mark('render');
       const voxelStatusLive = voxelPrototype.getStatus?.() ?? null;
@@ -452,9 +605,12 @@ async function startEditor() {
     controller.dispose();
     editorCamera.dispose();
     objectView.dispose();
+    constructionView.dispose();
+    constructionCompiler.dispose();
     frameRateDisplay.dispose();
     terrainView.dispose();
     worldStore.dispose();
+    localAssetObjectUrls.forEach((url) => URL.revokeObjectURL(url));
   }, { once: true });
 }
 

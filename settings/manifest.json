@@ -1,0 +1,16 @@
+{
+  "kind": "simcity-dnd-settings-library",
+  "version": 1,
+  "settings": [
+    {
+      "id": "authored-default",
+      "name": "Authored natural world",
+      "url": "authored-natural-world.json"
+    },
+    {
+      "id": "eldara-authored",
+      "name": "Eldara · authored natural world",
+      "url": "eldara-authored-natural-world.json"
+    }
+  ]
+}

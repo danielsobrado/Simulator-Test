@@ -178,6 +178,9 @@ export function aggregateCanopyClusters({
           depth: cluster.depth * averageCrown,
           speciesId: lobe[0].speciesId ?? null,
           speciesColor: lobe[0].speciesColor ?? null,
+          // Lobes never span patches, so any member's grove seed describes the
+          // whole fragment — the far canopy turns autumn with the trees it stands in for.
+          groveSeed: lobe[0].groveSeed ?? 0,
         }));
       });
     });

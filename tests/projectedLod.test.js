@@ -14,6 +14,29 @@ const thresholds = {
   clusterPixels: 0.45,
 };
 
+test('clusterPixels 0 disables the aggregate canopy band instead of matching everything', () => {
+  // `pixels >= 0` is true for every tree, so a naive threshold read would turn the
+  // whole world into cluster blobs — the band has to drop out entirely.
+  const off = { ...thresholds, clusterPixels: 0 };
+  assert.equal(selectProjectedLod({ pixels: 1, ...off }), 'culled');
+  assert.equal(selectProjectedLod({ pixels: 0, ...off }), 'culled');
+  assert.equal(selectProjectedLod({ pixels: 3, ...off }), 'impostor');
+  // Still reachable when configured on.
+  assert.equal(selectProjectedLod({ pixels: 1, ...thresholds }), 'cluster');
+});
+
+test('collapsing clusterRadius onto impostorRadius culls instead of demoting to cluster', () => {
+  const radii = {
+    meshRadius: 1, proxyRadius: 3, impostorRadius: 5, clusterRadius: 5,
+  };
+  // Every path that would otherwise fall through to 'cluster' now culls.
+  assert.equal(clampLodToRadii({ band: 'impostor', chunkDistance: 6, ...radii }), 'culled');
+  assert.equal(clampLodToRadii({ band: 'near', chunkDistance: 7, ...radii }), 'culled');
+  assert.equal(clampLodToRadii({ band: 'proxy', chunkDistance: 6, ...radii }), 'culled');
+  // Inside the impostor range nothing changes.
+  assert.equal(clampLodToRadii({ band: 'near', chunkDistance: 4, ...radii }), 'impostor');
+});
+
 test('orthographic projected size responds to zoom', () => {
   const camera = { isOrthographicCamera: true, top: 90, bottom: -90, zoom: 1 };
   const normal = projectedPixelHeight({ camera, worldPosition: {}, worldHeight: 10, viewportHeight: 900 });

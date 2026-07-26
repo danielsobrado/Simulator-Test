@@ -16,7 +16,9 @@ function baseBand(pixels, thresholds) {
   if (pixels >= thresholds.nearPixels) return 'near';
   if (pixels >= thresholds.proxyPixels) return 'proxy';
   if (pixels >= thresholds.impostorPixels) return 'impostor';
-  if (pixels >= thresholds.clusterPixels) return 'cluster';
+  // A zero threshold disables the band rather than matching everything, which is
+  // how the aggregate canopy is switched off: `pixels >= 0` is always true.
+  if (thresholds.clusterPixels > 0 && pixels >= thresholds.clusterPixels) return 'cluster';
   return 'culled';
 }
 

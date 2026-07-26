@@ -8,6 +8,7 @@ import { ProceduralWorkshopMaterialController } from './ProceduralWorkshopMateri
 import { ProceduralWorkshopPlannerClient } from './ProceduralWorkshopPlannerClient.js';
 import { createWorkshopStage } from './ProceduralWorkshopStage.js';
 import { ProceduralWorkshopSurfaceEditor } from './ProceduralWorkshopSurfaceEditor.js';
+import { WorkshopAmbientOcclusion } from './WorkshopAmbientOcclusion.js';
 
 function randomSeed() {
   const values = new Uint32Array(1);
@@ -36,6 +37,7 @@ export class ProceduralWorkshopUi {
     this.planner = new ProceduralWorkshopPlannerClient();
     this.planRevision = 0;
     this.stage = null;
+    this.ambientOcclusion = null;
     this.surfaceEditor = null;
     this.resizeObserver = null;
     this.animationFrame = 0;
@@ -369,6 +371,7 @@ export class ProceduralWorkshopUi {
         ...(this.materialController?.toDocument() ?? {}),
         componentTransforms: this.componentController?.toDocument() ?? {},
         openingAttachments: this.componentController?.toOpeningAttachmentsDocument() ?? {},
+        openingAssemblies: this.componentController?.toOpeningAssembliesDocument() ?? {},
       },
     };
   }
@@ -506,6 +509,11 @@ export class ProceduralWorkshopUi {
           this.syncTransformModeButtons(this.componentController?.mode ?? 'translate');
         },
       });
+      this.ambientOcclusion = new WorkshopAmbientOcclusion({
+        renderer,
+        scene: this.scene,
+        camera: this.camera,
+      });
 
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(this.canvasHost);
@@ -530,6 +538,8 @@ export class ProceduralWorkshopUi {
     this.controls = null;
     this.stage?.dispose();
     this.stage = null;
+    this.ambientOcclusion?.dispose();
+    this.ambientOcclusion = null;
     this.previewRoot.removeFromParent();
     this.renderer?.domElement.remove();
     this.renderer?.dispose();
@@ -638,7 +648,8 @@ export class ProceduralWorkshopUi {
       return;
     }
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    if (this.ambientOcclusion) this.ambientOcclusion.render();
+    else this.renderer.render(this.scene, this.camera);
     this.animationFrame = requestAnimationFrame(() => this.renderLoop());
   }
 

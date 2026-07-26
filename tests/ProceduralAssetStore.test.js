@@ -20,6 +20,7 @@ const recipe = {
   height: 5,
   roofScale: 1,
   roofOverhang: 0.35,
+  roofPitch: 38,
   seed: 1848,
   detail: 2,
   weathering: 0.35,
@@ -54,6 +55,7 @@ const recipe = {
   ],
   componentTransforms: {},
   openingAttachments: {},
+  openingAssemblies: {},
 };
 
 function importedSurfaceTextures() {
@@ -129,6 +131,7 @@ test('older workshop recipes receive compatible quality, texture, and component 
   assert.deepEqual(normalized.surfaceTextures, { sources: {}, slots: {} });
   assert.deepEqual(normalized.componentTransforms, {});
   assert.deepEqual(normalized.openingAttachments, {});
+  assert.deepEqual(normalized.openingAssemblies, {});
 });
 
 test('component transforms are normalized, sparse, and bounded', () => {
@@ -269,11 +272,24 @@ test('procedural asset documents preserve images and semantic component edits', 
           position: [0.5, 0],
           scale: [1.2, 1.4],
         },
+        'copy-door-1-1': {
+          sourceId: 'door-1',
+          hostId: 'structure-left',
+          position: [1.7, 0],
+          scale: [1.2, 1.4],
+        },
+      },
+      openingAssemblies: {
+        'assembly-door-1': {
+          kind: 'door',
+          hostId: 'structure-left',
+          memberIds: ['door-1', 'copy-door-1-1'],
+        },
       },
     },
   });
   const document = source.toDocument();
-  assert.equal(document[0].version, 5);
+  assert.equal(document[0].version, 7);
   assert.equal(document[0].key, record.key);
   assert.equal('geometry' in document[0], false);
   assert.equal(
@@ -282,6 +298,10 @@ test('procedural asset documents preserve images and semantic component edits', 
   );
   assert.deepEqual(document[0].recipe.componentTransforms['door-1'].position, [0.75, 0, 0]);
   assert.deepEqual(document[0].recipe.openingAttachments['door-1'].position, [0.5, 0]);
+  assert.deepEqual(document[0].recipe.openingAssemblies['assembly-door-1'].memberIds, [
+    'door-1',
+    'copy-door-1-1',
+  ]);
 
   const target = new ProceduralAssetStore();
   target.replaceAll(document);
@@ -289,16 +309,17 @@ test('procedural asset documents preserve images and semantic component edits', 
   assert.ok(Object.isFrozen(target.list()[0].recipe));
 });
 
-test('version-one through version-four workshop records migrate to version five', () => {
+test('version-one through version-six workshop records migrate to version seven', () => {
   const oldRecord = createProceduralAssetRecord({ label: 'Legacy Tower', recipe });
-  for (const version of [1, 2, 3, 4]) {
+  for (const version of [1, 2, 3, 4, 5, 6]) {
     const store = new ProceduralAssetStore();
     store.replaceAll([{ ...oldRecord, version }]);
     const [migrated] = store.toDocument();
-    assert.equal(migrated.version, 5);
+    assert.equal(migrated.version, 7);
     assert.deepEqual(migrated.recipe.surfaceTextures, { sources: {}, slots: {} });
     assert.deepEqual(migrated.recipe.componentTransforms, {});
     assert.deepEqual(migrated.recipe.openingAttachments, {});
+    assert.deepEqual(migrated.recipe.openingAssemblies, {});
     assert.deepEqual(migrated.recipe.composition, { version: 1, primitives: [] });
   }
 });

@@ -68,6 +68,7 @@ export class ForestHabitatField {
     heightAt,
     waterDistanceAt = null,
     revisionProvider = null,
+    regionalCharacterField = null,
     config = {},
   }) {
     if (!Number.isFinite(tileSize) || tileSize <= 0) {
@@ -84,6 +85,7 @@ export class ForestHabitatField {
     this.heightAt = heightAt;
     this.waterDistanceAt = typeof waterDistanceAt === 'function' ? waterDistanceAt : null;
     this.revisionProvider = typeof revisionProvider === 'function' ? revisionProvider : null;
+    this.regionalCharacterField = regionalCharacterField;
     this.cacheRevision = this.revisionProvider?.() ?? 0;
     this.cacheLimit = Math.max(256, Math.trunc(config.cacheSamples) || 32768);
     this.sampleCache = new Map();
@@ -100,6 +102,18 @@ export class ForestHabitatField {
       tileSize,
       Number(config.patchSampleSpacing) || DEFAULT_PATCH_SAMPLE_SPACING,
     );
+    // Shape broad ecological patches into visually legible stands. Coverage
+    // contrast moves the effective edge inward, while the core boost restores
+    // local tree density there. At their neutral value of 1 these preserve the
+    // original habitat distribution exactly.
+    this.coverageContrast = Math.max(
+      0.1,
+      Number.isFinite(config.coverageContrast) ? config.coverageContrast : 1,
+    );
+    this.coreDensityBoost = Math.max(
+      0.1,
+      Number.isFinite(config.coreDensityBoost) ? config.coreDensityBoost : 1,
+    );
     this.profiles = createForestBiomeProfiles(config.profiles);
     this.patchField = new ForestPatchField({
       seed: this.seed,
@@ -111,10 +125,13 @@ export class ForestHabitatField {
       this.tileSize,
       this.slopeSampleDistance,
       this.patchSampleSpacing,
+      this.coverageContrast,
+      this.coreDensityBoost,
       // Acceptance changes the moment a water provider appears, so it belongs in
       // the signature that invalidates cached manifests.
       this.waterDistanceAt ? 'riparian' : 'nowater',
       this.patchField.signature,
+      this.regionalCharacterField?.signature ?? 'uniform-regions',
       forestProfileSignature(this.profiles),
     ].join('|');
   }
@@ -240,9 +257,11 @@ export class ForestHabitatField {
     // A gallery wood along a river is not an upland patch that happens to touch
     // water — it is its own corridor, so it competes with the patch field for
     // coverage instead of scaling it.
-    const coverage = Math.max(patch.patchCoverage, riparian);
+    const regionalForest = this.regionalCharacterField?.sampleChannel(x, z, 'forest') ?? 1;
+    const rawCoverage = Math.max(patch.patchCoverage, riparian) * regionalForest;
+    const coverage = clamp01(rawCoverage ** this.coverageContrast);
     const suitability = clamp01(
-      profile.density
+      profile.density * this.coreDensityBoost
       * coverage
       * elevationFactor
       * slopeFactor
@@ -258,7 +277,8 @@ export class ForestHabitatField {
       // treat coverage as "how wooded is this spot", so they must see the
       // riparian belt too; the raw patch term stays available separately.
       patchCoverage: coverage,
-      uplandPatchCoverage: patch.patchCoverage,
+      uplandPatchCoverage: clamp01(patch.patchCoverage ** this.coverageContrast),
+      rawPatchCoverage: patch.patchCoverage,
       patchEdge: patch.patchEdge,
       patchDistance: patch.patchDistance,
       elevation,
@@ -268,6 +288,7 @@ export class ForestHabitatField {
       waterWeight: waterFactor,
       waterDistance: distanceToWater,
       riparian,
+      regionalForest,
       suitability,
     }));
   }

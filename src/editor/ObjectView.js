@@ -2,6 +2,13 @@ import * as THREE from 'three/webgpu';
 import { QUARTER_TURN_RADIANS } from './constants.js';
 import { disposeModelParts } from './assets/modelParts.js';
 import { createObjectModelParts } from './ObjectModelLibrary.js';
+import { ObjectLodController } from './ObjectLodController.js';
+import { PerfCounters } from './performance/qa/PerfCounters.js';
+import {
+  createInstancedRenderers,
+  disposeInstancedRenderers,
+  writeInstances,
+} from './stylized/lod/StylizedLodRuntime.js';
 import { evaluateObjectSurface } from './TerrainPlacement.js';
 
 const PREVIEW_VALID_COLOR = '#79d47d';
@@ -20,6 +27,32 @@ function nextCapacity(required) {
   return capacity;
 }
 
+function geometryTriangles(geometry) {
+  return (geometry.index?.count ?? geometry.getAttribute('position')?.count ?? 0) / 3;
+}
+
+function bandTriangles(parts) {
+  return parts.reduce((total, part) => total + geometryTriangles(part.geometry), 0);
+}
+
+function geometryBytes(geometry) {
+  let bytes = geometry.index?.array?.byteLength ?? 0;
+  for (const attribute of Object.values(geometry.attributes)) {
+    bytes += attribute.array?.byteLength ?? 0;
+  }
+  return bytes;
+}
+
+function modelBounds(parts) {
+  const bounds = new THREE.Box3().makeEmpty();
+  for (const entry of parts) {
+    entry.geometry.computeBoundingBox();
+    if (!entry.geometry.boundingBox) continue;
+    bounds.union(entry.geometry.boundingBox.clone().applyMatrix4(entry.matrix));
+  }
+  return bounds;
+}
+
 export class ObjectView {
   constructor({ terrainView, tileMap, heightField, objectMap, objectCatalog }) {
     this.terrainView = terrainView;
@@ -36,6 +69,7 @@ export class ObjectView {
     this.pointer = new THREE.Vector2();
     this.renderers = new Map();
     this.pickMeshes = [];
+    this.selectedObjectId = null;
     this.previewGroup = new THREE.Group();
     this.previewGroup.visible = false;
     terrainView.scene.add(this.previewGroup);
@@ -83,11 +117,32 @@ export class ObjectView {
     this.refreshAll();
   }
 
-  createRendererRecord(definition, parts) {
+  createRendererRecord(definition, parts, lodParts = null) {
     const hasFoundation = definition.foundation.mode === 'terrace';
+    const hasLod = Boolean(lodParts?.coarse?.length && lodParts?.shell?.length);
+    const bounds = modelBounds(parts);
     return {
       definition,
       parts,
+      lodSources: hasLod
+        ? { near: parts, coarse: lodParts.coarse, shell: lodParts.shell }
+        : null,
+      lodMeshes: hasLod ? { near: [], coarse: [], shell: [] } : null,
+      // Triangle counts are fixed for the life of the record, so they are
+      // measured once here rather than reduced over every part of every band on
+      // every frame inside `update()`.
+      lodTriangles: hasLod
+        ? {
+          near: bandTriangles(parts),
+          coarse: bandTriangles(lodParts.coarse),
+          shell: bandTriangles(lodParts.shell),
+        }
+        : null,
+      lodController: hasLod ? new ObjectLodController(lodParts.config) : null,
+      lodShadows: hasLod ? lodParts.shadows : null,
+      lodPlacements: [],
+      lodSignatures: { near: '', coarse: '', shell: '' },
+      worldHeight: bounds.isEmpty() ? 1 : Math.max(0.1, bounds.max.y - bounds.min.y),
       meshes: [],
       capacity: 0,
       foundationGeometry: hasFoundation ? new THREE.BoxGeometry(1, 1, 1) : null,
@@ -103,26 +158,16 @@ export class ObjectView {
     };
   }
 
-  registerDefinition(definition, parts) {
+  registerDefinition(definition, parts, lodParts = null) {
     if (!definition || !Array.isArray(parts) || parts.length === 0) {
       throw new Error('Cannot register an empty procedural object renderer.');
     }
     const previous = this.renderers.get(definition.key);
     if (previous) {
-      for (const mesh of previous.meshes) {
-        this.root.remove(mesh);
-        mesh.dispose?.();
-      }
-      if (previous.foundationMesh) {
-        this.root.remove(previous.foundationMesh);
-        previous.foundationMesh.dispose?.();
-      }
-      previous.foundationGeometry?.dispose();
-      previous.foundationMaterial?.dispose();
-      disposeModelParts(previous.parts);
+      this.disposeRendererRecord(previous);
     }
     this.definitionByKey.set(definition.key, definition);
-    this.renderers.set(definition.key, this.createRendererRecord(definition, parts));
+    this.renderers.set(definition.key, this.createRendererRecord(definition, parts, lodParts));
     if (this.previewDefinitionKey === definition.key) {
       for (const child of this.previewGroup.children) child.material.dispose();
       this.previewGroup.clear();
@@ -168,6 +213,7 @@ export class ObjectView {
   }
 
   refreshAll() {
+    const startedAt = performance.now();
     const grouped = new Map(Array.from(this.renderers.keys(), (definitionKey) => [definitionKey, []]));
     for (const object of this.objectMap.list()) {
       grouped.get(object.definitionKey)?.push(object);
@@ -180,24 +226,62 @@ export class ObjectView {
       this.ensureCapacity(renderer, objects.length);
       const objectIds = objects.map((object) => object.id);
 
-      for (const mesh of renderer.meshes) {
-        mesh.count = objects.length;
-        mesh.userData.objectIds = objectIds;
-        this.pickMeshes.push(mesh);
-      }
-
-      for (let index = 0; index < placements.length; index += 1) {
-        const { object, placement } = placements[index];
-        const rootMatrix = this.createObjectMatrix(object, placement.surface);
-        for (let partIndex = 0; partIndex < renderer.parts.length; partIndex += 1) {
-          const matrix = new THREE.Matrix4().multiplyMatrices(rootMatrix, renderer.parts[partIndex].matrix);
-          renderer.meshes[partIndex].setMatrixAt(index, matrix);
+      if (renderer.lodSources) {
+        renderer.lodController.clear();
+        renderer.lodPlacements = placements.map(({ object, placement }) => {
+          const matrix = this.createObjectMatrix(object, placement.surface);
+          return {
+            object,
+            matrix,
+            worldPosition: new THREE.Vector3(
+              matrix.elements[12],
+              matrix.elements[13] + renderer.worldHeight / 2,
+              matrix.elements[14],
+            ),
+            worldHeight: renderer.worldHeight,
+          };
+        });
+        renderer.lodController.seed(renderer.lodPlacements);
+        const nearInstances = renderer.lodPlacements.map(({ object, matrix }) => ({
+          matrix,
+          fade: 1,
+          seed: object.id / 0xffffffff,
+          objectId: object.id,
+        }));
+        writeInstances([renderer.lodMeshes.near], [nearInstances]);
+        writeInstances([renderer.lodMeshes.coarse], [[]]);
+        writeInstances([renderer.lodMeshes.shell], [[]]);
+        renderer.lodSignatures = {
+          near: objectIds.map((id) => `${id}:16`).join('|'),
+          coarse: '',
+          shell: '',
+        };
+        for (const meshes of Object.values(renderer.lodMeshes)) {
+          for (const mesh of meshes) {
+            mesh.userData.objectIds = meshes === renderer.lodMeshes.near ? objectIds : [];
+            this.pickMeshes.push(mesh);
+          }
         }
-      }
+      } else {
+        for (const mesh of renderer.meshes) {
+          mesh.count = objects.length;
+          mesh.userData.objectIds = objectIds;
+          this.pickMeshes.push(mesh);
+        }
 
-      for (const mesh of renderer.meshes) {
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
+        for (let index = 0; index < placements.length; index += 1) {
+          const { object, placement } = placements[index];
+          const rootMatrix = this.createObjectMatrix(object, placement.surface);
+          for (let partIndex = 0; partIndex < renderer.parts.length; partIndex += 1) {
+            const matrix = new THREE.Matrix4().multiplyMatrices(rootMatrix, renderer.parts[partIndex].matrix);
+            renderer.meshes[partIndex].setMatrixAt(index, matrix);
+          }
+        }
+
+        for (const mesh of renderer.meshes) {
+          mesh.instanceMatrix.needsUpdate = true;
+          mesh.computeBoundingSphere();
+        }
       }
 
       const foundationPlacements = placements.filter(
@@ -205,6 +289,44 @@ export class ObjectView {
       );
       this.refreshFoundations(renderer, foundationPlacements);
     }
+
+    this.updatePerformanceCounters(grouped);
+    PerfCounters.inc('objectRefreshes');
+    PerfCounters.inc('objectRefreshMs', performance.now() - startedAt);
+  }
+
+  updatePerformanceCounters(grouped = null) {
+    const countsByDefinition = grouped ?? (() => {
+      const counts = new Map(Array.from(this.renderers.keys(), (definitionKey) => [definitionKey, []]));
+      for (const object of this.objectMap.list()) counts.get(object.definitionKey)?.push(object);
+      return counts;
+    })();
+    let instances = 0;
+    let drawMeshes = 0;
+    let triangles = 0;
+    let geometryBytesTotal = 0;
+    const countedGeometries = new Set();
+    for (const renderer of this.renderers.values()) {
+      const objectCount = countsByDefinition.get(renderer.definition.key)?.length ?? 0;
+      if (objectCount > 0) {
+        instances += objectCount;
+        drawMeshes += renderer.parts.length;
+        triangles += renderer.parts.reduce(
+          (total, entry) => total + geometryTriangles(entry.geometry) * objectCount,
+          0,
+        );
+      }
+      const sources = renderer.lodSources ? Object.values(renderer.lodSources).flat() : renderer.parts;
+      for (const entry of sources) {
+        if (countedGeometries.has(entry.geometry)) continue;
+        countedGeometries.add(entry.geometry);
+        geometryBytesTotal += geometryBytes(entry.geometry);
+      }
+    }
+    PerfCounters.set('objectInstances', instances);
+    PerfCounters.set('objectDrawMeshes', drawMeshes);
+    PerfCounters.set('objectTriangles', triangles);
+    PerfCounters.set('objectGeometryBytes', geometryBytesTotal);
   }
 
   ensureCapacity(renderer, required) {
@@ -218,6 +340,36 @@ export class ObjectView {
     }
 
     const capacity = nextCapacity(required);
+    if (renderer.lodSources) {
+      for (const meshes of Object.values(renderer.lodMeshes)) {
+        disposeInstancedRenderers(this.root, [meshes]);
+      }
+      renderer.lodMeshes = {
+        near: createInstancedRenderers({
+          root: this.root,
+          partsByPrototype: [renderer.lodSources.near],
+          capacity,
+          name: `${renderer.definition.key}-near`,
+          castShadow: renderer.lodShadows.near,
+        })[0],
+        coarse: createInstancedRenderers({
+          root: this.root,
+          partsByPrototype: [renderer.lodSources.coarse],
+          capacity,
+          name: `${renderer.definition.key}-coarse`,
+          castShadow: renderer.lodShadows.coarse,
+        })[0],
+        shell: createInstancedRenderers({
+          root: this.root,
+          partsByPrototype: [renderer.lodSources.shell],
+          capacity,
+          name: `${renderer.definition.key}-shell`,
+          castShadow: renderer.lodShadows.shell,
+        })[0],
+      };
+      renderer.capacity = capacity;
+      return;
+    }
     for (const mesh of renderer.meshes) {
       this.root.remove(mesh);
       mesh.dispose?.();
@@ -233,6 +385,51 @@ export class ObjectView {
       return mesh;
     });
     renderer.capacity = capacity;
+  }
+
+  update(timestamp, camera) {
+    const startedAt = performance.now();
+    const viewportHeight = this.terrainView.renderer.domElement.clientHeight
+      || this.terrainView.renderer.domElement.height
+      || 1;
+    const counts = { near: 0, coarse: 0, shell: 0 };
+    let transitions = 0;
+    let triangles = 0;
+    let drawMeshes = 0;
+    for (const renderer of this.renderers.values()) {
+      if (!renderer.lodController || renderer.lodPlacements.length === 0) continue;
+      const plan = renderer.lodController.plan({
+        placements: renderer.lodPlacements,
+        camera,
+        viewportHeight,
+        timestamp,
+        selectedObjectId: this.selectedObjectId,
+      });
+      transitions += plan.transitions;
+      for (const band of ['near', 'coarse', 'shell']) {
+        const instances = plan.buckets[band];
+        counts[band] += instances.length;
+        if (instances.length > 0) {
+          drawMeshes += renderer.lodSources[band].length;
+          triangles += renderer.lodTriangles[band] * instances.length;
+        }
+        if (renderer.lodSignatures[band] === plan.signatures[band]) continue;
+        writeInstances([renderer.lodMeshes[band]], [instances]);
+        const objectIds = instances.map(({ objectId }) => objectId);
+        for (const mesh of renderer.lodMeshes[band]) mesh.userData.objectIds = objectIds;
+        renderer.lodSignatures[band] = plan.signatures[band];
+        PerfCounters.inc('objectLodBucketRewrites');
+      }
+    }
+    PerfCounters.set('objectLodNear', counts.near);
+    PerfCounters.set('objectLodCoarse', counts.coarse);
+    PerfCounters.set('objectLodShell', counts.shell);
+    PerfCounters.set('objectLodTransitions', transitions);
+    if (counts.near + counts.coarse + counts.shell > 0) {
+      PerfCounters.set('objectTriangles', triangles);
+      PerfCounters.set('objectDrawMeshes', drawMeshes);
+    }
+    PerfCounters.inc('objectLodSelectionMs', performance.now() - startedAt);
   }
 
   ensureFoundationCapacity(renderer, required) {
@@ -429,6 +626,7 @@ export class ObjectView {
   }
 
   setSelection(objectId) {
+    this.selectedObjectId = objectId ? Number(objectId) : null;
     const object = objectId ? this.objectMap.getById(objectId) : null;
     if (!object) {
       this.selectionOverlay.visible = false;
@@ -457,17 +655,7 @@ export class ObjectView {
 
   dispose() {
     for (const renderer of this.renderers.values()) {
-      for (const mesh of renderer.meshes) {
-        this.root.remove(mesh);
-        mesh.dispose?.();
-      }
-      if (renderer.foundationMesh) {
-        this.root.remove(renderer.foundationMesh);
-        renderer.foundationMesh.dispose?.();
-      }
-      renderer.foundationGeometry?.dispose();
-      renderer.foundationMaterial?.dispose();
-      disposeModelParts(renderer.parts);
+      this.disposeRendererRecord(renderer);
     }
     for (const child of this.previewGroup.children) {
       child.material.dispose();
@@ -485,5 +673,27 @@ export class ObjectView {
       this.footprintPreview,
       this.selectionOverlay,
     );
+  }
+
+  disposeRendererRecord(renderer) {
+    for (const mesh of renderer.meshes) {
+      this.root.remove(mesh);
+      mesh.dispose?.();
+    }
+    if (renderer.lodMeshes) {
+      for (const meshes of Object.values(renderer.lodMeshes)) {
+        disposeInstancedRenderers(this.root, [meshes]);
+      }
+    }
+    if (renderer.foundationMesh) {
+      this.root.remove(renderer.foundationMesh);
+      renderer.foundationMesh.dispose?.();
+    }
+    renderer.foundationGeometry?.dispose();
+    renderer.foundationMaterial?.dispose();
+    const sourceParts = renderer.lodSources
+      ? Object.values(renderer.lodSources).flat()
+      : renderer.parts;
+    disposeModelParts(sourceParts);
   }
 }

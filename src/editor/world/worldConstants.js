@@ -3,6 +3,6 @@ export const WORLD_CHUNK_KEY_SEPARATOR = ':';
 export const WORLD_MAX_SAFE_CELL_COORDINATE = 0x3fffffff;
 export const WORLD_GENERATOR_VERSION = 1;
 export const WORLD_DEFAULT_SEED = 918273;
-export const WORLD_DEFAULT_HEIGHT_SCALE = 12;
+export const WORLD_DEFAULT_HEIGHT_SCALE = 24;
 export const WORLD_HEIGHT_EPSILON = 1e-4;
 export const WORLD_TILE_OVERRIDE_SENTINEL = -1;

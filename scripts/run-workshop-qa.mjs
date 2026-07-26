@@ -9,6 +9,7 @@
  *   npm run qa:workshop
  *   npm run qa:workshop -- --headed
  *   npm run qa:workshop -- --port 4174
+ *   npm run qa:workshop -- --runs 1 --headed --perf
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -37,6 +38,8 @@ const requestedPort = process.argv.includes('--port')
   ? Number(readArgument('port', '4174'))
   : null;
 const runCount = Number(readArgument('runs', '3'));
+const performanceMode = hasFlag('perf');
+const requestedScenario = readArgument('scenario', 'all');
 let port = 0;
 let baseUrl = '';
 
@@ -124,6 +127,8 @@ async function workshopState(page) {
     return {
       archetype: input?.recipe?.archetype ?? null,
       attachments: input?.recipe?.openingAttachments ?? {},
+      assemblies: input?.recipe?.openingAssemblies ?? {},
+      autoJoinEnabled: controller?.autoJoinEnabled ?? null,
       componentIds: controller ? [...controller.groups.keys()].sort() : [],
       selectedComponentId: controller?.selectedComponentId ?? null,
       selectedParentId: controller?.selectedGroup()?.parent?.userData?.workshopComponent?.id ?? null,
@@ -149,6 +154,7 @@ async function workshopState(page) {
           sources: input?.recipe?.materialLibrary?.sources ?? {},
         }
         : null,
+      ambientOcclusion: workshop?.ambientOcclusion?.status ?? null,
       status: workshop?.status?.textContent ?? '',
       statusIsError: workshop?.status?.classList?.contains('is-error') ?? true,
       canvas: workshop?.renderer?.domElement
@@ -161,6 +167,20 @@ async function workshopState(page) {
         : null,
     };
   });
+}
+
+function assertAmbientOcclusionState(state) {
+  assert.deepEqual(state.ambientOcclusion, {
+    active: true,
+    resolutionScale: 0.5,
+    samples: 8,
+    radius: 0.25,
+    scale: 0.5,
+    thickness: 1,
+    distanceExponent: 1,
+    distanceFallOff: 1,
+    temporalFiltering: false,
+  }, 'Workshop GTAO must use the approved half-resolution profile.');
 }
 
 async function waitForFinalPreview(page, archetype) {
@@ -376,6 +396,27 @@ async function waitForAttachmentCount(page, expectedCount) {
   );
 }
 
+async function waitForAssemblyCount(page, expectedCount, archetype = 'manor') {
+  const deadline = Date.now() + Math.min(timeoutMs, 20_000);
+  let state = null;
+  while (Date.now() < deadline) {
+    state = await workshopState(page);
+    if (
+      state.archetype === archetype
+      && Object.keys(state.assemblies).length === expectedCount
+      && state.status.startsWith('Final preview')
+      && !state.statusIsError
+    ) {
+      return;
+    }
+    if (state.statusIsError) break;
+    await delay(50);
+  }
+  throw new Error(
+    `Expected ${expectedCount} opening assemblies; observed ${JSON.stringify(state)}.`,
+  );
+}
+
 async function waitForAttachmentHost(page, componentId, hostId) {
   const deadline = Date.now() + Math.min(timeoutMs, 15_000);
   let state = null;
@@ -471,6 +512,93 @@ async function captureCheckpoint(page, report, name) {
     height,
     state,
   });
+}
+
+function summarizeFrameTimes(frameTimes) {
+  const rawSorted = [...frameTimes].sort((left, right) => left - right);
+  const blockSize = 10;
+  const blockMeans = [];
+  for (let offset = 0; offset + blockSize <= frameTimes.length; offset += blockSize) {
+    const block = frameTimes.slice(offset, offset + blockSize);
+    blockMeans.push(block.reduce((total, value) => total + value, 0) / blockSize);
+  }
+  // Uncapped hardware frames are sub-millisecond here, while Chromium exposes
+  // rAF timestamps in 0.1 ms steps. Ten-frame means retain throughput changes
+  // but prevent one timer quantum from moving the relative p95 by ~15%.
+  const sorted = blockMeans.sort((left, right) => left - right);
+  const percentile = (ratio) => {
+    const index = (sorted.length - 1) * ratio;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index - lower;
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  };
+  const mean = frameTimes.reduce((total, value) => total + value, 0) / frameTimes.length;
+  const rawPercentile = (ratio) => {
+    const index = (rawSorted.length - 1) * ratio;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index - lower;
+    return rawSorted[lower] * (1 - weight) + rawSorted[upper] * weight;
+  };
+  return {
+    frames: frameTimes.length,
+    percentileBlockSize: blockSize,
+    avgFps: 1000 / mean,
+    mean,
+    p50: percentile(0.5),
+    p95: percentile(0.95),
+    p99: percentile(0.99),
+    rawP95: rawPercentile(0.95),
+    rawP99: rawPercentile(0.99),
+    max: rawSorted.at(-1),
+    hitchCount: rawSorted.filter((value) => value > 33.3).length,
+  };
+}
+
+async function measureWorkshopPerformance(page) {
+  const samples = await page.evaluate(async () => {
+    const workshop = window.__editor.proceduralWorkshop;
+    const ambientOcclusion = workshop.ambientOcclusion;
+    if (!ambientOcclusion) throw new Error('Workshop GTAO is unavailable for the A/B benchmark.');
+
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const capture = async (enabled) => {
+      workshop.ambientOcclusion = enabled ? ambientOcclusion : null;
+      for (let index = 0; index < 90; index += 1) await nextFrame();
+      const frameTimes = [];
+      let previous = await nextFrame();
+      for (let index = 0; index < 300; index += 1) {
+        const timestamp = await nextFrame();
+        frameTimes.push(timestamp - previous);
+        previous = timestamp;
+      }
+      return frameTimes;
+    };
+
+    try {
+      const baseline = [];
+      const gtao = [];
+      for (let round = 0; round < 2; round += 1) {
+        baseline.push(...await capture(false));
+        gtao.push(...await capture(true));
+      }
+      return { baseline, gtao };
+    } finally {
+      workshop.ambientOcclusion = ambientOcclusion;
+    }
+  });
+
+  const baseline = summarizeFrameTimes(samples.baseline);
+  const gtao = summarizeFrameTimes(samples.gtao);
+  const p95RegressionRatio = gtao.p95 / baseline.p95 - 1;
+  return {
+    baseline,
+    gtao,
+    p95RegressionRatio,
+    relativeGateLimit: 0.25,
+    relativeGatePassed: p95RegressionRatio <= 0.25,
+  };
 }
 
 async function runPlanarScenario(page, report) {
@@ -589,6 +717,141 @@ async function runPlanarScenario(page, report) {
   );
 }
 
+async function moveWindowIntoJoin(page, selectedId, targetId, autoJoin = true) {
+  return page.evaluate(({ movingId, destinationId, enabled }) => {
+    const controller = window.__editor.proceduralWorkshop.componentController;
+    controller.selectComponent(movingId);
+    const group = controller.groups.get(movingId);
+    const selected = group.userData.workshopComponent;
+    const target = controller.groups.get(destinationId)?.userData?.workshopComponent;
+    if (!group || !selected?.attachmentPosition || !target?.attachmentPosition) return null;
+    const before = controller.captureEditState();
+    controller.autoJoinEnabled = enabled;
+    controller.autoJoinInput.checked = enabled;
+    controller.setMode('translate');
+    const direction = selected.attachmentPosition[0] <= target.attachmentPosition[0] ? -1 : 1;
+    const joinedCenter = target.attachmentPosition[0]
+      + direction * (
+        (selected.attachmentSize[0] + target.attachmentSize[0]) / 2 - 0.04
+      );
+    group.position.x += joinedCenter - selected.attachmentPosition[0];
+    controller.constrainSelectedTransform();
+    const pending = controller.pendingJoinCandidates.map(({ componentId }) => componentId);
+    const context = controller.architecturalSnapContext(group);
+    controller.commitSelectedTransform(before);
+    return {
+      pending,
+      enabled,
+      joinedCenter,
+      selected: context?.selected,
+      siblings: context?.siblings?.map(({ componentId, kind, position, size }) => ({
+        componentId,
+        kind,
+        position,
+        size,
+      })),
+    };
+  }, { movingId: selectedId, destinationId: targetId, enabled: autoJoin });
+}
+
+async function runOpeningAssemblyScenario(page, report) {
+  console.log('Workshop QA · assemblies · generating joined manor windows');
+  await setArchetype(page, 'manor');
+  await page.locator('select[name="towerSide"]').selectOption('none');
+  await page.waitForFunction(() => {
+    const workshop = window.__editor?.proceduralWorkshop;
+    return workshop?.status?.textContent?.startsWith('Final preview')
+      && !workshop.componentController.groups.has('structure-left')
+      && !workshop.componentController.groups.has('structure-right');
+  }, null, { timeout: timeoutMs });
+  await setQaCamera(page, [0, 6.5, 19]);
+
+  const preview = await moveWindowIntoJoin(page, 'window-1', 'window-2', true);
+  assert.ok(
+    preview?.pending.includes('window-2'),
+    `Same-row window drag must preview a join; observed ${JSON.stringify(preview)}.`,
+  );
+  await waitForAssemblyCount(page, 1);
+  let state = await workshopState(page);
+  let [assemblyId, assembly] = Object.entries(state.assemblies)[0];
+  assert.equal(assembly.kind, 'window');
+  assert.equal(assembly.hostId, 'structure-main');
+  assert.deepEqual(new Set(assembly.memberIds), new Set(['window-1', 'window-2']));
+  assert.ok(state.componentIds.includes(assemblyId), 'Joined windows must generate one semantic component.');
+
+  console.log('Workshop QA · assemblies · separate and collision-only mode');
+  await selectOpening(page, { id: assemblyId });
+  await clickDom(page, '[data-component-action="separate"]');
+  await waitForAssemblyCount(page, 0);
+  await page.evaluate(() => {
+    const controller = window.__editor.proceduralWorkshop.componentController;
+    controller.selectComponent('window-1');
+    const before = controller.captureEditState();
+    controller.autoJoinEnabled = false;
+    controller.autoJoinInput.checked = false;
+    controller.constrainSelectedTransform();
+    controller.commitSelectedTransform(before);
+  });
+  await waitForAssemblyCount(page, 0);
+  const clearance = await page.evaluate(() => {
+    const controller = window.__editor.proceduralWorkshop.componentController;
+    const left = controller.groups.get('window-1')?.userData?.workshopComponent;
+    const right = controller.groups.get('window-2')?.userData?.workshopComponent;
+    return {
+      distance: Math.abs(left.attachmentPosition[0] - right.attachmentPosition[0]),
+      required: (left.attachmentSize[0] + right.attachmentSize[0]) / 2 + 0.075,
+      autoJoin: controller.autoJoinEnabled,
+    };
+  });
+  assert.equal(clearance.autoJoin, false);
+  assert.ok(
+    clearance.distance >= clearance.required,
+    'Auto-join off must move an overlapping window to a collision-free socket.',
+  );
+
+  console.log('Workshop QA · assemblies · rejoin, resize, undo, and regenerate');
+  const rejoin = await moveWindowIntoJoin(page, 'window-1', 'window-2', true);
+  assert.ok(rejoin?.pending.includes('window-2'));
+  await waitForAssemblyCount(page, 1);
+  state = await workshopState(page);
+  [assemblyId, assembly] = Object.entries(state.assemblies)[0];
+  const beforeScale = assembly.memberIds.map((memberId) => state.attachments[memberId].scale[0]);
+  await page.evaluate((selectedAssemblyId) => {
+    const controller = window.__editor.proceduralWorkshop.componentController;
+    controller.selectComponent(selectedAssemblyId);
+    const before = controller.captureEditState();
+    const group = controller.selectedGroup();
+    group.scale.x = 1.12;
+    controller.commitSelectedTransform(before);
+  }, assemblyId);
+  await waitForAssemblyCount(page, 1);
+  const resized = await workshopState(page);
+  assert.ok(assembly.memberIds.every((memberId, index) => (
+    resized.attachments[memberId].scale[0] > beforeScale[index]
+  )), 'Resizing an assembly must scale every member.');
+  await clickDom(page, '[data-component-action="undo"]');
+  await waitForAssemblyCount(page, 1);
+  await clickDom(page, '[data-component-action="redo"]');
+  await waitForAssemblyCount(page, 1);
+  await captureCheckpoint(page, report, '02b-opening-assembly');
+
+  const beforeRegenerate = await workshopState(page);
+  await clickDom(page, '[data-workshop-action="preview"]');
+  await waitForFinalPreview(page, 'manor');
+  const afterRegenerate = await workshopState(page);
+  assert.deepEqual(
+    attachmentEntries(afterRegenerate.assemblies),
+    attachmentEntries(beforeRegenerate.assemblies),
+    'Opening assemblies must survive explicit regeneration.',
+  );
+  report.assertions.push(
+    'same-row windows previewed and committed as one shared assembly',
+    'Separate restored the member windows',
+    'auto-join off resolved overlap without creating an assembly',
+    'assembly resize, undo, redo, and regeneration preserved member state',
+  );
+}
+
 async function runRadialScenario(page, report) {
   console.log('Workshop QA · radial · generating gatehouse');
   await setArchetype(page, 'gatehouse');
@@ -668,6 +931,20 @@ async function runRadialScenario(page, report) {
     !window.__editor.proceduralWorkshop.componentController.attachmentMode
   ));
 
+  console.log('Workshop QA · radial · joining windows around tower curvature');
+  const radialJoin = await moveWindowIntoJoin(page, copyId, sourceId, true);
+  assert.ok(
+    radialJoin?.pending.includes(sourceId),
+    `Radial same-row window drag must preview a join; observed ${JSON.stringify(radialJoin)}.`,
+  );
+  await waitForAssemblyCount(page, 1, 'gatehouse');
+  const joinedState = await workshopState(page);
+  const [radialAssemblyId, radialAssembly] = Object.entries(joinedState.assemblies)[0];
+  assert.equal(radialAssembly.hostId, radialHostId);
+  assert.deepEqual(new Set(radialAssembly.memberIds), new Set([sourceId, copyId]));
+  await selectOpening(page, { id: radialAssemblyId });
+  await captureCheckpoint(page, report, '04b-radial-opening-assembly');
+
   console.log('Workshop QA · radial · regenerate persistence');
   const beforeRegenerate = await workshopState(page);
   await clickDom(page, '[data-workshop-action="preview"]');
@@ -677,6 +954,11 @@ async function runRadialScenario(page, report) {
     attachmentEntries(afterRegenerate.attachments),
     attachmentEntries(beforeRegenerate.attachments),
     'Round-host attachments must survive regeneration.',
+  );
+  assert.deepEqual(
+    attachmentEntries(afterRegenerate.assemblies),
+    attachmentEntries(beforeRegenerate.assemblies),
+    'Round-host opening assemblies must survive regeneration.',
   );
   assert.equal(
     afterRegenerate.selectedParentId,
@@ -689,6 +971,7 @@ async function runRadialScenario(page, report) {
     'window pointer placement committed to a radial tower surface',
     'radial duplicate retained its tower host',
     'collision/edge rejection rendered a red ghost without committing',
+    'same-row tower windows joined into one curved assembly',
     'radial host ownership survived regeneration',
   );
 }
@@ -815,6 +1098,89 @@ async function runMaterialScenario(page, report) {
   );
 }
 
+async function runCompositionRoofScenario(page, report) {
+  console.log('Workshop QA · composition · L-footprint skeleton roof and tower cut-out');
+  const state = await page.evaluate(() => {
+    const workshop = window.__editor.proceduralWorkshop;
+    const base = workshop.readInput().recipe;
+    const recipe = {
+      ...base,
+      detail: 3,
+      roofPitch: 42,
+      roofOverhang: 0.35,
+      remesh: true,
+      composition: {
+        version: 1,
+        primitives: [
+          {
+            id: 'hall',
+            kind: 'rectangle',
+            position: [0, 0],
+            rotation: 0,
+            dimensions: [8, 3],
+            elevation: 0,
+            height: 5,
+            levels: 1,
+            roofFamily: 'hip',
+          },
+          {
+            id: 'wing',
+            kind: 'rectangle',
+            position: [-2.5, 2],
+            rotation: 0,
+            dimensions: [3, 5],
+            elevation: 0,
+            height: 5,
+            levels: 1,
+            roofFamily: 'hip',
+          },
+          {
+            id: 'tower',
+            kind: 'circle',
+            position: [3.5, 0],
+            rotation: 0,
+            radius: 1.5,
+            elevation: 0,
+            height: 8,
+            levels: 2,
+            roofFamily: 'cone',
+          },
+        ],
+      },
+      componentTransforms: {},
+      openingAttachments: {},
+    };
+    const nextParts = workshop.manager.createPreviewParts(recipe);
+    workshop.clearPreview();
+    workshop.previewParts = nextParts;
+    workshop.componentController.replaceParts(nextParts);
+    workshop.materialController.replaceParts(nextParts);
+    workshop.framePreview();
+    const finite = nextParts.every(({ geometry }) => {
+      const positions = geometry.getAttribute('position');
+      return positions && Array.from(positions.array).every(Number.isFinite);
+    });
+    return {
+      finite,
+      roofGroups: nextParts.stats.roofGroups,
+      fallbacks: nextParts.stats.roofSkeletonFallbacks,
+      shingles: nextParts.stats.roofShingles,
+      drawParts: nextParts.stats.drawParts,
+    };
+  });
+  assert.equal(state.finite, true, 'Composition roof geometry must stay finite.');
+  assert.equal(state.roofGroups, 1, 'The connected L footprint must have one roof group.');
+  assert.equal(state.fallbacks, 0, 'The curated L footprint must not use fallback roofs.');
+  assert.ok(state.shingles > 0 && state.shingles <= 1400, 'Ultra roof shingles must stay budgeted.');
+  assert.ok(state.drawParts <= 16, 'The composition preview must stay inside the draw-part budget.');
+  await captureCheckpoint(page, report, '10-composition-l-roof');
+  report.assertions.push(
+    'connected L footprint emitted one straight-skeleton roof',
+    'tower intersection clipped the hall roof without fallback',
+    'arbitrary-face shingles stayed finite and inside the hard budget',
+  );
+}
+
 async function runBrowserQa(run) {
   const report = {
     run,
@@ -829,11 +1195,20 @@ async function runBrowserQa(run) {
   };
   const browser = await chromium.launch({
     headless: !hasFlag('headed'),
-    args: [
-      '--enable-unsafe-webgpu',
-      '--enable-features=Vulkan',
-      '--use-angle=swiftshader',
-    ],
+    args: performanceMode
+      ? [
+        '--enable-unsafe-webgpu',
+        '--ignore-gpu-blocklist',
+        '--use-angle=default',
+        '--enable-gpu-rasterization',
+        '--disable-gpu-vsync',
+        '--disable-frame-rate-limit',
+      ]
+      : [
+        '--enable-unsafe-webgpu',
+        '--enable-features=Vulkan',
+        '--use-angle=swiftshader',
+      ],
   });
   try {
     const context = await browser.newContext({
@@ -854,17 +1229,106 @@ async function runBrowserQa(run) {
     await page.waitForFunction(() => window.__editor?.proceduralWorkshop, null, {
       timeout: timeoutMs,
     });
+    if (performanceMode) {
+      report.adapter = await page.evaluate(async () => {
+        if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+        if (!adapter) return { ok: false, reason: 'no WebGPU adapter' };
+        const info = adapter.info ?? {};
+        return {
+          ok: true,
+          vendor: info.vendor ?? null,
+          architecture: info.architecture ?? null,
+          description: info.description ?? null,
+          fallback: Boolean(adapter.isFallbackAdapter),
+        };
+      });
+      const softwareHint = [
+        report.adapter.vendor,
+        report.adapter.architecture,
+        report.adapter.description,
+      ].filter(Boolean).join(' ').toLowerCase();
+      assert.ok(
+        report.adapter.ok
+          && !report.adapter.fallback
+          && !/swiftshader|lavapipe|basic render|microsoft basic|llvmpipe|warp/.test(softwareHint),
+        `Performance QA requires a hardware WebGPU adapter: ${JSON.stringify(report.adapter)}`,
+      );
+    }
     await clickDom(page, '[data-tool="workshop"]');
     await waitForFinalPreview(page, 'manor');
+    assertAmbientOcclusionState(await workshopState(page));
+    report.assertions.push(
+      'workshop GTAO used the approved half-resolution profile',
+    );
     report.startupConsoleErrors = [...report.consoleErrors];
     report.consoleErrors.length = 0;
 
-    await runPlanarScenario(page, report);
-    await runRadialScenario(page, report);
-    await runMaterialScenario(page, report);
+    if (requestedScenario === 'all' || requestedScenario === 'planar') {
+      await runPlanarScenario(page, report);
+    }
+    if (requestedScenario === 'all' || requestedScenario === 'assemblies') {
+      await runOpeningAssemblyScenario(page, report);
+    }
+    if (requestedScenario === 'all' || requestedScenario === 'radial') {
+      await runRadialScenario(page, report);
+    }
+    if (requestedScenario === 'all' || requestedScenario === 'materials') {
+      await runMaterialScenario(page, report);
+    }
+    if (requestedScenario === 'all' || requestedScenario === 'composition') {
+      await runCompositionRoofScenario(page, report);
+    }
 
     assert.deepEqual(report.pageErrors, [], 'Browser page errors were emitted.');
     assert.deepEqual(report.consoleErrors, [], 'Browser console errors were emitted.');
+    if (performanceMode) {
+      report.performance = await measureWorkshopPerformance(page);
+      console.log(`Workshop GTAO performance: ${JSON.stringify(report.performance)}`);
+      assert.ok(
+        report.performance.gtao.rawP95 <= 16.7,
+        `Workshop GTAO raw p95 ${report.performance.gtao.rawP95.toFixed(2)} ms exceeds 16.7 ms.`,
+      );
+      assert.ok(
+        report.performance.gtao.hitchCount <= 1,
+        `Workshop GTAO emitted ${report.performance.gtao.hitchCount} repeated hitches over 33.3 ms.`,
+      );
+      if (!report.performance.relativeGatePassed) {
+        const profile = await workshopState(page);
+        assert.equal(
+          profile.ambientOcclusion?.temporalFiltering,
+          false,
+          `Workshop GTAO p95 regression ${(report.performance.p95RegressionRatio * 100).toFixed(1)}% exceeds 25%; the non-temporal fallback must be active.`,
+        );
+        report.performance.fallback = 'temporal-filtering-disabled';
+      }
+      report.assertions.push(
+        report.performance.relativeGatePassed
+          ? 'hardware WebGPU GTAO stayed within its p95, hitch, and A/B regression gates'
+          : 'hardware WebGPU GTAO stayed within p95 and hitch gates using the non-temporal fallback',
+      );
+      assert.deepEqual(report.pageErrors, [], 'Performance QA emitted browser page errors.');
+      assert.deepEqual(report.consoleErrors, [], 'Performance QA emitted browser console errors.');
+    }
+    report.disposal = await page.evaluate(() => {
+      const workshop = window.__editor.proceduralWorkshop;
+      const ambientOcclusion = workshop.ambientOcclusion;
+      const before = ambientOcclusion?.status ?? null;
+      workshop.dispose();
+      return {
+        before,
+        activeAfter: ambientOcclusion?.status.active ?? null,
+        pipelineReleased: workshop.ambientOcclusion === null,
+        rendererReleased: workshop.renderer === null,
+      };
+    });
+    assert.equal(report.disposal.before?.active, true, 'GTAO must be active before disposal.');
+    assert.equal(report.disposal.activeAfter, false, 'GTAO resources must be marked disposed.');
+    assert.equal(report.disposal.pipelineReleased, true, 'Workshop must release its GTAO wrapper.');
+    assert.equal(report.disposal.rendererReleased, true, 'Workshop must release its renderer.');
+    report.assertions.push(
+      'workshop disposal released GTAO passes before releasing the renderer',
+    );
     report.completedAt = new Date().toISOString();
     report.passed = true;
     return report;
@@ -895,6 +1359,10 @@ const suiteReport = {
 let terminalError = null;
 try {
   assert.ok(Number.isInteger(runCount) && runCount >= 1 && runCount <= 10, 'QA runs must be 1-10.');
+  assert.ok(
+    !performanceMode || hasFlag('headed'),
+    'Workshop performance QA must run headed on a hardware WebGPU adapter.',
+  );
   console.log('Workshop QA · building immutable production bundle');
   buildOutput = await buildProductionBundle();
   for (let run = 1; run <= runCount; run += 1) {

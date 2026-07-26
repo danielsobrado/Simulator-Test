@@ -3,41 +3,160 @@ import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { markAttributeRangeUpdated } from './attributeUpload.js';
 import { createStylizedGrassMaterial } from './StylizedGrassMaterial.js';
-import { cellSampleRandom01, sampleHeight } from './scatterMath.js';
-import { clumpsPerCell, densityForDistance } from './grassLodMath.js';
+import { cellSampleRandom01, grassClumpCellOffset, sampleHeight } from './scatterMath.js';
+import {
+  clumpsPerCell,
+  densityForDistance,
+  grassLodBand,
+  trianglesPerBlade,
+} from './grassLodMath.js';
+import { generatedProfile, resampleProfile } from './grassBladeProfiles.js';
 import { filterScatterByForest } from './forest/ForestFloor.js';
 import {
   compactGrassScatter,
 } from './vegetationScatter.js';
 
 const BLADE_SEGMENTS = 3;
+// One triangle per blade. The far band is not meant to survive inspection — it
+// exists so real grass reaches past the near ring at a fifth of its cost.
+const FAR_BLADE_SEGMENTS = 1;
 const TWO_PI = Math.PI * 2;
+// Sunflower packing: successive blades land the most irrelevant angle apart, so a
+// clump fills its disc evenly at any blade count instead of forming rings.
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+// In blade-widths, not metres: the shader scales the whole clump by the instance's
+// blade width. With the upstream 0.06 m blade width this is a 0.75 m radius against
+// a mean clump spacing of 0.82 m. That generous overlap hides the streamed clump
+// representation and reads like upstream's independently scattered blades.
+// `clumpsFormCarpet` in grassLodMath guards this against future density changes.
+const CLUMP_RADIUS = 12.5;
+const DEFAULT_TILT_MAX = 0.16;
+
+function fract(value) {
+  return value - Math.floor(value);
+}
+
+function bladeRandom01(bladeIndex, salt) {
+  return fract(Math.sin((bladeIndex + 1) * 12.9898 + salt * 78.233) * 43758.5453);
+}
 const DEFAULT_BUILD_SLICE_CELLS = 64;
 const DEFAULT_INACTIVE_RELEASE_FRAMES = 30;
 const DEFAULT_BLADES_PER_CLUMP = 8;
 const DEFAULT_INFLUENCE_TEXTURE_SIZE = 32;
 
-function bladeHalfWidth(t) {
-  return 0.5 * ((1 - t) ** 1.2);
-}
+// Local XZ is in blade widths — the shader scales the whole clump by the instance's
+// blade width — so a profile's peak half-width lands here, matching the width the
+// old generated taper carried at its base.
+const PEAK_HALF_WIDTH = 0.5;
 
-function createClumpGeometry(maxInstances, bladesPerClump) {
-  const verticesPerBlade = BLADE_SEGMENTS * 2 + 1;
-  const positions = new Float32Array(bladesPerClump * verticesPerBlade * 3);
+/**
+ * Blade geometry for one clump.
+ *
+ * `segments` sets the blade's height divisions and so its cost: 3 gives the
+ * tapered five-triangle blade used up close, 1 collapses it to a single triangle
+ * for the far band. The clump layout is identical either way, so the same instance
+ * data drives both and a chunk can switch bands without rebuilding.
+ *
+ * `profiles` are blade silhouettes already resampled to `segments` (see
+ * grassBladeProfiles.js). Blades draw from the pool by their own deterministic
+ * roll, so one clump carries several authored shapes rather than a field of
+ * identical strips. Omit it and every blade falls back to the generated taper.
+ *
+ * `instanceBase` and `instanceParams` are passed in rather than allocated here
+ * precisely so the two bands share them — at 24k instances a chunk, duplicating
+ * them per band would cost more memory than the whole blade mesh saves.
+ */
+export function createClumpGeometry({
+  bladesPerClump,
+  segments = BLADE_SEGMENTS,
+  tiltMax = DEFAULT_TILT_MAX,
+  instanceBase,
+  instanceParams,
+  profiles,
+}) {
+  const shapes = profiles?.length
+    ? profiles
+    : [resampleProfile(generatedProfile(), segments)];
+  const verticesPerBlade = segments * 2 + 1;
+  const vertexCount = bladesPerClump * verticesPerBlade;
+  const positions = new Float32Array(vertexCount * 3);
+  // WebGPU allows eight vertex buffers per pipeline and `position`, `normal` and
+  // the two shared instance attributes claim four of them, so the per-blade data
+  // is packed rather than given one buffer per concept. Unpacked it was nine
+  // buffers and the pipeline simply failed to create — a blank field, not a slow
+  // one. See the accessor comments below for what sits in each channel.
+  const bladeAxes = new Float32Array(vertexCount * 4);
+  const bladeCenters = new Float32Array(vertexCount * 3);
+  const bladeShapes = new Float32Array(vertexCount * 4);
   const indices = [];
 
   for (let bladeIndex = 0; bladeIndex < bladesPerClump; bladeIndex += 1) {
-    const phase = bladeIndex / bladesPerClump * TWO_PI;
-    const radial = 1.25 + (bladeIndex % 3) * 1.15;
+    // Golden-angle spiral rather than evenly spaced phases on three fixed radii.
+    // The old layout was invisible at eight blades but turns into concentric
+    // rings the moment a clump carries a few dozen, which is exactly what the
+    // dense settings ask for. `sqrt` keeps area density uniform across the disc
+    // instead of crowding the centre.
+    const phase = bladeIndex * GOLDEN_ANGLE;
+    const radial = CLUMP_RADIUS * Math.sqrt((bladeIndex + 0.5) / bladesPerClump);
     const centerX = Math.cos(phase) * radial;
     const centerZ = Math.sin(phase) * radial;
-    const axisX = Math.cos(phase + Math.PI * 0.5);
-    const axisZ = Math.sin(phase + Math.PI * 0.5);
+    // Facing must not follow the placement spiral. Tangential blades reveal the
+    // hidden clump as circular combs once wind leans them; upstream gives every
+    // independently-scattered blade its own random yaw.
+    const orientation = bladeRandom01(bladeIndex, 1) * TWO_PI;
+    const axisX = Math.cos(orientation);
+    const axisZ = Math.sin(orientation);
     const vertexBase = bladeIndex * verticesPerBlade;
+    // Upstream chooses a full min→max length independently for every blade.
+    // Store the random phase rather than shortening the normalized geometry:
+    // the shader combines it with the clump seed and the configured range. This
+    // keeps the tip at normalized y=1 for colour/wind masks while avoiding the
+    // old 0.62→1 multiplier that made the field both shorter and darker.
+    const lengthPhase = bladeRandom01(bladeIndex, 3);
+    // Upstream scatters every blade with up to 0.16 radians of tilt. A clump is
+    // one instance here, so the equivalent variation is baked per blade into
+    // vertex attributes and scaled by that clump's instance length in the shader.
+    // Two independent rolls the shader spends on colour: one picks the blade's
+    // place on the cool→warm ramp, the other its brightness. Upstream gets this
+    // for free — every blade is its own instance, so its base samples the patch
+    // noise at a different point. Batched clumps land 96 blades on one sample,
+    // which is what collapses a dense field into a single flat green.
+    const tintPhase = bladeRandom01(bladeIndex, 4);
+    const shadePhase = bladeRandom01(bladeIndex, 5);
+    // Which authored silhouette this blade wears. Rolled per blade rather than
+    // assigned per clump: a clump is a hidden batching unit, and giving one shape
+    // to all 96 of its blades would make that unit visible as patches of a single
+    // outline across the field.
+    const shape = shapes[Math.floor(bladeRandom01(bladeIndex, 6) * shapes.length) % shapes.length];
+    const tiltPhase = bladeRandom01(bladeIndex, 2) * TWO_PI;
+    const tilt = Math.tan(tiltMax * fract((bladeIndex + 1) * 0.754877666));
+    const leanX = Math.cos(tiltPhase) * tilt;
+    const leanZ = Math.sin(tiltPhase) * tilt;
+    const facingX = -axisZ;
+    const facingZ = axisX;
+    // Every vertex of a blade carries the same per-blade data; only which row of
+    // the profile it sits on differs. `bladeFacing.y` is not stored at all — it is
+    // always zero, and a channel is worth more than restating that.
+    const writeBladeVertex = (vertex, row) => {
+      bladeAxes[vertex * 4] = leanX;
+      bladeAxes[vertex * 4 + 1] = leanZ;
+      bladeAxes[vertex * 4 + 2] = facingX;
+      bladeAxes[vertex * 4 + 3] = facingZ;
+      bladeCenters[vertex * 3] = centerX;
+      bladeCenters[vertex * 3 + 1] = centerZ;
+      bladeCenters[vertex * 3 + 2] = lengthPhase;
+      bladeShapes[vertex * 4] = tintPhase;
+      bladeShapes[vertex * 4 + 1] = shadePhase;
+      // The arc is in blade lengths, not blade widths, so it cannot be folded into
+      // `position` — the shader scales local XZ by the instance's width. It rides
+      // along the blade's own width axis, which is where the authored card bends.
+      bladeShapes[vertex * 4 + 2] = axisX * shape.curve[row];
+      bladeShapes[vertex * 4 + 3] = axisZ * shape.curve[row];
+    };
 
-    for (let segment = 0; segment < BLADE_SEGMENTS; segment += 1) {
-      const t = segment / BLADE_SEGMENTS;
-      const width = bladeHalfWidth(t);
+    for (let segment = 0; segment < segments; segment += 1) {
+      const t = segment / segments;
+      const width = shape.halfWidth[segment] * PEAK_HALF_WIDTH;
       const left = (vertexBase + segment * 2) * 3;
       const right = left + 3;
       positions[left] = centerX - axisX * width;
@@ -46,37 +165,44 @@ function createClumpGeometry(maxInstances, bladesPerClump) {
       positions[right] = centerX + axisX * width;
       positions[right + 1] = t;
       positions[right + 2] = centerZ + axisZ * width;
+      for (const vertex of [vertexBase + segment * 2, vertexBase + segment * 2 + 1]) {
+        writeBladeVertex(vertex, segment);
+      }
     }
 
-    const tip = (vertexBase + BLADE_SEGMENTS * 2) * 3;
+    const tipVertex = vertexBase + segments * 2;
+    const tip = tipVertex * 3;
     positions[tip] = centerX;
     positions[tip + 1] = 1;
     positions[tip + 2] = centerZ;
+    writeBladeVertex(tipVertex, segments);
 
-    for (let segment = 0; segment < BLADE_SEGMENTS - 1; segment += 1) {
+    for (let segment = 0; segment < segments - 1; segment += 1) {
       const left = vertexBase + segment * 2;
       const right = left + 1;
       const nextLeft = left + 2;
       const nextRight = right + 2;
       indices.push(left, nextLeft, right, right, nextLeft, nextRight);
     }
-    const lastLeft = vertexBase + (BLADE_SEGMENTS - 1) * 2;
-    indices.push(lastLeft, vertexBase + BLADE_SEGMENTS * 2, lastLeft + 1);
+    const lastLeft = vertexBase + (segments - 1) * 2;
+    indices.push(lastLeft, vertexBase + segments * 2, lastLeft + 1);
   }
 
   const geometry = new THREE.InstancedBufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  // xy = wind/tilt lean, zw = the blade's facing in XZ (its y is always 0).
+  geometry.setAttribute('bladeAxis', new THREE.BufferAttribute(bladeAxes, 4));
+  // xy = the blade's offset within its clump, z = its length phase.
+  geometry.setAttribute('bladeCenter', new THREE.BufferAttribute(bladeCenters, 3));
+  // xy = the two colour rolls, zw = the authored profile's arc at this row.
+  geometry.setAttribute('bladeShape', new THREE.BufferAttribute(bladeShapes, 4));
   geometry.setIndex(indices);
-  geometry.setAttribute(
-    'instanceBase',
-    new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 3), 3),
-  );
-  geometry.setAttribute(
-    'instanceParams',
-    new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4),
-  );
+  geometry.setAttribute('instanceBase', instanceBase);
+  geometry.setAttribute('instanceParams', instanceParams);
   geometry.instanceCount = 0;
-  geometry.computeVertexNormals();
+  // No vertex normals: the material forces the shading normal to view-space +Y for
+  // every blade, so a computed one would be three floats a vertex that nothing
+  // reads — and one more vertex buffer against the eight-buffer ceiling.
   return geometry;
 }
 
@@ -123,6 +249,7 @@ export class StylizedGrassSlot {
     config,
     sunDirection,
     forestFieldProvider = null,
+    bladeProfileProvider = null,
   }) {
     this.terrainSlot = terrainSlot;
     this.terrainView = terrainView;
@@ -130,17 +257,33 @@ export class StylizedGrassSlot {
     this.config = config;
     this.sunDirection = sunDirection;
     this.forestFieldProvider = forestFieldProvider;
+    // Read through a provider rather than stored: switching the blade profile set
+    // from Settings has to reach 49 slots, and a provider means the switch is one
+    // assignment plus a release rather than a walk over every slot's own copy.
+    this.bladeProfileProvider = bladeProfileProvider;
+    this.builtProfileRevision = -1;
     this.chunkSize = terrainView.worldStore.chunkSize;
     this.tileSize = terrainView.worldStore.tileSize;
     this.chunkWorldSize = this.chunkSize * this.tileSize;
     this.bladesPerCell = config.grass.bladesPerCell;
     this.bladesPerClump = config.grass.bladesPerClump ?? DEFAULT_BLADES_PER_CLUMP;
     this.clumpsPerCell = clumpsPerCell(this.bladesPerCell, this.bladesPerClump);
+    // Chunks within this many rings get full-shape blades; the rest get the cheap
+    // single-triangle band, which is what makes a residentRadius above 1 affordable.
+    this.nearRadius = Math.min(
+      config.grass.residentRadius,
+      config.grass.nearRadius ?? config.grass.residentRadius,
+    );
     this.maxInstances = this.chunkSize * this.chunkSize * this.clumpsPerCell;
     this.chunkCenter = uniform(new THREE.Vector2());
     this.time = uniform(0);
     this.emptyGeometry = new THREE.BufferGeometry();
     this.geometry = null;
+    this.nearGeometry = null;
+    this.farGeometry = null;
+    this.instanceBase = null;
+    this.instanceParams = null;
+    this.band = 'near';
     this.material = null;
     this.trampleTexture = null;
     this.tramplePixels = null;
@@ -184,7 +327,38 @@ export class StylizedGrassSlot {
   ensureResources() {
     if (this.geometry) return;
     this.createTrampleTexture();
-    this.geometry = createClumpGeometry(this.maxInstances, this.bladesPerClump);
+    this.instanceBase = new THREE.InstancedBufferAttribute(
+      new Float32Array(this.maxInstances * 3),
+      3,
+    );
+    this.instanceParams = new THREE.InstancedBufferAttribute(
+      new Float32Array(this.maxInstances * 4),
+      4,
+    );
+    const pool = this.bladeProfileProvider?.();
+    this.builtProfileRevision = pool?.revision ?? -1;
+    const bands = {
+      bladesPerClump: this.bladesPerClump,
+      tiltMax: this.config.grass.tiltMax ?? DEFAULT_TILT_MAX,
+      instanceBase: this.instanceBase,
+      instanceParams: this.instanceParams,
+    };
+    // Each band resamples the same manifest onto its own segment budget, so the
+    // far blade keeps the authored outline's proportions instead of reverting to
+    // the generated taper the moment a chunk crosses the ring.
+    this.nearGeometry = createClumpGeometry({
+      ...bands,
+      segments: BLADE_SEGMENTS,
+      profiles: pool?.near,
+    });
+    // Only built when some ring can actually reach it; with nearRadius equal to
+    // residentRadius every chunk stays on full blades and this would never draw.
+    this.farGeometry = this.nearRadius < this.config.grass.residentRadius
+      ? createClumpGeometry({ ...bands, segments: FAR_BLADE_SEGMENTS, profiles: pool?.far })
+      : null;
+    this.geometry = this.band === 'far' && this.farGeometry
+      ? this.farGeometry
+      : this.nearGeometry;
     this.material = createStylizedGrassMaterial({
       surfaceMaskTexture: this.terrainSlot.surfaceMaskTexture,
       trampleTexture: this.trampleTexture,
@@ -200,12 +374,34 @@ export class StylizedGrassSlot {
     PerfCounters.inc('grassResourceAllocations');
   }
 
+  /**
+   * Swaps the active blade geometry. The instance attributes are shared between
+   * the two, so the chunk's scatter carries over untouched — only `instanceCount`
+   * and the bounds, which live on the geometry, have to follow it across.
+   */
+  setBand(band) {
+    this.band = band;
+    if (!this.geometry) return;
+    const next = band === 'far' && this.farGeometry ? this.farGeometry : this.nearGeometry;
+    if (next === this.geometry) return;
+    next.instanceCount = this.geometry.instanceCount;
+    next.boundingBox = this.geometry.boundingBox;
+    next.boundingSphere = this.geometry.boundingSphere;
+    this.geometry = next;
+    this.mesh.geometry = next;
+  }
+
   releaseResources() {
     if (!this.geometry) return;
-    this.geometry.dispose();
+    this.nearGeometry?.dispose();
+    this.farGeometry?.dispose();
     this.material?.dispose();
     this.trampleTexture?.dispose();
     this.geometry = null;
+    this.nearGeometry = null;
+    this.farGeometry = null;
+    this.instanceBase = null;
+    this.instanceParams = null;
     this.material = null;
     this.trampleTexture = null;
     this.tramplePixels = null;
@@ -275,7 +471,13 @@ export class StylizedGrassSlot {
     }
 
     this.inactiveFrames = 0;
+    // Blade shape is baked into the clump's vertex buffer, so switching profile
+    // sets is a rebuild, not a uniform. Dropping the resources here lets the
+    // existing allocate-on-demand path do it without a second code path.
+    const profileRevision = this.bladeProfileProvider?.()?.revision ?? -1;
+    if (this.geometry && profileRevision !== this.builtProfileRevision) this.releaseResources();
     this.ensureResources();
+    this.setBand(grassLodBand(distance, this.nearRadius));
     this.updateTrampleTexture(descriptor, localBoulders, objectSignature);
     this.mesh.position.copy(this.terrainSlot.mesh.position);
     this.chunkCenter.value.set(descriptor.centerWorldX, descriptor.centerWorldZ);
@@ -388,10 +590,14 @@ export class StylizedGrassSlot {
       const localX = cellIndex % this.chunkSize;
       const localZ = Math.floor(cellIndex / this.chunkSize);
       for (let clumpIndex = 0; clumpIndex < job.clumpsPerCell; clumpIndex += 1) {
-        const jitterX = cellSampleRandom01(job.descriptor.chunkX, job.descriptor.chunkZ, cellIndex, clumpIndex, 0);
-        const jitterZ = cellSampleRandom01(job.descriptor.chunkX, job.descriptor.chunkZ, cellIndex, clumpIndex, 1);
-        const sampleX = localX + jitterX;
-        const sampleZ = localZ + jitterZ;
+        const offset = grassClumpCellOffset(
+          job.descriptor.chunkX,
+          job.descriptor.chunkZ,
+          cellIndex,
+          clumpIndex,
+        );
+        const sampleX = localX + offset.x;
+        const sampleZ = localZ + offset.z;
         const localWorldX = -this.chunkWorldSize / 2 + sampleX * this.tileSize;
         const localWorldZ = this.chunkWorldSize / 2 - sampleZ * this.tileSize;
         const height = sampleHeight(job.page, sampleX, sampleZ, this.chunkSize);
@@ -453,6 +659,14 @@ export class StylizedGrassSlot {
     PerfCounters.set('grassBufferUpload', uploadMs);
     PerfCounters.set('grassLastChunkClumps', state.count);
     PerfCounters.set('grassLastChunkEffectiveBlades', state.count * this.bladesPerClump);
+    // Reported so a blade-profile switch can be judged on cost as well as looks.
+    // It follows the band this chunk is on, which is the point: the far band is
+    // where a shape change stops costing anything.
+    PerfCounters.set(
+      'grassLastChunkTriangles',
+      state.count * this.bladesPerClump
+        * trianglesPerBlade(this.band === 'far' && this.farGeometry ? FAR_BLADE_SEGMENTS : BLADE_SEGMENTS),
+    );
     PerfCounters.set('grassInstanceAttributeBytes', bytes);
   }
 
@@ -462,3 +676,6 @@ export class StylizedGrassSlot {
     this.emptyGeometry.dispose();
   }
 }
+
+export const GRASS_BLADE_SEGMENTS = BLADE_SEGMENTS;
+export const GRASS_FAR_BLADE_SEGMENTS = FAR_BLADE_SEGMENTS;

@@ -41,12 +41,30 @@ const DEFAULT_PALETTES = Object.freeze({
   wetland: Object.freeze(['wetland_sparse', 'broadleaf_tall']),
 });
 
+/**
+ * Fraction of trees that ignore their grove's dominant species. Real stands are
+ * not monocultures, but they are not uniform mixes either — a birch grove reads
+ * as birch precisely because the odd spruce in it is the exception.
+ */
+const DEFAULT_GROVE_MIX = 0.16;
+
 function stableUnit(stableId, channel) {
   let value = Math.imul(channel + 1, 0x9e3779b1);
   for (let index = 0; index < stableId.length; index += 1) {
     value = Math.imul(value ^ stableId.charCodeAt(index), 0x85ebca6b);
   }
   return hash32(value) / 0xffffffff;
+}
+
+/** Index into `weights` selected by `roll`, which must be in [0, 1). */
+function pickWeighted(weights, roll) {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let remaining = roll * total;
+  for (let index = 0; index < weights.length; index += 1) {
+    remaining -= weights[index];
+    if (remaining < 0) return index;
+  }
+  return weights.length - 1;
 }
 
 function weightedAge(edge, coverage, random) {
@@ -65,6 +83,8 @@ export class ForestSpeciesRegistry {
     palettes = {},
     prototypeCount = 1,
     prototypeIndexBySpecies = null,
+    prototypeTileIds = null,
+    groveMix = DEFAULT_GROVE_MIX,
   } = {}) {
     this.species = new Map();
     for (const [id, definition] of Object.entries({ ...DEFAULT_SPECIES, ...species })) {
@@ -81,21 +101,47 @@ export class ForestSpeciesRegistry {
     // Without an explicit mapping every species draws from the whole prototype
     // range, so `speciesId` carries no geometry — the pre-species behaviour.
     this.prototypeIndexBySpecies = prototypeIndexBySpecies ?? null;
+    // Biomes a given prototype is restricted to, by prototype index. Absent from
+    // the map means "everywhere". This is how an expensive or strongly
+    // characterful tree is confined to the biomes it belongs in without giving
+    // it a species of its own.
+    this.prototypeTileIds = prototypeTileIds?.size > 0 ? prototypeTileIds : null;
+    this.prototypeTileCache = new Map();
+    this.groveMix = Math.min(1, Math.max(0, Number(groveMix) || 0));
     this.signature = JSON.stringify({
       species: [...this.species.values()],
       palettes: this.palettes,
       prototypeCount: this.prototypeCount,
+      groveMix: this.groveMix,
       prototypeIndices: this.prototypeIndexBySpecies
         ? [...this.prototypeIndexBySpecies.map.entries()]
+        : null,
+      prototypeTileIds: this.prototypeTileIds
+        ? [...this.prototypeTileIds.entries()].map(([index, tiles]) => [index, [...tiles]])
         : null,
     });
   }
 
-  /** Prototype indices able to render `speciesId`, in ascending order. */
-  prototypesFor(speciesId) {
+  /**
+   * Prototype indices able to render `speciesId` in `tileId`, in ascending
+   * order. A restriction that would leave the species with nothing is ignored
+   * rather than applied, so a tree always has something to draw.
+   */
+  prototypesFor(speciesId, tileId = null) {
     if (!this.prototypeIndexBySpecies) return null;
-    const indices = this.prototypeIndexBySpecies.map.get(speciesId);
-    return indices?.length > 0 ? indices : this.prototypeIndexBySpecies.fallback;
+    const configured = this.prototypeIndexBySpecies.map.get(speciesId);
+    const indices = configured?.length > 0 ? configured : this.prototypeIndexBySpecies.fallback;
+    if (!this.prototypeTileIds || tileId === null || tileId === undefined) return indices;
+    const cacheKey = `${speciesId}:${tileId}`;
+    const cached = this.prototypeTileCache.get(cacheKey);
+    if (cached) return cached;
+    const allowed = indices.filter((index) => {
+      const tiles = this.prototypeTileIds.get(index);
+      return !tiles || tiles.has(tileId);
+    });
+    const result = allowed.length > 0 ? allowed : indices;
+    this.prototypeTileCache.set(cacheKey, result);
+    return result;
   }
 
   /**
@@ -117,22 +163,30 @@ export class ForestSpeciesRegistry {
     });
   }
 
+  /**
+   * Species for one tree. The roll is keyed on the grove rather than the tree, so
+   * a patch comes out dominated by a single species — a birch stand, then a spruce
+   * stand — instead of every patch averaging out to the same biome mix. A
+   * `groveMix` share still rolls per tree, which keeps the odd off-species tree
+   * and softens patch boundaries.
+   *
+   * Habitats with no `patchId` (bare habitats from callers that do not run the
+   * patch field) fall back to rolling per tree throughout.
+   */
+  selectSpecies(candidate, habitat, usable, weights) {
+    const grove = habitat.patchId;
+    if (!grove || stableUnit(candidate.stableId, 79) < this.groveMix) {
+      return usable[pickWeighted(weights, stableUnit(candidate.stableId, 41))];
+    }
+    return usable[pickWeighted(weights, stableUnit(grove, 41))];
+  }
+
   select(candidate, habitat) {
     const configured = this.palettes[habitat.profileKey] ?? ['broadleaf_round'];
     const palette = configured.filter((id) => this.species.has(id));
     const usable = palette.length > 0 ? palette : ['broadleaf_round'];
     const weights = this.paletteWeights(usable, habitat);
-    const total = weights.reduce((sum, weight) => sum + weight, 0);
-    let roll = stableUnit(candidate.stableId, 41) * total;
-    let speciesIndex = usable.length - 1;
-    for (let index = 0; index < usable.length; index += 1) {
-      roll -= weights[index];
-      if (roll < 0) {
-        speciesIndex = index;
-        break;
-      }
-    }
-    const speciesId = usable[speciesIndex];
+    const speciesId = this.selectSpecies(candidate, habitat, usable, weights);
     const species = this.species.get(speciesId);
     const ageClass = weightedAge(
       habitat.patchEdge,
@@ -141,7 +195,7 @@ export class ForestSpeciesRegistry {
     );
     const age = AGE_CLASSES[ageClass];
     const individualVariation = 0.9 + stableUnit(candidate.stableId, 47) * 0.2;
-    const speciesPrototypes = this.prototypesFor(speciesId);
+    const speciesPrototypes = this.prototypesFor(speciesId, habitat.tileId);
     const prototypeRoll = stableUnit(`${speciesId}:${candidate.stableId}`, 53);
     const prototypeIndex = speciesPrototypes
       ? speciesPrototypes[Math.min(
@@ -170,6 +224,9 @@ export class ForestSpeciesRegistry {
       speciesColor: species.color,
       colorSeed: stableUnit(candidate.stableId, 67),
       windSeed: stableUnit(candidate.stableId, 71),
+      // Grove-scoped, so every tree in a stand turns the same autumn colour while
+      // `colorSeed` keeps per-tree brightness varied within it.
+      groveSeed: stableUnit(habitat.patchId ?? candidate.stableId, 83),
       habitatFlags: Object.freeze({
         edge: habitat.patchEdge > 0.55,
         core: habitat.patchCoverage > 0.75 && habitat.patchEdge < 0.35,

@@ -92,6 +92,7 @@ export function createTreeImpostorSourceSignature(prototypes, config) {
   }
   const configuration = JSON.stringify({
     trees: config?.trees ?? null,
+    treeVariants: config?.assets?.treeVariants ?? null,
     impostor: config?.lod?.impostor ?? null,
   });
   let hash = hashText(0x811c9dc5, configuration);

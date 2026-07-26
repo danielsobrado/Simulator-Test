@@ -24,7 +24,9 @@ world:
   maxCpuChunks: 81
   floatingOriginThreshold: 4096
   minimapCells: 192
-  heightScale: 12
+  # Keeps new procedural worlds visibly rolling around the starting chunks.
+  # The generator remains deterministic and continuous across chunk borders.
+  heightScale: 24
   seaLevel: -1.5
   maxCommitsPerFrame: 1
   maxCommitsPerFrameIdle: 4
@@ -75,6 +77,20 @@ player:
   groundSnapDistance: 0.6
   mouseSensitivity: 0.0022
   maxPitchDegrees: 85
+objects:
+  lod:
+    enabled: true
+    nearPixels: 140
+    coarsePixels: 35
+    hysteresisRatio: 0.15
+    transitionMs: 240
+    fadeSteps: 16
+    near:
+      castShadow: true
+    coarse:
+      castShadow: true
+    shell:
+      castShadow: false
 renderer:
   antialias: true
   forceWebGL: false
@@ -94,12 +110,342 @@ stylizedSurface:
   enabled: true
   assets:
     scene: /assets/grass-scene.glb
-    rockMaterial: RocksStylized_M
     trunkMaterial: Material.011
     leafMaterial: 2237f4d60830642a24d65276e7abe1e6
+    # Authored scatter prototypes retain their embedded diffuse/normal textures.
+    # Per-file scales normalize the source packages into metre-sized scenery.
+    rockVariants:
+      - scene: /assets/rocks/rock.glb
+        scale: 0.02
+      - scene: /assets/rocks/obj_nat_rock_01.glb
+        scale: 0.012
+      - scene: /assets/rocks/a_simple_rock.glb
+        scale: 1
+      - scene: /assets/rocks/ruined-fence/stone-01.glb
+        scale: 1
+      - scene: /assets/rocks/ruined-fence/stone-03.glb
+        scale: 1
+      - scene: /assets/rocks/ruined-fence/stone-06.glb
+        scale: 1
+      - scene: /assets/rocks/ruined-fence/stone-08.glb
+        scale: 1
+      - scene: /assets/rocks/3d_scan_rock.glb
+        scale: 0.045
+      # Four curated stones extracted offline from the forest showroom. The
+      # other five remain individual library assets without entering residency.
+      - scene: /assets/rocks/forest-pack/rock-02.glb
+        scale: 1
+      - scene: /assets/rocks/forest-pack/rock-04.glb
+        scale: 1
+      - scene: /assets/rocks/forest-pack/rock-06.glb
+        scale: 1
+      - scene: /assets/rocks/forest-pack/rock-08.glb
+        scale: 1
+    bushVariants:
+      - scene: /assets/bushes/stylized_bush.glb
+        scale: 1
+      - scene: /assets/bushes/small_bush.glb
+        scale: 2
+      - scene: /assets/bushes/bush2.glb
+        scale: 0.5
+      - scene: /assets/bushes/bush.glb
+        scale: 1
+      - scene: /assets/bushes/bamboo_bush.glb
+        scale: 0.006
+    # Additional authored tree prototypes. Their embedded textures are retained
+    # and each entry joins the configured species' deterministic prototype pool.
+    treeVariants:
+      - scene: /assets/trees/stylized-oak.glb
+        trunkMaterial: trunk_Mat.001
+        leafMaterial: leafes_Mat.001
+        species: broadleaf_round
+        # Deterministic CLOD bark synthesis, projected in object space so the
+        # trunk and branches share one consistent fissured surface.
+        barkProfile: spruce
+        barkScale: 0.8
+        barkSeed: 83
+        # Unit conversion, grounding and centring are baked by the offline extractor.
+        scale: 1
+        # Still the heaviest tree in the pool by an order of magnitude after
+        # offline decimation (182 154 -> 62 883 triangles; its crown is thousands
+        # of disconnected leaf shells that no simplifier will collapse further).
+        # Confined to the two biomes that place trees as isolated specimens and
+        # copses — savanna at density 0.24 and grassland at 0.16 — where a hero
+        # oak is what the composition wants and where few of them are drawn.
+        # Closed forest uses the 4 599- and 1 806-triangle crowns below.
+        tileIds: [3, 4]
+      - scene: /assets/trees/forest-pack/tree-wide-01.glb
+        trunkMaterial: Tree_Trunk_01
+        leafMaterial: Tree_Branches_01
+        species: conifer_wide
+        scale: 1
+      # Two more distinct conifer crowns from the same pack, 630 and 624
+      # triangles. Verified distinct rather than transforms of tree-wide-01.
+      - scene: /assets/trees/forest-pack/tree-wide-02.glb
+        trunkMaterial: Tree_Trunk_01
+        leafMaterial: Tree_Branches_01
+        species: conifer_wide
+        scale: 1
+      - scene: /assets/trees/forest-pack/tree-wide-03.glb
+        trunkMaterial: Tree_Trunk_01
+        leafMaterial: Tree_Branches_01
+        species: conifer_wide
+        scale: 1
+      - scene: /assets/trees/forest-pack/tree-narrow-01.glb
+        trunkMaterial: Tree_Trunk_02
+        leafMaterial: Tree_Branches_02
+        species: conifer_narrow
+        scale: 1
+      # Two genuinely distinct tree geometries extracted from the 42.8 MB whole
+      # scene. Its other placements remain saved as individual offline GLBs.
+      # These two carry every broadleaf species. `species` is a list because one
+      # crown serves several: the registry gives each species its own crown
+      # aspect, spacing, trunk proportion and age curve, and the canopy takes the
+      # hue of the biome it stands in, so a tropical emergent and a temperate
+      # beech read apart without a second mesh. Covering all four broadleaf
+      # species here is also what retires the generated lobe-and-cylinder
+      # archetypes: they are now built only for a species nothing authored claims.
+      - scene: /assets/trees/tree-scene/tree-02.glb
+        trunkMaterial: Bark
+        leafMaterial: Leaves
+        species: [broadleaf_round, tropical_tall]
+        barkProfile: beech
+        barkScale: 0.9
+        barkSeed: 113
+        scale: 1
+      - scene: /assets/trees/tree-scene/tree-03.glb
+        trunkMaterial: Bark
+        leafMaterial: Leaves
+        species: [broadleaf_tall, wetland_sparse]
+        barkProfile: birch
+        barkScale: 0.72
+        barkSeed: 127
+        scale: 1
+    # Sparse recognisable plants layered over the shared procedural blade carpet.
+    # Each prototype group becomes one instanced object with all of its authored
+    # stem/leaf/flower materials intact.
+    # Every entry is under 350 triangles. `tileIds` decides which biomes may grow
+    # it, `character` weights it toward one ~420 m regional district, and
+    # `canopy` toward woodland interior ('core'), woodland fringe ('edge') or
+    # open ground ('open'). Heavier extractions — clover at 10 912 triangles and
+    # the 2 681-52 188 triangle ground patches — stay offline; their streaming
+    # cost was measured and rejected (docs/authored-natural-assets.md).
+    groundDetailVariants:
+      # --- Lush tufts: meadow districts of the temperate and grass biomes. -----
+      - scene: /assets/ground/stylized-grass/clump-01.glb
+        scale: 1
+        weight: 1.2
+        tileIds: [4, 6, 8, 9, 14]
+        character: meadow
+        canopy: open
+        prototypeGroups:
+          - [clump-01]
+      - scene: /assets/ground/stylized-grass/clump-02.glb
+        scale: 1
+        weight: 1.2
+        tileIds: [4, 6, 14]
+        character: meadow
+        canopy: open
+        prototypeGroups:
+          - [clump-02]
+      - scene: /assets/ground/stylized-grass/clump-03.glb
+        scale: 1
+        weight: 1.2
+        tileIds: [4, 6, 8]
+        character: meadow
+        prototypeGroups:
+          - [clump-03]
+      # --- Sparse shapes: what thin ground grows, and what survives shade. -----
+      # 32 and 96 triangles. These are the clumps' own source shapes, so a taiga
+      # floor and a tundra read as the same plant thinned out, not another plant.
+      - scene: /assets/ground/stylized-grass/source-01.glb
+        scale: 1
+        weight: 1.4
+        tileIds: [2, 7, 8, 9, 10]
+        character: forest
+        canopy: core
+        prototypeGroups:
+          - [source-01]
+      - scene: /assets/ground/stylized-grass/source-02.glb
+        scale: 1
+        weight: 1.1
+        tileIds: [2, 4, 5, 6, 7, 9, 10, 14]
+        prototypeGroups:
+          - [source-02]
+      # --- Broad low patches: 80 triangles for a 2.9 m footprint, scaled down.
+      - scene: /assets/ground/tree-scene/grass-dense.glb
+        scale: 0.4
+        weight: 1.3
+        tileIds: [3, 5, 7, 8]
+        character: forest
+        prototypeGroups:
+          - [grass-dense]
+      - scene: /assets/ground/tree-scene/grass-small.glb
+        scale: 0.55
+        weight: 1
+        tileIds: [4, 5, 6, 14]
+        character: meadow
+        prototypeGroups:
+          - [grass-small]
+      # --- Tall blades. The same two shapes come in Green_Grass and Brown_Grass,
+      # which is what lets a wetland be lush and a savanna dry without new
+      # geometry. Green stays full height as reeds; dry is scaled to tuft height.
+      - scene: /assets/ground/weeds/grass-blade-01.glb
+        scale: 1
+        weight: 1.2
+        tileIds: [12]
+        prototypeGroups:
+          - [grass-blade-01]
+      - scene: /assets/ground/weeds/grass-blade-03.glb
+        scale: 1
+        weight: 1.2
+        tileIds: [12]
+        prototypeGroups:
+          - [grass-blade-03]
+      - scene: /assets/ground/weeds/grass-blade-04.glb
+        scale: 0.55
+        weight: 1.4
+        tileIds: [1, 2, 3]
+        character: scrub
+        prototypeGroups:
+          - [grass-blade-04]
+      - scene: /assets/ground/weeds/grass-blade-05.glb
+        scale: 0.55
+        weight: 1.4
+        tileIds: [1, 3]
+        character: scrub
+        prototypeGroups:
+          - [grass-blade-05]
+      # Mixed brown and green in one clump: the transitional shape, so scrub
+      # districts of a grassland do not switch to dry grass all at once.
+      - scene: /assets/ground/weeds/grass-blade-02.glb
+        scale: 0.6
+        weight: 1
+        tileIds: [3, 4, 5, 12, 14]
+        character: scrub
+        canopy: open
+        prototypeGroups:
+          - [grass-blade-02]
+      # --- Blossoms: meadow districts and woodland fringes only. Rainforest,
+      # taiga, tundra and desert get none, which is most of what separates them.
+      - scene: /assets/ground/weeds/flower-01.glb
+        scale: 1.3
+        weight: 0.7
+        tileIds: [4, 14]
+        character: meadow
+        canopy: open
+        prototypeGroups:
+          - [flower-01]
+      - scene: /assets/ground/weeds/flower-02.glb
+        scale: 1.3
+        weight: 0.7
+        tileIds: [4, 6]
+        character: meadow
+        canopy: edge
+        prototypeGroups:
+          - [flower-02]
+      # --- Leafy weeds and sprouts: shaded floor and cold thin ground. --------
+      - scene: /assets/ground/grass-chunks/chunk-01.glb
+        scale: 1
+        weight: 1.3
+        tileIds: [5, 6, 7, 8]
+        character: forest
+        canopy: core
+        prototypeGroups:
+          - [chunk-01]
+      # 12 triangles each. Small enough that a tundra or a cold desert can be
+      # given cover without it reading as vegetation cover at all.
+      - scene: /assets/ground/grass-chunks/chunk-05.glb
+        scale: 4
+        weight: 1.5
+        tileIds: [1, 2, 9, 10]
+        prototypeGroups:
+          - [chunk-05]
+      - scene: /assets/ground/grass-chunks/chunk-06.glb
+        scale: 4
+        weight: 1.5
+        tileIds: [1, 2, 9, 10]
+        prototypeGroups:
+          - [chunk-06]
+    # The same authored wet plants are reused as short submerged silhouettes.
+    # The water surface follows terrain at +0.12 m, so these remain visible below
+    # it instead of becoming reeds floating at an unrelated sea plane.
+    aquaticVariants:
+      # 4 975 and 6 145 triangles — heavier than every runtime tree except the
+      # oak, and they were scattering across open marine water at 24 candidates
+      # per chunk. Confined to wetland (12), where a detailed rooted plant is
+      # actually looked at; marine shallows keep the 116-triangle weeds below.
+      - scene: /assets/ground/aquatic/grass-plant-brown.glb
+        scale: 1
+        weight: 0.5
+        tileIds: [12]
+        prototypeGroups:
+          - [grass-plant-brown]
+      - scene: /assets/ground/aquatic/grass-plant-green.glb
+        scale: 1
+        weight: 0.5
+        tileIds: [12]
+        prototypeGroups:
+          - [grass-plant-green]
+      - scene: /assets/ground/aquatic/weed-01.glb
+        scale: 1
+        prototypeGroups:
+          - [weed-01]
+      - scene: /assets/ground/aquatic/weed-02.glb
+        scale: 1
+        prototypeGroups:
+          - [weed-02]
+      # Low-poly floating leaves sit on the terrain-following water surface.
+      - scene: /assets/ground/aquatic/lotus-04.glb
+        scale: 1
+        weight: 1
+        heightOffset: 0.125
+        placement: &lotusPlacement
+          strategy: shoreline-colonies
+          # Selected 16 m gardens recur only in roughly one third of broad
+          # 72 m cells, and only within 12 m of an open-water bank.
+          supercellSize: 72
+          probability: 0.34
+          radius: 16
+          shorelineCells: 6
+          openWaterTileIds: [0]
+          seed: 9404
+        prototypeGroups:
+          - [lotus-04]
+      - scene: /assets/ground/aquatic/lotus-11.glb
+        scale: 1
+        weight: 1
+        heightOffset: 0.125
+        placement: *lotusPlacement
+        prototypeGroups:
+          - [lotus-11]
+    # Optional close wildlife. These runtime files retain only the selected
+    # flight clip; the original multi-animation downloads stay under assets/.
+    wildlifeVariants:
+      - id: crow
+        scene: /assets/animals/crow-flight.glb
+        clip: SKM_Crow|SKM_Crow|Crow_Fly
+        scale: 0.28
+        weight: 0.55
+        maxActive: 1
+        animationTimeScale: 1
+        headingOffsetDegrees: 0
+        tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15]
+      - id: seagull
+        scene: /assets/animals/seagull-flight.glb
+        clip: fly
+        scale: 0.4
+        weight: 0.45
+        maxActive: 1
+        animationTimeScale: 1
+        headingOffsetDegrees: 0
+        tileIds: [0, 12]
     barkColor: /assets/textures/bark/bark_color.png
     barkAo: /assets/textures/bark/bark_AO.png
     barkHeight: /assets/textures/bark/bark_height.png
+    # CC0 foliage alpha card. Its RGB is a hard mask and its alpha the antialiased
+    # one, so only the alpha channel is read; colour comes from the species palette.
+    foliageCard: /assets/textures/leaf/foliage_512a.png
     flowerA:
       mask: /assets/textures/flower/flowers.png
       zones: /assets/textures/flower/flowersRGB.png
@@ -108,28 +454,106 @@ stylizedSurface:
       mask: /assets/textures/flower3/flowers.png
       zones: /assets/textures/flower3/flowersRGB.png
       gradient: /assets/textures/flower3/flowersGradient.png
+  # One coarse canonical field coordinates the natural layers into broad
+  # meadow, woodland, scrub and rocky districts. It is sampled from world
+  # coordinates, so imported macro maps gain the same regional detail without
+  # baking masks into their chunks.
+  regionalPlacement:
+    enabled: true
+    regionSize: 420
+    sampleSpacing: 28
+    contrast: 2.4
+    minimumInfluence: 0.28
   grass:
+    # How far real grass geometry reaches, in chunk rings. Rings beyond nearRadius
+    # draw single-triangle blades instead of the tapered five-triangle ones.
+    #
+    # Kept at 1 on measurement, not on principle. Raising it to 2 was A/B'd with
+    # qa:perf (chunk-cross, warmup 2, duration 12, run) over two runs each: hitches
+    # went 5/8 -> 11/10 and dt p99 10.7/13.6 -> 11.8/15.1 ms. The cheaper blades do
+    # their job on the draw side, but the extra ring still pays full per-chunk
+    # scatter generation — grass build slices tripled (12 -> 36) and grassScatterMs
+    # went 21.6 -> 58.2. The cost is in building the ring, not drawing it, so the
+    # far band alone cannot pay for it. Raising this needs coarser far-ring scatter
+    # first. See docs/perf-qa.md.
     residentRadius: 1
-    bladesPerCell: 48
-    bladesPerClump: 8
+    nearRadius: 1
+    # Density comes from these two together, and only the ratio costs anything.
+    # Blades are baked into the clump's shared vertex buffer, so instances are
+    # clumps, not blades: clumpsPerCell = ceil(bladesPerCell / bladesPerClump)
+    # drives instance memory, per-chunk build work and buffer uploads, while
+    # bladesPerClump is paid once in a shared buffer and then only in raster.
+    # Raising both together therefore multiplies visible density at no streaming
+    # cost. 576/96 keeps six streamed clumps per cell while lifting the rendered
+    # field from 48 to 144 blades/m² — a world-scale compromise toward the
+    # reference diorama's 300 blades/m² without multiplying chunk build work.
+    bladesPerCell: 576
+    bladesPerClump: 96
     influenceTextureSize: 32
     outerRingDensity: 0.45
     tileIds: [3, 4, 5, 6, 7, 8, 9, 12, 14]
+    # Match the upstream Spring preset's blade silhouette. Density is adapted to
+    # the streamed clump representation, but the rendered blade dimensions are not.
     minWidth: 0.06
     maxWidth: 0.06
     minLength: 0.15
     maxLength: 0.25
+    tiltMax: 0.16
+    # Blade silhouettes lifted from the authored grass GLBs. Those assets are alpha
+    # cards — their meshes are parallel-sided ribbons and the shape lives in the
+    # texture alpha — so drawing them directly would mean alpha blending at 144
+    # blades/m². `npm run extract:grass-profiles` bakes the outlines instead and the
+    # runtime rebuilds them on the same 5-triangle strip it already draws, which is
+    # why switching sets costs geometry rebuilds and nothing per frame.
+    bladeProfiles:
+      manifest: /assets/ground/grass-blade-profiles.json
+      # Startup selection. Switchable live under Settings > Grass blades.
+      set: authored
+      # A set is a pool: every blade rolls its own shape from it, so listing more
+      # than one is how a clump stops reading as 96 copies of one outline. `id`s
+      # come from the manifest; `generated` is the built-in taper this system
+      # replaced, kept as the A/B baseline.
+      sets:
+        generated:
+          label: Generated taper (baseline)
+          profiles: [generated]
+        authored:
+          label: Authored mix
+          profiles: [stylized-01, meadow-01, field-01]
+        stylized:
+          label: Stylized clump only
+          profiles: [stylized-01]
+        arched:
+          label: Arched meadow blade
+          profiles: [meadow-01]
+        slender:
+          label: Slender field blade
+          profiles: [field-01]
+        # Authored shapes against the old taper, for judging how much of the change
+        # is silhouette and how much is simply having more than one shape.
+        mixedWithBaseline:
+          label: Authored mix + baseline
+          profiles: [stylized-01, meadow-01, field-01, generated]
   streaming:
     grassBuildsPerFrame: 1
     flowerBuildsPerFrame: 1
     treeBuildsPerFrame: 1
     rockBuildsPerFrame: 1
     bushBuildsPerFrame: 1
+    detailBuildsPerFrame: 1
     heavyBuildBudgetMs: 3
     grassCellsPerBuildSlice: 64
     inactiveReleaseFrames: 30
     treeManifestBuildsPerFrame: 1
     manifestBuildBudgetMs: 3
+    # Authored prop variants are streamed per biome rather than loaded at boot.
+    # The prefetch window is this many chunks beyond each layer's residency, so a
+    # variant is fetched and installed well before its biome is close enough to
+    # scatter anything. One install per frame keeps the geometry extraction that
+    # an arriving variant costs from landing as a hitch.
+    variantPrefetchChunks: 5
+    variantAppliesPerFrame: 1
+    variantRescanIntervalMs: 500
   lod:
     enabled: true
     tree:
@@ -140,11 +564,17 @@ stylizedSurface:
       nearPixels: 32
       proxyPixels: 8
       impostorPixels: 2
-      clusterPixels: 0.45
+      # Aggregate far-canopy band, off by default: the blobs it draws for a whole
+      # patch read as pale sheets over the horizon rather than distant woodland,
+      # and they pop in as chunks stream. Beyond impostorRadius the far-terrain
+      # backdrop carries the horizon instead. Set above 0 to bring the band back.
+      clusterPixels: 0
       hysteresisRatio: 0.15
       transitionMs: 320
     rock:
-      meshRadius: 1
+      # Keep the authored textured geometry through the visible mid-ground.
+      # Radius 1 forced 40–60 px rocks into the atlas-less dodecahedron proxy.
+      meshRadius: 3
       proxyRadius: 3
       nearPixels: 16
       proxyPixels: 1.5
@@ -187,12 +617,40 @@ stylizedSurface:
     gradientStart: 0.15
     gradientEnd: 1.0
     gradientPower: 1.6
+    # Upstream scatters every blade separately, so each one samples the patch
+    # noise at its own base and neighbours differ. Blades are batched into clumps
+    # here, so 96 of them share one sample — which is why raising bladesPerCell
+    # to 576 made the field denser without making it read as more blades. These
+    # rolls are baked per blade instead.
+    bladeVariation:
+      # Ends of the per-blade ramp: a shaded blade low in the sward and a
+      # sun-bleached one at the top of it. Kept either side of bottom/top so the
+      # mix widens the field's range rather than shifting its hue.
+      cool: '#3c6a1c'
+      warm: '#a8c63e'
+      # How far a blade may travel along that ramp. This flattens the base→tip
+      # gradient by the same fraction, which `rootShade` below pays back.
+      strength: 0.4
+      # Multiplicative brightness spread, ±shade/2. Separates blades that happen
+      # to land on the same point of the ramp.
+      shade: 0.34
+    # Roots of a dense sward sit in near-total shade. Applied over the bottom
+    # `height` of every blade, this is what gives the carpet visible depth
+    # instead of the flat sheet a uniformly lit field turns into.
+    rootShade:
+      strength: 0.45
+      height: 0.35
   translucency:
     color: '#c1e54d'
-    strength: 2.5
+    # Backlight is added on top of the blade colour, so strength above ~1.3 clips
+    # on its own before the blade is even mixed in: at the old 2.5 this term peaked
+    # at linear (1.33, 1.96, 0.19) and turned grass facing the sun to yellow-white.
+    strength: 1.0
     power: 6.4
     tipBias: 1.0
   patch:
+    # Match the upstream spring preset: broad, restrained environmental colour
+    # zones instead of high-frequency variation on every few blade clumps.
     lush: '#6f9a2a'
     dry: '#b8a94e'
     strength: 0.35
@@ -200,59 +658,77 @@ stylizedSurface:
     bias: 1.6
   dirt:
     color: '#ac956c'
-    scale: 0.4
-    coverage: 0.12
-    softness: 0.06
-    warp: 0.2
-    bladeCut: 0.85
-    bladeBlend: 0.65
+    # The upstream 0.4/0.41 mask is composed for its small diorama. At world
+    # scale it becomes all-over camouflage, so leave only broad, sparse bare
+    # pockets and let the path layer provide the strong ground composition.
+    scale: 0.07
+    coverage: 0.2
+    softness: 0.045
+    warp: 0.35
+    bladeCut: 1.0
+    bladeBlend: 0.8
   path:
     tileId: 13
     # Wider, softer shoulder than a hard stripe. vergeWidth splits the blend band
     # into a bare tread (above it) and a scuffed verge (below it).
-    blendCells: 3.5
+    blendCells: 2.25
     vergeWidth: 0.45
     vergeBlend: 0.55
+    vergeCut: 0.72
+    edgeScale: 0.42
+    edgeWarp: 0.18
     rutStrength: 0.16
     rutScale: 1.6
+    # Generated worlds need readable paths before any Road cells are painted.
+    # A smooth world-space contour produces long connected game trails; Road
+    # tiles are still authoritative and are merged into the same wear profile.
+    naturalTrail:
+      enabled: true
+      scale: 0.018
+      level: 0.08
+      width: 0.038
+      softness: 0.035
+      warp: 0.9
+      clearThreshold: 0.42
     # Trees, bushes and boulders are cleared this many cells from a road tile.
     # Derived from the canonical tile map, so clearance never depends on which
     # chunks happen to be resident.
     clearCells: 3
   rocks:
     enabled: true
-    residentRadius: 1
+    residentRadius: 2
     # Boulders gather into scree groups rather than scattering evenly, so the
     # per-chunk budget is raised while clear ground stays genuinely clear.
-    perChunk: 14
+    perChunk: 72
     tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
-    minScale: 0.65
-    maxScale: 1.2
+    minScale: 0.9
+    maxScale: 1.5
     radius: 1.8
     falloff: 0.7
     flatten: 0.85
     bend: 0.25
-    # Dark faceted stone. colorVariation spreads instance brightness so a scree
-    # field is not a field of clones; burial sinks each boulder by a fraction of
-    # its height so it reads as embedded in the ground.
-    color: '#3a3d42'
-    colorVariation: 0.34
-    burial: 0.18
-    # Cluster field: supercells set clump scale, the slope terms decide where
-    # scree accumulates. flatBias keeps flat meadow mostly clear.
-    clusterSupercellSize: 58
-    clusterSampleSpacing: 5
+    # White preserves the authored rock maps; a small variation keeps repeated
+    # instances from reading as exact clones. Authored geometry and textures stay
+    # active through both rock LOD bands. Burial is measured per prototype.
+    color: '#ffffff'
+    colorVariation: 0.08
+    burial: 0.06
+    # Compact high-density scree pockets with genuinely empty ground between.
+    # The higher candidate budget supplies several stones to each small core;
+    # it no longer spends that budget across dozens of diffuse singleton patches.
+    clusterSupercellSize: 96
+    clusterSampleSpacing: 4
     clusterDensity: 0.72
-    clusterRadiusMin: 0.22
-    clusterRadiusMax: 0.5
-    clusterEdgeWidth: 0.36
-    clusterBoundaryWarp: 0.24
+    clusterRadiusMin: 0.09
+    clusterRadiusMax: 0.19
+    clusterEdgeWidth: 0.16
+    clusterBoundaryWarp: 0.18
     preferredSlope: 0.55
     maximumSlope: 2.4
-    flatBias: 0.18
+    flatBias: 0.72
   bushes:
     enabled: true
-    residentRadius: 1
+    residentRadius: 2
     perChunk: 96
     tileIds: [3, 4, 5, 6, 7, 8, 9, 12, 14]
     minScale: 0.7
@@ -273,9 +749,105 @@ stylizedSurface:
     preferredSlope: 0.3
     maximumSlope: 1.5
     flatBias: 0.85
-  flowers:
+  groundDetails:
+    enabled: true
+    # Authored accents stay in the walking ring; distant coverage remains the
+    # procedural grass/impostor system measured by the performance harness.
+    residentRadius: 1
+    # Existing flower cards already cover small blossoms; these candidates are
+    # reserved for the larger silhouettes that the procedural layers lack.
+    #
+    # A chunk is 128 m square, so the former 24 put one authored plant every
+    # ~26 m — the assets were loaded, instanced and drawn, and you could walk a
+    # field without meeting one. 240 brings that to roughly one every 8 m before
+    # densityByTile and the regional meadow gate thin it further, which is close
+    # enough to read as part of the sward the procedural blades carry.
+    #
+    # This is the accent layer, not ground cover: instance capacity is allocated
+    # per prototype rather than shared (scatterMath.instanceCapacity), so ~19
+    # prototypes each reserve perChunk x 9 slots. Going another order of
+    # magnitude here wants that pool shared first.
+    #
+    # A/B'd with qa:perf (chunk-cross, warmup 2, duration 12, run), three runs
+    # each: median avgFps 141.3 vs 137.1, hitches 9 vs 8, dt p99 26.2 vs 23.6 ms
+    # against perChunk 24. Both sets carried one outlier run, and the difference
+    # sits inside that spread — the layer rebuilds once per chunk window and is
+    # cached, so the extra candidates cost placement work, not per-frame work.
+    perChunk: 240
+    # Deserts (1, 2) and tundra (10) join the layer so they stop being bare
+    # ground; densityByTile is what keeps them looking like deserts and tundra.
+    tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14]
+    # Share of the per-chunk candidate budget a biome keeps. Absent means 1.
+    # `tileIds` on each variant decides *what* grows; this decides *how much*,
+    # which is the other half of a biome reading as itself — a taiga floor is
+    # thin, a desert is nearly bare, a grassland is full.
+    densityByTile:
+      1: 0.12
+      2: 0.16
+      3: 0.55
+      9: 0.45
+      10: 0.2
+    minScale: 0.82
+    maxScale: 1.24
+    radius: 0.34
+    heightOffset: 0.015
+    colorVariation: 0.14
+    castShadow: false
+  aquaticPlants:
     enabled: true
     residentRadius: 1
+    # This candidate pool gives selected lotus colonies several leaves;
+    # the colony rule rejects lotus everywhere else, while rooted plants remain
+    # sparse enough for the six shared instanced renderers.
+    perChunk: 24
+    # Marine and wetland are canonical Azgaar IDs 0 and 12.
+    tileIds: [0, 12]
+    minScale: 0.78
+    maxScale: 1.3
+    radius: 0.42
+    heightOffset: -0.02
+    colorVariation: 0.1
+    castShadow: false
+  wildlife:
+    enabled: true
+    # Default ambience: one instanced draw using three-triangle billboard birds.
+    # Flocks remain distant, intermittent and capped.
+    distant:
+      enabled: true
+      maxBirds: 10
+      flockSizeMin: 3
+      flockSizeMax: 7
+      initialDelayMin: 6
+      initialDelayMax: 14
+      intervalMin: 22
+      intervalMax: 40
+      durationMin: 14
+      durationMax: 22
+      radiusMin: 80
+      radiusMax: 130
+      altitudeMin: 30
+      altitudeMax: 48
+      size: 1
+      color: '#18212b'
+    # Opt-in close tier. Enabling this loads two skinned GLBs and permits at
+    # most one crow and one seagull. Leave false on lower-memory targets.
+    authored:
+      enabled: false
+      maxActive: 2
+      habitatSearchCells: 32
+      initialDelayMin: 8
+      initialDelayMax: 18
+      intervalMin: 18
+      intervalMax: 35
+      durationMin: 10
+      durationMax: 16
+      radiusMin: 18
+      radiusMax: 42
+      altitudeMin: 8
+      altitudeMax: 18
+  flowers:
+    enabled: true
+    residentRadius: 2
     perChunk: 480
     outerRingDensity: 0.5
     tileIds: [3, 4, 5, 6, 7, 8, 9, 12, 14]
@@ -293,7 +865,7 @@ stylizedSurface:
     colorStem: '#648029'
   trees:
     enabled: true
-    residentRadius: 1
+    residentRadius: 2
     perChunk: 12
     clearRadius: 3.5
     tileIds: [3, 4, 5, 6, 7, 8, 9, 10, 12]
@@ -306,6 +878,10 @@ stylizedSurface:
       maxAcceptedPerChunk: 72
       patchSupercellSize: 384
       patchSampleSpacing: 12
+      # Convert broad low-probability habitat into compact stands: coverage
+      # contrast clears the gaps, while the core boost packs trees into groves.
+      coverageContrast: 2.2
+      coreDensityBoost: 2.5
       slopeSampleDistance: 4
       # Riparian belts: how far from open water the habitat field still measures a
       # distance. Beyond this it reports "no water nearby", so it must cover the
@@ -314,16 +890,27 @@ stylizedSurface:
       # Set to 0 to disable the water term entirely.
       waterRangeMeters: 80
     forestFloor:
-      grassCoreDensity: 0.18
-      grassEdgeDensity: 0.72
-      flowerCoreDensity: 0.08
+      # Core densities are how much ground cover survives under closed canopy.
+      # These were low enough (0.18 grass, 0.08 flowers) that a wood interior was
+      # bare dark earth; a real forest floor is shaded, not swept.
+      grassCoreDensity: 0.45
+      grassEdgeDensity: 0.82
+      flowerCoreDensity: 0.18
       flowerEdgeDensity: 0.58
-      bushCoreDensity: 0.22
+      bushCoreDensity: 0.28
       bushEdgeDensity: 0.95
-      groundCoreColor: '#273c25'
-      groundStrength: 0.68
+      # Tint the ground takes under canopy. The old '#273c25' at 0.68 landed the
+      # wood interior near black once Lambert shading and canopy shadow stacked on
+      # top of it — this keeps the floor shaded but still readable.
+      groundCoreColor: '#3b5233'
+      groundStrength: 0.45
     minScale: 0.85
     maxScale: 1.15
+    # Share of trees that ignore their grove's dominant species. 0 gives strict
+    # single-species stands; the biome mix only reasserts itself across groves.
+    groveMix: 0.16
+    # Share of broadleaf groves that turn autumn. Conifer groves stay green.
+    autumnGroves: 0.55
     leafBottom: '#1c3b23'
     leafTop: '#5c8338'
     brightness: 1.05
@@ -331,6 +918,22 @@ stylizedSurface:
     variationColor: '#1e4430'
     variationStrength: 0.6
     variationScale: 2.5
+    # View-angle rim on the canopy edge, ported from the CC0 Godot fluffy-foliage
+    # shader. Lifts grazing angles toward a warm light so the crown silhouette
+    # reads as soft mass instead of a hard lit-surface boundary. 0 disables it.
+    rimColor: '#cfe08a'
+    rimStrength: 0.34
+    rimPower: 2.2
+    # Alpha-cut leaf cards scattered over the crown lobes. They carry the ragged
+    # foliage silhouette; the lobes behind them keep the canopy from going
+    # see-through. cardsPerLobe 0 disables the cards entirely.
+    cardsPerLobe: 4
+    # Card half-extent as a fraction of its lobe's radius. Above ~0.6 the cards
+    # start redefining the crown's bounding box, which drives LOD thresholds.
+    cardScale: 0.42
+    # Alpha cut for the baked impostor atlas. The live LOD bands dither instead,
+    # so this does not change what you see at close range.
+    cardAlphaTest: 0.32
     windStrength: 0.12
     flutterAmplitude: 0.35
     flutterSpeed: 3.2
@@ -371,18 +974,62 @@ stylizedSurface:
     grainStrength: 0.95
   groundCover:
     enabled: true
-    startDistance: 150
-    endDistance: 620
+    # Shader impostor overlaps the last real-grass chunk before taking over.
+    startDistance: 110
+    endDistance: 320
     direction: [0.88, 0.47]
     frequency: 2.8
     noiseScale: 0.08
     noiseWarp: 3.2
     strandThreshold: 0.72
-    strength: 0.36
-    tipColor: '#9dbb45'
-    tipStrength: 0.28
+    strength: 0.58
+    tipColor: '#91b632'
+    tipStrength: 0.24
+    # Share of the distant grass cover that survives under canopy. 0 restores the
+    # old behaviour, where wooded ground past startDistance was drawn bare.
+    forestRetention: 0.5
   sky:
     enabled: true
+    # Half-resolution, low-tap screen-space light shafts. The effect is routed
+    # only through the perspective walking camera; the editor stays unfiltered.
+    godRays:
+      enabled: true
+      technique: screen-space
+      intensity: 1.2
+      # Preserve enough ray-buffer detail for close silhouettes and use enough
+      # radial taps that one tap cannot appear as a displaced canopy-sized slab.
+      resolutionScale: 0.6
+      samples: 24
+      density: 0.96
+      decay: 0.92
+      weight: 0.35
+      exposure: 0.85
+      # Keep screen-space dust subtle; stronger moving grain reads as flicker
+      # once bright shafts cross detailed foliage.
+      dustStrength: 0.04
+      dustScale: 3
+      dustSpeed: 0.008
+      # Cloud colour remains softly translucent, but its denser transmission
+      # mask can still carve strong shafts around the sun.
+      cloudOcclusion: 0.9
+      # World-space samples use the sun's directional shadow map, so shafts stay
+      # attached to trees and buildings while the player turns or walks. A
+      # bilateral pass softens the low-resolution raymarch without smearing
+      # silhouettes, and exponential height fog concentrates scattering near
+      # the ground.
+      volumetric:
+        intensity: 1
+        resolutionScale: 0.5
+        raymarchSteps: 40
+        density: 0.7
+        maxDensity: 0.45
+        distanceAttenuation: 2
+        blurSoftness: 0.85
+        cloudInfluence: 0.75
+        fogDensity: 0.018
+        fogBaseHeight: 2
+        fogHeightFalloff: 0.035
+        fogMaxDistance: 180
     radius: 5000
     lowColor: '#4aa7e2'
     highColor: '#8ecef2'
@@ -441,7 +1088,7 @@ stylizedSurface:
       farDensityScale: 1.5
 voxelPrototype:
   enabled: true
-  visible: true
+  visible: false
   streamRadius: 1
   slotCount: 9
   cells: [24, 16, 24]

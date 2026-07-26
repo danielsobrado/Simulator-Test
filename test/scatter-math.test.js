@@ -6,7 +6,10 @@ import {
   overlaps,
   scatterRandom01,
 } from '../src/editor/stylized/scatterMath.js';
-import { StylizedSceneAssetCache } from '../src/editor/stylized/StylizedSceneAssetCache.js';
+import {
+  StylizedSceneAssetCache,
+  createStylizedSceneLoader,
+} from '../src/editor/stylized/StylizedSceneAssetCache.js';
 
 test('scatter RNG is deterministic and channel-separated', () => {
   assert.equal(scatterRandom01(1, 2, 3, 0), scatterRandom01(1, 2, 3, 0));
@@ -27,6 +30,24 @@ test('overlaps honors combined clearance radii', () => {
   const placements = [{ x: 0, z: 0, radius: 2 }];
   assert.equal(overlaps(3, 0, placements, 0.5), false);
   assert.equal(overlaps(2.4, 0, placements, 0.5), true);
+});
+
+test('stylized GLTF loader enables meshopt and renderer-aware KTX2 decoding', () => {
+  const renderer = {
+    isWebGPURenderer: true,
+    hasFeature() {
+      return false;
+    },
+  };
+  const { loader, ktx2Loader } = createStylizedSceneLoader({
+    renderer,
+    baseUrl: '/game/',
+  });
+
+  assert.ok(loader.meshoptDecoder);
+  assert.equal(loader.ktx2Loader, ktx2Loader);
+  assert.equal(ktx2Loader.transcoderPath, '');
+  ktx2Loader.dispose();
 });
 
 test('StylizedSceneAssetCache shares one load and disposes on final release', async () => {

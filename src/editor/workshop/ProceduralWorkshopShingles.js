@@ -48,6 +48,18 @@ const DECK_CLEARANCE = 0.004;
 /** How far the eaves course oversails, as a fraction of tile length. */
 const EAVES_OVERSAIL = 0.35;
 
+/**
+ * Absolute ceiling on that oversail, in metres.
+ *
+ * Tile length grows adaptively on large roofs to hold the tile budget, so a
+ * purely proportional oversail grew with it: a 8 m square tower's pyramid
+ * oversailed its deck by 1.27 m, which is not an eaves detail but a second roof.
+ * It also inflated the detail-3 envelope far enough past the detail-1 envelope
+ * that the LOD ladder refused the asset outright. An eaves overhang is an
+ * architectural dimension and does not scale with how coarsely the roof is tiled.
+ */
+const MAX_EAVES_OVERSAIL = 0.18;
+
 /** Maximum upward tilt of a tile's free edge, in radians, at full irregularity. */
 const MAX_EDGE_KICK = 0.09;
 
@@ -101,7 +113,9 @@ function planCourses(slantLength, courseLength) {
   const courses = [];
   for (let row = 0; row < rows; row += 1) {
     const low = (row * courseStep) / slantLength;
-    const oversail = row === 0 ? tileLength * EAVES_OVERSAIL : 0;
+    const oversail = row === 0
+      ? Math.min(tileLength * EAVES_OVERSAIL, MAX_EAVES_OVERSAIL)
+      : 0;
     courses.push({
       row,
       low,
@@ -256,11 +270,17 @@ export function shingledConeGeometries(recipe, {
   let stableIndex = seedOffset * 10_000;
 
   const emit = (tile, yaw) => {
-    geometries.push(transformGeometry(tile, {
+    transformGeometry(tile, {
       rotation: [0, rotationY + yaw, 0],
       position: [centerX, baseY, centerZ],
-      scale: [1, 1, depthScale],
-    }));
+    });
+    // World-space, after the yaw, exactly as the deck applies it
+    // (`roof.scale(1, 1, depth / width)`). Passing it through `transformGeometry`
+    // scaled in the tile's pre-rotation frame instead, so on the facets that face
+    // +/-X the depth squash landed on world X and the tiles no longer matched the
+    // deck they cover.
+    if (depthScale !== 1) tile.scale(1, 1, depthScale);
+    geometries.push(tile);
     stableIndex += 1;
     assertBudget(geometries.length);
   };
@@ -289,7 +309,12 @@ export function shingledConeGeometries(recipe, {
             stableIndex,
             kickSign: 1,
             heightRatio: course.centre,
-          }), (facet / sides) * Math.PI * 2);
+          // Half-facet offset. A tile is built facing local +Z, so without it the
+          // tile facets sit at theta 0/90/180/270 while `ConeGeometry` centres
+          // its facets between its vertices, at 45/135/225/315 — the tiles ended
+          // up rotated a half facet off the deck they are meant to lie on, which
+          // on a square tower is a full 45 degrees.
+          }), ((facet + 0.5) / sides) * Math.PI * 2);
         }
       }
       continue;
@@ -365,6 +390,133 @@ export function shingledSlopeGeometries(recipe, {
       }));
       stableIndex += 1;
       assertBudget(geometries.length);
+    }
+  }
+  return geometries;
+}
+
+function faceFrame(face) {
+  const [[startX, startZ], [endX, endZ]] = face.sourceEdge;
+  const length = Math.hypot(endX - startX, endZ - startZ);
+  if (length <= 1e-8) throw new Error('A shingled roof face has a zero-length eave.');
+  const edgeX = (endX - startX) / length;
+  const edgeZ = (endZ - startZ) / length;
+  const centroid = face.rings[0].reduce(
+    (sum, point) => [sum[0] + point[0], sum[1] + point[1]],
+    [0, 0],
+  ).map((value) => value / face.rings[0].length);
+  let inwardX = -edgeZ;
+  let inwardZ = edgeX;
+  if ((centroid[0] - startX) * inwardX + (centroid[1] - startZ) * inwardZ < 0) {
+    inwardX *= -1;
+    inwardZ *= -1;
+  }
+  const toLocal = ([x, z]) => [
+    (x - startX) * edgeX + (z - startZ) * edgeZ,
+    (x - startX) * inwardX + (z - startZ) * inwardZ,
+  ];
+  return {
+    startX,
+    startZ,
+    edgeX,
+    edgeZ,
+    inwardX,
+    inwardZ,
+    yaw: Math.atan2(inwardX, inwardZ),
+    rings: face.rings.map((ring) => ring.map(toLocal)),
+  };
+}
+
+function scanlineIntervals(rings, v) {
+  const intersections = [];
+  for (const ring of rings) {
+    for (let index = 0; index < ring.length; index += 1) {
+      const [u1, v1] = ring[index];
+      const [u2, v2] = ring[(index + 1) % ring.length];
+      if ((v1 <= v && v2 > v) || (v2 <= v && v1 > v)) {
+        intersections.push(u1 + (u2 - u1) * ((v - v1) / (v2 - v1)));
+      }
+    }
+  }
+  intersections.sort((left, right) => left - right);
+  const intervals = [];
+  for (let index = 0; index + 1 < intersections.length; index += 2) {
+    if (intersections[index + 1] - intersections[index] > 1e-6) {
+      intervals.push([intersections[index], intersections[index + 1]]);
+    }
+  }
+  return intervals;
+}
+
+function countFaceTiles(frames, pitch, metrics) {
+  let count = 0;
+  for (const frame of frames) {
+    const maxV = Math.max(...frame.rings.flat().map(([, v]) => v));
+    if (maxV <= 1e-6) continue;
+    const slant = maxV / Math.max(0.01, Math.cos(pitch));
+    const { courses } = planCourses(slant, metrics.courseLength);
+    for (const course of courses) {
+      const v = maxV * course.centre;
+      for (const [start, end] of scanlineIntervals(frame.rings, v)) {
+        count += Math.max(1, Math.round((end - start) / metrics.tileWidth));
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Tile arbitrary straight-skeleton roof faces.
+ *
+ * Each face supplies one or more clipped rings plus its source eave. Rows are
+ * intersected with all rings using even/odd fill, so concave faces and tower
+ * cut-outs are handled by the same deterministic scanline path.
+ */
+export function shingledRoofFaceGeometries(recipe, {
+  faces,
+  baseY,
+  pitchDegrees,
+  seedOffset,
+}) {
+  if (!shinglesEnabled(recipe) || !faces?.length) return [];
+  const pitch = pitchDegrees * Math.PI / 180;
+  const frames = faces.map(faceFrame);
+  const metrics = fitMetrics(
+    recipe.detail,
+    (candidate) => countFaceTiles(frames, pitch, candidate),
+  );
+  const geometries = [];
+  let stableIndex = seedOffset * 10_000;
+  for (const frame of frames) {
+    const maxV = Math.max(...frame.rings.flat().map(([, v]) => v));
+    if (maxV <= 1e-6) continue;
+    const slant = maxV / Math.max(0.01, Math.cos(pitch));
+    const { courses } = planCourses(slant, metrics.courseLength);
+    for (const course of courses) {
+      const v = maxV * course.centre;
+      for (const [start, end] of scanlineIntervals(frame.rings, v)) {
+        const span = end - start;
+        const columns = Math.max(1, Math.round(span / metrics.tileWidth));
+        const step = span / columns;
+        for (let column = 0; column < columns; column += 1) {
+          const u = start + step * (column + 0.5);
+          const tile = tileGeometry(recipe, {
+            width: step * LATERAL_OVERLAP,
+            length: course.tileLength,
+            pitch: -pitch,
+            position: [u, baseY + v * Math.tan(pitch), v],
+            stableIndex,
+            kickSign: -1,
+            heightRatio: course.centre,
+          });
+          geometries.push(transformGeometry(tile, {
+            rotation: [0, frame.yaw, 0],
+            position: [frame.startX, 0, frame.startZ],
+          }));
+          stableIndex += 1;
+          assertBudget(geometries.length);
+        }
+      }
     }
   }
   return geometries;

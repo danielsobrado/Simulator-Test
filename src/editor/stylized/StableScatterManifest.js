@@ -187,6 +187,7 @@ function createCandidate({
   tileAt,
   heightAt,
   prototypeCount,
+  prototypeIndexForRoll,
   minScale,
   maxScale,
   radiusForScale,
@@ -197,14 +198,24 @@ function createCandidate({
     + Math.floor(scatterRandom01(chunkX, chunkZ, index, 0) * chunkSize);
   const cellZ = chunkZ * chunkSize
     + Math.floor(scatterRandom01(chunkX, chunkZ, index, 1) * chunkSize);
-  if (!tileIds.has(tileAt(cellX, cellZ))) return null;
+  const tileId = tileAt(cellX, cellZ);
+  if (!tileIds.has(tileId)) return null;
 
   const center = cellCenterToWorld(cellX, cellZ, tileSize);
   const x = center.x + (scatterRandom01(chunkX, chunkZ, index, 2) - 0.5) * tileSize;
   const z = center.z + (scatterRandom01(chunkX, chunkZ, index, 3) - 0.5) * tileSize;
-  const prototypeIndex = Math.floor(
-    scatterRandom01(chunkX, chunkZ, index, 4) * prototypeCount,
-  ) % prototypeCount;
+  const prototypeRoll = scatterRandom01(chunkX, chunkZ, index, 4);
+  // World coordinates go to the selector as well as the biome: prototype choice
+  // varies within a biome by regional character and forest canopy, both of which
+  // are sampled from position.
+  const prototypeIndex = prototypeIndexForRoll
+    ? prototypeIndexForRoll(prototypeRoll, tileId, x, z)
+    : Math.floor(prototypeRoll * prototypeCount) % prototypeCount;
+  if (!Number.isInteger(prototypeIndex)
+      || prototypeIndex < 0
+      || prototypeIndex >= prototypeCount) {
+    throw new Error('prototypeIndexForRoll must return an available prototype index.');
+  }
   const scale = minScale
     + scatterRandom01(chunkX, chunkZ, index, 5) * (maxScale - minScale);
   const rotationY = scatterRandom01(chunkX, chunkZ, index, 6) * Math.PI * 2;
@@ -214,6 +225,7 @@ function createCandidate({
     ownerChunkX: chunkX,
     ownerChunkZ: chunkZ,
     index,
+    tileId,
     x,
     z,
     height: heightAt(x, z),
@@ -247,6 +259,7 @@ export function buildStableChunkManifest({
   tileAt,
   heightAt,
   prototypeCount,
+  prototypeIndexForRoll = null,
   minScale,
   maxScale,
   radiusForScale,
@@ -279,6 +292,7 @@ export function buildStableChunkManifest({
           tileAt,
           heightAt,
           prototypeCount,
+          prototypeIndexForRoll,
           minScale,
           maxScale,
           radiusForScale,

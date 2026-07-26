@@ -1,7 +1,114 @@
 # Masonry LOD and Far Representation
 
-Status: **planned, not implemented, and deliberately evidence-gated.** Written
-2026-07-25.
+Status: **LOD 0–2 implemented after passing the evidence gate.** Written and
+implemented 2026-07-25. LOD 3 and shader-bevelled bricks remain deferred.
+
+## Implementation outcome and measured gate
+
+The deterministic `object-town` harness now places 64 or 256 copies of one
+detail-3 masonry gatehouse and records object instances, source triangles,
+geometry bytes, LOD populations, transitions, bucket rewrites, and selection
+time. The runner accepts `--buildings`.
+
+Real WebGPU, NVIDIA Lovelace, `--headed --warmup 8 --duration 14`:
+
+| Configuration | Avg FPS (two runs) | dt p50 | Hitches | Object triangles at end |
+|---|---:|---:|---:|---:|
+| 64, before LOD | 137.86 / 124.25 | 6.5 / 7.2 ms | 7 / 6 | 10.45 M |
+| 256, before LOD | 85.30 / 68.55 | 10.1 / 11.6 ms | 19 / 42 | 41.82 M |
+| 64, LOD 0–2 | 126.27 / 135.16 | 7.0 / 6.7 ms | 6 / 5 | ~0.62 M |
+| 256, LOD 0–2 | 95.44 / 95.71 | 9.4 / 9.3 ms | 7 / 12 | 2.48 M |
+
+The 256-building cost exceeded run variance and scaled with triangles while the
+object draw-mesh count stayed constant, so phase 1 correctly concluded "build
+it." The shipped ladder:
+
+- migrates all workshop families to `MeshStandardNodeMaterial`, including bump
+  maps and clone/preset behavior;
+- regenerates LOD 1 from the same recipe at detail 1;
+- derives LOD 2 from the detail-1 structural envelope, keeping mortar, roof, and
+  opening-recess families while dropping individual stones and foliage;
+- validates structural envelope agreement (≤0.08 m) and refuses LOD generation
+  unless coarse geometry saves at least 5%;
+- generates both lower tiers during asset installation. This intentionally
+  replaces the proposed lazy first-use generation: for the measured gatehouse,
+  all tiers use 24.74 MB versus 21.79 MB near-only (+13.6%), while eager creation
+  guarantees no first-sight generation hitch;
+- selects per object by projected pixel height with hysteresis, 240 ms dithered
+  transitions, selected-object near pinning, stable-camera plan reuse, per-band
+  instance buckets, and partial attribute uploads;
+- applies config-driven shadows: near/coarse cast, shell does not.
+
+The optional analytical shader bevel remains rejected until a new measurement
+shows the 14%-sized coarse tier itself is a bottleneck.
+
+### Code-review corrections, 2026-07-26
+
+Review of the above found the shell tier shipping a silhouette defect that its
+stated validation did not cover, and the envelope gate rejecting an archetype it
+should have admitted.
+
+- **The shell tier deflated the building.** Only `coarse` was validated against
+  the 0.08 m envelope; `shell` never was. Because `shell` was the coarse tier's
+  structural families verbatim, and that core is inset by construction — a
+  tower's mortar cylinder sits at `radius - depth * 0.46` — the measured
+  near→shell footprint error was 0.66 m on a wall and **2.16 m on a tower, about
+  22% of its width**, with the roof left overhanging a shrunken core. The core is
+  now expanded in X/Z to the near tier's masonry envelope, and the shell is
+  validated: measured error is now 0.013 m (wall) and 0.032 m (tower).
+- **Shell validation is footprint-only, deliberately.** Dropping individual
+  stones necessarily drops crenellations with them, so a shell is legitimately
+  shorter than the near tier — a tower measures 9.15 m to its battlements and
+  6.98 m to its wall head. Gating on the full envelope rejected every masonry
+  asset. Height difference is recorded as `shellHeightDelta` but not gated.
+- **The envelope tolerance is now size-relative**, `max(0.08 m, 2% of the largest
+  dimension)`. LOD error is judged in screen space, and a fixed 0.08 m floor
+  rejected the manor archetype over 0.13 m — 1.6% of its width, sub-pixel where
+  the coarse tier runs — forfeiting a **19x** triangle reduction (169,902 →
+  8,836). The manor now gets both tiers.
+- **A shell that cannot be built faithfully falls back to the coarse tier**
+  rather than cancelling LOD entirely. A gatehouse's masonry envelope is driven by
+  flanking towers that are `stone` while its core is only the central wall, so no
+  single scale reconciles them; it now ships LOD 0/1 with the coarse tier serving
+  the shell band, banking the 46% saving instead of nothing.
+- Refusals and degradations are now visible as counters
+  (`objectLodRefusedCoarseEnvelope`, `objectLodRefusedSaving`,
+  `objectLodShellFootprintUsedCoarse`, `objectLodShellEmptyUsedCoarse`); they were
+  previously silent.
+- Shell parts are cloned before transformation, so they can no longer alias and
+  mutate the coarse tier; disposal deduplicates now that the shell may *be* the
+  coarse tier.
+- Per-band triangle counts are measured once at registration instead of being
+  reduced over every part of every band on every frame inside `update()`.
+
+Regression coverage: `tests/ObjectLodGeometry.test.js` now asserts the shell
+footprint tracks the near masonry footprint across all five archetypes — the test
+that would have caught the 2.16 m defect — plus the coarse-fallback contract and
+the absence of geometry aliasing.
+
+#### Re-measured after the corrections
+
+`object-town`, 256 buildings, `--headed --warmup 8 --duration 14`, real WebGPU,
+NVIDIA Lovelace, two consecutive runs:
+
+| Metric | Before LOD | LOD as first shipped | LOD after corrections |
+|---|---:|---:|---:|
+| Avg FPS | 85.30 / 68.55 | 95.44 / 95.71 | 158.57 / 158.74 |
+| dt p50 / p95 | 10.1 / 11.6 ms | 9.4 / 9.3 ms | 6.0 / 8.5 ms |
+| Hitches | 19 / 42 | 7 / 12 | 5 / 5 |
+| Object triangles | 41.82 M | 2.48 M | 5.97 M |
+
+**Object triangles rose by design.** The QA scene places gatehouses, and a
+gatehouse now serves its shell band from the coarse tier rather than from a core
+that was 2.16 m too small. The ladder delivers an 86% triangle reduction instead
+of 94%, which is the price of the silhouette being correct, and it remains far
+ahead of the 41.82 M no-LOD baseline.
+
+The frame-rate difference from the previously recorded run is **not attributed**
+here: these two runs are internally consistent (0.1% apart) but no A/B was taken
+against the pre-correction build in the same session, and this scenario was not
+re-run under the earlier code. Treat the third column as the current figure and
+the second as historical, not as a measured delta.
 
 ## 1. Objective
 

@@ -10,9 +10,9 @@ function clamp01(value) {
  * density at the fringe — thickets ring a wood rather than carpeting its floor.
  */
 const FLOOR_DEFAULTS = Object.freeze({
-  grass: Object.freeze({ core: 0.18, edge: 0.72 }),
-  flower: Object.freeze({ core: 0.08, edge: 0.58 }),
-  bush: Object.freeze({ core: 0.22, edge: 0.95 }),
+  grass: Object.freeze({ core: 0.45, edge: 0.82 }),
+  flower: Object.freeze({ core: 0.18, edge: 0.58 }),
+  bush: Object.freeze({ core: 0.28, edge: 0.95 }),
 });
 
 export const FOREST_FLOOR_KINDS = Object.freeze(Object.keys(FLOOR_DEFAULTS));

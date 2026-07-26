@@ -16,6 +16,9 @@ export class TerrainAwareEditorController extends EditorController {
     this.importWarnings = [];
     this.focusProvider = null;
     this.proceduralAssetManager = options.proceduralAssetManager ?? null;
+    this.biomeAssetPalette = options.biomeAssetPalette ?? null;
+    this.sceneSettingsProvider = null;
+    this.sceneSettingsConsumer = null;
   }
 
   getState() {
@@ -137,6 +140,9 @@ export class TerrainAwareEditorController extends EditorController {
       this.voxelStampStore?.replaceAll(
         direction === 'undo' ? entry.beforeVoxelStamps : entry.afterVoxelStamps,
       );
+      this.constructionStore?.replaceAll(
+        direction === 'undo' ? entry.beforeConstructions : entry.afterConstructions,
+      );
       this.campaign = cloneCampaign(
         direction === 'undo' ? entry.beforeCampaign : entry.afterCampaign,
       );
@@ -144,6 +150,7 @@ export class TerrainAwareEditorController extends EditorController {
         ? [...(entry.beforeImportWarnings ?? [])]
         : [...(entry.afterImportWarnings ?? [])];
       this.setSelectedObject(null);
+      this.setSelectedConstruction(null);
       this.terrainView.refreshAll();
       this.refreshObjects();
       return;
@@ -164,12 +171,14 @@ export class TerrainAwareEditorController extends EditorController {
     const beforeWorld = this.worldStore.createSnapshot();
     const beforeObjects = this.objectMap.clear();
     const beforeVoxelStamps = this.voxelStampStore?.clear() ?? [];
+    const beforeConstructions = this.constructionStore?.clear() ?? [];
     const beforeCampaign = cloneCampaign(this.campaign);
     const beforeImportWarnings = [...this.importWarnings];
     if (beforeWorld.tileOverrides.length === 0
         && beforeWorld.heightOverrides.length === 0
         && beforeObjects.length === 0
         && beforeVoxelStamps.length === 0
+        && beforeConstructions.length === 0
         && !beforeCampaign) {
       return;
     }
@@ -185,12 +194,15 @@ export class TerrainAwareEditorController extends EditorController {
       afterObjects: [],
       beforeVoxelStamps,
       afterVoxelStamps: [],
+      beforeConstructions,
+      afterConstructions: [],
       beforeCampaign,
       afterCampaign: null,
       beforeImportWarnings,
       afterImportWarnings: [],
     });
     this.setSelectedObject(null);
+    this.setSelectedConstruction(null);
     this.terrainView.refreshAll();
     this.refreshObjects();
     this.emitMap();
@@ -209,13 +221,37 @@ export class TerrainAwareEditorController extends EditorController {
       ...(this.proceduralAssetManager
         ? { proceduralAssets: this.proceduralAssetManager.toDocument() }
         : {}),
+      ...(this.constructionStore
+        ? { constructions: this.constructionStore.toDocument() }
+        : {}),
+      ...(this.biomeAssetPalette
+        ? {
+          visualConfig: {
+            biomeAssets: this.biomeAssetPalette.toDocument(),
+            ...(this.sceneSettingsProvider
+              ? { sceneSettings: this.sceneSettingsProvider() }
+              : {}),
+          },
+        }
+        : {}),
     };
   }
 
   loadDocument(document) {
     const previousProceduralAssets = this.proceduralAssetManager?.toDocument() ?? null;
+    const previousConstructions = this.constructionStore?.toDocument() ?? null;
+    const previousBiomeAssets = this.biomeAssetPalette?.toDocument() ?? null;
+    const previousSceneSettings = this.sceneSettingsProvider?.() ?? null;
     try {
       this.proceduralAssetManager?.replaceAll(document.proceduralAssets ?? []);
+      this.constructionStore?.replaceAll(document.constructions ?? []);
+      if (document.visualConfig?.sceneSettings && this.sceneSettingsConsumer) {
+        this.sceneSettingsConsumer(document.visualConfig.sceneSettings);
+      } else if (document.visualConfig?.biomeAssets) {
+        this.biomeAssetPalette?.replaceDocument(document.visualConfig.biomeAssets);
+      } else {
+        this.biomeAssetPalette?.reset();
+      }
       loadWorldDocument(
         document,
         this.tileMap,
@@ -228,6 +264,15 @@ export class TerrainAwareEditorController extends EditorController {
       if (previousProceduralAssets) {
         this.proceduralAssetManager.replaceAll(previousProceduralAssets);
       }
+      if (previousConstructions) {
+        this.constructionStore.replaceAll(previousConstructions);
+      }
+      if (previousBiomeAssets) {
+        this.biomeAssetPalette.replaceDocument(previousBiomeAssets);
+      }
+      if (previousSceneSettings && this.sceneSettingsConsumer) {
+        this.sceneSettingsConsumer(previousSceneSettings);
+      }
       throw error;
     }
     this.campaign = cloneCampaign(document.campaign);
@@ -239,6 +284,7 @@ export class TerrainAwareEditorController extends EditorController {
     this.undoStack = [];
     this.redoStack = [];
     this.setSelectedObject(null);
+    this.setSelectedConstruction(null);
     if (this.importWarnings.length > 0) {
       this.emitNotice(this.importWarnings.join(' '));
     }

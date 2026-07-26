@@ -7,10 +7,10 @@ import {
   updateLodTransition,
 } from './projectedLod.js';
 import { createDitheredMaterial } from './StylizedDitheredMaterial.js';
-import { markInstancedMeshRangeUpdated } from '../attributeUpload.js';
+import { markAttributeSubrangeUpdated } from '../attributeUpload.js';
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 
-function createGeometry(source, capacity) {
+function createGeometry(source, capacity, tinted) {
   const geometry = source.clone();
   geometry.setAttribute(
     'instanceLodFade',
@@ -24,13 +24,31 @@ function createGeometry(source, capacity) {
     'instanceColorVariation',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
   );
+  if (tinted) {
+    geometry.setAttribute(
+      'instanceLeafTint',
+      new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3),
+    );
+  }
   return geometry;
 }
 
-export function createInstancedRenderers({ root, partsByPrototype, capacity, name, castShadow }) {
+/**
+ * `tintLeaves` opts the leaf parts of every prototype into a per-instance hue.
+ * Trunks are deliberately excluded — a grove's autumn tint belongs to its canopy.
+ */
+export function createInstancedRenderers({
+  root,
+  partsByPrototype,
+  capacity,
+  name,
+  castShadow,
+  tintLeaves = false,
+}) {
   return partsByPrototype.map((parts, prototypeIndex) => parts.map((part, partIndex) => {
-    const geometry = createGeometry(part.geometry, capacity);
-    const material = createDitheredMaterial(part.material);
+    const tinted = tintLeaves && part.kind === 'leaf';
+    const geometry = createGeometry(part.geometry, capacity, tinted);
+    const material = createDitheredMaterial(part.material, { tinted });
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
     mesh.count = 0;
     mesh.castShadow = Boolean(castShadow && part.kind !== 'leaf');
@@ -42,6 +60,74 @@ export function createInstancedRenderers({ root, partsByPrototype, capacity, nam
   }));
 }
 
+/**
+ * Lowest and highest instance index whose data actually changed. `max < min` means
+ * the attribute is untouched and needs no upload.
+ */
+function resetDirtyRange(range) {
+  range.min = Infinity;
+  range.max = -1;
+  return range;
+}
+
+function widenDirtyRange(range, index) {
+  if (index < range.min) range.min = index;
+  if (index > range.max) range.max = index;
+}
+
+function writeScalarInstance(attribute, index, value, range) {
+  if (attribute.array[index] === value) return;
+  attribute.array[index] = value;
+  widenDirtyRange(range, index);
+}
+
+/** Scalar writer's vec3 counterpart, for the per-instance leaf tint. */
+function writeTintInstance(attribute, index, tint, range) {
+  const array = attribute.array;
+  const offset = index * 3;
+  if (
+    array[offset] === tint[0]
+    && array[offset + 1] === tint[1]
+    && array[offset + 2] === tint[2]
+  ) return;
+  array[offset] = tint[0];
+  array[offset + 1] = tint[1];
+  array[offset + 2] = tint[2];
+  widenDirtyRange(range, index);
+}
+
+/** Equivalent to `setMatrixAt`, but skips the write when the matrix is unchanged. */
+function writeMatrixInstance(attribute, index, matrix, range) {
+  const array = attribute.array;
+  const offset = index * 16;
+  const elements = matrix.elements;
+  for (let element = 0; element < 16; element += 1) {
+    if (array[offset + element] !== elements[element]) {
+      array.set(elements, offset);
+      widenDirtyRange(range, index);
+      return;
+    }
+  }
+}
+
+// Reused across calls so a rebuild allocates nothing here.
+const MATRIX_RANGE = { min: Infinity, max: -1 };
+const FADE_RANGE = { min: Infinity, max: -1 };
+const SEED_RANGE = { min: Infinity, max: -1 };
+const COLOR_RANGE = { min: Infinity, max: -1 };
+const TINT_RANGE = { min: Infinity, max: -1 };
+const UNTINTED = Object.freeze([1, 1, 1]);
+
+/**
+ * Write instance data, uploading only what changed.
+ *
+ * Rebuilds are usually triggered by an LOD cross-fade, which changes `fade` for the
+ * transitioning chunks and leaves every matrix byte-identical. Re-uploading the
+ * whole buffer on each of those cost hundreds of kilobytes per rebuild and showed up
+ * as hitches whose phase timers were all cheap, because the upload lands
+ * asynchronously between frames. Instances are written in chunk order, so a single
+ * chunk's change stays a tight contiguous range.
+ */
 export function writeInstances(renderers, instancesByPrototype) {
   let total = 0;
   renderers.forEach((parts, prototypeIndex) => {
@@ -51,23 +137,38 @@ export function writeInstances(renderers, instancesByPrototype) {
       const writableCount = Math.min(instances.length, capacity);
       const dropped = instances.length - writableCount;
       if (dropped > 0) PerfCounters.inc('stylizedInstancesDroppedByCapacity', dropped);
+      const previousCount = mesh.count;
       mesh.count = writableCount;
       const fades = mesh.geometry.getAttribute('instanceLodFade');
       const seeds = mesh.geometry.getAttribute('instanceStableSeed');
       const colors = mesh.geometry.getAttribute('instanceColorVariation');
+      const tints = mesh.geometry.getAttribute('instanceLeafTint');
+      const matrixRange = resetDirtyRange(MATRIX_RANGE);
+      const fadeRange = resetDirtyRange(FADE_RANGE);
+      const seedRange = resetDirtyRange(SEED_RANGE);
+      const colorRange = resetDirtyRange(COLOR_RANGE);
+      const tintRange = resetDirtyRange(TINT_RANGE);
       for (let index = 0; index < writableCount; index += 1) {
         const instance = instances[index];
-        mesh.setMatrixAt(index, instance.matrix);
-        fades.array[index] = instance.fade;
-        seeds.array[index] = instance.seed;
-        if (colors) colors.array[index] = instance.colorVariation ?? 1;
+        writeMatrixInstance(mesh.instanceMatrix, index, instance.matrix, matrixRange);
+        writeScalarInstance(fades, index, instance.fade, fadeRange);
+        writeScalarInstance(seeds, index, instance.seed, seedRange);
+        if (colors) {
+          writeScalarInstance(colors, index, instance.colorVariation ?? 1, colorRange);
+        }
+        if (tints) {
+          writeTintInstance(tints, index, instance.leafTint ?? UNTINTED, tintRange);
+        }
       }
-      markInstancedMeshRangeUpdated(
-        mesh,
-        writableCount,
-        [fades, seeds, colors].filter(Boolean),
-      );
-      mesh.computeBoundingSphere();
+      markAttributeSubrangeUpdated(mesh.instanceMatrix, matrixRange.min, matrixRange.max);
+      markAttributeSubrangeUpdated(fades, fadeRange.min, fadeRange.max);
+      markAttributeSubrangeUpdated(seeds, seedRange.min, seedRange.max);
+      if (colors) markAttributeSubrangeUpdated(colors, colorRange.min, colorRange.max);
+      if (tints) markAttributeSubrangeUpdated(tints, tintRange.min, tintRange.max);
+      // The bounding sphere depends on the matrices and on how many are drawn.
+      if (matrixRange.max >= 0 || writableCount !== previousCount) {
+        mesh.computeBoundingSphere();
+      }
     }
     total += Math.min(
       instances.length,

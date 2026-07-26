@@ -1,6 +1,11 @@
 import * as THREE from 'three/webgpu';
-import { attribute, vec3 } from 'three/tsl';
+import {
+  texture,
+  uv,
+  vec3,
+} from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import { materialList } from '../assets/assetUrl.js';
 import { instanceCapacity } from './scatterMath.js';
 import { buildStableChunkManifest, placementSignature } from './StableScatterManifest.js';
 import {
@@ -10,11 +15,13 @@ import {
   pruneStateMap,
   writeInstances,
 } from './lod/StylizedLodRuntime.js';
-import { createForestBushPrototypeGeometry } from './forest/ForestBushGeometry.js';
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { forestFloorDensity } from './forest/ForestFloor.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 import { createPathClearanceField } from './TreeManifestStore.js';
+import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
+import { registerPrototypeIndices } from './BiomeAssetPalette.js';
+import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
 
 const BUSH_CLUSTER_SEED_OFFSET = 0x5b;
 const BUSH_PRIORITY_CHANNEL = 31;
@@ -46,13 +53,22 @@ function lodSettings(config) {
   });
 }
 
-function createMaterial(color, doubleSided) {
-  const value = new THREE.Color(color);
+function createMaterial(source) {
+  const map = source?.map ?? null;
+  const value = new THREE.Color(source?.color ?? '#ffffff');
   const material = new THREE.MeshLambertNodeMaterial({
-    side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+    side: source?.side ?? THREE.DoubleSide,
   });
-  material.colorNode = vec3(value.r, value.g, value.b).mul(attribute('color', 'vec3'));
-  material.flatShading = true;
+  const baseColor = vec3(value.r, value.g, value.b);
+  material.colorNode = map
+    ? texture(map, uv()).rgb.mul(baseColor)
+    : baseColor;
+  if (map) {
+    material.opacityNode = texture(map, uv()).a;
+    material.alphaTest = source?.alphaTest > 0 ? source.alphaTest : 0.35;
+  }
+  material.transparent = false;
+  material.depthWrite = true;
   return material;
 }
 
@@ -71,11 +87,26 @@ function createMaterial(color, doubleSided) {
  * rare without that coupling.
  */
 export class StylizedBushView {
-  constructor({ terrainView, config, revisionTracker, forestFieldProvider = null }) {
+  constructor({
+    terrainView,
+    config,
+    revisionTracker,
+    forestFieldProvider = null,
+    biomeAssetPalette = null,
+    regionalCharacterField = null,
+  }) {
     this.terrainView = terrainView;
     this.config = config;
     this.revisionTracker = revisionTracker;
     this.forestFieldProvider = forestFieldProvider;
+    this.biomeAssetPalette = biomeAssetPalette;
+    this.regionalCharacterField = regionalCharacterField;
+    this.prototypeIndicesByAsset = new Map();
+    this.prototypeBiomeRules = [];
+    this.prototypeIndexForRoll = null;
+    // Bumped by every `appendVariants`, so the resident-window key notices a
+    // variant that streamed in while the camera stood still.
+    this.prototypeRevision = 0;
     this.enabled = Boolean(config.bushes?.enabled);
     this.prototypes = [];
     this.meshes = [];
@@ -92,10 +123,19 @@ export class StylizedBushView {
     terrainView.scene.add(this.root);
   }
 
-  build() {
-    if (!this.enabled || this.disposed) return;
+  /**
+   * Install more authored bush variants alongside whatever is already resident.
+   *
+   * Variants stream in as the camera approaches the biomes they belong to, so
+   * this is additive: existing prototypes keep their indices and their
+   * instances, and only the new ones get renderers.
+   */
+  appendVariants(authoredVariants = []) {
+    if (!this.enabled || this.disposed || authoredVariants.length === 0) return;
     const bushes = this.config.bushes;
-    this.clusterField = new ScatterClusterField({
+    // Both fields describe the terrain, not the prop set, so they are built once
+    // on the first variant and reused by every one that streams in later.
+    this.clusterField ??= new ScatterClusterField({
       kind: 'bush',
       seed: resolveForestSeed(this.terrainView.worldStore),
       seedOffset: BUSH_CLUSTER_SEED_OFFSET,
@@ -103,19 +143,45 @@ export class StylizedBushView {
       slopeSampleDistance: this.config.trees.habitat?.slopeSampleDistance ?? 4,
       config: bushes,
     });
-    this.pathClearance = createPathClearanceField(this.terrainView, this.config);
+    this.pathClearance ??= createPathClearanceField(this.terrainView, this.config);
 
-    const generated = createForestBushPrototypeGeometry();
-    this.prototypes = generated.map((prototype, index) => ({
-      geometry: prototype.geometry,
-      material: createMaterial(
-        index === 0 ? bushes.colorLarge : (index === 1 ? bushes.colorSmall : bushes.colorFern),
-        prototype.doubleSided,
-      ),
+    const firstNewPrototype = this.prototypes.length;
+    const extracted = [];
+    for (const { scene, definition } of authoredVariants) {
+      const firstIndex = firstNewPrototype + extracted.length;
+      const variants = extractAuthoredMeshPrototypes(scene, { scale: definition.scale });
+      if (variants.length === 0) {
+        throw new Error(`Bush variant ${definition.scene} produced no prototypes.`);
+      }
+      extracted.push(...variants);
+      for (let index = 0; index < variants.length; index += 1) {
+        this.prototypeBiomeRules.push({
+          tileIds: definition.tileIds ?? null,
+          weight: definition.weight ?? 1,
+          character: definition.character ?? null,
+          characterStrength: definition.characterStrength,
+          canopy: definition.canopy,
+        });
+      }
+      registerPrototypeIndices(
+        this.prototypeIndicesByAsset,
+        definition.id ?? definition.scene,
+        firstIndex,
+        variants.length,
+      );
+    }
+    this.prototypeIndexForRoll = createBiomePrototypeSelector({
+      rules: this.prototypeBiomeRules,
+      regionalCharacterField: this.regionalCharacterField,
+    });
+    const newPrototypes = extracted.map(({ geometry, source }, index) => ({
+      geometry,
+      material: createMaterial(materialList(source)[0]),
       kind: 'bush',
-      height: prototype.height,
-      prototypeId: prototype.prototypeId,
+      height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
+      prototypeId: `authored-bush-${firstNewPrototype + index}`,
     }));
+    this.prototypes.push(...newPrototypes);
     this.prototypeHeight = Math.max(...this.prototypes.map((prototype) => prototype.height));
 
     const settings = lodSettings(this.config);
@@ -123,21 +189,22 @@ export class StylizedBushView {
       residentRadius: settings.proxyRadius + 1,
       perChunk: bushes.perChunk,
     });
-    const partsByPrototype = this.prototypes.map((prototype) => [prototype]);
-    this.meshes = createInstancedRenderers({
+    const partsByPrototype = newPrototypes.map((prototype) => [prototype]);
+    this.meshes.push(...createInstancedRenderers({
       root: this.root,
       partsByPrototype,
       capacity,
-      name: 'stylized-bush-near',
+      name: `stylized-bush-near-${firstNewPrototype}`,
       castShadow: true,
-    });
-    this.proxyMeshes = createInstancedRenderers({
+    }));
+    this.proxyMeshes.push(...createInstancedRenderers({
       root: this.root,
       partsByPrototype,
       capacity,
-      name: 'stylized-bush-proxy',
+      name: `stylized-bush-proxy-${firstNewPrototype}`,
       castShadow: false,
-    });
+    }));
+    this.prototypeRevision += 1;
   }
 
   /**
@@ -162,7 +229,12 @@ export class StylizedBushView {
         : 1;
       // Fringes are the densest band: cluster edge and forest edge both add.
       const fringe = 1 + edgeAffinity * Math.max(cluster.edge, habitat?.patchEdge ?? 0);
-      const density = Math.min(1, cluster.density * canopy * fringe);
+      const regionalScrub = this.regionalCharacterField?.sampleChannel(
+        candidate.x,
+        candidate.z,
+        'scrub',
+      ) ?? 1;
+      const density = Math.min(1, cluster.density * canopy * fringe * regionalScrub);
       if (candidate.priority >= density) return null;
       return {
         clusterId: cluster.clusterId,
@@ -171,6 +243,7 @@ export class StylizedBushView {
         bushCanopy: canopy,
         bushSlope: cluster.slope,
         forestPatchId: habitat?.patchId ?? null,
+        regionalScrub,
       };
     };
   }
@@ -181,8 +254,11 @@ export class StylizedBushView {
       this.prototypes.length,
       this.clusterField.signature,
       this.forestFieldProvider?.()?.signature ?? 'uniform',
+      this.regionalCharacterField?.signature ?? 'uniform-regions',
+      JSON.stringify(this.prototypeBiomeRules),
       this.pathClearance?.signature ?? 'nopath',
       blockers.signature,
+      this.biomeAssetPalette?.revision ?? 0,
     ].join('|');
     const cacheKey = `${chunkX}:${chunkZ}`;
     const cached = this.manifestCache.get(cacheKey);
@@ -200,6 +276,24 @@ export class StylizedBushView {
       tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
       heightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z),
       prototypeCount: this.prototypes.length,
+      prototypeIndexForRoll: (roll, tileId, x, z) => {
+        const automaticIndex = this.prototypeIndexForRoll(
+          roll,
+          tileId,
+          x,
+          z,
+          this.prototypeIndexForRoll.usesCanopy
+            ? this.forestFieldProvider?.()?.sample(x, z) ?? null
+            : null,
+        );
+        return this.biomeAssetPalette?.resolvePrototypeIndex({
+          tileId,
+          layerId: 'bushes',
+          automaticIndex,
+          prototypeIndicesByAsset: this.prototypeIndicesByAsset,
+          roll,
+        }) ?? automaticIndex;
+      },
       minScale: bushes.minScale,
       maxScale: bushes.maxScale,
       radiusForScale: (scale) => bushes.radius * scale,
@@ -250,7 +344,13 @@ export class StylizedBushView {
       };
     pruneStateMap(this.chunkLodStates, plan.entries);
     const revisionSignature = this.revisionTracker.windowSignature(focus, renderRadius + 1, 1);
-    const updateKey = `${focus.chunkX}:${focus.chunkZ}:${revisionSignature}:${plan.signature}`;
+    const updateKey = `${focus.chunkX}:${focus.chunkZ}:${revisionSignature}:${
+      plan.signature
+    }:${this.biomeAssetPalette?.revision ?? 0}:p${this.prototypeRevision}`
+      // Boulders block bush placement, so a rock variant that streams in has to
+      // reschedule this layer too — otherwise a stationary camera keeps bushes
+      // that were scattered before the boulders existed.
+      + `:r${rockSource?.prototypeRevision ?? 0}`;
     if (updateKey === this.lastUpdateKey && !this.pendingRebuild) return;
     this.pendingRebuild = {
       key: `bush-lod:${updateKey}`,
@@ -367,6 +467,7 @@ export class StylizedBushView {
       prototype.material?.dispose();
     }
     this.prototypes.length = 0;
+    this.prototypeIndicesByAsset.clear();
     this.placements.length = 0;
     this.manifestCache.clear();
     this.chunkLodStates.clear();

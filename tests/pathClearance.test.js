@@ -22,6 +22,26 @@ function createField(clearCells, tileAt = (cellX) => roadColumnTiles(cellX)) {
   });
 }
 
+function createNaturalTrailField(overrides = {}) {
+  return new PathClearanceField({
+    tileAt: () => GRASS_TILE,
+    tileSize: TILE_SIZE,
+    chunkSize: CHUNK_SIZE,
+    roadTileId: ROAD_TILE,
+    clearCells: 0,
+    naturalTrail: {
+      enabled: true,
+      scale: 0.018,
+      level: 0.08,
+      width: 0.038,
+      softness: 0.035,
+      warp: 0.9,
+      clearThreshold: 0.42,
+      ...overrides,
+    },
+  });
+}
+
 test('candidates on and beside a road are cleared, distant ones are kept', () => {
   const field = createField(3);
   const worldZ = -50;
@@ -78,4 +98,32 @@ test('a world with no roads never blocks', () => {
   const field = createField(3, () => GRASS_TILE);
   assert.equal(field.blocks(0, 0), false);
   assert.equal(field.distanceAt(0, 0) > 3, true);
+});
+
+test('natural trails clear props even in a world with no authored roads', () => {
+  const field = createNaturalTrailField();
+  let blocked = null;
+  let open = null;
+  for (let z = -320; z <= 320 && (!blocked || !open); z += 4) {
+    for (let x = -320; x <= 320 && (!blocked || !open); x += 4) {
+      if (field.blocks(x, z)) blocked ??= [x, z];
+      else open ??= [x, z];
+    }
+  }
+  assert.ok(blocked, 'expected at least one point on a natural trail');
+  assert.ok(open, 'expected dense ground away from natural trails');
+  assert.equal(field.exclusion()({ x: blocked[0], z: blocked[1] }), true);
+  assert.equal(field.exclusion()({ x: open[0], z: open[1] }), false);
+});
+
+test('natural trail clearance is stable across world chunk boundaries', () => {
+  const field = createNaturalTrailField();
+  const first = [];
+  const second = [];
+  for (let z = -128; z <= 128; z += 2) {
+    first.push(field.blocks(63.999, z));
+    second.push(field.blocks(64.001, z));
+  }
+  const disagreements = first.filter((value, index) => value !== second[index]).length;
+  assert.ok(disagreements <= 1, `unexpected seam produced ${disagreements} disagreements`);
 });

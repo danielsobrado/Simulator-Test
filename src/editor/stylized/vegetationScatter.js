@@ -1,4 +1,9 @@
-import { cellSampleRandom01, sampleHeight, scatterRandom01 } from './scatterMath.js';
+import {
+  cellSampleRandom01,
+  grassClumpCellOffset,
+  sampleHeight,
+  scatterRandom01,
+} from './scatterMath.js';
 import { clumpsPerCell } from './grassLodMath.js';
 
 const TWO_PI = Math.PI * 2;
@@ -62,10 +67,9 @@ export function buildGrassScatter({
     const localX = cellIndex % chunkSize;
     const localZ = Math.floor(cellIndex / chunkSize);
     for (let clumpIndex = 0; clumpIndex < clumps; clumpIndex += 1) {
-      const jitterX = cellSampleRandom01(page.chunkX, page.chunkZ, cellIndex, clumpIndex, 0);
-      const jitterZ = cellSampleRandom01(page.chunkX, page.chunkZ, cellIndex, clumpIndex, 1);
-      const sampleX = localX + jitterX;
-      const sampleZ = localZ + jitterZ;
+      const offset = grassClumpCellOffset(page.chunkX, page.chunkZ, cellIndex, clumpIndex);
+      const sampleX = localX + offset.x;
+      const sampleZ = localZ + offset.z;
       const localWorldX = -chunkWorldSize / 2 + sampleX * tileSize;
       const localWorldZ = chunkWorldSize / 2 - sampleZ * tileSize;
       const height = sampleHeight(page, sampleX, sampleZ, chunkSize);

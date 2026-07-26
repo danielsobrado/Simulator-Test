@@ -347,6 +347,8 @@ function inferredOpeningAnchors(entries, structures) {
       kind: hint.kind,
       attachmentPosition: hint.attachmentPosition ?? null,
       attachmentSize: hint.attachmentSize ?? null,
+      assemblyId: hint.assemblyId ?? null,
+      memberIds: hint.memberIds ?? null,
       entries: [],
     };
     group.entries.push(entry);
@@ -370,6 +372,8 @@ function inferredOpeningAnchors(entries, structures) {
       sourceEntry,
       attachmentPosition: group.attachmentPosition,
       attachmentSize: group.attachmentSize,
+      assemblyId: group.assemblyId,
+      memberIds: group.memberIds,
     };
   });
   const candidates = entries
@@ -485,6 +489,8 @@ function ensureComponent(components, definition) {
       attachmentSurface: definition.attachmentSurface ?? null,
       attachmentPosition: definition.attachmentPosition ?? null,
       attachmentSize: definition.attachmentSize ?? null,
+      assemblyId: definition.assemblyId ?? null,
+      memberIds: definition.memberIds ?? null,
       entries: [],
     });
   }
@@ -522,7 +528,10 @@ function classifyComponents(entries, recipe) {
       continue;
     }
 
-    const structure = nearestStructure(entry, structures);
+    const hintedStructure = entry.semanticHint?.kind === 'structure'
+      ? structures.find(({ id }) => id === entry.semanticHint.id)
+      : null;
+    const structure = hintedStructure ?? nearestStructure(entry, structures);
     let definition = structure;
     if (entry.slot === 'foliage') {
       definition = entry.semanticHint?.kind === 'ivy'
@@ -581,6 +590,8 @@ function componentMetadata(component) {
     attachmentSurface: component.attachmentSurface,
     attachmentPosition: component.attachmentPosition,
     attachmentSize: component.attachmentSize,
+    assemblyId: component.assemblyId,
+    memberIds: component.memberIds,
   });
 }
 

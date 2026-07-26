@@ -98,14 +98,23 @@ export function createTreeProxyPrototype(parts, config) {
   });
   const canopyGeometry = mergeGeometries(crownLobeGeometries, false);
   crownLobeGeometries.forEach((geometry) => geometry.dispose());
+  // `trunkBounds` includes every branch merged into the bark part. Using that
+  // full horizontal extent as a cylinder diameter turns spreading limbs into a
+  // massive solid bole at proxy distance. Preserve a naturally wide source
+  // trunk, but cap it against the canopy silhouette so branches cannot inflate it.
+  const branchInclusiveDiameter = Math.max(trunkSize.x, trunkSize.z);
+  const proxyTrunkDiameter = Math.min(branchInclusiveDiameter, crownWidth * 0.14);
   const trunkGeometry = new THREE.CylinderGeometry(
-    Math.max(0.04, Math.max(trunkSize.x, trunkSize.z) * 0.42),
-    Math.max(0.05, Math.max(trunkSize.x, trunkSize.z) * 0.55),
+    Math.max(0.04, proxyTrunkDiameter * 0.34),
+    Math.max(0.05, proxyTrunkDiameter * 0.5),
     Math.max(0.1, trunkSize.y),
     5,
     1,
   );
   trunkGeometry.translate(trunkCenter.x, trunkCenter.y, trunkCenter.z);
+  trunkGeometry.computeBoundingBox();
+  trunkGeometry.computeBoundingSphere();
+  const proxyTrunkBounds = trunkGeometry.boundingBox.clone();
 
   return {
     height: Math.max(0.1, combinedBounds.max.y - combinedBounds.min.y),
@@ -130,7 +139,7 @@ export function createTreeProxyPrototype(parts, config) {
         kind: 'leaf',
       },
       {
-        geometry: createBoxForBounds(trunkBounds),
+        geometry: createBoxForBounds(proxyTrunkBounds),
         material: makeMaterial(config.trees.barkTint),
         kind: 'trunk',
       },
@@ -171,7 +180,7 @@ export function createForestUnderstoryPrototypes(config) {
   ];
 }
 
-export function createRockProxyPrototype(prototype) {
+export function createRockProxyPrototype(prototype, proxyColor = '#b8ad98') {
   prototype.geometry.computeBoundingBox();
   const bounds = prototype.geometry.boundingBox;
   const size = bounds.getSize(new THREE.Vector3());
@@ -186,6 +195,12 @@ export function createRockProxyPrototype(prototype) {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   const material = prototype.material.clone();
+  // The source material uses a packed atlas whose UV islands match the authored
+  // rocks. A generated dodecahedron has unrelated UVs and mostly samples the
+  // atlas' black gutters, so it becomes a dark blob at the exact LOD boundary
+  // where its silhouette should stay stable.
+  if ('map' in material) material.map = null;
+  if ('color' in material) material.color = new THREE.Color(proxyColor);
   material.flatShading = true;
   material.needsUpdate = true;
   return {

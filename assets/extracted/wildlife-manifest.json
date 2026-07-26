@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "generator": "scripts/prepare-wildlife-assets.mjs",
+  "assets": [
+    {
+      "id": "crow",
+      "input": "assets/animals/animated_crow__3d_animal_model.glb",
+      "inputBytes": 6549964,
+      "inputSha256": "377c73487ad6601f1b54ec865764405ca64dbc8b1e71238756c76f830238be21",
+      "prepared": "assets/extracted/animals/crow-flight.glb",
+      "published": "public/assets/animals/crow-flight.glb",
+      "preparedBytes": 5134844,
+      "preparedSha256": "3accb1d4d5488e7b657ed2b02b88d68cff0fe4885508f3e47c523e2e70f881c2",
+      "clip": "SKM_Crow|SKM_Crow|Crow_Fly",
+      "duration": 2.5,
+      "triangles": 17034,
+      "sourceAsset": {
+        "author": "AnimalMesh 3D (https://sketchfab.com/AnimalMesh3D)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/animated-crow-3d-animal-model-6e634f78d54341a89bbbb6ee1d24876a",
+        "title": "Animated Crow – 3D Animal Model"
+      }
+    },
+    {
+      "id": "seagull",
+      "input": "assets/animals/seagull__stylized_animated_3d_model.glb",
+      "inputBytes": 6797796,
+      "inputSha256": "a9dca91fcb01e29189ed0398eda4a7d9a2d47b97290a3a186b88b643b8ce4871",
+      "prepared": "assets/extracted/animals/seagull-flight.glb",
+      "published": "public/assets/animals/seagull-flight.glb",
+      "preparedBytes": 3580912,
+      "preparedSha256": "f247b0d636103a6a13067e6bbccc45f5fa5af5d54bbc20cdf281600be0e3e20b",
+      "clip": "fly",
+      "duration": 0.833333,
+      "triangles": 2242,
+      "sourceAsset": {
+        "author": "AnimalMesh 3D (https://sketchfab.com/AnimalMesh3D)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/seagull-stylized-animated-3d-model-b331b360c0064536a6e517c1a93a349d",
+        "title": "Seagull – Stylized Animated 3D Model"
+      }
+    }
+  ]
+}

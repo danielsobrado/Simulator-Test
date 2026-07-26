@@ -60,6 +60,8 @@ export function rebuildTreeLod({
   fallbackImpostorRenderers,
   clusterRenderers,
   understoryRenderers = [],
+  resolveLeafTint = null,
+  resolvePrototypeIndex = null,
 }) {
   PerfCounters.inc('treeRebuilds');
   const near = createInstances(prototypeCount);
@@ -119,6 +121,7 @@ export function rebuildTreeLod({
             fade: representation.fade,
             seed: cluster.seed,
             colorVariation: 0.9 + cluster.seed * 0.2,
+            leafTint: resolveLeafTint?.(cluster),
           });
         }
         const emergent = aggregate?.emergent ?? (() => {
@@ -131,9 +134,11 @@ export function rebuildTreeLod({
             .slice(0, emergentCount);
         })();
         for (const placement of emergent) {
-          const atlas = impostorAtlases[placement.prototypeIndex];
-          if (!atlas || !impostorBatches[placement.prototypeIndex]) continue;
-          impostors[placement.prototypeIndex].push({
+          const prototypeIndex = resolvePrototypeIndex?.(placement)
+            ?? placement.prototypeIndex;
+          const atlas = impostorAtlases[prototypeIndex];
+          if (!atlas || !impostorBatches[prototypeIndex]) continue;
+          impostors[prototypeIndex].push({
             x: placement.x,
             y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * placement.scale,
             z: placement.z,
@@ -153,6 +158,8 @@ export function rebuildTreeLod({
       }
 
       for (const placement of placements) {
+        const prototypeIndex = resolvePrototypeIndex?.(placement)
+          ?? placement.prototypeIndex;
         const seed = stableSeed(placement);
         if (representation.band === 'near' && placement.ageClass === 'dead') {
           understory[0].push({
@@ -168,11 +175,16 @@ export function rebuildTreeLod({
             colorVariation: 0.82 + (placement.colorSeed ?? seed) * 0.16,
           });
         }
+        // No `leafTint` on impostor records: `instanceImpostorParams` is a full
+        // vec4 (yaw, fade, seed, radius) and the GPU batch's culling buffers are
+        // laid out to match, so carrying a tint means a new attribute through both
+        // batch paths. Until then the impostor band renders its baked green while
+        // the proxy and cluster bands either side of it turn.
         if (representation.band === 'impostor' && impostorBatches.length > 0) {
-          const atlas = impostorAtlases[placement.prototypeIndex];
-          const batch = impostorBatches[placement.prototypeIndex];
+          const atlas = impostorAtlases[prototypeIndex];
+          const batch = impostorBatches[prototypeIndex];
           if (atlas && batch) {
-            impostors[placement.prototypeIndex].push({
+            impostors[prototypeIndex].push({
               x: placement.x,
               y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * placement.scale,
               z: placement.z,
@@ -204,9 +216,10 @@ export function rebuildTreeLod({
           fade: representation.fade,
           seed,
           colorVariation: 0.9 + (placement.colorSeed ?? seed) * 0.2,
+          leafTint: resolveLeafTint?.(placement),
         };
         const target = representation.band === 'near' ? near : proxy;
-        target[placement.prototypeIndex].push(instance);
+        target[prototypeIndex].push(instance);
       }
     }
   }

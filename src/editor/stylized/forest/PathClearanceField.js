@@ -1,10 +1,13 @@
 import { TileDistanceField } from './TileDistanceField.js';
+import {
+  naturalTrailMaskAt,
+  normalizeNaturalTrailConfig,
+} from '../naturalTrailMath.js';
 
 /**
- * Keeps trees, bushes and boulders off roads and their shoulders. A thin policy
- * layer over `TileDistanceField`: the cleared band is measured from the canonical
- * tile map, so it matches the painted path exactly and never depends on which
- * chunks happen to be resident.
+ * Keeps trees, bushes and boulders off roads and their shoulders. Authored roads
+ * are measured from the canonical tile map; deterministic natural trails use the
+ * same continuous field as the materials. Neither depends on resident chunks.
  */
 export class PathClearanceField {
   constructor({
@@ -13,9 +16,11 @@ export class PathClearanceField {
     chunkSize,
     roadTileId = 13,
     clearCells = 3,
+    naturalTrail = null,
     revisionProvider = null,
   }) {
     this.clearCells = Math.max(0, Number(clearCells) || 0);
+    this.naturalTrail = normalizeNaturalTrailConfig(naturalTrail ?? {});
     this.field = new TileDistanceField({
       tileAt,
       tileSize,
@@ -26,11 +31,21 @@ export class PathClearanceField {
       revisionProvider,
     });
     this.roadTileId = roadTileId;
-    this.signature = this.field.signature;
+    this.signature = [
+      this.field.signature,
+      'natural-trail',
+      this.naturalTrail.enabled ? 1 : 0,
+      this.naturalTrail.scale,
+      this.naturalTrail.level,
+      this.naturalTrail.width,
+      this.naturalTrail.softness,
+      this.naturalTrail.warp,
+      this.naturalTrail.clearThreshold,
+    ].join(':');
   }
 
   get enabled() {
-    return this.clearCells > 0;
+    return this.clearCells > 0 || this.naturalTrail.enabled;
   }
 
   get stats() {
@@ -42,7 +57,12 @@ export class PathClearanceField {
   }
 
   blocks(worldX, worldZ) {
-    return this.distanceAt(worldX, worldZ) < this.clearCells;
+    const roadBlocked = this.clearCells > 0
+      && this.distanceAt(worldX, worldZ) < this.clearCells;
+    if (roadBlocked) return true;
+    return this.naturalTrail.enabled
+      && naturalTrailMaskAt(worldX, worldZ, this.naturalTrail)
+        >= this.naturalTrail.clearThreshold;
   }
 
   /** Rejection predicate in the shape `createForestPlacementEvaluator` expects. */

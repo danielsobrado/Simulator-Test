@@ -39,6 +39,17 @@ test('parseQaParams defaults qa=1 to run-forward move', () => {
   assert.equal(config.download, true);
 });
 
+test('object-town scenario clamps its deterministic building count and uses a longer warmup', () => {
+  const defaultTown = parseQaParams('?qa=object-town');
+  assert.equal(defaultTown.buildingCount, 64);
+  assert.equal(defaultTown.warmupSeconds, 8);
+  assert.equal(defaultTown.durationSeconds, 14);
+  assert.deepEqual(defaultTown.keys, ['KeyW', 'ShiftLeft']);
+
+  assert.equal(parseQaParams('?qa=object-town&buildings=999').buildingCount, 256);
+  assert.equal(parseQaParams('?qa=object-town&buildings=-4').buildingCount, 1);
+});
+
 test('createMovementPlan warms up before measuring', () => {
   const config = parseQaParams('?qa=strafe&warmup=2&duration=5');
   const plan = createMovementPlan(config);

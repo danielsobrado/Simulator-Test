@@ -1,0 +1,2547 @@
+{
+  "version": 1,
+  "generator": "scripts/extract-authored-assets.mjs",
+  "sources": [
+    {
+      "key": "low-poly-tree-scene",
+      "input": "assets/trees/low_poly_tree_scene_free.glb",
+      "sha256": "3304a0ba9ab2d3e5b2f8216a4326836577dca80f00b0ee541b65a9459cae2e01",
+      "bytes": 42793852,
+      "sourceAsset": {
+        "author": "Nicholas-3D (https://sketchfab.com/Nicholas01)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd",
+        "title": "Low Poly Tree Scene Free"
+      },
+      "outputs": [
+        {
+          "name": "tree-01",
+          "roots": [
+            "Bark.013_0"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-01.glb",
+          "published": null,
+          "sha256": "4a7b94bbb17bf4f58962a5ab0dde2b8bb3162f2ca96ca6846851114f9aa348b0",
+          "bytes": 984228,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 276,
+          "bounds": {
+            "min": [
+              -2.410992,
+              0,
+              -2.436503
+            ],
+            "max": [
+              2.410992,
+              10.44253,
+              2.436503
+            ]
+          }
+        },
+        {
+          "name": "tree-02",
+          "roots": [
+            "Bark.001_2669"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-02.glb",
+          "published": "public/assets/trees/tree-scene/tree-02.glb",
+          "sha256": "9ac92e8b2a70ef532111a7e3f3efce3c54192945c4ca7270d2285b5133575532",
+          "bytes": 1676248,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -3.14445,
+              0,
+              -3.471996
+            ],
+            "max": [
+              3.14445,
+              8.724312,
+              3.471996
+            ]
+          }
+        },
+        {
+          "name": "tree-03",
+          "roots": [
+            "Bark_2671"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-03.glb",
+          "published": "public/assets/trees/tree-scene/tree-03.glb",
+          "sha256": "aeb6fe37bf0fcff161ff778bd1cdb462cc64c2ce499235bdca6b91669c4f7b49",
+          "bytes": 1444516,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -2.262907,
+              0,
+              -2.209544
+            ],
+            "max": [
+              2.262907,
+              7.454905,
+              2.209544
+            ]
+          }
+        },
+        {
+          "name": "tree-04",
+          "roots": [
+            "Bark.002_2673"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-04.glb",
+          "published": null,
+          "sha256": "6cc13c9765bd8da408ab166056d70d63316835677bd8119313299ca5c6865617",
+          "bytes": 1676232,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -4.087785,
+              0,
+              -4.513595
+            ],
+            "max": [
+              4.087785,
+              11.341606,
+              4.513595
+            ]
+          }
+        },
+        {
+          "name": "tree-05",
+          "roots": [
+            "Bark.003_2675"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-05.glb",
+          "published": null,
+          "sha256": "2ba211f79eae1853131bbb3140ffac3b2080a4ff88a089d54413260a41f48006",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.131677,
+              0,
+              -6.770392
+            ],
+            "max": [
+              6.131677,
+              17.012409,
+              6.770392
+            ]
+          }
+        },
+        {
+          "name": "tree-06",
+          "roots": [
+            "Bark.004_2677"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-06.glb",
+          "published": null,
+          "sha256": "740c4b87958cfe39ebd09abf6669172a53e52c8102ece36e852b60bce5d9ed1d",
+          "bytes": 1676280,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.156646,
+              0,
+              -6.004633
+            ],
+            "max": [
+              6.156646,
+              15.834626,
+              6.004633
+            ]
+          }
+        },
+        {
+          "name": "tree-07",
+          "roots": [
+            "Bark.005_2679"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-07.glb",
+          "published": null,
+          "sha256": "7d52f18bb86cfb8c66ed375ea791837cf649f6d5ce688b3f9a5ba1eb25c80902",
+          "bytes": 1676348,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -4.840438,
+              0,
+              -4.456584
+            ],
+            "max": [
+              4.840438,
+              12.214037,
+              4.456584
+            ]
+          }
+        },
+        {
+          "name": "tree-08",
+          "roots": [
+            "Bark.006_2681"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-08.glb",
+          "published": null,
+          "sha256": "0bd7f08fec1a7185991575019176e76214b70c27b0c65763653c918723698a4f",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -3.483952,
+              0,
+              -3.221351
+            ],
+            "max": [
+              3.483952,
+              8.724312,
+              3.221351
+            ]
+          }
+        },
+        {
+          "name": "tree-09",
+          "roots": [
+            "Bark.007_2683"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-09.glb",
+          "published": null,
+          "sha256": "e062a4a6c4ebd5693f75cc0c16a1b47630cc8f859fd7477fb57d3097464b802b",
+          "bytes": 1444548,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -3.686868,
+              0,
+              -3.728996
+            ],
+            "max": [
+              3.686868,
+              12.429255,
+              3.728996
+            ]
+          }
+        },
+        {
+          "name": "tree-10",
+          "roots": [
+            "Bark.008_2685"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-10.glb",
+          "published": null,
+          "sha256": "55d69fa40a6d7986f4244db92155a7213b763317df8b8e9cced0fbc2f6c06599",
+          "bytes": 1444536,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -4.599578,
+              0,
+              -4.652135
+            ],
+            "max": [
+              4.599578,
+              15.506203,
+              4.652135
+            ]
+          }
+        },
+        {
+          "name": "tree-11",
+          "roots": [
+            "Bark.009_2687"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-11.glb",
+          "published": null,
+          "sha256": "dddc369f4faee58ebf5d67331abd6009e31e4d4a98839bbfab71d973ac8cdc96",
+          "bytes": 1444548,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -5.154922,
+              0,
+              -5.086395
+            ],
+            "max": [
+              5.154922,
+              17.220831,
+              5.086395
+            ]
+          }
+        },
+        {
+          "name": "tree-12",
+          "roots": [
+            "Bark.010_2689"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-12.glb",
+          "published": null,
+          "sha256": "0c6673e2f2f2b6899d478a66b944a25ded7b48a49089809c12d05065c4080778",
+          "bytes": 1444612,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -2.874736,
+              0,
+              -2.907584
+            ],
+            "max": [
+              2.874736,
+              9.691376,
+              2.907584
+            ]
+          }
+        },
+        {
+          "name": "tree-13",
+          "roots": [
+            "Bark.011_2691"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-13.glb",
+          "published": null,
+          "sha256": "e08b08fb448689b720dfa467937f98685aca26250920066871c8774b45a90b49",
+          "bytes": 1444552,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -4.412823,
+              0,
+              -4.308678
+            ],
+            "max": [
+              4.412823,
+              14.537065,
+              4.308678
+            ]
+          }
+        },
+        {
+          "name": "tree-14",
+          "roots": [
+            "Bark.012_2693"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-14.glb",
+          "published": null,
+          "sha256": "69d52b10d62a1be9e6141fe75b2a3625b0b5d4552104ad50de37695d3dfdab57",
+          "bytes": 1444556,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -3.165518,
+              0,
+              -3.050704
+            ],
+            "max": [
+              3.165518,
+              10.436866,
+              3.050704
+            ]
+          }
+        },
+        {
+          "name": "tree-15",
+          "roots": [
+            "Bark.014_2695"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-15.glb",
+          "published": null,
+          "sha256": "cdb7583a2725398f6cc66938e464a47a05840fad3d1a7e90a8ce05c6f33a9401",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -4.877532,
+              0,
+              -4.509892
+            ],
+            "max": [
+              4.877532,
+              12.214037,
+              4.509892
+            ]
+          }
+        },
+        {
+          "name": "tree-16",
+          "roots": [
+            "Bark.015_2697"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-16.glb",
+          "published": null,
+          "sha256": "f84b28523617a561284795a49e133d8498091ab09455f4f84e3ebd051d53d392",
+          "bytes": 1676348,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -5.480147,
+              0,
+              -5.463282
+            ],
+            "max": [
+              5.480147,
+              14.07057,
+              5.463282
+            ]
+          }
+        },
+        {
+          "name": "tree-17",
+          "roots": [
+            "Bark.016_2699"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-17.glb",
+          "published": null,
+          "sha256": "3ce5b6bbd8c1e3d35392c3923b36662f86ad44f4512dba467cbdfab22d298d89",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -7.847839,
+              0,
+              -7.857863
+            ],
+            "max": [
+              7.847839,
+              20.636908,
+              7.857863
+            ]
+          }
+        },
+        {
+          "name": "tree-18",
+          "roots": [
+            "Bark.017_2701"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-18.glb",
+          "published": null,
+          "sha256": "87df1015c348ee8e69d16700393f784342699440703d0ea07824a0755e5fec98",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -7.113649,
+              0,
+              -7.135607
+            ],
+            "max": [
+              7.113649,
+              18.321055,
+              7.135607
+            ]
+          }
+        },
+        {
+          "name": "tree-19",
+          "roots": [
+            "Bark.018_2703"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-19.glb",
+          "published": null,
+          "sha256": "15bcd4082da25e8567c7f1b1a1b5b79c73a7e1c78ec0b7465c65c29daba5aa0d",
+          "bytes": 1676284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.253827,
+              0,
+              -5.951386
+            ],
+            "max": [
+              6.253827,
+              15.928685,
+              5.951386
+            ]
+          }
+        },
+        {
+          "name": "tree-20",
+          "roots": [
+            "Bark.019_2705"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-20.glb",
+          "published": null,
+          "sha256": "3c52fdaf1aa657bec6def8b2cf85f258a7aad20c79fddb730b0f03ddd56a9cf4",
+          "bytes": 1444688,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 1806,
+          "bounds": {
+            "min": [
+              -9.290726,
+              0,
+              -6.103738
+            ],
+            "max": [
+              9.290726,
+              12.429255,
+              6.103738
+            ]
+          }
+        },
+        {
+          "name": "tree-21",
+          "roots": [
+            "Bark.020_2707"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-21.glb",
+          "published": null,
+          "sha256": "dc83193826704d081ab28ee03bacabafc41becb31d6d4a01c06c1a82610d996b",
+          "bytes": 1676328,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.868946,
+              0,
+              -6.324228
+            ],
+            "max": [
+              6.868946,
+              17.332638,
+              6.324228
+            ]
+          }
+        },
+        {
+          "name": "tree-22",
+          "roots": [
+            "Bark.021_2709"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-22.glb",
+          "published": null,
+          "sha256": "acd927b13d96ed5055001d6fce9d8f4b8a215e1cd3b009b20428a052880b9ef9",
+          "bytes": 1676344,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.598308,
+              0,
+              -6.719491
+            ],
+            "max": [
+              6.598308,
+              17.332638,
+              6.719491
+            ]
+          }
+        },
+        {
+          "name": "tree-23",
+          "roots": [
+            "Bark.022_2711"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/tree-23.glb",
+          "published": null,
+          "sha256": "477c4a2075398303d76be96d364031e939b0ed251d3765f152eb52a0bbdfbb8a",
+          "bytes": 1676396,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 4599,
+          "bounds": {
+            "min": [
+              -6.70392,
+              0,
+              -6.430929
+            ],
+            "max": [
+              6.70392,
+              17.012409,
+              6.430929
+            ]
+          }
+        },
+        {
+          "name": "grass-small",
+          "roots": [
+            "Grass_B_Low_Small_1"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/grass-small.glb",
+          "published": "public/assets/ground/tree-scene/grass-small.glb",
+          "sha256": "1bcf6d18bb50343dcb91be1cc540eaedfb79d9714b3d05d0c812dd6cd4e6642b",
+          "bytes": 44448,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 50,
+          "bounds": {
+            "min": [
+              -0.604783,
+              0,
+              -0.51582
+            ],
+            "max": [
+              0.604783,
+              1.140321,
+              0.51582
+            ]
+          }
+        },
+        {
+          "name": "grass-dense",
+          "roots": [
+            "Grass_B_Low_Dense_2"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-tree-scene/grass-dense.glb",
+          "published": "public/assets/ground/tree-scene/grass-dense.glb",
+          "sha256": "a67338f23032ebce3e9876f55b6bde4c848f7c380768f7d8bde344f93373f69f",
+          "bytes": 52496,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 80,
+          "bounds": {
+            "min": [
+              -1.462122,
+              0,
+              -1.481312
+            ],
+            "max": [
+              1.462122,
+              1.277307,
+              1.481312
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "low-poly-forest-pack",
+      "input": "assets/trees/low_poly_forest_tree_pack.glb",
+      "sha256": "a7aabc44265f961037684ae9a47c93396167a6d35f15cb743cfedd3bb08df411",
+      "bytes": 10258136,
+      "sourceAsset": {
+        "author": "99.Miles (https://sketchfab.com/99.Miles)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b",
+        "title": "Low Poly Forest Tree Pack"
+      },
+      "outputs": [
+        {
+          "name": "rock-01",
+          "roots": [
+            "Rocks"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-01.glb",
+          "published": null,
+          "sha256": "d0560edeb2123de17bfdb5430bb3e0c3c4ad71efdbe5dedf0e437c8ad7715262",
+          "bytes": 420852,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 18,
+          "bounds": {
+            "min": [
+              -0.336588,
+              0,
+              -0.355064
+            ],
+            "max": [
+              0.336588,
+              0.375679,
+              0.355064
+            ]
+          }
+        },
+        {
+          "name": "rock-02",
+          "roots": [
+            "Rocks.001"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-02.glb",
+          "published": "public/assets/rocks/forest-pack/rock-02.glb",
+          "sha256": "f453e8b6cc204e0239ac9452359a0dd17bd82d24feb9ea0e5fa3e982b6afc81f",
+          "bytes": 427876,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 127,
+          "bounds": {
+            "min": [
+              -0.886674,
+              0,
+              -0.826434
+            ],
+            "max": [
+              0.886674,
+              1.071561,
+              0.826434
+            ]
+          }
+        },
+        {
+          "name": "rock-03",
+          "roots": [
+            "Rocks.002"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-03.glb",
+          "published": null,
+          "sha256": "f066d65a9424a35b96f8a88e6b41ea994ac83068a3ae66faa15e3754ec6aa14e",
+          "bytes": 423128,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 63,
+          "bounds": {
+            "min": [
+              -0.722216,
+              0,
+              -0.604998
+            ],
+            "max": [
+              0.722216,
+              0.850016,
+              0.604998
+            ]
+          }
+        },
+        {
+          "name": "rock-04",
+          "roots": [
+            "Rocks.003"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-04.glb",
+          "published": "public/assets/rocks/forest-pack/rock-04.glb",
+          "sha256": "799a81d48f577e5975a93b6c11949afaa7512d832681dfe648a1afb996bbde96",
+          "bytes": 421348,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 26,
+          "bounds": {
+            "min": [
+              -0.368763,
+              0,
+              -0.468284
+            ],
+            "max": [
+              0.368763,
+              0.39317,
+              0.468284
+            ]
+          }
+        },
+        {
+          "name": "rock-05",
+          "roots": [
+            "Rocks.004"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-05.glb",
+          "published": null,
+          "sha256": "a11348180998d87f45ed152977b14f8ebb23868ecd91f4c82576f6091306b766",
+          "bytes": 421576,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 34,
+          "bounds": {
+            "min": [
+              -0.570497,
+              0,
+              -0.441187
+            ],
+            "max": [
+              0.570497,
+              0.629934,
+              0.441187
+            ]
+          }
+        },
+        {
+          "name": "rock-06",
+          "roots": [
+            "Rocks.005"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-06.glb",
+          "published": "public/assets/rocks/forest-pack/rock-06.glb",
+          "sha256": "8303474e9c23eca3b87c8ac63800bbeb0e51aa76e470131ad80fe6c73b3c0a86",
+          "bytes": 425332,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 97,
+          "bounds": {
+            "min": [
+              -0.643114,
+              0,
+              -1.055219
+            ],
+            "max": [
+              0.643114,
+              0.57353,
+              1.055219
+            ]
+          }
+        },
+        {
+          "name": "rock-07",
+          "roots": [
+            "Rocks.006"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-07.glb",
+          "published": null,
+          "sha256": "bf110717c0056fb5f544ebd9bfb0e50da7e0af45e5799fa01fdd3fe1c163f900",
+          "bytes": 425484,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 99,
+          "bounds": {
+            "min": [
+              -0.672174,
+              0,
+              -0.820021
+            ],
+            "max": [
+              0.672174,
+              0.91449,
+              0.820021
+            ]
+          }
+        },
+        {
+          "name": "rock-08",
+          "roots": [
+            "Rocks.007"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-08.glb",
+          "published": "public/assets/rocks/forest-pack/rock-08.glb",
+          "sha256": "b98ba697c597c941ffb540d382d9c0ff07e8251af7828c6c1e65ec7977468f59",
+          "bytes": 422540,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 51,
+          "bounds": {
+            "min": [
+              -0.658818,
+              0,
+              -0.493876
+            ],
+            "max": [
+              0.658818,
+              0.610505,
+              0.493876
+            ]
+          }
+        },
+        {
+          "name": "rock-09",
+          "roots": [
+            "Rocks.008"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/rock-09.glb",
+          "published": null,
+          "sha256": "8d3635e029ca6d47302b689a7958f48a1d5beb3f20a7088b60657bf116748f4d",
+          "bytes": 422360,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 46,
+          "bounds": {
+            "min": [
+              -0.35557,
+              0,
+              -0.388837
+            ],
+            "max": [
+              0.35557,
+              0.437375,
+              0.388837
+            ]
+          }
+        },
+        {
+          "name": "tree-wide-01",
+          "roots": [
+            "Tree_Branches_01.001",
+            "Tree_Trunk_01"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/tree-wide-01.glb",
+          "published": "public/assets/trees/forest-pack/tree-wide-01.glb",
+          "sha256": "567631349886c5ab5f2172e2c3f3bdccdcd43637b974bfbf94b250a42c9776d2",
+          "bytes": 866384,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 6,
+          "triangles": 624,
+          "bounds": {
+            "min": [
+              -2.955994,
+              0,
+              -2.732422
+            ],
+            "max": [
+              2.955994,
+              10.337585,
+              2.732422
+            ]
+          }
+        },
+        {
+          "name": "tree-wide-02",
+          "roots": [
+            "Tree_Branches_01",
+            "Tree_Trunk_01.001"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/tree-wide-02.glb",
+          "published": "public/assets/trees/forest-pack/tree-wide-02.glb",
+          "sha256": "3f4412f8f095238bccfa07972659465aecc66f6b4af25149f3f271ec056d55c1",
+          "bytes": 870284,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 6,
+          "triangles": 630,
+          "bounds": {
+            "min": [
+              -3.904053,
+              0,
+              -3.74353
+            ],
+            "max": [
+              3.904053,
+              25.41252,
+              3.74353
+            ]
+          }
+        },
+        {
+          "name": "tree-wide-03",
+          "roots": [
+            "Tree_Branches_01.002",
+            "Tree_Trunk_01.002"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/tree-wide-03.glb",
+          "published": "public/assets/trees/forest-pack/tree-wide-03.glb",
+          "sha256": "9e08041113b2d9308355bdc9fba0a032780092d6321dbd4ffac1db599c4f864d",
+          "bytes": 875428,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 6,
+          "triangles": 624,
+          "bounds": {
+            "min": [
+              -5.031494,
+              0,
+              -5.034485
+            ],
+            "max": [
+              5.031494,
+              18.458089,
+              5.034485
+            ]
+          }
+        },
+        {
+          "name": "tree-narrow-01",
+          "roots": [
+            "Tree_Branches_02",
+            "Tree_Trunk_02"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/trees/low-poly-forest-pack/tree-narrow-01.glb",
+          "published": "public/assets/trees/forest-pack/tree-narrow-01.glb",
+          "sha256": "d11a10a366b328475beabf57cc93b1c5ab2d520a801a6485dc272d3955bb87af",
+          "bytes": 668876,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 5,
+          "triangles": 285,
+          "bounds": {
+            "min": [
+              -3.307699,
+              0,
+              -3.831016
+            ],
+            "max": [
+              3.307699,
+              11.866035,
+              3.831016
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "stylized-oak",
+      "input": "assets/trees/stylized_tree.glb",
+      "sha256": "efe4873d257d089b88a611db1c0ccd40f5577aada86fbc4bcb911f1b794b8360",
+      "bytes": 14342812,
+      "sourceAsset": {
+        "author": "yonimantz (https://sketchfab.com/yonimantz09)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/stylized-tree-6d1aeea748f147789004bc03e1930d32",
+        "title": "Stylized Tree"
+      },
+      "outputs": [
+        {
+          "name": "stylized-oak",
+          "roots": [
+            "oak 01",
+            "oak 01.001"
+          ],
+          "scale": 14,
+          "output": "assets/extracted/trees/stylized-oak/stylized-oak.glb",
+          "published": "public/assets/trees/stylized-oak.glb",
+          "simplifyRatio": 0.05,
+          "sha256": "c2c49a30b983b18c51b6d3558fab3d986f9b98f13f3bece8183790085e198f88",
+          "bytes": 5444908,
+          "nodes": 8,
+          "meshes": 5,
+          "materials": 2,
+          "textures": 1,
+          "triangles": 62883,
+          "bounds": {
+            "min": [
+              -2.489967,
+              0,
+              -2.622715
+            ],
+            "max": [
+              2.489967,
+              7.793065,
+              2.622715
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "ruined-rock-fence",
+      "input": "assets/rocks/ruined_rock_fence.glb",
+      "sha256": "282f6e67a2258822adc8f46788c6819ef8fc5dd33eb3a4ce8dadb04e4fbe79a4",
+      "bytes": 2842856,
+      "sourceAsset": {
+        "author": "VladNeko (https://sketchfab.com/vlad.neko)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/ruined-rock-fence-75e2716c378e4a68bac3577303671921",
+        "title": "Ruined rock fence"
+      },
+      "outputs": [
+        {
+          "name": "stone-01",
+          "roots": [
+            "1_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-01.glb",
+          "published": "public/assets/rocks/ruined-fence/stone-01.glb",
+          "sha256": "30973fd9585795b2aa69bec66879fe835549700cf0dc3613240e7510ae1c05a9",
+          "bytes": 557304,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 58,
+          "bounds": {
+            "min": [
+              -0.618117,
+              0,
+              -0.706646
+            ],
+            "max": [
+              0.618117,
+              1.332247,
+              0.706646
+            ]
+          }
+        },
+        {
+          "name": "stone-02",
+          "roots": [
+            "2_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-02.glb",
+          "published": null,
+          "sha256": "37d57d4f03443fab79d264e9514c01c73d34e02cbbc9c7d30f19b800e50b2c53",
+          "bytes": 556484,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 36,
+          "bounds": {
+            "min": [
+              -0.281765,
+              0,
+              -0.438824
+            ],
+            "max": [
+              0.281765,
+              0.623939,
+              0.438824
+            ]
+          }
+        },
+        {
+          "name": "stone-03",
+          "roots": [
+            "3_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-03.glb",
+          "published": "public/assets/rocks/ruined-fence/stone-03.glb",
+          "sha256": "974daf76f4aa94a8e2c23d22911b9e9c2d5ab8903713231a03e95a2ad5ff02cc",
+          "bytes": 556536,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 36,
+          "bounds": {
+            "min": [
+              -0.261085,
+              0,
+              -0.221021
+            ],
+            "max": [
+              0.261085,
+              0.330711,
+              0.221021
+            ]
+          }
+        },
+        {
+          "name": "stone-04",
+          "roots": [
+            "4_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-04.glb",
+          "published": null,
+          "sha256": "e6cffe02815d6537a18a9a0f1b4bce4f7685b2dbc26eabc39c3ea2ea050b253c",
+          "bytes": 558216,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 76,
+          "bounds": {
+            "min": [
+              -0.79938,
+              0,
+              -0.529645
+            ],
+            "max": [
+              0.79938,
+              0.89219,
+              0.529645
+            ]
+          }
+        },
+        {
+          "name": "stone-05",
+          "roots": [
+            "5_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-05.glb",
+          "published": null,
+          "sha256": "e39c97fea6523d81cf9fffa29485e79fd4a80953528250b6fd452e277154e9c0",
+          "bytes": 557388,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 62,
+          "bounds": {
+            "min": [
+              -0.74871,
+              0,
+              -0.609478
+            ],
+            "max": [
+              0.74871,
+              1.248479,
+              0.609478
+            ]
+          }
+        },
+        {
+          "name": "stone-06",
+          "roots": [
+            "6_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-06.glb",
+          "published": "public/assets/rocks/ruined-fence/stone-06.glb",
+          "sha256": "e51e5a7f1fe89d01aef9b43097c3b2249095c493832066bff576fbd31436c960",
+          "bytes": 556920,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 48,
+          "bounds": {
+            "min": [
+              -0.448218,
+              0,
+              -0.673718
+            ],
+            "max": [
+              0.448218,
+              0.928965,
+              0.673718
+            ]
+          }
+        },
+        {
+          "name": "stone-07",
+          "roots": [
+            "7_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-07.glb",
+          "published": null,
+          "sha256": "808a3becb6ad6af8b71e95597b5c62ce432d3e319a99a0aac413ee2ab6de1bbf",
+          "bytes": 556612,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 36,
+          "bounds": {
+            "min": [
+              -0.294172,
+              0,
+              -0.400211
+            ],
+            "max": [
+              0.294172,
+              0.553156,
+              0.400211
+            ]
+          }
+        },
+        {
+          "name": "stone-08",
+          "roots": [
+            "8_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-08.glb",
+          "published": "public/assets/rocks/ruined-fence/stone-08.glb",
+          "sha256": "16979baf330c218752464c8e0dba50f3d5a893874d404b6d49255a571f61960f",
+          "bytes": 557348,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 60,
+          "bounds": {
+            "min": [
+              -0.957687,
+              0,
+              -0.600026
+            ],
+            "max": [
+              0.957687,
+              1.096428,
+              0.600026
+            ]
+          }
+        },
+        {
+          "name": "stone-09",
+          "roots": [
+            "9_lp"
+          ],
+          "scale": 0.01,
+          "output": "assets/extracted/rocks/ruined-rock-fence/stone-09.glb",
+          "published": null,
+          "sha256": "75e218cd0126ebbe10dea84c28a8b6e457c5fcbb877250b98d8580e75e4a6193",
+          "bytes": 557248,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 52,
+          "bounds": {
+            "min": [
+              -0.778655,
+              0,
+              -0.689427
+            ],
+            "max": [
+              0.778655,
+              1.028925,
+              0.689427
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "stylized-grass",
+      "input": "assets/grass/stylized_grass.glb",
+      "sha256": "613a893f2615116373cd7a45c75c2dff5f921c7cf6ae45ffad577ffd2408ef84",
+      "bytes": 166852,
+      "sourceAsset": {
+        "author": "Firdaus Sahak (https://sketchfab.com/firdaussahak)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/stylized-grass-3a5a5c5be677403d9f56e451cd3dd4af",
+        "title": "Stylized grass"
+      },
+      "outputs": [
+        {
+          "name": "source-01",
+          "roots": [
+            "Grass:Grass_Master"
+          ],
+          "scale": 0.04,
+          "output": "assets/extracted/ground/stylized-grass/source-01.glb",
+          "published": "public/assets/ground/stylized-grass/source-01.glb",
+          "sha256": "635d3c8b2c096ee793be3b3f351c20c9e072880d1dbb7ad6daffaf6c270ad269",
+          "bytes": 31984,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 32,
+          "bounds": {
+            "min": [
+              -0.028015,
+              0,
+              0
+            ],
+            "max": [
+              0.028015,
+              0.538388,
+              0
+            ]
+          }
+        },
+        {
+          "name": "source-02",
+          "roots": [
+            "Grass:ShapeVariantGRP"
+          ],
+          "scale": 0.04,
+          "output": "assets/extracted/ground/stylized-grass/source-02.glb",
+          "published": "public/assets/ground/stylized-grass/source-02.glb",
+          "sha256": "4bb62a75a8cbb5f2df69cb2f7e89147687068baf849b0f3c60a1eb4e53a3088e",
+          "bytes": 37188,
+          "nodes": 8,
+          "meshes": 3,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 96,
+          "bounds": {
+            "min": [
+              -0.110809,
+              0,
+              -0.075179
+            ],
+            "max": [
+              0.110809,
+              0.536601,
+              0.075179
+            ]
+          }
+        },
+        {
+          "name": "clump-01",
+          "roots": [
+            "Grass:Clump01GRP"
+          ],
+          "scale": 0.04,
+          "output": "assets/extracted/ground/stylized-grass/clump-01.glb",
+          "published": "public/assets/ground/stylized-grass/clump-01.glb",
+          "sha256": "8df0831b5e5861d884d9ffb9c53238bb8074bbbd1723b9ecfc16d85daae3d54e",
+          "bytes": 49420,
+          "nodes": 18,
+          "meshes": 8,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 244,
+          "bounds": {
+            "min": [
+              -0.245484,
+              0,
+              -0.247582
+            ],
+            "max": [
+              0.245484,
+              0.539126,
+              0.247582
+            ]
+          }
+        },
+        {
+          "name": "clump-02",
+          "roots": [
+            "Grass:Ckump02GRP"
+          ],
+          "scale": 0.04,
+          "output": "assets/extracted/ground/stylized-grass/clump-02.glb",
+          "published": "public/assets/ground/stylized-grass/clump-02.glb",
+          "sha256": "6e662467ac8ae7b0f1ab35716d7278eea9b0d985aeff69f5fa4489196449d8fc",
+          "bytes": 57100,
+          "nodes": 24,
+          "meshes": 11,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 340,
+          "bounds": {
+            "min": [
+              -0.296316,
+              0,
+              -0.300741
+            ],
+            "max": [
+              0.296316,
+              0.548206,
+              0.300741
+            ]
+          }
+        },
+        {
+          "name": "clump-03",
+          "roots": [
+            "Grass:Ckump03GRP"
+          ],
+          "scale": 0.04,
+          "output": "assets/extracted/ground/stylized-grass/clump-03.glb",
+          "published": "public/assets/ground/stylized-grass/clump-03.glb",
+          "sha256": "e2f4cf3ff186218134cbf5d7c09ba39b9dc4e13108e14c5b393153922b87edfc",
+          "bytes": 57120,
+          "nodes": 24,
+          "meshes": 11,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 340,
+          "bounds": {
+            "min": [
+              -0.277181,
+              0,
+              -0.261466
+            ],
+            "max": [
+              0.277181,
+              0.540827,
+              0.261466
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "weeds-and-grass",
+      "input": "assets/grass/weeds_and_grass.glb",
+      "sha256": "c90779a6fe6a87d463c763c5ed9f9e186341dc9124c13704cdc2e78d734c7088",
+      "bytes": 974104,
+      "sourceAsset": {
+        "author": "spoon420 (https://sketchfab.com/spoon420)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/weeds-and-grass-7e2b98aab6064d63bb2fc3fda8450c27",
+        "title": "Weeds and grass"
+      },
+      "outputs": [
+        {
+          "name": "grass-plant-brown",
+          "roots": [
+            "Grass plant brown"
+          ],
+          "scale": 2.2,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-plant-brown.glb",
+          "published": "public/assets/ground/aquatic/grass-plant-brown.glb",
+          "sha256": "92b76eb1e23bd4543387c1ef41d079a771b927088d33d62f2c2ad18c8330aab7",
+          "bytes": 183928,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 2,
+          "triangles": 4975,
+          "bounds": {
+            "min": [
+              -0.236225,
+              0,
+              -0.237963
+            ],
+            "max": [
+              0.236225,
+              0.57123,
+              0.237963
+            ]
+          }
+        },
+        {
+          "name": "grass-plant-green",
+          "roots": [
+            "Grass Plant green"
+          ],
+          "scale": 2.2,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-plant-green.glb",
+          "published": "public/assets/ground/aquatic/grass-plant-green.glb",
+          "sha256": "e4d452d9ae2944c17b414f0694c7133dcfcbaf9725575417e43c4ce1a216f69d",
+          "bytes": 224540,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 2,
+          "triangles": 6145,
+          "bounds": {
+            "min": [
+              -0.48642,
+              0,
+              -0.376101
+            ],
+            "max": [
+              0.48642,
+              0.66891,
+              0.376101
+            ]
+          }
+        },
+        {
+          "name": "weed-01",
+          "roots": [
+            "weed.001"
+          ],
+          "scale": 2.2,
+          "output": "assets/extracted/ground/weeds-and-grass/weed-01.glb",
+          "published": "public/assets/ground/aquatic/weed-01.glb",
+          "sha256": "ec4013f9f45cd48c86f5ba6527928989e5f903ce7cbe2aee639a891d822cff13",
+          "bytes": 98900,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 2,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.38896,
+              0,
+              -0.387662
+            ],
+            "max": [
+              0.38896,
+              0.134728,
+              0.387662
+            ]
+          }
+        },
+        {
+          "name": "weed-02",
+          "roots": [
+            "weed.000"
+          ],
+          "scale": 2.2,
+          "output": "assets/extracted/ground/weeds-and-grass/weed-02.glb",
+          "published": "public/assets/ground/aquatic/weed-02.glb",
+          "sha256": "d172a6d3cc5e73985c80095b4308b2a4752160e82bc3178f4d0f3500ce4d76b4",
+          "bytes": 98900,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 2,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.388256,
+              0,
+              -0.386408
+            ],
+            "max": [
+              0.388256,
+              0.134728,
+              0.386408
+            ]
+          }
+        },
+        {
+          "name": "grass-blade-01",
+          "roots": [
+            "Grass Blade"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-blade-01.glb",
+          "published": "public/assets/ground/weeds/grass-blade-01.glb",
+          "sha256": "48b459b9d1950a958863bd0c45b823a5d4cfa3c6e393458f93efbde552cb880e",
+          "bytes": 10912,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 45,
+          "bounds": {
+            "min": [
+              -0.030199,
+              0,
+              -0.021607
+            ],
+            "max": [
+              0.030199,
+              1.51746,
+              0.021607
+            ]
+          }
+        },
+        {
+          "name": "grass-blade-02",
+          "roots": [
+            "Grass Blade.002"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-blade-02.glb",
+          "published": "public/assets/ground/weeds/grass-blade-02.glb",
+          "sha256": "ebbc8b14bb27e05db9bc91126b08d24c99352bd5b60fdd43c26bd8d5f6bc1152",
+          "bytes": 22728,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 2,
+          "triangles": 115,
+          "bounds": {
+            "min": [
+              -0.122279,
+              0,
+              -0.068205
+            ],
+            "max": [
+              0.122279,
+              1.400909,
+              0.068205
+            ]
+          }
+        },
+        {
+          "name": "grass-blade-03",
+          "roots": [
+            "Grass Blade.003"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-blade-03.glb",
+          "published": "public/assets/ground/weeds/grass-blade-03.glb",
+          "sha256": "936e5f8a49805e0fb0fa2708f9a1428519a88a89d0dd1c8a12a6a0e0a8bacc28",
+          "bytes": 11900,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 75,
+          "bounds": {
+            "min": [
+              -0.086636,
+              0,
+              -0.021607
+            ],
+            "max": [
+              0.086636,
+              1.51746,
+              0.021607
+            ]
+          }
+        },
+        {
+          "name": "grass-blade-04",
+          "roots": [
+            "Grass Blade.004"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-blade-04.glb",
+          "published": "public/assets/ground/weeds/grass-blade-04.glb",
+          "sha256": "88396df6eac0b3a9173e7175b687cc18dffef012cee206b033787bed1780c212",
+          "bytes": 12044,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 45,
+          "bounds": {
+            "min": [
+              -0.012465,
+              0,
+              -0.013641
+            ],
+            "max": [
+              0.012465,
+              1.51746,
+              0.013641
+            ]
+          }
+        },
+        {
+          "name": "grass-blade-05",
+          "roots": [
+            "Grass Blade.005"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/grass-blade-05.glb",
+          "published": "public/assets/ground/weeds/grass-blade-05.glb",
+          "sha256": "5bda89475bfa2d156c7ecada208d6c5ca58576da34a240276d14b45be1bf3f31",
+          "bytes": 13296,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 85,
+          "bounds": {
+            "min": [
+              -0.04888,
+              0,
+              -0.020113
+            ],
+            "max": [
+              0.04888,
+              1.51746,
+              0.020113
+            ]
+          }
+        },
+        {
+          "name": "flower-01",
+          "roots": [
+            "Flower"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/flower-01.glb",
+          "published": "public/assets/ground/weeds/flower-01.glb",
+          "sha256": "04bcd96313f2f12635f3a32e8f07a9ceeafbbf4348438d4d9d2d6b0372d6abf6",
+          "bytes": 16052,
+          "nodes": 5,
+          "meshes": 3,
+          "materials": 3,
+          "textures": 1,
+          "triangles": 85,
+          "bounds": {
+            "min": [
+              -0.046559,
+              0,
+              -0.011577
+            ],
+            "max": [
+              0.046559,
+              0.245752,
+              0.011577
+            ]
+          }
+        },
+        {
+          "name": "flower-02",
+          "roots": [
+            "Flower.001"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/weeds-and-grass/flower-02.glb",
+          "published": "public/assets/ground/weeds/flower-02.glb",
+          "sha256": "97420afbcd24df029827a3c9f70d1ecf9e513e7e3475105854c7b3792217d47e",
+          "bytes": 16868,
+          "nodes": 5,
+          "meshes": 3,
+          "materials": 3,
+          "textures": 1,
+          "triangles": 101,
+          "bounds": {
+            "min": [
+              -0.033341,
+              0,
+              -0.02136
+            ],
+            "max": [
+              0.033341,
+              0.245811,
+              0.02136
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "clover",
+      "input": "assets/grass/clover_grass.glb",
+      "sha256": "b0ab269409ed4f7216fa94b17a5485eced8867f5368db58eefacad61572b0964",
+      "bytes": 1328160,
+      "sourceAsset": {
+        "author": "kelvladmail (https://sketchfab.com/kelvladmail)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/clover-grass-beeff00b4496409da82b7c1a9705039e",
+        "title": "Clover Grass"
+      },
+      "outputs": [
+        {
+          "name": "clover",
+          "roots": [
+            "foli",
+            "trunks"
+          ],
+          "scale": 0.004,
+          "output": "assets/extracted/ground/clover/clover.glb",
+          "published": null,
+          "sha256": "2aaef81a2144e582c8f7b5637a2a6a09340cdb7f5d585ae7e634c138ee9a0e80",
+          "bytes": 548456,
+          "nodes": 5,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 10912,
+          "bounds": {
+            "min": [
+              -0.396641,
+              0,
+              -0.47776
+            ],
+            "max": [
+              0.396641,
+              0.415252,
+              0.47776
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "lotus",
+      "input": "assets/grass/lotus.glb",
+      "sha256": "38c16548449d71c4eae84662c00d92968a36b401f2cdd3b448fc621a7cc8bd3f",
+      "bytes": 6960744,
+      "sourceAsset": {
+        "author": "Amagi_Arts (https://sketchfab.com/natsuboy304)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/lotus-5627ae9572ce419fac75b68a2ac54594",
+        "title": "LOTUS"
+      },
+      "outputs": [
+        {
+          "name": "lotus-01",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.001_0"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-01.glb",
+          "published": null,
+          "sha256": "3ae25af0882c21771bf19265cc29764a6dd72803ee5871e0f30ddb79538c31a7",
+          "bytes": 1301836,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9172,
+          "bounds": {
+            "min": [
+              -0.436134,
+              0,
+              -0.570536
+            ],
+            "max": [
+              0.436134,
+              0.55666,
+              0.570536
+            ]
+          }
+        },
+        {
+          "name": "lotus-02",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.002_1"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-02.glb",
+          "published": null,
+          "sha256": "d49a9dc361ab1b1de01b5246b511c9f5c86e6e44283b9cda990fbbe008932767",
+          "bytes": 1140048,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9168,
+          "bounds": {
+            "min": [
+              -0.422382,
+              0,
+              -0.460596
+            ],
+            "max": [
+              0.422382,
+              0.55666,
+              0.460596
+            ]
+          }
+        },
+        {
+          "name": "lotus-03",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.004_2"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-03.glb",
+          "published": null,
+          "sha256": "c17248b13fee4c1f4f56fd1d2aa44d91de9d79557d1b8d074260d24322a94814",
+          "bytes": 63052,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 48,
+          "bounds": {
+            "min": [
+              -0.293692,
+              0,
+              -0.287426
+            ],
+            "max": [
+              0.293692,
+              0,
+              0.287426
+            ]
+          }
+        },
+        {
+          "name": "lotus-04",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.003_3"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-04.glb",
+          "published": "public/assets/ground/aquatic/lotus-04.glb",
+          "sha256": "4b41bad5171e3793c4da35a9a1d3e93d8884d2ea1f0acdf8afe87c7249138a82",
+          "bytes": 63612,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 52,
+          "bounds": {
+            "min": [
+              -0.386864,
+              0,
+              -0.388246
+            ],
+            "max": [
+              0.386864,
+              0,
+              0.388246
+            ]
+          }
+        },
+        {
+          "name": "lotus-05",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.010_4"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-05.glb",
+          "published": null,
+          "sha256": "15bf0e769c3cc4a25952339588b6c902f72b474f7953e70bdc044a899106603e",
+          "bytes": 1140348,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9172,
+          "bounds": {
+            "min": [
+              -0.571626,
+              0,
+              -0.442154
+            ],
+            "max": [
+              0.571626,
+              0.55666,
+              0.442154
+            ]
+          }
+        },
+        {
+          "name": "lotus-06",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus_5"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-06.glb",
+          "published": null,
+          "sha256": "4b5be2f620753cd100c278b30148e9f4333dce0c9e10ed19fdb83b95459e27b9",
+          "bytes": 67904,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.489106,
+              0,
+              -0.472166
+            ],
+            "max": [
+              0.489106,
+              0,
+              0.472166
+            ]
+          }
+        },
+        {
+          "name": "lotus-07",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.012_6"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-07.glb",
+          "published": null,
+          "sha256": "dd334c15c6aec1b3dc6e7cb5bd5cb65dcdcc55053f3b5c6906d55bd0d2f497a0",
+          "bytes": 67264,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.19233,
+              0,
+              -0.185668
+            ],
+            "max": [
+              0.19233,
+              0,
+              0.185668
+            ]
+          }
+        },
+        {
+          "name": "lotus-08",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.006_7"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-08.glb",
+          "published": null,
+          "sha256": "7385db49c910becbde28d6afa975319c5a1f8bd334fb06c21e29e0df6a8b1292",
+          "bytes": 1139540,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9168,
+          "bounds": {
+            "min": [
+              -0.462412,
+              0,
+              -0.4112
+            ],
+            "max": [
+              0.462412,
+              0.55666,
+              0.4112
+            ]
+          }
+        },
+        {
+          "name": "lotus-09",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.009_8"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-09.glb",
+          "published": null,
+          "sha256": "fc3c9ac6983f503049b0c1a23af396880741565a71b001871903b43d1df64437",
+          "bytes": 63616,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 52,
+          "bounds": {
+            "min": [
+              -0.386864,
+              0,
+              -0.388246
+            ],
+            "max": [
+              0.386864,
+              0,
+              0.388246
+            ]
+          }
+        },
+        {
+          "name": "lotus-10",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.011_9"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-10.glb",
+          "published": null,
+          "sha256": "0fc7246e5a7f7ddacfae51e9f6b81915864a8d9fd71842206173c42eca4ea075",
+          "bytes": 1301252,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9168,
+          "bounds": {
+            "min": [
+              -0.42238,
+              0,
+              -0.460594
+            ],
+            "max": [
+              0.42238,
+              0.55666,
+              0.460594
+            ]
+          }
+        },
+        {
+          "name": "lotus-11",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.005_10"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-11.glb",
+          "published": "public/assets/ground/aquatic/lotus-11.glb",
+          "sha256": "d8563a4948ad6f9103851e17bfacbfd9518d8cf884003f99a740237433266797",
+          "bytes": 67204,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.495684,
+              0,
+              -0.478516
+            ],
+            "max": [
+              0.495684,
+              0,
+              0.478516
+            ]
+          }
+        },
+        {
+          "name": "lotus-12",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.007_11"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-12.glb",
+          "published": null,
+          "sha256": "6e7ff2ecfa5d9c5af527c501d1349a61c5f958788a233c869542e58f5dcd9412",
+          "bytes": 1140284,
+          "nodes": 4,
+          "meshes": 2,
+          "materials": 2,
+          "textures": 4,
+          "triangles": 9172,
+          "bounds": {
+            "min": [
+              -0.465356,
+              0,
+              -0.56137
+            ],
+            "max": [
+              0.465356,
+              0.55666,
+              0.56137
+            ]
+          }
+        },
+        {
+          "name": "lotus-13",
+          "roots": [
+            "12_Pcs_Lotus_Leaves_High_Quality_Durable_Prime_Sturdy_Lotus.008_12"
+          ],
+          "scale": 4,
+          "output": "assets/extracted/ground/lotus/lotus-13.glb",
+          "published": null,
+          "sha256": "93f10f9a962e08e8d1ecea943e21ac8d81b49a5cb954acb67b9f41af6ed4be84",
+          "bytes": 67716,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 1,
+          "triangles": 116,
+          "bounds": {
+            "min": [
+              -0.567538,
+              0,
+              -0.547882
+            ],
+            "max": [
+              0.567538,
+              0,
+              0.547882
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "simple-grass-chunks",
+      "input": "assets/grass/simple_grass_chunks.glb",
+      "sha256": "3ccf10773008eebda64018ac2a0a97c453c14127938141728b965c318851d009",
+      "bytes": 20215408,
+      "sourceAsset": {
+        "author": "3dhdscan (https://sketchfab.com/3dhdscan)",
+        "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+        "source": "https://sketchfab.com/3d-models/simple-grass-chunks-eb4f6dc9d4e3455ea3435385faf58b60",
+        "title": "Simple grass chunks"
+      },
+      "outputs": [
+        {
+          "name": "chunk-01",
+          "roots": [
+            "rostlinka_07c"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-01.glb",
+          "published": "public/assets/ground/grass-chunks/chunk-01.glb",
+          "sha256": "fa808d2f59cf81ef887d715d1f211d28efa3a20eb9acef71dd48ff9185a39fdb",
+          "bytes": 60384,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 37,
+          "bounds": {
+            "min": [
+              -0.139808,
+              0,
+              -0.170028
+            ],
+            "max": [
+              0.139808,
+              0.563868,
+              0.170028
+            ]
+          }
+        },
+        {
+          "name": "chunk-02",
+          "roots": [
+            "rostlinka_07_ground"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-02.glb",
+          "published": null,
+          "sha256": "70acf2db1d961d1e5d19855c21376b372a5a9c3771148e18c65c0f24ced15051",
+          "bytes": 3281176,
+          "nodes": 4,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 52188,
+          "bounds": {
+            "min": [
+              -0.304281,
+              0,
+              -0.304591
+            ],
+            "max": [
+              0.304281,
+              0.063136,
+              0.304591
+            ]
+          }
+        },
+        {
+          "name": "chunk-03",
+          "roots": [
+            "ground_close_04"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-03.glb",
+          "published": null,
+          "sha256": "d7ff8dfe549c6077b8e22d82e5625aa6280ffa57a60b3318eb18be4a9721b25f",
+          "bytes": 186000,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 2681,
+          "bounds": {
+            "min": [
+              -1.370461,
+              0,
+              -1.378293
+            ],
+            "max": [
+              1.370461,
+              0.107839,
+              1.378293
+            ]
+          }
+        },
+        {
+          "name": "chunk-04",
+          "roots": [
+            "rostlinka_7c_scater"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-04.glb",
+          "published": null,
+          "sha256": "39ba2dcc9faf03f405ccbb120866d4fd09f543ea1fb5bca334c475be9ca9c954",
+          "bytes": 631712,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 3,
+          "triangles": 4551,
+          "bounds": {
+            "min": [
+              -1.294972,
+              0,
+              -1.271981
+            ],
+            "max": [
+              1.294972,
+              0.745288,
+              1.271981
+            ]
+          }
+        },
+        {
+          "name": "chunk-05",
+          "roots": [
+            "r12_b"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-05.glb",
+          "published": "public/assets/ground/grass-chunks/chunk-05.glb",
+          "sha256": "d980f429ff2de2ff5dc23dd3093c23cfb7122170a63ab77f9af611b9b77c254e",
+          "bytes": 38420,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 12,
+          "bounds": {
+            "min": [
+              -0.031811,
+              0,
+              -0.046892
+            ],
+            "max": [
+              0.031811,
+              0.076953,
+              0.046892
+            ]
+          }
+        },
+        {
+          "name": "chunk-06",
+          "roots": [
+            "r12_a"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-06.glb",
+          "published": "public/assets/ground/grass-chunks/chunk-06.glb",
+          "sha256": "67aa1ee84d66463f65575dca805e67ad37ba3e0ca0b7d038451b1ad7f4591942",
+          "bytes": 38424,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 12,
+          "bounds": {
+            "min": [
+              -0.041431,
+              0,
+              -0.048003
+            ],
+            "max": [
+              0.041431,
+              0.080762,
+              0.048003
+            ]
+          }
+        },
+        {
+          "name": "chunk-07",
+          "roots": [
+            "r12_c"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-07.glb",
+          "published": null,
+          "sha256": "0a33bcfa6e9040270a5773cd3eab1f89f2b1d11f7b6a02b06ed416448d8884ca",
+          "bytes": 37860,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 7,
+          "bounds": {
+            "min": [
+              -0.023767,
+              0,
+              -0.026529
+            ],
+            "max": [
+              0.023767,
+              0.041501,
+              0.026529
+            ]
+          }
+        },
+        {
+          "name": "chunk-08",
+          "roots": [
+            "Forest001"
+          ],
+          "scale": 1,
+          "output": "assets/extracted/ground/simple-grass-chunks/chunk-08.glb",
+          "published": null,
+          "sha256": "f09d72430d5f549d7a80f8112bf75c518a50f55da1d62825b2eb521a695e2e17",
+          "bytes": 3567020,
+          "nodes": 3,
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "triangles": 18478,
+          "bounds": {
+            "min": [
+              -1.354287,
+              0,
+              -1.37388
+            ],
+            "max": [
+              1.354287,
+              0.237402,
+              1.37388
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

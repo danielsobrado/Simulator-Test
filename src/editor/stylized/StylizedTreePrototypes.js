@@ -38,13 +38,26 @@ export function findPrototypeRoots(root, config) {
  * foliage) so trunks don't float when leaves extend below the bark.
  */
 export function extractPrototypeParts(root, config) {
+  return extractPrototypePartsFromRoots([root], config);
+}
+
+/**
+ * Variant of extractPrototypeParts for packs that author trunk and crown as
+ * sibling showroom objects. Their original world matrices are retained until
+ * the complete group is centred and grounded as one reusable tree.
+ */
+export function extractPrototypePartsFromRoots(roots, config) {
   const sources = [];
-  root.traverse((node) => {
-    if (!node.isMesh) return;
-    const kind = meshKind(node, config);
-    if (!kind) return;
-    sources.push({ node, kind });
-  });
+  const seen = new Set();
+  for (const root of roots) {
+    root.traverse((node) => {
+      if (!node.isMesh || seen.has(node)) return;
+      seen.add(node);
+      const kind = meshKind(node, config);
+      if (!kind) return;
+      sources.push({ node, kind });
+    });
+  }
   if (sources.length === 0) return null;
 
   const combinedMin = new THREE.Vector3(
@@ -111,6 +124,28 @@ export function createRootCollarGeometry(parts) {
   return geometry;
 }
 
+function matchAttributeStorage(attribute, template) {
+  if (
+    attribute.array.constructor === template.array.constructor
+    && attribute.normalized === template.normalized
+    && attribute.gpuType === template.gpuType
+  ) {
+    return attribute;
+  }
+  const converted = new THREE.BufferAttribute(
+    new template.array.constructor(attribute.count * attribute.itemSize),
+    attribute.itemSize,
+    template.normalized,
+  );
+  converted.gpuType = template.gpuType;
+  for (let index = 0; index < attribute.count; index += 1) {
+    for (let component = 0; component < attribute.itemSize; component += 1) {
+      converted.setComponent(index, component, attribute.getComponent(index, component));
+    }
+  }
+  return converted;
+}
+
 export function attachRootCollar(parts) {
   const trunkPart = parts.find((part) => part.kind === 'trunk');
   const root = createRootCollarGeometry(parts);
@@ -126,6 +161,9 @@ export function attachRootCollar(parts) {
       attribute.itemSize,
       attribute.normalized,
     ));
+  }
+  for (const [name, attribute] of Object.entries(trunk.attributes)) {
+    root.setAttribute(name, matchAttributeStorage(root.getAttribute(name), attribute));
   }
   const merged = mergeGeometries([trunk, root], false);
   root.dispose();

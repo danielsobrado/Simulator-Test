@@ -5,15 +5,23 @@ import { materialList, normalizeBaseUrl, resolveAssetUrl } from '../assets/asset
 import {
   attachRootCollar,
   extractPrototypeParts,
+  extractPrototypePartsFromRoots,
   findPrototypeRoots,
 } from './StylizedTreePrototypes.js';
-import { createStylizedLeafMaterial, createStylizedTrunkMaterial } from './StylizedTreeMaterials.js';
+import { resolveAuthoredPrototypeGroups } from './StylizedPrototypeBake.js';
 import {
-  FOREST_GENERATED_SPECIES,
+  createAuthoredTrunkMaterial,
+  createStylizedLeafMaterial,
+  createStylizedTrunkMaterial,
+} from './StylizedTreeMaterials.js';
+import {
   FOREST_SPECIES_PALETTES,
   createForestSpeciesPrototypeGeometry,
   createSpeciesPrototypeIndex,
+  uncoveredGeneratedSpecies,
 } from './forest/ForestSpeciesGeometry.js';
+import { createForestLeafTintTable } from './forest/forestLeafTint.js';
+import { createProceduralBarkTextures } from './forest/ProceduralBarkTextures.js';
 import { instanceCapacity } from './scatterMath.js';
 import { TreeManifestStore } from './TreeManifestStore.js';
 import { rebuildTreeLod } from './TreeLodAssembler.js';
@@ -36,9 +44,38 @@ import {
 import { TreeImpostorBaker } from './impostor/TreeImpostorBaker.js';
 import { TreeImpostorBatch } from './impostor/TreeImpostorBatch.js';
 import { createTreeImpostorSourceSignature } from './impostor/TreeImpostorManifest.js';
+import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 
 function firstMaterial(mesh, name) {
   return materialList(mesh).find((material) => material?.name === name) ?? materialList(mesh)[0];
+}
+
+function inferTreeMaterials(scene, definition) {
+  if (definition.trunkMaterial && definition.leafMaterial) return definition;
+  const names = new Set();
+  scene.traverse((node) => {
+    if (!node.isMesh) return;
+    for (const material of materialList(node)) {
+      if (material?.name) names.add(material.name);
+    }
+  });
+  const available = [...names];
+  const find = (pattern, excluded = null) => available.find(
+    (name) => name !== excluded && pattern.test(name),
+  );
+  const trunkMaterial = definition.trunkMaterial
+    ?? find(/bark|trunk|wood|branch/i)
+    ?? available[0];
+  const leafMaterial = definition.leafMaterial
+    ?? find(/leaf|leaves|foliage|needle|crown/i, trunkMaterial)
+    ?? available.find((name) => name !== trunkMaterial);
+  if (!trunkMaterial || !leafMaterial) return definition;
+  return {
+    ...definition,
+    trunkMaterial,
+    leafMaterial,
+    species: definition.species ?? 'broadleaf_round',
+  };
 }
 
 function configureBarkTexture(texture, colorSpace) {
@@ -54,7 +91,13 @@ function lodSettings(config) {
   const meshRadius = tree.meshRadius ?? config.trees.residentRadius;
   const proxyRadius = Math.max(meshRadius, tree.proxyRadius ?? 3);
   const impostorRadius = Math.max(proxyRadius, tree.impostorRadius ?? 5);
-  const clusterRadius = Math.max(impostorRadius, tree.clusterRadius ?? 8);
+  // `clusterPixels: 0` switches the aggregate far-canopy band off. Its radius has
+  // to collapse onto the impostor radius as well, or `clampLodToRadii` still
+  // demotes anything past the impostor range to 'cluster' and the band comes back.
+  const clusterPixels = tree.clusterPixels ?? 0;
+  const clusterRadius = clusterPixels > 0
+    ? Math.max(impostorRadius, tree.clusterRadius ?? 8)
+    : impostorRadius;
   return Object.freeze({
     enabled: config.lod?.enabled !== false,
     meshRadius,
@@ -66,7 +109,7 @@ function lodSettings(config) {
       nearPixels: tree.nearPixels ?? 32,
       proxyPixels: tree.proxyPixels ?? 8,
       impostorPixels: tree.impostorPixels ?? 2,
-      clusterPixels: tree.clusterPixels ?? 0.45,
+      clusterPixels,
       hysteresisRatio: tree.hysteresisRatio ?? 0.15,
     },
   });
@@ -83,17 +126,30 @@ function disposePrototypeParts(prototypes) {
 }
 
 export class StylizedTreeView {
-  constructor({ terrainView, objectMap = null, config, revisionTracker, baseUrl = '/' }) {
+  constructor({
+    terrainView,
+    objectMap = null,
+    config,
+    revisionTracker,
+    baseUrl = '/',
+    biomeAssetPalette = null,
+    regionalCharacterField = null,
+  }) {
     this.terrainView = terrainView;
     this.config = config;
     this.revisionTracker = revisionTracker;
     this.objectMap = objectMap;
     this.baseUrl = normalizeBaseUrl(baseUrl);
+    this.biomeAssetPalette = biomeAssetPalette;
+    this.regionalCharacterField = regionalCharacterField;
+    this.prototypeIndicesByAsset = new Map();
     this.textureLoader = new THREE.TextureLoader();
     this.time = uniform(0);
     this.prototypes = [];
     this.prototypeSignature = null;
     this.speciesPrototypeIndex = null;
+    this.prototypeTileIds = null;
+    this.leafTints = createForestLeafTintTable({ config });
     this.proxyPrototypes = [];
     this.fallbackImpostorPrototypes = [];
     this.renderers = [];
@@ -135,79 +191,232 @@ export class StylizedTreeView {
     return { color, ao, height };
   }
 
-  async buildFromScene(scene) {
+  /**
+   * Alpha card for the crown leaf quads. Clamped rather than repeated: each quad
+   * maps the whole card once, so wrapping would only bleed neighbouring leaves
+   * across the edge. Returns null when cards are switched off in config.
+   */
+  async loadFoliageCard() {
+    const path = this.config.assets.foliageCard;
+    if (!path || !(this.config.trees.cardsPerLobe > 0)) return null;
+    const card = await this.textureLoader.loadAsync(this.resolveUrl(path));
+    card.wrapS = THREE.ClampToEdgeWrapping;
+    card.wrapT = THREE.ClampToEdgeWrapping;
+    card.colorSpace = THREE.NoColorSpace;
+    card.needsUpdate = true;
+    this.textures.push(card);
+    return card;
+  }
+
+  async buildFromScene(scene, authoredVariants = []) {
     if (!this.config.trees.enabled || !scene || this.disposed) return;
-    const barkTextures = await this.loadBarkTextures();
+    const [barkTextures, foliageCard] = await Promise.all([
+      this.loadBarkTextures(),
+      this.loadFoliageCard(),
+    ]);
     if (this.disposed) return;
-    scene.updateMatrixWorld(true);
-    const roots = scene.children.flatMap((child) => findPrototypeRoots(child, this.config));
-    if (roots.length === 0) {
+    const primaryCount = this.appendScenePrototypes(scene, this.config, barkTextures);
+    if (primaryCount === 0) {
       throw new Error('No pine prototype contains both configured trunk and leaf materials.');
     }
 
-    for (const root of roots) {
-      const baked = extractPrototypeParts(root, this.config);
+    const glbPrototypeCount = this.prototypes.length;
+    registerPrototypeIndices(
+      this.prototypeIndicesByAsset,
+      this.config.assets.scene,
+      0,
+      glbPrototypeCount,
+    );
+    const additionalPrototypeIndicesBySpecies = new Map();
+    const prototypeTileIds = new Map();
+    for (const { scene: variantScene, definition: inputDefinition } of authoredVariants) {
+      const definition = inferTreeMaterials(variantScene, inputDefinition);
+      const extractionConfig = {
+        ...this.config,
+        assets: {
+          ...this.config.assets,
+          leafMaterial: definition.leafMaterial,
+          trunkMaterial: definition.trunkMaterial,
+        },
+      };
+      const firstIndex = this.prototypes.length;
+      const authoredBarkTextures = definition.barkProfile
+        ? createProceduralBarkTextures({
+          profile: definition.barkProfile,
+          seed: definition.barkSeed,
+        })
+        : null;
+      if (authoredBarkTextures) {
+        this.textures.push(
+          authoredBarkTextures.albedoHeight,
+          authoredBarkTextures.normalRoughness,
+        );
+      }
+      const count = this.appendScenePrototypes(variantScene, extractionConfig, barkTextures, {
+        preserveSourceAppearance: true,
+        scale: definition.scale,
+        authoredBarkTextures,
+        authoredBarkScale: definition.barkScale,
+        prototypeGroups: definition.prototypeGroups,
+        sourceLabel: `Tree variant ${definition.scene}`,
+      });
+      if (count === 0) {
+        throw new Error(
+          `Tree variant ${definition.scene} contains no upright prototype with its configured materials.`,
+        );
+      }
+      const indices = Array.from({ length: count }, (_, offset) => firstIndex + offset);
+      registerPrototypeIndices(
+        this.prototypeIndicesByAsset,
+        definition.id ?? definition.scene,
+        firstIndex,
+        count,
+      );
+      if (definition.tileIds) {
+        const tiles = new Set(definition.tileIds);
+        for (const index of indices) prototypeTileIds.set(index, tiles);
+      }
+      // One geometry can serve several species. We have three authored broadleaf
+      // crowns, not six, so a tropical emergent and a temperate beech share a
+      // mesh and are told apart by the species registry's crown aspect, spacing
+      // and trunk proportions plus the per-biome canopy hue. Listing the species
+      // here is free; a second `scene:` entry would cost another pair of
+      // full-capacity InstancedMeshes for identical geometry.
+      const speciesIds = Array.isArray(definition.species)
+        ? definition.species
+        : [definition.species];
+      for (const speciesId of speciesIds) {
+        const existing = additionalPrototypeIndicesBySpecies.get(speciesId) ?? [];
+        additionalPrototypeIndicesBySpecies.set(speciesId, [...existing, ...indices]);
+      }
+    }
+    // Only now is authored coverage known, so only now can the fallback set be
+    // decided. With the shipped configuration this generates nothing.
+    const generatedFirstIndex = this.prototypes.length;
+    const generatedSpeciesIds = this.appendGeneratedSpeciesPrototypes(
+      barkTextures,
+      foliageCard,
+      uncoveredGeneratedSpecies(additionalPrototypeIndicesBySpecies.keys()),
+    );
+    this.speciesPrototypeIndex = createSpeciesPrototypeIndex({
+      glbPrototypeCount,
+      generatedSpeciesIds,
+      generatedFirstIndex,
+      additionalPrototypeIndicesBySpecies,
+    });
+    this.prototypeTileIds = prototypeTileIds;
+    this.prototypeSignature = createTreeImpostorSourceSignature(this.prototypes, this.config);
+    this.createRenderResources();
+  }
+
+  appendScenePrototypes(
+    scene,
+    extractionConfig,
+    barkTextures,
+    {
+      preserveSourceAppearance = false,
+      scale = 1,
+      authoredBarkTextures = null,
+      authoredBarkScale = 0.8,
+      prototypeGroups = null,
+      sourceLabel = 'Tree prototype',
+    } = {},
+  ) {
+    scene.updateMatrixWorld(true);
+    const rootGroups = prototypeGroups
+      ? resolveAuthoredPrototypeGroups(scene, prototypeGroups, sourceLabel)
+      : scene.children.flatMap(
+        (child) => findPrototypeRoots(child, extractionConfig).map((root) => [root]),
+      );
+    const firstIndex = this.prototypes.length;
+    for (const roots of rootGroups) {
+      const baked = roots.length === 1
+        ? extractPrototypeParts(roots[0], extractionConfig)
+        : extractPrototypePartsFromRoots(roots, extractionConfig);
       if (!baked) continue;
+      if (scale !== 1) {
+        for (const part of baked) {
+          part.geometry.scale(scale, scale, scale);
+          part.geometry.computeBoundingBox();
+          part.geometry.computeBoundingSphere();
+        }
+      }
       const parts = baked.map((part) => {
         const source = firstMaterial(
           part.source,
-          part.kind === 'leaf' ? this.config.assets.leafMaterial : this.config.assets.trunkMaterial,
+          part.kind === 'leaf'
+            ? extractionConfig.assets.leafMaterial
+            : extractionConfig.assets.trunkMaterial,
         );
-        let leafMap = null;
-        if (part.kind === 'leaf' && source?.map) {
-          leafMap = source.map.clone();
-          leafMap.needsUpdate = true;
-          this.textures.push(leafMap);
+        let sourceMap = null;
+        if (source?.map) {
+          sourceMap = source.map.clone();
+          sourceMap.needsUpdate = true;
+          this.textures.push(sourceMap);
         }
         const material = part.kind === 'leaf'
           ? createStylizedLeafMaterial({
             source,
-            leafMap,
+            leafMap: sourceMap,
             bounds: {
               minY: part.geometry.boundingBox.min.y,
               maxY: part.geometry.boundingBox.max.y,
             },
             time: this.time,
             config: this.config,
+            preserveSourceColor: preserveSourceAppearance,
           })
-          : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config });
+          : (preserveSourceAppearance
+            ? createAuthoredTrunkMaterial({
+              source,
+              sourceMap,
+              barkTextures: authoredBarkTextures,
+              barkScale: authoredBarkScale,
+            })
+            : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config }));
         return {
           geometry: part.geometry,
           material,
           kind: part.kind,
-          sourceMap: leafMap,
+          sourceMap,
         };
       });
-      attachRootCollar(parts);
+      // Imported variants already include their authored trunk base. The generic
+      // collar is sized from all trunk/branch bounds, which can turn a spreading
+      // broadleaf into a conspicuous polygonal plinth.
+      if (!preserveSourceAppearance) attachRootCollar(parts);
       if (parts.length > 0) this.prototypes.push(parts);
     }
-    if (this.prototypes.length === 0) {
-      throw new Error('Pine prototype extraction produced no upright renderable parts.');
-    }
-
-    this.appendGeneratedSpeciesPrototypes(barkTextures);
-    this.prototypeSignature = createTreeImpostorSourceSignature(this.prototypes, this.config);
-    this.createRenderResources();
+    return this.prototypes.length - firstIndex;
   }
 
   /**
-   * The source GLB only contains conifers, so broadleaf species are generated.
-   * They append after the GLB prototypes, which keeps existing baked impostor
-   * indices aligned with the GLB range.
+   * Last-resort geometry for species no authored variant covers — a custom
+   * preset naming a species its GLBs do not supply, for instance. These append
+   * after both the source-GLB conifers and the authored variants, so they are
+   * always the tail of the prototype range.
+   *
+   * Returns the species it actually generated, which may be empty.
    */
-  appendGeneratedSpeciesPrototypes(barkTextures) {
-    const glbPrototypeCount = this.prototypes.length;
-    const generated = createForestSpeciesPrototypeGeometry(FOREST_GENERATED_SPECIES);
+  appendGeneratedSpeciesPrototypes(barkTextures, foliageCard, speciesIds) {
+    if (speciesIds.length === 0) return [];
+    const generated = createForestSpeciesPrototypeGeometry(speciesIds, {
+      cardsPerLobe: foliageCard ? this.config.trees.cardsPerLobe : 0,
+      cardScale: this.config.trees.cardScale,
+    });
     for (const prototype of generated) {
       const palette = FOREST_SPECIES_PALETTES[prototype.speciesId] ?? null;
       const parts = prototype.parts.map((part) => ({
         geometry: part.geometry,
         kind: part.kind,
-        sourceMap: null,
+        sourceMap: part.card ? foliageCard : null,
         material: part.kind === 'leaf'
           ? createStylizedLeafMaterial({
             source: null,
-            leafMap: null,
+            // Only the card part is cut; the lobes stay solid so the canopy keeps
+            // an interior and does not go see-through.
+            leafMap: part.card ? foliageCard : null,
+            alphaTest: part.card ? this.config.trees.cardAlphaTest : 0,
             bounds: {
               minY: part.geometry.boundingBox.min.y,
               maxY: part.geometry.boundingBox.max.y,
@@ -226,10 +435,7 @@ export class StylizedTreeView {
       // and the collar it merges is indexed while these are de-indexed.
       this.prototypes.push(parts);
     }
-    this.speciesPrototypeIndex = createSpeciesPrototypeIndex({
-      glbPrototypeCount,
-      generatedSpeciesIds: generated.map((prototype) => prototype.speciesId),
-    });
+    return generated.map((prototype) => prototype.speciesId);
   }
 
   createRenderResources() {
@@ -261,6 +467,7 @@ export class StylizedTreeView {
       capacity: nearCapacity,
       name: 'stylized-pine-near',
       castShadow: true,
+      tintLeaves: true,
     });
     this.proxyRenderers = createInstancedRenderers({
       root: this.root,
@@ -268,6 +475,7 @@ export class StylizedTreeView {
       capacity: proxyCapacity,
       name: 'stylized-pine-proxy',
       castShadow: false,
+      tintLeaves: true,
     });
     this.fallbackImpostorRenderers = createInstancedRenderers({
       root: this.root,
@@ -275,14 +483,21 @@ export class StylizedTreeView {
       capacity: impostorCapacity,
       name: 'stylized-pine-impostor-fallback',
       castShadow: false,
+      tintLeaves: true,
     });
-    this.clusterPrototypes = [[createCanopyClusterPart(this.config)]];
+    // Skipped outright when the band is off rather than left empty: the renderer
+    // sizes itself for the cluster radius, so an unreachable band still cost about
+    // a megabyte of instance buffers.
+    this.clusterPrototypes = settings.thresholds.clusterPixels > 0
+      ? [[createCanopyClusterPart(this.config)]]
+      : [];
     this.clusterRenderers = createInstancedRenderers({
       root: this.root,
       partsByPrototype: this.clusterPrototypes,
       capacity: capacityFor(settings.clusterRadius),
       name: 'stylized-canopy-cluster',
       castShadow: false,
+      tintLeaves: true,
     });
     this.understoryPrototypes = createForestUnderstoryPrototypes(this.config);
     this.understoryRenderers = createInstancedRenderers({
@@ -299,7 +514,9 @@ export class StylizedTreeView {
       revisionTracker: this.revisionTracker,
       prototypeCount: this.prototypes.length,
       prototypeIndexBySpecies: this.speciesPrototypeIndex ?? null,
+      prototypeTileIds: this.prototypeTileIds ?? null,
       objectMap: this.objectMap,
+      regionalCharacterField: this.regionalCharacterField,
       onBuilt: () => {
         // Newly built manifests need a follow-up LOD write; the update loop
         // detects `manifestFlush.built > 0` and enqueues one budgeted rebuild.
@@ -390,7 +607,9 @@ export class StylizedTreeView {
     const revision = this.revisionTracker.windowSignature(focus, radius + 1, 1);
     // Per-chunk rock blockers live in TreeManifestStore — do not use a global
     // rock signature that would rebuild every tree band when far rocks stream.
-    const key = `${focus.chunkX}:${focus.chunkZ}:${revision}:${plan.signature}:${this.impostorVersion}`;
+    const key = `${focus.chunkX}:${focus.chunkZ}:${revision}:${plan.signature}:${
+      this.impostorVersion
+    }:${this.biomeAssetPalette?.revision ?? 0}`;
 
     for (const entry of plan.entries) {
       const visible = entry.representations.some((value) => (
@@ -451,6 +670,8 @@ export class StylizedTreeView {
       fallbackImpostorRenderers: this.fallbackImpostorRenderers,
       clusterRenderers: this.clusterRenderers,
       understoryRenderers: this.understoryRenderers,
+      resolveLeafTint: (record) => this.resolveLeafTint(record),
+      resolvePrototypeIndex: (placement) => this.resolvePalettePrototypeIndex(placement),
     });
     // Deliberately no second manifest flush here. `update` already flushed the
     // queue this frame; flushing again put a full chunk manifest build — fractal
@@ -458,6 +679,40 @@ export class StylizedTreeView {
     // instance rebuild, which is what made these frames 12-18 ms. Chunks scheduled
     // during the rebuild are picked up by the next frame's flush.
     return true;
+  }
+
+  /** Canonical tile under a placement, in the same convention the scatter uses. */
+  tileIdAt(x, z) {
+    const tileSize = this.terrainView.worldStore.tileSize;
+    return this.terrainView.tileMap.get(
+      Math.floor(x / tileSize),
+      Math.floor(-z / tileSize),
+    );
+  }
+
+  /**
+   * Per-instance canopy hue. A turned grove keeps its autumn colour; everything
+   * else takes the hue of the biome it stands in, which is what makes a taiga
+   * read differently from a rainforest when both draw the same authored crown.
+   */
+  resolveLeafTint(record) {
+    return this.leafTints.tintFor(
+      record.speciesId,
+      record.groveSeed ?? 0,
+      this.tileIdAt(record.x, record.z),
+    );
+  }
+
+  resolvePalettePrototypeIndex(placement) {
+    if (!this.biomeAssetPalette) return placement.prototypeIndex;
+    const tileId = this.tileIdAt(placement.x, placement.z);
+    return this.biomeAssetPalette.resolvePrototypeIndex({
+      tileId,
+      layerId: 'trees',
+      automaticIndex: placement.prototypeIndex,
+      prototypeIndicesByAsset: this.prototypeIndicesByAsset,
+      roll: placement.priority,
+    });
   }
 
   createNearOnlyPlan(focus, radius) {
@@ -499,6 +754,7 @@ export class StylizedTreeView {
     disposePrototypeParts(this.fallbackImpostorPrototypes);
     disposePrototypeParts(this.clusterPrototypes);
     disposePrototypeParts(this.understoryPrototypes);
+    this.prototypeIndicesByAsset.clear();
     this.textures.forEach((texture) => texture.dispose());
     this.manifestStore?.dispose();
     this.chunkLodStates.clear();

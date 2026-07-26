@@ -22,6 +22,12 @@ function assertPositive(value, path) {
   }
 }
 
+function assertNonNegative(value, path) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Invalid editor configuration: ${path} must not be negative.`);
+  }
+}
+
 function assertFinite(value, path) {
   if (!Number.isFinite(value)) {
     throw new Error(`Invalid editor configuration: ${path} must be finite.`);
@@ -53,11 +59,13 @@ function validateTreeBand(tree) {
     ['nearPixels', tree.nearPixels],
     ['proxyPixels', tree.proxyPixels],
     ['impostorPixels', tree.impostorPixels],
-    ['clusterPixels', tree.clusterPixels],
     ['transitionMs', tree.transitionMs],
   ]) {
     assertPositive(value, `stylizedSurface.lod.tree.${name}`);
   }
+  // Zero disables the aggregate canopy band rather than matching every tree, so
+  // this threshold alone is allowed down to zero.
+  assertNonNegative(tree.clusterPixels, 'stylizedSurface.lod.tree.clusterPixels');
   if (!(tree.nearPixels > tree.proxyPixels
       && tree.proxyPixels > tree.impostorPixels
       && tree.impostorPixels > tree.clusterPixels)) {
@@ -182,7 +190,34 @@ function validateRockAppearance(rocks) {
   if (rocks.color !== undefined && (typeof rocks.color !== 'string' || rocks.color.length === 0)) {
     throw new Error('Invalid editor configuration: stylizedSurface.rocks.color must be a colour string.');
   }
+  if (rocks.proxyColor !== undefined
+    && (typeof rocks.proxyColor !== 'string' || rocks.proxyColor.length === 0)) {
+    throw new Error('Invalid editor configuration: stylizedSurface.rocks.proxyColor must be a colour string.');
+  }
   validateClusterField(rocks, 'stylizedSurface.rocks');
+}
+
+function validateGroundDetailLayer(layer, path) {
+  if (!layer) return;
+  assertBoolean(layer.enabled, `${path}.enabled`);
+  if (!layer.enabled) return;
+  assertNonNegativeInteger(layer.residentRadius, `${path}.residentRadius`);
+  assertPositiveInteger(layer.perChunk, `${path}.perChunk`);
+  if (layer.perChunk > 256) {
+    throw new Error(`Invalid editor configuration: ${path}.perChunk must not exceed 256.`);
+  }
+  assertPositive(layer.minScale, `${path}.minScale`);
+  assertPositive(layer.maxScale, `${path}.maxScale`);
+  if (layer.maxScale < layer.minScale) {
+    throw new Error(`Invalid editor configuration: ${path}.maxScale must cover its minimum.`);
+  }
+  assertPositive(layer.radius, `${path}.radius`);
+  assertFinite(layer.heightOffset, `${path}.heightOffset`);
+  assertUnitInterval(layer.colorVariation, `${path}.colorVariation`);
+  assertBoolean(layer.castShadow, `${path}.castShadow`);
+  if (!Array.isArray(layer.tileIds) || layer.tileIds.length === 0) {
+    throw new Error(`Invalid editor configuration: ${path}.tileIds must be a non-empty array.`);
+  }
 }
 
 function validateImpostor(impostor) {
@@ -257,6 +292,15 @@ export function validateStylizedLodConfig(config) {
     if (habitat.patchSampleSpacing !== undefined) {
       assertPositive(habitat.patchSampleSpacing, 'stylizedSurface.trees.habitat.patchSampleSpacing');
     }
+    for (const name of ['coverageContrast', 'coreDensityBoost']) {
+      if (habitat[name] === undefined) continue;
+      assertPositive(habitat[name], `stylizedSurface.trees.habitat.${name}`);
+      if (habitat[name] > 8) {
+        throw new Error(
+          `Invalid editor configuration: stylizedSurface.trees.habitat.${name} must not exceed 8.`,
+        );
+      }
+    }
     if (habitat.waterRangeMeters !== undefined) {
       assertFinite(habitat.waterRangeMeters, 'stylizedSurface.trees.habitat.waterRangeMeters');
       if (habitat.waterRangeMeters < 0) {
@@ -316,6 +360,8 @@ export function validateStylizedLodConfig(config) {
   validateAerial(surface.sky?.aerial);
   validateBushes(surface.bushes);
   validateRockAppearance(surface.rocks);
+  validateGroundDetailLayer(surface.groundDetails, 'stylizedSurface.groundDetails');
+  validateGroundDetailLayer(surface.aquaticPlants, 'stylizedSurface.aquaticPlants');
   if (!surface.lod) return config;
   assertBoolean(surface.lod.enabled, 'stylizedSurface.lod.enabled');
   validateTreeBand(surface.lod.tree);

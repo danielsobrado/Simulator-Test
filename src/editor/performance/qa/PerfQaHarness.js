@@ -20,6 +20,7 @@ export class PerfQaHarness {
     viewModeController,
     playerController,
     terrainView,
+    objectView = null,
     stylizedSurface = null,
     voxelPrototype = null,
     editorConfig = null,
@@ -29,6 +30,7 @@ export class PerfQaHarness {
     this.viewModeController = viewModeController;
     this.playerController = playerController;
     this.terrainView = terrainView;
+    this.objectView = objectView;
     this.stylizedSurface = stylizedSurface;
     this.voxelPrototype = voxelPrototype;
     this.editorConfig = editorConfig;
@@ -94,6 +96,11 @@ export class PerfQaHarness {
 
   start() {
     PerfCounters.reset();
+    this.objectView?.updatePerformanceCounters();
+    if (this.config.scenarioId === 'object-town') {
+      PerfCounters.set('objectQaTarget', this.config.buildingCount);
+      PerfCounters.set('objectQaPlaced', this.objectView?.objectMap?.size ?? 0);
+    }
     this.profiler = new FrameProfiler({ hitchMs: this.config.hitchMs });
     this.report = null;
     this.status = 'running';

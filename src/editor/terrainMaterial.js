@@ -6,9 +6,7 @@ import {
   distance,
   dot,
   float,
-  fract,
   max,
-  min,
   mix,
   oneMinus,
   positionLocal,
@@ -20,9 +18,14 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { stylizedDirtMask, stylizedFbm, stylizedPatchMask } from './stylized/StylizedNoiseNodes.js';
+import {
+  stylizedDirtMask,
+  stylizedFbm,
+  stylizedNaturalTrailMask,
+  stylizedPatchMask,
+  stylizedPathWearMask,
+} from './stylized/StylizedNoiseNodes.js';
 
-const CELL_GRID_COLOR = vec3(0.035, 0.045, 0.038);
 const HEIGHT_SHADE_SCALE = 0.018;
 const MINIMUM_HEIGHT_SHADE = 0.72;
 const MAXIMUM_HEIGHT_SHADE = 1.22;
@@ -32,12 +35,6 @@ function colorNode(value) {
   return vec3(color.r, color.g, color.b);
 }
 
-function gridLine(coordinate, width) {
-  const wrapped = fract(coordinate);
-  const edge = min(wrapped, vec2(1).sub(wrapped));
-  return oneMinus(smoothstep(0, width, min(edge.x, edge.y)));
-}
-
 export function createTerrainMaterial({
   tileTexture,
   heightTexture,
@@ -45,17 +42,13 @@ export function createTerrainMaterial({
   forestFloorTexture,
   chunkCenter,
   chunkWorldSize,
-  width,
-  height,
   stylizedConfig,
 }) {
   const terrainUv = uv();
-  const mapSize = vec2(width, height);
   const tileColor = texture(tileTexture, terrainUv).rgb;
   const terrainHeight = texture(heightTexture, terrainUv).r;
   const surface = texture(surfaceMaskTexture, terrainUv);
   const forestFloor = texture(forestFloorTexture, terrainUv).r;
-  const cellGrid = gridLine(terrainUv.mul(mapSize), 0.045);
   const heightShade = clamp(
     terrainHeight.mul(HEIGHT_SHADE_SCALE).add(1),
     MINIMUM_HEIGHT_SHADE,
@@ -77,14 +70,26 @@ export function createTerrainMaterial({
     bias: float(stylizedConfig.patch.bias),
   };
   const grassCoverage = surface.g;
-  const pathMask = surface.r;
   const proceduralDirt = stylizedDirtMask(worldXZ, dirtSettings).mul(grassCoverage);
-  // The path mask fades out across its blend band. The tread is the inner, fully
-  // bare part; the remainder is the verge, where grass thins but does not vanish.
   const pathConfig = stylizedConfig.path ?? {};
-  const treadStart = float(pathConfig.vergeWidth ?? 0.45);
-  const tread = smoothstep(treadStart, 1, pathMask);
-  const dirt = max(tread, proceduralDirt);
+  const naturalTrailConfig = pathConfig.naturalTrail;
+  const naturalTrail = naturalTrailConfig?.enabled
+    ? stylizedNaturalTrailMask(worldXZ, {
+      scale: float(naturalTrailConfig.scale),
+      level: float(naturalTrailConfig.level),
+      width: float(naturalTrailConfig.width),
+      softness: float(naturalTrailConfig.softness),
+      warp: float(naturalTrailConfig.warp),
+    }).mul(grassCoverage)
+    : float(0);
+  const pathMask = max(surface.r, naturalTrail);
+  const pathWear = stylizedPathWearMask(pathMask, worldXZ, {
+    vergeWidth: float(pathConfig.vergeWidth ?? 0.45),
+    vergeCut: float(pathConfig.vergeCut ?? 0.72),
+    edgeScale: float(pathConfig.edgeScale ?? 0.42),
+    edgeWarp: float(pathConfig.edgeWarp ?? 0.18),
+  });
+  const dirt = max(pathWear.wear, proceduralDirt);
   const patch = stylizedPatchMask(worldXZ, patchSettings);
   const grassTint = mix(
     colorNode(stylizedConfig.color.bottom),
@@ -98,29 +103,35 @@ export function createTerrainMaterial({
   let groundColor = mix(tileColor, grassTint, grassCoverage);
   // Verge first, then the bare tread on top, so the path reads as a worn centre
   // with a scuffed margin instead of a hard-edged stripe.
-  const verge = pathMask.sub(tread).max(0);
   groundColor = mix(
     groundColor,
     mix(grassTint, colorNode(stylizedConfig.dirt.color), pathConfig.vergeBlend ?? 0.55),
-    verge,
+    pathWear.verge,
   );
-  groundColor = mix(groundColor, colorNode(stylizedConfig.dirt.color), dirt);
-  // Ruts: banded noise stretched along the path so wheel tracks follow it.
+  groundColor = mix(groundColor, colorNode(stylizedConfig.dirt.color), max(pathWear.tread, proceduralDirt));
+  // Layered soil variation keeps the path from reading as one flat tan ribbon.
   const rutStrength = pathConfig.rutStrength ?? 0;
   if (rutStrength > 0) {
-    const ruts = stylizedFbm(worldXZ.mul(vec2(
-      pathConfig.rutScale ?? 1.6,
-      (pathConfig.rutScale ?? 1.6) * 0.18,
-    ))).sub(0.5);
+    const rutScale = pathConfig.rutScale ?? 1.6;
+    const ruts = stylizedFbm(worldXZ.mul(rutScale)).sub(0.5)
+      .add(stylizedFbm(worldXZ.mul(rutScale * 4.1).add(vec2(7.1, 3.7))).sub(0.5).mul(0.35));
     groundColor = groundColor.mul(
-      float(1).add(ruts.mul(rutStrength).mul(tread)),
+      float(1).add(ruts.mul(rutStrength).mul(pathWear.mask)),
     );
   }
   const forestFloorConfig = stylizedConfig.trees?.forestFloor ?? {};
+  // Canopy tint belongs to the living forest floor, not exposed earth. Applying
+  // it after the dirt/path layers without this guard recolours their warm soil
+  // into broad grey-green swaths wherever the forest field overlaps a worn area.
+  // Keeping the masks mutually exclusive also preserves the same dirt colour the
+  // grass and flower shaders use at the transition.
+  const forestFloorTint = forestFloor
+    .mul(forestFloorConfig.groundStrength ?? 0.68)
+    .mul(oneMinus(dirt));
   groundColor = mix(
     groundColor,
     colorNode(forestFloorConfig.groundCoreColor ?? '#273c25'),
-    forestFloor.mul(forestFloorConfig.groundStrength ?? 0.68),
+    forestFloorTint,
   );
 
   const variation = stylizedFbm(worldXZ.mul(stylizedConfig.ground.variationScale)).sub(0.5);
@@ -142,31 +153,56 @@ export function createTerrainMaterial({
   const farCover = stylizedConfig.groundCover;
   if (farCover?.enabled) {
     const cameraDistance = distance(cameraPosition, positionWorld);
+    // A wooded floor is shaded, not bare. Removing the far cover outright under
+    // canopy left distant forest as flat unbroken ground, which — together with
+    // the `groundCoreColor` tint and the thinned blade density — is what made the
+    // forest interior read as near-black. `forestRetention` thins it instead.
+    const retention = float(farCover.forestRetention ?? 0.5);
     const farMask = smoothstep(farCover.startDistance, farCover.endDistance, cameraDistance)
       .mul(grassCoverage)
-      .mul(oneMinus(forestFloor))
+      .mul(oneMinus(forestFloor.mul(oneMinus(retention))))
       .mul(oneMinus(dirt));
     const direction = vec2(farCover.direction[0], farCover.direction[1]);
-    const strand = smoothstep(
+    const strandA = smoothstep(
       farCover.strandThreshold,
       1,
       abs(sin(dot(worldXZ, direction).mul(farCover.frequency)
         .add(stylizedFbm(worldXZ.mul(farCover.noiseScale)).mul(farCover.noiseWarp)))),
+    );
+    const crossDirection = vec2(direction.y.negate(), direction.x);
+    const strandB = smoothstep(
+      Math.min(0.98, farCover.strandThreshold + 0.08),
+      1,
+      abs(sin(dot(worldXZ, crossDirection).mul(farCover.frequency * 1.37)
+        .add(stylizedFbm(worldXZ.mul(farCover.noiseScale * 1.7).add(vec2(4.7, 9.2)))
+          .mul(farCover.noiseWarp)))),
+    );
+    const strand = max(strandA, strandB.mul(0.7));
+    const coverVariation = smoothstep(
+      0.2,
+      0.82,
+      stylizedFbm(worldXZ.mul(farCover.noiseScale * 0.55).add(vec2(13.1, 5.3))),
     );
     const farGrass = mix(
       grassTint,
       colorNode(farCover.tipColor),
       strand.mul(farCover.tipStrength),
     );
-    groundColor = mix(groundColor, farGrass, farMask.mul(farCover.strength));
+    groundColor = mix(
+      groundColor,
+      farGrass,
+      farMask.mul(farCover.strength).mul(mix(float(0.62), float(1), coverVariation)),
+    );
   }
 
   groundColor = max(groundColor, vec3(0));
 
   const material = new THREE.MeshLambertNodeMaterial();
-  const cellShaded = mix(groundColor, CELL_GRID_COLOR, cellGrid.mul(0.08));
-  material.colorNode = cellShaded.mul(heightShade);
-  material.normalNode = vec3(0, 0, 1);
+  material.colorNode = groundColor.mul(heightShade);
+  // Leave normalNode on the material default: PlaneGeometry's local +Z is
+  // transformed through the mesh's -90° X rotation into world +Y and then into
+  // view space. A literal local +Z here bypasses those transforms and makes the
+  // ground light as though its normal points toward the camera.
   material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
   return material;
 }

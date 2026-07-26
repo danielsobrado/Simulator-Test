@@ -89,3 +89,23 @@ test('source signature changes with geometry or bake configuration', () => {
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });
+
+test('source signature changes with authored tree material configuration', () => {
+  const prototypeParts = [[{
+    kind: 'trunk',
+    geometry: geometry(1),
+    sourceMap: null,
+  }]];
+  const first = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    assets: { treeVariants: [{ barkProfile: 'spruce', barkScale: 0.8 }] },
+    lod: { impostor: {} },
+  });
+  const changed = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    assets: { treeVariants: [{ barkProfile: 'beech', barkScale: 0.8 }] },
+    lod: { impostor: {} },
+  });
+
+  assert.notEqual(first, changed);
+});

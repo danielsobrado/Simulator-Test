@@ -1,0 +1,12 @@
+{
+  "kind": "simcity-dnd-map-library",
+  "version": 1,
+  "maps": [
+    {
+      "id": "eldara-2026",
+      "name": "Eldara Full (2026)",
+      "url": "Eldara Full 2026-07-23-20-37.json",
+      "format": "azgaar-full-json"
+    }
+  ]
+}

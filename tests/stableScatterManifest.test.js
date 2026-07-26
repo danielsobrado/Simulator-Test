@@ -50,3 +50,37 @@ test('stable blockers remove overlapping candidates', () => {
   }]));
   assert.ok(!blocked.some((candidate) => candidate.stableId === baseline[0].stableId));
 });
+
+test('stable manifests support deterministic weighted prototype selection', () => {
+  const manifest = buildStableChunkManifest({
+    ...options(0, 0),
+    prototypeIndexForRoll: () => 2,
+  });
+
+  assert.ok(manifest.length > 0);
+  assert.ok(manifest.every((candidate) => candidate.prototypeIndex === 2));
+  assert.throws(
+    () => buildStableChunkManifest({
+      ...options(0, 0),
+      prototypeIndexForRoll: () => 3,
+    }),
+    /available prototype index/,
+  );
+});
+
+test('prototype selection receives the candidate biome tile ID', () => {
+  const seenTileIds = new Set();
+  const manifest = buildStableChunkManifest({
+    ...options(0, 0),
+    tileIds: [7],
+    tileAt: () => 7,
+    prototypeIndexForRoll: (_roll, tileId) => {
+      seenTileIds.add(tileId);
+      return 1;
+    },
+  });
+
+  assert.ok(manifest.length > 0);
+  assert.deepEqual([...seenTileIds], [7]);
+  assert.ok(manifest.every((candidate) => candidate.prototypeIndex === 1));
+});

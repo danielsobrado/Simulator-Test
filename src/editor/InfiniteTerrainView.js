@@ -22,6 +22,10 @@ import {
   enrichPageRenderPixels,
 } from './world/ChunkRenderPixels.js';
 import { TileDistanceField } from './stylized/forest/TileDistanceField.js';
+import {
+  StylizedGodRaysPostProcess,
+  directionFromAngles,
+} from './stylized/StylizedGodRaysPostProcess.js';
 
 const PICK_ITERATIONS = 6;
 const PREVIEW_HEIGHT_OFFSET = 0.08;
@@ -215,6 +219,17 @@ export class InfiniteTerrainView {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#0a100c');
+    const skyConfig = stylizedConfig?.sky;
+    this.godRays = new StylizedGodRaysPostProcess({
+      renderer: this.renderer,
+      scene: this.scene,
+      config: skyConfig?.godRays,
+      sunDirection: directionFromAngles(
+        skyConfig?.sunElevation ?? 10,
+        skyConfig?.sunAzimuth ?? 258,
+      ),
+      sunColor: skyConfig?.sunColor ?? '#ffffff',
+    });
     this.geometry = new THREE.PlaneGeometry(
       this.chunkWorldSize,
       this.chunkWorldSize,
@@ -264,7 +279,13 @@ export class InfiniteTerrainView {
   }
 
   render(camera) {
-    this.renderer.render(this.scene, camera);
+    if (!this.godRays.render(camera)) {
+      this.renderer.render(this.scene, camera);
+    }
+  }
+
+  prewarmPostProcessing(camera) {
+    return this.godRays.prewarm(camera);
   }
 
   getStreamingStatus() {
@@ -746,6 +767,7 @@ export class InfiniteTerrainView {
       slot.forestFloorTexture.dispose();
     }
     this.geometry.dispose();
+    this.godRays.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

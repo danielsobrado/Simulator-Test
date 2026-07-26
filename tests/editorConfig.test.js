@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import yaml from 'js-yaml';
 import { validateEditorConfig } from '../src/config/validateEditorConfig.js';
 
 function createValidConfig() {
@@ -64,6 +66,15 @@ function createValidConfig() {
 test('accepts positive nested map, world, camera, player, renderer, and terrain values', () => {
   const config = createValidConfig();
   assert.equal(validateEditorConfig(config), config);
+});
+
+test('starts with streamed voxel chunks hidden', () => {
+  const config = yaml.load(readFileSync(
+    new URL('../editor.config.yaml', import.meta.url),
+    'utf8',
+  ));
+
+  assert.equal(config.voxelPrototype.visible, false);
 });
 
 test('reads import.azgaarAtlasLongEdge through nested object paths', () => {

@@ -15,12 +15,17 @@ import {
 import {
   isWorkshopArchitecturalOpening,
   solveWorkshopArchitecturalSnap,
+  solveWorkshopOpeningConstraints,
   validateWorkshopOpeningPlacement,
 } from './ProceduralWorkshopArchitecturalSnapping.js';
 import {
   nextOpeningCopyId,
   serializeOpeningAttachments,
 } from './ProceduralWorkshopOpeningAttachments.js';
+import {
+  nextOpeningAssemblyId,
+  serializeOpeningAssemblies,
+} from './ProceduralWorkshopOpeningAssemblies.js';
 import { solveWorkshopBoundaryResize } from './ProceduralWorkshopBoundaryResize.js';
 
 const POINTER_SELECT_DISTANCE = 5;
@@ -225,8 +230,11 @@ function openingDescriptor(group) {
   const baseSize = bounds.getSize(new THREE.Vector3());
   const baseCenter = bounds.getCenter(new THREE.Vector3());
   return {
+    componentId: group.userData.workshopComponent.id,
     kind: group.userData.workshopComponent.kind,
     label: group.userData.workshopComponent.label,
+    assemblyId: group.userData.workshopComponent.assemblyId ?? null,
+    memberIds: group.userData.workshopComponent.memberIds ?? null,
     position: {
       x: group.position.x + baseCenter.x * group.scale.x,
       y: group.position.y + baseCenter.y * group.scale.y,
@@ -261,6 +269,7 @@ export class ProceduralWorkshopComponentController {
     this.onModeChange = onModeChange;
     this.transforms = {};
     this.openingAttachments = {};
+    this.openingAssemblies = {};
     this.groups = new Map();
     this.meshes = [];
     this.selectedComponentId = null;
@@ -269,6 +278,8 @@ export class ProceduralWorkshopComponentController {
     this.axisConstraint = 'policy';
     this.snapEnabled = true;
     this.snapInverted = false;
+    this.autoJoinEnabled = true;
+    this.pendingJoinCandidates = [];
     this.history = [];
     this.future = [];
     this.dragStartTransforms = null;
@@ -323,9 +334,14 @@ export class ProceduralWorkshopComponentController {
         <button type="button" data-component-action="duplicate" title="Duplicate the selected opening beside itself" disabled>Duplicate</button>
         <button type="button" data-component-action="repeat" title="Create a row of three evenly spaced openings" disabled>Repeat ×3</button>
         <button type="button" data-component-action="delete-opening" title="Delete a duplicated opening" disabled>Delete copy</button>
+        <button type="button" data-component-action="separate" title="Separate a joined opening assembly" disabled>Separate</button>
         <label class="workshop-component-snap">
           <input type="checkbox" data-role="workshop-component-snap" checked />
           Smart snap
+        </label>
+        <label class="workshop-component-snap">
+          <input type="checkbox" data-role="workshop-component-auto-join" checked />
+          Auto-join openings
         </label>
         <label class="workshop-component-axis">
           Axes
@@ -364,6 +380,7 @@ export class ProceduralWorkshopComponentController {
     this.spaceSelect = root.querySelector('[data-role="workshop-component-space"]');
     this.axisSelect = root.querySelector('[data-role="workshop-component-axis"]');
     this.snapInput = root.querySelector('[data-role="workshop-component-snap"]');
+    this.autoJoinInput = root.querySelector('[data-role="workshop-component-auto-join"]');
     this.valueFields = [...root.querySelectorAll('[data-transform-field]')];
     this.undoButton = root.querySelector('[data-component-action="undo"]');
     this.redoButton = root.querySelector('[data-component-action="redo"]');
@@ -372,6 +389,7 @@ export class ProceduralWorkshopComponentController {
       '[data-component-action="attach"], [data-component-action="duplicate"], [data-component-action="repeat"]',
     )];
     this.deleteOpeningButton = root.querySelector('[data-component-action="delete-opening"]');
+    this.separateButton = root.querySelector('[data-component-action="separate"]');
     this.detailsButton = root.querySelector('[data-component-action="toggle-details"]');
     this.hint = root.querySelector('[data-role="workshop-component-hint"]');
     this.snapFeedback = root.querySelector('[data-role="workshop-component-snap-feedback"]');
@@ -380,6 +398,7 @@ export class ProceduralWorkshopComponentController {
     this.onSpaceChange = () => this.setSpace(this.spaceSelect.value);
     this.onAxisChange = () => this.setAxisConstraint(this.axisSelect.value);
     this.onSnapChange = () => this.setSnapEnabled(this.snapInput.checked);
+    this.onAutoJoinChange = () => this.setAutoJoinEnabled(this.autoJoinInput.checked);
     this.onRootClick = (event) => {
       const action = event.target.closest('[data-component-action]')?.dataset.componentAction;
       if (action === 'undo') this.undo();
@@ -389,6 +408,7 @@ export class ProceduralWorkshopComponentController {
       if (action === 'duplicate') this.duplicateSelectedOpening();
       if (action === 'repeat') this.repeatSelectedOpening();
       if (action === 'delete-opening') this.deleteSelectedOpening();
+      if (action === 'separate') this.separateSelectedAssembly();
       if (action === 'toggle-details') this.toggleDetails();
     };
     this.onValueChange = (event) => {
@@ -423,6 +443,7 @@ export class ProceduralWorkshopComponentController {
     this.spaceSelect.addEventListener('change', this.onSpaceChange);
     this.axisSelect.addEventListener('change', this.onAxisChange);
     this.snapInput.addEventListener('change', this.onSnapChange);
+    this.autoJoinInput.addEventListener('change', this.onAutoJoinChange);
     this.root.addEventListener('click', this.onRootClick);
     this.root.addEventListener('change', this.onValueChange);
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
@@ -778,21 +799,32 @@ export class ProceduralWorkshopComponentController {
     if (!descriptor || surface?.type !== 'round' || !component?.attachmentPosition) {
       return descriptor;
     }
-    const size = component.attachmentSize
+    const baseSize = component.attachmentSize
       ? {
         x: component.attachmentSize[0],
         y: component.attachmentSize[1],
       }
       : descriptor.size;
+    const basePosition = group.userData.workshopBasePosition ?? group.position;
+    const deltaX = group.position.x - basePosition.x;
+    const deltaY = group.position.y - basePosition.y;
+    const size = {
+      x: baseSize.x * Math.abs(group.scale.x),
+      y: baseSize.y * Math.abs(group.scale.y),
+    };
     return {
       ...descriptor,
       position: {
-        x: component.attachmentPosition[0],
-        y: component.attachmentPosition[1] + size.y / 2,
+        x: component.attachmentPosition[0] + deltaX,
+        y: component.attachmentPosition[1] + size.y / 2 + deltaY,
       },
       size,
-      baseSize: { ...size },
-      baseCenter: { x: 0, y: size.y / 2 },
+      baseSize,
+      baseCenter: { x: 0, y: baseSize.y / 2 },
+      baseSurfacePosition: {
+        x: component.attachmentPosition[0],
+        y: component.attachmentPosition[1] + baseSize.y / 2,
+      },
     };
   }
 
@@ -867,9 +899,19 @@ export class ProceduralWorkshopComponentController {
     this.placementHelper.visible = true;
     const existing = this.openingAttachments[this.selectedComponentId];
     const stored = selectedGroup.userData.workshopStoredTransform;
+    const selectedComponent = selectedGroup.userData.workshopComponent;
     this.attachmentPreview = {
       valid: validation.valid,
       componentId: this.selectedComponentId,
+      assemblyPlacement: selectedComponent.assemblyId
+        ? {
+          hostId: context.component.id,
+          position: [
+            result.position.x,
+            result.position.y - result.size.y / 2,
+          ],
+        }
+        : null,
       attachment: {
         sourceId: existing?.sourceId ?? this.selectedComponentId,
         hostId: context.component.id,
@@ -891,10 +933,47 @@ export class ProceduralWorkshopComponentController {
     const preview = this.attachmentPreview;
     if (!preview?.valid) return false;
     const before = this.captureEditState();
+    const component = this.selectedComponent();
+    if (component?.assemblyId && preview.assemblyPlacement) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      const targetHost = this.groups.get(preview.assemblyPlacement.hostId);
+      const oldX = component.attachmentPosition?.[0] ?? 0;
+      const oldBottom = component.attachmentPosition?.[1] ?? 0;
+      const next = { ...this.openingAttachments };
+      for (const memberId of assembly.memberIds) {
+        const member = next[memberId];
+        if (!member) continue;
+        next[memberId] = {
+          ...member,
+          hostId: preview.assemblyPlacement.hostId,
+          position: [
+            this.surfaceWrappedX(
+              preview.assemblyPlacement.position[0] + member.position[0] - oldX,
+              targetHost,
+            ),
+            preview.assemblyPlacement.position[1] + member.position[1] - oldBottom,
+          ],
+        };
+      }
+      this.openingAttachments = next;
+      this.openingAssemblies = serializeOpeningAssemblies({
+        ...this.openingAssemblies,
+        [component.assemblyId]: {
+          ...assembly,
+          hostId: preview.assemblyPlacement.hostId,
+          memberIds: this.sortAssemblyMembers(
+            assembly.memberIds,
+            targetHost,
+            preview.assemblyPlacement.position[0],
+          ),
+        },
+      });
+    } else {
     this.openingAttachments = {
       ...this.openingAttachments,
       [preview.componentId]: preview.attachment,
     };
+    }
     delete this.transforms[preview.componentId];
     this.attachmentMode = false;
     this.attachmentPreview = null;
@@ -975,6 +1054,7 @@ export class ProceduralWorkshopComponentController {
     return {
       componentTransforms: copyTransformDocument(this.transforms),
       openingAttachments: serializeOpeningAttachments(this.openingAttachments),
+      openingAssemblies: serializeOpeningAssemblies(this.openingAssemblies),
     };
   }
 
@@ -991,13 +1071,14 @@ export class ProceduralWorkshopComponentController {
   restoreTransformDocument(document, notify = true) {
     const state = document?.componentTransforms
       ? document
-      : { componentTransforms: document, openingAttachments: {} };
+      : { componentTransforms: document, openingAttachments: {}, openingAssemblies: {} };
     this.transforms = Object.fromEntries(
       Object.entries(copyTransformDocument(state.componentTransforms)).filter(([componentId]) => (
         this.groups.has(componentId)
       )),
     );
     this.openingAttachments = serializeOpeningAttachments(state.openingAttachments);
+    this.openingAssemblies = serializeOpeningAssemblies(state.openingAssemblies);
     const identity = createIdentityComponentTransform();
     for (const [componentId, group] of this.groups) {
       const transform = this.transforms[componentId] ?? identity;
@@ -1037,8 +1118,12 @@ export class ProceduralWorkshopComponentController {
     for (const componentId of Object.keys(this.transforms)) {
       if (!definitions.has(componentId)) delete this.transforms[componentId];
     }
+    const assembledMembers = new Set(Object.values(this.openingAssemblies).flatMap(
+      ({ memberIds }) => memberIds,
+    ));
     for (const componentId of Object.keys(this.openingAttachments)) {
       if (componentId.startsWith('copy-') && !definitions.has(componentId)) {
+        if (assembledMembers.has(componentId)) continue;
         delete this.openingAttachments[componentId];
       }
     }
@@ -1209,6 +1294,8 @@ export class ProceduralWorkshopComponentController {
     const group = this.groups.get(componentId);
     if (!group) return;
     this.selectedComponentId = componentId;
+    this.pendingJoinCandidates = [];
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
     this.select.value = componentId;
     this.transformControls.attach(group);
     const policy = group.userData.workshopComponent.editPolicy
@@ -1225,11 +1312,24 @@ export class ProceduralWorkshopComponentController {
     const component = group.userData.workshopComponent;
     const openingSelected = isWorkshopArchitecturalOpening(component);
     for (const button of this.openingActionButtons) button.disabled = !openingSelected;
+    const assembly = component.assemblyId
+      ? this.openingAssemblies[component.assemblyId]
+      : null;
+    const deletableAssembly = Boolean(assembly?.memberIds.every((memberId) => (
+      memberId.startsWith('copy-') && this.openingAttachments[memberId]
+    )));
     this.deleteOpeningButton.disabled = !(
       openingSelected
-      && this.selectedComponentId.startsWith('copy-')
-      && this.openingAttachments[this.selectedComponentId]
+      && (
+        deletableAssembly
+        || (
+          this.selectedComponentId.startsWith('copy-')
+          && this.openingAttachments[this.selectedComponentId]
+        )
+      )
     );
+    this.deleteOpeningButton.textContent = deletableAssembly ? 'Delete assembly' : 'Delete copy';
+    this.separateButton.disabled = !component.assemblyId;
     this.hint.textContent = `${component.label} · drag gold edge arrows to reshape · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
   }
 
@@ -1288,6 +1388,14 @@ export class ProceduralWorkshopComponentController {
     this.applySnapSettings();
   }
 
+  setAutoJoinEnabled(enabled) {
+    this.autoJoinEnabled = Boolean(enabled);
+    this.autoJoinInput.checked = this.autoJoinEnabled;
+    this.pendingJoinCandidates = [];
+    this.constrainSelectedTransform();
+    return this.autoJoinEnabled;
+  }
+
   applySnapSettings() {
     const policy = this.selectedPolicy();
     const enabled = this.snapEnabled !== this.snapInverted;
@@ -1335,7 +1443,8 @@ export class ProceduralWorkshopComponentController {
       return null;
     }
     const wallBounds = directMeshBounds(parent);
-    const selected = openingDescriptor(group);
+    const surface = parent.userData.workshopComponent.attachmentSurface;
+    const selected = this.openingDescriptorOnSurface(group, surface);
     if (wallBounds.isEmpty() || !selected) return null;
     const siblings = [];
     for (const sibling of parent.children) {
@@ -1344,24 +1453,35 @@ export class ProceduralWorkshopComponentController {
       )) {
         continue;
       }
-      const descriptor = openingDescriptor(sibling);
+      const descriptor = this.openingDescriptorOnSurface(sibling, surface);
       if (descriptor) siblings.push(descriptor);
     }
     return {
       selected,
       siblings,
-      wallBounds: {
-        minX: wallBounds.min.x,
-        maxX: wallBounds.max.x,
-        minY: wallBounds.min.y,
-        maxY: wallBounds.max.y,
-      },
+      surface,
+      wallBounds: surface?.type === 'round'
+        ? {
+          minX: -Math.PI * surface.radius,
+          maxX: Math.PI * surface.radius,
+          minY: wallBounds.min.y,
+          maxY: wallBounds.max.y,
+        }
+        : {
+          minX: wallBounds.min.x,
+          maxX: wallBounds.max.x,
+          minY: wallBounds.min.y,
+          maxY: wallBounds.max.y,
+        },
     };
   }
 
   snapSelectedArchitecturally(group, policy) {
     const context = this.architecturalSnapContext(group);
-    if (!context) return null;
+    if (!context) {
+      this.pendingJoinCandidates = [];
+      return null;
+    }
     const enabled = this.snapEnabled !== this.snapInverted;
     const result = solveWorkshopArchitecturalSnap({
       kind: group.userData.workshopComponent.kind,
@@ -1375,22 +1495,63 @@ export class ProceduralWorkshopComponentController {
       edgeInset: Math.max(0.04, policy.translationSnap),
       neighborGap: Math.max(0.12, policy.translationSnap * 3),
     });
+    const component = group.userData.workshopComponent;
+    const constrained = component.kind === 'door' || component.kind === 'window'
+      ? solveWorkshopOpeningConstraints({
+        kind: component.kind,
+        mode: this.mode,
+        position: result.position,
+        size: result.size,
+        wallBounds: context.wallBounds,
+        siblings: context.siblings,
+        autoJoin: this.autoJoinEnabled,
+        edgeInset: Math.max(0.04, policy.translationSnap),
+        neighborGap: Math.max(0.12, policy.translationSnap * 3, 0.16),
+      })
+      : {
+        position: result.position,
+        size: result.size,
+        joins: [],
+        guides: [],
+      };
+    this.pendingJoinCandidates = [...constrained.joins];
+    this.selectionHelper.material.color.set(
+      this.pendingJoinCandidates.length > 0 ? INFERENCE_COLOR : SELECTION_COLOR,
+    );
     if (this.mode === 'scale') {
       for (const axis of policy.scaleAxes) {
         const baseSize = context.selected.baseSize[axis];
-        if (baseSize > 0) group.scale[axis] = result.size[axis] / baseSize;
+        if (baseSize > 0) group.scale[axis] = constrained.size[axis] / baseSize;
       }
     }
-    group.position.x = result.position.x - context.selected.baseCenter.x * group.scale.x;
-    group.position.y = result.position.y - context.selected.baseCenter.y * group.scale.y;
-    return result;
+    if (context.surface?.type === 'round' && context.selected.baseSurfacePosition) {
+      const basePosition = group.userData.workshopBasePosition;
+      group.position.x = basePosition.x
+        + constrained.position.x - context.selected.baseSurfacePosition.x;
+      group.position.y = basePosition.y
+        + constrained.position.y
+        - (
+          group.userData.workshopComponent.attachmentPosition[1]
+          + context.selected.baseSize.y * group.scale.y / 2
+        );
+    } else {
+      group.position.x = constrained.position.x - context.selected.baseCenter.x * group.scale.x;
+      group.position.y = constrained.position.y - context.selected.baseCenter.y * group.scale.y;
+    }
+    return {
+      ...result,
+      position: constrained.position,
+      size: constrained.size,
+      guides: [...result.guides, ...constrained.guides],
+      joins: constrained.joins,
+    };
   }
 
   updateSnapFeedback(guides = []) {
     if (!this.snapFeedback) return;
     const reasons = [...new Set(guides.map((guide) => guide.reason))];
     this.snapFeedback.textContent = reasons.length > 0
-      ? `Smart snap · ${reasons.slice(0, 2).join(' · ')}`
+      ? `${guides.some(({ type }) => type === 'join') ? 'Auto-join' : 'Smart snap'} · ${reasons.slice(0, 2).join(' · ')}`
       : '';
   }
 
@@ -1473,12 +1634,180 @@ export class ProceduralWorkshopComponentController {
     this.updateInferenceHelper(snappedAxes);
   }
 
+  attachmentForOpeningGroup(group, descriptor = openingDescriptor(group)) {
+    const component = group?.userData?.workshopComponent;
+    if (!component || !descriptor) return null;
+    const existing = this.openingAttachments[component.id];
+    const stored = group.userData.workshopStoredTransform ?? createIdentityComponentTransform();
+    return {
+      sourceId: existing?.sourceId ?? component.id,
+      hostId: group.parent?.userData?.workshopComponent?.id ?? component.hostId,
+      position: [
+        descriptor.position.x,
+        descriptor.position.y - descriptor.size.y / 2,
+      ],
+      scale: existing ? [...existing.scale] : [stored.scale[0], stored.scale[1]],
+    };
+  }
+
+  materializeAssemblyMember(componentId, preferredGroup = null, preferredDescriptor = null) {
+    if (this.openingAttachments[componentId]) return true;
+    const group = preferredGroup ?? this.groups.get(componentId);
+    const descriptor = preferredDescriptor ?? openingDescriptor(group);
+    const attachment = this.attachmentForOpeningGroup(group, descriptor);
+    if (!attachment) return false;
+    this.openingAttachments = {
+      ...this.openingAttachments,
+      [componentId]: attachment,
+    };
+    delete this.transforms[componentId];
+    return true;
+  }
+
+  surfaceWrappedX(value, hostGroup) {
+    const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    if (surface?.type !== 'round' || !(surface.radius > 0)) return value;
+    const circumference = Math.PI * 2 * surface.radius;
+    const half = circumference / 2;
+    return ((value + half) % circumference + circumference) % circumference - half;
+  }
+
+  sortAssemblyMembers(memberIds, hostGroup, anchorX) {
+    const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    const circumference = surface?.type === 'round' && surface.radius > 0
+      ? Math.PI * 2 * surface.radius
+      : 0;
+    const position = (memberId) => {
+      const raw = this.openingAttachments[memberId]?.position[0] ?? 0;
+      if (!(circumference > 0)) return raw;
+      let delta = raw - anchorX;
+      const half = circumference / 2;
+      delta = ((delta + half) % circumference + circumference) % circumference - half;
+      return anchorX + delta;
+    };
+    return [...new Set(memberIds)].sort((left, right) => (
+      position(left) - position(right) || left.localeCompare(right)
+    ));
+  }
+
+  applyAssemblyDelta(component, delta) {
+    const assembly = this.openingAssemblies[component.assemblyId];
+    if (!assembly) return false;
+    const hostGroup = this.groups.get(assembly.hostId);
+    const baseX = component.attachmentPosition?.[0] ?? 0;
+    const baseY = component.attachmentPosition?.[1] ?? 0;
+    const next = { ...this.openingAttachments };
+    for (const memberId of assembly.memberIds) {
+      const attachment = next[memberId];
+      if (!attachment) continue;
+      let offsetX = attachment.position[0] - baseX;
+      const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+      if (surface?.type === 'round' && surface.radius > 0) {
+        const circumference = Math.PI * 2 * surface.radius;
+        const half = circumference / 2;
+        offsetX = ((offsetX + half) % circumference + circumference) % circumference - half;
+      }
+      next[memberId] = {
+        ...attachment,
+        position: [
+          this.surfaceWrappedX(baseX + offsetX * delta.scale[0] + delta.position[0], hostGroup),
+          THREE.MathUtils.clamp(
+            baseY + (attachment.position[1] - baseY) * delta.scale[1] + delta.position[1],
+            0,
+            COMPONENT_POSITION_LIMIT,
+          ),
+        ],
+        scale: [
+          THREE.MathUtils.clamp(
+            attachment.scale[0] * delta.scale[0],
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+          ),
+          THREE.MathUtils.clamp(
+            attachment.scale[1] * delta.scale[1],
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+          ),
+        ],
+      };
+    }
+    this.openingAttachments = next;
+    delete this.transforms[component.assemblyId];
+    return true;
+  }
+
+  commitPendingOpeningAssembly(selectedGroup, selectedDescriptor) {
+    if (this.pendingJoinCandidates.length === 0) return null;
+    const component = selectedGroup.userData.workshopComponent;
+    if (component.kind !== 'door' && component.kind !== 'window') return null;
+    const candidates = [...this.pendingJoinCandidates];
+    const memberIds = component.memberIds
+      ? [...component.memberIds]
+      : [component.id];
+    const consumedAssemblies = new Set();
+    if (component.assemblyId) consumedAssemblies.add(component.assemblyId);
+    if (!component.memberIds) {
+      this.materializeAssemblyMember(component.id, selectedGroup, selectedDescriptor);
+    }
+    for (const candidate of candidates) {
+      if (candidate.memberIds) {
+        memberIds.push(...candidate.memberIds);
+        if (candidate.assemblyId) consumedAssemblies.add(candidate.assemblyId);
+        continue;
+      }
+      memberIds.push(candidate.componentId);
+      this.materializeAssemblyMember(candidate.componentId);
+    }
+    const hostGroup = selectedGroup.parent;
+    const hostId = hostGroup?.userData?.workshopComponent?.id;
+    if (!hostId || memberIds.some((memberId) => !this.openingAttachments[memberId])) {
+      this.pendingJoinCandidates = [];
+      return null;
+    }
+    const preferredAssemblyId = component.assemblyId
+      ?? candidates.find(({ assemblyId }) => assemblyId)?.assemblyId
+      ?? nextOpeningAssemblyId(component.kind, this.openingAssemblies);
+    const nextAssemblies = { ...this.openingAssemblies };
+    for (const assemblyId of consumedAssemblies) delete nextAssemblies[assemblyId];
+    nextAssemblies[preferredAssemblyId] = {
+      kind: component.kind,
+      hostId,
+      memberIds: this.sortAssemblyMembers(
+        memberIds,
+        hostGroup,
+        selectedDescriptor.position.x,
+      ),
+    };
+    this.openingAssemblies = serializeOpeningAssemblies(nextAssemblies);
+    this.pendingJoinCandidates = [];
+    return preferredAssemblyId;
+  }
+
   commitSelectedTransform(before = this.captureEditState()) {
     const group = this.groups.get(this.selectedComponentId);
     if (!group) return;
+    const previewJoinCandidates = [...this.pendingJoinCandidates];
     this.constrainSelectedTransform();
+    if (this.pendingJoinCandidates.length === 0 && previewJoinCandidates.length > 0) {
+      this.pendingJoinCandidates = previewJoinCandidates;
+    }
     const delta = componentTransformFromGroup(group);
-    const topologyDriven = isOpening2d(group.userData.workshopComponent);
+    const component = group.userData.workshopComponent;
+    const topologyDriven = isOpening2d(component);
+    const selectedDescriptor = openingDescriptor(group);
+    if (component.assemblyId) {
+      this.applyAssemblyDelta(component, delta);
+      this.commitPendingOpeningAssembly(group, selectedDescriptor);
+      this.selectionHelper.material.color.set(SELECTION_COLOR);
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateInferenceHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(component, delta, { reason: 'assemblies' });
+      return;
+    }
     const attachment = this.openingAttachments[this.selectedComponentId];
     const transform = topologyDriven && !attachment
       ? combineComponentTransforms(group.userData.workshopStoredTransform, delta)
@@ -1521,12 +1850,14 @@ export class ProceduralWorkshopComponentController {
       this.transforms[this.selectedComponentId] = transform;
     }
     group.userData.workshopStoredTransform = transform;
+    this.commitPendingOpeningAssembly(group, selectedDescriptor);
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
     if (topologyDriven) applyTransform(group, createIdentityComponentTransform());
     this.updateSelectionHelper();
     this.updateInferenceHelper();
     this.updateNumericFields();
     this.recordHistory(before);
-    this.onChange?.(group.userData.workshopComponent, transform);
+    this.onChange?.(component, transform);
   }
 
   updateNumericFields() {
@@ -1594,6 +1925,17 @@ export class ProceduralWorkshopComponentController {
       );
     }
     const transform = normalizeComponentTransform(values);
+    const component = group.userData.workshopComponent;
+    if (component.assemblyId) {
+      this.applyAssemblyDelta(component, transform);
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(component, transform, { reason: 'assemblies' });
+      return;
+    }
     const attachment = this.openingAttachments[this.selectedComponentId];
     if (attachment) {
       this.openingAttachments = {
@@ -1633,6 +1975,38 @@ export class ProceduralWorkshopComponentController {
     if (!group) return;
     const before = this.captureEditState();
     const component = group.userData.workshopComponent;
+    if (component.assemblyId) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      const next = { ...this.openingAttachments };
+      for (const memberId of assembly?.memberIds ?? []) {
+        const member = next[memberId];
+        if (!member) continue;
+        next[memberId] = {
+          ...member,
+          position: [
+            this.surfaceWrappedX(-member.position[0], group.parent),
+            member.position[1],
+          ],
+        };
+      }
+      this.openingAttachments = next;
+      if (assembly) {
+        this.openingAssemblies = serializeOpeningAssemblies({
+          ...this.openingAssemblies,
+          [component.assemblyId]: {
+            ...assembly,
+            memberIds: this.sortAssemblyMembers(
+              assembly.memberIds,
+              group.parent,
+              -(component.attachmentPosition?.[0] ?? 0),
+            ),
+          },
+        });
+      }
+      this.recordHistory(before);
+      this.onChange?.(component, createIdentityComponentTransform(), { reason: 'assemblies' });
+      return;
+    }
     const attachment = this.openingAttachments[this.selectedComponentId];
     if (attachment) {
       this.openingAttachments = {
@@ -1664,6 +2038,100 @@ export class ProceduralWorkshopComponentController {
     this.onChange?.(component, transform);
   }
 
+  createAssemblyCopies(count, group, component, context) {
+    const assembly = this.openingAssemblies[component.assemblyId];
+    if (!assembly) return 0;
+    const before = this.captureEditState();
+    const siblings = [...context.siblings, context.selected];
+    let attachments = { ...this.openingAttachments };
+    let assemblies = { ...this.openingAssemblies };
+    let created = 0;
+    let lastAssemblyId = null;
+    const step = context.selected.size.x + 0.16;
+    const rightRoom = context.wallBounds.maxX - context.selected.position.x;
+    const leftRoom = context.selected.position.x - context.wallBounds.minX;
+    const preferredDirection = rightRoom >= leftRoom ? 1 : -1;
+    for (let index = 1; index <= count; index += 1) {
+      let placement = null;
+      for (const direction of [preferredDirection, -preferredDirection]) {
+        const result = solveWorkshopArchitecturalSnap({
+          kind: component.kind,
+          position: {
+            x: context.selected.position.x + direction * step * index,
+            y: context.selected.position.y,
+          },
+          size: context.selected.size,
+          wallBounds: context.wallBounds,
+          siblings,
+          enabled: true,
+        });
+        const validation = validateWorkshopOpeningPlacement({
+          position: result.position,
+          size: result.size,
+          wallBounds: context.wallBounds,
+          siblings,
+        });
+        if (validation.valid) {
+          placement = result;
+          break;
+        }
+      }
+      if (!placement) continue;
+      const deltaX = placement.position.x - context.selected.position.x;
+      const deltaY = (
+        placement.position.y - placement.size.y / 2
+        - (context.selected.position.y - context.selected.size.y / 2)
+      );
+      const copiedMemberIds = [];
+      for (const memberId of assembly.memberIds) {
+        const member = attachments[memberId];
+        if (!member) continue;
+        const copyId = nextOpeningCopyId(member.sourceId, attachments);
+        attachments[copyId] = {
+          ...member,
+          position: [
+            this.surfaceWrappedX(member.position[0] + deltaX, group.parent),
+            member.position[1] + deltaY,
+          ],
+          scale: [...member.scale],
+        };
+        copiedMemberIds.push(copyId);
+      }
+      if (copiedMemberIds.length !== assembly.memberIds.length) continue;
+      const assemblyId = nextOpeningAssemblyId(component.kind, assemblies);
+      assemblies[assemblyId] = {
+        kind: component.kind,
+        hostId: assembly.hostId,
+        memberIds: this.sortAssemblyMembers(
+          copiedMemberIds,
+          group.parent,
+          placement.position.x,
+        ),
+      };
+      siblings.push({
+        componentId: assemblyId,
+        assemblyId,
+        memberIds: copiedMemberIds,
+        kind: component.kind,
+        label: `${component.label} copy`,
+        position: placement.position,
+        size: placement.size,
+      });
+      lastAssemblyId = assemblyId;
+      created += 1;
+    }
+    if (created === 0) {
+      this.updateSnapFeedback([{ reason: 'No collision-free wall space for another assembly' }]);
+      return 0;
+    }
+    this.openingAttachments = attachments;
+    this.openingAssemblies = serializeOpeningAssemblies(assemblies);
+    this.selectedComponentId = lastAssemblyId;
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return created;
+  }
+
   createOpeningCopies(count) {
     const group = this.selectedGroup();
     const component = group?.userData?.workshopComponent;
@@ -1676,6 +2144,9 @@ export class ProceduralWorkshopComponentController {
     if (!group || !isWorkshopArchitecturalOpening(component) || !context) {
       this.hint.textContent = 'Select a door, window, or arch with a compatible host wall.';
       return 0;
+    }
+    if (component.assemblyId) {
+      return this.createAssemblyCopies(count, group, component, context);
     }
     const before = this.captureEditState();
     const existing = this.openingAttachments[this.selectedComponentId];
@@ -1759,6 +2230,25 @@ export class ProceduralWorkshopComponentController {
   }
 
   deleteSelectedOpening() {
+    const component = this.selectedComponent();
+    if (component?.assemblyId) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      if (!assembly || !assembly.memberIds.every((memberId) => (
+        memberId.startsWith('copy-') && this.openingAttachments[memberId]
+      ))) {
+        return false;
+      }
+      const before = this.captureEditState();
+      const attachments = { ...this.openingAttachments };
+      assembly.memberIds.forEach((memberId) => delete attachments[memberId]);
+      const assemblies = { ...this.openingAssemblies };
+      delete assemblies[component.assemblyId];
+      this.openingAttachments = attachments;
+      this.openingAssemblies = serializeOpeningAssemblies(assemblies);
+      this.recordHistory(before);
+      this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+      return true;
+    }
     if (
       !this.selectedComponentId?.startsWith('copy-')
       || !this.openingAttachments[this.selectedComponentId]
@@ -1775,9 +2265,29 @@ export class ProceduralWorkshopComponentController {
     return true;
   }
 
+  separateSelectedAssembly() {
+    const component = this.selectedComponent();
+    const assemblyId = component?.assemblyId;
+    if (!assemblyId || !this.openingAssemblies[assemblyId]) return false;
+    const before = this.captureEditState();
+    const next = { ...this.openingAssemblies };
+    delete next[assemblyId];
+    this.openingAssemblies = serializeOpeningAssemblies(next);
+    delete this.transforms[assemblyId];
+    this.pendingJoinCandidates = [];
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
   resetSelected() {
     const group = this.groups.get(this.selectedComponentId);
     if (!group) return;
+    if (group.userData.workshopComponent.assemblyId) {
+      this.separateSelectedAssembly();
+      return;
+    }
     const before = this.captureEditState();
     delete this.transforms[this.selectedComponentId];
     if (this.openingAttachments[this.selectedComponentId]) {
@@ -1798,6 +2308,7 @@ export class ProceduralWorkshopComponentController {
     const before = this.captureEditState();
     this.transforms = {};
     this.openingAttachments = {};
+    this.openingAssemblies = {};
     const identity = createIdentityComponentTransform();
     for (const group of this.groups.values()) {
       group.userData.workshopStoredTransform = identity;
@@ -1815,6 +2326,10 @@ export class ProceduralWorkshopComponentController {
 
   toOpeningAttachmentsDocument() {
     return serializeOpeningAttachments(this.openingAttachments);
+  }
+
+  toOpeningAssembliesDocument() {
+    return serializeOpeningAssemblies(this.openingAssemblies);
   }
 
   clear() {
@@ -1835,6 +2350,7 @@ export class ProceduralWorkshopComponentController {
     this.hoveredBoundaryHandle = null;
     this.attachmentMode = false;
     this.attachmentPreview = null;
+    this.pendingJoinCandidates = [];
     this.transformControls.enabled = true;
     this.attachButton?.classList.remove('is-active');
     this.updateSnapFeedback();
@@ -1860,6 +2376,7 @@ export class ProceduralWorkshopComponentController {
     this.spaceSelect.removeEventListener('change', this.onSpaceChange);
     this.axisSelect.removeEventListener('change', this.onAxisChange);
     this.snapInput.removeEventListener('change', this.onSnapChange);
+    this.autoJoinInput.removeEventListener('change', this.onAutoJoinChange);
     this.root.removeEventListener('click', this.onRootClick);
     this.root.removeEventListener('change', this.onValueChange);
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);

@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
-import { extractRockPrototypes } from './StylizedPrototypeBake.js';
+import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { instanceCapacity } from './scatterMath.js';
 import {
   buildStableChunkManifest,
@@ -14,9 +14,10 @@ import {
   pruneStateMap,
   writeInstances,
 } from './lod/StylizedLodRuntime.js';
-import { createRockProxyPrototype } from './lod/StylizedProxyGeometry.js';
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
+import { registerPrototypeIndices } from './BiomeAssetPalette.js';
+import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
 
 // Reused across a rebuild: `compose` reads out of these, so only the matrix
 // itself has to be a fresh object per instance.
@@ -31,9 +32,9 @@ import { createPathClearanceField } from './TreeManifestStore.js';
 const ROCK_CLUSTER_SEED_OFFSET = 0xa7;
 
 /**
- * Boulders read as dark, hard-faceted stone. `rocks.color` tints the source GLB
- * material toward that; instance colour variation then spreads each cluster over
- * a range so a scree field is not a field of clones.
+ * Keep the source GLB's authored stylized texture. Upstream only overrides the
+ * PBR response (roughness, metalness and flat shading); deleting the map turns
+ * its warm, painted rocks into featureless silhouettes.
  */
 function cloneMaterial(mesh, config) {
   const source = materialList(mesh)[0];
@@ -42,7 +43,6 @@ function cloneMaterial(mesh, config) {
   if ('metalness' in material) material.metalness = 0;
   if (config?.rocks?.color && 'color' in material) {
     material.color = new THREE.Color(config.rocks.color);
-    if ('map' in material) material.map = null;
   }
   material.flatShading = true;
   material.needsUpdate = true;
@@ -83,12 +83,27 @@ function disposePrototypeParts(prototypes) {
 }
 
 export class StylizedRockView {
-  constructor({ terrainView, config, revisionTracker }) {
+  constructor({
+    terrainView,
+    config,
+    revisionTracker,
+    biomeAssetPalette = null,
+    regionalCharacterField = null,
+  }) {
     this.terrainView = terrainView;
     this.config = config;
     this.revisionTracker = revisionTracker;
+    this.biomeAssetPalette = biomeAssetPalette;
+    this.regionalCharacterField = regionalCharacterField;
+    this.prototypeIndicesByAsset = new Map();
+    this.prototypeBiomeRules = [];
+    this.prototypeIndexForRoll = null;
+    // Bumped by every `appendVariants`, so the resident-window key notices a
+    // variant that streamed in while the camera stood still.
+    this.prototypeRevision = 0;
     this.prototypes = [];
     this.proxyPrototypes = [];
+    this.prototypeHeights = [];
     this.meshes = [];
     this.proxyMeshes = [];
     this.placements = [];
@@ -108,19 +123,56 @@ export class StylizedRockView {
     terrainView.scene.add(this.root);
   }
 
-  async buildFromScene(scene) {
-    if (!this.config.rocks.enabled || !scene || this.disposed) return;
-    scene.updateMatrixWorld(true);
-    const extracted = extractRockPrototypes(scene, this.config.assets.rockMaterial);
-    this.prototypes = extracted.map(({ geometry, source }) => ({
+  /**
+   * Install more authored rock variants alongside whatever is already resident.
+   *
+   * Variants stream in as the camera approaches the biomes they belong to, so
+   * this is additive: existing prototypes keep their indices and their
+   * instances, and only the new ones get renderers.
+   */
+  appendVariants(authoredVariants = []) {
+    if (!this.config.rocks.enabled || this.disposed || authoredVariants.length === 0) return;
+    const firstNewPrototype = this.prototypes.length;
+    const extracted = [];
+    for (const { scene, definition } of authoredVariants) {
+      const firstIndex = firstNewPrototype + extracted.length;
+      const variants = extractAuthoredMeshPrototypes(scene, {
+        scale: definition.scale,
+        rootNames: definition.rootNames,
+      });
+      if (variants.length === 0) {
+        throw new Error(`Rock variant ${definition.scene} produced no prototypes.`);
+      }
+      extracted.push(...variants);
+      for (let index = 0; index < variants.length; index += 1) {
+        this.prototypeBiomeRules.push({
+          tileIds: definition.tileIds ?? null,
+          weight: definition.weight ?? 1,
+          character: definition.character ?? null,
+          characterStrength: definition.characterStrength,
+          canopy: definition.canopy,
+        });
+      }
+      registerPrototypeIndices(
+        this.prototypeIndicesByAsset,
+        definition.id ?? definition.scene,
+        firstIndex,
+        variants.length,
+      );
+    }
+    this.prototypeIndexForRoll = createBiomePrototypeSelector({
+      rules: this.prototypeBiomeRules,
+      regionalCharacterField: this.regionalCharacterField,
+    });
+    const newPrototypes = extracted.map(({ geometry, source }) => ({
       geometry,
       material: cloneMaterial(source, this.config),
       kind: 'rock',
     }));
-    if (this.prototypes.length === 0) {
-      throw new Error(`No rock meshes use material ${this.config.assets.rockMaterial}.`);
-    }
-    this.clusterField = new ScatterClusterField({
+    this.prototypes.push(...newPrototypes);
+    // Both fields describe the terrain, not the prop set, so they are built once
+    // on the first variant and reused by every one that streams in later.
+    this.clusterField ??= new ScatterClusterField({
       kind: 'rock',
       seed: resolveForestSeed(this.terrainView.worldStore),
       seedOffset: ROCK_CLUSTER_SEED_OFFSET,
@@ -128,30 +180,45 @@ export class StylizedRockView {
       slopeSampleDistance: this.config.trees.habitat?.slopeSampleDistance ?? 4,
       config: this.config.rocks,
     });
-    this.pathClearance = createPathClearanceField(this.terrainView, this.config);
+    this.pathClearance ??= createPathClearanceField(this.terrainView, this.config);
 
     const settings = lodSettings(this.config);
     const capacity = instanceCapacity({
       residentRadius: settings.proxyRadius + 1,
       perChunk: this.config.rocks.perChunk,
     });
-    const proxies = this.prototypes.map((prototype) => createRockProxyPrototype(prototype));
-    this.proxyPrototypes = proxies.map((prototype) => prototype.parts);
-    this.prototypeHeight = Math.max(...proxies.map((prototype) => prototype.height));
-    this.meshes = createInstancedRenderers({
+    // These authored meshes are already compact enough for the complete rock
+    // residency window. Keeping cloned authored parts in the proxy band avoids
+    // reverting to the old textureless dodecahedron in the mid-ground.
+    const newProxyPrototypes = newPrototypes.map((prototype) => [{
+      geometry: prototype.geometry.clone(),
+      material: prototype.material.clone(),
+      kind: 'rock',
+    }]);
+    this.proxyPrototypes.push(...newProxyPrototypes);
+    this.prototypeHeights.push(...newPrototypes.map((prototype) => {
+      prototype.geometry.computeBoundingBox();
+      return Math.max(
+        0.1,
+        prototype.geometry.boundingBox.max.y - prototype.geometry.boundingBox.min.y,
+      );
+    }));
+    this.prototypeHeight = Math.max(...this.prototypeHeights);
+    this.meshes.push(...createInstancedRenderers({
       root: this.root,
-      partsByPrototype: this.prototypes.map((prototype) => [prototype]),
+      partsByPrototype: newPrototypes.map((prototype) => [prototype]),
       capacity,
-      name: 'stylized-rock-near',
+      name: `stylized-rock-near-${firstNewPrototype}`,
       castShadow: true,
-    });
-    this.proxyMeshes = createInstancedRenderers({
+    }));
+    this.proxyMeshes.push(...createInstancedRenderers({
       root: this.root,
-      partsByPrototype: this.proxyPrototypes,
+      partsByPrototype: newProxyPrototypes,
       capacity,
-      name: 'stylized-rock-proxy',
+      name: `stylized-rock-proxy-${firstNewPrototype}`,
       castShadow: false,
-    });
+    }));
+    this.prototypeRevision += 1;
   }
 
   update(timestamp, camera) {
@@ -191,7 +258,9 @@ export class StylizedRockView {
       };
     pruneStateMap(this.chunkLodStates, plan.entries);
     const revisionSignature = this.revisionTracker.windowSignature(focus, placementRadius, 1);
-    const updateKey = `${focus.chunkX}:${focus.chunkZ}:${revisionSignature}:${plan.signature}`;
+    const updateKey = `${focus.chunkX}:${focus.chunkZ}:${revisionSignature}:${
+      plan.signature
+    }:${this.biomeAssetPalette?.revision ?? 0}:p${this.prototypeRevision}`;
     if (updateKey === this.lastUpdateKey && !this.pendingRebuild) return;
     this.pendingRebuild = {
       key: `rock-lod:${updateKey}`,
@@ -236,12 +305,18 @@ export class StylizedRockView {
     return (candidate) => {
       if (blocksPath?.(candidate)) return null;
       const cluster = this.clusterField.sample(candidate.x, candidate.z);
-      if (candidate.priority >= cluster.density) return null;
+      const regionalRocky = this.regionalCharacterField?.sampleChannel(
+        candidate.x,
+        candidate.z,
+        'rocky',
+      ) ?? 1;
+      if (candidate.priority >= cluster.density * regionalRocky) return null;
       return {
         clusterId: cluster.clusterId,
         rockCoverage: cluster.coverage,
         rockEdge: cluster.edge,
         rockSlope: cluster.slope,
+        regionalRocky,
       };
     };
   }
@@ -251,7 +326,10 @@ export class StylizedRockView {
       this.revisionTracker.signature(chunkX, chunkZ, 1),
       this.prototypes.length,
       this.clusterField?.signature ?? 'uniform',
+      this.regionalCharacterField?.signature ?? 'uniform-regions',
+      JSON.stringify(this.prototypeBiomeRules),
       this.pathClearance?.signature ?? 'nopath',
+      this.biomeAssetPalette?.revision ?? 0,
     ].join('|');
     const cacheKey = `${chunkX}:${chunkZ}`;
     const cached = this.manifestCache.get(cacheKey);
@@ -271,6 +349,16 @@ export class StylizedRockView {
       tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
       heightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z),
       prototypeCount: this.prototypes.length,
+      prototypeIndexForRoll: (roll, tileId, x, z) => {
+        const automaticIndex = this.prototypeIndexForRoll(roll, tileId, x, z);
+        return this.biomeAssetPalette?.resolvePrototypeIndex({
+          tileId,
+          layerId: 'rocks',
+          automaticIndex,
+          prototypeIndicesByAsset: this.prototypeIndicesByAsset,
+          roll,
+        }) ?? automaticIndex;
+      },
       minScale: this.config.rocks.minScale,
       maxScale: this.config.rocks.maxScale,
       radiusForScale: (scale) => this.config.rocks.radius * scale,
@@ -287,7 +375,11 @@ export class StylizedRockView {
     // the ground rather than resting on it.
     const burial = Math.max(0, Number(this.config.rocks.burial) || 0);
     const colorRange = Math.max(0, Number(this.config.rocks.colorVariation) || 0);
-    const burialFor = (placement) => this.prototypeHeight * placement.scale * burial;
+    const burialFor = (placement) => (
+      (this.prototypeHeights[placement.prototypeIndex] ?? this.prototypeHeight)
+      * placement.scale
+      * burial
+    );
     const near = createInstances(this.prototypes.length);
     const proxy = createInstances(this.prototypes.length);
     const placements = [];
@@ -391,7 +483,9 @@ export class StylizedRockView {
       prototype.material?.dispose();
     }
     this.prototypes.length = 0;
+    this.prototypeHeights.length = 0;
     disposePrototypeParts(this.proxyPrototypes);
+    this.prototypeIndicesByAsset.clear();
     this.placements.length = 0;
     this.manifestCache.clear();
     this.placementsByChunk.clear();

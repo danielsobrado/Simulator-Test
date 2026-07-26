@@ -1,0 +1,39 @@
+{
+  "kind": "simcity-dnd-scene-settings",
+  "version": 1,
+  "name": "Eldara · authored natural world",
+  "map": {
+    "kind": "url",
+    "url": "../maps/Eldara Full 2026-07-23-20-37.json",
+    "label": "Eldara Full (2026)"
+  },
+  "environment": {
+    "godRays": {
+      "enabled": true,
+      "technique": "screen-space",
+      "screenIntensity": 1.2,
+      "screenResolutionScale": 0.6,
+      "screenDensity": 0.96,
+      "screenDecay": 0.92,
+      "screenWeight": 0.35,
+      "screenExposure": 0.85,
+      "screenDustStrength": 0.04,
+      "screenDustScale": 3,
+      "screenDustSpeed": 0.008,
+      "cloudOcclusion": 0.9
+    }
+  },
+  "biomeAssets": {
+    "kind": "simcity-dnd-biome-assets",
+    "version": 1,
+    "biomes": {}
+  },
+  "assets": [],
+  "placement": {
+    "enabled": true,
+    "regionSize": 420,
+    "sampleSpacing": 28,
+    "contrast": 2.4,
+    "minimumInfluence": 0.28
+  }
+}

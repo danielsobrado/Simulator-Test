@@ -8,6 +8,24 @@ import { validateEditorConfig } from '../src/config/validateEditorConfig.js';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ASSET_PATHS = Object.freeze([
   'public/assets/grass-scene.glb',
+  'public/assets/rocks/rock.glb',
+  'public/assets/rocks/obj_nat_rock_01.glb',
+  'public/assets/rocks/a_simple_rock.glb',
+  'public/assets/rocks/ruined-fence/stone-01.glb',
+  'public/assets/rocks/forest-pack/rock-02.glb',
+  'public/assets/trees/stylized-oak.glb',
+  'public/assets/trees/forest-pack/tree-wide-01.glb',
+  'public/assets/trees/tree-scene/tree-02.glb',
+  'public/assets/ground/stylized-grass/clump-01.glb',
+  'public/assets/ground/aquatic/weed-01.glb',
+  'public/assets/ground/aquatic/lotus-04.glb',
+  'public/assets/animals/crow-flight.glb',
+  'public/assets/animals/seagull-flight.glb',
+  'public/assets/bushes/stylized_bush.glb',
+  'public/assets/bushes/small_bush.glb',
+  'public/assets/bushes/bush2.glb',
+  'public/assets/bushes/bush.glb',
+  'public/assets/bushes/bamboo_bush.glb',
   'public/assets/textures/bark/bark_color.png',
   'public/assets/textures/bark/bark_AO.png',
   'public/assets/textures/bark/bark_height.png',
@@ -24,6 +42,19 @@ async function loadConfig() {
   return validateEditorConfig(yaml.load(text));
 }
 
+async function createNodeGlbLoader(THREE) {
+  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+  const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.setKTX2Loader({
+    load(_url, onLoad) {
+      queueMicrotask(() => onLoad(new THREE.Texture()));
+    },
+  });
+  return loader;
+}
+
 test('stylized environment config validates all enabled layers', async () => {
   const config = await loadConfig();
   const surface = config.stylizedSurface;
@@ -32,6 +63,10 @@ test('stylized environment config validates all enabled layers', async () => {
   assert.equal(surface.flowers.enabled, true);
   assert.equal(surface.trees.enabled, true);
   assert.equal(surface.water.enabled, true);
+  assert.equal(surface.wildlife.enabled, true);
+  assert.equal(surface.wildlife.distant.enabled, true);
+  assert.equal(surface.wildlife.authored.enabled, false);
+  assert.ok(surface.wildlife.distant.maxBirds <= 10);
   assert.equal(surface.sky.enabled, true);
   assert.ok(surface.grass.bladesPerCell > 0);
   assert.ok(surface.translucency.strength > 0);
@@ -88,15 +123,14 @@ test('pine prototypes bake upright through world matrices', async () => {
 
   const { readFileSync } = await import('node:fs');
   const THREE = await import('three');
-  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
   const {
+    attachRootCollar,
     extractPrototypeParts,
     findPrototypeRoots,
   } = await import('../src/editor/stylized/StylizedTreePrototypes.js');
-  const { extractRockPrototypes } = await import('../src/editor/stylized/StylizedPrototypeBake.js');
   const config = await loadConfig();
 
-  const loader = new GLTFLoader();
+  const loader = await createNodeGlbLoader(THREE);
   const buffer = readFileSync(path.join(ROOT, 'public/assets/grass-scene.glb'));
   const gltf = await new Promise((resolve, reject) => {
     loader.parse(
@@ -133,15 +167,63 @@ test('pine prototypes bake upright through world matrices', async () => {
       `trunk base should sit near y=0, got ${trunkBase}`,
     );
     assert.ok(size.y < 20, `world bake should keep demo scale, got height ${size.y}`);
+    assert.equal(
+      attachRootCollar(parts),
+      true,
+      'quantized authored attributes must merge with the procedural root collar',
+    );
   }
+});
 
-  const rocks = extractRockPrototypes(gltf.scene, config.stylizedSurface.assets.rockMaterial);
-  assert.ok(rocks.length >= 3, `expected unique rock prototypes, got ${rocks.length}`);
-  assert.ok(rocks.length <= 6, `rock prototypes should be deduped by group, got ${rocks.length}`);
-  for (const rock of rocks) {
-    const size = rock.geometry.boundingBox.getSize(new THREE.Vector3());
-    assert.ok(Math.abs(rock.geometry.boundingBox.min.y) < 1e-4, 'rock must sit on y=0');
-    assert.ok(size.y > 0.05 && size.y < 5, `unexpected rock height ${size.y}`);
+test('authored rocks and bushes bake upright at scenery scale', async () => {
+  globalThis.self = globalThis;
+  globalThis.Image = class Image {
+    set src(_value) {
+      queueMicrotask(() => this.onload?.());
+    }
+  };
+  globalThis.createImageBitmap = async () => ({ width: 1, height: 1, close() {} });
+
+  const { readFileSync } = await import('node:fs');
+  const THREE = await import('three');
+  const {
+    extractAuthoredMeshPrototypes,
+  } = await import('../src/editor/stylized/StylizedPrototypeBake.js');
+  const config = await loadConfig();
+  const loader = await createNodeGlbLoader(THREE);
+
+  for (const [kind, variants] of [
+    ['rock', config.stylizedSurface.assets.rockVariants],
+    ['bush', config.stylizedSurface.assets.bushVariants],
+  ]) {
+    for (const definition of variants) {
+      const relativePath = definition.scene.replace(/^\/+/, 'public/');
+      const buffer = readFileSync(path.join(ROOT, relativePath));
+      const gltf = await new Promise((resolve, reject) => {
+        loader.parse(
+          buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+          '',
+          resolve,
+          reject,
+        );
+      });
+      const prototypes = extractAuthoredMeshPrototypes(gltf.scene, {
+        scale: definition.scale,
+        rootNames: definition.rootNames,
+      });
+      assert.ok(prototypes.length > 0, `${definition.scene} should contain ${kind} meshes`);
+      for (const prototype of prototypes) {
+        const size = prototype.geometry.boundingBox.getSize(new THREE.Vector3());
+        assert.ok(
+          Math.abs(prototype.geometry.boundingBox.min.y) < 1e-4,
+          `${definition.scene} must sit on y=0`,
+        );
+        assert.ok(
+          size.y > 0.2 && size.y < 3,
+          `${definition.scene} has unexpected ${kind} height ${size.y}`,
+        );
+      }
+    }
   }
 });
 

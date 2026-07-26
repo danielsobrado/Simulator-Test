@@ -11,26 +11,53 @@ import { StylizedBushView } from './StylizedBushView.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import { StylizedChunkRevisionTracker } from './StylizedChunkRevisionTracker.js';
 import { StylizedFlowerView } from './StylizedFlowerView.js';
-import { StylizedGrassSlot } from './StylizedGrassSlot.js';
+import { StylizedGroundDetailView } from './StylizedGroundDetailView.js';
+import {
+  GRASS_BLADE_SEGMENTS,
+  GRASS_FAR_BLADE_SEGMENTS,
+  StylizedGrassSlot,
+} from './StylizedGrassSlot.js';
+import { GrassBladeProfilePool } from './GrassBladeProfilePool.js';
 import { StylizedRockView } from './StylizedRockView.js';
 import { StylizedSceneAssetCache } from './StylizedSceneAssetCache.js';
 import { StylizedSkyView } from './StylizedSkyView.js';
 import { StylizedTreeView } from './StylizedTreeView.js';
 import { StylizedWaterSlot } from './StylizedWaterSlot.js';
+import { StylizedVariantResidency } from './StylizedVariantResidency.js';
+import { StylizedWildlifeView } from './StylizedWildlifeView.js';
+import { RegionalCharacterField } from './RegionalCharacterField.js';
+import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 
 export class StylizedSurfaceView {
-  constructor({ terrainView, objectMap, config, baseUrl = '/' }) {
+  constructor({
+    terrainView,
+    objectMap,
+    config,
+    baseUrl = '/',
+    biomeAssetPalette = null,
+  }) {
     this.terrainView = terrainView;
     this.objectMap = objectMap;
     this.config = config;
     this.enabled = Boolean(config?.enabled);
     this.impostorBakeMode = isTreeImpostorBakeMode();
     this.sceneAssets = this.enabled
-      ? new StylizedSceneAssetCache({ baseUrl })
+      ? new StylizedSceneAssetCache({ renderer: terrainView.renderer, baseUrl })
       : null;
     this.sharedScenePath = null;
+    this.treeVariantPaths = [];
+    this.rockVariantPaths = [];
+    this.bushVariantPaths = [];
+    this.groundDetailVariantPaths = [];
+    this.aquaticVariantPaths = [];
     this.revisionTracker = this.enabled
       ? new StylizedChunkRevisionTracker({ worldStore: terrainView.worldStore })
+      : null;
+    this.regionalCharacterField = this.enabled
+      ? new RegionalCharacterField({
+        seed: resolveForestSeed(terrainView.worldStore),
+        config: config.regionalPlacement,
+      })
       : null;
     if (this.enabled && !this.impostorBakeMode) {
       for (const terrainSlot of terrainView.slots) terrainSlot.mesh.receiveShadow = true;
@@ -40,7 +67,13 @@ export class StylizedSurfaceView {
       : null;
     const sunDirection = this.skyView?.sunDirection ?? vec3(0.35, 0.85, 0.25);
     this.rockView = this.enabled && !this.impostorBakeMode
-      ? new StylizedRockView({ terrainView, config, revisionTracker: this.revisionTracker })
+      ? new StylizedRockView({
+        terrainView,
+        config,
+        revisionTracker: this.revisionTracker,
+        biomeAssetPalette,
+        regionalCharacterField: this.regionalCharacterField,
+      })
       : null;
     this.treeView = this.enabled
       ? new StylizedTreeView({
@@ -49,6 +82,8 @@ export class StylizedSurfaceView {
         config,
         revisionTracker: this.revisionTracker,
         baseUrl,
+        biomeAssetPalette,
+        regionalCharacterField: this.regionalCharacterField,
       })
       : null;
     this.flowerView = this.enabled && !this.impostorBakeMode
@@ -65,13 +100,67 @@ export class StylizedSurfaceView {
         config,
         revisionTracker: this.revisionTracker,
         forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+        biomeAssetPalette,
+        regionalCharacterField: this.regionalCharacterField,
       })
       : null;
+    this.groundDetailView = this.enabled
+      && !this.impostorBakeMode
+      && config.groundDetails?.enabled
+      ? new StylizedGroundDetailView({
+        terrainView,
+        config,
+        revisionTracker: this.revisionTracker,
+        layerConfig: config.groundDetails,
+        layerName: 'groundDetail',
+        priorityChannel: 41,
+        biomeAssetPalette,
+        regionalCharacterField: this.regionalCharacterField,
+        // Lets a wood's shaded interior grow different cover from its fringe.
+        forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+      })
+      : null;
+    this.aquaticPlantView = this.enabled
+      && !this.impostorBakeMode
+      && config.aquaticPlants?.enabled
+      ? new StylizedGroundDetailView({
+        terrainView,
+        config,
+        revisionTracker: this.revisionTracker,
+        layerConfig: config.aquaticPlants,
+        layerName: 'aquaticPlant',
+        priorityChannel: 43,
+        biomeAssetPalette,
+      })
+      : null;
+    this.wildlifeView = this.enabled
+      && !this.impostorBakeMode
+      && config.wildlife?.enabled
+      ? new StylizedWildlifeView({
+        terrainView,
+        config: {
+          ...config.wildlife,
+          variants: config.assets.wildlifeVariants ?? [],
+        },
+        baseUrl,
+        loader: this.sceneAssets.loader,
+      })
+      : null;
+    this.biomeAssetPalette = biomeAssetPalette;
     this.ready = this.bootstrapLayers();
+    // Impostor baking only ever looks at trees, which `ready` already covers.
     this.bakeRequest = this.ready.then(() => this.maybeHandleImpostorBake());
     this.bakeRequest.catch((error) => {
       console.error('Tree impostor export request failed.', error);
     });
+    this.bladeProfiles = new GrassBladeProfilePool({
+      config: config.grass,
+      nearSegments: GRASS_BLADE_SEGMENTS,
+      farSegments: GRASS_FAR_BLADE_SEGMENTS,
+    });
+    // `load` swallows its own failures into a fallback set, so this promise settles
+    // either way — it exists to tell the Settings control when the list is final.
+    this.bladeProfiles.ready = this.bladeProfiles.load(baseUrl);
     this.slots = this.enabled && !this.impostorBakeMode
       ? terrainView.slots.map((terrainSlot) => new StylizedGrassSlot({
         terrainSlot,
@@ -80,6 +169,7 @@ export class StylizedSurfaceView {
         config,
         sunDirection,
         forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+        bladeProfileProvider: () => this.bladeProfiles,
       }))
       : [];
     this.waterSlots = this.enabled && !this.impostorBakeMode && config.water?.enabled
@@ -122,33 +212,122 @@ export class StylizedSurfaceView {
       buildsPerFrame: config.streaming?.bushBuildsPerFrame ?? 1,
       budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
     });
+    this.detailBuildQueue = new StylizedBuildQueue({
+      // These sparse authored rings are intentionally independent of the tree
+      // manifest backlog. Sharing its cumulative yield gate could leave water
+      // plants and ground accents at zero instances for many seconds while a
+      // newly streamed forest window settles. Their measured cost is tracked
+      // separately and remains capped to one layer rebuild per frame.
+      buildsPerFrame: config.streaming?.detailBuildsPerFrame ?? 1,
+      budgetMs: config.streaming?.heavyBuildBudgetMs ?? 3,
+    });
     this.chunkWorldSize = terrainView.worldStore.chunkSize * terrainView.worldStore.tileSize;
     this.tileSize = terrainView.worldStore.tileSize;
+    this.variantResidency = this.enabled && !this.impostorBakeMode
+      ? this.createVariantResidency(config)
+      : null;
   }
 
+  /**
+   * Everything the first frame genuinely needs.
+   *
+   * Trees are here rather than in the lazy set because the forest field they
+   * build is what grass, bushes and ground details read to decide where a wood's
+   * interior is — a deferred forest would make every other layer re-scatter the
+   * moment it landed. The prop layers below are not load-bearing that way, so
+   * they stream in from `variantResidency` as their biomes come into range.
+   */
   async bootstrapLayers() {
     if (!this.enabled) return null;
-    const needsScene = this.config.trees.enabled
-      || (!this.impostorBakeMode && this.config.rocks.enabled);
+    const needsScene = this.config.trees.enabled;
     try {
       let sharedScene = null;
       if (needsScene) {
         this.sharedScenePath = this.config.assets.scene;
         sharedScene = await this.sceneAssets.acquire(this.sharedScenePath);
       }
+      const treeVariants = this.config.trees.enabled
+        ? await Promise.all(
+          (this.config.assets.treeVariants ?? []).map(async (definition) => {
+            this.treeVariantPaths.push(definition.scene);
+            return { definition, scene: await this.sceneAssets.acquire(definition.scene) };
+          }),
+        )
+        : [];
       await Promise.all([
-        this.rockView?.buildFromScene(sharedScene),
-        this.treeView?.buildFromScene(sharedScene),
+        this.treeView?.buildFromScene(sharedScene, treeVariants),
         this.flowerView?.ready,
       ].filter(Boolean));
-      // Bush prototypes are procedural, so they need no scene — but they read the
-      // forest field, which only exists once the tree manifest store is built.
-      this.bushView?.build();
       return null;
     } catch (error) {
       console.warn('Some stylized assets failed to load; remaining layers stay active.', error);
       return null;
     }
+  }
+
+  /**
+   * The prop layers, streamed per biome instead of loaded up front.
+   *
+   * Each entry hands the residency a way to fetch a variant's scene and a way to
+   * install it. Acquiring through the shared cache keeps the ref-count that
+   * `dispose` releases, so the recorded paths are the ones actually taken.
+   */
+  createVariantResidency(config) {
+    const layer = (id, paletteLayerId, view, definitions, paths, residentRadius) => ({
+      id,
+      paletteLayerId,
+      definitions: definitions ?? [],
+      residentRadius,
+      acquire: async (scene) => {
+        const loaded = await this.sceneAssets.acquire(scene);
+        paths.push(scene);
+        return loaded;
+      },
+      apply: (variants) => view.appendVariants(variants),
+    });
+    const streaming = config.streaming ?? {};
+    return new StylizedVariantResidency({
+      terrainView: this.terrainView,
+      revisionTracker: this.revisionTracker,
+      biomeAssetPalette: this.biomeAssetPalette,
+      prefetchChunks: streaming.variantPrefetchChunks ?? 4,
+      appliesPerFrame: streaming.variantAppliesPerFrame ?? 1,
+      rescanIntervalMs: streaming.variantRescanIntervalMs ?? 500,
+      layers: [
+        this.rockView && layer(
+          'rocks',
+          'rocks',
+          this.rockView,
+          config.assets.rockVariants,
+          this.rockVariantPaths,
+          config.rocks?.residentRadius ?? 2,
+        ),
+        this.bushView && layer(
+          'bushes',
+          'bushes',
+          this.bushView,
+          config.assets.bushVariants,
+          this.bushVariantPaths,
+          config.bushes?.residentRadius ?? 2,
+        ),
+        this.groundDetailView && layer(
+          'groundDetails',
+          'groundDetails',
+          this.groundDetailView,
+          config.assets.groundDetailVariants,
+          this.groundDetailVariantPaths,
+          config.groundDetails?.residentRadius ?? 1,
+        ),
+        this.aquaticPlantView && layer(
+          'aquaticPlants',
+          'aquaticPlants',
+          this.aquaticPlantView,
+          config.assets.aquaticVariants,
+          this.aquaticVariantPaths,
+          config.aquaticPlants?.residentRadius ?? 1,
+        ),
+      ].filter(Boolean),
+    });
   }
 
   async maybeHandleImpostorBake() {
@@ -201,7 +380,11 @@ export class StylizedSurfaceView {
     if (!this.enabled || this.impostorBakeMode) return;
     this.frameStartedAt = performance.now();
     this.updateRendererCounters();
+    // Ahead of the layer updates: a variant installed here is picked up by this
+    // frame's rebuild scheduling rather than waiting for the next one.
+    this.variantResidency?.update(this.frameStartedAt);
     this.skyView?.update(timestamp, camera);
+    this.wildlifeView?.update(timestamp, camera);
     this.rockView?.update(timestamp, camera);
     if (this.rockView?.pendingRebuild) {
       this.rockBuildQueue.enqueue(this.rockView.pendingRebuild);
@@ -229,6 +412,17 @@ export class StylizedSurfaceView {
     this.bushBuildQueue.flush((job) => {
       void job;
       return this.bushView?.applyPendingRebuild() ?? false;
+    });
+    this.groundDetailView?.update();
+    this.aquaticPlantView?.update();
+    for (const view of [this.groundDetailView, this.aquaticPlantView]) {
+      if (view?.pendingRebuild) this.detailBuildQueue.enqueue(view.pendingRebuild);
+    }
+    this.detailBuildQueue.flush((job) => {
+      if (job.key.startsWith('groundDetail:')) {
+        return this.groundDetailView?.applyPendingRebuild() ?? false;
+      }
+      return this.aquaticPlantView?.applyPendingRebuild() ?? false;
     });
     this.updateForestGroundTextures();
     this.flowerView?.update(timestamp);
@@ -339,7 +533,12 @@ export class StylizedSurfaceView {
 
   dispose() {
     this.skyView?.dispose();
+    this.variantResidency?.dispose();
+    this.variantResidency = null;
+    this.wildlifeView?.dispose();
     this.flowerView?.dispose();
+    this.groundDetailView?.dispose();
+    this.aquaticPlantView?.dispose();
     this.bushView?.dispose();
     this.treeView?.dispose();
     this.rockView?.dispose();
@@ -347,6 +546,16 @@ export class StylizedSurfaceView {
       this.sceneAssets?.release(this.sharedScenePath);
       this.sharedScenePath = null;
     }
+    for (const path of this.treeVariantPaths) this.sceneAssets?.release(path);
+    this.treeVariantPaths.length = 0;
+    for (const path of this.rockVariantPaths) this.sceneAssets?.release(path);
+    this.rockVariantPaths.length = 0;
+    for (const path of this.bushVariantPaths) this.sceneAssets?.release(path);
+    this.bushVariantPaths.length = 0;
+    for (const path of this.groundDetailVariantPaths) this.sceneAssets?.release(path);
+    this.groundDetailVariantPaths.length = 0;
+    for (const path of this.aquaticVariantPaths) this.sceneAssets?.release(path);
+    this.aquaticVariantPaths.length = 0;
     this.sceneAssets?.dispose();
     this.sceneAssets = null;
     this.grassBuildQueue.clear();
@@ -354,6 +563,7 @@ export class StylizedSurfaceView {
     this.treeBuildQueue.clear();
     this.rockBuildQueue.clear();
     this.bushBuildQueue.clear();
+    this.detailBuildQueue.clear();
     for (const slot of this.waterSlots) slot.dispose();
     this.waterSlots.length = 0;
     for (const slot of this.slots) slot.dispose();

@@ -11,6 +11,10 @@ import {
   serializeOpeningAttachments,
 } from './ProceduralWorkshopOpeningAttachments.js';
 import {
+  normalizeOpeningAssemblies,
+  serializeOpeningAssemblies,
+} from './ProceduralWorkshopOpeningAssemblies.js';
+import {
   normalizeWorkshopComposition,
   serializeWorkshopComposition,
 } from './ProceduralWorkshopComposition.js';
@@ -23,9 +27,10 @@ import {
   LEGACY_IRREGULARITY,
 } from './ProceduralWorkshopIrregularity.js';
 
-const ASSET_VERSION = 5;
+const ASSET_VERSION = 7;
 const MAX_ASSETS = 32;
-const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, 3, 4, ASSET_VERSION]);
+const SUPPORTED_ASSET_VERSIONS = new Set([1, 2, 3, 4, 5, 6, ASSET_VERSION]);
+const LEGACY_ROOF_PITCH = 40;
 const VALID_ARCHETYPES = new Set(['wall', 'gatehouse', 'tower', 'square-tower', 'manor']);
 const VALID_STYLES = new Set(['granite', 'limestone', 'sandstone']);
 const VALID_TOP_STYLES = new Set(['battlements', 'slate', 'terracotta']);
@@ -144,6 +149,12 @@ export function normalizeProceduralRecipe(input = {}) {
       0.1,
       0.9,
     ),
+    roofPitch: requireFinite(
+      valueOrDefault(source.roofPitch, 38),
+      'Roof pitch',
+      15,
+      60,
+    ),
     seed: requireInteger(valueOrDefault(source.seed, 1), 'Seed', 0, 0x7fffffff),
     detail: requireInteger(valueOrDefault(source.detail, 2), 'Detail', 1, 3),
     weathering: requireFinite(valueOrDefault(source.weathering, 0.35), 'Weathering', 0, 1),
@@ -162,6 +173,7 @@ export function normalizeProceduralRecipe(input = {}) {
     ...materialDocument,
     componentTransforms: normalizeComponentTransforms(source.componentTransforms),
     openingAttachments: normalizeOpeningAttachments(source.openingAttachments),
+    openingAssemblies: normalizeOpeningAssemblies(source.openingAssemblies),
   });
 }
 
@@ -204,8 +216,14 @@ export function createProceduralAssetRecord(input, existingKeys = new Set()) {
  * value in the record always wins.
  */
 function applyLegacyRecipeDefaults(recipe, version) {
-  if (version > 4 || recipe.irregularity !== undefined) return recipe;
-  return { ...recipe, irregularity: LEGACY_IRREGULARITY };
+  let migrated = recipe;
+  if (version <= 4 && recipe.irregularity === undefined) {
+    migrated = { ...migrated, irregularity: LEGACY_IRREGULARITY };
+  }
+  if (version <= 5 && recipe.roofPitch === undefined) {
+    migrated = { ...migrated, roofPitch: LEGACY_ROOF_PITCH };
+  }
+  return migrated;
 }
 
 function normalizeRecord(input) {
@@ -287,6 +305,7 @@ export class ProceduralAssetStore {
         }),
         componentTransforms: serializeComponentTransforms(record.recipe.componentTransforms),
         openingAttachments: serializeOpeningAttachments(record.recipe.openingAttachments),
+        openingAssemblies: serializeOpeningAssemblies(record.recipe.openingAssemblies),
       },
     }));
   }

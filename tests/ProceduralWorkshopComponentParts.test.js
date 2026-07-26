@@ -80,6 +80,88 @@ test('workshop preview exposes semantic components with structure ownership', ()
   }
 });
 
+test('joined manor windows generate one shared semantic assembly', () => {
+  const parts = createProceduralWorkshopComponentParts(recipe({
+    towerSide: 'none',
+    ivy: false,
+    openingAttachments: {
+      'window-1': {
+        sourceId: 'window-1',
+        hostId: 'structure-main',
+        position: [-0.45, 2.45],
+        scale: [1, 1],
+      },
+      'window-2': {
+        sourceId: 'window-2',
+        hostId: 'structure-main',
+        position: [0.45, 2.45],
+        scale: [1, 1],
+      },
+    },
+    openingAssemblies: {
+      'assembly-window-1': {
+        kind: 'window',
+        hostId: 'structure-main',
+        memberIds: ['window-1', 'window-2'],
+      },
+    },
+  }), { preserveComponents: true });
+  try {
+    const assembly = parts.components.find(({ id }) => id === 'assembly-window-1');
+    assert.ok(assembly);
+    assert.equal(assembly.kind, 'window');
+    assert.equal(assembly.parentId, 'structure-main');
+    assert.equal(assembly.assemblyId, 'assembly-window-1');
+    assert.deepEqual(assembly.memberIds, ['window-1', 'window-2']);
+    assert.ok(assembly.attachmentSize[0] > 1.6);
+    assert.equal(parts.components.some(({ id }) => id === 'window-1'), false);
+    assert.equal(parts.components.some(({ id }) => id === 'window-2'), false);
+  } finally {
+    disposeModelParts(parts);
+  }
+});
+
+test('joined tower windows follow their round host as one assembly', () => {
+  const parts = createProceduralWorkshopComponentParts(recipe({
+    ivy: false,
+    openingAttachments: {
+      'window-1': {
+        sourceId: 'window-1',
+        hostId: 'structure-left',
+        position: [-0.35, 2.2],
+        scale: [1, 1],
+      },
+      'window-6': {
+        sourceId: 'window-6',
+        hostId: 'structure-left',
+        position: [0.35, 2.2],
+        scale: [1, 1],
+      },
+    },
+    openingAssemblies: {
+      'assembly-window-1': {
+        kind: 'window',
+        hostId: 'structure-left',
+        memberIds: ['window-1', 'window-6'],
+      },
+    },
+  }), { preserveComponents: true });
+  try {
+    const assembly = parts.components.find(({ id }) => id === 'assembly-window-1');
+    assert.ok(assembly);
+    assert.equal(assembly.parentId, 'structure-left');
+    assert.deepEqual(assembly.memberIds, ['window-1', 'window-6']);
+    const assemblyBounds = boundsForParts(parts, ({ component }) => (
+      component?.id === 'assembly-window-1'
+    ));
+    const size = assemblyBounds.getSize(new THREE.Vector3());
+    assert.ok(size.x > 0.5);
+    assert.ok(size.z > 0.1);
+  } finally {
+    disposeModelParts(parts);
+  }
+});
+
 test('moving or scaling a wall structure carries its roof and attached details', () => {
   const base = createProceduralWorkshopComponentParts(recipe({
     towerSide: 'none',

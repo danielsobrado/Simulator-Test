@@ -110,6 +110,7 @@ export function buildPerfReport({
       speed: config.speed,
       keys: config.keys,
       hitchMs: config.hitchMs,
+      buildingCount: config.buildingCount ?? null,
     },
     config: {
       player: playerConfig,

@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { finalizeGeometry, mergeParts, unitRandom } from './proceduralGeometry.js';
+import {
+  finalizeGeometry,
+  mergeParts,
+  spherifyNormals,
+  unitRandom,
+} from './proceduralGeometry.js';
+
+// Matches the tree crowns, so a shrub under a tree is lit on the same terms.
+const BUSH_NORMAL_SPHERIFY = 0.85;
 
 /**
  * Procedural understory prototypes: the rounded dome bushes and fern tufts that
@@ -256,6 +264,12 @@ export function createBushPrototypeGeometry(prototypeId) {
   // Ground the prototype so instances sit on the terrain rather than floating.
   geometry.translate(0, -geometry.boundingBox.min.y, 0);
   finalizeGeometry(geometry);
+  // Shrubs are built from many small clusters, so flat face normals fragment them
+  // worst of all. Ferns are flat blades whose normals already mean something, so
+  // they keep theirs. Runs before the colour bake, which reads normals.
+  if (archetype.kind === 'shrub') {
+    spherifyNormals(geometry, { strength: BUSH_NORMAL_SPHERIFY });
+  }
   addFoliageColorVariation(geometry, prototypeId);
   const size = geometry.boundingBox.getSize(new THREE.Vector3());
   return {

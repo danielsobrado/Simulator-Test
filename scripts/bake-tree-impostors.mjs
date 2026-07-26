@@ -8,6 +8,7 @@ import {
   removeDirectoryWithRetry,
   terminateChildProcess,
 } from './lib/processLifecycle.mjs';
+import { chromium } from 'playwright';
 import {
   TREE_IMPOSTOR_MANIFEST_VERSION,
   validateTreeImpostorManifest,
@@ -23,6 +24,11 @@ const FILE_TIMEOUT_MS = 30_000;
 const POLL_MS = 250;
 const DEBUG_PORT = 9237;
 const MAX_DIAGNOSTIC_LINES = 240;
+
+function optionValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : null;
+}
 
 class CdpClient {
   constructor(url) {
@@ -352,9 +358,54 @@ async function cleanupTemporaryRoot(path) {
   }
 }
 
+async function bakeWithPlaywright(url, downloadDirectory, diagnostics) {
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--disable-gpu-sandbox',
+      '--enable-webgl',
+      '--ignore-gpu-blocklist',
+      '--enable-unsafe-swiftshader',
+      '--use-angle=swiftshader',
+    ],
+  });
+  try {
+    const context = await browser.newContext({ acceptDownloads: true });
+    const page = await context.newPage();
+    page.on('console', (message) => {
+      appendDiagnostic(diagnostics, `console.${message.type()}: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => {
+      appendDiagnostic(diagnostics, `Browser exception: ${error.message}`);
+    });
+    const downloadPromise = page.waitForEvent('download', {
+      timeout: BAKE_TIMEOUT_MS + FILE_TIMEOUT_MS,
+    });
+    await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: COMMAND_TIMEOUT_MS });
+    await page.waitForFunction(
+      () => ['done', 'failed'].includes(window.__treeImpostorBakeStatus),
+      null,
+      { timeout: BAKE_TIMEOUT_MS },
+    );
+    const state = await page.evaluate(() => ({
+      status: window.__treeImpostorBakeStatus,
+      error: window.__treeImpostorBakeError ?? null,
+    }));
+    if (state.status !== 'done') {
+      throw new Error(`Tree impostor bake failed in browser: ${state.error ?? 'unknown error'}`);
+    }
+    const download = await downloadPromise;
+    const bundlePath = join(downloadDirectory, DOWNLOAD_NAME);
+    await download.saveAs(bundlePath);
+    return bundlePath;
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const diagnostics = [];
-  const browser = findBrowser();
+  const installedBrowser = findBrowser();
   const temporaryRoot = await mkdtemp(join(tmpdir(), 'simcity-dnd-impostor-'));
   const downloadDirectory = join(temporaryRoot, 'downloads');
   const profileDirectory = join(temporaryRoot, 'profile');
@@ -369,18 +420,38 @@ async function main() {
     safebrowsing: { enabled: false },
   }));
 
-  const vite = spawnLogged(process.execPath, [
-    'node_modules/vite/bin/vite.js',
-    '--host', HOST,
-    '--port', String(PORT),
-    '--strictPort',
-  ], diagnostics);
+  const externalUrl = optionValue('--url');
+  const vite = externalUrl
+    ? null
+    : spawnLogged(process.execPath, [
+      'node_modules/vite/bin/vite.js',
+      '--host', HOST,
+      '--port', String(PORT),
+      '--strictPort',
+    ], diagnostics);
   let chrome = null;
   let cdp = null;
   try {
-    await waitForServer(`http://${HOST}:${PORT}/`, 30_000);
-    log(`Vite is ready on ${HOST}:${PORT}.`);
-    const url = `http://${HOST}:${PORT}/?bakeImpostors=1&download=1`;
+    if (vite) {
+      await waitForServer(`http://${HOST}:${PORT}/`, 30_000);
+      log(`Vite is ready on ${HOST}:${PORT}.`);
+    }
+    const url = new URL(externalUrl ?? `http://${HOST}:${PORT}/`);
+    url.searchParams.set('bakeImpostors', '1');
+    url.searchParams.set('download', '1');
+    if (externalUrl) {
+      const bundlePath = await bakeWithPlaywright(url, downloadDirectory, diagnostics);
+      const bundle = JSON.parse(await readFile(bundlePath, 'utf8'));
+      await writeAssets(bundle);
+      const validation = execFileSync(
+        process.execPath,
+        ['scripts/validate-impostors.mjs', '--required'],
+        { encoding: 'utf8', stdio: 'pipe' },
+      );
+      process.stdout.write(validation);
+      log(`Wrote ${bundle.prototypes.length} tree impostor atlases to ${OUTPUT_DIRECTORY}.`);
+      return;
+    }
     const browserArguments = [
       '--headless=new',
       '--no-first-run',
@@ -402,7 +473,7 @@ async function main() {
       'about:blank',
     ];
     if (process.platform === 'linux') browserArguments.unshift('--no-sandbox');
-    chrome = spawnLogged(browser, browserArguments, diagnostics);
+    chrome = spawnLogged(installedBrowser, browserArguments, diagnostics);
     cdp = new CdpClient(await waitForDevTools(30_000));
     cdp.on('Runtime.consoleAPICalled', ({ type, args }) => {
       appendDiagnostic(diagnostics, `console.${type}: ${(args ?? []).map(remoteObjectText).join(' ')}`);
@@ -432,7 +503,7 @@ async function main() {
     } catch {
       await cdp.call('Page.setDownloadBehavior', downloadBehavior);
     }
-    const navigation = await cdp.call('Page.navigate', { url });
+    const navigation = await cdp.call('Page.navigate', { url: url.href });
     if (navigation.errorText) throw new Error(`Page navigation failed: ${navigation.errorText}`);
 
     try {

@@ -9,7 +9,9 @@ export function normalizeBaseUrl(baseUrl) {
 }
 
 export function resolveAssetUrl(baseUrl, assetPath) {
-  return `${normalizeBaseUrl(baseUrl)}${String(assetPath).replace(/^\/+/, '')}`;
+  const value = String(assetPath);
+  if (/^(?:https?:|blob:|data:)/i.test(value)) return value;
+  return `${normalizeBaseUrl(baseUrl)}${value.replace(/^\/+/, '')}`;
 }
 
 export function materialList(mesh) {

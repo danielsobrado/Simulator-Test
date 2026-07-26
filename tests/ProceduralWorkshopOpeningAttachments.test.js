@@ -113,6 +113,185 @@ test('opening layout routes originals and copies to planar and radial hosts', ()
   assert.equal(radial.angle, 0.5);
 });
 
+test('opening layout collapses attached members into one planar assembly', () => {
+  const recipe = {
+    componentTransforms: {},
+    openingAttachments: normalizeOpeningAttachments({
+      'window-1': {
+        sourceId: 'window-1',
+        hostId: 'structure-main',
+        position: [-0.55, 1.4],
+        scale: [1, 1],
+      },
+      'window-2': {
+        sourceId: 'window-2',
+        hostId: 'structure-main',
+        position: [0.55, 1.4],
+        scale: [1, 1],
+      },
+    }),
+    openingAssemblies: {
+      'assembly-window-1': {
+        kind: 'window',
+        hostId: 'structure-main',
+        memberIds: ['window-1', 'window-2'],
+      },
+    },
+  };
+  const base = [
+    {
+      componentId: 'window-1',
+      componentLabel: 'Window 1',
+      hostId: 'structure-main',
+      width: 1,
+      springHeight: 1,
+      radius: 0.2,
+      bottom: 1.4,
+    },
+    {
+      componentId: 'window-2',
+      componentLabel: 'Window 2',
+      hostId: 'structure-main',
+      width: 1,
+      springHeight: 1,
+      radius: 0.2,
+      bottom: 1.4,
+    },
+  ];
+  const [assembly] = resolveWorkshopOpeningLayout(recipe, base, [{
+    id: 'structure-main',
+    type: 'planar',
+    width: 8,
+    height: 5,
+  }]).get('structure-main');
+  assert.equal(assembly.componentId, 'assembly-window-1');
+  assert.equal(assembly.rectangular, true);
+  assert.equal(assembly.memberOpenings.length, 2);
+  assert.deepEqual(assembly.memberIds, ['window-1', 'window-2']);
+  assert.ok(Math.abs(assembly.centerX) < 1e-9);
+  assert.equal(assembly.width, 2.1);
+  assert.equal(assembly.springHeight, 1.5);
+});
+
+test('round opening assemblies unwrap members across the radial seam', () => {
+  const radius = 2;
+  const half = Math.PI * radius;
+  const recipe = {
+    componentTransforms: {},
+    openingAttachments: normalizeOpeningAttachments({
+      'window-1': {
+        sourceId: 'window-1',
+        hostId: 'structure-left',
+        position: [half - 0.3, 1],
+        scale: [1, 1],
+      },
+      'window-2': {
+        sourceId: 'window-2',
+        hostId: 'structure-left',
+        position: [-half + 0.3, 1],
+        scale: [1, 1],
+      },
+    }),
+    openingAssemblies: {
+      'assembly-window-1': {
+        kind: 'window',
+        hostId: 'structure-left',
+        memberIds: ['window-1', 'window-2'],
+      },
+    },
+  };
+  const base = ['window-1', 'window-2'].map((componentId) => ({
+    componentId,
+    componentLabel: componentId,
+    hostId: 'structure-left',
+    width: 0.5,
+    springHeight: 0.7,
+    radius: 0.2,
+    bottom: 1,
+  }));
+  const [assembly] = resolveWorkshopOpeningLayout(recipe, base, [{
+    id: 'structure-left',
+    type: 'round',
+    width: Math.PI * 2 * radius,
+    height: 5,
+    radius,
+  }]).get('structure-left');
+  assert.equal(assembly.componentId, 'assembly-window-1');
+  assert.ok(assembly.width < 1.2);
+  assert.ok(Math.abs(Math.abs(assembly.surfaceX) - half) < 0.05);
+});
+
+test('opening assemblies reject missing attachments and mixed kinds', () => {
+  const host = [{
+    id: 'structure-main',
+    type: 'planar',
+    width: 8,
+    height: 5,
+  }];
+  const base = [
+    {
+      componentId: 'door-1',
+      componentLabel: 'Door',
+      hostId: 'structure-main',
+      width: 1,
+      springHeight: 1.8,
+      radius: 0.5,
+      bottom: 0,
+      door: true,
+    },
+    {
+      componentId: 'window-1',
+      componentLabel: 'Window',
+      hostId: 'structure-main',
+      width: 0.8,
+      springHeight: 0.8,
+      radius: 0.25,
+      bottom: 2,
+    },
+  ];
+  assert.throws(
+    () => resolveWorkshopOpeningLayout({
+      componentTransforms: {},
+      openingAttachments: {},
+      openingAssemblies: {
+        'assembly-window-1': {
+          kind: 'window',
+          hostId: 'structure-main',
+          memberIds: ['door-1', 'window-1'],
+        },
+      },
+    }, base, host),
+    /has no attachment/,
+  );
+  assert.throws(
+    () => resolveWorkshopOpeningLayout({
+      componentTransforms: {},
+      openingAttachments: normalizeOpeningAttachments({
+        'door-1': {
+          sourceId: 'door-1',
+          hostId: 'structure-main',
+          position: [0, 0],
+          scale: [1, 1],
+        },
+        'window-1': {
+          sourceId: 'window-1',
+          hostId: 'structure-main',
+          position: [1, 2],
+          scale: [1, 1],
+        },
+      }),
+      openingAssemblies: {
+        'assembly-window-1': {
+          kind: 'window',
+          hostId: 'structure-main',
+          memberIds: ['door-1', 'window-1'],
+        },
+      },
+    }, base, host),
+    /must all be windows/,
+  );
+});
+
 test('opening layout prevents impossible narrow-radius arches with horizontal shoulders', () => {
   const layout = resolveWorkshopOpeningLayout({
     componentTransforms: {},

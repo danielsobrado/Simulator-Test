@@ -54,6 +54,7 @@ When a run finishes, the report is available as:
 | `strafe` | Hold right (`D`) |
 | `diagonal` | Hold `W`+`D` |
 | `chunk-cross` | Long forward run intended to cross chunk boundaries |
+| `object-town` | Deterministic 64/256-building masonry town; set `buildings=64` or `256` |
 
 The harness enters walk mode at a fixed pose, bypasses pointer lock, and injects keys so runs are repeatable without mouse capture.
 
@@ -86,6 +87,7 @@ Extra CLI flags for `qa:perf`:
 
 ```bash
 npm run qa:perf -- --qa move --duration 8 --warmup 1 --speed walk --url http://localhost:5173
+npm run qa:perf -- --headed --qa object-town --buildings 256 --warmup 8 --duration 14
 npm run qa:perf -- --headed
 ```
 
@@ -107,6 +109,21 @@ npm run qa:perf -- --headed
 | `src/editor/player/PlayerController.js` | Harness input bypass (`setHarnessActive` / `setHarnessKeys` / `setPose`) |
 
 Counters are incremented from stylized rebuild paths and terrain `assignSlot` / `uploadPage` commit.
+
+## Close other tabs rendering the app
+
+A second browser tab running the app renders continuously against the same GPU and
+silently ruins a run. Measured on 2026-07-26, identical code and scenario:
+
+| | With an app tab open elsewhere | Tab closed |
+|--|--|--|
+| Avg FPS | 141, 148, 158 | 202, 205, 208 |
+| Hitches | 10, 11, 11 | 5, 7, 8, 9 |
+
+That is a ~30% swing — far larger than most changes worth measuring, and it points
+the wrong way (it looks exactly like a regression in whatever you just changed).
+The harness cannot detect it. **Close every other tab serving the app before an A/B,
+and be suspicious of any run whose absolute FPS is well below the usual band.**
 
 ## Attribution caveat
 
@@ -139,6 +156,96 @@ Captured against local Vite (`?qa=chunk-cross&warmup=2&duration=12&speed=run&hit
 4. Early hitches (~150–250 ms) appeared right after the measure phase began (post-warmup settle).
 5. Phase timers on those hitch frames stayed small (~2–14 ms), which matches async upload work completing outside the marked loop body.
 6. `stylized` phase max reached ~948 ms once (rebuild spike); keep samples that include counter deltas / expensive phases when diagnosing rebuild cost.
+
+### Measured: grass `residentRadius` 1 → 2 is a regression (2026-07-26)
+
+A cheap far blade band was added (`nearRadius` rings keep the tapered five-triangle
+blade, rings beyond it drop to a single triangle) so that grass geometry could reach
+past the near ring. The draw-side saving is real — 40 triangles per clump down to 8 —
+but the extra ring is **not** affordable on it.
+
+`--qa chunk-cross --warmup 2 --duration 12 --speed run`, two runs each:
+
+| Metric | `residentRadius: 2` | `residentRadius: 1` |
+|--------|--------------------|---------------------|
+| Hitches (>33.3 ms) | 11, 10 | 5, 8 |
+| dt p95 | 6.3, 8.77 ms | 6.19, 6.6 ms |
+| dt p99 | 11.8, 15.1 ms | 10.7, 13.6 ms |
+| Avg FPS | 195, 174 | 201, 191 |
+| `grassBuildSlices` | 36 | 12 |
+| `grassScatterMs` | 58.2 | 21.6 |
+| `attributeBytesUploaded` | 33.3 MB | 27.0 MB |
+
+**Why:** the cost is in *building* the ring, not drawing it. A far-ring chunk still
+runs full per-chunk scatter generation — `outerRingDensity` halves its clump count
+but `buildCells` still walks every cell — so 16 extra chunks tripled the grass build
+slices. Cheaper blades cannot pay that back.
+
+**Before raising `residentRadius` again,** make far-ring scatter coarser (skip cells
+rather than only thinning clumps per cell). The band machinery itself stays in place
+and costs nothing while `nearRadius === residentRadius`: `farGeometry` is not even
+allocated in that case.
+
+### Measured: grass density 4× is free, `bladesPerClump` is the lever (2026-07-26)
+
+Counterpart to the finding above. Blades are baked into the clump's **shared**
+vertex buffer, so an instance is a clump, not a blade:
+
+```
+clumpsPerCell = ceil(bladesPerCell / bladesPerClump)
+```
+
+Only `clumpsPerCell` drives instance memory, per-chunk build work and buffer
+uploads. `bladesPerClump` is paid once in a buffer shared by every instance, and
+after that only in raster. Raising **both together** multiplies visible density
+while holding `clumpsPerCell` fixed.
+
+`48/8` → `192/32` (4× blades, `clumpsPerCell` 6 either way):
+
+| Metric | 48 / 8 | 192 / 32 | 384 / 64 |
+|--------|--------|----------|----------|
+| Effective blades per chunk | 97,400 | **389,600** | 779,200 |
+| Clumps (instances) | 12,175 | 12,175 | 12,175 |
+| `grassBuildSlices` | 12 | 12 | 12 |
+| `grassInstanceAttributeBytes` | 340,900 | 340,900 | 340,900 |
+| Hitches (>33.3 ms) | 7, 5, 8 | 5, 8, 8 | 11 |
+| dt p95 | 6.5, 6.19, 6.6 | 6.4, 6.49, 6.8 | 6.5 |
+| dt p99 | 13.4, 10.7, 13.6 | 11.3, 12.0, 15.1 | 13.4 |
+
+4× density is indistinguishable from baseline — every streaming counter is byte
+identical and the frame metrics sit inside run-to-run spread. **8× (384/64) is
+where it starts to cost**: 11 hitches on its single run, at the top of the spread.
+Settled on `192/32`; go higher only with more runs than one.
+
+Raising `bladesPerCell` *alone* is the expensive form — it increases
+`clumpsPerCell`, which is the streaming-cost term.
+
+**Clump footprint** (`CLUMP_RADIUS` in `StylizedGrassSlot.js`) is separate and also
+close to free. The first pass went 3.55 → 7.5 blade-widths, spreading each clump
+from 0.24 m to 0.51 m; this measured at 203.8/207.9 FPS before and 201.6/204.7
+after, hitches 7/5 → 9/8. The upstream-parity pass then moved to the upstream
+0.06 m blade width and a 12.5 blade-width footprint (0.75 m radius), because the
+barely-overlapping 7.5 footprint still exposed circular tufts at player height.
+The same low-discrepancy clump records now overlap into visually continuous cover;
+the follow-up A/B is recorded below. `clumpsFormCarpet` in `grassLodMath.js`
+guards the relationship if density changes again.
+
+`chunk-cross --warmup 8 --duration 14 --speed run`, real NVIDIA WebGPU adapter:
+
+| Metric | 7.5 footprint, pre-parity sample | 12.5 footprint + per-blade parity |
+|--------|----------------------------------|-----------------------------------|
+| Avg FPS | 193.7 | 200.5, 208.7 |
+| dt p95 | 7.4 ms | 6.4, 6.9 ms |
+| dt p99 | 11.4 ms | 8.4, 8.9 ms |
+| Hitches (>33.3 ms) | 3 | 5, 5 |
+| Grass build slices | 12 | 12, 12 |
+| Last-chunk clumps | 12,173 | 12,173, 12,173 |
+| Last-chunk effective blades | 389,536 | 389,536, 389,536 |
+
+The extra footprint and per-blade centre/facing attributes do not increase
+streaming work or instance uploads. Frame throughput improved within normal
+run-to-run variance; the two extra hitches are in the historical 5–9 spread and
+did not move p95/p99 upward.
 
 ### Fix landed: worker render pixels + commit queue
 
@@ -272,6 +379,24 @@ comparing anything to it.
 > **headless** run. Those numbers measured the WebGL backend, not WebGPU — see
 > [Harness must run on real hardware](#harness-must-run-on-real-hardware) — and
 > have been replaced by the headed figures above.
+
+### Terrain normal and forest-floor/dirt layering (2026-07-26)
+
+Large ground bands were isolated with fixed-pose A/B captures. Disabling
+directional shadows left their shape intact; disabling procedural dirt removed
+it. Two terrain-material layering defects made those intended dirt patches read
+like shadow streaks:
+
+1. The forest-floor tint was applied on top of exposed dirt and path tread,
+   shifting warm soil toward `groundCoreColor`.
+2. `normalNode` was assigned a literal local +Z even though node-material normals
+   are consumed in view space. Leaving the plane's default transformed normal
+   correctly rotates its local +Z into world +Y.
+
+The existing `PCFSoftShadowMap`, 2048 map, 120 m half-extent, bias, normal bias,
+and radius remain unchanged. A headed `chunk-cross --warmup 8 --duration 14
+--speed run` on the real NVIDIA WebGPU adapter after the fix measured 219.1 FPS,
+4.3/6.6/8.8 ms p50/p95/p99, and 3 hitches over 33.3 ms.
 
 ### Instrumented sub-phases
 

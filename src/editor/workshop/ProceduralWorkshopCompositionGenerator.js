@@ -1,11 +1,13 @@
 import * as THREE from 'three/webgpu';
 import { normalizeWorkshopComposition } from './ProceduralWorkshopComposition.js';
+import { createSkeletonRoofParts } from './ProceduralWorkshopSkeletonRoof.js';
 
 function material(slot, color, options = {}) {
-  const result = new THREE.MeshStandardMaterial({
+  const result = new THREE.MeshStandardNodeMaterial({
     color,
     roughness: options.roughness ?? 0.9,
     metalness: options.metalness ?? 0,
+    vertexColors: options.vertexColors ?? false,
   });
   result.userData.workshopSlot = slot;
   return result;
@@ -64,19 +66,6 @@ function rectangleParts(primitive, materials) {
       connected: true,
     });
   });
-  const roofHeight = primitive.roofFamily === 'flat' ? 0.25 : Math.min(3, depth * 0.42);
-  const roofGeometry = primitive.roofFamily === 'flat'
-    ? new THREE.BoxGeometry(width + 0.3, roofHeight, depth + 0.3)
-    : new THREE.ConeGeometry(Math.hypot(width, depth) * 0.53, roofHeight, 4);
-  roofGeometry.rotateY(Math.PI / 4);
-  roofGeometry.translate(0, primitive.height / 2 + roofHeight / 2, 0);
-  result.push(part(roofGeometry, materials.roof, transform.clone(), {
-    id: `${primitive.id}:roof:main`,
-    componentId: primitive.id,
-    label: 'Main roof',
-    family: 'roof',
-    connected: true,
-  }));
   return result;
 }
 
@@ -161,7 +150,7 @@ export function createWorkshopCompositionParts(recipe) {
   const composition = normalizeWorkshopComposition(recipe.composition);
   const materials = {
     walls: material('mortar', '#b69b70'),
-    roof: material('roof', '#566864', { roughness: 0.82 }),
+    roof: material('roof', '#566864', { roughness: 0.82, vertexColors: true }),
   };
   const parts = composition.primitives.flatMap((primitive) => (
     primitive.kind === 'rectangle'
@@ -170,6 +159,16 @@ export function createWorkshopCompositionParts(recipe) {
         ? circleParts(primitive, materials)
         : wallParts(primitive, materials)
   ));
+  const roofResult = createSkeletonRoofParts({
+    recipe,
+    rectangles: composition.primitives.filter(({ kind }) => kind === 'rectangle'),
+    circles: composition.primitives.filter(({ kind }) => kind === 'circle'),
+    roofMaterial: materials.roof,
+    wallMaterial: materials.walls,
+    roofPitch: recipe.roofPitch,
+    roofOverhang: recipe.roofOverhang,
+  });
+  parts.push(...roofResult.parts);
   for (const materialValue of Object.values(materials)) {
     if (!parts.some((entry) => entry.material === materialValue)) materialValue.dispose();
   }
@@ -183,6 +182,7 @@ export function createWorkshopCompositionParts(recipe) {
       features: composition.primitives.length,
       sourceVertices,
       primitives: composition.primitives.length,
+      ...roofResult.stats,
     }),
   });
   return parts;

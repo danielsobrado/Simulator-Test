@@ -32,6 +32,7 @@ const duration = readArg('duration', '12');
 const warmup = readArg('warmup', '2');
 const speed = readArg('speed', 'run');
 const hitchMs = readArg('hitchMs', '33.3');
+const buildings = readArg('buildings');
 const timeoutMs = Number(
   readArg('timeoutMs', String((Number(warmup) + Number(duration) + 90) * 1000)),
 );
@@ -45,6 +46,7 @@ const query = new URLSearchParams({
   download: '0',
   autostart: '1',
 });
+if (buildings !== null) query.set('buildings', buildings);
 const targetUrl = `${baseUrl.replace(/\/$/, '')}/?${query.toString()}`;
 const outPath = path.join(outDir, 'perf-qa-latest.json');
 const runnerPath = path.join(outDir, 'perf-qa-playwright-runner.cjs');

@@ -17,7 +17,11 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { stylizedDirtMask } from './StylizedNoiseNodes.js';
+import {
+  stylizedDirtMask,
+  stylizedNaturalTrailMask,
+  stylizedPathWearMask,
+} from './StylizedNoiseNodes.js';
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -44,7 +48,23 @@ export function createStylizedFlowerMaterial({
   );
   const worldXZ = base.xz.add(chunkCenter);
   const surface = texture(surfaceMaskTexture, localUv);
-  const dirt = max(surface.r, stylizedDirtMask(worldXZ, {
+  const naturalTrailConfig = config.path?.naturalTrail;
+  const naturalTrail = naturalTrailConfig?.enabled
+    ? stylizedNaturalTrailMask(worldXZ, {
+      scale: float(naturalTrailConfig.scale),
+      level: float(naturalTrailConfig.level),
+      width: float(naturalTrailConfig.width),
+      softness: float(naturalTrailConfig.softness),
+      warp: float(naturalTrailConfig.warp),
+    }).mul(surface.g)
+    : float(0);
+  const pathWear = stylizedPathWearMask(max(surface.r, naturalTrail), worldXZ, {
+    vergeWidth: float(config.path?.vergeWidth ?? 0.45),
+    vergeCut: float(config.path?.vergeCut ?? 0.72),
+    edgeScale: float(config.path?.edgeScale ?? 0.42),
+    edgeWarp: float(config.path?.edgeWarp ?? 0.18),
+  });
+  const dirt = max(pathWear.wear, stylizedDirtMask(worldXZ, {
     scale: float(config.dirt.scale),
     coverage: float(config.dirt.coverage),
     softness: float(config.dirt.softness),

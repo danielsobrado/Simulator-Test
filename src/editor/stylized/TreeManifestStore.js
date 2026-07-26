@@ -25,11 +25,12 @@ export function createPathClearanceField(terrainView, config) {
     chunkSize: terrainView.worldStore.chunkSize,
     roadTileId: config.path?.tileId ?? 13,
     clearCells: config.path?.clearCells ?? 0,
+    naturalTrail: config.path?.naturalTrail,
     revisionProvider: () => terrainView.worldStore.revision,
   });
 }
 
-function createForestField(terrainView, config) {
+function createForestField(terrainView, config, regionalCharacterField = null) {
   const habitat = config.trees.habitat ?? {};
   if (habitat.enabled === false) return null;
   return new ForestHabitatField({
@@ -41,6 +42,7 @@ function createForestField(terrainView, config) {
       ? (x, z) => terrainView.getCanonicalWaterDistance(x, z)
       : null,
     revisionProvider: () => terrainView.worldStore.revision,
+    regionalCharacterField,
     config: habitat,
   });
 }
@@ -52,7 +54,9 @@ export class TreeManifestStore {
     revisionTracker,
     prototypeCount,
     prototypeIndexBySpecies = null,
+    prototypeTileIds = null,
     objectMap = null,
+    regionalCharacterField = null,
     onBuilt,
   }) {
     this.terrainView = terrainView;
@@ -61,12 +65,14 @@ export class TreeManifestStore {
     this.prototypeCount = prototypeCount;
     this.objectMap = objectMap;
     this.onBuilt = onBuilt;
-    this.forestField = createForestField(terrainView, config);
+    this.forestField = createForestField(terrainView, config, regionalCharacterField);
     this.speciesRegistry = new ForestSpeciesRegistry({
       species: config.trees.species,
       palettes: config.trees.speciesPalettes,
       prototypeCount,
       prototypeIndexBySpecies,
+      prototypeTileIds,
+      groveMix: config.trees.groveMix,
     });
     this.pathClearance = createPathClearanceField(terrainView, config);
     this.editStore = new ForestEditStore(terrainView.worldStore.forestEdits);

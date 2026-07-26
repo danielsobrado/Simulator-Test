@@ -63,6 +63,7 @@ Generated stones are derived data. They are never authoritative world objects.
 17. [Procedural object workshop](15-procedural-object-workshop.md)
 18. [Arbitrary-footprint roofs (straight skeleton)](16-arbitrary-footprint-roofs.md) — planned
 19. [Masonry LOD and far representation](17-masonry-lod-and-far-representation.md) — planned, evidence-gated
+20. [Live spline editor and GPU-driven construction renderer](18-live-spline-editor-and-gpu-construction-renderer.md) — proposed
 
 Docs 16 and 17 were added 2026-07-25. Both are plans only; neither is
 implemented. Doc 17 opens with a measurement phase that is explicitly permitted to

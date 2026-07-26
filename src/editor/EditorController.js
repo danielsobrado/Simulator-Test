@@ -10,6 +10,12 @@ import {
 } from './constants.js';
 import { createWorldDocument, loadWorldDocument } from './WorldDocument.js';
 import { TILE_BY_SHORTCUT } from './tileCatalog.js';
+import { executeConstructionCommand } from './construction/ConstructionCommands.js';
+import {
+  createCubicBezierPathFromStroke,
+  findCubicBezierSelfIntersections,
+  moveCubicBezierAnchor,
+} from './construction/curve/CubicBezierPath.js';
 
 export class EditorController {
   constructor({
@@ -23,6 +29,8 @@ export class EditorController {
     brushSizes,
     defaultBrushSize,
     terrainConfig,
+    constructionStore = null,
+    constructionView = null,
   }) {
     this.tileMap = tileMap;
     this.heightField = heightField;
@@ -33,12 +41,21 @@ export class EditorController {
     this.objectCatalog = objectCatalog;
     this.brushSizes = brushSizes;
     this.terrainConfig = terrainConfig;
+    this.constructionStore = constructionStore;
+    this.constructionView = constructionView;
     this.tool = 'terrain';
     this.terrainMode = 'paint';
     this.selectedTileId = 4;
     this.selectedObjectKey = objectCatalog[0].key;
     this.objectRotation = 0;
     this.selectedObjectId = null;
+    this.selectedConstructionId = null;
+    this.constructionMode = 'draw';
+    this.constructionHeight = 3.5;
+    this.constructionThickness = 0.8;
+    this.constructionStroke = null;
+    this.constructionDrawing = false;
+    this.constructionAnchorDrag = null;
     this.movingObjectId = null;
     this.brushSize = brushSizes.includes(defaultBrushSize) ? defaultBrushSize : brushSizes[0];
     this.undoStack = [];
@@ -110,6 +127,15 @@ export class EditorController {
       selectedObject,
       isMovingSelected: this.movingObjectId !== null,
       objectCount: this.objectMap.size,
+      constructionCount: this.constructionStore?.size ?? 0,
+      constructionMode: this.constructionMode,
+      constructionHeight: this.constructionHeight,
+      constructionThickness: this.constructionThickness,
+      selectedConstruction: this.selectedConstructionId
+        ? this.constructionStore?.get(this.selectedConstructionId) ?? null
+        : null,
+      isDrawingConstruction: this.constructionDrawing,
+      isMovingConstructionAnchor: this.constructionAnchorDrag !== null,
       brushSize: this.brushSize,
       canUndo: this.undoStack.length > 0,
       canRedo: this.redoStack.length > 0,
@@ -123,6 +149,10 @@ export class EditorController {
     this.tool = tool;
     if (tool !== 'select') {
       this.setSelectedObject(null);
+    }
+    if (tool !== 'construction') {
+      this.cancelConstructionGesture();
+      this.setSelectedConstruction(null);
     }
     this.updatePreviews();
     this.emitState();
@@ -169,6 +199,50 @@ export class EditorController {
     this.brushSize = brushSize;
     this.updatePreviews();
     this.emitState();
+  }
+
+  selectConstructionMode(mode) {
+    if (!['draw', 'edit'].includes(mode) || !this.constructionStore || !this.constructionView) {
+      return;
+    }
+    this.cancelConstructionGesture();
+    this.constructionMode = mode;
+    this.tool = 'construction';
+    if (mode === 'draw') this.setSelectedConstruction(null);
+    this.setSelectedObject(null);
+    this.updatePreviews();
+    this.emitState();
+  }
+
+  setConstructionDimensions({ height, thickness }) {
+    if (Number.isFinite(height)) {
+      this.constructionHeight = Math.max(0.5, Math.min(30, height));
+    }
+    if (Number.isFinite(thickness)) {
+      this.constructionThickness = Math.max(0.1, Math.min(10, thickness));
+    }
+    this.emitState();
+  }
+
+  setSelectedConstruction(constructionId) {
+    const id = constructionId == null ? null : String(constructionId);
+    this.selectedConstructionId = id && this.constructionStore?.get(id) ? id : null;
+    this.constructionView?.setSelection(this.selectedConstructionId);
+  }
+
+  deleteSelectedConstruction() {
+    if (!this.selectedConstructionId || !this.constructionStore) return;
+    try {
+      const change = executeConstructionCommand(this.constructionStore, {
+        type: 'delete',
+        constructionId: this.selectedConstructionId,
+      });
+      this.setSelectedConstruction(null);
+      this.commitHistory(change);
+      this.emitMap();
+    } catch (error) {
+      this.emitNotice(error.message, true);
+    }
   }
 
   rotatePlacement() {
@@ -264,6 +338,13 @@ export class EditorController {
       return;
     }
 
+    if (entry.kind === 'construction') {
+      this.constructionStore?.applyChange(entry, direction);
+      const target = direction === 'undo' ? entry.before : entry.after;
+      this.setSelectedConstruction(target?.id ?? null);
+      return;
+    }
+
     if (entry.kind === 'world') {
       this.tileMap.applyPatch(entry.terrainPatch, direction);
       this.heightField.applyPatch(entry.heightPatch, direction);
@@ -329,6 +410,10 @@ export class EditorController {
     }
 
     event.preventDefault();
+    if (this.tool === 'construction' && this.constructionStore && this.constructionView) {
+      this.onConstructionPointerDown(event);
+      return;
+    }
     if (this.tool === 'terrain') {
       this.canvas.setPointerCapture(event.pointerId);
       this.painting = true;
@@ -370,12 +455,23 @@ export class EditorController {
     this.updatePreviews();
     this.emitHover(cell);
 
+    if (this.tool === 'construction' && this.constructionView) {
+      this.onConstructionPointerMove(event);
+    }
+
     if (this.painting && !this.spacePressed) {
       this.editTerrainFromPointer(event, false);
     }
   }
 
   onPointerUp(event) {
+    if (
+      event.button === PRIMARY_POINTER_BUTTON
+      && (this.constructionDrawing || this.constructionAnchorDrag)
+    ) {
+      this.onConstructionPointerUp(event);
+      return;
+    }
     if (event.button !== PRIMARY_POINTER_BUTTON || !this.painting) {
       return;
     }
@@ -386,6 +482,188 @@ export class EditorController {
       this.canvas.releasePointerCapture(event.pointerId);
     }
     this.finishStroke();
+  }
+
+  pickCanonicalConstructionPoint(event) {
+    const render = this.terrainView.pickWorld(
+      event.clientX,
+      event.clientY,
+      this.editorCamera.camera,
+    );
+    if (!render) return null;
+    const canonical = this.terrainView.floatingOrigin
+      ? this.terrainView.floatingOrigin.toCanonical(render.x, render.z)
+      : render;
+    return { x: canonical.x, z: canonical.z };
+  }
+
+  onConstructionPointerDown(event) {
+    if (this.constructionMode === 'edit') {
+      const handle = this.constructionView.pickHandle(
+        event.clientX,
+        event.clientY,
+        this.editorCamera.camera,
+      );
+      if (handle) {
+        const before = this.constructionStore.get(handle.constructionId);
+        this.constructionAnchorDrag = {
+          ...handle,
+          before,
+          candidate: before,
+        };
+        this.canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      const constructionId = this.constructionView.pickConstruction(
+        event.clientX,
+        event.clientY,
+        this.editorCamera.camera,
+      );
+      this.setSelectedConstruction(constructionId);
+      this.emitState();
+      return;
+    }
+
+    const point = this.pickCanonicalConstructionPoint(event);
+    if (!point) return;
+    this.setSelectedConstruction(null);
+    this.constructionStroke = [point];
+    this.constructionDrawing = true;
+    this.canvas.setPointerCapture(event.pointerId);
+    this.emitState();
+  }
+
+  onConstructionPointerMove(event) {
+    const point = this.pickCanonicalConstructionPoint(event);
+    if (!point) return;
+    if (this.constructionDrawing && this.constructionStroke) {
+      const previous = this.constructionStroke.at(-1);
+      if (Math.hypot(point.x - previous.x, point.z - previous.z) >= 0.12) {
+        this.constructionStroke.push(point);
+      }
+      if (this.constructionStroke.length >= 2) {
+        try {
+          const path = createCubicBezierPathFromStroke(this.constructionStroke, {
+            anchorPrefix: 'preview-anchor',
+            segmentPrefix: 'preview-segment',
+          });
+          const record = this.constructionDraftRecord(path, 'construction-preview');
+          this.constructionView.setDraft(record, {
+            valid: findCubicBezierSelfIntersections(path).length === 0,
+          });
+        } catch {
+          this.constructionView.clearDraft();
+        }
+      }
+      return;
+    }
+
+    if (this.constructionAnchorDrag) {
+      const drag = this.constructionAnchorDrag;
+      const path = moveCubicBezierAnchor(drag.before.path, drag.anchorId, point);
+      drag.candidate = {
+        ...drag.before,
+        revision: drag.before.revision + 1,
+        path,
+        features: path.features,
+      };
+      this.constructionView.setDraft(drag.candidate, {
+        constructionId: drag.constructionId,
+        valid: findCubicBezierSelfIntersections(path).length === 0,
+      });
+    }
+  }
+
+  onConstructionPointerUp(event) {
+    if (this.canvas.hasPointerCapture(event.pointerId)) {
+      this.canvas.releasePointerCapture(event.pointerId);
+    }
+    if (this.constructionDrawing) {
+      const stroke = this.constructionStroke ?? [];
+      this.constructionDrawing = false;
+      this.constructionStroke = null;
+      this.constructionView.clearDraft();
+      if (
+        stroke.length < 2
+        || Math.hypot(stroke.at(-1).x - stroke[0].x, stroke.at(-1).z - stroke[0].z) < 0.5
+      ) {
+        this.emitNotice('Drag at least 0.5 metres to create a wall.', true);
+        this.emitState();
+        return;
+      }
+      try {
+        const id = this.constructionStore.nextConstructionId();
+        const path = createCubicBezierPathFromStroke(stroke, {
+          anchorPrefix: `${id}-anchor`,
+          segmentPrefix: `${id}-segment`,
+        });
+        if (findCubicBezierSelfIntersections(path).length > 0) {
+          throw new Error('Construction paths cannot intersect themselves.');
+        }
+        const change = executeConstructionCommand(this.constructionStore, {
+          type: 'create',
+          record: this.constructionDraftRecord(path, id),
+        });
+        this.commitHistory(change);
+        this.setSelectedConstruction(id);
+        this.constructionMode = 'edit';
+        this.emitMap();
+      } catch (error) {
+        this.emitNotice(error.message, true);
+      }
+      this.emitState();
+      return;
+    }
+
+    if (this.constructionAnchorDrag) {
+      const drag = this.constructionAnchorDrag;
+      this.constructionAnchorDrag = null;
+      this.constructionView.clearDraft();
+      try {
+        if (findCubicBezierSelfIntersections(drag.candidate.path).length > 0) {
+          throw new Error('Construction paths cannot intersect themselves.');
+        }
+        const anchor = drag.candidate.path.anchors.find(({ id }) => id === drag.anchorId);
+        const change = executeConstructionCommand(this.constructionStore, {
+          type: 'move_anchor',
+          constructionId: drag.constructionId,
+          anchorId: drag.anchorId,
+          position: anchor.position,
+        });
+        this.commitHistory(change);
+        this.setSelectedConstruction(drag.constructionId);
+        this.emitMap();
+      } catch (error) {
+        this.emitNotice(error.message, true);
+      }
+      this.emitState();
+    }
+  }
+
+  constructionDraftRecord(path, id) {
+    const numericId = Number.parseInt(String(id).match(/[0-9]+/)?.[0] ?? '1', 10);
+    return {
+      version: 1,
+      id,
+      revision: 1,
+      seed: numericId,
+      kind: 'wall',
+      label: `Curved wall ${numericId}`,
+      style: { key: 'coursed-rubble', version: 1 },
+      dimensions: {
+        height: this.constructionHeight,
+        thickness: this.constructionThickness,
+      },
+      path,
+      features: path.features,
+    };
+  }
+
+  cancelConstructionGesture() {
+    this.constructionDrawing = false;
+    this.constructionStroke = null;
+    this.constructionAnchorDrag = null;
+    this.constructionView?.clearDraft();
   }
 
   onPointerLeave() {
@@ -646,17 +924,24 @@ export class EditorController {
       case 'v':
         this.selectTool('select');
         break;
+      case 'c':
+        this.selectTool('construction');
+        break;
       case 'r':
         this.tool === 'select' ? this.rotateSelected() : this.rotatePlacement();
         break;
       case 'delete':
       case 'backspace':
-        if (this.tool === 'select') {
+        if (this.tool === 'construction' && this.selectedConstructionId) {
+          event.preventDefault();
+          this.deleteSelectedConstruction();
+        } else if (this.tool === 'select') {
           event.preventDefault();
           this.deleteSelected();
         }
         break;
       case 'escape':
+        this.cancelConstructionGesture();
         this.movingObjectId = null;
         this.setSelectedObject(null);
         this.emitState();
@@ -687,6 +972,11 @@ export class EditorController {
   }
 
   updatePreviews() {
+    if (this.tool === 'construction') {
+      this.terrainView.setPreview(null);
+      this.objectView.setPreview(null);
+      return;
+    }
     if (this.tool === 'terrain') {
       const color = this.terrainMode === 'paint'
         ? this.tileMap.getTileDefinition(this.selectedTileId).color

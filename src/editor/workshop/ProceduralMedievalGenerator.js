@@ -40,6 +40,7 @@ function shortAngle(value) {
 function openingHalfWidth(opening, y) {
   const localY = y - opening.bottom;
   if (localY < 0 || localY > opening.springHeight + opening.radius) return 0;
+  if (opening.rectangular) return opening.width / 2;
   if (localY <= opening.springHeight) return opening.width / 2;
   const archY = localY - opening.springHeight;
   return Math.sqrt(Math.max(0, opening.radius ** 2 - archY ** 2));
@@ -65,6 +66,8 @@ function tagOpeningGeometry(geometry, opening, door) {
       opening.width,
       opening.springHeight + opening.radius,
     ]),
+    assemblyId: opening.assemblyId ?? null,
+    memberIds: opening.memberIds ? Object.freeze([...opening.memberIds]) : null,
   });
   return geometry;
 }
@@ -211,20 +214,29 @@ function buildArchTrim(recipe, opening, {
   return stones;
 }
 
-function addOpeningDetails(sets, recipe, opening, {
+function addOpeningInsert(sets, recipe, opening, {
   frontZ,
-  seedOffset,
   door = false,
+  rectangular = false,
 }) {
-  sets.stone.push(...buildArchTrim(recipe, opening, { frontZ, seedOffset }));
-  const panel = tagOpeningGeometry(archedPanel({
+  const height = opening.springHeight + opening.radius;
+  const panel = tagOpeningGeometry(rectangular
+    ? beveledBox({
+      width: opening.width * 0.9,
+      height: height * 0.9,
+      depth: 0.12,
+      position: [opening.centerX, opening.bottom + height * 0.45, frontZ - 0.11],
+      detail: recipe.detail,
+      bevelRatio: 0.025,
+    })
+    : archedPanel({
     width: opening.width * 0.91,
     springHeight: opening.springHeight,
     radius: opening.radius * 0.91,
     depth: 0.12,
     position: [opening.centerX, opening.bottom, frontZ - 0.11],
     detail: recipe.detail,
-  }), opening, door);
+    }), opening, door);
   if (door) {
     sets.wood.push(panel);
     const plankCount = Math.max(3, Math.round(opening.width / 0.32));
@@ -264,6 +276,108 @@ function addOpeningDetails(sets, recipe, opening, {
       bevelRatio: 0.08,
     }), opening, door));
   }
+}
+
+function addPlanarOpeningAssemblyDetails(sets, recipe, opening, {
+  frontZ,
+  seedOffset,
+  door,
+}) {
+  const height = opening.springHeight + opening.radius;
+  const trim = Math.max(0.16, Math.min(0.3, opening.width * 0.055));
+  const frameDepth = 0.3;
+  const frame = [
+    beveledBox({
+      width: opening.width + trim * 2,
+      height: trim,
+      depth: frameDepth,
+      position: [opening.centerX, opening.bottom + height + trim * 0.45, frontZ],
+      detail: recipe.detail,
+      bevelRatio: 0.09,
+    }),
+    beveledBox({
+      width: trim,
+      height,
+      depth: frameDepth,
+      position: [opening.centerX - opening.width / 2 - trim * 0.45, opening.bottom + height / 2, frontZ],
+      detail: recipe.detail,
+      bevelRatio: 0.09,
+    }),
+    beveledBox({
+      width: trim,
+      height,
+      depth: frameDepth,
+      position: [opening.centerX + opening.width / 2 + trim * 0.45, opening.bottom + height / 2, frontZ],
+      detail: recipe.detail,
+      bevelRatio: 0.09,
+    }),
+  ];
+  if (!door) {
+    frame.push(beveledBox({
+      width: opening.width + trim * 2,
+      height: trim,
+      depth: frameDepth,
+      position: [opening.centerX, opening.bottom - trim * 0.45, frontZ],
+      detail: recipe.detail,
+      bevelRatio: 0.09,
+    }));
+  }
+  sets.stone.push(...frame.map((geometry) => tagOpeningGeometry(geometry, opening, door)));
+
+  const members = opening.memberOpenings ?? [opening];
+  members.forEach((member) => {
+    addOpeningInsert(sets, recipe, {
+      ...member,
+      componentId: opening.componentId,
+      componentLabel: opening.componentLabel,
+      assemblyId: opening.assemblyId,
+      memberIds: opening.memberIds,
+      centerX: member.centerX,
+      bottom: opening.bottom,
+      springHeight: height,
+      radius: 0,
+      rectangular: true,
+    }, {
+      frontZ,
+      door,
+      rectangular: true,
+    });
+  });
+
+  const ordered = [...members].sort((left, right) => (
+    left.centerX - right.centerX || left.componentId.localeCompare(right.componentId)
+  ));
+  for (let index = 1; index < ordered.length; index += 1) {
+    const dividerX = (
+      ordered[index - 1].centerX + ordered[index].centerX
+    ) / 2;
+    sets.wood.push(tagOpeningGeometry(beveledBox({
+      width: 0.075,
+      height: height * 0.92,
+      depth: 0.07,
+      position: [dividerX, opening.bottom + height * 0.46, frontZ - 0.015],
+      detail: 1,
+      bevelRatio: 0.08,
+    }), opening, door));
+  }
+  void seedOffset;
+}
+
+function addOpeningDetails(sets, recipe, opening, {
+  frontZ,
+  seedOffset,
+  door = false,
+}) {
+  if (opening.assemblyId) {
+    addPlanarOpeningAssemblyDetails(sets, recipe, opening, {
+      frontZ,
+      seedOffset,
+      door,
+    });
+    return;
+  }
+  sets.stone.push(...buildArchTrim(recipe, opening, { frontZ, seedOffset }));
+  addOpeningInsert(sets, recipe, opening, { frontZ, door });
 }
 
 function buildBattlementLine(sets, recipe, {
@@ -539,6 +653,104 @@ function towerOpenings(recipe, height, {
   return openings;
 }
 
+function rotateGeneratedRange(sets, starts, centerX, centerZ, angle) {
+  if (Math.abs(angle ?? 0) <= 1e-7) return;
+  const matrix = new THREE.Matrix4()
+    .makeTranslation(centerX, 0, centerZ)
+    .multiply(new THREE.Matrix4().makeRotationY(angle))
+    .multiply(new THREE.Matrix4().makeTranslation(-centerX, 0, -centerZ));
+  for (const [slot, geometries] of Object.entries(sets)) {
+    for (let index = starts[slot]; index < geometries.length; index += 1) {
+      geometries[index].applyMatrix4(matrix);
+    }
+  }
+}
+
+function addRoundOpeningAssemblyDetails(sets, recipe, opening, {
+  centerX,
+  centerZ,
+  radius,
+  depth,
+}) {
+  const frontZ = centerZ + radius + depth * 0.55;
+  const height = opening.springHeight + opening.radius;
+  for (const member of opening.memberOpenings) {
+    const starts = Object.fromEntries(Object.entries(sets).map(([slot, geometries]) => (
+      [slot, geometries.length]
+    )));
+    addOpeningInsert(sets, recipe, {
+      ...member,
+      componentId: opening.componentId,
+      componentLabel: opening.componentLabel,
+      assemblyId: opening.assemblyId,
+      memberIds: opening.memberIds,
+      centerX,
+      bottom: opening.bottom,
+      springHeight: height,
+      radius: 0,
+      rectangular: true,
+    }, {
+      frontZ,
+      door: opening.door,
+      rectangular: true,
+    });
+    rotateGeneratedRange(sets, starts, centerX, centerZ, member.angle ?? 0);
+  }
+
+  const trim = Math.max(0.16, Math.min(0.28, opening.width * 0.055));
+  const faceRadius = radius + depth * 0.55;
+  const surfaceStart = opening.assemblySurfaceStart;
+  const surfaceEnd = opening.assemblySurfaceEnd;
+  const segmentCount = Math.max(2, Math.ceil(opening.width / 0.42));
+  const segmentWidth = opening.width / segmentCount;
+  const radialFrameBox = ({
+    surfaceX,
+    y,
+    width,
+    boxHeight,
+  }) => {
+    const angle = (opening.angle ?? 0) + (surfaceX - opening.surfaceX) / radius;
+    return tagOpeningGeometry(beveledBox({
+      width,
+      height: boxHeight,
+      depth: 0.3,
+      position: [
+        centerX + Math.sin(angle) * faceRadius,
+        y,
+        centerZ + Math.cos(angle) * faceRadius,
+      ],
+      rotation: [0, angle, 0],
+      detail: recipe.detail,
+      bevelRatio: 0.09,
+    }), opening, opening.door);
+  };
+  for (let index = 0; index < segmentCount; index += 1) {
+    const surfaceX = surfaceStart + segmentWidth * (index + 0.5);
+    sets.stone.push(radialFrameBox({
+      surfaceX,
+      y: opening.bottom + height + trim * 0.45,
+      width: segmentWidth * 1.02,
+      boxHeight: trim,
+    }));
+    if (!opening.door) {
+      sets.stone.push(radialFrameBox({
+        surfaceX,
+        y: opening.bottom - trim * 0.45,
+        width: segmentWidth * 1.02,
+        boxHeight: trim,
+      }));
+    }
+  }
+  for (const surfaceX of [surfaceStart - trim * 0.45, surfaceEnd + trim * 0.45]) {
+    sets.stone.push(radialFrameBox({
+      surfaceX,
+      y: opening.bottom + height / 2,
+      width: trim,
+      boxHeight: height,
+    }));
+  }
+}
+
 function addTowerOpeningDetails(sets, recipe, openings, {
   centerX,
   centerZ,
@@ -548,6 +760,15 @@ function addTowerOpeningDetails(sets, recipe, openings, {
 }) {
   const frontZ = centerZ + radius + depth * 0.55;
   openings.forEach((opening, index) => {
+    if (opening.assemblyId) {
+      addRoundOpeningAssemblyDetails(sets, recipe, opening, {
+        centerX,
+        centerZ,
+        radius,
+        depth,
+      });
+      return;
+    }
     const starts = Object.fromEntries(Object.entries(sets).map(([slot, geometries]) => (
       [slot, geometries.length]
     )));
@@ -559,17 +780,7 @@ function addTowerOpeningDetails(sets, recipe, openings, {
       seedOffset: seedOffset + index,
       door: opening.door,
     });
-    if (Math.abs(opening.angle ?? 0) > 1e-7) {
-      const matrix = new THREE.Matrix4()
-        .makeTranslation(centerX, 0, centerZ)
-        .multiply(new THREE.Matrix4().makeRotationY(opening.angle))
-        .multiply(new THREE.Matrix4().makeTranslation(-centerX, 0, -centerZ));
-      for (const [slot, geometries] of Object.entries(sets)) {
-        for (let geometryIndex = starts[slot]; geometryIndex < geometries.length; geometryIndex += 1) {
-          geometries[geometryIndex].applyMatrix4(matrix);
-        }
-      }
-    }
+    rotateGeneratedRange(sets, starts, centerX, centerZ, opening.angle ?? 0);
   });
 }
 
@@ -1134,9 +1345,11 @@ function addFlowerBox(sets, recipe, {
   y,
   z,
   seedOffset,
+  width = 0.72,
 }) {
+  const safeWidth = Math.max(0.42, width);
   sets.wood.push(beveledBox({
-    width: 0.72,
+    width: safeWidth,
     height: 0.16,
     depth: 0.25,
     position: [x, y, z],
@@ -1144,11 +1357,12 @@ function addFlowerBox(sets, recipe, {
     bevelRatio: 0.16,
   }));
   const random = createRandom(mixSeed(recipe.seed, seedOffset));
-  for (let index = 0; index < 7; index += 1) {
+  const flowerCount = Math.max(5, Math.min(28, Math.round(safeWidth / 0.1)));
+  for (let index = 0; index < flowerCount; index += 1) {
     sets.foliage.push(leaf({
       radius: 0.075 + random() * 0.035,
       position: [
-        x - 0.28 + index * 0.093,
+        x - safeWidth * 0.4 + index * safeWidth * 0.8 / Math.max(1, flowerCount - 1),
         y + 0.13 + random() * 0.11,
         z + 0.04 + random() * 0.08,
       ],
@@ -1307,6 +1521,7 @@ function buildManor(recipe) {
         y: opening.bottom - 0.08,
         z: depth / 2 + 0.39,
         seedOffset: 750 + index,
+        width: opening.assemblyId ? opening.width * 0.94 : 0.72,
       });
     }
   });

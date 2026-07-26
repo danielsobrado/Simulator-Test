@@ -9,6 +9,7 @@ import {
 } from '../src/editor/stylized/vegetationScatter.js';
 import { markAttributeRangeUpdated } from '../src/editor/stylized/attributeUpload.js';
 import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
+import { grassClumpCellOffset } from '../src/editor/stylized/scatterMath.js';
 
 function makePage({ chunkSize = 4, tileId = 3 } = {}) {
   const tiles = new Uint8Array(chunkSize * chunkSize).fill(tileId);
@@ -80,6 +81,18 @@ test('buildGrassScatter is deterministic and compactable', () => {
   assert.equal(compact.clumpsPerCell, 1);
   assert.equal(compact.base[0], scatter.base[0]);
   assert.equal(compact.base[3], scatter.base[6]);
+});
+
+test('grass clump prefixes stay distributed inside a cell', () => {
+  const points = Array.from({ length: 6 }, (_, index) => (
+    grassClumpCellOffset(2, -1, 7, index)
+  ));
+  assert.equal(new Set(points.map((point) => point.x.toFixed(4))).size, points.length);
+  assert.equal(new Set(points.map((point) => point.z.toFixed(4))).size, points.length);
+  assert.ok(Math.max(...points.map((point) => point.x))
+    - Math.min(...points.map((point) => point.x)) > 0.55);
+  assert.ok(Math.max(...points.map((point) => point.z))
+    - Math.min(...points.map((point) => point.z)) > 0.55);
 });
 
 test('buildFlowerScatter and enrichPageVegetationScatter attach buffers', () => {
