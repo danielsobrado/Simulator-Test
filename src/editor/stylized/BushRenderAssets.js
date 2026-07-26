@@ -28,8 +28,8 @@ export function cloneBushMaterial(source) {
   if (usesCutout(material)) {
     material.alphaTest = Math.max(0.35, material.alphaTest ?? 0);
     material.transparent = false;
-    material.depthWrite = true;
   }
+  material.depthWrite = true;
   material.needsUpdate = true;
   return material;
 }
@@ -49,16 +49,21 @@ export function createBushProxyGeometry(sourceGeometry) {
     throw new Error('Bush proxy generation requires buffer geometry.');
   }
   sourceGeometry.computeBoundingBox();
-  const bounds = sourceGeometry.boundingBox;
-  const size = bounds.getSize(new THREE.Vector3());
-  const center = bounds.getCenter(new THREE.Vector3());
+  const sourceBounds = sourceGeometry.boundingBox;
+  const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+  const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
   const geometry = new THREE.IcosahedronGeometry(0.5, 0);
+  geometry.computeBoundingBox();
+  const proxyBounds = geometry.boundingBox;
+  const proxySize = proxyBounds.getSize(new THREE.Vector3());
+  const proxyCenter = proxyBounds.getCenter(new THREE.Vector3());
+  geometry.translate(-proxyCenter.x, -proxyCenter.y, -proxyCenter.z);
   geometry.scale(
-    Math.max(size.x, MIN_PROXY_EXTENT),
-    Math.max(size.y, MIN_PROXY_EXTENT),
-    Math.max(size.z, MIN_PROXY_EXTENT),
+    Math.max(sourceSize.x, MIN_PROXY_EXTENT) / proxySize.x,
+    Math.max(sourceSize.y, MIN_PROXY_EXTENT) / proxySize.y,
+    Math.max(sourceSize.z, MIN_PROXY_EXTENT) / proxySize.z,
   );
-  geometry.translate(center.x, center.y, center.z);
+  geometry.translate(sourceCenter.x, sourceCenter.y, sourceCenter.z);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
