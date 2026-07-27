@@ -1,8 +1,8 @@
 # Static player-collision configuration.
 #
-# The collision runtime remains disabled until the P2 character motor is integrated.
-# P0 loads and validates this contract so later phases do not introduce hidden
-# constants or implicit coordinate conventions.
+# P2 integrates the capsule motor and primitive solver. Normal worlds keep the
+# runtime disabled until P3 adds production tree colliders; collision QA and
+# explicit debug switches can activate the deterministic fixture now.
 enabled: false
 schemaVersion: 1
 
@@ -13,6 +13,7 @@ streaming:
   buildsPerFrame: 1
   buildBudgetMs: 2
   binSize: 12
+  maxChunksPerCollider: 64
 
 player:
   radius: 0.35

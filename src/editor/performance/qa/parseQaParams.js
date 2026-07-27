@@ -38,6 +38,18 @@ const SCENARIOS = Object.freeze({
     keys: () => [],
     defaults: { duration: 3, speed: 'walk', warmup: 3 },
   },
+  'collision-p2': {
+    id: 'collision-p2',
+    label: 'Collision P2 wall-stop motor',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 3,
+      speed: 'run',
+      warmup: 3,
+      spawn: { x: 8, z: -14 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {
@@ -91,11 +103,11 @@ export function parseQaParams(search = '') {
     scenarioId: scenario.id,
     scenarioLabel: scenario.label,
     spawn: Object.freeze({
-      x: readNumber(params, 'x', 0),
-      z: readNumber(params, 'z', 0),
+      x: readNumber(params, 'x', defaults.spawn?.x ?? 0),
+      z: readNumber(params, 'z', defaults.spawn?.z ?? 0),
     }),
-    yawDegrees: readNumber(params, 'yaw', 0),
-    pitchDegrees: readNumber(params, 'pitch', 0),
+    yawDegrees: readNumber(params, 'yaw', defaults.yawDegrees ?? 0),
+    pitchDegrees: readNumber(params, 'pitch', defaults.pitchDegrees ?? 0),
     warmupSeconds: Math.max(0, readNumber(params, 'warmup', defaults.warmup ?? 2)),
     durationSeconds: Math.max(0.5, readNumber(params, 'duration', defaults.duration ?? 12)),
     speed,

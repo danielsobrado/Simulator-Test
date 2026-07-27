@@ -1,7 +1,7 @@
 import { createCollisionP0QaScene } from './CollisionP0QaScene.js';
 
 const params = new URLSearchParams(window.location.search);
-const enabled = ['collision-p0', 'collision-p1'].includes(params.get('qa'));
+const enabled = ['collision-p0', 'collision-p1', 'collision-p2'].includes(params.get('qa'));
 
 if (enabled && !import.meta.env.DEV) {
   window.__collisionP0Qa = Object.freeze({ status: 'unavailable' });
