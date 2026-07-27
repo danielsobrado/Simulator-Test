@@ -67,8 +67,14 @@ export class NaturalCollisionProvider {
     }
     const ids = new Set();
     for (const component of components) {
-      if (!component?.id || !component.provider?.buildChunkData || ids.has(component.id)) {
-        throw new Error('Natural collision components require unique IDs and chunk builders.');
+      if (!component?.id
+          || typeof component.counterName !== 'string'
+          || !component.counterName.trim()
+          || !component.provider?.buildChunkData
+          || ids.has(component.id)) {
+        throw new Error(
+          'Natural collision components require unique IDs, counter names, and chunk builders.',
+        );
       }
       ids.add(component.id);
     }
@@ -162,6 +168,12 @@ export class NaturalCollisionProvider {
     }
   }
 
+  enqueueRetry(key) {
+    if (!this.chunkStates.has(key) || this.pendingRefreshKeys.has(key)) return;
+    this.pendingRefreshKeys.add(key);
+    this.pendingRefresh.push(key);
+  }
+
   refresh(world) {
     const epoch = this.sourceEpoch();
     if (epoch !== this.lastSourceEpoch) {
@@ -174,6 +186,7 @@ export class NaturalCollisionProvider {
     let rebuilt = 0;
     let frameError = null;
     const changedCounts = Object.create(null);
+    const retryKeys = [];
     while (this.pendingRefresh.length > 0 && attempted < this.buildsPerFrame) {
       if (attempted > 0 && this.now() - startedAt >= this.buildBudgetMs) break;
       const key = this.pendingRefresh.shift();
@@ -201,9 +214,13 @@ export class NaturalCollisionProvider {
         }
       } catch (error) {
         frameError = error;
+        if (this.chunkStates.has(key) && world.isOwnerChunkReady(chunkX, chunkZ)) {
+          retryKeys.push(key);
+        }
         this.logger.error?.(`Natural collision refresh failed for ${key}.`, error);
       }
     }
+    for (const key of retryKeys) this.enqueueRetry(key);
     if (frameError) this.lastError = frameError;
     else if (attempted > 0) this.lastError = null;
     const elapsed = this.now() - startedAt;
