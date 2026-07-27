@@ -40,7 +40,7 @@ export function createWaterSample({
   flowZ = 0,
   flags = WATER_SAMPLE_FLAG_NONE,
 }) {
-  if (!WATER_KINDS.has(kind)) {
+  if (!WATER_KINDS.includes(kind)) {
     throw new Error(`Unknown water kind: ${kind}.`);
   }
   assertNonNegativeInteger(bodyId, 'bodyId');
