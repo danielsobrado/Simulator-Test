@@ -22,7 +22,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import { screenDitherThreshold } from '../lod/screenDither.js';
+import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -87,8 +87,12 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
       .add(up.mul(viewNormal.y))
       .add(backward.mul(viewNormal.z)),
   );
-  const coverage = albedo.a.mul(parameters.y);
-  const visible = step(screenDitherThreshold(parameters.z), coverage);
+  const signedFade = parameters.y;
+  const coverage = albedo.a.mul(signedFade.abs());
+  const visible = step(
+    orientedScreenDitherThreshold(parameters.z, signedFade),
+    coverage,
+  );
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
