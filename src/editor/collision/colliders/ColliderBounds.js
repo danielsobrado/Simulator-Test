@@ -5,6 +5,13 @@ function assertFinite(value, name) {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
 }
 
+function assertSafeChunkCoordinate(value) {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('Collision chunk coordinate is outside the safe integer range.');
+  }
+  return value;
+}
+
 export function createCanonicalAabb({ minX, minY, minZ, maxX, maxY, maxZ }) {
   const values = { minX, minY, minZ, maxX, maxY, maxZ };
   for (const [name, value] of Object.entries(values)) assertFinite(value, name);
@@ -27,8 +34,8 @@ export function collisionChunkForCanonical(canonicalX, canonicalZ, chunkWorldSiz
   assertFinite(canonicalZ, 'canonicalZ');
   if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
   return Object.freeze({
-    chunkX: Math.floor(canonicalX / chunkWorldSize),
-    chunkZ: Math.floor(-canonicalZ / chunkWorldSize),
+    chunkX: assertSafeChunkCoordinate(Math.floor(canonicalX / chunkWorldSize)),
+    chunkZ: assertSafeChunkCoordinate(Math.floor(-canonicalZ / chunkWorldSize)),
   });
 }
 
@@ -47,14 +54,25 @@ export function collisionChunkCanonicalBounds(chunkX, chunkZ, chunkWorldSize) {
   });
 }
 
+export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
+  if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
+  return Object.freeze({
+    minChunkX: assertSafeChunkCoordinate(Math.floor(aabb.minX / chunkWorldSize)),
+    maxChunkX: assertSafeChunkCoordinate(
+      Math.floor((aabb.maxX + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
+    ),
+    minChunkZ: assertSafeChunkCoordinate(Math.floor((-aabb.maxZ) / chunkWorldSize)),
+    maxChunkZ: assertSafeChunkCoordinate(
+      Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
+    ),
+  });
+}
+
 export function collisionChunksForAabb(aabb, chunkWorldSize, target = []) {
   target.length = 0;
-  const minChunkX = Math.floor(aabb.minX / chunkWorldSize);
-  const maxChunkX = Math.floor((aabb.maxX + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize);
-  const minChunkZ = Math.floor((-aabb.maxZ) / chunkWorldSize);
-  const maxChunkZ = Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize);
-  for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
-    for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+  const range = collisionChunkRangeForAabb(aabb, chunkWorldSize);
+  for (let chunkZ = range.minChunkZ; chunkZ <= range.maxChunkZ; chunkZ += 1) {
+    for (let chunkX = range.minChunkX; chunkX <= range.maxChunkX; chunkX += 1) {
       target.push(Object.freeze({ chunkX, chunkZ }));
     }
   }

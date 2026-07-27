@@ -12,10 +12,11 @@ const PRIMITIVE_TYPES = new Set([
   COLLIDER_TYPE_BOX,
 ]);
 
-function freezeVector(value, name, dimensions = 3) {
+function freezeVector(value, name, dimensions = 3, { positive = false } = {}) {
   if (!Array.isArray(value) || value.length !== dimensions
-      || value.some((entry) => !Number.isFinite(entry))) {
-    throw new Error(`Collision ${name} must contain ${dimensions} finite values.`);
+      || value.some((entry) => !Number.isFinite(entry) || (positive && entry <= 0))) {
+    const qualifier = positive ? 'positive finite' : 'finite';
+    throw new Error(`Collision ${name} must contain ${dimensions} ${qualifier} values.`);
   }
   return Object.freeze([...value]);
 }
@@ -25,7 +26,9 @@ function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }
   if (!Number.isSafeInteger(ownerChunkX) || !Number.isSafeInteger(ownerChunkZ)) {
     throw new Error('Collider owner chunk coordinates must be safe integers.');
   }
-  if (!Number.isInteger(layers) || layers <= 0) throw new Error('Collider layers must be positive.');
+  if (!Number.isSafeInteger(layers) || layers <= 0 || layers > COLLISION_LAYERS.all) {
+    throw new Error('Collider layers must contain supported collision-layer bits.');
+  }
   return {
     sourceId,
     type,
@@ -54,7 +57,7 @@ export function createPrimitiveCollider({
     ...commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }),
     position: freezeVector(position, 'position'),
     rotationY,
-    dimensions: freezeVector(dimensions, 'dimensions'),
+    dimensions: freezeVector(dimensions, 'dimensions', 3, { positive: true }),
     prototypeId: prototypeId == null ? null : String(prototypeId),
   });
 }

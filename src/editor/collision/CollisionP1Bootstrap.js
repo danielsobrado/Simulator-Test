@@ -65,8 +65,12 @@ function attach() {
   frameId = requestAnimationFrame((timestamp) => update(editor, timestamp));
 }
 
-if (qaMode) publish('waiting');
-frameId = requestAnimationFrame(attach);
+if (!import.meta.env.DEV) {
+  if (qaMode) publish('unavailable');
+} else {
+  if (qaMode) publish('waiting');
+  frameId = requestAnimationFrame(attach);
+}
 
 window.addEventListener('pagehide', () => {
   disposed = true;

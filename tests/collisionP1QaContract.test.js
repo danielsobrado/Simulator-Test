@@ -32,3 +32,16 @@ test('the application loads both P0 fixture and P1 broadphase bootstraps', () =>
   );
   assert.match(p0Bootstrap, /collision-p1/);
 });
+
+test('the P1 bootstrap never polls the development-only editor API in production', () => {
+  const bootstrap = readFileSync(
+    new URL('../src/editor/collision/CollisionP1Bootstrap.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(bootstrap, /if \(!import\.meta\.env\.DEV\) \{/);
+  assert.match(bootstrap, /if \(qaMode\) publish\('unavailable'\);/);
+  assert.match(
+    bootstrap,
+    /\} else \{[\s\S]*frameId = requestAnimationFrame\(attach\);[\s\S]*\}/,
+  );
+});

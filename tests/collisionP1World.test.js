@@ -91,6 +91,60 @@ test('failed atomic replacement retains the previous valid collision data', () =
   );
 });
 
+test('equal or stale owner revisions cannot overwrite valid data', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const previous = box({
+    sourceId: 'qa:revision-1',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 4,
+    maxX: 8,
+    minZ: -8,
+    maxZ: -4,
+  });
+  const conflicting = box({
+    sourceId: 'qa:revision-1-conflict',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 12,
+    maxX: 16,
+    minZ: -16,
+    maxZ: -12,
+  });
+  assert.equal(world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [previous] }), true);
+  assert.equal(world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [conflicting] }), false);
+  assert.equal(world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 0, colliders: [conflicting] }), false);
+  assert.equal(world.getCollider(previous.sourceId), previous);
+  assert.equal(world.getCollider(conflicting.sourceId), null);
+});
+
+test('candidate queries inspect active chunks instead of enumerating world distance', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const record = box({
+    sourceId: 'qa:active-only',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 4,
+    maxX: 8,
+    minZ: -8,
+    maxZ: -4,
+  });
+  world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [record] });
+  world.chunkScratch.length = 0;
+  const candidates = world.collectCandidates(queryBounds(-1e9, 1e9, -1e9, 1e9));
+  assert.deepEqual(candidates.map((entry) => entry.sourceId), [record.sourceId]);
+  assert.equal(world.chunkScratch.length, 0, 'query must not materialise every crossed chunk');
+  assert.equal(world.getStatus().lastQueryChunks, 1);
+});
+
+test('readiness reports are capped for teleport-sized destinations', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const readiness = world.checkAabbReadiness(queryBounds(0, 128 * 1000, -1, 0));
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.missing.length, 64);
+  assert.equal(readiness.truncated, true);
+});
+
 test('negative canonical chunks, unloading, and floating origin remain deterministic', () => {
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
   const negative = box({
