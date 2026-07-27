@@ -1,19 +1,13 @@
 import {
   attribute,
-  dot,
   float,
-  fract,
   positionLocal,
-  positionWorld,
-  sin,
   step,
   texture,
   uv,
   vec3,
 } from 'three/tsl';
-
-const HASH_VECTOR = vec3(12.9898, 78.233, 37.719);
-const HASH_SCALE = 43758.5453;
+import { screenDitherThreshold } from './screenDither.js';
 
 export function createSourceOpacityNode(material) {
   if (material.opacityNode) return material.opacityNode;
@@ -33,12 +27,12 @@ function applyMorphology(material, sourceMaterial, kind) {
   if (kind !== 'leaf' && kind !== 'trunk') return;
   const morphology = attribute('instanceMorphology', 'vec3');
   const sourcePosition = sourceMaterial.positionNode ?? positionLocal;
-  const scaleX = kind === 'leaf' ? morphology.x : morphology.z;
-  const scaleZ = kind === 'leaf' ? morphology.y : morphology.z;
+  const horizontalScale = kind === 'leaf' ? morphology.x : morphology.z;
+  const verticalScale = kind === 'leaf' ? morphology.y : float(1);
   material.positionNode = vec3(
-    sourcePosition.x.mul(scaleX),
-    sourcePosition.y,
-    sourcePosition.z.mul(scaleZ),
+    sourcePosition.x.mul(horizontalScale),
+    sourcePosition.y.mul(verticalScale),
+    sourcePosition.z.mul(horizontalScale),
   );
 }
 
@@ -55,15 +49,9 @@ export function createDitheredMaterial(sourceMaterial, {
   const fade = attribute('instanceLodFade', 'float');
   const seed = attribute('instanceStableSeed', 'float');
   const colorVariation = attribute('instanceColorVariation', 'float');
-  const seededPosition = positionWorld.mul(1.71).add(vec3(
-    seed.mul(19.19),
-    seed.mul(31.37),
-    seed.mul(47.11),
-  ));
-  const threshold = fract(sin(dot(seededPosition, HASH_VECTOR)).mul(HASH_SCALE));
   const sourceOpacity = createSourceOpacityNode(material);
   const coverage = sourceOpacity ? sourceOpacity.mul(fade) : fade;
-  material.opacityNode = step(threshold, coverage);
+  material.opacityNode = step(screenDitherThreshold(seed), coverage);
   if (material.colorNode) {
     const variation = tinted
       ? attribute('instanceLeafTint', 'vec3').mul(colorVariation)
