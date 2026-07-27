@@ -29,6 +29,7 @@ import {
   stylizedPatchMask,
   stylizedPathWearMask,
 } from './StylizedNoiseNodes.js';
+import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -92,6 +93,7 @@ export function createStylizedGrassMaterial({
   // disappear, recolour or sway as one visible unit.
   const worldXZ = base.xz.add(sampleOffset).add(chunkCenter);
   const surface = texture(surfaceMaskTexture, localUv);
+  const surfaceClass = createSurfaceClassNodes(surface);
   const trampleSample = texture(trampleTexture, localUv);
   const trampleDirection = trampleSample.xy.mul(2).sub(1);
   const trampleInfluence = trampleSample.z;
@@ -114,7 +116,7 @@ export function createStylizedGrassMaterial({
       width: float(naturalTrailConfig.width),
       softness: float(naturalTrailConfig.softness),
       warp: float(naturalTrailConfig.warp),
-    }).mul(surface.g)
+    }).mul(surfaceClass.grass)
     : float(0);
   const pathWear = stylizedPathWearMask(max(surface.r, naturalTrail), worldXZ, {
     vergeWidth: float(config.path?.vergeWidth ?? 0.45),
@@ -124,7 +126,8 @@ export function createStylizedGrassMaterial({
   });
   const dirt = max(pathWear.wear, stylizedDirtMask(worldXZ, dirtSettings));
   const shrink = oneMinus(dirt.mul(config.dirt.bladeCut))
-    .mul(oneMinus(trampleInfluence.mul(config.rocks.flatten)));
+    .mul(oneMinus(trampleInfluence.mul(config.rocks.flatten)))
+    .mul(surfaceClass.landGrass);
   // The blade's rank in its clump's length ordering, uniform in [0, 1).
   const lengthRank = bladeLengthPhase.add(parameters.w).fract();
   // Skewed toward the short end: a flat roll over the configured range puts most
@@ -342,6 +345,8 @@ export function createStylizedGrassMaterial({
   // `mat3(viewMatrix) * worldUp` instead of treating view +Y as world +Y.
   material.normalNode = shadingNormal.transformDirection(cameraViewMatrix);
   material.colorNode = bladeColor.add(translucency);
+  material.opacityNode = surfaceClass.landGrass;
+  material.alphaTest = 0.5;
   material.depthWrite = true;
   material.transparent = false;
   return material;

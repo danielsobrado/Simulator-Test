@@ -24,6 +24,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
+import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -82,17 +83,17 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
 }
 
 export function createStylizedWaterMaterial({
-  heightTexture,
   surfaceMaskTexture,
   chunkCenter,
   chunkWorldSize,
+  waterLevel = 0,
   time,
   config,
 }) {
   const water = config.water;
   const terrainUv = uv();
-  const terrainHeight = texture(heightTexture, terrainUv).r;
-  const waterMask = texture(surfaceMaskTexture, terrainUv).b;
+  const surface = texture(surfaceMaskTexture, terrainUv);
+  const waterMask = createSurfaceClassNodes(surface).water;
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
@@ -127,13 +128,14 @@ export function createStylizedWaterMaterial({
   const distance = length(positionWorld.xz.sub(cameraPosition.xz));
   const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
   const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp).mul(fade).mul(waterMask);
+  const surfaceHeight = float(waterLevel).add(water.heightOffset);
 
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,
     side: THREE.FrontSide,
   });
-  material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight.add(water.heightOffset)));
+  material.positionNode = positionLocal.add(vec3(0, 0, surfaceHeight));
   material.colorNode = color;
   material.opacityNode = alpha;
   material.alphaTest = 0.02;
