@@ -41,7 +41,7 @@ export class PlayerController {
     this.forward = new THREE.Vector3();
     this.right = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
-    this.underwaterView = config.water?.underwater
+    this.underwaterView = config.water?.underwater && terrainView.scene
       ? new UnderwaterViewController({
         terrainView,
         playerController: this,
@@ -126,7 +126,10 @@ export class PlayerController {
   }
 
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
-    if (Number.isFinite(x) && Number.isFinite(z)) this.state = this.createState(x, z);
+    if (Number.isFinite(x) && Number.isFinite(z)) {
+      this.state = this.createState(x, z);
+      this.underwaterView?.restoreSurfaceEnvironment();
+    }
     if (Number.isFinite(yaw)) this.yaw = yaw;
     if (Number.isFinite(pitch)) {
       const maxPitch = THREE.MathUtils.degToRad(this.config.maxPitchDegrees);
@@ -211,7 +214,9 @@ export class PlayerController {
       forward: this.forward,
       right: this.right,
       getGroundHeight: (x, z) => this.terrainView.getWorldHeight(x, z),
-      getWaterSample: (x, z) => this.terrainView.getWorldWater(x, z),
+      getWaterSample: typeof this.terrainView.getWorldWater === 'function'
+        ? (x, z) => this.terrainView.getWorldWater(x, z)
+        : null,
     });
     const waterChanged = nextState.waterState !== this.state.waterState
       || nextState.headSubmerged !== this.state.headSubmerged
