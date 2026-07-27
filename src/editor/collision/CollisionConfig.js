@@ -18,6 +18,7 @@ export const COLLISION_CONFIG_DEFAULTS = deepFreeze({
     buildsPerFrame: 1,
     buildBudgetMs: 2,
     binSize: 12,
+    maxChunksPerCollider: 64,
   },
   player: {
     radius: 0.35,
@@ -77,7 +78,7 @@ function assertNonNegativeInteger(value, path) {
 }
 
 function assertPositiveInteger(value, path) {
-  if (!Number.isInteger(value) || value < 1) {
+  if (!Number.isSafeInteger(value) || value < 1) {
     throw new Error(`Invalid collision configuration: ${path} must be a positive integer.`);
   }
 }
@@ -101,6 +102,10 @@ export function validateCollisionConfig(config) {
   assertPositiveInteger(config.streaming.buildsPerFrame, 'collision.streaming.buildsPerFrame');
   assertPositive(config.streaming.buildBudgetMs, 'collision.streaming.buildBudgetMs');
   assertPositive(config.streaming.binSize, 'collision.streaming.binSize');
+  assertPositiveInteger(
+    config.streaming.maxChunksPerCollider,
+    'collision.streaming.maxChunksPerCollider',
+  );
 
   assertObject(config.player, 'collision.player');
   for (const field of ['radius', 'bodyHeight', 'skinWidth', 'maxSubstepDistance']) {
