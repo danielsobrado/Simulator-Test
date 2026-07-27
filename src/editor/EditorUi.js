@@ -10,7 +10,7 @@ import {
 } from './storage.js';
 import { selectMinimapBurgs } from './map/minimapBurgs.js';
 import { normalizeSceneSettings } from './settings/SceneSettings.js';
-import { assetFileName, formatBytes } from './ui/loadingSources.js';
+import { assetFileName, formatBytes, trackStreamingSettle } from './ui/loadingSources.js';
 import { hexToRgbBytes } from './tileCatalog.js';
 
 const TERRAIN_MODE_LABELS = Object.freeze({
@@ -123,7 +123,7 @@ export class EditorUi {
           <header class="sidebar-header">
             <span class="sidebar-header__mark" aria-hidden="true">⚔️</span>
             <div class="sidebar-header__text">
-              <h1>SimCity DnD</h1>
+              <h1>Drusniel World</h1>
               <p>Infinite terrain and settlement editor</p>
             </div>
           </header>
@@ -822,6 +822,24 @@ export class EditorUi {
   }
 
   /**
+   * Lets map loads wait on chunk streaming after the import returns.
+   *
+   * `loadMapUrl` resolving does not mean the world is ready — it means the document
+   * is applied and residency has been re-centred. The chunks themselves arrive over
+   * the following seconds, which is the window that previously looked like the
+   * overlay being stuck on nothing.
+   */
+  attachStreamingProbe(probe) {
+    this.streamingProbe = probe;
+  }
+
+  async settleStreaming(session, stepId) {
+    if (!this.streamingProbe || !session) return;
+    session.start(stepId);
+    await trackStreamingSettle({ session, ...this.streamingProbe });
+  }
+
+  /**
    * Runs work behind the loading overlay, handing the session to the callback so
    * it can advance its own steps.
    *
@@ -874,6 +892,7 @@ export class EditorUi {
         steps: [
           { id: 'fetch', label: 'Downloading map' },
           { id: 'import', label: 'Importing world and rebuilding terrain' },
+          { id: 'stream', label: 'Streaming chunks into view' },
         ],
         detail: assetFileName(url),
       },
@@ -881,11 +900,14 @@ export class EditorUi {
         if (!session) return run();
         session.start('fetch');
         const toImport = setTimeout(() => session.start('import'), 400);
+        let result;
         try {
-          return await run();
+          result = await run();
         } finally {
           clearTimeout(toImport);
         }
+        await this.settleStreaming(session, 'stream');
+        return result;
       },
     );
   }
@@ -1064,6 +1086,7 @@ export class EditorUi {
               { id: 'read', label: 'Reading and parsing the file' },
               { id: 'import', label: 'Importing world and rebuilding terrain' },
               { id: 'apply', label: 'Updating tiles and minimap' },
+              { id: 'stream', label: 'Streaming chunks into view' },
             ],
             detail: `${file.name} · ${formatBytes(file.size)}`,
           },
@@ -1084,6 +1107,7 @@ export class EditorUi {
               this.minimapCenter = controller.getFocusCell?.() ?? this.minimapCenter;
               this.updateMinimap();
             }
+            await this.settleStreaming(session, 'stream');
           },
         );
         this.showToast('World imported.');

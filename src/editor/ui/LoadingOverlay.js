@@ -46,29 +46,47 @@ export class LoadingOverlay {
     this.stepList = this.element.querySelector('[data-role="loading-steps"]');
     this.errorLine = this.element.querySelector('[data-role="loading-error"]');
     this.renderedSteps = null;
+    this.rendered = {};
   }
 
   attach(tracker) {
     return tracker.subscribe((state) => this.render(state));
   }
 
+  /**
+   * Writes `value` to a property only when it changed.
+   *
+   * The streaming source emits every frame, and this panel is on screen precisely
+   * when the main thread is busiest. Assigning identical text and identical widths
+   * 144 times a second is layout and paint work charged against the load it is
+   * supposed to be reporting on.
+   */
+  #set(key, target, property, value) {
+    if (this.rendered[key] === value) return;
+    this.rendered[key] = value;
+    target[property] = value;
+  }
+
   render(state) {
     if (!state.open) {
       this.element.hidden = true;
       this.renderedSteps = null;
+      this.rendered = {};
       return;
     }
     this.element.hidden = false;
-    this.title.textContent = state.title;
+    this.#set('title', this.title, 'textContent', state.title);
+    // Rounded first: the bar is 420 px wide, so sub-percent changes cannot move it
+    // by a pixel and only exist to dirty the compositor.
     const percent = Math.round(state.ratio * 100);
-    this.percent.textContent = `${percent}%`;
-    this.fill.style.width = `${percent}%`;
+    this.#set('percent', this.percent, 'textContent', `${percent}%`);
+    this.#set('fill', this.fill.style, 'width', `${percent}%`);
     // The active step names the phase; the detail names the individual file or
     // chunk. Showing the phase when there is no detail keeps the line from
     // flickering empty between items.
-    this.detail.textContent = state.detail || state.activeLabel || '';
-    this.errorLine.hidden = !state.error;
-    this.errorLine.textContent = state.error ?? '';
+    this.#set('detail', this.detail, 'textContent', state.detail || state.activeLabel || '');
+    this.#set('errorHidden', this.errorLine, 'hidden', !state.error);
+    this.#set('error', this.errorLine, 'textContent', state.error ?? '');
 
     // Rebuilding the list every emit would thrash the DOM at streaming rates, so
     // the structure is built once per session and only the changed marks update.
@@ -86,13 +104,19 @@ export class LoadingOverlay {
     for (const step of state.steps) {
       const item = this.stepList.querySelector(`[data-step-id="${CSS.escape(step.id)}"]`);
       if (!item) continue;
-      item.dataset.state = step.state;
-      const mark = item.querySelector('.loading-step-mark');
-      mark.textContent = STATE_MARK[step.state] ?? '·';
-      const label = item.querySelector('.loading-step-label');
-      label.textContent = step.units
-        ? `${step.label} (${step.units.done}/${step.units.total})`
-        : step.label;
+      this.#set(`state:${step.id}`, item.dataset, 'state', step.state);
+      this.#set(
+        `mark:${step.id}`,
+        item.querySelector('.loading-step-mark'),
+        'textContent',
+        STATE_MARK[step.state] ?? '·',
+      );
+      this.#set(
+        `label:${step.id}`,
+        item.querySelector('.loading-step-label'),
+        'textContent',
+        step.units ? `${step.label} (${step.units.done}/${step.units.total})` : step.label,
+      );
     }
   }
 }

@@ -214,7 +214,7 @@ export class InfiniteTerrainView {
     this.renderer.toneMappingExposure = rendererConfig.toneMappingExposure ?? 1.12;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.domElement.setAttribute('aria-label', 'SimCity DnD infinite world editor viewport');
+    this.renderer.domElement.setAttribute('aria-label', 'Drusniel World infinite world editor viewport');
     container.append(this.renderer.domElement);
 
     this.scene = new THREE.Scene();

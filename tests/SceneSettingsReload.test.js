@@ -147,3 +147,51 @@ test('world saves with custom assets reload before the controller consumes them'
   assert.equal(activation.settings.assets[0].id, 'custom-oak');
   assert.equal(activation.options.worldDocument.world.seed, 126);
 });
+
+test('activation announces the reload before navigating away', async () => {
+  // `location.assign` does not stop execution, so a caller that is mid-boot keeps
+  // going — through the shader pre-warm, the longest phase there is — building a
+  // scene the browser discards milliseconds later, then replaying the whole
+  // sequence on the new page. The hook is what lets boot know to stop, and it has
+  // to fire *before* the navigation for that to be worth anything.
+  const runtime = new SceneSettingsRuntime({
+    controller: { loadDocument: () => {} },
+    biomeAssetPalette: createPalette(),
+    godRays: null,
+    config: createConfig(),
+  });
+  const order = [];
+  runtime.onSceneReload = () => order.push('announced');
+  const originalLocation = globalThis.location;
+  const originalSession = globalThis.sessionStorage;
+  const session = createSession();
+  Object.defineProperty(globalThis, 'location', {
+    value: {
+      href: 'https://example.test/editor',
+      search: '',
+      assign: () => order.push('navigated'),
+    },
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: session,
+    configurable: true,
+    writable: true,
+  });
+  try {
+    await runtime.activate(createSceneSettingsDocument({ name: 'Look' }));
+    assert.deepEqual(order, ['announced', 'navigated']);
+
+    order.length = 0;
+    runtime.activateUrl('https://example.test/look.json');
+    assert.deepEqual(order, ['announced', 'navigated']);
+  } finally {
+    Object.defineProperty(globalThis, 'location', {
+      value: originalLocation, configurable: true, writable: true,
+    });
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      value: originalSession, configurable: true, writable: true,
+    });
+  }
+});

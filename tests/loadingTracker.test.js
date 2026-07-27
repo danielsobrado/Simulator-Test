@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { LoadingTracker } from '../src/editor/ui/LoadingTracker.js';
 import {
   assetFileName,
@@ -275,4 +276,24 @@ test('byte sizes read as a rough scale, not a precise count', () => {
   // A missing File.size must not put "NaN undefined" in front of the user.
   assert.equal(formatBytes(undefined), '');
   assert.equal(formatBytes(-1), '');
+});
+
+test('the overlay never puts a compositing filter over the live canvas', () => {
+  // `backdrop-filter` on a full-viewport fixed layer makes the compositor re-blur
+  // the whole framebuffer every frame, over a WebGPU canvas that is already the
+  // most expensive thing on the page. It cost most of the frame rate for as long as
+  // the overlay was up — and the overlay is shown exactly during the heaviest work,
+  // so it taxed the very thing it was reporting on.
+  const css = readFileSync(
+    new URL('../src/editor/ui/loadingOverlay.css', import.meta.url),
+    'utf8',
+  );
+  const declarations = css
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('/*'));
+  assert.equal(
+    declarations.some((line) => /backdrop-filter\s*:/.test(line)),
+    false,
+    'loadingOverlay.css declares backdrop-filter',
+  );
 });

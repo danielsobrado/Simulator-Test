@@ -11,9 +11,17 @@
   place-items: center;
   pointer-events: none;
   background: rgb(6 10 8 / 42%);
-  backdrop-filter: blur(2px);
   animation: loading-overlay-in 140ms ease-out;
 }
+
+/*
+ * No `backdrop-filter` here. A blur on a full-viewport fixed layer makes the
+ * compositor re-blur the whole framebuffer every frame, over a live WebGPU canvas
+ * that is already the most expensive thing on the page. It cost most of the frame
+ * rate for the entire time the overlay was up — and because the overlay is shown
+ * exactly during the heaviest work, it taxed the thing it was reporting on. The
+ * flat scrim above costs nothing and reads the same at this opacity.
+ */
 
 @keyframes loading-overlay-in {
   from { opacity: 0; }

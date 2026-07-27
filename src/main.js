@@ -6,7 +6,7 @@ import './editor/map/worldMap.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
 import { LoadingOverlay } from './editor/ui/LoadingOverlay.js';
 import { LoadingTracker } from './editor/ui/LoadingTracker.js';
-import { bindAssetProgress, watchWalkModeEntry } from './editor/ui/loadingSources.js';
+import { assetFileName, bindAssetProgress, watchWalkModeEntry } from './editor/ui/loadingSources.js';
 import { EditorCamera } from './editor/EditorCamera.js';
 import { EditorUi } from './editor/EditorUi.js';
 import { InfiniteTerrainView } from './editor/InfiniteTerrainView.js';
@@ -78,10 +78,14 @@ const BOOT_STEPS = Object.freeze([
 ]);
 
 async function startEditor() {
+  // Set when a scene look stages a page reload. Everything after the map step is
+  // expensive setup for a document that is about to be thrown away — the shader
+  // pre-warm alone is the longest phase in boot — so this lets the rest be skipped.
+  let sceneReloadPending = false;
   const loading = new LoadingTracker();
   const loadingOverlay = new LoadingOverlay(document.body);
   loadingOverlay.attach(loading);
-  const boot = loading.begin({ title: 'Starting SimCity DnD', steps: BOOT_STEPS });
+  const boot = loading.begin({ title: 'Starting Drusniel World', steps: BOOT_STEPS });
   boot.start('settings');
   // A `?settings=` reference is user-supplied and can go stale — the session
   // handoff is gone in a duplicated tab, a preset URL can 404, a hand-edited
@@ -348,15 +352,22 @@ async function startEditor() {
   // world fills in over the following frames. So readiness is observed from the
   // streaming status rather than awaited, and the overlay closes when it settles.
   const streamingFrameListeners = new Set();
-  watchWalkModeEntry({
-    viewModeController,
-    loading,
-    walkMode: PLAYER_MODE_WALK,
+  const streamingProbe = {
     getStatus: () => terrainView.getStreamingStatus(),
     onFrame: (listener) => {
       streamingFrameListeners.add(listener);
       return () => streamingFrameListeners.delete(listener);
     },
+  };
+  // Map loads finish with the document applied and residency re-centred, but the
+  // chunks themselves arrive over the next few seconds. Without this the overlay
+  // closed on the import and the world kept assembling behind it.
+  ui.attachStreamingProbe(streamingProbe);
+  watchWalkModeEntry({
+    viewModeController,
+    loading,
+    walkMode: PLAYER_MODE_WALK,
+    ...streamingProbe,
   });
 
   controller = new TerrainAwareEditorController({
@@ -398,6 +409,16 @@ async function startEditor() {
       ui.updateMinimap();
     },
   });
+  // A map carrying its own saved look reloads the page from inside `loadMap`, which
+  // otherwise reads as boot spontaneously restarting: the sequence runs to the end,
+  // the browser swaps the page, and every step replays with nothing said about why.
+  sceneSettingsRuntime.onSceneReload = (document, url) => {
+    sceneReloadPending = true;
+    ui.showSceneReload(
+      'Reloading for the world look',
+      document?.name ?? (url ? assetFileName(url) : ''),
+    );
+  };
   controller.sceneSettingsProvider = () => sceneSettingsRuntime.capture();
   controller.sceneSettingsConsumer = (document) => {
     sceneSettingsRuntime.applyVisualSettings(document);
@@ -422,6 +443,21 @@ async function startEditor() {
     // than the session, because boot continues and the rest still has to report.
     boot.fail(error);
     ui.showToast(`Preset map not loaded: ${error.message}`, true);
+  }
+  // A map that carries its own look has, by this point, staged the handoff and
+  // asked the browser to navigate. `location.assign` does not stop execution, so
+  // without this the rest of boot runs to completion — voxel init, the wait on
+  // stylized assets, and the shader pre-warm — building a scene that is discarded
+  // milliseconds later, and the whole sequence then replays on the new page.
+  //
+  // The staging is already complete (`activate` awaits its own save before
+  // navigating), so there is nothing left to finish. Nothing needs disposing
+  // either: the document is going away. The only loose end is promises already in
+  // flight, whose rejections would otherwise surface as unhandled.
+  if (sceneReloadPending) {
+    stylizedSurface.ready?.catch?.(() => {});
+    stylizedSurface.bakeRequest?.catch?.(() => {});
+    return;
   }
   ui.syncGodRaysSettings(terrainView.godRays.getSettings());
   const proceduralWorkshop = new ProceduralWorkshopUi({
@@ -680,7 +716,7 @@ async function startEditor() {
 }
 
 function showStartupError(error) {
-  console.error('Failed to start the SimCity DnD editor.', error);
+  console.error('Failed to start the Drusniel World editor.', error);
   document.querySelector('#app').innerHTML = `
     <main style="padding:24px;font-family:system-ui;color:#f4e6e6;background:#211414;min-height:100vh">
       <h1>Editor failed to start</h1>

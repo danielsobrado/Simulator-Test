@@ -284,14 +284,28 @@ export class SceneSettingsRuntime {
       .sort((left, right) => left.name.localeCompare(right.name));
   }
 
+  /**
+   * Stages the settings and navigates. This is a full page reload, not an in-place
+   * apply — asset variants are resolved into the editor config at boot, so a look
+   * that adds assets can only take effect from a fresh start.
+   *
+   * `onSceneReload` exists because that navigation is otherwise invisible. Loading
+   * a map whose world document carries its own look lands here from inside
+   * `loadMap`, which the caller experiences as an ordinary map load: boot would run
+   * on to completion, the browser would then swap the page, and the whole startup
+   * sequence would replay with no explanation. Announcing it is the difference
+   * between "the loader went backwards" and "it is reloading, and here is why".
+   */
   async activate(document, {
     worldDocument = null,
     sourceUrl = globalThis.location?.href,
   } = {}) {
+    this.onSceneReload?.(document);
     return activateSceneSettings(document, { worldDocument, sourceUrl });
   }
 
   activateUrl(url) {
+    this.onSceneReload?.(null, url);
     const next = new URL(globalThis.location.href);
     next.searchParams.set('settings', url);
     globalThis.location.assign(next.href);

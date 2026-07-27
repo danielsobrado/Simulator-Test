@@ -247,7 +247,7 @@ function normalizePlacement(placement) {
 export function normalizeSceneSettings(document) {
   const source = object(document, 'Scene settings');
   if (source.kind !== SCENE_SETTINGS_KIND) {
-    throw new Error('The selected document is not a SimCity DnD scene settings file.');
+    throw new Error('The selected document is not a Drusniel World scene settings file.');
   }
   if (source.version !== SCENE_SETTINGS_VERSION) {
     throw new Error(`Unsupported scene settings version: ${source.version}.`);
