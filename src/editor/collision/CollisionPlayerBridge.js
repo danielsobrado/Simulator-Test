@@ -1,14 +1,21 @@
 let currentPlayer = null;
 let currentConfig = null;
+let currentTreeSource = null;
 const listeners = new Set();
 
-function publish() {
-  if (!currentPlayer || !currentConfig) return;
-  const composition = Object.freeze({
+function composition() {
+  if (!currentPlayer || !currentConfig) return null;
+  return Object.freeze({
     player: currentPlayer,
     collisionConfig: currentConfig,
+    treeSource: currentTreeSource,
   });
-  for (const listener of listeners) listener(composition);
+}
+
+function publish() {
+  const value = composition();
+  if (!value) return;
+  for (const listener of listeners) listener(value);
 }
 
 export function registerCollisionConfig(config) {
@@ -26,16 +33,28 @@ export function registerCollisionPlayer(player) {
   };
 }
 
+export function registerCollisionTreeSource(source) {
+  if (!source?.treeView) {
+    throw new Error('Collision tree-source registration requires an initialized tree view.');
+  }
+  currentTreeSource = Object.freeze({
+    treeView: source.treeView,
+    rockSource: source.rockSource ?? null,
+  });
+  publish();
+  return () => {
+    if (currentTreeSource?.treeView !== source.treeView) return;
+    currentTreeSource = null;
+    publish();
+  };
+}
+
 export function subscribeCollisionComposition(listener) {
   if (typeof listener !== 'function') {
     throw new Error('Collision composition subscription requires a listener.');
   }
   listeners.add(listener);
-  if (currentPlayer && currentConfig) {
-    listener(Object.freeze({
-      player: currentPlayer,
-      collisionConfig: currentConfig,
-    }));
-  }
+  const value = composition();
+  if (value) listener(value);
   return () => listeners.delete(listener);
 }
