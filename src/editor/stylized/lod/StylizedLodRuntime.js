@@ -10,7 +10,11 @@ import { createDitheredMaterial } from './StylizedDitheredMaterial.js';
 import { markAttributeSubrangeUpdated } from '../attributeUpload.js';
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 
-function createGeometry(source, capacity, tinted) {
+const WAITING_FADE = Number.EPSILON;
+const UNTINTED = Object.freeze([1, 1, 1]);
+const IDENTITY_MORPHOLOGY = Object.freeze([1, 1, 1]);
+
+function createGeometry(source, capacity, tinted, morphed) {
   const geometry = source.clone();
   geometry.setAttribute(
     'instanceLodFade',
@@ -24,6 +28,12 @@ function createGeometry(source, capacity, tinted) {
     'instanceColorVariation',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
   );
+  if (morphed) {
+    geometry.setAttribute(
+      'instanceMorphology',
+      new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3),
+    );
+  }
   if (tinted) {
     geometry.setAttribute(
       'instanceLeafTint',
@@ -33,10 +43,6 @@ function createGeometry(source, capacity, tinted) {
   return geometry;
 }
 
-/**
- * `tintLeaves` opts the leaf parts of every prototype into a per-instance hue.
- * Trunks are deliberately excluded — a grove's autumn tint belongs to its canopy.
- */
 export function createInstancedRenderers({
   root,
   partsByPrototype,
@@ -47,8 +53,12 @@ export function createInstancedRenderers({
 }) {
   return partsByPrototype.map((parts, prototypeIndex) => parts.map((part, partIndex) => {
     const tinted = tintLeaves && part.kind === 'leaf';
-    const geometry = createGeometry(part.geometry, capacity, tinted);
-    const material = createDitheredMaterial(part.material, { tinted });
+    const morphed = tintLeaves;
+    const geometry = createGeometry(part.geometry, capacity, tinted, morphed);
+    const material = createDitheredMaterial(part.material, {
+      tinted,
+      kind: morphed ? part.kind : null,
+    });
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
     mesh.count = 0;
     mesh.castShadow = Boolean(castShadow && part.kind !== 'leaf');
@@ -60,10 +70,6 @@ export function createInstancedRenderers({
   }));
 }
 
-/**
- * Lowest and highest instance index whose data actually changed. `max < min` means
- * the attribute is untouched and needs no upload.
- */
 function resetDirtyRange(range) {
   range.min = Infinity;
   range.max = -1;
@@ -81,22 +87,20 @@ function writeScalarInstance(attribute, index, value, range) {
   widenDirtyRange(range, index);
 }
 
-/** Scalar writer's vec3 counterpart, for the per-instance leaf tint. */
-function writeTintInstance(attribute, index, tint, range) {
+function writeVector3Instance(attribute, index, value, range) {
   const array = attribute.array;
   const offset = index * 3;
   if (
-    array[offset] === tint[0]
-    && array[offset + 1] === tint[1]
-    && array[offset + 2] === tint[2]
+    array[offset] === value[0]
+    && array[offset + 1] === value[1]
+    && array[offset + 2] === value[2]
   ) return;
-  array[offset] = tint[0];
-  array[offset + 1] = tint[1];
-  array[offset + 2] = tint[2];
+  array[offset] = value[0];
+  array[offset + 1] = value[1];
+  array[offset + 2] = value[2];
   widenDirtyRange(range, index);
 }
 
-/** Equivalent to `setMatrixAt`, but skips the write when the matrix is unchanged. */
 function writeMatrixInstance(attribute, index, matrix, range) {
   const array = attribute.array;
   const offset = index * 16;
@@ -110,24 +114,13 @@ function writeMatrixInstance(attribute, index, matrix, range) {
   }
 }
 
-// Reused across calls so a rebuild allocates nothing here.
 const MATRIX_RANGE = { min: Infinity, max: -1 };
 const FADE_RANGE = { min: Infinity, max: -1 };
 const SEED_RANGE = { min: Infinity, max: -1 };
 const COLOR_RANGE = { min: Infinity, max: -1 };
 const TINT_RANGE = { min: Infinity, max: -1 };
-const UNTINTED = Object.freeze([1, 1, 1]);
+const MORPHOLOGY_RANGE = { min: Infinity, max: -1 };
 
-/**
- * Write instance data, uploading only what changed.
- *
- * Rebuilds are usually triggered by an LOD cross-fade, which changes `fade` for the
- * transitioning chunks and leaves every matrix byte-identical. Re-uploading the
- * whole buffer on each of those cost hundreds of kilobytes per rebuild and showed up
- * as hitches whose phase timers were all cheap, because the upload lands
- * asynchronously between frames. Instances are written in chunk order, so a single
- * chunk's change stays a tight contiguous range.
- */
 export function writeInstances(renderers, instancesByPrototype) {
   let total = 0;
   renderers.forEach((parts, prototypeIndex) => {
@@ -143,11 +136,13 @@ export function writeInstances(renderers, instancesByPrototype) {
       const seeds = mesh.geometry.getAttribute('instanceStableSeed');
       const colors = mesh.geometry.getAttribute('instanceColorVariation');
       const tints = mesh.geometry.getAttribute('instanceLeafTint');
+      const morphologies = mesh.geometry.getAttribute('instanceMorphology');
       const matrixRange = resetDirtyRange(MATRIX_RANGE);
       const fadeRange = resetDirtyRange(FADE_RANGE);
       const seedRange = resetDirtyRange(SEED_RANGE);
       const colorRange = resetDirtyRange(COLOR_RANGE);
       const tintRange = resetDirtyRange(TINT_RANGE);
+      const morphologyRange = resetDirtyRange(MORPHOLOGY_RANGE);
       for (let index = 0; index < writableCount; index += 1) {
         const instance = instances[index];
         writeMatrixInstance(mesh.instanceMatrix, index, instance.matrix, matrixRange);
@@ -157,7 +152,15 @@ export function writeInstances(renderers, instancesByPrototype) {
           writeScalarInstance(colors, index, instance.colorVariation ?? 1, colorRange);
         }
         if (tints) {
-          writeTintInstance(tints, index, instance.leafTint ?? UNTINTED, tintRange);
+          writeVector3Instance(tints, index, instance.leafTint ?? UNTINTED, tintRange);
+        }
+        if (morphologies) {
+          writeVector3Instance(
+            morphologies,
+            index,
+            instance.morphology ?? IDENTITY_MORPHOLOGY,
+            morphologyRange,
+          );
         }
       }
       markAttributeSubrangeUpdated(mesh.instanceMatrix, matrixRange.min, matrixRange.max);
@@ -165,7 +168,13 @@ export function writeInstances(renderers, instancesByPrototype) {
       markAttributeSubrangeUpdated(seeds, seedRange.min, seedRange.max);
       if (colors) markAttributeSubrangeUpdated(colors, colorRange.min, colorRange.max);
       if (tints) markAttributeSubrangeUpdated(tints, tintRange.min, tintRange.max);
-      // The bounding sphere depends on the matrices and on how many are drawn.
+      if (morphologies) {
+        markAttributeSubrangeUpdated(
+          morphologies,
+          morphologyRange.min,
+          morphologyRange.max,
+        );
+      }
       if (matrixRange.max >= 0 || writableCount !== previousCount) {
         mesh.computeBoundingSphere();
       }
@@ -190,6 +199,20 @@ export function disposeInstancedRenderers(root, renderers) {
   renderers.length = 0;
 }
 
+function waitingState(target, timestamp) {
+  return {
+    from: 'culled',
+    target,
+    startedAt: timestamp,
+    complete: false,
+    waitingForData: true,
+    representations: Object.freeze([
+      { band: 'culled', fade: 1 },
+      { band: target, fade: WAITING_FADE },
+    ]),
+  };
+}
+
 export function buildChunkLodPlan({
   focus,
   radius,
@@ -209,46 +232,57 @@ export function buildChunkLodPlan({
   const entries = [];
   const signature = [];
   const origin = floatingOrigin.getState();
+  const needsReadyAnchor = typeof positionForChunk === 'function';
 
   for (let chunkZ = focus.chunkZ - radius; chunkZ <= focus.chunkZ + radius; chunkZ += 1) {
     for (let chunkX = focus.chunkX - radius; chunkX <= focus.chunkX + radius; chunkX += 1) {
       const chunkDistance = Math.max(Math.abs(chunkX - focus.chunkX), Math.abs(chunkZ - focus.chunkZ));
       const anchor = positionForChunk?.(chunkX, chunkZ) ?? null;
+      const ready = !needsReadyAnchor || anchor !== null;
       const canonicalX = anchor?.x ?? (chunkX + 0.5) * chunkWorldSize;
       const canonicalZ = anchor?.z ?? -(chunkZ + 0.5) * chunkWorldSize;
+      const worldHeight = objectHeight * Math.max(0.05, anchor?.heightScale ?? 1);
       const worldPosition = {
         x: canonicalX - origin.x,
-        y: (anchor?.y ?? 0) + objectHeight * 0.5,
+        y: (anchor?.y ?? 0) + worldHeight * 0.5,
         z: canonicalZ - origin.z,
       };
       const pixels = projectedPixelHeight({
         camera,
         worldPosition,
-        worldHeight: objectHeight,
+        worldHeight,
         viewportHeight,
       });
       const key = `${chunkX}:${chunkZ}`;
-      const previous = transitionStates.get(key)?.target ?? null;
+      const storedState = transitionStates.get(key) ?? null;
+      const previous = storedState?.target ?? null;
       const selected = selectProjectedLod({ pixels, previous, ...thresholds });
       const target = clampLodToRadii({ band: selected, chunkDistance, ...radii });
-      const state = updateLodTransition({
-        state: transitionStates.get(key) ?? null,
-        target,
-        timestamp,
-        durationMs: transitionMs,
-      });
+      let state;
+      if (!ready && target !== 'culled') {
+        state = waitingState(target, timestamp);
+      } else {
+        state = updateLodTransition({
+          state: storedState?.waitingForData ? null : storedState,
+          target,
+          timestamp,
+          durationMs: transitionMs,
+        });
+      }
       transitionStates.set(key, state);
       entries.push({
         chunkX,
         chunkZ,
         chunkDistance,
         band: target,
+        ready,
         representations: state.representations,
         lodAnchor: Object.freeze({ x: canonicalX, y: anchor?.y ?? 0, z: canonicalZ }),
       });
       signature.push([
         key,
         target,
+        ready ? 'ready' : 'waiting',
         ...state.representations.map((representation) => (
           `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}`
         )),
