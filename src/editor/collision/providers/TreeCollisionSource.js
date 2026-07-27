@@ -45,7 +45,7 @@ export function treeCollisionPlacementSignature(placements) {
 function sourceEpoch(treeView, rockSource) {
   const manifestStore = treeView.manifestStore;
   return [
-    treeView.terrainView?.worldStore?.revision ?? 0,
+    treeView.revisionTracker?.revision ?? 0,
     manifestStore?.editStore?.revision ?? 0,
     manifestStore?.pathClearance?.signature ?? 'path:unknown',
     manifestStore?.forestField?.signature ?? 'forest:uniform',
