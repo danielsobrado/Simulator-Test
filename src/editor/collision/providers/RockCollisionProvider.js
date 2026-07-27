@@ -117,7 +117,7 @@ function colliderForPart(context) {
     : sphereCollider(context);
 }
 
-function walkableCollider({ placement, profile, prototype, translationY, scale }) {
+function walkableCollider({ placement, prototype, translationY, scale }) {
   const transform = composeUniformTransform({
     x: placement.x,
     y: translationY,
@@ -176,6 +176,15 @@ export class RockCollisionProvider {
     this.config = config;
     this.descriptor = source.descriptor;
     this.policySignature = policySignature(config);
+    this.world = null;
+  }
+
+  attachWorld(world) {
+    if (!world?.registerPrototype) throw new Error('Rock collision provider requires a collision world.');
+    if (this.world && this.world !== world) {
+      throw new Error('Rock collision provider cannot attach to multiple collision worlds.');
+    }
+    this.world = world;
   }
 
   getEpoch() {
@@ -190,7 +199,7 @@ export class RockCollisionProvider {
     return this.source.getCachedProfileCount?.() ?? 0;
   }
 
-  buildChunkData(chunkX, chunkZ, world = null) {
+  buildChunkData(chunkX, chunkZ) {
     const snapshot = this.source.snapshotChunk(chunkX, chunkZ);
     const profiles = this.source.getProfiles();
     const colliders = [];
@@ -226,10 +235,9 @@ export class RockCollisionProvider {
       let placementColliders;
       let meshPrototype = null;
       if (tier === ROCK_COLLISION_TIER_WALKABLE) {
-        meshPrototype = this.source.getMeshPrototype(prototypeIndex, world);
+        meshPrototype = this.source.getMeshPrototype(prototypeIndex, this.world);
         placementColliders = [walkableCollider({
           placement,
-          profile,
           prototype: meshPrototype,
           translationY,
           scale,
@@ -284,5 +292,6 @@ export class RockCollisionProvider {
 
   dispose() {
     this.source.dispose?.();
+    this.world = null;
   }
 }
