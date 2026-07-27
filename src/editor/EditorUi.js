@@ -9,6 +9,7 @@ import {
   saveToBrowser,
 } from './storage.js';
 import { normalizeSceneSettings } from './settings/SceneSettings.js';
+import { assetFileName, formatBytes } from './ui/loadingSources.js';
 import { hexToRgbBytes } from './tileCatalog.js';
 
 const TERRAIN_MODE_LABELS = Object.freeze({
@@ -803,6 +804,79 @@ export class EditorUi {
     }
   }
 
+  attachLoading(tracker) {
+    this.loading = tracker;
+  }
+
+  /**
+   * Runs work behind the loading overlay, handing the session to the callback so
+   * it can advance its own steps.
+   *
+   * On failure the session is left on screen for a moment rather than closed
+   * immediately: the toast that follows is transient, and the panel is the only
+   * place that names *which* step died.
+   */
+  async withLoading({ title, steps, detail = '' }, run) {
+    if (!this.loading) return run(null);
+    const session = this.loading.begin({ title, steps, detail });
+    try {
+      const result = await run(session);
+      session.finish();
+      return result;
+    } catch (error) {
+      session.fail(error);
+      setTimeout(() => session.finish(), 2600);
+      throw error;
+    }
+  }
+
+  /**
+   * Opens a terminal notice for the flows that end by navigating away.
+   *
+   * These sessions are never finished on purpose: the page is about to reload, and
+   * closing the panel first would leave the window blank and unexplained for the
+   * whole navigation. Whatever replaces it is a fresh boot with its own overlay.
+   */
+  showSceneReload(label, detail = '') {
+    this.loading?.begin({
+      title: label,
+      steps: [{ id: 'reload', label: 'Reloading the scene' }],
+      detail,
+    }).start('reload');
+  }
+
+  /**
+   * A map load whose stages are not individually observable — `loadMapUrl`
+   * fetches, imports and rebuilds inside one call.
+   *
+   * Rather than fake granularity, the download is given a real head start and the
+   * rest is reported as one step with the file named. A bar that lies about which
+   * stage it is in is worse than a coarse one that does not. Flows whose stages we
+   * *do* control call `withLoading` directly and advance the steps for real.
+   */
+  async withMapLoading(label, url, run) {
+    return this.withLoading(
+      {
+        title: `Loading ${label}`,
+        steps: [
+          { id: 'fetch', label: 'Downloading map' },
+          { id: 'import', label: 'Importing world and rebuilding terrain' },
+        ],
+        detail: assetFileName(url),
+      },
+      async (session) => {
+        if (!session) return run();
+        session.start('fetch');
+        const toImport = setTimeout(() => session.start('import'), 400);
+        try {
+          return await run();
+        } finally {
+          clearTimeout(toImport);
+        }
+      },
+    );
+  }
+
   attachGrassTuning(tuning) {
     this.grassTuning = tuning;
     this.syncGrassTuning(tuning?.getSettings?.());
@@ -967,21 +1041,38 @@ export class EditorUi {
       this.fileInput.value = '';
       if (!file) return;
       try {
-        const document = this.sceneSettingsRuntime
-          ? await this.sceneSettingsRuntime.loadEmbeddedMap(
-            await importJson(file),
-            file.name,
-          )
-          : await importMap(file, {
-            config: this.config,
-            resolveAzgaarOptions: (summary) => this.resolveAzgaarImportOptions(summary),
-          });
-        if (!this.sceneSettingsRuntime) {
-          controller.loadDocument(document);
-          this.syncImportedBiomeTiles(document);
-          this.minimapCenter = controller.getFocusCell?.() ?? this.minimapCenter;
-          this.updateMinimap();
-        }
+        // Unlike a URL load this path owns each stage, so the steps are reported as
+        // they actually happen. Reading and parsing a multi-megabyte Azgaar export
+        // is a real wait of its own before the import even starts.
+        await this.withLoading(
+          {
+            title: 'Importing world',
+            steps: [
+              { id: 'read', label: 'Reading and parsing the file' },
+              { id: 'import', label: 'Importing world and rebuilding terrain' },
+              { id: 'apply', label: 'Updating tiles and minimap' },
+            ],
+            detail: `${file.name} · ${formatBytes(file.size)}`,
+          },
+          async (session) => {
+            session?.start('read');
+            const parsed = this.sceneSettingsRuntime ? await importJson(file) : null;
+            session?.start('import');
+            const document = this.sceneSettingsRuntime
+              ? await this.sceneSettingsRuntime.loadEmbeddedMap(parsed, file.name)
+              : await importMap(file, {
+                config: this.config,
+                resolveAzgaarOptions: (summary) => this.resolveAzgaarImportOptions(summary),
+              });
+            session?.start('apply');
+            if (!this.sceneSettingsRuntime) {
+              controller.loadDocument(document);
+              this.syncImportedBiomeTiles(document);
+              this.minimapCenter = controller.getFocusCell?.() ?? this.minimapCenter;
+              this.updateMinimap();
+            }
+          },
+        );
         this.showToast('World imported.');
       } catch (error) {
         this.showToast(error.message, true);
@@ -994,6 +1085,7 @@ export class EditorUi {
       try {
         const document = normalizeSceneSettings(await importJson(file));
         if (!this.confirmSceneReload('Loading a world look')) return;
+        this.showSceneReload('Loading world look', file.name);
         this.sceneSettingsRuntime.activate(document);
       } catch (error) {
         this.showToast(error.message, true);
@@ -1005,13 +1097,29 @@ export class EditorUi {
       if (!file || !this.sceneSettingsRuntime) return;
       try {
         if (!this.confirmSceneReload('Adding a GLB')) return;
-        await this.sceneSettingsRuntime.addLocalAsset({
-          layer: this.sceneAssetLayer.value,
-          file,
-          label: this.sceneAssetLabel.value.trim() || file.name.replace(/\.glb$/i, ''),
-          scale: Number(this.sceneAssetScale.value),
-          tileIds: [this.selectedBiomeAssetTileId],
-        });
+        // This one ends in a page reload, so the overlay is the last thing on
+        // screen. Without it a large GLB looks like the button did nothing.
+        await this.withLoading(
+          {
+            title: 'Adding GLB asset',
+            steps: [
+              { id: 'store', label: 'Storing the GLB for this browser' },
+              { id: 'reload', label: 'Reloading the scene' },
+            ],
+            detail: `${file.name} · ${formatBytes(file.size)}`,
+          },
+          async (session) => {
+            session?.start('store');
+            await this.sceneSettingsRuntime.addLocalAsset({
+              layer: this.sceneAssetLayer.value,
+              file,
+              label: this.sceneAssetLabel.value.trim() || file.name.replace(/\.glb$/i, ''),
+              scale: Number(this.sceneAssetScale.value),
+              tileIds: [this.selectedBiomeAssetTileId],
+            });
+            session?.start('reload');
+          },
+        );
       } catch (error) {
         this.showToast(error.message, true);
       }
@@ -1334,13 +1442,28 @@ export class EditorUi {
           this.showToast('World saved in this browser.');
           break;
         case 'load': {
-          const worldDocument = await loadFromBrowser(this.config.storage.key);
+          const worldDocument = await this.withLoading(
+            {
+              title: 'Loading browser save',
+              steps: [
+                { id: 'read', label: 'Reading the browser save' },
+                { id: 'apply', label: 'Rebuilding terrain' },
+              ],
+            },
+            async (session) => {
+              session?.start('read');
+              const saved = await loadFromBrowser(this.config.storage.key);
+              if (!saved) return null;
+              session?.start('apply');
+              this.controller.loadDocument(saved);
+              this.syncImportedBiomeTiles(saved);
+              return saved;
+            },
+          );
           if (!worldDocument) {
             this.showToast('No browser save exists yet.');
             return;
           }
-          this.controller.loadDocument(worldDocument);
-          this.syncImportedBiomeTiles(worldDocument);
           this.showToast('Browser save loaded.');
           break;
         }
@@ -1358,10 +1481,12 @@ export class EditorUi {
           }
           if (!this.confirmSceneReload('Loading a world look')) break;
           if (selected.startsWith('url:')) {
+            this.showSceneReload('Loading world look', assetFileName(selected.slice(4)));
             this.sceneSettingsRuntime.activateUrl(selected.slice(4));
           } else if (selected.startsWith('browser:')) {
             const document = await loadFromBrowser(selected.slice(8));
             if (!document) throw new Error('The selected browser settings no longer exist.');
+            this.showSceneReload('Loading world look', document.name ?? '');
             this.sceneSettingsRuntime.activate(document);
           }
           break;
@@ -1410,6 +1535,7 @@ export class EditorUi {
           // document would otherwise fail during boot with no panel to fix it in.
           normalizeSceneSettings(await loadJsonFromUrl(url));
           if (!this.confirmSceneReload('Loading a world look')) break;
+          this.showSceneReload('Loading world look', assetFileName(url));
           this.sceneSettingsRuntime.activateUrl(url);
           break;
         }
@@ -1418,7 +1544,11 @@ export class EditorUi {
           const url = this.sceneMapPreset.value;
           if (!url) throw new Error('Choose a map first.');
           const entry = this.sceneMapLibrary.find((candidate) => candidate.url === url);
-          await this.sceneSettingsRuntime.loadMapUrl(url, entry?.name);
+          await this.withMapLoading(
+            entry?.name ?? 'map',
+            url,
+            () => this.sceneSettingsRuntime.loadMapUrl(url, entry?.name),
+          );
           this.showToast(`${entry?.name ?? 'Map'} loaded.`);
           break;
         }
@@ -1426,7 +1556,11 @@ export class EditorUi {
           if (!this.sceneSettingsRuntime) break;
           const url = this.sceneMapUrl.value.trim();
           if (!url) throw new Error('Enter a map URL first.');
-          await this.sceneSettingsRuntime.loadMapUrl(url);
+          await this.withMapLoading(
+            'map URL',
+            url,
+            () => this.sceneSettingsRuntime.loadMapUrl(url),
+          );
           this.showToast('Map URL loaded.');
           break;
         }
@@ -1435,6 +1569,7 @@ export class EditorUi {
           const url = this.sceneAssetUrl.value.trim();
           if (!url) throw new Error('Enter a GLB URL first.');
           if (!this.confirmSceneReload('Adding a GLB')) break;
+          this.showSceneReload('Adding GLB asset', assetFileName(url));
           await this.sceneSettingsRuntime.addUrlAsset({
             layer: this.sceneAssetLayer.value,
             url,

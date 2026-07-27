@@ -114,6 +114,15 @@ are stored in canonical world space and offset by a group for floating-origin sn
 so origin shifts do not rebuild instance buffers. Animation is uniform-driven and does
 not rebuild instances every frame.
 
+Authored *variants* stream too, not just instances. Only the trees and the shared
+scene load before the first frame; rock, bush, ground-detail and aquatic variants
+arrive as the camera approaches the biomes their `tileIds` claim, capped at one
+install per frame. `streaming.variantPrefetchChunks`,
+`streaming.variantAppliesPerFrame` and `streaming.variantRescanIntervalMs` tune
+that, and
+[asset startup and variant residency](asset-startup-and-variant-residency.md)
+explains why the split falls where it does.
+
 ## Configuration
 
 All style and density values live under `stylizedSurface` in `editor.config.yaml`.

@@ -238,6 +238,47 @@ The headed hardware QA confirms that the target NVIDIA adapter transcodes the
 current KTX2 set to BC7. That result is adapter-specific; other GPUs can select
 ASTC, ETC2, or another supported target.
 
+## Texture tiers
+
+**Added 2026-07-26.** Transcoding, not download, dominates the asset phase of
+startup: 110 KTX2 textures at 1024×1024 cost a median 270 ms each and 29.3 s
+cumulative across the transcoder workers. The scatter layers contributed most of
+that count.
+
+`RUNTIME_TEXTURE_TIERS` therefore splits the colour/normal ceiling in two:
+
+| tier | ceiling | assets |
+| --- | --- | --- |
+| `hero` | 1024 | tree variants and the shared scene |
+| `scatter` | 512 | rocks, bushes, ground details, aquatic plants, wildlife |
+
+Scatter props are drawn small and in bulk — a ground tuft or a boulder never
+fills more of the screen than its own silhouette — so halving the dimension
+quarters the block count where it is least visible. Trees keep the full size:
+they are the hero silhouettes the camera stands next to.
+
+Each base profile gains a scatter counterpart, giving four:
+`standard`, `alphaCritical`, `standardScatter`, `alphaCriticalScatter`. Alpha
+handling is unchanged and still selected from the source materials; the tier is
+orthogonal to it. Data (`attrib`) textures stay at their existing 512 ceiling —
+they are already the smaller half of the budget and are read for their values
+rather than their detail.
+
+`runtimeAssetTextureTiers` in `scripts/lib/runtime-asset-sources.mjs` derives the
+tier from which configured variant list a scene appears in. A scene listed under
+both a tree and a scatter layer keeps the hero tier: being shared is a reason to
+encode it once at the higher quality. Both `optimize-runtime-assets.mjs` and
+`validate-runtime-assets.mjs` read the same map, so the validator recomputes the
+expected profile exactly as the optimizer chose it.
+
+`RUNTIME_ASSET_PROFILE_VERSION` moved to `2`. Re-encoding rewrote 24 GLBs and
+took the published payload from ~35 MiB to ~26.5 MiB; boot-time transcodes fell
+to 37 at a 94 ms median, 3.7 s cumulative. The remaining 1024² textures are the
+hero tier, as intended.
+
+See [asset startup and variant residency](asset-startup-and-variant-residency.md)
+for the loading-side half of the same investigation.
+
 ## Implemented build safety and measurement
 
 `npm run optimize:runtime-assets` now uses a content-addressed cache keyed by

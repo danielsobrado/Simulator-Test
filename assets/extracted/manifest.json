@@ -1119,24 +1119,24 @@
           "scale": 14,
           "output": "assets/extracted/trees/stylized-oak/stylized-oak.glb",
           "published": "public/assets/trees/stylized-oak.glb",
-          "simplifyRatio": 0.05,
-          "sha256": "c2c49a30b983b18c51b6d3558fab3d986f9b98f13f3bece8183790085e198f88",
-          "bytes": 5444908,
+          "simplifyRatio": 0.3,
+          "sha256": "4b2ec2e6768fc0cd8eb06335f45366634b2eaf49211b5d9e531ff1c2007f8715",
+          "bytes": 6936448,
           "nodes": 8,
           "meshes": 5,
           "materials": 2,
           "textures": 1,
-          "triangles": 62883,
+          "triangles": 82330,
           "bounds": {
             "min": [
-              -2.489967,
+              -2.522638,
               0,
-              -2.622715
+              -2.708949
             ],
             "max": [
-              2.489967,
-              7.793065,
-              2.622715
+              2.522638,
+              7.859021,
+              2.708949
             ]
           }
         }

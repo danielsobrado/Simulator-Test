@@ -86,6 +86,56 @@ function validateFile(relativePath, expectedHash, expectedBytes, expectedName) {
     throw new Error(`${relativePath} is missing extraction provenance or its single scene.`);
   }
   validateEmbeddedImages(json, binary, relativePath);
+  return json;
+}
+
+/** Triangles bound to each material name in a parsed GLB document. */
+function trianglesByMaterial(json) {
+  const totals = new Map();
+  for (const mesh of json.meshes ?? []) {
+    for (const primitive of mesh.primitives ?? []) {
+      const name = json.materials?.[primitive.material]?.name ?? '<none>';
+      const accessor = primitive.indices ?? primitive.attributes?.POSITION;
+      const count = (json.accessors?.[accessor]?.count ?? 0) / 3;
+      totals.set(name, (totals.get(name) ?? 0) + count);
+    }
+  }
+  return totals;
+}
+
+// `simplifyRatio` is one number applied to every primitive, but primitives do not
+// respond to it equally. Independent cards (leaf quads, alpha fronds) track it
+// exactly, because the simplifier just deletes whole cards. Open-ended tube
+// geometry — branches, stems — is border edges all the way down, and meshopt will
+// not collapse a border, so it floors well above the target however low the ratio
+// goes.
+//
+// Set aggressively enough, that asymmetry strips one part to nothing while leaving
+// the other almost untouched. `stylized-oak` shipped that way: 5% of its leaf cards
+// against 49% of its branches, which rendered as a bare skeleton with a few specks.
+// Nothing else caught it, because every file was individually well-formed.
+//
+// Only simplified outputs are checked. Plenty of authored assets are lopsided by
+// design — `lotus-01` carries a 9 120-triangle bloom beside a 52-triangle leaf tag
+// at 175:1 — and that is not a defect, it is just how the artist built it.
+const SIMPLIFY_DIVERGENCE_LIMIT = 6;
+
+function validateSimplifyBalance(json, relativePath, simplifyRatio) {
+  if (simplifyRatio === undefined) return;
+  const totals = [...trianglesByMaterial(json).entries()].filter(([, count]) => count > 0);
+  if (totals.length < 2) return;
+  const counts = totals.map(([, count]) => count);
+  const ratio = Math.max(...counts) / Math.min(...counts);
+  if (ratio <= SIMPLIFY_DIVERGENCE_LIMIT) return;
+  const summary = totals
+    .map(([name, count]) => `${name}=${Math.round(count)}`)
+    .join(', ');
+  throw new Error(
+    `${relativePath} is simplified at ratio ${simplifyRatio} and its materials came out `
+    + `wildly uneven (${summary}; ${ratio.toFixed(1)}:1 against a ${SIMPLIFY_DIVERGENCE_LIMIT}:1 `
+    + 'limit). One part has almost certainly been decimated away while another kept its '
+    + 'triangles — see the stylized-oak notes in authored-asset-extraction.config.mjs.',
+  );
 }
 
 if (!fs.existsSync(manifestPath)) {
@@ -113,7 +163,8 @@ for (const source of manifest.sources) {
     if (Math.abs(output.bounds?.min?.[1] ?? Number.POSITIVE_INFINITY) > 0.0001) {
       throw new Error(`${output.output} is not grounded at y=0.`);
     }
-    validateFile(output.output, output.sha256, output.bytes, output.name);
+    const json = validateFile(output.output, output.sha256, output.bytes, output.name);
+    validateSimplifyBalance(json, output.output, output.simplifyRatio);
     outputCount += 1;
     if (output.published) {
       publishedCount += 1;

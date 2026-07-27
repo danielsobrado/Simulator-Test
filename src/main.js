@@ -4,6 +4,9 @@ import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';
 import './editor/map/worldMap.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
+import { LoadingOverlay } from './editor/ui/LoadingOverlay.js';
+import { LoadingTracker } from './editor/ui/LoadingTracker.js';
+import { bindAssetProgress, watchWalkModeEntry } from './editor/ui/loadingSources.js';
 import { EditorCamera } from './editor/EditorCamera.js';
 import { EditorUi } from './editor/EditorUi.js';
 import { InfiniteTerrainView } from './editor/InfiniteTerrainView.js';
@@ -26,6 +29,7 @@ import { parseQaParams } from './editor/performance/qa/parseQaParams.js';
 import { PlayerController } from './editor/player/PlayerController.js';
 import { ViewModeController } from './editor/player/ViewModeController.js';
 import { ViewModeUi } from './editor/player/ViewModeUi.js';
+import { PLAYER_MODE_WALK } from './editor/player/playerConstants.js';
 import { isTreeImpostorBakeMode } from './editor/stylized/impostorBakeMode.js';
 import { StylizedSurfaceView } from './editor/stylized/StylizedSurfaceView.js';
 import { BiomeAssetPalette } from './editor/stylized/BiomeAssetPalette.js';
@@ -61,7 +65,24 @@ import {
 
 const TERRAIN_PREFETCH_REFRESH_MS = 200;
 
+// Boot is a fixed sequence, so its steps are declared up front and the bar has a
+// real denominator. Ids are stable strings because `LoadingSession.start` throws on
+// an unknown one — a renamed phase fails loudly rather than silently never lighting.
+const BOOT_STEPS = Object.freeze([
+  { id: 'settings', label: 'Scene settings' },
+  { id: 'terrain', label: 'Terrain view and GPU device' },
+  { id: 'assets', label: 'World assets' },
+  { id: 'blades', label: 'Grass blade profiles' },
+  { id: 'map', label: 'Initial map' },
+  { id: 'prewarm', label: 'Compiling render pipelines' },
+]);
+
 async function startEditor() {
+  const loading = new LoadingTracker();
+  const loadingOverlay = new LoadingOverlay(document.body);
+  loadingOverlay.attach(loading);
+  const boot = loading.begin({ title: 'Starting SimCity DnD', steps: BOOT_STEPS });
+  boot.start('settings');
   // A `?settings=` reference is user-supplied and can go stale — the session
   // handoff is gone in a duplicated tab, a preset URL can 404, a hand-edited
   // document can be invalid. None of that should stop the editor from booting,
@@ -208,9 +229,11 @@ async function startEditor() {
     stylizedConfig: config.stylizedSurface,
   });
 
+  boot.start('terrain');
   try {
     await terrainView.initialize();
   } catch (error) {
+    boot.fail(error);
     terrainView.dispose();
     worldStore.dispose();
     throw error;
@@ -256,12 +279,19 @@ async function startEditor() {
     baseUrl: import.meta.env.BASE_URL,
     biomeAssetPalette,
   });
+  boot.start('assets');
+  // Every stylized GLB already reports through the startup telemetry, so the
+  // overlay can name the file it is on without instrumenting each loader.
+  const releaseAssetProgress = bindAssetProgress(boot);
   ui.attachGodRays(terrainView.godRays);
   ui.attachGrassTuning(stylizedSurface.grassTuning);
+  ui.attachLoading(loading);
   ui.attachGrassBladeProfiles(stylizedSurface.bladeProfiles);
   // The list has to be redrawn once the manifest lands: before that every set
   // resolves to the generated taper and would be labelled as unbaked.
   stylizedSurface.bladeProfiles.ready.then(() => ui.renderGrassBladeProfiles());
+  boot.start('blades');
+  await stylizedSurface.bladeProfiles.ready;
 
   if (impostorBakeMode) {
     await stylizedSurface.bakeRequest;
@@ -312,6 +342,21 @@ async function startEditor() {
     playerController,
     terrainView,
     objectView,
+  });
+
+  // Walk mode is not an awaitable call — dropping in re-centres residency and the
+  // world fills in over the following frames. So readiness is observed from the
+  // streaming status rather than awaited, and the overlay closes when it settles.
+  const streamingFrameListeners = new Set();
+  watchWalkModeEntry({
+    viewModeController,
+    loading,
+    walkMode: PLAYER_MODE_WALK,
+    getStatus: () => terrainView.getStreamingStatus(),
+    onFrame: (listener) => {
+      streamingFrameListeners.add(listener);
+      return () => streamingFrameListeners.delete(listener);
+    },
   });
 
   controller = new TerrainAwareEditorController({
@@ -365,11 +410,14 @@ async function startEditor() {
       true,
     );
   }
+  boot.start('map');
   try {
     await sceneSettingsRuntime.applyInitialRuntime();
   } catch (error) {
     // The preset's map may be unreachable. The generated world is already live,
-    // so keep it and say the map did not load.
+    // so keep it and say the map did not load. The step is marked failed rather
+    // than the session, because boot continues and the rest still has to report.
+    boot.fail(error);
     ui.showToast(`Preset map not loaded: ${error.message}`, true);
   }
   ui.syncGodRaysSettings(terrainView.godRays.getSettings());
@@ -449,12 +497,15 @@ async function startEditor() {
   // in the GPU process — it shows up as a ~90 ms hitch on whichever frame a new
   // LOD band first becomes visible, with every phase timer on that frame cheap.
   // Doing it here moves the cost into load, where a stall is not a stutter.
+  releaseAssetProgress();
+  boot.start('prewarm', 'Compiling shaders — this is the long one');
   try {
     await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);
     terrainView.prewarmPostProcessing(playerController.camera);
   } catch (error) {
     console.warn('Render pipeline pre-warm failed; pipelines will compile on demand.', error);
   }
+  boot.finish();
 
   const perfQa = PerfQaHarness.fromLocation({
     viewModeController,
@@ -566,6 +617,10 @@ async function startEditor() {
       ui.renderStreamingStatus(terrainView.getStreamingStatus());
       nextStreamingStatusAt = frameTimestamp + 250;
     }
+    // Per frame, not on the 250 ms status cadence: the settle test counts
+    // consecutive quiet frames, and sampling four times a second would make it
+    // wait seconds after the world was already still.
+    for (const listener of streamingFrameListeners) listener();
     terrainView.render(viewModeController.camera);
     assetStartupTelemetry.markFirstFrame();
     if (profiling) {

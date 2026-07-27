@@ -22,6 +22,21 @@ hitch count tracks how much chunk streaming is still in flight — always compar
 runs at the same `--warmup`, and prefer an A/B against the unmodified code over
 comparing to the recorded baseline on a different machine.
 
+## Asset startup
+
+Added 2026-07-26: only the trees and the shared scene may block the first frame.
+Every other authored variant streams in per biome through
+`StylizedVariantResidency`, one install per frame — see
+[asset startup and variant residency](docs/asset-startup-and-variant-residency.md).
+Do not add an authored GLB to a `Promise.all` in `bootstrapLayers`; register it
+as a residency layer instead, and give it `tileIds` so it can be withheld from
+worlds that lack its biomes.
+
+When a scatter view installs prototypes, it must append rather than rebuild, and
+bump its `prototypeRevision` — the resident-window update key is otherwise blind
+to the prototype set and a variant arriving under a stationary camera would never
+be drawn.
+
 ## Workshop art direction
 
 Buildings must read as constructed stonework, not noise-displaced boxes
