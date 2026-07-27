@@ -106,7 +106,7 @@ export class WaterTerrainModel {
     const southWest = this.sampleHeight(x0, z1);
     const southEast = this.sampleHeight(x1, z1);
     const north = northWest + (northEast - northWest) * tx;
-    const south = southWest + (southEast - northWest) * 0 + (southEast - southWest) * tx;
+    const south = southWest + (southEast - southWest) * tx;
     return north + (south - north) * tz;
   }
 
