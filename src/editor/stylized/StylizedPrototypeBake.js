@@ -2,16 +2,23 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const COLLIDER_NODE_PATTERN = /^COLLIDER(?:_WALKABLE)?(?:$|[_:.-])/i;
+const AUTHORED_COLLISION_PROXIES = new WeakMap();
+
+export function authoredCollisionProxyForGeometry(geometry) {
+  return AUTHORED_COLLISION_PROXIES.get(geometry) ?? null;
+}
+
+export function releaseAuthoredCollisionProxy(geometry) {
+  const proxy = AUTHORED_COLLISION_PROXIES.get(geometry);
+  if (!proxy) return false;
+  proxy.geometry.dispose();
+  AUTHORED_COLLISION_PROXIES.delete(geometry);
+  return true;
+}
 
 /**
  * Shared GLB prototype grounding for stylized scatter.
- *
- * Upstream GrassField keeps rocks/trees at their authored scene transforms.
- * When we re-instance them across the streamed world we must NOT bake the
- * demo's art-directed tumble/lean into the prototype — only the mesh shape
- * and Sketchfab world scale — then sit the AABB on y = 0.
  */
-
 export function ensureVertexNormals(geometry) {
   if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
   return geometry;
@@ -29,10 +36,6 @@ export function groundGeometry(geometry) {
   return geometry;
 }
 
-/**
- * Scale-only bake: drops placement rotation/lean from the demo GLB so scatter
- * instances rest naturally. Matches the mesh's local authored up-axis.
- */
 export function bakeScaledGeometry(mesh) {
   const geometry = mesh.geometry.clone();
   const worldScale = new THREE.Vector3();
@@ -45,11 +48,6 @@ export function bakeScaledGeometry(mesh) {
   return groundGeometry(geometry);
 }
 
-/**
- * Full world-matrix bake: keeps parent axis fixes (Sketchfab −90°) and nested
- * part offsets. Used for multi-part pines whose parts are authored upright
- * under a Sketchfab root.
- */
 export function bakeWorldGeometry(mesh) {
   const geometry = mesh.geometry.clone();
   geometry.applyMatrix4(mesh.matrixWorld);
@@ -73,14 +71,6 @@ function sceneNodesByName(scene, names, label) {
   return names.map((name) => found.get(name));
 }
 
-/**
- * Resolves configuration-authored groups of scene roots.
- *
- * Packs commonly present their reusable objects in a showroom scene rather
- * than as separate files. Keeping the grouping in YAML lets one GLB supply
- * multi-part plants or trees without baking source-scene placement into the
- * streamed instances.
- */
 export function resolveAuthoredPrototypeGroups(scene, groups, label = 'Authored prototype') {
   if (!Array.isArray(groups) || groups.length === 0) {
     throw new Error(`${label} groups must be a non-empty array.`);
@@ -132,13 +122,6 @@ function mergePartsByMaterial(parts) {
   });
 }
 
-/**
- * Extracts curated multi-part prototypes from a showroom-style GLB.
- *
- * Every group is grounded and centred as one object, but its mesh parts remain
- * separate so each embedded material (leaf, stem, blossom, and so on) survives
- * instancing and both authored LOD bands.
- */
 export function extractAuthoredGroupedPrototypes(
   scene,
   { scale = 1, groups, label = 'Authored prototype' } = {},
@@ -149,9 +132,7 @@ export function extractAuthoredGroupedPrototypes(
   scene.updateMatrixWorld(true);
   return resolveAuthoredPrototypeGroups(scene, groups, label).map((roots) => {
     const meshes = collectMeshes(roots);
-    if (meshes.length === 0) {
-      throw new Error(`${label} group contains no mesh geometry.`);
-    }
+    if (meshes.length === 0) throw new Error(`${label} group contains no mesh geometry.`);
     const parts = meshes.map((source) => {
       const geometry = bakeWorldGeometry(source);
       if (scale !== 1) geometry.scale(scale, scale, scale);
@@ -170,31 +151,6 @@ export function extractAuthoredGroupedPrototypes(
     }
     return mergePartsByMaterial(parts);
   });
-}
-
-/**
- * Turns every authored mesh in a GLB into an independently grounded scatter
- * prototype. Full world transforms retain Sketchfab axis/unit conversions while
- * re-centering discards the source scene's showcase placement.
- */
-export function extractAuthoredMeshPrototypes(scene, { scale = 1, rootNames = null } = {}) {
-  if (!Number.isFinite(scale) || scale <= 0) {
-    throw new Error('Authored scatter prototype scale must be positive.');
-  }
-  scene.updateMatrixWorld(true);
-  const prototypes = [];
-  const roots = rootNames
-    ? sceneNodesByName(scene, rootNames, 'Authored mesh prototype')
-    : [scene];
-  for (const node of collectMeshes(roots)) {
-    const geometry = bakeWorldGeometry(node);
-    if (scale !== 1) geometry.scale(scale, scale, scale);
-    prototypes.push({
-      geometry: groundGeometry(geometry),
-      source: node,
-    });
-  }
-  return prototypes;
 }
 
 function colliderSuffix(name) {
@@ -225,11 +181,6 @@ function alignedProxyGeometry(proxyNode, visualBounds, scale) {
   return geometry;
 }
 
-/**
- * Extracts visual rocks and reserved authored collision meshes in one pass.
- * Reserved nodes never become render prototypes. The proxy is translated by the
- * visual rock's centring/grounding transform so both remain in the same frame.
- */
 export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = null } = {}) {
   if (!Number.isFinite(scale) || scale <= 0) {
     throw new Error('Authored rock prototype scale must be positive.');
@@ -256,15 +207,27 @@ export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = nu
   });
 }
 
+/**
+ * Generic authored meshes also honour reserved collision nodes. This keeps the
+ * existing rock view API unchanged while collision-only geometry stays hidden.
+ */
+export function extractAuthoredMeshPrototypes(scene, options = {}) {
+  return extractAuthoredRockPrototypes(scene, options).map((prototype) => {
+    if (prototype.collisionProxyGeometry) {
+      AUTHORED_COLLISION_PROXIES.set(prototype.geometry, Object.freeze({
+        geometry: prototype.collisionProxyGeometry,
+        name: prototype.collisionProxyName,
+      }));
+    }
+    return { geometry: prototype.geometry, source: prototype.source };
+  });
+}
+
 export function isUprightSize(size, { strict = false } = {}) {
   if (strict) return size.y >= size.x && size.y >= size.z;
   return size.y >= size.x * 0.55 && size.y >= size.z * 0.55;
 }
 
-/**
- * Rock prototypes: scale only — never bake the demo GLB's placement tumble.
- * Dedupes repeated instances of the same mesh geometry.
- */
 export function extractRockPrototypes(scene, rockMaterialName) {
   const seenGroups = new Set();
   const prototypes = [];
