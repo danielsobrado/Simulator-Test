@@ -259,17 +259,22 @@ export class RockCollisionProvider {
 
       colliders.push(...placementColliders);
       stats.colliders += placementColliders.length;
-      sample ??= sampleFrom({
+      const candidateSample = sampleFrom({
         placement,
         profile,
         tier,
         colliders: placementColliders,
         prototype: meshPrototype,
       });
+      if (!sample || (tier === ROCK_COLLISION_TIER_WALKABLE
+          && sample.tier !== ROCK_COLLISION_TIER_WALKABLE)) {
+        sample = candidateSample;
+      }
     }
 
     colliders.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
-    const meshStatus = this.source.getMeshPrototypeStatus?.() ?? { count: 0, triangles: 0, generated: 0 };
+    const meshStatus = this.source.getMeshPrototypeStatus?.()
+      ?? { count: 0, triangles: 0, generated: 0 };
     PerfCounters.set('collisionRockProfiles', profiles.length);
     PerfCounters.set('collisionRockMeshPrototypes', meshStatus.count);
     PerfCounters.set('collisionRockMeshTriangles', meshStatus.triangles);
