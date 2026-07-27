@@ -21,9 +21,13 @@ const CONFIG = Object.freeze({
   }),
 });
 
+function geometry(width = 3, height = 1.5, depth = 2) {
+  const result = new BoxGeometry(width, height, depth);
+  result.translate(0, height * 0.5, 0);
+  return result;
+}
+
 function rockView() {
-  const geometry = new BoxGeometry(3, 1.5, 2);
-  geometry.translate(0, 0.75, 0);
   const placement = Object.freeze({
     stableId: 'large-rock',
     x: 8,
@@ -36,7 +40,7 @@ function rockView() {
     ownerChunkZ: 0,
   });
   return {
-    prototypes: [{ geometry }],
+    prototypes: [{ geometry: geometry() }],
     prototypeHeights: [1.5],
     prototypeIndicesByAsset: new Map(),
     prototypeRevision: 1,
@@ -67,6 +71,28 @@ test('walkable rocks emit one mesh instance and share one prototype BVH', () => 
   assert.equal(provider.getStatus().meshPrototypes.count, 1);
 
   provider.dispose();
+  view.prototypes[0].geometry.dispose();
+});
+
+test('replacing geometry with the same asset key registers a fresh BVH', () => {
+  const view = rockView();
+  const source = createRockCollisionSource({ rockView: view, config: CONFIG });
+  const provider = new RockCollisionProvider({ source, config: CONFIG });
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  provider.attachWorld(world);
+
+  const firstGeometry = view.prototypes[0].geometry;
+  const first = provider.buildChunkData(0, 0).colliders[0];
+  view.prototypes[0] = { geometry: geometry(3, 1.5, 2) };
+  view.prototypeRevision += 1;
+  const second = provider.buildChunkData(0, 0).colliders[0];
+
+  assert.notEqual(second.prototypeId, first.prototypeId);
+  assert.equal(world.getStatus().prototypes, 2);
+  assert.equal(provider.getStatus().meshPrototypes.count, 2);
+
+  provider.dispose();
+  firstGeometry.dispose();
   view.prototypes[0].geometry.dispose();
 });
 
