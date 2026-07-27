@@ -1,6 +1,8 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey, parseCollisionChunkKey } from './CollisionIds.js';
 import {
+  COLLISION_RETRY_BASE_MS,
+  COLLISION_RETRY_MAX_MS,
   MAX_COLLISION_BUILDS_PER_FRAME,
   MAX_COLLISION_STREAMING_RADIUS,
 } from './CollisionLimits.js';
@@ -59,6 +61,11 @@ function routeChunks(start, end) {
     }
   }
   return chunks;
+}
+
+function retryDelay(attempts) {
+  const exponent = Math.max(0, Math.min(20, attempts - 1));
+  return Math.min(COLLISION_RETRY_MAX_MS, COLLISION_RETRY_BASE_MS * (2 ** exponent));
 }
 
 function validateResidencyConfig(config) {
@@ -124,6 +131,7 @@ export class CollisionResidency {
     this.loadedKeys = new Set();
     this.queue = [];
     this.queuedByKey = new Map();
+    this.retryByKey = new Map();
     this.currentChunk = null;
     this.predictedChunk = null;
     this.lastBuildError = null;
@@ -131,12 +139,28 @@ export class CollisionResidency {
     this.sequence = 0;
   }
 
+  retryReady(key) {
+    const retry = this.retryByKey.get(key);
+    return !retry || this.now() >= retry.at;
+  }
+
+  recordRetry(key) {
+    const previous = this.retryByKey.get(key);
+    const attempts = (previous?.attempts ?? 0) + 1;
+    this.retryByKey.set(key, Object.freeze({
+      attempts,
+      at: this.now() + retryDelay(attempts),
+    }));
+  }
+
   schedule(chunkX, chunkZ, priority) {
     const key = collisionChunkKey(chunkX, chunkZ);
     if (this.world.isOwnerChunkReady(chunkX, chunkZ)) {
+      this.retryByKey.delete(key);
       this.loadedKeys.add(key);
       return;
     }
+    if (!this.retryReady(key)) return;
     const existing = this.queuedByKey.get(key);
     if (existing) {
       existing.priority = Math.min(existing.priority, priority);
@@ -160,11 +184,31 @@ export class CollisionResidency {
       writeIndex += 1;
     }
     this.queue.length = writeIndex;
+
+    for (const key of this.retryByKey.keys()) {
+      const chunk = parseCollisionChunkKey(key);
+      if (!this.desiredKeys.has(key) || this.world.isOwnerChunkReady(chunk.chunkX, chunk.chunkZ)) {
+        this.retryByKey.delete(key);
+      }
+    }
+  }
+
+  notifyOwnerUnloaded(chunkX, chunkZ) {
+    try {
+      this.onOwnerChunkUnloaded?.(chunkX, chunkZ);
+      return null;
+    } catch (error) {
+      this.lastBuildError = error;
+      this.logger.error?.(`Collision owner unload callback failed for ${chunkX}:${chunkZ}.`, error);
+      return error;
+    }
   }
 
   unload(chunkX, chunkZ) {
+    const key = collisionChunkKey(chunkX, chunkZ);
     if (!this.world.unloadOwnerChunk(chunkX, chunkZ)) return false;
-    this.onOwnerChunkUnloaded?.(chunkX, chunkZ);
+    this.retryByKey.delete(key);
+    this.notifyOwnerUnloaded(chunkX, chunkZ);
     return true;
   }
 
@@ -233,6 +277,41 @@ export class CollisionResidency {
     this.updateCounters();
   }
 
+  commitOwnerChunk(job, result, revision, colliders) {
+    const replaced = this.world.replaceOwnerChunk({
+      chunkX: job.chunkX,
+      chunkZ: job.chunkZ,
+      revision,
+      colliders,
+    });
+    if (!replaced) {
+      if (this.world.isOwnerChunkReady(job.chunkX, job.chunkZ)) {
+        this.retryByKey.delete(job.key);
+        this.loadedKeys.add(job.key);
+      }
+      return false;
+    }
+
+    try {
+      this.onOwnerChunkCommitted?.({
+        chunkX: job.chunkX,
+        chunkZ: job.chunkZ,
+        revision,
+        providerData: result?.providerData ?? null,
+      });
+    } catch (error) {
+      this.world.unloadOwnerChunk(job.chunkX, job.chunkZ);
+      this.loadedKeys.delete(job.key);
+      this.notifyOwnerUnloaded(job.chunkX, job.chunkZ);
+      throw new Error(`Collision owner commit callback failed for ${job.key}.`, { cause: error });
+    }
+
+    this.retryByKey.delete(job.key);
+    this.loadedKeys.add(job.key);
+    this.builds += 1;
+    return true;
+  }
+
   flush() {
     const startedAt = this.now();
     let attempted = 0;
@@ -251,30 +330,15 @@ export class CollisionResidency {
         }
         const revision = result?.revision ?? 0;
         const colliders = result?.colliders ?? [];
-        const replaced = this.world.replaceOwnerChunk({
-          chunkX: job.chunkX,
-          chunkZ: job.chunkZ,
-          revision,
-          colliders,
-        });
-        this.loadedKeys.add(job.key);
-        if (replaced) {
-          this.onOwnerChunkCommitted?.({
-            chunkX: job.chunkX,
-            chunkZ: job.chunkZ,
-            revision,
-            providerData: result?.providerData ?? null,
-          });
-          this.builds += 1;
-          built += 1;
-        }
+        if (this.commitOwnerChunk(job, result, revision, colliders)) built += 1;
       } catch (error) {
         frameError = error;
+        this.recordRetry(job.key);
         this.logger.error?.(`Collision chunk build failed for ${job.key}.`, error);
       }
     }
     if (frameError) this.lastBuildError = frameError;
-    else if (attempted > 0) this.lastBuildError = null;
+    else if (attempted > 0 && this.retryByKey.size === 0) this.lastBuildError = null;
     PerfCounters.inc('collisionBuilds', built);
     PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
@@ -301,6 +365,7 @@ export class CollisionResidency {
       desiredChunks: this.desiredKeys.size,
       readyDesiredChunks: readyDesired,
       queuedBuilds: this.queue.length,
+      deferredRetries: this.retryByKey.size,
       loadedOwnerChunks: this.loadedKeys.size,
       ready: this.desiredKeys.size > 0 && readyDesired === this.desiredKeys.size,
       notReadyPolicy: COLLISION_NOT_READY_POLICY,
@@ -313,12 +378,14 @@ export class CollisionResidency {
     PerfCounters.set('collisionDesiredChunks', status.desiredChunks);
     PerfCounters.set('collisionReadyDesiredChunks', status.readyDesiredChunks);
     PerfCounters.set('collisionBuildQueueDepth', status.queuedBuilds);
+    PerfCounters.set('collisionBuildDeferredRetries', status.deferredRetries);
     PerfCounters.set('collisionLoadedOwnerChunks', status.loadedOwnerChunks);
   }
 
   dispose() {
     this.queue.length = 0;
     this.queuedByKey.clear();
+    this.retryByKey.clear();
     this.desiredKeys.clear();
     for (const key of this.loadedKeys) {
       const chunk = parseCollisionChunkKey(key);
