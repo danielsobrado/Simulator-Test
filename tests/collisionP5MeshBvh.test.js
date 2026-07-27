@@ -47,6 +47,21 @@ function fixture() {
   return { prototype, collider };
 }
 
+function contactAt({ prototype, collider, z }) {
+  return findMeshSideContact({
+    capsule: createCharacterCapsule({
+      x: 10,
+      y: 0,
+      z,
+      radius: 0.5,
+      bodyHeight: 1.8,
+    }),
+    collider,
+    prototype,
+    skinWidth: 0.03,
+  });
+}
+
 test('mesh BVH prototype is shared by every registered instance', () => {
   const { prototype } = fixture();
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
@@ -59,22 +74,18 @@ test('mesh BVH prototype is shared by every registered instance', () => {
 
 test('rotated scaled mesh instance produces a horizontal side contact', () => {
   const { prototype, collider } = fixture();
-  const capsule = createCharacterCapsule({
-    x: 10,
-    y: 0,
-    z: -9.25,
-    radius: 0.5,
-    bodyHeight: 1.8,
-  });
-  const contact = findMeshSideContact({
-    capsule,
-    collider,
-    prototype,
-    skinWidth: 0.03,
-  });
+  const contact = contactAt({ prototype, collider, z: -9.25 });
   assert.ok(contact);
   assert.equal(contact.sourceId, collider.sourceId);
   assert.ok(contact.depth > 0);
+  assert.ok(contact.normalZ < -0.9);
+  prototype.resource.dispose();
+});
+
+test('an embedded capsule is pushed out independently of triangle winding', () => {
+  const { prototype, collider } = fixture();
+  const contact = contactAt({ prototype, collider, z: -9 });
+  assert.ok(contact);
   assert.ok(contact.normalZ < -0.9);
   prototype.resource.dispose();
 });
