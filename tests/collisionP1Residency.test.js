@@ -55,7 +55,7 @@ test('teleport-sized velocity cannot create an unbounded prefetch route', () => 
   const harness = createResidency({ unloadRadius: 2, buildsPerFrame: 8 });
   harness.residency.update({
     focus: { x: 1, z: -1 },
-    velocity: { x: 1e12, z: -1e12 },
+    velocity: { x: Number.MAX_VALUE, z: -Number.MAX_VALUE },
   });
   const status = harness.residency.getStatus();
   assert.equal(status.predictedChunk.chunkX, 2);
@@ -105,6 +105,34 @@ test('failed builds respect the per-frame attempt limit', () => {
   assert.equal(result.built, 0);
   assert.equal(attempts, 3);
   assert.equal(result.remaining, 6);
+  assert.equal(residency.getStatus().lastBuildError, 'fixture failure');
+});
+
+test('a later success does not hide an earlier build failure in the same frame', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  let attempts = 0;
+  const residency = new CollisionResidency({
+    world,
+    config: {
+      residentRadius: 1,
+      unloadRadius: 1,
+      prefetchSeconds: 1,
+      buildsPerFrame: 2,
+      buildBudgetMs: 100,
+    },
+    buildOwnerChunk: () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('first build failed');
+      return { revision: 1, colliders: [] };
+    },
+    now: () => 0,
+    logger: QUIET_LOGGER,
+  });
+  residency.update({ focus: { x: 1, z: -1 }, velocity: { x: 0, z: 0 } });
+  const result = residency.flush();
+  assert.equal(result.attempted, 2);
+  assert.equal(result.built, 1);
+  assert.equal(residency.getStatus().lastBuildError, 'first build failed');
 });
 
 test('unload hysteresis retains nearby chunks and removes distant owners', () => {
