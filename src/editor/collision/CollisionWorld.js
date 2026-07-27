@@ -2,7 +2,13 @@ import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey } from './CollisionIds.js';
 import { COLLISION_LAYERS } from './CollisionLayers.js';
 import { CollisionChunk } from './CollisionChunk.js';
-import { collisionChunksForAabb } from './colliders/ColliderBounds.js';
+import {
+  canonicalAabbsIntersect,
+  collisionChunkRangeForAabb,
+  collisionChunksForAabb,
+} from './colliders/ColliderBounds.js';
+
+const MAX_REPORTED_MISSING_CHUNKS = 64;
 
 function cloneContributionMap(source) {
   return source ? new Map(source) : new Map();
@@ -56,7 +62,7 @@ export class CollisionWorld {
     }
     if (!Array.isArray(colliders)) throw new Error('Collision owner colliders must be an array.');
     const previousState = this.ownerStates.get(ownerKey);
-    if (previousState && revision < previousState.revision) return false;
+    if (previousState && revision <= previousState.revision) return false;
 
     const sourceIds = new Set();
     for (const collider of colliders) {
@@ -222,14 +228,9 @@ export class CollisionWorld {
   collectCandidates(aabb, layers = COLLISION_LAYERS.all, out = this.candidateBuffer) {
     out.length = 0;
     const stamp = this.nextQueryStamp();
-    const chunks = collisionChunksForAabb(aabb, this.chunkWorldSize, this.chunkScratch);
     let queriedChunks = 0;
-    for (const chunkCoordinates of chunks) {
-      const chunk = this.chunks.get(collisionChunkKey(
-        chunkCoordinates.chunkX,
-        chunkCoordinates.chunkZ,
-      ));
-      if (!chunk) continue;
+    for (const chunk of this.chunks.values()) {
+      if (!canonicalAabbsIntersect(chunk.bounds, aabb)) continue;
       queriedChunks += 1;
       chunk.query(aabb, stamp, this.registry, out, layers);
     }
@@ -241,14 +242,25 @@ export class CollisionWorld {
   }
 
   checkAabbReadiness(aabb) {
+    const range = collisionChunkRangeForAabb(aabb, this.chunkWorldSize);
     const missing = [];
-    const chunks = collisionChunksForAabb(aabb, this.chunkWorldSize, this.chunkScratch);
-    for (const chunk of chunks) {
-      if (!this.isCollisionChunkReady(chunk.chunkX, chunk.chunkZ)) {
-        missing.push(collisionChunkKey(chunk.chunkX, chunk.chunkZ));
+    let truncated = false;
+    outer:
+    for (let chunkZ = range.minChunkZ; chunkZ <= range.maxChunkZ; chunkZ += 1) {
+      for (let chunkX = range.minChunkX; chunkX <= range.maxChunkX; chunkX += 1) {
+        if (this.isCollisionChunkReady(chunkX, chunkZ)) continue;
+        if (missing.length >= MAX_REPORTED_MISSING_CHUNKS) {
+          truncated = true;
+          break outer;
+        }
+        missing.push(collisionChunkKey(chunkX, chunkZ));
       }
     }
-    return Object.freeze({ ready: missing.length === 0, missing: Object.freeze(missing) });
+    return Object.freeze({
+      ready: missing.length === 0,
+      missing: Object.freeze(missing),
+      truncated,
+    });
   }
 
   getCollider(sourceId) {
