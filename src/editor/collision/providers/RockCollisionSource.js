@@ -94,6 +94,7 @@ export function createRockCollisionSource({ rockView, config }) {
   return Object.freeze({
     descriptor: Object.freeze({ id: 'production-rock-primitives' }),
     getProfiles: () => ensureProfiles(),
+    getCachedProfileCount: () => profiles.length,
     getProfileSignature() {
       ensureProfiles();
       return profileSignature;
