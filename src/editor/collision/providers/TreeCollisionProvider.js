@@ -228,6 +228,7 @@ export class TreeCollisionProvider {
       if (attempted > 0 && this.now() - startedAt >= this.buildBudgetMs) break;
       const key = this.pendingRefresh.shift();
       this.pendingRefreshKeys.delete(key);
+      attempted += 1;
       const previous = this.chunkStates.get(key);
       if (!previous) continue;
       const { chunkX, chunkZ } = parseCollisionChunkKey(key);
@@ -235,7 +236,6 @@ export class TreeCollisionProvider {
         this.removeUnloadedState(key);
         continue;
       }
-      attempted += 1;
       try {
         const data = this.buildChunkData(chunkX, chunkZ);
         if (data.signature === previous.signature) continue;
