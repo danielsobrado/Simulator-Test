@@ -10,7 +10,7 @@ import {
   smoothstep,
   vec3,
 } from 'three/tsl';
-import { AzgaarMacroWorldGenerator } from './AzgaarMacroWorldGenerator.js';
+import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import { AZGAAR_MACRO_SOURCE_KIND } from '../import/AzgaarMacroWorldSource.js';
 
 const DEFAULT_RADIUS_METERS = 10000;
@@ -94,13 +94,6 @@ export class MacroFarTerrainView {
       this.rockSlopeStart + 0.001,
       Number(farConfig.rockSlopeFull ?? 0.62),
     );
-
-    this.metadata = {
-      seed: config.world.seed,
-      version: config.world.generatorVersion,
-      heightScale: config.world.heightScale,
-      seaLevel: config.world.seaLevel,
-    };
 
     this.generator = null;
     this.baseTerrainRef = null;
@@ -215,7 +208,10 @@ export class MacroFarTerrainView {
     this.job = null;
     if (baseTerrain?.kind === AZGAAR_MACRO_SOURCE_KIND) {
       try {
-        this.generator = new AzgaarMacroWorldGenerator(baseTerrain, this.metadata);
+        this.generator = createWorldGenerator(
+          this.worldStore.generator.toMetadata(),
+          baseTerrain,
+        );
       } catch (error) {
         console.error('Far-terrain backdrop could not build a macro generator.', error);
       }

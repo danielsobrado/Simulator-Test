@@ -45,3 +45,25 @@ test('river banks blend back to untouched terrain', () => {
   assert.equal(model.sampleWater(50, 60).coverage, 0);
   assert.equal(model.sampleHeight(50, 60), 25);
 });
+
+test('minimum river radius reaches the terrain vertex grid', () => {
+  const narrowSource = Object.freeze({
+    atlas: Object.freeze({ width: 10, height: 10 }),
+    bounds: Object.freeze({ minCellX: 0, minCellZ: 0, widthCells: 10, heightCells: 10 }),
+    rivers: Object.freeze([Object.freeze({
+      id: 9,
+      widthAtlas: 0.01,
+      points: Object.freeze([[0, 0.5], [10, 0.5]]),
+    })]),
+  });
+  const model = new WaterTerrainModel({
+    source: narrowSource,
+    seed: 6,
+    seaLevel: 0,
+    config,
+    sampleBaseHeight: () => 10,
+    sampleBaseTile: () => 4,
+  });
+
+  assert.ok(model.sampleHeight(5, 0) < 10);
+});

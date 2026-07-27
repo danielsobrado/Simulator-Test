@@ -6,6 +6,7 @@ import {
 import {
   getRuntimeWaterDomainConfig,
   resolveWaterDomainConfig,
+  serializeWaterDomainConfig,
 } from '../water/WaterConfig.js';
 import { WaterTerrainModel } from '../water/WaterTerrainModel.js';
 
@@ -49,15 +50,6 @@ function fractalNoise(x, z, seed) {
   return total / weight;
 }
 
-function serializableWaterDomain(config) {
-  return {
-    version: config.version,
-    cellSizeMeters: config.cellSizeMeters,
-    shoreDistanceMeters: config.shoreDistanceMeters,
-    ocean: { ...config.ocean },
-    river: { ...config.river },
-  };
-}
 
 export class ProceduralWorldGenerator {
   constructor({
@@ -161,7 +153,7 @@ export class ProceduralWorldGenerator {
       heightScale: this.heightScale,
       seaLevel: this.seaLevel,
       waterDomainVersion: this.waterDomain.version,
-      waterDomain: serializableWaterDomain(this.waterDomain),
+      waterDomain: serializeWaterDomainConfig(this.waterDomain),
     });
   }
 }

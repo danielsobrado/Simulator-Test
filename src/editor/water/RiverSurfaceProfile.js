@@ -1,10 +1,15 @@
 import { WATER_BODY_ID_RIVER_BASE } from './WaterConstants.js';
 
+const MINIMUM_RIVER_RADIUS_CELLS = 0.75;
+
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
 function toWorldCell(source, point) {
+  if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) {
+    return null;
+  }
   return {
     x: source.bounds.minCellX + point[0] / source.atlas.width * source.bounds.widthCells,
     z: source.bounds.minCellZ + point[1] / source.atlas.height * source.bounds.heightCells,
@@ -14,6 +19,7 @@ function toWorldCell(source, point) {
 function deduplicatePoints(points) {
   const result = [];
   for (const point of points) {
+    if (!point) continue;
     const previous = result[result.length - 1];
     if (!previous || Math.hypot(point.x - previous.x, point.z - previous.z) > 1e-6) {
       result.push(point);
@@ -24,7 +30,20 @@ function deduplicatePoints(points) {
 
 function resolveBodyId(value) {
   const id = Number.isSafeInteger(value) && value >= 0 ? value : 0;
-  return WATER_BODY_ID_RIVER_BASE + id;
+  const bodyId = WATER_BODY_ID_RIVER_BASE + id;
+  return Number.isSafeInteger(bodyId) ? bodyId : WATER_BODY_ID_RIVER_BASE;
+}
+
+function assertSourceDimensions(source) {
+  const values = [
+    source?.atlas?.width,
+    source?.atlas?.height,
+    source?.bounds?.widthCells,
+    source?.bounds?.heightCells,
+  ];
+  if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new Error('River surface generation requires positive atlas and world dimensions.');
+  }
 }
 
 export function createRiverSurfaceSegments({
@@ -34,6 +53,7 @@ export function createRiverSurfaceSegments({
   config,
 }) {
   if (!source?.rivers?.length) return [];
+  assertSourceDimensions(source);
   const segments = [];
   const cellSizeMeters = config.cellSizeMeters;
 
@@ -44,9 +64,11 @@ export function createRiverSurfaceSegments({
     const lastHeight = sampleBaseHeight(points[points.length - 1].x, points[points.length - 1].z);
     if (firstHeight < lastHeight) points = points.reverse();
 
+    const widthAtlas = Number(river.widthAtlas);
+    const safeWidthAtlas = Number.isFinite(widthAtlas) && widthAtlas > 0 ? widthAtlas : 0;
     const worldWidthCells = Math.max(
       1 / 256,
-      Number(river.widthAtlas ?? 0) / source.atlas.width * source.bounds.widthCells,
+      safeWidthAtlas / source.atlas.width * source.bounds.widthCells,
     );
     const worldWidthMeters = worldWidthCells * cellSizeMeters;
     const channelDepth = clamp(
@@ -54,7 +76,7 @@ export function createRiverSurfaceSegments({
       config.river.minimumDepth,
       config.river.maximumDepth,
     );
-    const radiusCells = Math.max(worldWidthCells * 0.5, 0.75 / cellSizeMeters);
+    const radiusCells = Math.max(worldWidthCells * 0.5, MINIMUM_RIVER_RADIUS_CELLS);
     const levels = new Float64Array(points.length);
     const bankInset = Math.min(0.35, channelDepth * 0.2);
     levels[0] = Math.max(seaLevel, sampleBaseHeight(points[0].x, points[0].z) - bankInset);

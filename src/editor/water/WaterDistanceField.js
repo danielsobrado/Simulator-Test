@@ -25,14 +25,20 @@ export class WaterDistanceField {
     if (!Number.isInteger(maxDistanceCells) || maxDistanceCells < 1) {
       throw new Error('Water distance field maxDistanceCells must be a positive integer.');
     }
+    if (!Number.isInteger(cacheLimit) || cacheLimit < 1) {
+      throw new Error('Water distance field cacheLimit must be a positive integer.');
+    }
     this.isWaterCell = isWaterCell;
     this.blockSize = blockSize;
     this.maxDistanceCells = maxDistanceCells;
-    this.cacheLimit = Math.max(1, Math.floor(cacheLimit));
+    this.cacheLimit = cacheLimit;
     this.cache = new Map();
   }
 
   sample(cellX, cellZ) {
+    if (!Number.isFinite(cellX) || !Number.isFinite(cellZ)) {
+      throw new Error('Water distance field coordinates must be finite.');
+    }
     const x = Math.floor(cellX);
     const z = Math.floor(cellZ);
     const blockX = floorDiv(x, this.blockSize);

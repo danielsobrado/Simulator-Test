@@ -14,6 +14,7 @@ export class StylizedWaterSlot {
     this.terrainView = terrainView;
     this.config = config;
     this.time = uniform(0);
+    this.surfaceOrigin = uniform(0);
     this.fieldSize = terrainView.chunkSize + 1;
     this.waterFieldPixels = new Uint16Array(
       this.fieldSize * this.fieldSize * WATER_FIELD_CHANNELS,
@@ -32,10 +33,12 @@ export class StylizedWaterSlot {
     this.waterFieldTexture.unpackAlignment = 1;
     this.waterFieldTexture.needsUpdate = true;
     this.uploadedPage = null;
-    this.uploadedRevision = -1;
+    this.uploadedFieldRevision = -1;
     this.material = createStylizedWaterMaterial({
+      surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
       waterFieldTexture: this.waterFieldTexture,
       waterFieldSize: this.fieldSize,
+      waterSurfaceOrigin: this.surfaceOrigin,
       chunkCenter: terrainSlot.chunkCenter,
       chunkWorldSize: terrainView.chunkWorldSize,
       time: this.time,
@@ -57,8 +60,9 @@ export class StylizedWaterSlot {
     }
     this.waterFieldPixels.set(page.waterFieldPixels);
     this.waterFieldTexture.needsUpdate = true;
+    this.surfaceOrigin.value = page.waterFieldSurfaceOrigin ?? 0;
     this.uploadedPage = page;
-    this.uploadedRevision = page.revision;
+    this.uploadedFieldRevision = page.waterFieldRevision ?? 0;
     PerfCounters.inc(PERF_COUNTER_WATER_UPLOAD_BYTES, page.waterFieldPixels.byteLength);
     PerfCounters.inc('textureBytesUploaded', page.waterFieldPixels.byteLength);
   }
@@ -78,7 +82,8 @@ export class StylizedWaterSlot {
     );
     this.mesh.visible = ready;
     if (!ready) return;
-    if (page !== this.uploadedPage || page.revision !== this.uploadedRevision) {
+    if (page !== this.uploadedPage
+        || (page.waterFieldRevision ?? 0) !== this.uploadedFieldRevision) {
       this.uploadField(page);
     }
     this.mesh.position.copy(this.terrainSlot.mesh.position);

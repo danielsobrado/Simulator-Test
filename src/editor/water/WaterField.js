@@ -1,14 +1,18 @@
 const WATER_FIELD_CHANNELS = 4;
+const WATER_FIELD_HALO = 1;
+const DIAGONAL_WEIGHT = Math.SQRT1_2;
+
+const conversionBuffer = new ArrayBuffer(4);
+const conversionFloat = new Float32Array(conversionBuffer);
+const conversionBits = new Uint32Array(conversionBuffer);
 
 function floatToHalf(value) {
   if (Number.isNaN(value)) return 0x7e00;
   if (value === Number.POSITIVE_INFINITY) return 0x7c00;
   if (value === Number.NEGATIVE_INFINITY) return 0xfc00;
 
-  const float = new Float32Array(1);
-  const bits = new Uint32Array(float.buffer);
-  float[0] = value;
-  const raw = bits[0];
+  conversionFloat[0] = value;
+  const raw = conversionBits[0];
   const sign = (raw >>> 16) & 0x8000;
   let exponent = ((raw >>> 23) & 0xff) - 127 + 15;
   let mantissa = raw & 0x7fffff;
@@ -50,46 +54,152 @@ export function halfToFloat(value) {
   } else {
     raw = sign | ((exponent + 127 - 15) << 23) | (mantissa << 13);
   }
-  const bits = new Uint32Array(1);
-  bits[0] = raw;
-  return new Float32Array(bits.buffer)[0];
+  conversionBits[0] = raw;
+  return conversionFloat[0];
 }
 
-export function createWaterField({ originX, originZ, chunkSize, sampleWater }) {
+function sampleIndex(x, z, width) {
+  return z * width + x;
+}
+
+function resolveDrySurfaceHeight(samples, sampleWidth, localX, localZ, fallback) {
+  let weightedSurface = 0;
+  let totalWeight = 0;
+  const centerX = localX + WATER_FIELD_HALO;
+  const centerZ = localZ + WATER_FIELD_HALO;
+
+  for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
+    for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+      if (offsetX === 0 && offsetZ === 0) continue;
+      const neighbor = samples[sampleIndex(
+        centerX + offsetX,
+        centerZ + offsetZ,
+        sampleWidth,
+      )];
+      if (!(neighbor.coverage > 0)) continue;
+      const distanceWeight = offsetX !== 0 && offsetZ !== 0 ? DIAGONAL_WEIGHT : 1;
+      const weight = neighbor.coverage * distanceWeight;
+      weightedSurface += neighbor.surfaceHeight * weight;
+      totalWeight += weight;
+    }
+  }
+
+  return totalWeight > 0 ? weightedSurface / totalWeight : fallback;
+}
+
+export function createWaterField({
+  originX,
+  originZ,
+  chunkSize,
+  sampleWater,
+}) {
+  if (!Number.isSafeInteger(originX) || !Number.isSafeInteger(originZ)) {
+    throw new Error('Water field origin must use safe integer cell coordinates.');
+  }
   if (!Number.isInteger(chunkSize) || chunkSize < 1) {
     throw new Error('Water field chunkSize must be a positive integer.');
   }
   if (typeof sampleWater !== 'function') {
     throw new Error('Water field requires a sampleWater callback.');
   }
+
   const width = chunkSize + 1;
   const height = chunkSize + 1;
-  const pixels = new Uint16Array(width * height * WATER_FIELD_CHANNELS);
+  const sampleWidth = width + WATER_FIELD_HALO * 2;
+  const sampleHeight = height + WATER_FIELD_HALO * 2;
+  const samples = new Array(sampleWidth * sampleHeight);
+
+  for (let sampleZ = 0; sampleZ < sampleHeight; sampleZ += 1) {
+    for (let sampleX = 0; sampleX < sampleWidth; sampleX += 1) {
+      samples[sampleIndex(sampleX, sampleZ, sampleWidth)] = sampleWater(
+        originX + sampleX - WATER_FIELD_HALO,
+        originZ + sampleZ - WATER_FIELD_HALO,
+      );
+    }
+  }
+
+  const vertexCount = width * height;
+  const surfaceHeights = new Float64Array(vertexCount);
+  let minimumSurface = Number.POSITIVE_INFINITY;
+  let maximumSurface = Number.NEGATIVE_INFINITY;
   for (let localZ = 0; localZ < height; localZ += 1) {
     for (let localX = 0; localX < width; localX += 1) {
-      const sample = sampleWater(originX + localX, originZ + localZ);
-      const index = (localZ * width + localX) * WATER_FIELD_CHANNELS;
+      const sample = samples[sampleIndex(
+        localX + WATER_FIELD_HALO,
+        localZ + WATER_FIELD_HALO,
+        sampleWidth,
+      )];
+      const surfaceHeight = sample.coverage > 0
+        ? sample.surfaceHeight
+        : resolveDrySurfaceHeight(
+          samples,
+          sampleWidth,
+          localX,
+          localZ,
+          sample.surfaceHeight,
+        );
+      surfaceHeights[localZ * width + localX] = surfaceHeight;
+      if (sample.coverage > 0) {
+        minimumSurface = Math.min(minimumSurface, surfaceHeight);
+        maximumSurface = Math.max(maximumSurface, surfaceHeight);
+      }
+    }
+  }
+  const surfaceOrigin = Number.isFinite(minimumSurface)
+    ? (minimumSurface + maximumSurface) * 0.5
+    : 0;
+
+  const pixels = new Uint16Array(vertexCount * WATER_FIELD_CHANNELS);
+  for (let localZ = 0; localZ < height; localZ += 1) {
+    for (let localX = 0; localX < width; localX += 1) {
+      const sample = samples[sampleIndex(
+        localX + WATER_FIELD_HALO,
+        localZ + WATER_FIELD_HALO,
+        sampleWidth,
+      )];
+      const vertexIndex = localZ * width + localX;
+      const index = vertexIndex * WATER_FIELD_CHANNELS;
+      const depth = sample.coverage > 0 || !Number.isFinite(sample.bedHeight)
+        ? sample.depth
+        : Math.max(0, surfaceHeights[vertexIndex] - sample.bedHeight);
       pixels[index] = floatToHalf(sample.coverage);
-      pixels[index + 1] = floatToHalf(sample.surfaceHeight);
-      pixels[index + 2] = floatToHalf(sample.depth);
+      pixels[index + 1] = floatToHalf(surfaceHeights[vertexIndex] - surfaceOrigin);
+      pixels[index + 2] = floatToHalf(depth);
       pixels[index + 3] = floatToHalf(sample.shoreDistance);
     }
   }
-  return Object.freeze({ pixels, width, height });
+  return Object.freeze({ pixels, width, height, surfaceOrigin });
+}
+
+function resolveChunkSize(page) {
+  const tileChunkSize = page.tiles ? Math.sqrt(page.tiles.length) : NaN;
+  const heightChunkSize = page.heights ? Math.sqrt(page.heights.length) - 1 : NaN;
+  const hasTiles = Number.isInteger(tileChunkSize) && tileChunkSize > 0;
+  const hasHeights = Number.isInteger(heightChunkSize) && heightChunkSize > 0;
+  if (hasTiles && hasHeights && tileChunkSize !== heightChunkSize) {
+    throw new Error('Terrain page tile and height dimensions disagree.');
+  }
+  const chunkSize = hasTiles ? tileChunkSize : heightChunkSize;
+  if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+    throw new Error('Terrain page dimensions cannot resolve a square water field.');
+  }
+  return chunkSize;
 }
 
 export function enrichPageWaterField(page, sampleWater) {
-  const chunkSize = page.tiles
-    ? Math.round(Math.sqrt(page.tiles.length))
-    : Math.round(Math.sqrt(page.heights.length) - 1);
   const field = createWaterField({
     originX: page.originX,
     originZ: page.originZ,
-    chunkSize,
+    chunkSize: resolveChunkSize(page),
     sampleWater,
   });
   page.waterFieldPixels = field.pixels;
   page.waterFieldWidth = field.width;
   page.waterFieldHeight = field.height;
+  page.waterFieldSurfaceOrigin = field.surfaceOrigin;
+  const previousRevision = Number.isSafeInteger(page.waterFieldRevision)
+    ? page.waterFieldRevision
+    : 0;
+  page.waterFieldRevision = previousRevision + 1;
   return page;
 }

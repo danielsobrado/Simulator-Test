@@ -1,4 +1,7 @@
-import { WATER_DOMAIN_VERSION } from './WaterConstants.js';
+import {
+  WATER_DOMAIN_LEGACY_VERSION,
+  WATER_DOMAIN_VERSION,
+} from './WaterConstants.js';
 
 const WATER_CONFIG_KEYS = Object.freeze(['waterDomain', 'player']);
 
@@ -7,7 +10,7 @@ export const DEFAULT_WATER_DOMAIN_CONFIG = Object.freeze({
   cellSizeMeters: 1,
   shoreDistanceMeters: 48,
   ocean: Object.freeze({
-    coastalShelfMeters: 32,
+    coastalShelfMeters: 20,
     shelfDepth: 4,
     maximumDepth: 24,
     maximumBedSlope: 0.75,
@@ -67,6 +70,14 @@ export function resolveWaterDomainVersion(value) {
   return version;
 }
 
+export function resolvePersistedWaterDomainVersion(value) {
+  if (value === undefined || value === null) return WATER_DOMAIN_LEGACY_VERSION;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid persisted water-domain version: ${String(value)}.`);
+  }
+  return value;
+}
+
 export function validateWaterDomainDefinition(domain) {
   assertObject(domain, 'waterDomain');
   assertObject(domain.ocean, 'waterDomain.ocean');
@@ -78,6 +89,11 @@ export function validateWaterDomainDefinition(domain) {
   for (const field of ['coastalShelfMeters', 'shelfDepth', 'maximumDepth', 'maximumBedSlope']) {
     assertPositive(domain.ocean[field], `waterDomain.ocean.${field}`);
   }
+  if (domain.ocean.coastalShelfMeters >= domain.shoreDistanceMeters) {
+    throw new Error(
+      'Invalid water configuration: waterDomain.shoreDistanceMeters must exceed coastalShelfMeters.',
+    );
+  }
   if (domain.ocean.shelfDepth > domain.ocean.maximumDepth) {
     throw new Error(
       'Invalid water configuration: waterDomain.ocean.maximumDepth must cover shelfDepth.',
@@ -86,6 +102,14 @@ export function validateWaterDomainDefinition(domain) {
   if (domain.ocean.maximumBedSlope > 1) {
     throw new Error(
       'Invalid water configuration: waterDomain.ocean.maximumBedSlope must be within (0, 1].',
+    );
+  }
+  const shelfSlope = domain.ocean.shelfDepth / domain.ocean.coastalShelfMeters;
+  const deepSlope = (domain.ocean.maximumDepth - domain.ocean.shelfDepth)
+    / (domain.shoreDistanceMeters - domain.ocean.coastalShelfMeters);
+  if (Math.max(shelfSlope, deepSlope) > domain.ocean.maximumBedSlope) {
+    throw new Error(
+      'Invalid water configuration: ocean depth profile exceeds maximumBedSlope.',
     );
   }
 
@@ -116,6 +140,34 @@ export function resolveWaterDomainConfig(value = runtimeWaterDomainConfig) {
   });
   validateWaterDomainDefinition(resolved);
   return freezeDomain(resolved);
+}
+
+export function serializeWaterDomainConfig(value) {
+  return cloneDomain(resolveWaterDomainConfig(value));
+}
+
+export function waterDomainConfigsEqual(left, right) {
+  if (!left || !right) return false;
+  return JSON.stringify(serializeWaterDomainConfig(left))
+    === JSON.stringify(serializeWaterDomainConfig(right));
+}
+
+export function assertCompatibleWaterDomainMetadata(actual, expected) {
+  const actualVersion = resolvePersistedWaterDomainVersion(actual?.waterDomainVersion);
+  const expectedVersion = resolveWaterDomainVersion(expected?.waterDomainVersion);
+  if (actualVersion !== expectedVersion) {
+    if (actualVersion < expectedVersion) {
+      throw new Error(
+        `World water-domain version ${actualVersion} requires migration to ${expectedVersion}.`,
+      );
+    }
+    throw new Error(
+      `World water-domain version ${actualVersion} is newer than supported version ${expectedVersion}.`,
+    );
+  }
+  if (!waterDomainConfigsEqual(actual?.waterDomain, expected?.waterDomain)) {
+    throw new Error('World water-domain settings do not match the active editor configuration.');
+  }
 }
 
 export function getRuntimeWaterDomainConfig() {
