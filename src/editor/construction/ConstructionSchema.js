@@ -1,10 +1,19 @@
+import {
+  DEFAULT_CONSTRUCTION_STYLE_KEY,
+  isConstructionStyleKey,
+} from './masonry/ConstructionStyleCatalog.js';
+
 export const CONSTRUCTION_RECORD_VERSION = 1;
 export const CUBIC_BEZIER_PATH_VERSION = 2;
 export const MAX_CONSTRUCTION_PATH_POINTS = 512;
+export const MAX_CONSTRUCTION_TOP_POINTS = 64;
 
 const ID_PATTERN = /^[a-z][a-z0-9-]{0,95}$/;
 const PATH_TYPES = new Set(['polyline', 'cubicBezier']);
 const FEATURE_KINDS = new Set(['door', 'window', 'arch', 'gate', 'tower', 'breach']);
+const OPENING_PROFILES = new Set(['round', 'segmental', 'pointed', 'flat']);
+const TOP_STYLES = new Set(['flat', 'irregular', 'crenellated', 'ruined']);
+const MATERIAL_FAMILIES = Object.freeze(['stone', 'mortar', 'roof']);
 
 function requireObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -65,6 +74,10 @@ function normalizeFeatures(input, validSegmentIds) {
     if (!validSegmentIds.has(segmentId)) {
       throw new Error(`Construction feature ${index + 1} references missing segment ${segmentId}.`);
     }
+    const profile = feature.profile ?? 'round';
+    if (!OPENING_PROFILES.has(profile)) {
+      throw new Error(`Construction feature ${index + 1} has unsupported profile ${profile}.`);
+    }
     return Object.freeze({
       id: requireId(feature.id, `Construction feature ${index + 1}`),
       kind,
@@ -77,6 +90,16 @@ function normalizeFeatures(input, validSegmentIds) {
       ),
       width: finite(feature.width ?? 1.2, `Construction feature ${index + 1} width`, 0.2, 20),
       height: finite(feature.height ?? 2.2, `Construction feature ${index + 1} height`, 0.2, 30),
+      // Bottom of the opening above local grade. A door sills at 0, a window
+      // above it; the course solver reserves nothing below the sill.
+      sill: finite(feature.sill ?? 0, `Construction feature ${index + 1} sill`, 0, 20),
+      profile,
+      dressed: feature.dressed !== false,
+      // Windows placed close together share a group id and get one surround.
+      // Holding Ctrl while placing suppresses the link by leaving this null.
+      group: feature.group == null
+        ? null
+        : requireId(feature.group, `Construction feature ${index + 1} group`),
     });
   });
   uniqueIds(features, 'Construction features');
@@ -179,6 +202,68 @@ export function normalizeConstructionPath(input) {
     : normalizeCubicBezierPath(source);
 }
 
+export function constructionPathSegmentIds(path) {
+  if (path.type === 'cubicBezier') return new Set(path.segments.map(({ id }) => id));
+  const ids = new Set();
+  for (let index = 0; index < path.points.length - 1; index += 1) {
+    ids.add(`segment-${path.points[index].id}-${path.points[index + 1].id}`);
+  }
+  if (path.closed) ids.add(`segment-${path.points.at(-1).id}-${path.points[0].id}`);
+  return ids;
+}
+
+/**
+ * Wall-top intent. Control points are anchored per segment exactly like
+ * features, so an unrelated anchor edit cannot slide them along the wall.
+ */
+function normalizeTop(input, validSegmentIds, fallbackBase) {
+  const source = requireObject(input ?? {}, 'Construction top');
+  const style = source.style ?? 'flat';
+  if (!TOP_STYLES.has(style)) throw new Error(`Unsupported construction top style ${style}.`);
+  const profileInput = source.profile ?? [];
+  if (!Array.isArray(profileInput)) throw new Error('Construction top profile must be an array.');
+  if (profileInput.length > MAX_CONSTRUCTION_TOP_POINTS) {
+    throw new Error(
+      `Construction top profile supports at most ${MAX_CONSTRUCTION_TOP_POINTS} points.`,
+    );
+  }
+  const profile = profileInput.map((value, index) => {
+    const entry = requireObject(value, `Construction top point ${index + 1}`);
+    const segmentId = requireId(entry.segmentId, `Construction top point ${index + 1} segment`);
+    if (!validSegmentIds.has(segmentId)) {
+      throw new Error(`Construction top point ${index + 1} references missing segment ${segmentId}.`);
+    }
+    return Object.freeze({
+      segmentId,
+      arcFraction: finite(
+        entry.arcFraction,
+        `Construction top point ${index + 1} arc fraction`,
+        0,
+        1,
+      ),
+      height: finite(entry.height, `Construction top point ${index + 1} height`, 0.2, 30),
+    });
+  });
+  return Object.freeze({
+    style,
+    base: finite(source.base ?? fallbackBase, 'Construction top base', 0.5, 30),
+    profile: Object.freeze(profile),
+  });
+}
+
+/** Preset ids only — image data lives in the world material document. */
+function normalizeMaterials(input) {
+  const source = requireObject(input ?? {}, 'Construction materials');
+  const materials = {};
+  for (const family of MATERIAL_FAMILIES) {
+    const value = source[family];
+    materials[family] = value == null
+      ? null
+      : requireId(value, `Construction ${family} material`);
+  }
+  return Object.freeze(materials);
+}
+
 export function normalizeConstructionRecord(input) {
   const source = requireObject(input, 'Construction record');
   if (source.version !== CONSTRUCTION_RECORD_VERSION) {
@@ -190,6 +275,11 @@ export function normalizeConstructionRecord(input) {
     ...source.path,
     features: source.features ?? source.path?.features ?? [],
   });
+  const dimensionHeight = finite(dimensions.height ?? 3.5, 'Construction height', 0.5, 30);
+  const styleKey = style.key ?? DEFAULT_CONSTRUCTION_STYLE_KEY;
+  if (!isConstructionStyleKey(styleKey)) {
+    throw new Error(`Unknown construction style ${styleKey}.`);
+  }
   return Object.freeze({
     version: CONSTRUCTION_RECORD_VERSION,
     id: requireId(source.id, 'Construction'),
@@ -200,13 +290,15 @@ export function normalizeConstructionRecord(input) {
       ? source.label.trim().slice(0, 80)
       : 'Curved wall',
     style: Object.freeze({
-      key: requireId(style.key ?? 'coursed-rubble', 'Construction style'),
+      key: styleKey,
       version: integer(style.version ?? 1, 'Construction style version', 1),
+      materials: normalizeMaterials(style.materials),
     }),
     dimensions: Object.freeze({
-      height: finite(dimensions.height ?? 3.5, 'Construction height', 0.5, 30),
+      height: dimensionHeight,
       thickness: finite(dimensions.thickness ?? 0.8, 'Construction thickness', 0.1, 10),
     }),
+    top: normalizeTop(source.top, constructionPathSegmentIds(path), dimensionHeight),
     path,
     features: path.features,
   });

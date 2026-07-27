@@ -43,6 +43,15 @@ export class EditorController {
     this.terrainConfig = terrainConfig;
     this.constructionStore = constructionStore;
     this.constructionView = constructionView;
+    /**
+     * Set by the composition root to `() => viewModeController.camera`.
+     *
+     * Every picker already takes a camera argument, so routing them through
+     * this getter is the whole of what editing from the player's first-person
+     * camera requires — the orbit camera was only ever hardcoded because there
+     * was nothing else to point at.
+     */
+    this.cameraProvider = null;
     this.tool = 'terrain';
     this.terrainMode = 'paint';
     this.selectedTileId = 4;
@@ -91,6 +100,10 @@ export class EditorController {
     this.canvas.addEventListener('contextmenu', this.boundHandlers.contextMenu);
     window.addEventListener('keydown', this.boundHandlers.keyDown);
     window.addEventListener('keyup', this.boundHandlers.keyUp);
+  }
+
+  get activeCamera() {
+    return this.cameraProvider?.() ?? this.editorCamera.camera;
   }
 
   subscribe(listener) {
@@ -425,7 +438,7 @@ export class EditorController {
     }
 
     if (this.tool === 'object') {
-      const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.editorCamera.camera);
+      const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.activeCamera);
       if (cell) {
         this.placeObject(cell);
       }
@@ -433,7 +446,7 @@ export class EditorController {
     }
 
     if (this.movingObjectId) {
-      const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.editorCamera.camera);
+      const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.activeCamera);
       if (cell) {
         this.moveSelectedTo(cell);
       }
@@ -443,14 +456,14 @@ export class EditorController {
     const objectId = this.objectView.pickObject(
       event.clientX,
       event.clientY,
-      this.editorCamera.camera,
+      this.activeCamera,
     );
     this.setSelectedObject(objectId);
     this.emitState();
   }
 
   onPointerMove(event) {
-    const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.editorCamera.camera);
+    const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.activeCamera);
     this.hoveredCell = cell;
     this.updatePreviews();
     this.emitHover(cell);
@@ -488,7 +501,7 @@ export class EditorController {
     const render = this.terrainView.pickWorld(
       event.clientX,
       event.clientY,
-      this.editorCamera.camera,
+      this.activeCamera,
     );
     if (!render) return null;
     const canonical = this.terrainView.floatingOrigin
@@ -502,7 +515,7 @@ export class EditorController {
       const handle = this.constructionView.pickHandle(
         event.clientX,
         event.clientY,
-        this.editorCamera.camera,
+        this.activeCamera,
       );
       if (handle) {
         const before = this.constructionStore.get(handle.constructionId);
@@ -517,7 +530,7 @@ export class EditorController {
       const constructionId = this.constructionView.pickConstruction(
         event.clientX,
         event.clientY,
-        this.editorCamera.camera,
+        this.activeCamera,
       );
       this.setSelectedConstruction(constructionId);
       this.emitState();
@@ -681,7 +694,7 @@ export class EditorController {
       return;
     }
 
-    const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.editorCamera.camera);
+    const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.activeCamera);
     if (!cell) {
       return;
     }

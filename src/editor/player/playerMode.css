@@ -119,6 +119,32 @@
   border-radius: 50%;
 }
 
+/*
+ * The bitmap is drawn north-up and turned here, so the player's front is always
+ * at the top of the dial. A square covers its own inscribed circle at every
+ * angle, so the round frame stays filled without oversizing the canvas.
+ */
+[data-view-mode='player'] .panel--minimap .minimap-frame canvas,
+[data-view-mode='player-spawn'] .panel--minimap .minimap-frame canvas {
+  transform: rotate(var(--minimap-heading, 0rad));
+}
+
+/* Fixed forward arrow: the map turns under it, this always points up. */
+[data-view-mode='player'] .panel--minimap .minimap-frame::after,
+[data-view-mode='player-spawn'] .panel--minimap .minimap-frame::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -58%);
+  border-right: 5px solid transparent;
+  border-bottom: 11px solid #f0cf68;
+  border-left: 5px solid transparent;
+  content: '';
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 75%));
+}
+
 [data-awaiting-spawn='true'] [data-role='viewport'] {
   cursor: crosshair;
 }

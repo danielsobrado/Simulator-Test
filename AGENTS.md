@@ -16,3 +16,6 @@ future task explicitly asks for it.
 Before changing terrain generation, chunk streaming, rendering, or residency
 behavior, read and follow the [player movement performance QA guide](docs/perf-qa.md).
 Use its deterministic harness to compare streaming-sensitive changes.
+
+
+Code Files are not too big unless really necessary and are always SOLID, refactor if needed

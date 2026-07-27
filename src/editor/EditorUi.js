@@ -8,6 +8,7 @@ import {
   loadJsonFromUrl,
   saveToBrowser,
 } from './storage.js';
+import { selectMinimapBurgs } from './map/minimapBurgs.js';
 import { normalizeSceneSettings } from './settings/SceneSettings.js';
 import { assetFileName, formatBytes } from './ui/loadingSources.js';
 import { hexToRgbBytes } from './tileCatalog.js';
@@ -21,6 +22,8 @@ const TERRAIN_MODE_LABELS = Object.freeze({
 const MINIMAP_HEIGHT_SHADE = 0.025;
 const MINIMAP_MINIMUM_SHADE = 0.55;
 const MINIMAP_MAXIMUM_SHADE = 1.25;
+// About a quarter degree — below this a re-styled transform is wasted work.
+const MINIMAP_HEADING_EPSILON = 0.004;
 const ALL_CATEGORIES = 'all';
 const CATEGORY_LABELS = Object.freeze({
   all: 'All',
@@ -30,6 +33,12 @@ const CATEGORY_LABELS = Object.freeze({
   nature: 'Nature',
   workshop: 'Workshop',
 });
+
+function formatDistance(meters) {
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(meters >= 10000 ? 0 : 1)} km`
+    : `${Math.round(meters)} m`;
+}
 
 function categoryLabel(category) {
   return CATEGORY_LABELS[category] ?? category.replace(/^\w/, (first) => first.toUpperCase());
@@ -94,6 +103,7 @@ export class EditorUi {
     this.minimapQueued = false;
     this.minimapCenter = { x: 0, z: 0 };
     this.minimapCells = config.world?.minimapCells ?? MINIMAP_SIZE;
+    this.minimapHeading = 0;
     this.workshop = null;
     this.objectQuery = '';
     this.objectCategory = ALL_CATEGORIES;
@@ -486,6 +496,7 @@ export class EditorUi {
             <h2>Local overview</h2>
             <div class="minimap-frame">
               <canvas data-role="minimap" width="${MINIMAP_SIZE}" height="${MINIMAP_SIZE}"></canvas>
+              <div class="minimap-burgs" data-role="minimap-burgs" aria-hidden="true"></div>
             </div>
             <p class="panel-note">${this.minimapCells} × ${this.minimapCells} cells around the active view.</p>
           </section>
@@ -540,6 +551,8 @@ export class EditorUi {
     this.objectTotal = root.querySelector('[data-role="object-total"]');
     this.brushRow = root.querySelector('[data-role="brush-row"]');
     this.minimap = root.querySelector('[data-role="minimap"]');
+    this.minimapFrame = root.querySelector('.minimap-frame');
+    this.minimapBurgs = root.querySelector('[data-role="minimap-burgs"]');
     this.toast = root.querySelector('[data-role="toast"]');
     this.coordinates = root.querySelector('[data-role="coordinates"]');
     this.hoverHeight = root.querySelector('[data-role="hover-height"]');
@@ -1633,6 +1646,25 @@ export class EditorUi {
     }
   }
 
+  /**
+   * Points the minimap at the camera's heading. The canvas is always drawn
+   * north-up; turning it is a CSS rotation of that same bitmap, so this can run
+   * every frame. A square covers its own inscribed circle at any angle, so the
+   * round player-mode frame never shows a gap.
+   *
+   * Three's `YXZ` camera yaw sends the view direction to `(-sin yaw, -cos yaw)`
+   * in world XZ, which is `yaw` counter-clockwise from canvas up — so rotating
+   * the bitmap clockwise by the same yaw puts the player's front at the top.
+   */
+  setMinimapHeading(heading) {
+    if (!Number.isFinite(heading)) return;
+    if (Math.abs(heading - this.minimapHeading) < MINIMAP_HEADING_EPSILON) return;
+    this.minimapHeading = heading;
+    // Set on the frame, not the canvas: the burg markers ride the same rotation
+    // and counter-rotate their labels from this one inherited value.
+    this.minimapFrame.style.setProperty('--minimap-heading', `${heading}rad`);
+  }
+
   queueMinimapUpdate() {
     if (this.minimapQueued) return;
     this.minimapQueued = true;
@@ -1687,6 +1719,44 @@ export class EditorUi {
     }
     context.strokeStyle = '#f0cf68';
     context.strokeRect(MINIMAP_SIZE / 2 - 2, MINIMAP_SIZE / 2 - 2, 4, 4);
+    this.renderMinimapBurgs();
+  }
+
+  /**
+   * Names the Azgaar settlements around the view. Markers are DOM, not canvas
+   * pixels, so the labels can counter-rotate and stay upright while the map
+   * turns; worlds without an Azgaar campaign simply get none.
+   */
+  renderMinimapBurgs() {
+    if (!this.minimapBurgs) return;
+    const markers = selectMinimapBurgs({
+      campaign: this.controller?.campaign ?? null,
+      center: this.minimapCenter,
+      cells: this.minimapCells,
+    });
+    const tileSize = this.tileMap?.tileSize ?? 1;
+    this.minimapBurgs.replaceChildren(...markers.map((marker) => {
+      const element = document.createElement('span');
+      element.className = 'minimap-burg';
+      element.classList.toggle('is-capital', marker.capital);
+      element.classList.toggle('is-offscreen', marker.offscreen);
+      element.style.left = `${marker.u * 100}%`;
+      element.style.top = `${marker.v * 100}%`;
+
+      const dot = document.createElement('span');
+      dot.className = 'minimap-burg__dot';
+      dot.style.background = marker.color;
+
+      const name = document.createElement('span');
+      name.className = 'minimap-burg__name';
+      // Burg names come from the imported map, so they are set as text.
+      name.textContent = marker.offscreen
+        ? `${marker.name} · ${formatDistance(marker.distanceCells * tileSize)}`
+        : marker.name;
+
+      element.append(dot, name);
+      return element;
+    }));
   }
 
   showToast(message, isError = false) {

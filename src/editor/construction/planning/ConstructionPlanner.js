@@ -2,6 +2,36 @@ import { normalizeConstructionRecord } from '../ConstructionSchema.js';
 import { sampleCubicBezierPath } from '../curve/CubicBezierPath.js';
 
 const DEFAULT_MAX_MODULE_LENGTH = 12;
+const HASH_QUANTUM = 1e4;
+
+/**
+ * FNV-1a over the canonical inputs of one module, so the view can skip
+ * rebuilding a module that a dirty-segment edit did not actually change.
+ * Floats are quantised to 0.1 mm first — otherwise re-sampling noise below the
+ * visible threshold would defeat the whole point of the hash.
+ */
+function createHasher() {
+  let hash = 0x811c9dc5;
+  const write = (text) => {
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+  };
+  return {
+    text(value) {
+      write(String(value));
+      write('');
+    },
+    number(value) {
+      write(String(Math.round(value * HASH_QUANTUM)));
+      write('');
+    },
+    digest() {
+      return (hash >>> 0).toString(16).padStart(8, '0');
+    },
+  };
+}
 
 function interpolate(left, right, targetDistance) {
   const span = right.distance - left.distance;
@@ -56,6 +86,93 @@ export function planConstruction(input, {
   }
   if (!(maxModuleLength >= 1)) throw new Error('Maximum construction module length is invalid.');
   const sampled = sampleCubicBezierPath(record.path);
+
+  // Contiguous arc range per segment, so per-segment anchored top points and
+  // features resolve to the same absolute arc coordinate the modules use.
+  // Ranges are chained rather than taken from sample membership because the
+  // sampler drops each segment's duplicated first point (see `CurveArcTable`).
+  const segmentEnds = new Map();
+  const segmentOrder = [];
+  for (const entry of sampled.points) {
+    if (!segmentEnds.has(entry.segmentId)) segmentOrder.push(entry.segmentId);
+    segmentEnds.set(entry.segmentId, Math.max(segmentEnds.get(entry.segmentId) ?? 0, entry.distance));
+  }
+  const segmentRanges = new Map();
+  let previousEnd = 0;
+  for (let index = 0; index < segmentOrder.length; index += 1) {
+    const segmentId = segmentOrder[index];
+    const end = index === segmentOrder.length - 1
+      ? sampled.totalDistance
+      : segmentEnds.get(segmentId);
+    segmentRanges.set(segmentId, { start: previousEnd, end });
+    previousEnd = end;
+  }
+  const toArc = (segmentId, arcFraction) => {
+    const range = segmentRanges.get(segmentId);
+    if (!range) return 0;
+    return range.start + (range.end - range.start) * arcFraction;
+  };
+
+  const topPoints = record.top.profile
+    .map((entry) => ({ distance: toArc(entry.segmentId, entry.arcFraction), height: entry.height }))
+    .sort((a, b) => a.distance - b.distance);
+  const featureArcs = record.features.map((feature) => ({
+    feature,
+    distance: toArc(feature.segmentId, feature.arcFraction),
+  }));
+
+  function hashModule(moduleId, from, to, modulePoints) {
+    const hasher = createHasher();
+    hasher.text(moduleId);
+    hasher.text(record.style.key);
+    hasher.number(record.style.version);
+    for (const family of ['stone', 'mortar', 'roof']) {
+      hasher.text(record.style.materials[family] ?? '-');
+    }
+    hasher.number(record.seed);
+    hasher.number(record.dimensions.height);
+    hasher.number(record.dimensions.thickness);
+    hasher.text(record.top.style);
+    hasher.number(record.top.base);
+    for (const point of modulePoints) {
+      hasher.number(point.x);
+      hasher.number(point.z);
+      hasher.number(point.tangentX);
+      hasher.number(point.tangentZ);
+    }
+    // The interpolated top height inside a module also depends on the nearest
+    // control point on each side, so bracket the slice rather than clipping it.
+    let first = topPoints.findIndex((entry) => entry.distance >= from);
+    if (first < 0) first = topPoints.length;
+    let last = -1;
+    for (let index = topPoints.length - 1; index >= 0; index -= 1) {
+      if (topPoints[index].distance <= to) {
+        last = index;
+        break;
+      }
+    }
+    const sliceStart = Math.max(0, first - 1);
+    const sliceEnd = Math.min(topPoints.length - 1, last + 1);
+    for (let index = sliceStart; index <= sliceEnd; index += 1) {
+      hasher.number(topPoints[index].distance);
+      hasher.number(topPoints[index].height);
+    }
+    for (const { feature, distance } of featureArcs) {
+      const margin = feature.width / 2 + 0.5;
+      if (distance + margin <= from || distance - margin >= to) continue;
+      hasher.text(feature.id);
+      hasher.text(feature.kind);
+      hasher.text(feature.profile);
+      hasher.text(feature.group ?? '-');
+      hasher.text(feature.dressed ? 'd' : '-');
+      hasher.number(distance);
+      hasher.number(feature.width);
+      hasher.number(feature.height);
+      hasher.number(feature.sill);
+    }
+    return hasher.digest();
+  }
+
   const modules = [];
   for (const segment of record.path.segments) {
     const segmentPoints = sampled.points.filter(({ segmentId }) => segmentId === segment.id);
@@ -71,10 +188,12 @@ export function planConstruction(input, {
       const relevant = sampled.points.filter(({ distance }) => distance >= from && distance <= to);
       const endpoints = [pointAtDistance(sampled.points, from), pointAtDistance(sampled.points, to)];
       const modulePoints = [...endpoints.slice(0, 1), ...relevant, ...endpoints.slice(1)];
+      const moduleId = `${segment.id}-span-${index + 1}`;
       modules.push(Object.freeze({
-        id: `${segment.id}-span-${index + 1}`,
+        id: moduleId,
         kind: 'curved-span',
         segmentId: segment.id,
+        contentHash: hashModule(moduleId, from, to, modulePoints),
         pathInterval: Object.freeze([from, to]),
         frame: Object.freeze({
           origin: Object.freeze([middle.x, middle.z]),
@@ -100,10 +219,16 @@ export function planConstruction(input, {
       sampled.points,
       record.dimensions.thickness / 2,
     )),
+    contentHash: (() => {
+      const hasher = createHasher();
+      for (const module of modules) hasher.text(module.contentHash);
+      return hasher.digest();
+    })(),
     stats: Object.freeze({
       sampleCount: sampled.points.length,
       moduleCount: modules.length,
       openingCount: record.features.length,
+      topPointCount: record.top.profile.length,
     }),
   });
 }

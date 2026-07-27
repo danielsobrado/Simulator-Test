@@ -381,6 +381,9 @@ async function startEditor() {
     const renderFocus = viewModeController.getFocusWorld();
     return floatingOrigin.toCanonical(renderFocus.x, renderFocus.z);
   };
+  // Pickers follow whichever camera is actually rendering, so construction
+  // editing works from the player's first-person view as well as the orbit one.
+  controller.cameraProvider = () => viewModeController.camera;
 
   const sceneSettingsRuntime = new SceneSettingsRuntime({
     controller,
@@ -567,9 +570,13 @@ async function startEditor() {
     }
 
     terrainView.flushUploadQueue();
+    // Drains the construction module build queue under its own frame budget,
+    // so committing a long wall cannot stall a frame.
+    constructionView.update(frameTimestamp);
     if (profiling) perfQa.mark('terrainCommit');
 
     viewModeController.update(frameTimestamp);
+    ui.setMinimapHeading(viewModeController.getHeading());
     if (profiling) perfQa.mark('player');
 
     let renderFocus = viewModeController.getFocusWorld();
@@ -578,7 +585,9 @@ async function startEditor() {
       PerfCounters.inc('floatingOriginSnaps');
       viewModeController.shiftWorld(rebase.shiftX, rebase.shiftZ);
       controller.refreshObjects();
-      constructionView.refreshAll();
+      // Construction geometry is origin-local, so a rebase only moves each
+      // record's group — no dispose, no rebuild, no hitch.
+      constructionView.rebase();
       renderFocus = viewModeController.getFocusWorld();
     }
     if (profiling) perfQa.mark('floatingOrigin');

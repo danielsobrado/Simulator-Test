@@ -175,6 +175,12 @@ export class ViewModeController {
       : this.editorCamera.getFocusWorld();
   }
 
+  // Only the first-person view has a heading worth turning the minimap by; the
+  // orbit view keeps it north-up so its click-to-recentre maths stays valid.
+  getHeading() {
+    return this.mode === PLAYER_MODE_WALK ? this.playerController.yaw : 0;
+  }
+
   shiftWorld(shiftX, shiftZ) {
     this.editorCamera.shiftWorld(shiftX, shiftZ);
     this.playerController.shiftWorld(shiftX, shiftZ);

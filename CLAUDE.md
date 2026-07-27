@@ -52,3 +52,5 @@ Buildings must read as constructed stonework, not noise-displaced boxes
 
 The world renderer and the workshop preview must agree on tone mapping and
 exposure, or a baked asset will not look the way it did while authoring.
+
+Code Files are not too big unless really necessary and are always SOLID, refactor if needed

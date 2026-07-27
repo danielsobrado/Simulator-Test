@@ -57,7 +57,12 @@ export class ConstructionStore {
     return snapshot;
   }
 
-  update(id, input) {
+  /**
+   * `hint` rides along on the emitted change so the renderer can narrow its
+   * rebuild. It is advisory only — the store never interprets it, and a view
+   * that ignores it stays correct, just slower.
+   */
+  update(id, input, hint = null) {
     const key = String(id);
     const current = this.records.get(key);
     if (!current) throw new Error(`Unknown construction ${key}.`);
@@ -70,7 +75,7 @@ export class ConstructionStore {
     this.records.set(key, record);
     const before = clone(current);
     const after = clone(record);
-    this.emit({ kind: 'update', id: key, before, after });
+    this.emit({ kind: 'update', id: key, before, after, hint });
     return after;
   }
 
