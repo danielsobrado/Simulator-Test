@@ -420,7 +420,10 @@ function buildBattlementLine(sets, recipe, {
         centerZ - Math.sin(yaw) * localX,
       ],
       rotation: [0, yaw, 0],
-    }, stableIndex + merlons + index, 1);
+      // Coping is a dressing, not field masonry. Omitting the category left it
+      // shaped at the full 'field' irregularity, so a battlement's cap read as
+      // rubble instead of a worked course (CLAUDE.md: dressings scale down).
+    }, stableIndex + merlons + index, 1, 'coping');
   }
 }
 
@@ -1334,7 +1337,8 @@ function addSteppedGableCoping(sets, recipe, {
         height: blockHeight * 0.92,
         depth: Math.max(0.34, depth / steps * 0.94),
         position: [endX, y + blockHeight * (step + 0.5), z],
-      }, stableIndex, 0.9 + progress * 0.1);
+        // Stepped gable coping is a worked dressing, same as the battlement cap.
+      }, stableIndex, 0.9 + progress * 0.1, 'coping');
       stableIndex += 1;
     }
   }

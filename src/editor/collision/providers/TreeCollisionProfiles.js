@@ -1,4 +1,5 @@
 import {
+  TREE_COLLISION_CENTRE_MERGE_SCALE,
   TREE_COLLISION_LOWER_BAND_END_RATIO,
   TREE_COLLISION_LOWER_BAND_START_RATIO,
   TREE_COLLISION_MAXIMUM_RADIUS_HEIGHT_RATIO,
@@ -64,27 +65,31 @@ function percentile(values, ratio) {
 function createSlice() {
   return {
     count: 0,
-    minX: Number.POSITIVE_INFINITY,
-    maxX: Number.NEGATIVE_INFINITY,
-    minZ: Number.POSITIVE_INFINITY,
-    maxZ: Number.NEGATIVE_INFINITY,
+    // Distinct horizontal samples, keyed by quantized position. The centre is
+    // their mean rather than the midpoint of their bounding box: a low-poly
+    // trunk ring is a triangle, whose bounding box is centred off-axis, and
+    // measuring radii from that off-axis point inflates every one of them.
+    samples: new Map(),
     radii: [],
   };
 }
 
 function updateSlice(slice, point) {
   slice.count += 1;
-  slice.minX = Math.min(slice.minX, point.x);
-  slice.maxX = Math.max(slice.maxX, point.x);
-  slice.minZ = Math.min(slice.minZ, point.z);
-  slice.maxZ = Math.max(slice.maxZ, point.z);
+  const key = `${Math.round(point.x * TREE_COLLISION_CENTRE_MERGE_SCALE)}`
+    + `:${Math.round(point.z * TREE_COLLISION_CENTRE_MERGE_SCALE)}`;
+  if (!slice.samples.has(key)) slice.samples.set(key, { x: point.x, z: point.z });
 }
 
 function sliceCenter(slice) {
-  return {
-    x: (slice.minX + slice.maxX) * 0.5,
-    z: (slice.minZ + slice.maxZ) * 0.5,
-  };
+  if (slice.samples.size === 0) return { x: 0, z: 0 };
+  let sumX = 0;
+  let sumZ = 0;
+  for (const sample of slice.samples.values()) {
+    sumX += sample.x;
+    sumZ += sample.z;
+  }
+  return { x: sumX / slice.samples.size, z: sumZ / slice.samples.size };
 }
 
 function sliceIndexFor(y, minimum, maximum) {

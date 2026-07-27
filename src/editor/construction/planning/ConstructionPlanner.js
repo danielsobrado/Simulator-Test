@@ -1,5 +1,13 @@
 import { normalizeConstructionRecord } from '../ConstructionSchema.js';
 import { sampleCubicBezierPath } from '../curve/CubicBezierPath.js';
+import { createCurveArcTable } from '../masonry/CurveArcTable.js';
+import { createWallTopProfile } from '../masonry/WallTopProfile.js';
+import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
+import {
+  MAX_CONSTRUCTION_STONES,
+  MAX_MODULE_STONES,
+  packCurvedWall,
+} from '../masonry/CurvedCoursePacker.js';
 
 const DEFAULT_MAX_MODULE_LENGTH = 12;
 const HASH_QUANTUM = 1e4;
@@ -79,6 +87,7 @@ function boundsForPoints(points, margin) {
 export function planConstruction(input, {
   maxModuleLength = DEFAULT_MAX_MODULE_LENGTH,
   terrainSamples = [],
+  masonry = true,
 } = {}) {
   const record = normalizeConstructionRecord(input);
   if (record.path.type !== 'cubicBezier') {
@@ -173,6 +182,14 @@ export function planConstruction(input, {
     return hasher.digest();
   }
 
+  // The masonry solve needs the same arc-length view of the path the renderer
+  // will use, so both come from one table rather than two approximations.
+  const style = constructionStyle(record.style.key);
+  const arcTable = masonry ? createCurveArcTable(sampled) : null;
+  const topProfile = masonry ? createWallTopProfile(record, arcTable, { style }) : null;
+  let stoneTotal = 0;
+  let overBudget = false;
+
   const modules = [];
   for (const segment of record.path.segments) {
     const segmentPoints = sampled.points.filter(({ segmentId }) => segmentId === segment.id);
@@ -189,11 +206,42 @@ export function planConstruction(input, {
       const endpoints = [pointAtDistance(sampled.points, from), pointAtDistance(sampled.points, to)];
       const modulePoints = [...endpoints.slice(0, 1), ...relevant, ...endpoints.slice(1)];
       const moduleId = `${segment.id}-span-${index + 1}`;
+      // Each module forks the random stream from its own index, so two modules
+      // never lay down the same course divisions and stack a full-height joint
+      // at their shared boundary.
+      const seedOffset = modules.length;
+      let packed = null;
+      if (masonry) {
+        packed = packCurvedWall({
+          arcTable,
+          arcRange: [from, to],
+          style,
+          thickness: record.dimensions.thickness,
+          seed: record.seed,
+          seedOffset,
+          topHeightAt: topProfile.heightAt,
+          ruinFactorAt: topProfile.ruinFactorAt,
+          slopeAt: topProfile.slopeAt,
+          crenellationsOver: topProfile.crenellationsOver,
+          topStyle: record.top.style,
+          budget: Math.max(0, Math.min(
+            MAX_MODULE_STONES,
+            MAX_CONSTRUCTION_STONES - stoneTotal,
+          )),
+        });
+        stoneTotal += packed.stats.stones;
+        // Over budget leaves the remaining modules unstoned; their shell stays
+        // visible rather than the whole wall failing.
+        overBudget = overBudget || packed.stats.overBudget;
+      }
       modules.push(Object.freeze({
         id: moduleId,
         kind: 'curved-span',
         segmentId: segment.id,
+        seedOffset,
         contentHash: hashModule(moduleId, from, to, modulePoints),
+        placements: packed ? packed.stones : null,
+        masonryStats: packed ? packed.stats : null,
         pathInterval: Object.freeze([from, to]),
         frame: Object.freeze({
           origin: Object.freeze([middle.x, middle.z]),
@@ -229,6 +277,8 @@ export function planConstruction(input, {
       moduleCount: modules.length,
       openingCount: record.features.length,
       topPointCount: record.top.profile.length,
+      stoneCount: stoneTotal,
+      overBudget,
     }),
   });
 }

@@ -17,6 +17,15 @@ Implementation checkpoint (2026-07-26):
 The current runtime deliberately stays on the CPU reference shell. Do not call it
 the GPU-driven renderer until the Phase 7–9 evidence gates have passed.
 
+> **Execution plan for phases 4–6:**
+> [`../tiny-glade-wall-builder/`](../tiny-glade-wall-builder/README.md) carries
+> the detailed, per-phase plan for finishing the live editor — curved masonry,
+> wall-top profiles, node editing, the radial material palette, openings by
+> omission, player-mode editing, and walkable ramparts. Its Phase 1 landed
+> 2026-07-27 (record model, module-partitioned view with content hashes, and a
+> rebase that rebuilds nothing). Phases 7–11 of *this* document remain out of its
+> scope.
+
 ## 1. Outcome
 
 Build two connected capabilities:

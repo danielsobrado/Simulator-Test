@@ -1,5 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { cubicBezierPathBounds, sampleCubicBezierPath } from '../curve/CubicBezierPath.js';
+import { createCurveArcTable } from '../masonry/CurveArcTable.js';
+import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
+import { createConstructionMaterials } from './ConstructionMaterials.js';
 
 const FOUNDATION_OVERLAP = 0.08;
 const HANDLE_RADIUS = 0.16;
@@ -11,9 +14,17 @@ const HANDLE_RADIUS = 0.16;
  */
 const ORIGIN_QUANTUM = 64;
 
-/** Per-frame ceiling on module rebuilds, so a large commit cannot hitch. */
+/**
+ * Per-frame ceiling on module rebuilds, so a large commit cannot hitch.
+ *
+ * One module per frame, matching the one-install-per-frame rule the stylized
+ * variant residency already follows. The time budget is checked *before* a
+ * build starts and a module cannot be interrupted once begun, so the real
+ * worst-case frame is one module's build time — measured at ~9 ms for a dense
+ * 12 m module. Allowing two put a 200 m commit over 18 ms per frame.
+ */
 const MODULE_BUILD_BUDGET_MS = 4;
-const MODULE_BUILD_COUNT = 2;
+const MODULE_BUILD_COUNT = 1;
 
 function quantizeOrigin(value) {
   return Math.round(value / ORIGIN_QUANTUM) * ORIGIN_QUANTUM;
@@ -147,6 +158,19 @@ export class ConstructionView {
       color: '#ffe091',
       depthTest: false,
     });
+    // Snapping is silent otherwise: the anchor just lands somewhere slightly
+    // else and the user cannot tell a junction join from a grid nudge until
+    // after releasing, by which point it is a surprise.
+    this.snapMaterials = new Map(Object.entries({
+      anchor: '#7ef0a4',
+      curve: '#7ad9f0',
+      straight: '#f0d97a',
+      grid: '#c3c9d4',
+      angle: '#c3c9d4',
+    }).map(([kind, color]) => [
+      kind,
+      new THREE.MeshBasicMaterial({ color, depthTest: false }),
+    ]));
     this.unsubscribe = store.subscribe((change) => this.onStoreChange(change));
     this.refreshAll();
   }
@@ -193,7 +217,15 @@ export class ConstructionView {
       group.name = `construction:${record.id}`;
       group.userData.constructionId = record.id;
       this.root.add(group);
-      entry = { group, origin, shellMesh: null, modules: new Map(), plan: null };
+      entry = {
+        group,
+        origin,
+        shellMesh: null,
+        modules: new Map(),
+        plan: null,
+        arcTable: null,
+        materials: null,
+      };
       this.entries.set(record.id, entry);
     }
     entry.record = record;
@@ -201,9 +233,18 @@ export class ConstructionView {
 
     if (hint?.materialOnly && entry.shellMesh) {
       // Geometry is unchanged; only the material assignment can differ.
+      entry.materials = createConstructionMaterials(record);
+      for (const resident of entry.modules.values()) {
+        for (const mesh of resident.meshes) mesh.material = entry.materials.stone;
+      }
       this.applySelectionMaterial(record.id, entry);
       return;
     }
+
+    // Rebuilt per revision: the arc table is the shared arc-length view the
+    // masonry builder places against, and must match the path the plan solved.
+    entry.arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
+    entry.materials = createConstructionMaterials(record);
 
     if (entry.shellMesh) {
       entry.group.remove(entry.shellMesh);
@@ -224,10 +265,15 @@ export class ConstructionView {
   }
 
   applySelectionMaterial(constructionId, entry) {
-    if (!entry.shellMesh) return;
-    entry.shellMesh.material = constructionId === this.selectedId
-      ? this.selectedMaterial
-      : this.wallMaterial;
+    const selected = constructionId === this.selectedId;
+    if (entry.shellMesh) {
+      entry.shellMesh.material = selected ? this.selectedMaterial : this.wallMaterial;
+    }
+    if (!entry.materials) return;
+    const stone = selected ? entry.materials.stoneSelected : entry.materials.stone;
+    for (const resident of entry.modules.values()) {
+      for (const mesh of resident.meshes) mesh.material = stone;
+    }
   }
 
   onStoreChange(change) {
@@ -345,10 +391,50 @@ export class ConstructionView {
     this.stats.queueDepth = this.buildQueue.length;
   }
 
-  // eslint-disable-next-line class-methods-use-this, no-unused-vars
   buildModule(entry, module) {
-    // Filled in by the masonry phase. The shell already covers this module's
-    // arc range, so doing nothing here is visually correct, not a stub hole.
+    const resident = entry.modules.get(module.id);
+    if (!resident) return;
+    const built = module.placements?.length
+      ? buildModuleMasonry(module.placements, {
+        record: entry.record,
+        materials: entry.materials,
+        arcTable: entry.arcTable,
+        moduleOrigin: entry.origin,
+        groundHeightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z) ?? 0,
+      })
+      : { meshes: [], stats: null };
+
+    // Remove the old meshes in the same tick the new ones go in, so a module
+    // never flickers to empty mid-swap (doc 18 §6).
+    for (const stale of resident.meshes) {
+      entry.group.remove(stale);
+      stale.geometry.dispose();
+    }
+    for (const mesh of built.meshes) {
+      mesh.name = `construction-masonry:${entry.record.id}:${module.id}`;
+      mesh.userData.constructionId = entry.record.id;
+      entry.group.add(mesh);
+    }
+    resident.meshes = built.meshes;
+    resident.stats = built.stats;
+    this.applySelectionMaterial(entry.record.id, entry);
+    this.updateShellVisibility(entry);
+  }
+
+  /**
+   * The shell is the fallback, not a second layer: it stays visible until every
+   * module has its own geometry, so a wall mid-build shows a plain ribbon
+   * rather than holes. Modules the budget refused keep it visible forever,
+   * which is the intended degradation.
+   */
+  updateShellVisibility(entry) {
+    if (!entry.shellMesh) return;
+    let pending = 0;
+    for (const resident of entry.modules.values()) {
+      if (resident.meshes.length === 0) pending += 1;
+    }
+    const covered = entry.modules.size > 0 && pending === 0;
+    entry.shellMesh.visible = !covered;
   }
 
   setSelection(constructionId) {
@@ -394,8 +480,25 @@ export class ConstructionView {
     }
   }
 
-  setDraft(record, { valid = true, constructionId = null } = {}) {
+  /** Tint the dragged anchor's handle to show which snap is about to apply. */
+  setSnapFeedback(anchorId, snapKind) {
+    for (const mesh of this.handleMeshes) {
+      const active = anchorId && mesh.userData.anchorId === anchorId && snapKind;
+      mesh.material = active
+        ? this.snapMaterials.get(snapKind) ?? this.handleMaterial
+        : this.handleMaterial;
+      mesh.scale.setScalar(active ? 1.35 : 1);
+    }
+  }
+
+  setDraft(record, {
+    valid = true,
+    constructionId = null,
+    snapKind = null,
+    anchorId = null,
+  } = {}) {
     this.clearDraft();
+    this.setSnapFeedback(anchorId, snapKind);
     this.previewedConstructionId = constructionId;
     if (constructionId) {
       const entry = this.entries.get(constructionId);
@@ -414,6 +517,7 @@ export class ConstructionView {
   }
 
   clearDraft() {
+    this.setSnapFeedback(null, null);
     if (this.previewMesh) {
       this.root.remove(this.previewMesh);
       this.previewMesh.geometry.dispose();
@@ -434,11 +538,20 @@ export class ConstructionView {
     );
   }
 
+  /**
+   * The shell doubles as the pick volume while it is visible. Once masonry
+   * covers a record the shell is hidden, so picking has to fall through to the
+   * module meshes or a finished wall becomes unselectable.
+   */
   pickTargets() {
     const targets = [];
     for (const entry of this.entries.values()) {
-      if (!entry.group.visible || !entry.shellMesh) continue;
-      targets.push(entry.shellMesh);
+      if (!entry.group.visible) continue;
+      if (entry.shellMesh?.visible) {
+        targets.push(entry.shellMesh);
+        continue;
+      }
+      for (const resident of entry.modules.values()) targets.push(...resident.meshes);
     }
     return targets;
   }
@@ -449,6 +562,27 @@ export class ConstructionView {
     const found = this.raycaster.intersectObjects(this.pickTargets(), false)
       .find(({ object }) => object.visible);
     return found?.object.userData.constructionId ?? null;
+  }
+
+  /** Canonical world point where the pointer meets a construction, or null. */
+  pickConstructionPoint(clientX, clientY, camera) {
+    this.setPointer(clientX, clientY);
+    this.raycaster.setFromCamera(this.pointer, camera);
+    const found = this.raycaster.intersectObjects(this.pickTargets(), false)
+      .find(({ object }) => object.visible);
+    if (!found) return null;
+    const canonical = this.floatingOrigin.toCanonical(found.point.x, found.point.z);
+    return {
+      constructionId: found.object.userData.constructionId,
+      x: canonical.x,
+      z: canonical.z,
+      y: found.point.y,
+    };
+  }
+
+  /** The arc table the masonry was placed against, for hover and edit maths. */
+  arcTableFor(constructionId) {
+    return this.entries.get(constructionId)?.arcTable ?? null;
   }
 
   pickHandle(clientX, clientY, camera) {
@@ -474,5 +608,7 @@ export class ConstructionView {
     this.invalidPreviewMaterial.dispose();
     this.handleGeometry.dispose();
     this.handleMaterial.dispose();
+    for (const material of this.snapMaterials.values()) material.dispose();
+    this.snapMaterials.clear();
   }
 }

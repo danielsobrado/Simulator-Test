@@ -21,12 +21,20 @@ test('collision defaults and resolved config are deeply immutable', () => {
   assert.throws(() => { config.player.radius = 9; }, TypeError);
 });
 
-test('the shipped collision config validates while remaining disabled', () => {
+test('the shipped collision config enables the runtime with every debug view off', () => {
   const source = loadShippedConfig();
   assert.equal(validateCollisionConfig(source), source);
   const config = createCollisionConfig(source);
-  assert.equal(config.enabled, false);
+  assert.equal(config.enabled, true);
   assert.equal(config.schemaVersion, 1);
+  // Debug visualisations draw wireframe helpers over the world, so shipping one
+  // switched on is a visible regression rather than a silent one.
+  assert.deepEqual(config.debug, {
+    colliders: false,
+    broadphase: false,
+    support: false,
+    contacts: false,
+  });
 });
 
 test('debug URL switches can enable all or individual visualisations', () => {

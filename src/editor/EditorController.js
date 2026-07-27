@@ -12,10 +12,24 @@ import { createWorldDocument, loadWorldDocument } from './WorldDocument.js';
 import { TILE_BY_SHORTCUT } from './tileCatalog.js';
 import { executeConstructionCommand } from './construction/ConstructionCommands.js';
 import {
+  closestPointOnCubicBezierPath,
   createCubicBezierPathFromStroke,
   findCubicBezierSelfIntersections,
   moveCubicBezierAnchor,
 } from './construction/curve/CubicBezierPath.js';
+import {
+  flattenHandlesAround,
+  resolveAnchorSnap,
+} from './construction/curve/CurveSnapping.js';
+import {
+  TOP_RADIUS_DEFAULT,
+  TOP_RADIUS_RANGE,
+  applyTopEdit,
+  flattenTop,
+} from './construction/masonry/WallTopEdit.js';
+
+/** Commit a raise/lower burst as one history entry once the keys settle. */
+const TOP_EDIT_COMMIT_MS = 250;
 
 export class EditorController {
   constructor({
@@ -67,6 +81,17 @@ export class EditorController {
     this.constructionStroke = null;
     this.constructionDrawing = false;
     this.constructionAnchorDrag = null;
+    /** The node under edit, so Delete removes a node rather than the wall. */
+    this.selectedAnchorId = null;
+    /** `{ constructionId, s }` under the pointer, for the raise/lower gesture. */
+    this.hoveredArc = null;
+    this.constructionTopRadius = TOP_RADIUS_DEFAULT;
+    /**
+     * A held arrow key must not make forty history entries, so raise/lower
+     * accumulates here and commits one command once the burst settles.
+     */
+    this.pendingTopEdit = null;
+    this.pendingTopEditTimer = null;
     this.movingObjectId = null;
     this.brushSize = brushSizes.includes(defaultBrushSize) ? defaultBrushSize : brushSizes[0];
     this.undoStack = [];
@@ -245,18 +270,26 @@ export class EditorController {
     this.constructionView?.setSelection(this.selectedConstructionId);
   }
 
-  deleteSelectedConstruction() {
-    if (!this.selectedConstructionId || !this.constructionStore) return;
+  /** Run a construction command, commit it to history, and report failures. */
+  runConstructionCommand(command) {
+    if (!this.constructionStore) return null;
     try {
-      const change = executeConstructionCommand(this.constructionStore, {
-        type: 'delete',
-        constructionId: this.selectedConstructionId,
-      });
-      this.setSelectedConstruction(null);
+      const change = executeConstructionCommand(this.constructionStore, command);
       this.commitHistory(change);
       this.emitMap();
+      return change;
     } catch (error) {
       this.emitNotice(error.message, true);
+      return null;
+    }
+  }
+
+  deleteSelectedConstruction() {
+    if (!this.selectedConstructionId || !this.constructionStore) return;
+    const constructionId = this.selectedConstructionId;
+    this.setSelectedConstruction(null);
+    if (!this.runConstructionCommand({ type: 'delete', constructionId })) {
+      this.setSelectedConstruction(constructionId);
     }
   }
 
@@ -313,6 +346,10 @@ export class EditorController {
   }
 
   undo() {
+    // A buffered raise/lower burst has already changed the store but has no
+    // history entry yet. Flush it first, or this undo pops the entry before it
+    // and the burst then lands on top of the restored state.
+    this.flushTopEdit();
     const entry = this.undoStack.pop();
     if (!entry) {
       return;
@@ -324,6 +361,7 @@ export class EditorController {
   }
 
   redo() {
+    this.flushTopEdit();
     const entry = this.redoStack.pop();
     if (!entry) {
       return;
@@ -497,6 +535,11 @@ export class EditorController {
 
     if (this.tool === 'construction' && this.constructionView) {
       this.onConstructionPointerMove(event);
+      // Only track the hovered arc when no gesture owns the pointer, so a
+      // drag cannot retarget the raise/lower keys mid-stroke.
+      if (!this.constructionDrawing && !this.constructionAnchorDrag) {
+        this.updateConstructionHover(event);
+      }
     }
 
     if (this.painting && !this.spacePressed) {
@@ -537,6 +580,51 @@ export class EditorController {
     return { x: canonical.x, z: canonical.z };
   }
 
+  /** Insert a node where the pointer meets a wall. Returns true if it landed. */
+  insertConstructionAnchorAt(event) {
+    const hit = this.constructionView.pickConstructionPoint(
+      event.clientX,
+      event.clientY,
+      this.activeCamera,
+    );
+    if (!hit) return false;
+    const record = this.constructionStore.get(hit.constructionId);
+    if (!record) return false;
+    const closest = closestPointOnCubicBezierPath(record.path, { x: hit.x, z: hit.z });
+    if (!closest) return false;
+    this.setSelectedConstruction(hit.constructionId);
+    const change = this.runConstructionCommand({
+      type: 'insert_anchor',
+      constructionId: hit.constructionId,
+      segmentId: closest.segmentId,
+      t: closest.t,
+    });
+    this.emitState();
+    return change !== null;
+  }
+
+  /** Delete the selected node, or the whole wall when no node is selected. */
+  deleteConstructionSelection() {
+    if (!this.selectedConstructionId) return;
+    if (!this.selectedAnchorId) {
+      this.deleteSelectedConstruction();
+      return;
+    }
+    const anchorId = this.selectedAnchorId;
+    this.selectedAnchorId = null;
+    const change = this.runConstructionCommand({
+      type: 'delete_anchor',
+      constructionId: this.selectedConstructionId,
+      anchorId,
+    });
+    if (change?.dropped > 0) {
+      this.emitNotice(
+        `Dropped ${change.dropped} wall detail${change.dropped === 1 ? '' : 's'} on the removed span.`,
+      );
+    }
+    this.emitState();
+  }
+
   onConstructionPointerDown(event) {
     if (this.constructionMode === 'edit') {
       const handle = this.constructionView.pickHandle(
@@ -546,14 +634,21 @@ export class EditorController {
       );
       if (handle) {
         const before = this.constructionStore.get(handle.constructionId);
+        this.selectedAnchorId = handle.anchorId;
         this.constructionAnchorDrag = {
           ...handle,
           before,
           candidate: before,
+          snap: null,
         };
         this.canvas.setPointerCapture(event.pointerId);
         return;
       }
+      this.selectedAnchorId = null;
+      // Double-clicking a wall inserts a node there. The split is exact, so the
+      // wall does not move — adding a control point must never feel like a
+      // mistake the user has to undo.
+      if (event.detail >= 2 && this.insertConstructionAnchorAt(event)) return;
       const constructionId = this.constructionView.pickConstruction(
         event.clientX,
         event.clientY,
@@ -600,7 +695,22 @@ export class EditorController {
 
     if (this.constructionAnchorDrag) {
       const drag = this.constructionAnchorDrag;
-      const path = moveCubicBezierAnchor(drag.before.path, drag.anchorId, point);
+      // Snapping is on by default; Left Ctrl suppresses it. Both source
+      // descriptions of the reference game reduce to this one rule.
+      const snap = resolveAnchorSnap({
+        candidate: point,
+        path: drag.before.path,
+        anchorId: drag.anchorId,
+        others: this.otherConstructionPaths(drag.constructionId),
+        enabled: !event.ctrlKey,
+      });
+      drag.snap = snap;
+      let path = moveCubicBezierAnchor(
+        drag.before.path,
+        drag.anchorId,
+        snap ? { x: snap.position[0], z: snap.position[1] } : point,
+      );
+      if (snap?.flattenHandles) path = flattenHandlesAround(path, drag.anchorId);
       drag.candidate = {
         ...drag.before,
         revision: drag.before.revision + 1,
@@ -610,8 +720,18 @@ export class EditorController {
       this.constructionView.setDraft(drag.candidate, {
         constructionId: drag.constructionId,
         valid: findCubicBezierSelfIntersections(path).length === 0,
+        snapKind: snap?.kind ?? null,
+        anchorId: drag.anchorId,
       });
     }
+  }
+
+  /** Every other construction's path, as snap targets. */
+  otherConstructionPaths(exceptId) {
+    if (!this.constructionStore) return [];
+    return this.constructionStore.list()
+      .filter((record) => record.id !== exceptId && record.path.type === 'cubicBezier')
+      .map((record) => ({ constructionId: record.id, path: record.path }));
   }
 
   onConstructionPointerUp(event) {
@@ -664,13 +784,28 @@ export class EditorController {
           throw new Error('Construction paths cannot intersect themselves.');
         }
         const anchor = drag.candidate.path.anchors.find(({ id }) => id === drag.anchorId);
-        const change = executeConstructionCommand(this.constructionStore, {
-          type: 'move_anchor',
-          constructionId: drag.constructionId,
-          anchorId: drag.anchorId,
-          position: anchor.position,
-        });
+        // Dragging one end onto the other closes the loop: the dragged anchor
+        // is dropped and the wrap-around segment takes its place, so a circle
+        // comes out seamless rather than with a doubled anchor at the seam.
+        const change = drag.snap?.closesLoop
+          ? executeConstructionCommand(this.constructionStore, {
+            type: 'close_path',
+            constructionId: drag.constructionId,
+            dropAnchorId: drag.anchorId,
+          })
+          : executeConstructionCommand(this.constructionStore, {
+            type: 'move_anchor',
+            constructionId: drag.constructionId,
+            anchorId: drag.anchorId,
+            position: anchor.position,
+            flattenHandles: drag.snap?.flattenHandles === true,
+          });
         this.commitHistory(change);
+        if (change.dropped > 0) {
+          this.emitNotice(
+            `Dropped ${change.dropped} wall detail${change.dropped === 1 ? '' : 's'} on the removed span.`,
+          );
+        }
         this.setSelectedConstruction(drag.constructionId);
         this.emitMap();
       } catch (error) {
@@ -700,9 +835,13 @@ export class EditorController {
   }
 
   cancelConstructionGesture() {
+    // Settle any buffered raise/lower first: leaving the store ahead of history
+    // across a tool or selection change would strand the edit un-undoable.
+    this.flushTopEdit();
     this.constructionDrawing = false;
     this.constructionStroke = null;
     this.constructionAnchorDrag = null;
+    this.hoveredArc = null;
     this.constructionView?.clearDraft();
   }
 
@@ -909,6 +1048,134 @@ export class EditorController {
     }
   }
 
+  /**
+   * Track which point of which wall the pointer is over, in arc length.
+   *
+   * `closestPointOnCubicBezierPath` returns the Bézier parameter `t`, not an
+   * arc fraction; converting through `arcFractionForParameter` is what keeps a
+   * raise landing under the cursor on an unevenly parameterised curve.
+   */
+  updateConstructionHover(event) {
+    if (this.tool !== 'construction' || !this.constructionView || !this.constructionStore) {
+      this.hoveredArc = null;
+      return;
+    }
+    const hit = this.constructionView.pickConstructionPoint(
+      event.clientX,
+      event.clientY,
+      this.activeCamera,
+    );
+    if (!hit) {
+      this.hoveredArc = null;
+      return;
+    }
+    const record = this.constructionStore.get(hit.constructionId);
+    const arcTable = this.constructionView.arcTableFor(hit.constructionId);
+    if (!record || !arcTable) {
+      this.hoveredArc = null;
+      return;
+    }
+    const closest = closestPointOnCubicBezierPath(record.path, { x: hit.x, z: hit.z });
+    this.hoveredArc = {
+      constructionId: hit.constructionId,
+      s: arcTable.toArc(
+        closest.segmentId,
+        arcTable.arcFractionForParameter(closest.segmentId, closest.t),
+      ),
+    };
+  }
+
+  adjustConstructionTopRadius(delta) {
+    const [low, high] = TOP_RADIUS_RANGE;
+    this.constructionTopRadius = Math.max(
+      low,
+      Math.min(high, this.constructionTopRadius + delta),
+    );
+    this.emitNotice(`Wall top radius ${this.constructionTopRadius.toFixed(1)} m`);
+    this.emitState();
+  }
+
+  /**
+   * Raise or lower the wall top under the pointer.
+   *
+   * The edit is applied to the store immediately so it is visible while the key
+   * is held, but the history entry is deferred: `pendingTopEdit` keeps the
+   * pre-burst record so one undo reverses the whole burst.
+   */
+  nudgeConstructionTop(direction) {
+    if (this.tool !== 'construction' || !this.hoveredArc || !this.constructionStore) return;
+    const { constructionId, s } = this.hoveredArc;
+    const record = this.constructionStore.get(constructionId);
+    const arcTable = this.constructionView?.arcTableFor(constructionId);
+    if (!record || !arcTable) return;
+
+    const top = applyTopEdit(record, arcTable, {
+      centre: s,
+      direction,
+      radius: this.constructionTopRadius,
+    });
+    if (!top) return;
+
+    if (!this.pendingTopEdit || this.pendingTopEdit.constructionId !== constructionId) {
+      this.flushTopEdit();
+      this.pendingTopEdit = { constructionId, before: record };
+    }
+    this.constructionStore.update(constructionId, { ...record, top }, {
+      dirtySegmentIds: [...new Set([
+        ...record.top.profile.map(({ segmentId }) => segmentId),
+        ...top.profile.map(({ segmentId }) => segmentId),
+      ])],
+    });
+    this.scheduleTopEditCommit();
+    this.emitState();
+  }
+
+  scheduleTopEditCommit() {
+    clearTimeout(this.pendingTopEditTimer);
+    this.pendingTopEditTimer = setTimeout(() => this.flushTopEdit(), TOP_EDIT_COMMIT_MS);
+  }
+
+  /**
+   * Turn a settled burst into one history entry.
+   *
+   * Must run before undo/redo: otherwise Ctrl+Z mid-burst would pop the
+   * *previous* entry and the buffered edit would then land on top of it.
+   */
+  flushTopEdit() {
+    clearTimeout(this.pendingTopEditTimer);
+    this.pendingTopEditTimer = null;
+    const pending = this.pendingTopEdit;
+    this.pendingTopEdit = null;
+    if (!pending) return;
+    const after = this.constructionStore?.get(pending.constructionId);
+    if (!after) return;
+    const segments = new Set([
+      ...pending.before.top.profile.map(({ segmentId }) => segmentId),
+      ...after.top.profile.map(({ segmentId }) => segmentId),
+    ]);
+    this.commitHistory(Object.freeze({
+      kind: 'construction',
+      before: pending.before,
+      after,
+      dirtySegmentIds: Object.freeze([...segments]),
+      materialOnly: false,
+    }));
+  }
+
+  /** Palette action: discard the profile and keep the wall's mean height. */
+  setConstructionTopStyle(style) {
+    const constructionId = this.selectedConstructionId ?? this.hoveredArc?.constructionId;
+    if (!constructionId || !this.constructionStore) return;
+    const record = this.constructionStore.get(constructionId);
+    const arcTable = this.constructionView?.arcTableFor(constructionId);
+    if (!record || !arcTable) return;
+    this.flushTopEdit();
+    const top = style === 'flat'
+      ? flattenTop(record, arcTable)
+      : { ...record.top, style };
+    this.runConstructionCommand({ type: 'set_top_profile', constructionId, top });
+  }
+
   commitHistory(entry) {
     this.undoStack.push(entry);
     if (this.undoStack.length > MAX_HISTORY_ENTRIES) {
@@ -916,6 +1183,33 @@ export class EditorController {
     }
     this.redoStack = [];
     this.emitState();
+  }
+
+  /**
+   * Build-tool key handling. Returns true when the press was consumed.
+   *
+   * Arrow keys raise and lower the wall top under the pointer; `[` and `]`
+   * size the falloff. Both are only claimed while the Build tool is active and
+   * a wall is actually hovered, so nothing is stolen from the other tools.
+   */
+  handleConstructionKeyDown(event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        if (!this.hoveredArc) return false;
+        event.preventDefault();
+        this.nudgeConstructionTop(event.key === 'ArrowUp' ? 1 : -1);
+        return true;
+      }
+      case '[':
+      case ']':
+        event.preventDefault();
+        this.adjustConstructionTopRadius(event.key === '[' ? -0.5 : 0.5);
+        return true;
+      default:
+        return false;
+    }
   }
 
   onKeyDown(event) {
@@ -942,6 +1236,13 @@ export class EditorController {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
       event.preventDefault();
       this.redo();
+      return;
+    }
+
+    // Build-tool keys are claimed before the shared shortcuts so the wall-top
+    // gesture can reuse `[`/`]` without taking them away from the brush in
+    // every other tool.
+    if (this.tool === 'construction' && this.handleConstructionKeyDown(event)) {
       return;
     }
 
@@ -977,7 +1278,7 @@ export class EditorController {
       case 'backspace':
         if (this.tool === 'construction' && this.selectedConstructionId) {
           event.preventDefault();
-          this.deleteSelectedConstruction();
+          this.deleteConstructionSelection();
         } else if (this.tool === 'select') {
           event.preventDefault();
           this.deleteSelected();
@@ -1126,6 +1427,8 @@ export class EditorController {
   }
 
   dispose() {
+    clearTimeout(this.pendingTopEditTimer);
+    this.pendingTopEditTimer = null;
     this.canvas.removeEventListener('pointerdown', this.boundHandlers.pointerDown);
     this.canvas.removeEventListener('pointermove', this.boundHandlers.pointerMove);
     this.canvas.removeEventListener('pointerup', this.boundHandlers.pointerUp);

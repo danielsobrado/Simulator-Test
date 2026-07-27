@@ -123,7 +123,17 @@ export function createCurveArcTable(sampled, { step = DEFAULT_STEP } = {}) {
     return Math.atan2(cross, dot) / measured;
   }
 
-  function maxCurvatureOver(s0, s1, samples = 8) {
+  /**
+   * Peak curvature magnitude over a range.
+   *
+   * The sample count scales with the range's length rather than being fixed: a
+   * fitted Bézier's curvature is not constant even where it approximates a
+   * circle, so a fixed count silently misses the peak on a long span and every
+   * caller sizing something against curvature is then under-constrained.
+   */
+  function maxCurvatureOver(s0, s1, { spacing = 0.25, maxSamples = 512 } = {}) {
+    const length = Math.abs(s1 - s0);
+    const samples = Math.max(8, Math.min(maxSamples, Math.ceil(length / spacing)));
     let maximum = 0;
     for (let i = 0; i <= samples; i += 1) {
       maximum = Math.max(maximum, Math.abs(curvatureAt(lerp(s0, s1, i / samples))));
@@ -141,6 +151,39 @@ export function createCurveArcTable(sampled, { step = DEFAULT_STEP } = {}) {
     const [start, end] = segmentRange(segmentId);
     const clamped = Math.max(0, Math.min(1, arcFraction));
     return start + (end - start) * clamped;
+  }
+
+  /**
+   * Convert a segment-local Bézier parameter to an arc fraction.
+   *
+   * `closestPointOnCubicBezierPath` returns `t`, the curve parameter — **not**
+   * an arc fraction. On an unevenly parameterised segment the two diverge, so
+   * feeding `t` straight into `toArc` puts an edit measurably away from where
+   * the cursor was, worst on exactly the tight curves where precision matters.
+   */
+  function arcFractionForParameter(segmentId, t) {
+    const clamped = Math.max(0, Math.min(1, t));
+    const range = segmentRanges.get(segmentId);
+    if (!range) throw new Error(`Unknown path segment ${segmentId}.`);
+    const span = range.end - range.start;
+    if (span <= EPSILON) return 0;
+
+    let previous = null;
+    for (const entry of points) {
+      if (entry.segmentId !== segmentId) {
+        if (previous) break;
+        continue;
+      }
+      if (entry.t >= clamped) {
+        if (!previous) return Math.max(0, (entry.distance - range.start) / span);
+        const window = entry.t - previous.t;
+        const ratio = window > EPSILON ? (clamped - previous.t) / window : 0;
+        const distance = previous.distance + (entry.distance - previous.distance) * ratio;
+        return Math.max(0, Math.min(1, (distance - range.start) / span));
+      }
+      previous = entry;
+    }
+    return 1;
   }
 
   function fromArc(s) {
@@ -168,5 +211,6 @@ export function createCurveArcTable(sampled, { step = DEFAULT_STEP } = {}) {
     segmentRange,
     toArc,
     fromArc,
+    arcFractionForParameter,
   });
 }

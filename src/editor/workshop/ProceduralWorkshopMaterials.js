@@ -119,7 +119,10 @@ function createByteTexture(data, size, colorSpace = THREE.NoColorSpace) {
   return texture;
 }
 
-function proceduralNormalTexture(kind, seed) {
+// Exported so live constructions can build the same stone surface rather than
+// approximating it. A wall and a workshop building of nominally the same stone
+// have to match, and the cheapest way to guarantee that is one implementation.
+export function proceduralNormalTexture(kind, seed) {
   const pixels = createSurfaceTexturePixels(kind, { size: 128, seed });
   return createByteTexture(pixels.normal, pixels.size);
 }
@@ -137,7 +140,7 @@ function stoneTexture(recipe) {
   });
 }
 
-function surfaceBumpTexture(seed, scale = 1) {
+export function surfaceBumpTexture(seed, scale = 1) {
   return createTexture(128, (x, y) => {
     const fine = mixSeed(seed + y * 719, x * 313) & 255;
     const broad = mixSeed(seed + Math.floor(y / 5), Math.floor(x / 5)) & 255;
@@ -146,7 +149,7 @@ function surfaceBumpTexture(seed, scale = 1) {
   }, { colorSpace: THREE.NoColorSpace });
 }
 
-function surfaceRoughnessTexture(seed, {
+export function surfaceRoughnessTexture(seed, {
   base = 220,
   variation = 24,
   broadScale = 9,

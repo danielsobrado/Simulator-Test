@@ -1,37 +1,70 @@
-import { moveCubicBezierAnchor } from './curve/CubicBezierPath.js';
+import {
+  closeCubicBezierPath,
+  cubicBezierDirtySegments,
+  deleteCubicBezierAnchor,
+  insertCubicBezierAnchor,
+  moveCubicBezierAnchor,
+  openCubicBezierPath,
+  setCubicBezierHandle,
+} from './curve/CubicBezierPath.js';
+import { flattenHandlesAround } from './curve/CurveSnapping.js';
 
-/**
- * Segments whose geometry an anchor move can change.
- *
- * Moving anchor `i` obviously changes segments `i-1` and `i`. It also changes
- * `i-2` and `i+1`, because the Catmull-Rom handle solve derives a segment's
- * handles from the anchors on either side of it — so the neighbours' curvature
- * moves too. Under-reporting here shows up as stale geometry next to an edit.
- */
-function dirtySegmentsForAnchor(path, anchorId) {
-  const anchorIndex = path.anchors.findIndex(({ id }) => id === anchorId);
-  if (anchorIndex < 0) return [];
+/** Segments adjacent to a segment, which a handle move reaches through. */
+function neighbouringSegments(path, segmentId) {
+  const index = path.segments.findIndex(({ id }) => id === segmentId);
+  if (index < 0) return [];
   const count = path.segments.length;
   const ids = new Set();
-  for (let offset = -2; offset <= 1; offset += 1) {
-    const index = anchorIndex + offset;
-    const wrapped = path.closed ? ((index % count) + count) % count : index;
+  for (let offset = -1; offset <= 1; offset += 1) {
+    const position = index + offset;
+    const wrapped = path.closed ? ((position % count) + count) % count : position;
     if (wrapped >= 0 && wrapped < count) ids.add(path.segments[wrapped].id);
   }
   return [...ids];
+}
+
+/** Every segment: for edits whose reach is the whole path. */
+function allSegments(path) {
+  return path.segments.map(({ id }) => id);
+}
+
+/**
+ * Drop top-profile points and features whose host segment no longer exists.
+ *
+ * Deleting an anchor or closing a loop removes segment ids. Both `top.profile`
+ * and `features` are anchored per segment — that is what stops them sliding
+ * when an unrelated anchor moves — so an orphaned reference would make
+ * `normalizeConstructionRecord` throw and the edit would fail rather than
+ * degrade. Dropping is the honest outcome: the stretch of wall those points
+ * described is genuinely gone.
+ */
+function reconcileToPath(record, path) {
+  const live = new Set(path.segments.map(({ id }) => id));
+  const profile = record.top.profile.filter(({ segmentId }) => live.has(segmentId));
+  const features = record.features.filter(({ segmentId }) => live.has(segmentId));
+  return {
+    ...record,
+    path: { ...path, features },
+    features,
+    top: { ...record.top, profile },
+    dropped: (record.top.profile.length - profile.length)
+      + (record.features.length - features.length),
+  };
 }
 
 /**
  * An empty `dirtySegmentIds` means "every module"; `materialOnly` means the
  * geometry is unchanged and the view need only swap materials.
  */
-function change(before, after, { dirtySegmentIds = [], materialOnly = false } = {}) {
+function change(before, after, { dirtySegmentIds = [], materialOnly = false, dropped = 0 } = {}) {
   return Object.freeze({
     kind: 'construction',
     before,
     after,
     dirtySegmentIds: Object.freeze([...dirtySegmentIds]),
     materialOnly,
+    /** Top points and features discarded because their segment went away. */
+    dropped,
   });
 }
 
@@ -48,12 +81,69 @@ export function executeConstructionCommand(store, command) {
   if (command.type === 'move_anchor') {
     const before = store.get(command.constructionId);
     if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
-    const dirtySegmentIds = dirtySegmentsForAnchor(before.path, command.anchorId);
-    const after = store.update(before.id, {
-      ...before,
-      path: moveCubicBezierAnchor(before.path, command.anchorId, command.position),
-    }, { dirtySegmentIds });
+    const dirtySegmentIds = cubicBezierDirtySegments(before.path, command.anchorId);
+    let path = moveCubicBezierAnchor(before.path, command.anchorId, command.position, {
+      resolveHandles: command.resolveHandles ?? 'catmull-rom',
+    });
+    // A `straight` snap positions the anchor on the line through its
+    // neighbours; the span only actually goes straight once the adjacent
+    // handles lose their perpendicular component too.
+    if (command.flattenHandles) path = flattenHandlesAround(path, command.anchorId);
+    const after = store.update(before.id, { ...before, path }, { dirtySegmentIds });
     return change(before, after, { dirtySegmentIds });
+  }
+  if (command.type === 'insert_anchor') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const dirtySegmentIds = neighbouringSegments(before.path, command.segmentId);
+    const path = insertCubicBezierAnchor(before.path, command.segmentId, command.t);
+    const after = store.update(before.id, { ...before, path }, { dirtySegmentIds });
+    return change(before, after, { dirtySegmentIds });
+  }
+  if (command.type === 'delete_anchor') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const path = deleteCubicBezierAnchor(before.path, command.anchorId);
+    const { dropped, ...next } = reconcileToPath(before, path);
+    // Segments are relinked, so scope the rebuild to everything.
+    const after = store.update(before.id, next, {});
+    return change(before, after, { dirtySegmentIds: allSegments(path), dropped });
+  }
+  if (command.type === 'move_handle') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const dirtySegmentIds = neighbouringSegments(before.path, command.segmentId);
+    const path = setCubicBezierHandle(
+      before.path,
+      command.segmentId,
+      command.which,
+      command.offset,
+      { mode: command.mode ?? 'smooth' },
+    );
+    const after = store.update(before.id, { ...before, path }, { dirtySegmentIds });
+    return change(before, after, { dirtySegmentIds });
+  }
+  if (command.type === 'close_path' || command.type === 'open_path') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const path = command.type === 'close_path'
+      ? closeCubicBezierPath(before.path, { dropAnchorId: command.dropAnchorId ?? null })
+      : openCubicBezierPath(before.path, { atSegmentId: command.segmentId ?? null });
+    const { dropped, ...next } = reconcileToPath(before, path);
+    const after = store.update(before.id, next, {});
+    return change(before, after, { dirtySegmentIds: allSegments(path), dropped });
+  }
+  if (command.type === 'set_top_profile') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    // A control point that moved off a segment dirties both the segment it left
+    // and the one it landed on, so the dirty set is the union across the edit.
+    const segments = new Set();
+    for (const point of before.top.profile) segments.add(point.segmentId);
+    for (const point of command.top.profile ?? []) segments.add(point.segmentId);
+    const hint = { dirtySegmentIds: [...segments] };
+    const after = store.update(before.id, { ...before, top: command.top }, hint);
+    return change(before, after, hint);
   }
   if (command.type === 'replace') {
     const before = store.get(command.constructionId);

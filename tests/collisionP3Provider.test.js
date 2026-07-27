@@ -172,13 +172,36 @@ test('manifest-derived trunks block the P2 character motor', () => {
     stepHeight: 1.1,
     groundSnapDistance: 0.6,
   });
-  const result = motor.move({
+  // `profile.centerX` offsets the trunk axis away from the placement origin,
+  // and the capsule may never come closer to that axis than the two radii plus
+  // the skin width.
+  const trunkX = 10.25;
+  const trunkZ = -10;
+  const clearance = 0.35 + 0.5 + 0.03;
+  const radialDistance = (position) => Math.hypot(position.x - trunkX, position.z - trunkZ);
+
+  const headOn = motor.move({
+    start: { x: trunkX, y: 0, z: -8 },
+    displacement: { x: 0, z: -5 },
+    grounded: true,
+  });
+  assert.equal(headOn.blocked, true);
+  assert.deepEqual(headOn.contacts, ['tree:tree%3A0%3A0%3A7:trunk']);
+  assert.ok(headOn.position.z > trunkZ, `tree was crossed at z=${headOn.position.z}`);
+  assert.ok(
+    radialDistance(headOn.position) >= clearance - 1e-9,
+    `trunk was penetrated at ${radialDistance(headOn.position)}`,
+  );
+
+  // A pass that only grazes the trunk slides around it instead of stopping, but
+  // still reports the contact and still keeps its distance.
+  motor.reset({ x: 10, y: 0, z: -7 });
+  const grazing = motor.move({
     start: { x: 10, y: 0, z: -7 },
     displacement: { x: 0, z: -5 },
     grounded: true,
   });
-
-  assert.equal(result.blocked, true);
-  assert.ok(result.position.z > -9.2, `tree was crossed at z=${result.position.z}`);
-  assert.deepEqual(result.contacts, ['tree:tree%3A0%3A0%3A7:trunk']);
+  assert.equal(grazing.blocked, true);
+  assert.deepEqual(grazing.contacts, ['tree:tree%3A0%3A0%3A7:trunk']);
+  assert.ok(grazing.position.x < 10, `grazing pass was not deflected: x=${grazing.position.x}`);
 });
