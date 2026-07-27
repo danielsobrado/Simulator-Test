@@ -1,5 +1,13 @@
+import { MAX_COLLIDER_CHUNKS } from '../CollisionLimits.js';
+
 const AXES = Object.freeze(['X', 'Y', 'Z']);
 const CHUNK_BOUNDARY_EPSILON = 1e-9;
+const CHUNK_RANGE_FIELDS = Object.freeze([
+  'minChunkX',
+  'maxChunkX',
+  'minChunkZ',
+  'maxChunkZ',
+]);
 
 function assertFinite(value, name) {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
@@ -10,6 +18,12 @@ function assertSafeChunkCoordinate(value) {
     throw new Error('Collision chunk coordinate is outside the safe integer range.');
   }
   return value;
+}
+
+function assertPositiveSafeInteger(value, name) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive safe integer.`);
+  }
 }
 
 export function createCanonicalAabb({ minX, minY, minZ, maxX, maxY, maxZ }) {
@@ -68,9 +82,43 @@ export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
   });
 }
 
-export function collisionChunksForAabb(aabb, chunkWorldSize, target = []) {
+export function collisionChunkCountForRange(range) {
+  for (const field of CHUNK_RANGE_FIELDS) {
+    if (!Number.isSafeInteger(range?.[field])) {
+      throw new Error('Collision chunk range coordinates must be safe integers.');
+    }
+  }
+  const columns = range.maxChunkX - range.minChunkX + 1;
+  const rows = range.maxChunkZ - range.minChunkZ + 1;
+  if (!Number.isSafeInteger(columns) || !Number.isSafeInteger(rows)
+      || columns < 1 || rows < 1) {
+    throw new Error('Collision chunk range is too large to enumerate safely.');
+  }
+  if (columns > Math.floor(Number.MAX_SAFE_INTEGER / rows)) {
+    throw new Error('Collision chunk range is too large to enumerate safely.');
+  }
+  return columns * rows;
+}
+
+export function collisionChunksForAabb(
+  aabb,
+  chunkWorldSize,
+  target = [],
+  maximumChunks = MAX_COLLIDER_CHUNKS,
+) {
+  assertPositiveSafeInteger(maximumChunks, 'maximumChunks');
+  if (maximumChunks > MAX_COLLIDER_CHUNKS) {
+    throw new Error(`maximumChunks must not exceed ${MAX_COLLIDER_CHUNKS}.`);
+  }
+  if (!Array.isArray(target)) throw new Error('Collision chunk target must be an array.');
   target.length = 0;
   const range = collisionChunkRangeForAabb(aabb, chunkWorldSize);
+  const chunkCount = collisionChunkCountForRange(range);
+  if (chunkCount > maximumChunks) {
+    throw new Error(
+      `Collision AABB overlaps ${chunkCount} chunks, exceeding the limit of ${maximumChunks}.`,
+    );
+  }
   for (let chunkZ = range.minChunkZ; chunkZ <= range.maxChunkZ; chunkZ += 1) {
     for (let chunkX = range.minChunkX; chunkX <= range.maxChunkX; chunkX += 1) {
       target.push(Object.freeze({ chunkX, chunkZ }));

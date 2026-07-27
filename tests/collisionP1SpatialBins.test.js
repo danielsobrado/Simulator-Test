@@ -25,6 +25,18 @@ function collider(sourceId, aabb) {
   });
 }
 
+test('spatial bin construction rejects unbounded allocation settings', () => {
+  const chunkBounds = collisionChunkCanonicalBounds(0, 0, 128);
+  assert.throws(
+    () => new CollisionSpatialBins({ chunkBounds, binSize: Number.MIN_VALUE }),
+    /more than .* bins per chunk/,
+  );
+  assert.throws(
+    () => new CollisionSpatialBins({ chunkBounds, binSize: Number.POSITIVE_INFINITY }),
+    /positive and finite/,
+  );
+});
+
 test('spatial bins insert, deduplicate, reuse output, and remove records', () => {
   const bins = new CollisionSpatialBins({
     chunkBounds: collisionChunkCanonicalBounds(0, 0, 128),

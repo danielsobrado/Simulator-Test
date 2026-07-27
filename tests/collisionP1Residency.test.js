@@ -4,6 +4,10 @@ import {
   COLLISION_NOT_READY_POLICY,
   CollisionResidency,
 } from '../src/editor/collision/CollisionResidency.js';
+import {
+  MAX_COLLISION_BUILDS_PER_FRAME,
+  MAX_COLLISION_STREAMING_RADIUS,
+} from '../src/editor/collision/CollisionLimits.js';
 import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
 import { createCanonicalAabb } from '../src/editor/collision/colliders/ColliderBounds.js';
 
@@ -38,6 +42,44 @@ function createResidency(config = {}) {
   };
 }
 
+function createDirectResidency(config) {
+  return new CollisionResidency({
+    world: new CollisionWorld({ chunkWorldSize: 128, binSize: 16 }),
+    config,
+    buildOwnerChunk: () => ({ revision: 1, colliders: [] }),
+    logger: QUIET_LOGGER,
+  });
+}
+
+test('direct residency construction rejects unsafe work settings', () => {
+  const base = {
+    residentRadius: 0,
+    unloadRadius: 1,
+    prefetchSeconds: 1,
+    buildsPerFrame: 1,
+    buildBudgetMs: 2,
+  };
+  assert.throws(
+    () => createDirectResidency({
+      ...base,
+      residentRadius: MAX_COLLISION_STREAMING_RADIUS + 1,
+      unloadRadius: MAX_COLLISION_STREAMING_RADIUS + 1,
+    }),
+    /residentRadius/,
+  );
+  assert.throws(
+    () => createDirectResidency({
+      ...base,
+      buildsPerFrame: MAX_COLLISION_BUILDS_PER_FRAME + 1,
+    }),
+    /buildsPerFrame/,
+  );
+  assert.throws(
+    () => createDirectResidency({ ...base, prefetchSeconds: Number.POSITIVE_INFINITY }),
+    /prefetchSeconds/,
+  );
+});
+
 test('residency prioritises current and bounded predicted-route chunks', () => {
   const harness = createResidency();
   harness.residency.update({
@@ -49,6 +91,22 @@ test('residency prioritises current and bounded predicted-route chunks', () => {
   harness.residency.flush();
   assert.deepEqual(harness.built.slice(0, 2), ['0:0', '1:0']);
   assert.equal(harness.residency.getStatus().predictedChunk.chunkX, 1);
+});
+
+test('queued priorities follow the latest predicted direction', () => {
+  const harness = createResidency({ residentRadius: 1, unloadRadius: 2 });
+  harness.residency.update({
+    focus: { x: 1, z: -1 },
+    velocity: { x: 300, z: 0 },
+  });
+  harness.residency.update({
+    focus: { x: 1, z: -1 },
+    velocity: { x: -300, z: 0 },
+  });
+
+  harness.residency.flush();
+  harness.residency.flush();
+  assert.deepEqual(harness.built.slice(0, 2), ['0:0', '-1:0']);
 });
 
 test('teleport-sized velocity cannot create an unbounded prefetch route', () => {
@@ -168,4 +226,18 @@ test('destination readiness exposes the P2 safe movement policy', () => {
   harness.residency.update({ focus: { x: 1, z: -1 }, velocity: { x: 0, z: 0 } });
   harness.residency.flush();
   assert.equal(harness.residency.checkDestination(destination).ready, true);
+});
+
+test('dispose clears residency status and queued work', () => {
+  const harness = createResidency({ residentRadius: 1, unloadRadius: 1 });
+  harness.residency.update({ focus: { x: 1, z: -1 }, velocity: { x: 0, z: 0 } });
+  harness.residency.dispose();
+
+  const status = harness.residency.getStatus();
+  assert.equal(status.currentChunk, null);
+  assert.equal(status.predictedChunk, null);
+  assert.equal(status.desiredChunks, 0);
+  assert.equal(status.queuedBuilds, 0);
+  assert.equal(status.loadedOwnerChunks, 0);
+  assert.equal(status.lastBuildError, null);
 });

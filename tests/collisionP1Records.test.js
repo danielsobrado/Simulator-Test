@@ -65,6 +65,7 @@ test('primitive records and canonical bounds are deeply immutable', () => {
   assert.equal(Object.isFrozen(collider.aabb), true);
   assert.equal(Object.isFrozen(collider.position), true);
   assert.throws(() => { collider.position[0] = 9; }, TypeError);
+  assert.throws(() => primitive({ sourceId: '   ' }), /sourceId is required/);
 });
 
 test('primitive records reject invalid dimensions and layer bits', () => {
@@ -72,6 +73,61 @@ test('primitive records reject invalid dimensions and layer bits', () => {
   assert.throws(() => primitive({ dimensions: [2, -1, 2] }), /positive finite/);
   assert.throws(() => primitive({ layers: 1 << 8 }), /supported collision-layer bits/);
   assert.throws(() => primitive({ layers: Number.MAX_SAFE_INTEGER }), /supported collision-layer bits/);
+});
+
+test('prototype metadata is copied and deeply immutable', () => {
+  const metadata = {
+    triangles: 64,
+    lod: {
+      triangleCounts: [64, 32],
+    },
+  };
+  const prototype = createColliderPrototype({
+    id: 'rock-large',
+    kind: 'mesh',
+    bounds: BOUNDS,
+    metadata,
+  });
+
+  metadata.lod.triangleCounts[0] = 999;
+  assert.equal(prototype.metadata.lod.triangleCounts[0], 64);
+  assert.equal(Object.isFrozen(prototype.metadata), true);
+  assert.equal(Object.isFrozen(prototype.metadata.lod), true);
+  assert.equal(Object.isFrozen(prototype.metadata.lod.triangleCounts), true);
+  assert.throws(() => { prototype.metadata.lod.triangleCounts[0] = 999; }, TypeError);
+});
+
+test('prototype metadata copies reserved keys without prototype mutation', () => {
+  const metadata = JSON.parse('{"__proto__":{"polluted":true}}');
+  const prototype = createColliderPrototype({
+    id: 'safe-keys',
+    kind: 'mesh',
+    bounds: BOUNDS,
+    metadata,
+  });
+
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(Object.hasOwn(prototype.metadata, '__proto__'), true);
+  assert.equal(prototype.metadata.__proto__.polluted, true);
+  assert.equal(Object.getPrototypeOf(prototype.metadata), Object.prototype);
+});
+
+test('prototype metadata rejects cycles and non-plain resources', () => {
+  const cyclic = {};
+  cyclic.self = cyclic;
+  assert.throws(
+    () => createColliderPrototype({ id: 'cyclic', kind: 'mesh', bounds: BOUNDS, metadata: cyclic }),
+    /must not contain cycles/,
+  );
+  assert.throws(
+    () => createColliderPrototype({
+      id: 'typed',
+      kind: 'mesh',
+      bounds: BOUNDS,
+      metadata: { data: new Uint8Array([1]) },
+    }),
+    /plain objects/,
+  );
 });
 
 test('mesh instances reference prototype resources without embedding them', () => {
@@ -91,5 +147,4 @@ test('mesh instances reference prototype resources without embedding them', () =
   });
   assert.equal(collider.prototypeId, prototype.id);
   assert.equal('metadata' in collider, false);
-  assert.equal(Object.isFrozen(prototype.metadata), true);
 });

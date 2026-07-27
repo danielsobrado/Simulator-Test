@@ -1,12 +1,22 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey } from './CollisionIds.js';
 import { COLLISION_LAYERS } from './CollisionLayers.js';
+import {
+  MAX_COLLIDER_CHUNKS,
+  MAX_COLLISION_BINS_PER_CHUNK,
+} from './CollisionLimits.js';
 import { CollisionChunk } from './CollisionChunk.js';
 import {
   canonicalAabbsIntersect,
+  collisionChunkCanonicalBounds,
   collisionChunkRangeForAabb,
   collisionChunksForAabb,
 } from './colliders/ColliderBounds.js';
+import {
+  COLLIDER_TYPE_MESH_INSTANCE,
+  isColliderPrototypeDescriptor,
+  isColliderRecordDescriptor,
+} from './colliders/ColliderRecords.js';
 
 const MAX_REPORTED_MISSING_CHUNKS = 64;
 
@@ -22,13 +32,50 @@ function maximumRevision(contributions) {
   return revision;
 }
 
+function compareColliderSourceIds(left, right) {
+  if (left.sourceId < right.sourceId) return -1;
+  if (left.sourceId > right.sourceId) return 1;
+  return 0;
+}
+
+function assertBinAllocation(chunkWorldSize, binSize) {
+  const columns = Math.max(1, Math.ceil(chunkWorldSize / binSize));
+  if (!Number.isSafeInteger(columns)
+      || columns > Math.floor(MAX_COLLISION_BINS_PER_CHUNK / columns)) {
+    throw new Error(
+      `Collision binSize creates more than ${MAX_COLLISION_BINS_PER_CHUNK} bins per chunk.`,
+    );
+  }
+}
+
 export class CollisionWorld {
-  constructor({ chunkWorldSize, binSize, maxBinsPerCollider = 64 }) {
-    if (!(chunkWorldSize > 0)) throw new Error('Collision chunkWorldSize must be positive.');
-    if (!(binSize > 0)) throw new Error('Collision binSize must be positive.');
+  constructor({
+    chunkWorldSize,
+    binSize,
+    maxBinsPerCollider = 64,
+    maxChunksPerCollider = 64,
+  }) {
+    if (!Number.isFinite(chunkWorldSize) || chunkWorldSize <= 0) {
+      throw new Error('Collision chunkWorldSize must be positive and finite.');
+    }
+    if (!Number.isFinite(binSize) || binSize <= 0) {
+      throw new Error('Collision binSize must be positive and finite.');
+    }
+    assertBinAllocation(chunkWorldSize, binSize);
+    if (!Number.isSafeInteger(maxBinsPerCollider) || maxBinsPerCollider < 1) {
+      throw new Error('Collision maxBinsPerCollider must be a positive safe integer.');
+    }
+    if (!Number.isSafeInteger(maxChunksPerCollider)
+        || maxChunksPerCollider < 1
+        || maxChunksPerCollider > MAX_COLLIDER_CHUNKS) {
+      throw new Error(
+        `Collision maxChunksPerCollider must be within 1 and ${MAX_COLLIDER_CHUNKS}.`,
+      );
+    }
     this.chunkWorldSize = chunkWorldSize;
     this.binSize = binSize;
     this.maxBinsPerCollider = maxBinsPerCollider;
+    this.maxChunksPerCollider = maxChunksPerCollider;
     this.registry = new Map();
     this.prototypes = new Map();
     this.chunks = new Map();
@@ -43,6 +90,9 @@ export class CollisionWorld {
   }
 
   registerPrototype(prototype) {
+    if (!isColliderPrototypeDescriptor(prototype)) {
+      throw new Error('Collision prototype must be created by createColliderPrototype.');
+    }
     const previous = this.prototypes.get(prototype.id);
     if (previous && previous !== prototype) {
       throw new Error(`Collision prototype ${prototype.id} is already registered.`);
@@ -64,15 +114,44 @@ export class CollisionWorld {
     const previousState = this.ownerStates.get(ownerKey);
     if (previousState && revision <= previousState.revision) return false;
 
+    const ownerBounds = collisionChunkCanonicalBounds(chunkX, chunkZ, this.chunkWorldSize);
     const sourceIds = new Set();
+    const references = new Map();
+    references.set(ownerKey, []);
+
     for (const collider of colliders) {
+      if (!isColliderRecordDescriptor(collider)) {
+        throw new Error('Collision owner chunks require validated collider records.');
+      }
       if (collider.ownerChunkX !== chunkX || collider.ownerChunkZ !== chunkZ) {
         throw new Error(`Collider ${collider.sourceId} has the wrong canonical owner chunk.`);
+      }
+      if (!canonicalAabbsIntersect(collider.aabb, ownerBounds)) {
+        throw new Error(`Collider ${collider.sourceId} does not overlap its canonical owner chunk.`);
+      }
+      if (collider.type === COLLIDER_TYPE_MESH_INSTANCE
+          && !this.prototypes.has(collider.prototypeId)) {
+        throw new Error(
+          `Mesh collider ${collider.sourceId} references unknown prototype ${collider.prototypeId}.`,
+        );
       }
       if (sourceIds.has(collider.sourceId)) {
         throw new Error(`Duplicate collider source id in owner chunk: ${collider.sourceId}.`);
       }
       sourceIds.add(collider.sourceId);
+
+      const chunks = collisionChunksForAabb(
+        collider.aabb,
+        this.chunkWorldSize,
+        this.chunkScratch,
+        this.maxChunksPerCollider,
+      );
+      for (const chunk of chunks) {
+        const key = collisionChunkKey(chunk.chunkX, chunk.chunkZ);
+        const ids = references.get(key) ?? [];
+        ids.push(collider.sourceId);
+        references.set(key, ids);
+      }
     }
 
     const nextRegistry = new Map(this.registry);
@@ -82,18 +161,6 @@ export class CollisionWorld {
         throw new Error(`Collider source id is already owned elsewhere: ${collider.sourceId}.`);
       }
       nextRegistry.set(collider.sourceId, { collider, lastQueryStamp: 0 });
-    }
-
-    const references = new Map();
-    references.set(ownerKey, []);
-    for (const collider of colliders) {
-      const chunks = collisionChunksForAabb(collider.aabb, this.chunkWorldSize, this.chunkScratch);
-      for (const chunk of chunks) {
-        const key = collisionChunkKey(chunk.chunkX, chunk.chunkZ);
-        const ids = references.get(key) ?? [];
-        ids.push(collider.sourceId);
-        references.set(key, ids);
-      }
     }
 
     const affected = new Set(previousState?.referenceKeys ?? []);
@@ -226,6 +293,7 @@ export class CollisionWorld {
   }
 
   collectCandidates(aabb, layers = COLLISION_LAYERS.all, out = this.candidateBuffer) {
+    if (!Array.isArray(out)) throw new Error('Collision candidate output must be an array.');
     out.length = 0;
     const stamp = this.nextQueryStamp();
     let queriedChunks = 0;
@@ -234,6 +302,7 @@ export class CollisionWorld {
       queriedChunks += 1;
       chunk.query(aabb, stamp, this.registry, out, layers);
     }
+    out.sort(compareColliderSourceIds);
     this.lastQueryChunkCount = queriedChunks;
     this.lastQueryCandidateCount = out.length;
     PerfCounters.set('collisionCandidates', out.length);
@@ -323,7 +392,12 @@ export class CollisionWorld {
     this.ownerStates.clear();
     this.candidateBuffer.length = 0;
     this.chunkScratch.length = 0;
+    this.queryStamp = 0;
+    this.lastQueryChunkCount = 0;
+    this.lastQueryCandidateCount = 0;
     this.revision += 1;
     this.updateCounters();
+    PerfCounters.set('collisionCandidates', 0);
+    PerfCounters.set('collisionQueryChunks', 0);
   }
 }

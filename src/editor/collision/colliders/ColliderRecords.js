@@ -6,11 +6,21 @@ export const COLLIDER_TYPE_CAPSULE = 'capsule';
 export const COLLIDER_TYPE_BOX = 'box';
 export const COLLIDER_TYPE_MESH_INSTANCE = 'mesh-instance';
 
+const COLLIDER_RECORD_BRAND = Symbol('collision-record');
+const COLLIDER_PROTOTYPE_BRAND = Symbol('collision-prototype');
 const PRIMITIVE_TYPES = new Set([
   COLLIDER_TYPE_SPHERE,
   COLLIDER_TYPE_CAPSULE,
   COLLIDER_TYPE_BOX,
 ]);
+
+export function isColliderRecordDescriptor(value) {
+  return value?.[COLLIDER_RECORD_BRAND] === true;
+}
+
+export function isColliderPrototypeDescriptor(value) {
+  return value?.[COLLIDER_PROTOTYPE_BRAND] === true;
+}
 
 function freezeVector(value, name, dimensions = 3, { positive = false } = {}) {
   if (!Array.isArray(value) || value.length !== dimensions
@@ -21,8 +31,44 @@ function freezeVector(value, name, dimensions = 3, { positive = false } = {}) {
   return Object.freeze([...value]);
 }
 
+function cloneMetadata(value, path = 'metadata', ancestors = new WeakSet()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`Collision ${path} numbers must be finite.`);
+    return value;
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Collision ${path} must contain JSON-like values.`);
+  }
+  if (ancestors.has(value)) throw new Error(`Collision ${path} must not contain cycles.`);
+
+  ancestors.add(value);
+  let clone;
+  if (Array.isArray(value)) {
+    clone = value.map((entry, index) => cloneMetadata(entry, `${path}[${index}]`, ancestors));
+  } else {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(`Collision ${path} must contain plain objects.`);
+    }
+    clone = {};
+    for (const [key, entry] of Object.entries(value)) {
+      Object.defineProperty(clone, key, {
+        value: cloneMetadata(entry, `${path}.${key}`, ancestors),
+        enumerable: true,
+        configurable: false,
+        writable: false,
+      });
+    }
+  }
+  ancestors.delete(value);
+  return Object.freeze(clone);
+}
+
 function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }) {
-  if (!sourceId || typeof sourceId !== 'string') throw new Error('Collider sourceId is required.');
+  if (typeof sourceId !== 'string' || !sourceId.trim()) {
+    throw new Error('Collider sourceId is required.');
+  }
   if (!Number.isSafeInteger(ownerChunkX) || !Number.isSafeInteger(ownerChunkZ)) {
     throw new Error('Collider owner chunk coordinates must be safe integers.');
   }
@@ -30,6 +76,7 @@ function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }
     throw new Error('Collider layers must contain supported collision-layer bits.');
   }
   return {
+    [COLLIDER_RECORD_BRAND]: true,
     sourceId,
     type,
     layers,
@@ -89,10 +136,14 @@ export function createMeshInstanceCollider({
 export function createColliderPrototype({ id, kind, bounds, metadata = {} }) {
   if (!id) throw new Error('Collider prototype id is required.');
   if (!kind) throw new Error('Collider prototype kind is required.');
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error('Collider prototype metadata must be a plain object.');
+  }
   return Object.freeze({
+    [COLLIDER_PROTOTYPE_BRAND]: true,
     id: String(id),
     kind: String(kind),
     bounds: createCanonicalAabb(bounds),
-    metadata: Object.freeze({ ...metadata }),
+    metadata: cloneMetadata(metadata),
   });
 }
