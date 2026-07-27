@@ -25,6 +25,15 @@ const playerConfig = Object.freeze({
   }),
 });
 
+const riverSample = Object.freeze({
+  kind: 3,
+  bodyId: 5,
+  coverage: 1,
+  surfaceHeight: 2,
+  flowX: 1,
+  flowZ: 0,
+});
+
 test('swimmers drift with the bounded canonical current when idle', () => {
   const state = createPlayerState({ x: 0, z: 0, groundHeight: 0, eyeHeight: 1.7 });
   const next = stepPlayerPhysics({
@@ -35,17 +44,43 @@ test('swimmers drift with the bounded canonical current when idle', () => {
     forward: { x: 1, z: 0 },
     right: { x: 0, z: 1 },
     getGroundHeight: () => 0,
-    getWaterSample: () => ({
-      kind: 3,
-      bodyId: 5,
-      coverage: 1,
-      surfaceHeight: 2,
-      flowX: 1,
-      flowZ: 0,
-    }),
+    getWaterSample: () => riverSample,
   });
   assert.equal(next.waterState, 'swimming');
   assert.ok(Math.abs(next.x - 0.1) < 1e-9);
+});
+
+test('current drift is resolved by the collision motor', () => {
+  const state = createPlayerState({ x: 0, z: 0, groundHeight: 0, eyeHeight: 1.7 });
+  let requestedDisplacement = null;
+  const next = stepPlayerPhysics({
+    state,
+    input: { forward: 0, right: 0, running: false, jump: false, ascend: 0, descend: 0 },
+    deltaSeconds: 0.05,
+    config: playerConfig,
+    forward: { x: 1, z: 0 },
+    right: { x: 0, z: 1 },
+    getGroundHeight: () => 0,
+    getWaterSample: () => riverSample,
+    resolveHorizontalMotion: (request) => {
+      requestedDisplacement = request.displacement;
+      return {
+        position: { ...request.start },
+        ready: true,
+        blocked: true,
+        stepped: false,
+        supportSourceId: 'terrain',
+        supportHeight: 0,
+        supportNormal: { x: 0, y: 1, z: 0 },
+        contacts: [],
+        previousValidPosition: { ...request.start },
+      };
+    },
+  });
+  assert.ok(Math.abs(requestedDisplacement.x - 0.1) < 1e-9);
+  assert.equal(requestedDisplacement.z, 0);
+  assert.equal(next.x, 0);
+  assert.equal(next.collisionBlocked, true);
 });
 
 test('canonical queries convert south-positive cell flow into north-positive world axes', () => {
