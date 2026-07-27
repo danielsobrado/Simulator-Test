@@ -205,14 +205,16 @@ export class GpuTreeImpostorBatch {
     );
   }
 
-  submitComputes(nodes) {
+  submitComputes(jobs) {
     if (typeof this.renderer.compute === 'function') {
-      for (const node of nodes) this.renderer.compute(node);
+      for (const job of jobs) this.renderer.compute(job.node, job.dispatchSize);
       return;
     }
     if (this.computePending) return;
     this.computePending = (async () => {
-      for (const node of nodes) await this.renderer.computeAsync(node);
+      for (const job of jobs) {
+        await this.renderer.computeAsync(job.node, job.dispatchSize);
+      }
     })().catch((error) => {
       console.error('GPU impostor culling failed.', error);
     }).finally(() => {
@@ -226,15 +228,17 @@ export class GpuTreeImpostorBatch {
     this.originUniform.value.set(origin.x, 0, origin.z);
     if (this.recordCount === 0) {
       if (this.indirectNeedsReset) {
-        this.submitComputes([this.computeReset]);
+        this.submitComputes([{ node: this.computeReset, dispatchSize: 1 }]);
         this.indirectNeedsReset = false;
       }
       return 0;
     }
 
     this.updatePlanes(camera);
-    if ('count' in this.computeCull) this.computeCull.count = this.recordCount;
-    this.submitComputes([this.computeReset, this.computeCull]);
+    this.submitComputes([
+      { node: this.computeReset, dispatchSize: 1 },
+      { node: this.computeCull, dispatchSize: this.recordCount },
+    ]);
     return null;
   }
 
