@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
 import { COLLISION_LAYERS } from '../src/editor/collision/CollisionLayers.js';
 import {
+  COLLIDER_TYPE_MESH_INSTANCE,
   COLLIDER_TYPE_SPHERE,
+  createColliderPrototype,
 } from '../src/editor/collision/colliders/ColliderRecords.js';
 import { RockCollisionProvider } from '../src/editor/collision/providers/RockCollisionProvider.js';
 
@@ -48,15 +51,34 @@ const config = Object.freeze({
   minimumCollidableWidth: 0.4,
   minimumWalkableHeight: 3,
   minimumWalkableWidth: 3,
+  maximumProxyTriangles: 96,
+  bvhMaxLeafTriangles: 4,
+  minimumProxyOverlapRatio: 0.35,
+  allowGeneratedProxyFallback: true,
+  requireAuthoredProxy: false,
   prototypeOverrides: Object.freeze({}),
 });
+
+function meshPrototype(world) {
+  const prototype = createColliderPrototype({
+    id: 'rock-walkable:test',
+    kind: 'mesh-bvh',
+    bounds: { minX: -1, minY: 0, minZ: -0.5, maxX: 1, maxY: 1, maxZ: 0.5 },
+    metadata: { generated: false, triangleCount: 8 },
+    resource: { triangleCount: 8, dispose() {} },
+  });
+  return world.registerPrototype(prototype);
+}
 
 function providerFor({ placements, profiles = [profile()], burial = 0.4, nextConfig = config }) {
   const frozenProfiles = Object.freeze(profiles);
   const source = Object.freeze({
-    descriptor: Object.freeze({ id: 'production-rock-primitives' }),
+    descriptor: Object.freeze({ id: 'production-rock-collision' }),
     getProfiles: () => frozenProfiles,
+    getCachedProfileCount: () => frozenProfiles.length,
     getProfileSignature: () => 'profiles:1',
+    getMeshPrototype: (_index, world) => meshPrototype(world),
+    getMeshPrototypeStatus: () => Object.freeze({ count: 1, triangles: 8, generated: 0 }),
     epoch: () => 'epoch:1',
     resolvePrototypeIndex: (record) => record.prototypeIndex,
     burialFor: () => burial,
@@ -66,6 +88,7 @@ function providerFor({ placements, profiles = [profile()], burial = 0.4, nextCon
       signature: 'manifest:1',
       placements: Object.freeze(placements),
     }),
+    dispose() {},
   });
   return new RockCollisionProvider({ source, config: nextConfig });
 }
@@ -97,7 +120,7 @@ test('decorative rocks generate no solid collider', () => {
   assert.equal(built.stats.blocking, 0);
 });
 
-test('walkable-class rocks expose an explicit blocking P4 fallback', () => {
+test('walkable-class rocks emit a solid mesh instance instead of the P4 fallback', () => {
   const provider = providerFor({
     placements: [placement()],
     nextConfig: {
@@ -106,10 +129,14 @@ test('walkable-class rocks expose an explicit blocking P4 fallback', () => {
       minimumWalkableWidth: 1.2,
     },
   });
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  provider.attachWorld(world);
   const built = provider.buildChunkData(0, 0);
-  assert.equal(built.stats.walkablePending, 1);
-  assert.equal(built.colliders[0].layers, COLLISION_LAYERS.blocking);
-  assert.match(built.colliders[0].prototypeId, /^rock-tier-walkable:.*:p4-fallback$/);
+  assert.equal(built.stats.walkable, 1);
+  assert.equal(built.stats.walkablePending, 0);
+  assert.equal(built.colliders[0].type, COLLIDER_TYPE_MESH_INSTANCE);
+  assert.equal(built.colliders[0].layers, COLLISION_LAYERS.solid);
+  assert.equal(world.getStatus().prototypes, 1);
 });
 
 test('compound profiles emit deterministic per-part source IDs', () => {
