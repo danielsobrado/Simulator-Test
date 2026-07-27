@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCollisionConfig } from '../src/editor/collision/CollisionConfig.js';
 import {
+  MAX_COLLIDER_CHUNKS,
+  MAX_COLLISION_BUILDS_PER_FRAME,
+  MAX_COLLISION_STREAMING_RADIUS,
+} from '../src/editor/collision/CollisionLimits.js';
+import {
   collisionChunkCountForRange,
   collisionChunksForAabb,
   createCanonicalAabb,
@@ -18,7 +23,7 @@ function horizontalBounds(minX, maxX) {
   });
 }
 
-test('collision configuration exposes a validated collider chunk-span limit', () => {
+test('collision configuration exposes bounded streaming limits', () => {
   assert.equal(createCollisionConfig({}).streaming.maxChunksPerCollider, 64);
   assert.equal(
     createCollisionConfig({ streaming: { maxChunksPerCollider: 8 } })
@@ -29,6 +34,27 @@ test('collision configuration exposes a validated collider chunk-span limit', ()
     () => createCollisionConfig({ streaming: { maxChunksPerCollider: 0 } }),
     /maxChunksPerCollider/,
   );
+  assert.throws(
+    () => createCollisionConfig({
+      streaming: { maxChunksPerCollider: MAX_COLLIDER_CHUNKS + 1 },
+    }),
+    /maxChunksPerCollider/,
+  );
+  assert.throws(
+    () => createCollisionConfig({
+      streaming: {
+        residentRadius: MAX_COLLISION_STREAMING_RADIUS + 1,
+        unloadRadius: MAX_COLLISION_STREAMING_RADIUS + 1,
+      },
+    }),
+    /residentRadius/,
+  );
+  assert.throws(
+    () => createCollisionConfig({
+      streaming: { buildsPerFrame: MAX_COLLISION_BUILDS_PER_FRAME + 1 },
+    }),
+    /buildsPerFrame/,
+  );
 });
 
 test('AABB chunk enumeration rejects spans above the requested limit', () => {
@@ -38,6 +64,15 @@ test('AABB chunk enumeration rejects spans above the requested limit', () => {
     /exceeding the limit of 2/,
   );
   assert.deepEqual(target, []);
+  assert.throws(
+    () => collisionChunksForAabb(
+      horizontalBounds(0, 1),
+      128,
+      [],
+      MAX_COLLIDER_CHUNKS + 1,
+    ),
+    /must not exceed/,
+  );
 });
 
 test('chunk range counts reject arithmetic outside the safe integer range', () => {
