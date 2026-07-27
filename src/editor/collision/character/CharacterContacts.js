@@ -90,16 +90,58 @@ function radialContact({
   return out;
 }
 
-function sphereContact(capsule, collider, skinWidth, out) {
-  return radialContact({
-    capsule,
-    collider,
-    colliderRadius: collider.dimensions[0],
-    colliderSegmentMinY: collider.position[1],
-    colliderSegmentMaxY: collider.position[1],
-    skinWidth,
-    out,
-  });
+function ellipsoidContact(capsule, collider, skinWidth, out) {
+  const local = worldToBoxLocal(collider, capsule.x, capsule.z);
+  const combinedY = collider.dimensions[1] + capsule.radius + skinWidth;
+  const verticalGap = intervalGap(
+    capsule.segmentMinY,
+    capsule.segmentMaxY,
+    collider.position[1],
+    collider.position[1],
+  );
+  if (verticalGap >= combinedY - CONTACT_EPSILON) return null;
+  const verticalScale = Math.sqrt(Math.max(
+    0,
+    1 - (verticalGap * verticalGap) / (combinedY * combinedY),
+  ));
+  const combinedX = (collider.dimensions[0] + capsule.radius + skinWidth) * verticalScale;
+  const combinedZ = (collider.dimensions[2] + capsule.radius + skinWidth) * verticalScale;
+  if (combinedX <= CONTACT_EPSILON || combinedZ <= CONTACT_EPSILON) return null;
+
+  const normalized = Math.hypot(local.x / combinedX, local.z / combinedZ);
+  if (normalized >= 1 - CONTACT_EPSILON) return null;
+
+  let localNormalX;
+  let localNormalZ;
+  let depth;
+  if (normalized <= CONTACT_EPSILON) {
+    if (combinedX <= combinedZ) {
+      localNormalX = 1;
+      localNormalZ = 0;
+      depth = combinedX;
+    } else {
+      localNormalX = 0;
+      localNormalZ = 1;
+      depth = combinedZ;
+    }
+  } else {
+    const boundaryScale = 1 / normalized;
+    const deltaX = local.x * boundaryScale - local.x;
+    const deltaZ = local.z * boundaryScale - local.z;
+    depth = Math.hypot(deltaX, deltaZ);
+    if (!(depth > CONTACT_EPSILON)) return null;
+    localNormalX = deltaX / depth;
+    localNormalZ = deltaZ / depth;
+  }
+
+  const normal = localNormalToWorld(localNormalX, localNormalZ, local.cosine, local.sine);
+  out.sourceId = collider.sourceId;
+  out.collider = collider;
+  out.normalX = normal.x;
+  out.normalY = 0;
+  out.normalZ = normal.z;
+  out.depth = depth;
+  return out;
 }
 
 function capsuleContact(capsule, collider, skinWidth, out) {
@@ -176,7 +218,7 @@ export function findPrimitiveSideContact(
     return boxContact(capsule, collider, skinWidth, out);
   }
   if (collider.type === COLLIDER_TYPE_SPHERE) {
-    return sphereContact(capsule, collider, skinWidth, out);
+    return ellipsoidContact(capsule, collider, skinWidth, out);
   }
   if (collider.type === COLLIDER_TYPE_CAPSULE) {
     return capsuleContact(capsule, collider, skinWidth, out);
@@ -205,30 +247,30 @@ function boxTopSupport({ x, z, radius, collider }) {
 }
 
 function sphereTopSupport({ x, z, radius, collider }) {
+  const local = worldToBoxLocal(collider, x, z);
   const radiusX = collider.dimensions[0];
   const radiusY = collider.dimensions[1];
   const radiusZ = collider.dimensions[2];
   const combinedX = radiusX + radius;
   const combinedY = radiusY + radius;
   const combinedZ = radiusZ + radius;
-  const dx = x - collider.position[0];
-  const dz = z - collider.position[2];
-  const radial = (dx * dx) / (combinedX * combinedX)
-    + (dz * dz) / (combinedZ * combinedZ);
+  const radial = (local.x * local.x) / (combinedX * combinedX)
+    + (local.z * local.z) / (combinedZ * combinedZ);
   if (radial > 1) return null;
   const root = Math.sqrt(Math.max(0, 1 - radial));
   const height = collider.position[1] + combinedY * root - radius;
-  const gradientX = dx / (combinedX * combinedX);
+  const gradientX = local.x / (combinedX * combinedX);
   const gradientY = root / Math.max(CONTACT_EPSILON, combinedY);
-  const gradientZ = dz / (combinedZ * combinedZ);
+  const gradientZ = local.z / (combinedZ * combinedZ);
   const length = Math.hypot(gradientX, gradientY, gradientZ);
+  const horizontal = localNormalToWorld(gradientX, gradientZ, local.cosine, local.sine);
   return {
     sourceId: collider.sourceId,
     height,
     normal: Object.freeze({
-      x: gradientX / length,
+      x: horizontal.x * Math.hypot(gradientX, gradientZ) / length,
       y: gradientY / length,
-      z: gradientZ / length,
+      z: horizontal.z * Math.hypot(gradientX, gradientZ) / length,
     }),
     collider,
   };
