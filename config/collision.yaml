@@ -1,7 +1,7 @@
 # Static player-collision configuration.
 #
-# P3 enables the production runtime with canonical tree-trunk colliders. Later
-# phases add rocks, placed objects, constructions, and walkable mesh proxies.
+# P4 adds canonical primitive rock collision. Large rocks are classified as
+# walkable-pending and use a visible primitive fallback until P5 installs BVHs.
 enabled: true
 schemaVersion: 1
 
@@ -33,8 +33,15 @@ trees:
 rocks:
   enabled: true
   minimumCollidableHeight: 0.3
+  minimumCollidableWidth: 0.4
   minimumWalkableHeight: 0.7
+  minimumWalkableWidth: 1.2
   maximumProxyTriangles: 96
+  # Keys use the configured asset id/scene path. Multi-prototype assets use #0,
+  # #1, and so on. Supported fields: tier, shape, collisionScale.
+  # tier: auto | decorative | blocking | walkable
+  # shape: auto | sphere | ellipsoid | capsule | compound
+  prototypeOverrides: {}
 
 objects:
   enabled: true
