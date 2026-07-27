@@ -28,6 +28,12 @@ function queryBoxForLine(line, radius) {
   return new Box3().setFromPoints([line.start, line.end]).expandByScalar(radius + QUERY_PADDING);
 }
 
+function orientTriangleNormal(normal, line, trianglePoint, scratch) {
+  line.at(0.5, scratch).sub(trianglePoint);
+  if (scratch.lengthSq() > EPSILON * EPSILON && normal.dot(scratch) < 0) normal.negate();
+  return normal;
+}
+
 export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 0, out = {} }) {
   const resource = prototype?.resource;
   if (!resource?.bvh || resource.disposed) return null;
@@ -38,6 +44,7 @@ export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 
   const trianglePoint = new Vector3();
   const segmentPoint = new Vector3();
   const localNormal = new Vector3();
+  const orientation = new Vector3();
   const worldNormal = new Vector3();
   let best = null;
   let triangleTests = 0;
@@ -52,11 +59,12 @@ export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 
 
       localNormal.subVectors(segmentPoint, trianglePoint);
       if (localNormal.lengthSq() > EPSILON * EPSILON) {
-        worldNormal.copy(localNormal).normalize().transformDirection(instance.matrix).normalize();
+        localNormal.normalize();
       } else {
         triangle.getNormal(localNormal);
-        worldNormal.copy(localNormal).transformDirection(instance.matrix).normalize();
+        orientTriangleNormal(localNormal, local.line, trianglePoint, orientation);
       }
+      worldNormal.copy(localNormal).transformDirection(instance.matrix).normalize();
       const horizontal = normaliseHorizontal(worldNormal);
       if (!horizontal) return false;
       const worldDepth = depth * instance.scale;
