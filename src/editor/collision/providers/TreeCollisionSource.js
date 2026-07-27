@@ -22,6 +22,18 @@ function mix(hash, value) {
   return Math.imul(hash ^ (value >>> 0), 0x01000193) >>> 0;
 }
 
+function treePrototypeKeys(treeView) {
+  const keys = treeView.prototypes.map((_, index) => `prototype:${index}`);
+  for (const [assetKey, indices] of treeView.prototypeIndicesByAsset ?? []) {
+    for (let offset = 0; offset < indices.length; offset += 1) {
+      const index = indices[offset];
+      if (!Number.isSafeInteger(index) || index < 0 || index >= keys.length) continue;
+      keys[index] = indices.length === 1 ? assetKey : `${assetKey}#${offset}`;
+    }
+  }
+  return keys;
+}
+
 export function treeCollisionPlacementSignature(placements) {
   let accumulator = 0;
   let count = 0;
@@ -61,7 +73,7 @@ export function createTreeCollisionSource({ treeView, rockSource = null, config 
   if (!treeView?.manifestStore || !Array.isArray(treeView.prototypes)) {
     throw new Error('Tree collision source requires initialized tree prototypes and manifests.');
   }
-  const prototypeKeys = treeView.prototypes.map((_, index) => `prototype:${index}`);
+  const prototypeKeys = treePrototypeKeys(treeView);
   const profiles = deriveTreeCollisionProfiles({
     prototypes: treeView.prototypes,
     prototypeKeys,
