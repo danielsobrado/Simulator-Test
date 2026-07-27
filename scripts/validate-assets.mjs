@@ -9,7 +9,9 @@ import { TILE_BY_KEY } from '../src/editor/tileCatalog.js';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SCRIPT_DIR, '..');
 const OBJECT_CONFIG_PATH = path.join(REPOSITORY_ROOT, 'config', 'objects.yaml');
+const COLLISION_CONFIG_PATH = path.join(REPOSITORY_ROOT, 'config', 'collision.yaml');
 const EDITOR_CONFIG_PATH = path.join(REPOSITORY_ROOT, 'editor.config.yaml');
+const COLLIDER_NODE_PATTERN = /^COLLIDER(?:_WALKABLE)?(?:$|[_:.-])/i;
 
 function parseGlbJson(buffer, filePath) {
   if (buffer.length < 20 || buffer.toString('ascii', 0, 4) !== 'glTF') {
@@ -34,10 +36,29 @@ function nodeNamesForVariant(variant) {
   ];
 }
 
-async function validateStylizedAssets(editorConfig) {
+function validateCollisionNodes(document, variant, collisionConfig) {
+  const nodes = (document.nodes ?? []).filter(
+    (node) => COLLIDER_NODE_PATTERN.test(node.name ?? ''),
+  );
+  for (const node of nodes) {
+    if (!Number.isSafeInteger(node.mesh)) {
+      throw new Error(`${variant.scene} collision node ${node.name} contains no mesh.`);
+    }
+  }
+  if (collisionConfig.rocks.requireAuthoredProxy && nodes.length === 0) {
+    throw new Error(
+      `${variant.scene} requires a COLLIDER or COLLIDER_WALKABLE mesh node.`,
+    );
+  }
+  return nodes.length;
+}
+
+async function validateStylizedAssets(editorConfig, collisionConfig) {
   const assets = editorConfig.stylizedSurface?.assets ?? {};
+  const rockVariants = assets.rockVariants ?? [];
+  const rockScenes = new Set(rockVariants.map((variant) => variant.scene));
   const variants = [
-    ...(assets.rockVariants ?? []),
+    ...rockVariants,
     ...(assets.bushVariants ?? []),
     ...(assets.treeVariants ?? []),
     ...(assets.groundDetailVariants ?? []),
@@ -45,6 +66,7 @@ async function validateStylizedAssets(editorConfig) {
     ...(assets.wildlifeVariants ?? []),
   ];
   const documents = new Map();
+  let collisionProxyNodes = 0;
   for (const variant of variants) {
     let document = documents.get(variant.scene);
     if (!document) {
@@ -61,6 +83,9 @@ async function validateStylizedAssets(editorConfig) {
       throw new Error(
         `${variant.scene} is missing configured prototype nodes: ${missingNodes.join(', ')}.`,
       );
+    }
+    if (rockScenes.has(variant.scene)) {
+      collisionProxyNodes += validateCollisionNodes(document, variant, collisionConfig);
     }
     const availableMaterials = new Set(
       (document.materials ?? []).map((material) => material.name),
@@ -96,7 +121,7 @@ async function validateStylizedAssets(editorConfig) {
   );
   console.log(
     `validated ${documents.size} authored GLBs, ${groupedCount} grouped prototypes, `
-    + `and ${selectedRootCount} selected mesh roots`,
+    + `${selectedRootCount} selected mesh roots and ${collisionProxyNodes} rock collision nodes`,
   );
 }
 
@@ -106,8 +131,6 @@ async function main() {
     throw new Error('config/objects.yaml must contain object definitions.');
   }
 
-  // Running the definitions through the real schema keeps this gate honest:
-  // footprints, foundations, and terrain keys fail here rather than at runtime.
   const catalog = createObjectCatalog(parsed.objects, TILE_BY_KEY);
   const modelNames = new Set(OBJECT_MODEL_NAMES);
   const usedModels = new Set();
@@ -135,7 +158,8 @@ async function main() {
   );
 
   const editorConfig = yaml.load(await readFile(EDITOR_CONFIG_PATH, 'utf8'));
-  await validateStylizedAssets(editorConfig);
+  const collisionConfig = yaml.load(await readFile(COLLISION_CONFIG_PATH, 'utf8'));
+  await validateStylizedAssets(editorConfig, collisionConfig);
 }
 
 main().catch((error) => {
