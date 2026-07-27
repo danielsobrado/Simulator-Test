@@ -26,6 +26,7 @@ export class UnderwaterViewController {
     this.surfaceBackground = cloneColor(this.scene.background, '#0a100c');
     this.surfaceFogColor = cloneColor(this.scene.fog?.color, '#9ab4c0');
     this.surfaceFogDensity = this.scene.fog?.density ?? 0;
+    this.surfaceFogExists = Boolean(this.scene.fog?.isFogExp2);
     this.surfaceNearPlane = this.camera.near;
     this.surfaceHemisphereIntensity = this.hemisphere?.intensity ?? 0;
     this.surfaceDirectionalIntensity = this.directional?.intensity ?? 0;
@@ -34,9 +35,11 @@ export class UnderwaterViewController {
     this.godRays = terrainView.godRays ?? null;
     this.originalGodRaysRender = this.godRays?.render ?? null;
     if (this.godRays && this.originalGodRaysRender) {
-      this.godRays.render = (camera) => (this.blend > 0
-        ? false
-        : this.originalGodRaysRender.call(this.godRays, camera));
+      this.godRays.render = (camera) => (
+        this.blend > 0 || this.playerController.getStatus().headSubmerged
+          ? false
+          : this.originalGodRaysRender.call(this.godRays, camera)
+      );
     }
     this.underwaterBackground = new THREE.Color(config.backgroundColor);
     this.underwaterFogColor = new THREE.Color(config.fogColor);
@@ -48,7 +51,8 @@ export class UnderwaterViewController {
   captureSurfaceEnvironment() {
     if (this.blend > 0) return;
     this.surfaceBackground.copy(cloneColor(this.scene.background, '#0a100c'));
-    if (this.scene.fog?.isFogExp2) {
+    this.surfaceFogExists = Boolean(this.scene.fog?.isFogExp2);
+    if (this.surfaceFogExists) {
       this.surfaceFogColor.copy(this.scene.fog.color);
       this.surfaceFogDensity = this.scene.fog.density;
     }
@@ -128,11 +132,15 @@ export class UnderwaterViewController {
   restoreSurfaceEnvironment() {
     this.blend = 0;
     this.scene.background = this.surfaceBackground;
-    if (!this.scene.fog?.isFogExp2) {
-      this.scene.fog = new THREE.FogExp2(this.surfaceFogColor, this.surfaceFogDensity);
+    if (this.surfaceFogExists) {
+      if (!this.scene.fog?.isFogExp2) {
+        this.scene.fog = new THREE.FogExp2(this.surfaceFogColor, this.surfaceFogDensity);
+      }
+      this.scene.fog.color.copy(this.surfaceFogColor);
+      this.scene.fog.density = this.surfaceFogDensity;
+    } else {
+      this.scene.fog = null;
     }
-    this.scene.fog.color.copy(this.surfaceFogColor);
-    this.scene.fog.density = this.surfaceFogDensity;
     if (this.hemisphere) this.hemisphere.intensity = this.surfaceHemisphereIntensity;
     if (this.directional) this.directional.intensity = this.surfaceDirectionalIntensity;
     if (this.skyMesh) this.skyMesh.visible = this.surfaceSkyVisible;
