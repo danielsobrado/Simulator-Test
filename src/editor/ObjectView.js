@@ -1,29 +1,24 @@
 import * as THREE from 'three/webgpu';
-import { QUARTER_TURN_RADIANS } from './constants.js';
 import { disposeModelParts } from './assets/modelParts.js';
 import { createObjectModelParts } from './ObjectModelLibrary.js';
 import { ObjectLodController } from './ObjectLodController.js';
 import { PerfCounters } from './performance/qa/PerfCounters.js';
+import { ObjectPlacementResolver } from './placement/ObjectPlacementResolver.js';
 import {
   createInstancedRenderers,
   disposeInstancedRenderers,
   writeInstances,
 } from './stylized/lod/StylizedLodRuntime.js';
-import { evaluateObjectSurface } from './TerrainPlacement.js';
 
 const PREVIEW_VALID_COLOR = '#79d47d';
 const PREVIEW_INVALID_COLOR = '#db6868';
 const SELECTION_COLOR = '#f0cf68';
 const FOUNDATION_EPSILON = 0.03;
-const FOUNDATION_OVERLAP = 0.04;
 const OVERLAY_HEIGHT_OFFSET = 0.09;
-const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 function nextCapacity(required) {
   let capacity = 8;
-  while (capacity < required) {
-    capacity *= 2;
-  }
+  while (capacity < required) capacity *= 2;
   return capacity;
 }
 
@@ -61,6 +56,13 @@ export class ObjectView {
     this.objectMap = objectMap;
     this.objectCatalog = objectCatalog;
     this.definitionByKey = new Map(objectCatalog.map((definition) => [definition.key, definition]));
+    this.placementResolver = new ObjectPlacementResolver({
+      objectMap,
+      definitionByKey: this.definitionByKey,
+      heightField,
+      tileSize: tileMap.tileSize,
+      floatingOrigin: terrainView.floatingOrigin,
+    });
     this.root = new THREE.Group();
     this.root.name = 'placed-objects';
     terrainView.scene.add(this.root);
@@ -91,15 +93,6 @@ export class ObjectView {
     this.selectionOverlay = this.createOverlay(SELECTION_COLOR, 0.24);
     terrainView.scene.add(this.footprintPreview, this.selectionOverlay);
 
-    // Fallback lighting only, for when the stylized sky rig is disabled
-    // (`stylizedSurface.enabled` or `sky.enabled` off, or an impostor bake).
-    //
-    // Until 2026-07-25 these were added unconditionally, so the normal world ran
-    // two hemisphere lights and two directional suns from different directions.
-    // The extra unshadowed fill flattened buildings and contradicted 05-…md §14
-    // ("walls must work with the existing scene light setup"). `StylizedSkyView`
-    // now evicts anything tagged `fallbackLighting` when it takes over as the
-    // single lighting authority.
     const hemisphere = new THREE.HemisphereLight('#dce8ff', '#293326', 1.45);
     const sun = new THREE.DirectionalLight('#fff1cf', 2.1);
     sun.position.set(80, 120, 60);
@@ -128,9 +121,6 @@ export class ObjectView {
         ? { near: parts, coarse: lodParts.coarse, shell: lodParts.shell }
         : null,
       lodMeshes: hasLod ? { near: [], coarse: [], shell: [] } : null,
-      // Triangle counts are fixed for the life of the record, so they are
-      // measured once here rather than reduced over every part of every band on
-      // every frame inside `update()`.
       lodTriangles: hasLod
         ? {
           near: bandTriangles(parts),
@@ -163,9 +153,7 @@ export class ObjectView {
       throw new Error('Cannot register an empty procedural object renderer.');
     }
     const previous = this.renderers.get(definition.key);
-    if (previous) {
-      this.disposeRendererRecord(previous);
-    }
+    if (previous) this.disposeRendererRecord(previous);
     this.definitionByKey.set(definition.key, definition);
     this.renderers.set(definition.key, this.createRendererRecord(definition, parts, lodParts));
     if (this.previewDefinitionKey === definition.key) {
@@ -193,31 +181,13 @@ export class ObjectView {
   }
 
   resolvePlacement(object) {
-    const definition = this.definitionByKey.get(object.definitionKey);
-    if (!definition) {
-      throw new Error(`Unknown object definition: ${object.definitionKey}.`);
-    }
-    const bounds = this.objectMap.getBounds(
-      object.x,
-      object.z,
-      object.definitionKey,
-      object.rotation,
-    );
-    const evaluation = evaluateObjectSurface({
-      definition,
-      heightField: this.heightField,
-      bounds,
-      tileSize: this.tileMap.tileSize,
-    });
-    return { definition, bounds, ...evaluation };
+    return this.placementResolver.resolve(object);
   }
 
   refreshAll() {
     const startedAt = performance.now();
     const grouped = new Map(Array.from(this.renderers.keys(), (definitionKey) => [definitionKey, []]));
-    for (const object of this.objectMap.list()) {
-      grouped.get(object.definitionKey)?.push(object);
-    }
+    for (const object of this.objectMap.list()) grouped.get(object.definitionKey)?.push(object);
 
     this.pickMeshes = [];
     for (const [definitionKey, renderer] of this.renderers.entries()) {
@@ -273,7 +243,10 @@ export class ObjectView {
           const { object, placement } = placements[index];
           const rootMatrix = this.createObjectMatrix(object, placement.surface);
           for (let partIndex = 0; partIndex < renderer.parts.length; partIndex += 1) {
-            const matrix = new THREE.Matrix4().multiplyMatrices(rootMatrix, renderer.parts[partIndex].matrix);
+            const matrix = new THREE.Matrix4().multiplyMatrices(
+              rootMatrix,
+              renderer.parts[partIndex].matrix,
+            );
             renderer.meshes[partIndex].setMatrixAt(index, matrix);
           }
         }
@@ -330,15 +303,7 @@ export class ObjectView {
   }
 
   ensureCapacity(renderer, required) {
-    // Definitions with nothing placed stay unallocated, so a large catalog does
-    // not put hundreds of empty instanced meshes in front of the renderer.
-    if (required === 0) {
-      return;
-    }
-    if (renderer.capacity >= Math.max(1, required)) {
-      return;
-    }
-
+    if (required === 0 || renderer.capacity >= Math.max(1, required)) return;
     const capacity = nextCapacity(required);
     if (renderer.lodSources) {
       for (const meshes of Object.values(renderer.lodMeshes)) {
@@ -374,7 +339,6 @@ export class ObjectView {
       this.root.remove(mesh);
       mesh.dispose?.();
     }
-
     renderer.meshes = renderer.parts.map((part) => {
       const mesh = new THREE.InstancedMesh(part.geometry, part.material, capacity);
       mesh.count = 0;
@@ -433,18 +397,12 @@ export class ObjectView {
   }
 
   ensureFoundationCapacity(renderer, required) {
-    if (!renderer.foundationGeometry || required === 0) {
-      return;
-    }
-    if (renderer.foundationMesh && renderer.foundationCapacity >= required) {
-      return;
-    }
-
+    if (!renderer.foundationGeometry || required === 0) return;
+    if (renderer.foundationMesh && renderer.foundationCapacity >= required) return;
     if (renderer.foundationMesh) {
       this.root.remove(renderer.foundationMesh);
       renderer.foundationMesh.dispose?.();
     }
-
     renderer.foundationCapacity = nextCapacity(required);
     renderer.foundationMesh = new THREE.InstancedMesh(
       renderer.foundationGeometry,
@@ -460,10 +418,7 @@ export class ObjectView {
 
   refreshFoundations(renderer, placements) {
     this.ensureFoundationCapacity(renderer, placements.length);
-    if (!renderer.foundationMesh) {
-      return;
-    }
-
+    if (!renderer.foundationMesh) return;
     renderer.foundationMesh.count = placements.length;
     renderer.foundationMesh.userData.objectIds = placements.map(({ object }) => object.id);
     for (let index = 0; index < placements.length; index += 1) {
@@ -475,74 +430,25 @@ export class ObjectView {
     }
     renderer.foundationMesh.instanceMatrix.needsUpdate = true;
     renderer.foundationMesh.computeBoundingSphere();
-    if (placements.length > 0) {
-      this.pickMeshes.push(renderer.foundationMesh);
-    }
+    if (placements.length > 0) this.pickMeshes.push(renderer.foundationMesh);
   }
 
   createObjectMatrix(object, surfaceOverride = null) {
-    const placement = surfaceOverride
-      ? {
-        bounds: this.objectMap.getBounds(object.x, object.z, object.definitionKey, object.rotation),
-        definition: this.definitionByKey.get(object.definitionKey),
-        surface: surfaceOverride,
-      }
-      : this.resolvePlacement(object);
-    const center = this.terrainView.boundsToWorld(placement.bounds);
-    const yaw = new THREE.Quaternion().setFromAxisAngle(
-      WORLD_UP,
-      -object.rotation * QUARTER_TURN_RADIANS,
-    );
-    let quaternion = yaw;
-
-    if (placement.definition.foundation.alignToNormal) {
-      const normal = new THREE.Vector3(
-        placement.surface.normal.x,
-        placement.surface.normal.y,
-        placement.surface.normal.z,
-      );
-      const alignment = new THREE.Quaternion().setFromUnitVectors(WORLD_UP, normal);
-      quaternion = alignment.multiply(yaw);
-    }
-
-    return new THREE.Matrix4().compose(
-      new THREE.Vector3(center.x, placement.surface.baseHeight, center.z),
-      quaternion,
-      new THREE.Vector3(1, 1, 1),
-    );
+    return this.placementResolver.createObjectMatrix(object, surfaceOverride);
   }
 
   createFoundationMatrix(bounds, surface) {
-    const center = this.terrainView.boundsToWorld(bounds);
-    const depth = surface.foundationDepth + FOUNDATION_OVERLAP;
-    return new THREE.Matrix4().compose(
-      new THREE.Vector3(
-        center.x,
-        surface.baseHeight - depth / 2,
-        center.z,
-      ),
-      new THREE.Quaternion(),
-      new THREE.Vector3(
-        bounds.width * this.tileMap.tileSize * 0.96,
-        depth,
-        bounds.depth * this.tileMap.tileSize * 0.96,
-      ),
-    );
+    return this.placementResolver.createFoundationMatrix(bounds, surface);
   }
 
   pickObject(clientX, clientY, camera) {
     const bounds = this.terrainView.renderer.domElement.getBoundingClientRect();
-    if (bounds.width === 0 || bounds.height === 0) {
-      return null;
-    }
+    if (bounds.width === 0 || bounds.height === 0) return null;
     this.pointer.x = ((clientX - bounds.left) / bounds.width) * 2 - 1;
     this.pointer.y = -((clientY - bounds.top) / bounds.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, camera);
-
     const hit = this.raycaster.intersectObjects(this.pickMeshes, false)[0];
-    if (!hit || hit.instanceId === undefined) {
-      return null;
-    }
+    if (!hit || hit.instanceId === undefined) return null;
     return hit.object.userData.objectIds[hit.instanceId] ?? null;
   }
 
@@ -553,11 +459,9 @@ export class ObjectView {
       this.footprintPreview.visible = false;
       return;
     }
-
     if (this.previewDefinitionKey !== preview.definitionKey) {
       this.rebuildPreview(preview.definitionKey);
     }
-
     const object = {
       definitionKey: preview.definitionKey,
       x: preview.x,
@@ -567,16 +471,19 @@ export class ObjectView {
     const placement = preview.surface
       ? {
         definition: this.definitionByKey.get(preview.definitionKey),
-        bounds: this.objectMap.getBounds(preview.x, preview.z, preview.definitionKey, preview.rotation),
+        bounds: this.objectMap.getBounds(
+          preview.x,
+          preview.z,
+          preview.definitionKey,
+          preview.rotation,
+        ),
         surface: preview.surface,
       }
       : this.resolvePlacement(object);
     const matrix = this.createObjectMatrix(object, placement.surface);
     matrix.decompose(this.previewGroup.position, this.previewGroup.quaternion, this.previewGroup.scale);
     const color = preview.valid ? PREVIEW_VALID_COLOR : PREVIEW_INVALID_COLOR;
-    for (const mesh of this.previewGroup.children) {
-      mesh.material.color.set(color);
-    }
+    for (const mesh of this.previewGroup.children) mesh.material.color.set(color);
     this.previewGroup.visible = true;
 
     if (placement.surface.foundationDepth > FOUNDATION_EPSILON) {
@@ -600,15 +507,10 @@ export class ObjectView {
   }
 
   rebuildPreview(definitionKey) {
-    for (const child of this.previewGroup.children) {
-      child.material.dispose();
-    }
+    for (const child of this.previewGroup.children) child.material.dispose();
     this.previewGroup.clear();
-
     const renderer = this.renderers.get(definitionKey);
-    if (!renderer) {
-      throw new Error(`Unknown object definition: ${definitionKey}.`);
-    }
+    if (!renderer) throw new Error(`Unknown object definition: ${definitionKey}.`);
     for (const part of renderer.parts) {
       const mesh = new THREE.Mesh(
         part.geometry,
@@ -642,7 +544,7 @@ export class ObjectView {
   }
 
   positionOverlay(overlay, bounds, color, height) {
-    const center = this.terrainView.boundsToWorld(bounds);
+    const center = this.placementResolver.renderCenter(bounds);
     overlay.position.set(center.x, height + OVERLAY_HEIGHT_OFFSET, center.z);
     overlay.scale.set(
       bounds.width * this.tileMap.tileSize,
@@ -654,12 +556,8 @@ export class ObjectView {
   }
 
   dispose() {
-    for (const renderer of this.renderers.values()) {
-      this.disposeRendererRecord(renderer);
-    }
-    for (const child of this.previewGroup.children) {
-      child.material.dispose();
-    }
+    for (const renderer of this.renderers.values()) this.disposeRendererRecord(renderer);
+    for (const child of this.previewGroup.children) child.material.dispose();
     this.previewFoundation.geometry.dispose();
     this.previewFoundation.material.dispose();
     this.footprintPreview.geometry.dispose();

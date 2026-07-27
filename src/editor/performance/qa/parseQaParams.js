@@ -26,6 +26,12 @@ const SCENARIOS = Object.freeze({
     keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
     defaults: { duration: 14, speed: 'run', warmup: 8 },
   },
+  'collision-p0': {
+    id: 'collision-p0',
+    label: 'Collision P0 fixture baseline',
+    keys: () => [],
+    defaults: { duration: 1, speed: 'walk', warmup: 2 },
+  },
 });
 
 function readNumber(params, key, fallback) {
