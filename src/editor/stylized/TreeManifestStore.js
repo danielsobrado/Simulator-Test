@@ -1,4 +1,5 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import { cellCenterToWorld } from '../world/WorldCoordinates.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import {
   blockersForChunk,
@@ -117,13 +118,14 @@ export class TreeManifestStore {
         object.definitionKey,
         object.rotation,
       );
-      const center = this.terrainView.boundsToWorld(footprint);
+      const minimum = cellCenterToWorld(footprint.minX, footprint.minZ, tileSize);
+      const maximum = cellCenterToWorld(footprint.maxX, footprint.maxZ, tileSize);
       const halfWidth = footprint.width * tileSize * 0.5;
       const halfDepth = footprint.depth * tileSize * 0.5;
       return {
         stableId: `construction:${object.id}`,
-        x: center.x,
-        z: center.z,
+        x: (minimum.x + maximum.x) * 0.5,
+        z: (minimum.z + maximum.z) * 0.5,
         radius: Math.hypot(halfWidth, halfDepth),
       };
     });
@@ -416,12 +418,11 @@ export class TreeManifestStore {
 
   schedule(chunkX, chunkZ, rockSource) {
     const key = `${chunkX}:${chunkZ}`;
-    if (this.pendingKeys.has(key)) return;
-    this.pendingKeys.add(key);
     const focus = this.terrainView.focusChunk;
     const priority = focus
       ? Math.max(Math.abs(chunkX - focus.chunkX), Math.abs(chunkZ - focus.chunkZ))
       : 0;
+    this.pendingKeys.add(key);
     this.queue.enqueue({ key, chunkX, chunkZ, rockSource, priority });
   }
 
