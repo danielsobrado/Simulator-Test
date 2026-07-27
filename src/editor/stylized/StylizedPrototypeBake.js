@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const COLLIDER_NODE_PATTERN = /^COLLIDER(?:_WALKABLE)?(?:$|[_:.-])/i;
+
 /**
  * Shared GLB prototype grounding for stylized scatter.
  *
@@ -195,6 +197,65 @@ export function extractAuthoredMeshPrototypes(scene, { scale = 1, rootNames = nu
   return prototypes;
 }
 
+function colliderSuffix(name) {
+  return THREE.PropertyBinding.sanitizeNodeName(
+    name.replace(/^COLLIDER(?:_WALKABLE)?(?:[_:.-])?/i, ''),
+  );
+}
+
+function authoredColliderFor(visual, index, visualCount, colliders) {
+  const visualKey = THREE.PropertyBinding.sanitizeNodeName(visual.name ?? '');
+  const byName = colliders.find((node) => colliderSuffix(node.name) === visualKey);
+  if (byName) return byName;
+  const byIndex = colliders.find((node) => colliderSuffix(node.name) === String(index));
+  if (byIndex) return byIndex;
+  return visualCount === 1 && colliders.length === 1 ? colliders[0] : null;
+}
+
+function alignedProxyGeometry(proxyNode, visualBounds, scale) {
+  if (!proxyNode) return null;
+  const geometry = bakeWorldGeometry(proxyNode);
+  if (scale !== 1) geometry.scale(scale, scale, scale);
+  const centerX = (visualBounds.min.x + visualBounds.max.x) * 0.5;
+  const centerZ = (visualBounds.min.z + visualBounds.max.z) * 0.5;
+  geometry.translate(-centerX, -visualBounds.min.y, -centerZ);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  ensureVertexNormals(geometry);
+  return geometry;
+}
+
+/**
+ * Extracts visual rocks and reserved authored collision meshes in one pass.
+ * Reserved nodes never become render prototypes. The proxy is translated by the
+ * visual rock's centring/grounding transform so both remain in the same frame.
+ */
+export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = null } = {}) {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    throw new Error('Authored rock prototype scale must be positive.');
+  }
+  scene.updateMatrixWorld(true);
+  const roots = rootNames
+    ? sceneNodesByName(scene, rootNames, 'Authored rock prototype')
+    : [scene];
+  const meshes = collectMeshes(roots);
+  const colliderMeshes = meshes.filter((node) => COLLIDER_NODE_PATTERN.test(node.name ?? ''));
+  const visualMeshes = meshes.filter((node) => !COLLIDER_NODE_PATTERN.test(node.name ?? ''));
+  return visualMeshes.map((source, index) => {
+    const rawVisual = bakeWorldGeometry(source);
+    if (scale !== 1) rawVisual.scale(scale, scale, scale);
+    rawVisual.computeBoundingBox();
+    const visualBounds = rawVisual.boundingBox.clone();
+    const proxyNode = authoredColliderFor(source, index, visualMeshes.length, colliderMeshes);
+    return {
+      geometry: groundGeometry(rawVisual),
+      source,
+      collisionProxyGeometry: alignedProxyGeometry(proxyNode, visualBounds, scale),
+      collisionProxyName: proxyNode?.name ?? null,
+    };
+  });
+}
+
 export function isUprightSize(size, { strict = false } = {}) {
   if (strict) return size.y >= size.x && size.y >= size.z;
   return size.y >= size.x * 0.55 && size.y >= size.z * 0.55;
@@ -211,8 +272,6 @@ export function extractRockPrototypes(scene, rockMaterialName) {
     if (!node.isMesh) return;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     if (!materials.some((material) => material?.name === rockMaterialName)) return;
-    // Demo GLB instances the same rock mesh with different placement tumbles.
-    // Group by parent (SM_Rocks_01, …) so we keep one resting prototype each.
     const groupKey = node.parent?.name || node.geometry?.uuid || node.name;
     if (!groupKey || seenGroups.has(groupKey)) return;
     seenGroups.add(groupKey);
