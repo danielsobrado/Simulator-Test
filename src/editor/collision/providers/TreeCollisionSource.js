@@ -3,6 +3,7 @@ import {
   treeCollisionProfileSignature,
 } from './TreeCollisionProfiles.js';
 import { TREE_COLLISION_SIGNATURE_SCALE } from './TreeCollisionConstants.js';
+import { prototypeCollisionKeys } from './PrototypeCollisionKeys.js';
 
 function quantize(value) {
   return Math.round((Number.isFinite(value) ? value : 0) * TREE_COLLISION_SIGNATURE_SCALE);
@@ -20,18 +21,6 @@ function hashText(value) {
 
 function mix(hash, value) {
   return Math.imul(hash ^ (value >>> 0), 0x01000193) >>> 0;
-}
-
-function treePrototypeKeys(treeView) {
-  const keys = treeView.prototypes.map((_, index) => `prototype:${index}`);
-  for (const [assetKey, indices] of treeView.prototypeIndicesByAsset ?? []) {
-    for (let offset = 0; offset < indices.length; offset += 1) {
-      const index = indices[offset];
-      if (!Number.isSafeInteger(index) || index < 0 || index >= keys.length) continue;
-      keys[index] = indices.length === 1 ? assetKey : `${assetKey}#${offset}`;
-    }
-  }
-  return keys;
 }
 
 export function treeCollisionPlacementSignature(placements) {
@@ -73,7 +62,10 @@ export function createTreeCollisionSource({ treeView, rockSource = null, config 
   if (!treeView?.manifestStore || !Array.isArray(treeView.prototypes)) {
     throw new Error('Tree collision source requires initialized tree prototypes and manifests.');
   }
-  const prototypeKeys = treePrototypeKeys(treeView);
+  const prototypeKeys = prototypeCollisionKeys({
+    prototypeCount: treeView.prototypes.length,
+    prototypeIndicesByAsset: treeView.prototypeIndicesByAsset,
+  });
   const profiles = deriveTreeCollisionProfiles({
     prototypes: treeView.prototypes,
     prototypeKeys,
