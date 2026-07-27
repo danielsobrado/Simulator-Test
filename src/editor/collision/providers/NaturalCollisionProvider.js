@@ -175,7 +175,15 @@ export class NaturalCollisionProvider {
   }
 
   refresh(world) {
-    const epoch = this.sourceEpoch();
+    let epoch;
+    try {
+      epoch = this.sourceEpoch();
+    } catch (error) {
+      this.lastError = error;
+      this.logger.error?.('Natural collision source refresh failed.', error);
+      this.updateCounters();
+      return Object.freeze({ attempted: 0, rebuilt: 0, remaining: this.pendingRefresh.length });
+    }
     if (epoch !== this.lastSourceEpoch) {
       this.lastSourceEpoch = epoch;
       this.enqueueLoadedChunks(world);
