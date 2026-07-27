@@ -73,3 +73,15 @@ test('terrain water queries consume live tile and height overrides', () => {
   assert.equal(land.kind, WATER_KIND_NONE);
   assert.equal(land.bedHeight, 25);
 });
+
+test('painted water uses the authoritative sea level', () => {
+  const terrainView = createTerrainView({ seaLevel: -100 });
+  terrainView.worldStore.setHeight(0, 0, -105);
+  terrainView.worldStore.setTile(0, 0, 0);
+
+  const water = getCanonicalWater(terrainView, 1, -1);
+  assert.equal(water.kind, WATER_KIND_OCEAN);
+  assert.equal(water.surfaceHeight, -100);
+  assert.equal(water.bedHeight, -105);
+  assert.equal(water.depth, 5);
+});

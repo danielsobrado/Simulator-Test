@@ -1,3 +1,4 @@
+import { cellKey } from '../world/WorldCoordinates.js';
 import {
   WATER_BODY_ID_PROCEDURAL_OCEAN,
   WATER_KIND_NONE,
@@ -9,42 +10,61 @@ import { createNoWaterSample, createWaterSample } from './WaterSample.js';
 
 const WATER_TILE_ID = 0;
 
-function assertTerrainView(terrainView) {
-  const worldStore = terrainView?.worldStore;
-  if (!worldStore?.generator || !terrainView?.floatingOrigin) {
-    throw new Error('Terrain water queries require a world store and floating origin.');
-  }
-  if (typeof worldStore.generator.sampleWater !== 'function'
+function assertWorldStore(worldStore) {
+  if (!worldStore?.generator
+      || typeof worldStore.generator.sampleWater !== 'function'
       || typeof worldStore.sampleHeight !== 'function'
       || typeof worldStore.getTile !== 'function') {
     throw new Error('The active world store does not implement water-domain queries.');
   }
 }
 
-function sampleCurrentWater(worldStore, cellX, cellZ) {
-  const bedHeight = worldStore.sampleHeight(cellX, cellZ);
-  const tileId = worldStore.getTile(Math.floor(cellX), Math.floor(cellZ));
-  if (tileId !== WATER_TILE_ID) {
+function assertTerrainView(terrainView) {
+  if (!terrainView?.floatingOrigin) {
+    throw new Error('Terrain water queries require a floating origin.');
+  }
+  assertWorldStore(terrainView.worldStore);
+}
+
+export function sampleWorldStoreWater(worldStore, cellX, cellZ) {
+  assertWorldStore(worldStore);
+  const tileX = Math.floor(cellX);
+  const tileZ = Math.floor(cellZ);
+  const tileId = worldStore.getTile(tileX, tileZ);
+  const base = worldStore.generator.sampleWater(cellX, cellZ);
+  const hasExplicitTileOverrides = worldStore.tileOverrides instanceof Map
+    && worldStore.tileOverrides.size > 0;
+  const explicitTileOverride = hasExplicitTileOverrides
+    && worldStore.tileOverrides.has(cellKey(tileX, tileZ));
+  const canUseBaseBed = worldStore.heightOverrides instanceof Map
+    && worldStore.heightOverrides.size === 0;
+  const bedHeight = canUseBaseBed
+    ? base.bedHeight
+    : worldStore.sampleHeight(cellX, cellZ);
+
+  if (tileId !== WATER_TILE_ID
+      && (base.kind !== WATER_KIND_RIVER || explicitTileOverride)) {
     return createNoWaterSample(bedHeight);
   }
 
-  const base = worldStore.generator.sampleWater(cellX, cellZ);
-  const kind = base.kind === WATER_KIND_NONE ? WATER_KIND_OCEAN : base.kind;
+  const addedWater = base.kind === WATER_KIND_NONE;
+  const kind = addedWater ? WATER_KIND_OCEAN : base.kind;
   const incompleteRiver = kind === WATER_KIND_RIVER
     && (base.flags & WATER_SAMPLE_FLAG_INCOMPLETE_BED) !== 0;
+  const surfaceHeight = addedWater
+    ? worldStore.generator.seaLevel
+    : incompleteRiver
+      ? Math.max(base.surfaceHeight, bedHeight)
+      : base.surfaceHeight;
   return createWaterSample({
     kind,
-    bodyId: base.kind === WATER_KIND_NONE
-      ? WATER_BODY_ID_PROCEDURAL_OCEAN
-      : base.bodyId,
-    coverage: base.kind === WATER_KIND_NONE ? 1 : base.coverage,
-    surfaceHeight: incompleteRiver
-      ? Math.max(base.surfaceHeight, bedHeight)
-      : base.surfaceHeight,
+    bodyId: addedWater ? WATER_BODY_ID_PROCEDURAL_OCEAN : base.bodyId,
+    coverage: addedWater ? 1 : base.coverage,
+    surfaceHeight,
     bedHeight,
-    shoreDistance: base.shoreDistance,
-    flowX: base.flowX,
-    flowZ: base.flowZ,
+    shoreDistance: addedWater ? 0 : base.shoreDistance,
+    flowX: addedWater ? 0 : base.flowX,
+    flowZ: addedWater ? 0 : base.flowZ,
     flags: base.flags,
   });
 }
@@ -55,7 +75,7 @@ export function getCanonicalWater(terrainView, worldX, worldZ) {
     throw new Error('Canonical water coordinates must be finite.');
   }
   const tileSize = terrainView.worldStore.tileSize;
-  return sampleCurrentWater(
+  return sampleWorldStoreWater(
     terrainView.worldStore,
     worldX / tileSize,
     -worldZ / tileSize,

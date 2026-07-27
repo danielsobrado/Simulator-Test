@@ -84,16 +84,23 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
 
 export function createStylizedWaterMaterial({
   surfaceMaskTexture,
+  waterFieldTexture,
+  waterFieldSize,
+  waterSurfaceOrigin,
   chunkCenter,
   chunkWorldSize,
-  waterLevel = 0,
   time,
   config,
 }) {
   const water = config.water;
   const terrainUv = uv();
+  const fieldUv = terrainUv
+    .mul((waterFieldSize - 1) / waterFieldSize)
+    .add(0.5 / waterFieldSize);
   const surface = texture(surfaceMaskTexture, terrainUv);
-  const waterMask = createSurfaceClassNodes(surface).water;
+  const exactCoverage = createSurfaceClassNodes(surface).water;
+  const waterField = texture(waterFieldTexture, fieldUv);
+  const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
@@ -127,8 +134,10 @@ export function createStylizedWaterMaterial({
 
   const distance = length(positionWorld.xz.sub(cameraPosition.xz));
   const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
-  const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp).mul(fade).mul(waterMask);
-  const surfaceHeight = float(waterLevel).add(water.heightOffset);
+  const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
+    .mul(fade)
+    .mul(waterCoverage);
+  const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
 
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,

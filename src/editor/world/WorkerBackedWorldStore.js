@@ -1,5 +1,9 @@
 import { InfiniteWorldStore } from './InfiniteWorldStore.js';
 import {
+  PERF_COUNTER_WATER_GENERATION_MS,
+  PerfCounters,
+} from '../performance/qa/PerfCounters.js';
+import {
   decodeChunkDocument,
   encodeChunkDocument,
 } from './ChunkDocumentCodec.js';
@@ -8,7 +12,9 @@ import {
   enrichPageRenderPixels,
   getSurfaceMaskSearchRadius,
 } from './ChunkRenderPixels.js';
-import { resolveWaterDomainVersion } from '../water/WaterConfig.js';
+import { assertCompatibleWaterDomainMetadata } from '../water/WaterConfig.js';
+import { enrichPageWaterField } from '../water/WaterField.js';
+import { sampleWorldStoreWater } from '../water/TerrainWaterQueries.js';
 import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
 
 function tileIndex(localX, localZ, chunkSize) {
@@ -19,6 +25,16 @@ function heightIndex(localX, localZ, vertexSize) {
   return localZ * vertexSize + localX;
 }
 
+function recordWaterGeneration(page, durationMs) {
+  page.timings = {
+    ...(page.timings ?? {}),
+    waterGenerationMs: durationMs,
+  };
+  page.waterGenerationRecorded = true;
+  PerfCounters.inc(PERF_COUNTER_WATER_GENERATION_MS, durationMs);
+  PerfCounters.set('waterGeneration', durationMs);
+}
+
 function assertGeneratorMetadata(actual, expected) {
   const fields = ['seed', 'version', 'heightScale', 'seaLevel'];
   for (const field of fields) {
@@ -26,10 +42,7 @@ function assertGeneratorMetadata(actual, expected) {
       throw new Error(`World generator ${field} does not match the active editor configuration.`);
     }
   }
-  if (resolveWaterDomainVersion(actual?.waterDomainVersion)
-      !== resolveWaterDomainVersion(expected.waterDomainVersion)) {
-    throw new Error('World water-domain version does not match the active editor configuration.');
-  }
+  assertCompatibleWaterDomainMetadata(actual, expected);
 }
 
 export class WorkerBackedWorldStore extends InfiniteWorldStore {
@@ -63,7 +76,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     }
     const pending = this.pendingChunks.get(key);
     if (pending) {
-      // Already in flight — nudge its priority in case it became more urgent.
       this.chunkWorker.reprioritize?.(chunkX, chunkZ, priority);
       return pending;
     }
@@ -105,7 +117,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     );
   }
 
-  /** Drop a not-yet-started generation request for a chunk leaving residency. */
   cancelChunk(chunkX, chunkZ) {
     return this.chunkWorker.cancel?.(chunkX, chunkZ) ?? false;
   }
@@ -113,16 +124,21 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   refreshPageRenderPixels(page) {
     const maskConfig = this.generator.getSurfaceMaskConfig?.(this.surfaceMaskConfig)
       ?? this.surfaceMaskConfig;
-    // Overrides invalidate worker-built scatter; main-thread grass/flower rebuild
-    // will regenerate from tiles/heights.
     delete page.grassScatter;
     delete page.flowerScatter;
-    return enrichPageRenderPixels(
+    enrichPageRenderPixels(
       page,
       (cellX, cellZ) => this.getTile(cellX, cellZ),
       maskConfig,
       (tileId) => this.generator.getTileDefinition?.(tileId),
     );
+    const waterStartedAt = performance.now();
+    enrichPageWaterField(
+      page,
+      (cellX, cellZ) => sampleWorldStoreWater(this, cellX, cellZ),
+    );
+    recordWaterGeneration(page, performance.now() - waterStartedAt);
+    return page;
   }
 
   hasHaloTileOverrides(originX, originZ) {
@@ -149,13 +165,14 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
       return current;
     }
     const { originX, originZ } = page;
-    let appliedOverrides = false;
+    let appliedTileOverrides = false;
+    let appliedHeightOverrides = false;
     for (let localZ = 0; localZ < this.chunkSize; localZ += 1) {
       for (let localX = 0; localX < this.chunkSize; localX += 1) {
         const override = this.tileOverrides.get(cellKey(originX + localX, originZ + localZ));
         if (override !== undefined) {
           page.tiles[tileIndex(localX, localZ, this.chunkSize)] = override;
-          appliedOverrides = true;
+          appliedTileOverrides = true;
         }
       }
     }
@@ -164,17 +181,22 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
         const override = this.heightOverrides.get(cellKey(originX + localX, originZ + localZ));
         if (override !== undefined) {
           page.heights[heightIndex(localX, localZ, this.vertexSize)] = override;
+          appliedHeightOverrides = true;
         }
       }
     }
 
     const pixelsMissing = !page.tilePixels || !page.surfaceMaskPixels;
-    // Neighbor painted roads/water sit outside this page's tiles but inside the path halo.
+    const waterFieldMissing = !page.waterFieldPixels;
     const neighborHaloDirty = this.hasHaloTileOverrides(originX, originZ);
-    if (appliedOverrides || pixelsMissing || page.renderPixelsDirty || neighborHaloDirty) {
+    if (appliedTileOverrides || appliedHeightOverrides || pixelsMissing || waterFieldMissing
+        || page.renderPixelsDirty || neighborHaloDirty) {
       this.refreshPageRenderPixels(page);
     }
 
+    if (!page.waterGenerationRecorded && Number.isFinite(page.timings?.waterGenerationMs)) {
+      recordWaterGeneration(page, page.timings.waterGenerationMs);
+    }
     this.clock += 1;
     const completed = {
       ...page,

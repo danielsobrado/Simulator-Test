@@ -1,6 +1,30 @@
-import { WATER_DOMAIN_VERSION } from './WaterConstants.js';
+import {
+  WATER_DOMAIN_LEGACY_VERSION,
+  WATER_DOMAIN_VERSION,
+} from './WaterConstants.js';
 
 const WATER_CONFIG_KEYS = Object.freeze(['waterDomain', 'player']);
+
+export const DEFAULT_WATER_DOMAIN_CONFIG = Object.freeze({
+  version: WATER_DOMAIN_VERSION,
+  cellSizeMeters: 1,
+  shoreDistanceMeters: 48,
+  ocean: Object.freeze({
+    coastalShelfMeters: 20,
+    shelfDepth: 4,
+    maximumDepth: 24,
+    maximumBedSlope: 0.75,
+  }),
+  river: Object.freeze({
+    minimumDepth: 0.8,
+    maximumDepth: 8,
+    widthDepthRatio: 0.18,
+    bankExponent: 1.8,
+    minimumGradient: 0.0002,
+  }),
+});
+
+let runtimeWaterDomainConfig = DEFAULT_WATER_DOMAIN_CONFIG;
 
 function assertObject(value, fieldName) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -20,6 +44,22 @@ function assertNonNegative(value, fieldName) {
   }
 }
 
+function cloneDomain(domain) {
+  return {
+    version: domain.version,
+    cellSizeMeters: domain.cellSizeMeters,
+    shoreDistanceMeters: domain.shoreDistanceMeters,
+    ocean: { ...domain.ocean },
+    river: { ...domain.river },
+  };
+}
+
+function freezeDomain(domain) {
+  Object.freeze(domain.ocean);
+  Object.freeze(domain.river);
+  return Object.freeze(domain);
+}
+
 export function resolveWaterDomainVersion(value) {
   const version = value ?? WATER_DOMAIN_VERSION;
   if (!Number.isInteger(version) || version !== WATER_DOMAIN_VERSION) {
@@ -30,34 +70,29 @@ export function resolveWaterDomainVersion(value) {
   return version;
 }
 
-export function applyWaterDomainConfig(config, waterConfig) {
-  assertObject(config, 'editor config');
-  assertObject(waterConfig, 'water config');
-  for (const key of WATER_CONFIG_KEYS) {
-    if (!(key in waterConfig)) {
-      throw new Error(`Invalid water configuration: missing ${key}.`);
-    }
+export function resolvePersistedWaterDomainVersion(value) {
+  if (value === undefined || value === null) return WATER_DOMAIN_LEGACY_VERSION;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid persisted water-domain version: ${String(value)}.`);
   }
-  assertObject(config.player, 'player');
-  config.waterDomain = structuredClone(waterConfig.waterDomain);
-  config.player.water = structuredClone(waterConfig.player.water);
-  return config;
+  return value;
 }
 
-export function validateWaterDomainConfig(config) {
-  assertObject(config, 'editor config');
-  const domain = config.waterDomain;
-  const playerWater = config.player?.water;
+export function validateWaterDomainDefinition(domain) {
   assertObject(domain, 'waterDomain');
   assertObject(domain.ocean, 'waterDomain.ocean');
   assertObject(domain.river, 'waterDomain.river');
-  assertObject(playerWater, 'player.water');
-
   resolveWaterDomainVersion(domain.version);
+  assertPositive(domain.cellSizeMeters, 'waterDomain.cellSizeMeters');
   assertPositive(domain.shoreDistanceMeters, 'waterDomain.shoreDistanceMeters');
 
   for (const field of ['coastalShelfMeters', 'shelfDepth', 'maximumDepth', 'maximumBedSlope']) {
     assertPositive(domain.ocean[field], `waterDomain.ocean.${field}`);
+  }
+  if (domain.ocean.coastalShelfMeters >= domain.shoreDistanceMeters) {
+    throw new Error(
+      'Invalid water configuration: waterDomain.shoreDistanceMeters must exceed coastalShelfMeters.',
+    );
   }
   if (domain.ocean.shelfDepth > domain.ocean.maximumDepth) {
     throw new Error(
@@ -67,6 +102,14 @@ export function validateWaterDomainConfig(config) {
   if (domain.ocean.maximumBedSlope > 1) {
     throw new Error(
       'Invalid water configuration: waterDomain.ocean.maximumBedSlope must be within (0, 1].',
+    );
+  }
+  const shelfSlope = domain.ocean.shelfDepth / domain.ocean.coastalShelfMeters;
+  const deepSlope = (domain.ocean.maximumDepth - domain.ocean.shelfDepth)
+    / (domain.shoreDistanceMeters - domain.ocean.coastalShelfMeters);
+  if (Math.max(shelfSlope, deepSlope) > domain.ocean.maximumBedSlope) {
+    throw new Error(
+      'Invalid water configuration: ocean depth profile exceeds maximumBedSlope.',
     );
   }
 
@@ -84,6 +127,83 @@ export function validateWaterDomainConfig(config) {
       'Invalid water configuration: waterDomain.river.maximumDepth must cover minimumDepth.',
     );
   }
+  return domain;
+}
+
+export function resolveWaterDomainConfig(value = runtimeWaterDomainConfig) {
+  const source = value ?? DEFAULT_WATER_DOMAIN_CONFIG;
+  const resolved = cloneDomain({
+    ...DEFAULT_WATER_DOMAIN_CONFIG,
+    ...source,
+    ocean: { ...DEFAULT_WATER_DOMAIN_CONFIG.ocean, ...source.ocean },
+    river: { ...DEFAULT_WATER_DOMAIN_CONFIG.river, ...source.river },
+  });
+  validateWaterDomainDefinition(resolved);
+  return freezeDomain(resolved);
+}
+
+export function serializeWaterDomainConfig(value) {
+  return cloneDomain(resolveWaterDomainConfig(value));
+}
+
+export function waterDomainConfigsEqual(left, right) {
+  if (!left || !right) return false;
+  return JSON.stringify(serializeWaterDomainConfig(left))
+    === JSON.stringify(serializeWaterDomainConfig(right));
+}
+
+export function assertCompatibleWaterDomainMetadata(actual, expected) {
+  const actualVersion = resolvePersistedWaterDomainVersion(actual?.waterDomainVersion);
+  const expectedVersion = resolveWaterDomainVersion(expected?.waterDomainVersion);
+  if (actualVersion !== expectedVersion) {
+    if (actualVersion < expectedVersion) {
+      throw new Error(
+        `World water-domain version ${actualVersion} requires migration to ${expectedVersion}.`,
+      );
+    }
+    throw new Error(
+      `World water-domain version ${actualVersion} is newer than supported version ${expectedVersion}.`,
+    );
+  }
+  if (!waterDomainConfigsEqual(actual?.waterDomain, expected?.waterDomain)) {
+    throw new Error('World water-domain settings do not match the active editor configuration.');
+  }
+}
+
+export function getRuntimeWaterDomainConfig() {
+  return runtimeWaterDomainConfig;
+}
+
+export function setRuntimeWaterDomainConfig(domain) {
+  runtimeWaterDomainConfig = resolveWaterDomainConfig(domain);
+  return runtimeWaterDomainConfig;
+}
+
+export function applyWaterDomainConfig(config, waterConfig) {
+  assertObject(config, 'editor config');
+  assertObject(waterConfig, 'water config');
+  for (const key of WATER_CONFIG_KEYS) {
+    if (!(key in waterConfig)) {
+      throw new Error(`Invalid water configuration: missing ${key}.`);
+    }
+  }
+  assertObject(config.player, 'player');
+  const domain = {
+    ...structuredClone(waterConfig.waterDomain),
+    cellSizeMeters: config.map?.tileSize ?? waterConfig.waterDomain.cellSizeMeters ?? 1,
+  };
+  config.waterDomain = domain;
+  config.player.water = structuredClone(waterConfig.player.water);
+  setRuntimeWaterDomainConfig(domain);
+  return config;
+}
+
+export function validateWaterDomainConfig(config) {
+  assertObject(config, 'editor config');
+  const domain = config.waterDomain;
+  const playerWater = config.player?.water;
+  validateWaterDomainDefinition(domain);
+  assertObject(playerWater, 'player.water');
 
   for (const field of [
     'wadeDepth',

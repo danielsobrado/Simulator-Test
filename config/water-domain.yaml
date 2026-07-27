@@ -1,8 +1,8 @@
 waterDomain:
-  version: 1
+  version: 2
   shoreDistanceMeters: 48
   ocean:
-    coastalShelfMeters: 32
+    coastalShelfMeters: 20
     shelfDepth: 4
     maximumDepth: 24
     maximumBedSlope: 0.75
