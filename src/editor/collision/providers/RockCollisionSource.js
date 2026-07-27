@@ -1,3 +1,7 @@
+import {
+  authoredCollisionProxyForGeometry,
+  releaseAuthoredCollisionProxy,
+} from '../../stylized/StylizedPrototypeBake.js';
 import { createMeshColliderPrototype } from '../mesh/MeshColliderPrototype.js';
 import { createRockCollisionProxy } from './RockCollisionProxy.js';
 import { prototypeCollisionKeys } from './PrototypeCollisionKeys.js';
@@ -112,9 +116,10 @@ export function createRockCollisionSource({ rockView, config }) {
     const cached = meshPrototypes.get(id);
     if (cached) return world.registerPrototype(cached);
 
+    const authored = authoredCollisionProxyForGeometry(visual);
     const proxy = createRockCollisionProxy({
       visualGeometry: visual,
-      authoredGeometry: rockView.collisionProxyGeometries?.[prototypeIndex] ?? null,
+      authoredGeometry: authored?.geometry ?? null,
       config,
       prototypeId: profile.id,
       allowGenerated: config.allowGeneratedProxyFallback,
@@ -129,6 +134,7 @@ export function createRockCollisionSource({ rockView, config }) {
         metadata: {
           source: 'rock',
           assetKey: profile.id,
+          proxyNode: authored?.name ?? null,
           generated: proxy.generated,
           overlap: proxy.overlap,
         },
@@ -137,6 +143,7 @@ export function createRockCollisionSource({ rockView, config }) {
       proxy.geometry.dispose();
     }
     meshPrototypes.set(id, descriptor);
+    if (authored) releaseAuthoredCollisionProxy(visual);
     return world.registerPrototype(descriptor);
   }
 
@@ -196,6 +203,9 @@ export function createRockCollisionSource({ rockView, config }) {
     dispose() {
       for (const prototype of meshPrototypes.values()) prototype.resource?.dispose?.();
       meshPrototypes.clear();
+      for (const prototype of rockView.prototypes) {
+        releaseAuthoredCollisionProxy(prototype.geometry);
+      }
     },
   });
 }
