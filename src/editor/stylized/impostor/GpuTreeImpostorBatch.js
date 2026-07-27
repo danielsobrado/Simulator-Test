@@ -11,11 +11,12 @@ import {
   struct,
   uint,
   uniform,
-  vec3,
 } from 'three/tsl';
+import { markAttributeRangeUpdated } from '../attributeUpload.js';
 import { createGpuTreeImpostorMaterial, updateImpostorCameraUniforms } from './TreeImpostorMaterial.js';
 
 const WORKGROUP_SIZE = 64;
+const DEFAULT_APPEARANCE = Object.freeze([1, 1, 1, 1]);
 
 function createGeometry() {
   const geometry = new THREE.BufferGeometry();
@@ -49,6 +50,7 @@ export class GpuTreeImpostorBatch {
     this.capacity = capacity;
     this.recordCount = 0;
     this.computePending = null;
+    this.indirectNeedsReset = false;
     this.disposed = false;
     this.frustum = new THREE.Frustum();
     this.projectionView = new THREE.Matrix4();
@@ -56,11 +58,13 @@ export class GpuTreeImpostorBatch {
     const geometry = createGeometry();
     const transformBuffer = new THREE.StorageBufferAttribute(new Float32Array(capacity * 4), 4);
     const parameterBuffer = new THREE.StorageBufferAttribute(new Float32Array(capacity * 4), 4);
+    const appearanceBuffer = new THREE.StorageBufferAttribute(new Float32Array(capacity * 4).fill(1), 4);
     const visibleBuffer = new THREE.StorageBufferAttribute(new Uint32Array(capacity), 1);
     const planeBuffer = new THREE.StorageBufferAttribute(new Float32Array(6 * 4), 4);
     const drawBuffer = new THREE.IndirectStorageBufferAttribute(new Uint32Array([6, 0, 0, 0, 0]), 5);
     const transformRead = storage(transformBuffer, 'vec4', capacity).toReadOnly();
     const parameterRead = storage(parameterBuffer, 'vec4', capacity).toReadOnly();
+    const appearanceRead = storage(appearanceBuffer, 'vec4', capacity).toReadOnly();
     const visibleWrite = storage(visibleBuffer, 'uint', capacity);
     const visibleRead = storage(visibleBuffer, 'uint', capacity).toReadOnly();
     const planeRead = storage(planeBuffer, 'vec4', 6).toReadOnly();
@@ -108,6 +112,7 @@ export class GpuTreeImpostorBatch {
       atlas,
       transformRead,
       parameterRead,
+      appearanceRead,
       visibleRead,
       instanceIndex: uint(instanceIndex),
       originUniform,
@@ -125,6 +130,7 @@ export class GpuTreeImpostorBatch {
     this.mesh = mesh;
     this.transformBuffer = transformBuffer;
     this.parameterBuffer = parameterBuffer;
+    this.appearanceBuffer = appearanceBuffer;
     this.visibleBuffer = visibleBuffer;
     this.planeBuffer = planeBuffer;
     this.drawBuffer = drawBuffer;
@@ -135,11 +141,11 @@ export class GpuTreeImpostorBatch {
   }
 
   setRecords(records) {
+    const previousCount = this.recordCount;
     const count = Math.min(records.length, this.capacity);
     const transforms = this.transformBuffer.array;
     const parameters = this.parameterBuffer.array;
-    transforms.fill(0);
-    parameters.fill(0);
+    const appearances = this.appearanceBuffer.array;
     for (let index = 0; index < count; index += 1) {
       const record = records[index];
       const offset = index * 4;
@@ -151,11 +157,32 @@ export class GpuTreeImpostorBatch {
       parameters[offset + 1] = record.fade;
       parameters[offset + 2] = record.seed;
       parameters[offset + 3] = record.radius;
+      const appearance = record.appearance ?? DEFAULT_APPEARANCE;
+      appearances[offset] = appearance[0];
+      appearances[offset + 1] = appearance[1];
+      appearances[offset + 2] = appearance[2];
+      appearances[offset + 3] = appearance[3];
     }
     this.recordCount = count;
     this.countUniform.value = count;
-    this.transformBuffer.needsUpdate = true;
-    this.parameterBuffer.needsUpdate = true;
+    this.indirectNeedsReset ||= previousCount > 0 && count === 0;
+    if (count > 0) {
+      markAttributeRangeUpdated(
+        this.transformBuffer,
+        count,
+        { counter: 'treeImpostorAttributeBytesUploaded' },
+      );
+      markAttributeRangeUpdated(
+        this.parameterBuffer,
+        count,
+        { counter: 'treeImpostorAttributeBytesUploaded' },
+      );
+      markAttributeRangeUpdated(
+        this.appearanceBuffer,
+        count,
+        { counter: 'treeImpostorAttributeBytesUploaded' },
+      );
+    }
     return count;
   }
 
@@ -171,27 +198,43 @@ export class GpuTreeImpostorBatch {
       values[offset + 2] = plane.normal.z;
       values[offset + 3] = plane.constant;
     }
-    this.planeBuffer.needsUpdate = true;
+    markAttributeRangeUpdated(
+      this.planeBuffer,
+      6,
+      { counter: 'treeImpostorAttributeBytesUploaded' },
+    );
+  }
+
+  submitComputes(nodes) {
+    if (typeof this.renderer.compute === 'function') {
+      for (const node of nodes) this.renderer.compute(node);
+      return;
+    }
+    if (this.computePending) return;
+    this.computePending = (async () => {
+      for (const node of nodes) await this.renderer.computeAsync(node);
+    })().catch((error) => {
+      console.error('GPU impostor culling failed.', error);
+    }).finally(() => {
+      this.computePending = null;
+    });
   }
 
   update(camera, origin, timestamp = 0) {
     if (this.disposed) return null;
     updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.originUniform.value.set(origin.x, 0, origin.z);
-    this.updatePlanes(camera);
-    if (typeof this.renderer.compute === 'function') {
-      this.renderer.compute(this.computeReset);
-      this.renderer.compute(this.computeCull);
-    } else if (!this.computePending) {
-      this.computePending = (async () => {
-        await this.renderer.computeAsync(this.computeReset);
-        await this.renderer.computeAsync(this.computeCull);
-      })().catch((error) => {
-        console.error('GPU impostor culling failed.', error);
-      }).finally(() => {
-        this.computePending = null;
-      });
+    if (this.recordCount === 0) {
+      if (this.indirectNeedsReset) {
+        this.submitComputes([this.computeReset]);
+        this.indirectNeedsReset = false;
+      }
+      return 0;
     }
+
+    this.updatePlanes(camera);
+    if ('count' in this.computeCull) this.computeCull.count = this.recordCount;
+    this.submitComputes([this.computeReset, this.computeCull]);
     return null;
   }
 
@@ -204,6 +247,7 @@ export class GpuTreeImpostorBatch {
     for (const resource of [
       this.transformBuffer,
       this.parameterBuffer,
+      this.appearanceBuffer,
       this.visibleBuffer,
       this.planeBuffer,
       this.drawBuffer,
