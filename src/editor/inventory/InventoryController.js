@@ -168,9 +168,13 @@ export class InventoryController {
       this.cancelDrag();
       return { ok: true, cancelled: true };
     }
-    const result = this.store.moveItem(this.drag.from, location);
-    this.cancelDrag();
+    // Clear drag before the store commit so subscribers never see a moved item
+    // while the controller still reports an active drag.
+    const from = this.drag.from;
+    this.drag = null;
+    const result = this.store.moveItem(from, location);
     if (!result.ok) {
+      this.emit();
       return result;
     }
     this.selectedLocation = location;

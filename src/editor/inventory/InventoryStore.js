@@ -15,9 +15,11 @@ import {
 import { locationsEqual } from './inventoryLocations.js';
 import {
   cloneInventoryState,
+  entryMatchesStaged,
   failResult,
   normalizeInventoryDocument,
   okResult,
+  validateEquipmentState,
 } from './InventoryValidation.js';
 
 function isArmourSlot(slot) {
@@ -26,6 +28,16 @@ function isArmourSlot(slot) {
 
 function isAccessorySlot(slot) {
   return ACCESSORY_SLOTS.includes(slot);
+}
+
+function isEquipmentLocation(location) {
+  return location?.kind === 'equipment' || location?.kind === 'weapon';
+}
+
+function createOperationId(store) {
+  const id = `op-${store.nextOperationId}`;
+  store.nextOperationId += 1;
+  return id;
 }
 
 /**
@@ -43,6 +55,9 @@ export class InventoryStore {
     this.catalog = catalog;
     this.defaultCapacity = options.capacity ?? DEFAULT_BAG_CAPACITY;
     this.listeners = new Set();
+    this.revision = 0;
+    this.nextOperationId = 1;
+    this.pendingOperations = new Map();
     this.state = normalizeInventoryDocument(
       document ?? createEmptyInventoryState({ capacity: this.defaultCapacity }),
       catalog,
@@ -73,29 +88,44 @@ export class InventoryStore {
     });
     const before = this.toDocument();
     this.state = next;
+    this.revision += 1;
+    this.pendingOperations.clear();
     if (emit) {
       this.emit({ kind: 'replace', before, after: this.toDocument() });
     }
     return okResult({ state: this.getState() });
   }
 
-  /** Apply a starting-loadout document (capacity, currency, items list). */
+  /**
+   * Apply a starting-loadout document atomically.
+   * Builds a draft store first; the live state is replaced only after success.
+   */
   applyStartingLoadout(loadout) {
     const capacity = loadout?.capacity ?? this.defaultCapacity;
     const gold = loadout?.currency?.gold ?? 0;
-    const empty = createEmptyInventoryState({ capacity, gold });
-    this.state = normalizeInventoryDocument(empty, this.catalog, { defaultCapacity: capacity });
+    const draft = new InventoryStore(
+      this.catalog,
+      createEmptyInventoryState({ capacity, gold }),
+      { capacity },
+    );
     const items = Array.isArray(loadout?.items) ? loadout.items : [];
     for (const item of items) {
-      const result = this.addItem(item.itemKey, item.quantity ?? 1, {
+      const result = draft.addItem(item.itemKey, item.quantity ?? 1, {
         metadata: item.metadata,
         emit: false,
       });
       if (!result.ok) {
         throw new Error(result.message);
       }
+      if (result.rejected > 0) {
+        throw new Error(`Starting loadout could not place all of ${item.itemKey}.`);
+      }
     }
-    this.emit({ kind: 'replace', before: null, after: this.toDocument() });
+    const before = this.toDocument();
+    this.state = draft.toDocument();
+    this.revision += 1;
+    this.pendingOperations.clear();
+    this.emit({ kind: 'replace', before, after: this.toDocument() });
     return okResult({ state: this.getState() });
   }
 
@@ -112,7 +142,6 @@ export class InventoryStore {
     let remaining = quantity;
     const acceptedBefore = quantity;
 
-    // Merge into existing compatible stacks first.
     if (definition.stackLimit > 1) {
       for (let index = 0; index < next.bagSlots.length && remaining > 0; index += 1) {
         const slot = next.bagSlots[index];
@@ -309,6 +338,9 @@ export class InventoryStore {
     const placed = this.placeInBag(next, entry, toBagIndex);
     if (!placed.ok) return placed;
 
+    const equipmentCheck = validateEquipmentState(next, this.catalog);
+    if (!equipmentCheck.ok) return equipmentCheck;
+
     this.commit(next, { kind: 'unequip' });
     return okResult({ state: this.getState() });
   }
@@ -334,13 +366,23 @@ export class InventoryStore {
     if (definition.category !== 'consumable' || !definition.action) {
       return failResult('not_usable', 'Item cannot be used.');
     }
-    // Decrement only after a successful action in a later gameplay phase.
-    // For now, expose intent without mutating so callers can confirm later.
+    const token = Object.freeze({
+      operationId: createOperationId(this),
+      kind: 'use',
+      location: structuredClone(from),
+      itemKey: fromRef.entry.itemKey,
+      instanceId: fromRef.entry.instanceId ?? null,
+      quantity: 1,
+      inventoryRevision: this.revision,
+      action: definition.action,
+    });
+    this.pendingOperations.set(token.operationId, token);
     return okResult({
+      pending: true,
+      token,
       action: definition.action,
       itemKey: definition.key,
       location: from,
-      pending: true,
       state: this.getState(),
     });
   }
@@ -353,9 +395,19 @@ export class InventoryStore {
     if (!Number.isInteger(dropQuantity) || dropQuantity < 1 || dropQuantity > fromRef.entry.quantity) {
       return failResult('invalid_quantity', 'Drop quantity is invalid.');
     }
-    // World pickup creation is a later phase; do not mutate until confirmed.
+    const token = Object.freeze({
+      operationId: createOperationId(this),
+      kind: 'drop',
+      location: structuredClone(from),
+      itemKey: fromRef.entry.itemKey,
+      instanceId: fromRef.entry.instanceId ?? null,
+      quantity: dropQuantity,
+      inventoryRevision: this.revision,
+    });
+    this.pendingOperations.set(token.operationId, token);
     return okResult({
       pending: true,
+      token,
       itemKey: fromRef.entry.itemKey,
       quantity: dropQuantity,
       location: from,
@@ -364,45 +416,57 @@ export class InventoryStore {
     });
   }
 
-  /** Confirm a previously staged drop by removing from inventory. */
-  confirmDrop(from, quantity) {
-    const fromRef = this.readLocation(this.state, from);
+  /** Confirm a previously staged drop by removing the matching entry. */
+  confirmDrop(tokenOrLocation, quantity = null) {
+    const token = this.resolvePendingToken(tokenOrLocation, 'drop', quantity);
+    if (!token.ok) return token;
+    const staged = token.token;
+    const fromRef = this.readLocation(this.state, staged.location);
     if (!fromRef.ok) return fromRef;
-    if (!fromRef.entry) return failResult('empty_slot', 'Slot is empty.');
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > fromRef.entry.quantity) {
-      return failResult('invalid_quantity', 'Drop quantity is invalid.');
+    if (!entryMatchesStaged(fromRef.entry, staged)) {
+      this.pendingOperations.delete(staged.operationId);
+      return failResult('stale_operation', 'The staged drop no longer matches the inventory entry.');
     }
+
     const next = cloneInventoryState(this.state);
     const stackLimit = this.catalog.stackLimit(fromRef.entry.itemKey);
-    if (fromRef.entry.quantity === quantity) {
-      this.writeLocation(next, from, null);
+    if (fromRef.entry.quantity === staged.quantity) {
+      this.writeLocation(next, staged.location, null);
     } else {
-      this.writeLocation(next, from, createInventoryEntry({
+      this.writeLocation(next, staged.location, createInventoryEntry({
         itemKey: fromRef.entry.itemKey,
-        quantity: fromRef.entry.quantity - quantity,
+        quantity: fromRef.entry.quantity - staged.quantity,
         instanceId: fromRef.entry.instanceId ?? null,
         metadata: fromRef.entry.metadata,
         stackLimit,
       }));
     }
+    this.pendingOperations.delete(staged.operationId);
     this.commit(next, { kind: 'drop' });
     return okResult({ state: this.getState() });
   }
 
-  /** Confirm a previously staged use by consuming one unit. */
-  confirmUse(from) {
-    const fromRef = this.readLocation(this.state, from);
+  /** Confirm a previously staged use by consuming one matching unit. */
+  confirmUse(tokenOrLocation) {
+    const token = this.resolvePendingToken(tokenOrLocation, 'use', 1);
+    if (!token.ok) return token;
+    const staged = token.token;
+    const fromRef = this.readLocation(this.state, staged.location);
     if (!fromRef.ok) return fromRef;
-    if (!fromRef.entry) return failResult('empty_slot', 'Slot is empty.');
+    if (!entryMatchesStaged(fromRef.entry, staged)) {
+      this.pendingOperations.delete(staged.operationId);
+      return failResult('stale_operation', 'The staged use no longer matches the inventory entry.');
+    }
     const definition = this.catalog.require(fromRef.entry.itemKey);
     if (definition.category !== 'consumable') {
       return failResult('not_usable', 'Item cannot be used.');
     }
+
     const next = cloneInventoryState(this.state);
     if (fromRef.entry.quantity === 1) {
-      this.writeLocation(next, from, null);
+      this.writeLocation(next, staged.location, null);
     } else {
-      this.writeLocation(next, from, createInventoryEntry({
+      this.writeLocation(next, staged.location, createInventoryEntry({
         itemKey: fromRef.entry.itemKey,
         quantity: fromRef.entry.quantity - 1,
         instanceId: fromRef.entry.instanceId ?? null,
@@ -410,6 +474,7 @@ export class InventoryStore {
         stackLimit: definition.stackLimit,
       }));
     }
+    this.pendingOperations.delete(staged.operationId);
     this.commit(next, { kind: 'use' });
     return okResult({ state: this.getState() });
   }
@@ -443,9 +508,46 @@ export class InventoryStore {
 
   // --- internals -----------------------------------------------------------
 
+  resolvePendingToken(tokenOrLocation, kind, quantity) {
+    if (tokenOrLocation && typeof tokenOrLocation === 'object' && tokenOrLocation.operationId) {
+      const staged = this.pendingOperations.get(tokenOrLocation.operationId);
+      if (!staged) {
+        return failResult('stale_operation', 'The staged operation is no longer pending.');
+      }
+      if (staged.kind !== kind) {
+        return failResult('invalid_operation', `Expected a ${kind} operation token.`);
+      }
+      if (staged.inventoryRevision !== this.revision) {
+        this.pendingOperations.delete(staged.operationId);
+        return failResult(
+          'stale_operation',
+          'The inventory changed since the operation was staged.',
+        );
+      }
+      return okResult({ token: staged });
+    }
+    // Legacy location-only callers: synthesise a token from the live entry.
+    const fromRef = this.readLocation(this.state, tokenOrLocation);
+    if (!fromRef.ok) return fromRef;
+    if (!fromRef.entry) return failResult('empty_slot', 'Slot is empty.');
+    const qty = quantity ?? (kind === 'use' ? 1 : fromRef.entry.quantity);
+    return okResult({
+      token: {
+        operationId: createOperationId(this),
+        kind,
+        location: structuredClone(tokenOrLocation),
+        itemKey: fromRef.entry.itemKey,
+        instanceId: fromRef.entry.instanceId ?? null,
+        quantity: qty,
+        inventoryRevision: this.revision,
+      },
+    });
+  }
+
   commit(next, { kind, emit = true } = {}) {
     const before = this.toDocument();
     this.state = next;
+    this.revision += 1;
     if (emit) {
       this.emit({ kind, before, after: this.toDocument() });
     }
@@ -463,42 +565,24 @@ export class InventoryStore {
     const toRef = this.readLocation(next, to);
     if (!toRef.ok) return toRef;
 
-    // Equipment destination validation.
-    if (to.kind === 'equipment' || to.kind === 'weapon') {
-      const slot = to.slot;
+    if (isEquipmentLocation(to)) {
       const definition = this.catalog.require(fromRef.entry.itemKey);
-      if (!definition.equipmentSlots.includes(slot)) {
-        return failResult('incompatible_equipment', `Item cannot equip in slot "${slot}".`);
+      if (!definition.equipmentSlots.includes(to.slot)) {
+        return failResult('incompatible_equipment', `Item cannot equip in slot "${to.slot}".`);
       }
       if (fromRef.entry.quantity !== 1) {
         return failResult('invalid_quantity', 'Only single items can be equipped.');
       }
     }
 
-    // Two-handed weapon: clear off-hand into bag before committing.
-    if (to.kind === 'weapon' && to.slot === 'mainHand') {
-      const definition = this.catalog.require(fromRef.entry.itemKey);
-      if (definition.hands === 2) {
-        const setKey = weaponSetKey(to.set);
-        const offHand = next.equipment.weaponSets[setKey].offHand;
-        if (offHand) {
-          const placed = this.placeInBag(next, offHand);
-          if (!placed.ok) {
-            return failResult(
-              'inventory_full',
-              'Cannot equip two-handed weapon: no space for the off-hand item.',
-            );
-          }
-          next.equipment.weaponSets[setKey].offHand = null;
-        }
-      }
-    }
-
-    // Equipping into off-hand while a two-hander occupies main hand fails.
     if (to.kind === 'weapon' && to.slot === 'offHand') {
       const setKey = weaponSetKey(to.set);
       const mainHand = next.equipment.weaponSets[setKey].mainHand;
-      if (mainHand && this.catalog.isTwoHanded(mainHand.itemKey)) {
+      // Ignore the case where we are moving the two-hander out of mainHand.
+      const movingOutMain = from.kind === 'weapon'
+        && from.set === to.set
+        && from.slot === 'mainHand';
+      if (!movingOutMain && mainHand && this.catalog.isTwoHanded(mainHand.itemKey)) {
         return failResult(
           'incompatible_equipment',
           'Cannot equip off-hand while a two-handed weapon is equipped.',
@@ -506,70 +590,76 @@ export class InventoryStore {
       }
     }
 
+    // Free the source first so displaced gear can reuse that bag slot.
     const moving = this.takeFromLocation(next, from);
 
-    // Merge into compatible bag destination.
-    if (to.kind === 'bag' && toRef.entry && canMergeEntries(moving, toRef.entry)) {
-      const stackLimit = this.catalog.stackLimit(moving.itemKey);
-      const space = stackLimit - toRef.entry.quantity;
-      if (space <= 0) {
-        // Full stack: swap instead.
-        this.writeLocation(next, to, moving);
-        this.writeLocation(next, from, toRef.entry);
-        return okResult({ next });
+    if (to.kind === 'weapon' && to.slot === 'mainHand' && this.catalog.isTwoHanded(moving.itemKey)) {
+      const setKey = weaponSetKey(to.set);
+      const offHand = next.equipment.weaponSets[setKey].offHand;
+      if (offHand) {
+        const placed = this.placeInBag(next, offHand);
+        if (!placed.ok) {
+          return failResult(
+            'inventory_full',
+            'Cannot equip two-handed weapon: no space for the off-hand item.',
+          );
+        }
+        next.equipment.weaponSets[setKey].offHand = null;
       }
-      const take = Math.min(space, moving.quantity);
-      this.writeLocation(next, to, createInventoryEntry({
-        itemKey: toRef.entry.itemKey,
-        quantity: toRef.entry.quantity + take,
-        instanceId: toRef.entry.instanceId ?? null,
-        metadata: toRef.entry.metadata,
-        stackLimit,
-      }));
-      if (take < moving.quantity) {
-        this.writeLocation(next, from, createInventoryEntry({
-          itemKey: moving.itemKey,
-          quantity: moving.quantity - take,
-          instanceId: moving.instanceId ?? null,
-          metadata: moving.metadata,
+    }
+
+    const destRef = this.readLocation(next, to);
+    if (!destRef.ok) return destRef;
+
+    if (to.kind === 'bag' && destRef.entry && canMergeEntries(moving, destRef.entry)) {
+      const stackLimit = this.catalog.stackLimit(moving.itemKey);
+      const space = stackLimit - destRef.entry.quantity;
+      if (space <= 0) {
+        this.writeLocation(next, to, moving);
+        this.writeLocation(next, from, destRef.entry);
+      } else {
+        const take = Math.min(space, moving.quantity);
+        this.writeLocation(next, to, createInventoryEntry({
+          itemKey: destRef.entry.itemKey,
+          quantity: destRef.entry.quantity + take,
+          instanceId: destRef.entry.instanceId ?? null,
+          metadata: destRef.entry.metadata,
           stackLimit,
         }));
-      }
-      return okResult({ next });
-    }
-
-    // Swap when destination occupied.
-    if (toRef.entry) {
-      if (from.kind === 'equipment' || from.kind === 'weapon') {
-        // Destination item must fit the source equipment slot when swapping.
-        if (to.kind === 'bag') {
-          this.writeLocation(next, to, moving);
-          this.writeLocation(next, from, toRef.entry);
-          // Validate the item now in the equipment slot.
-          const check = this.readLocation(next, from);
-          const def = this.catalog.require(check.entry.itemKey);
-          const slot = from.slot;
-          if (!def.equipmentSlots.includes(slot)) {
-            return failResult('incompatible_equipment', 'Swapped item cannot occupy the equipment slot.');
-          }
-          return okResult({ next });
+        if (take < moving.quantity) {
+          this.writeLocation(next, from, createInventoryEntry({
+            itemKey: moving.itemKey,
+            quantity: moving.quantity - take,
+            instanceId: moving.instanceId ?? null,
+            metadata: moving.metadata,
+            stackLimit,
+          }));
         }
       }
-      if (to.kind === 'equipment' || to.kind === 'weapon') {
-        // Moving equipment into occupied slot: unequip current into source if bag, else swap if compatible.
-        const occupying = toRef.entry;
-        if (from.kind === 'bag') {
-          this.writeLocation(next, to, moving);
-          this.writeLocation(next, from, occupying);
-          return okResult({ next });
-        }
+    } else if (destRef.entry) {
+      if (isEquipmentLocation(from) && !this.catalog.canEquipInSlot(destRef.entry.itemKey, from.slot)) {
+        return failResult(
+          'incompatible_equipment',
+          'Swapped item cannot occupy the source equipment slot.',
+        );
+      }
+      if (isEquipmentLocation(to) && !this.catalog.canEquipInSlot(moving.itemKey, to.slot)) {
+        return failResult(
+          'incompatible_equipment',
+          `Item cannot equip in slot "${to.slot}".`,
+        );
+      }
+      if (isEquipmentLocation(from) && destRef.entry.quantity !== 1) {
+        return failResult('invalid_quantity', 'Only single items can be equipped.');
       }
       this.writeLocation(next, to, moving);
-      this.writeLocation(next, from, toRef.entry);
-      return okResult({ next });
+      this.writeLocation(next, from, destRef.entry);
+    } else {
+      this.writeLocation(next, to, moving);
     }
 
-    this.writeLocation(next, to, moving);
+    const equipmentCheck = validateEquipmentState(next, this.catalog);
+    if (!equipmentCheck.ok) return equipmentCheck;
     return okResult({ next });
   }
 

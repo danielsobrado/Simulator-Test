@@ -210,3 +210,14 @@ test('isWorldInputBlocked tracks the active overlay', () => {
   assert.equal(controller.isWorldInputBlocked(), true);
   controller.dispose();
 });
+
+test('dispose clears uiBlocked while an overlay is active', () => {
+  const player = createPlayer();
+  player.pointerLocked = true;
+  const { controller, target } = createOverlay(player);
+  target.press('KeyI');
+  assert.equal(player.uiBlocked, true);
+  controller.dispose();
+  assert.equal(player.uiBlocked, false);
+  assert.equal(controller.activeOverlay, null);
+});

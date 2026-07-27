@@ -5,6 +5,8 @@ import { createItemDefinitions } from './itemCatalogSchema.js';
  * Gameplay effects stay outside this layer; the catalogue only resolves data.
  */
 export class ItemCatalog {
+  #definitions;
+
   /**
    * @param {Map<string, object>|Iterable<[string, object]>|object} definitions
    */
@@ -17,11 +19,10 @@ export class ItemCatalog {
     if (!map) {
       throw new Error('ItemCatalog requires a Map of definitions.');
     }
-    this.definitions = new Map();
+    this.#definitions = new Map();
     for (const [key, definition] of map) {
-      this.definitions.set(key, Object.freeze({ ...definition, key }));
+      this.#definitions.set(key, Object.freeze({ ...definition, key }));
     }
-    Object.freeze(this.definitions);
   }
 
   static fromDocument(document, options = {}) {
@@ -29,11 +30,11 @@ export class ItemCatalog {
   }
 
   has(itemKey) {
-    return this.definitions.has(itemKey);
+    return this.#definitions.has(itemKey);
   }
 
   get(itemKey) {
-    const definition = this.definitions.get(itemKey);
+    const definition = this.#definitions.get(itemKey);
     return definition ?? null;
   }
 
@@ -46,11 +47,11 @@ export class ItemCatalog {
   }
 
   list() {
-    return [...this.definitions.values()];
+    return [...this.#definitions.values()];
   }
 
   keys() {
-    return [...this.definitions.keys()];
+    return [...this.#definitions.keys()];
   }
 
   /** Returns true when every entry's itemKey is known. */

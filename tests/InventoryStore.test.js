@@ -202,3 +202,140 @@ test('getState returns clones so consumers cannot mutate the store', () => {
   assert.equal(inventory.getState().bagSlots[0].itemKey, 'iron_sword');
   assert.equal(inventory.getState().currency.gold, 0);
 });
+
+test('equips a two-handed weapon when the only free bag slot is the source', () => {
+  const inventory = store(1);
+  inventory.addItem('wooden_shield', 1);
+  inventory.equipItem({ kind: 'bag', index: 0 }, { slot: 'offHand' });
+  inventory.addItem('steel_greatsword', 1);
+  assert.equal(inventory.getState().bagSlots[0].itemKey, 'steel_greatsword');
+  assert.equal(inventory.getState().equipment.weaponSets.set1.offHand.itemKey, 'wooden_shield');
+
+  const result = inventory.equipItem({ kind: 'bag', index: 0 }, { slot: 'mainHand' });
+  assert.equal(result.ok, true, result.message);
+  const state = inventory.getState();
+  assert.equal(state.equipment.weaponSets.set1.mainHand.itemKey, 'steel_greatsword');
+  assert.equal(state.equipment.weaponSets.set1.offHand, null);
+  assert.equal(state.bagSlots[0].itemKey, 'wooden_shield');
+});
+
+test('rejects equipment-to-equipment swaps that break either slot', () => {
+  const inventory = store();
+  inventory.addItem('iron_sword', 1);
+  inventory.addItem('wooden_shield', 1);
+  inventory.equipItem({ kind: 'bag', index: 0 }, { slot: 'mainHand' });
+  inventory.equipItem({ kind: 'bag', index: 0 }, { slot: 'offHand' });
+  const before = inventory.toDocument();
+  const result = inventory.moveItem(
+    { kind: 'weapon', set: 1, slot: 'mainHand' },
+    { kind: 'weapon', set: 1, slot: 'offHand' },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'incompatible_equipment');
+  assert.deepEqual(inventory.toDocument(), before);
+});
+
+test('staged use confirmation rejects a replaced entry at the same location', () => {
+  const inventory = store();
+  inventory.addItem('healing_potion', 1);
+  inventory.addItem('bread', 1);
+  const staged = inventory.useItem({ kind: 'bag', index: 0 });
+  assert.equal(staged.ok, true);
+  assert.ok(staged.token.operationId);
+
+  inventory.moveItem({ kind: 'bag', index: 0 }, { kind: 'bag', index: 5 });
+  inventory.moveItem({ kind: 'bag', index: 1 }, { kind: 'bag', index: 0 });
+
+  const confirmed = inventory.confirmUse(staged.token);
+  assert.equal(confirmed.ok, false);
+  assert.equal(confirmed.code, 'stale_operation');
+  assert.equal(inventory.getState().bagSlots[0].itemKey, 'bread');
+  assert.equal(inventory.getState().bagSlots[5].itemKey, 'healing_potion');
+});
+
+test('staged drop confirmation rejects a replaced entry at the same location', () => {
+  const inventory = store();
+  inventory.addItem('healing_potion', 2);
+  inventory.addItem('torch', 1);
+  const staged = inventory.dropItem({ kind: 'bag', index: 0 }, 1);
+  assert.equal(staged.ok, true);
+
+  inventory.moveItem({ kind: 'bag', index: 0 }, { kind: 'bag', index: 5 });
+  inventory.moveItem({ kind: 'bag', index: 1 }, { kind: 'bag', index: 0 });
+
+  const confirmed = inventory.confirmDrop(staged.token);
+  assert.equal(confirmed.ok, false);
+  assert.equal(confirmed.code, 'stale_operation');
+  assert.equal(inventory.getState().bagSlots[0].itemKey, 'torch');
+});
+
+test('confirmUse succeeds when the staged entry remains at the location', () => {
+  const inventory = store();
+  inventory.addItem('healing_potion', 2);
+  const staged = inventory.useItem({ kind: 'bag', index: 0 });
+  const confirmed = inventory.confirmUse(staged.token);
+  assert.equal(confirmed.ok, true);
+  assert.equal(inventory.getState().bagSlots[0].quantity, 1);
+});
+
+test('replaying a confirmed use token is rejected', () => {
+  const inventory = store();
+  inventory.addItem('healing_potion', 3);
+  const staged = inventory.useItem({ kind: 'bag', index: 0 });
+  assert.equal(inventory.confirmUse(staged.token).ok, true);
+  assert.equal(inventory.getState().bagSlots[0].quantity, 2);
+  const replay = inventory.confirmUse(staged.token);
+  assert.equal(replay.ok, false);
+  assert.equal(replay.code, 'stale_operation');
+  assert.equal(inventory.getState().bagSlots[0].quantity, 2);
+});
+
+test('confirmUse rejects when inventory revision advanced after staging', () => {
+  const inventory = store();
+  inventory.addItem('healing_potion', 2);
+  inventory.addItem('torch', 1);
+  const staged = inventory.useItem({ kind: 'bag', index: 0 });
+  inventory.addItem('bread', 1);
+  const confirmed = inventory.confirmUse(staged.token);
+  assert.equal(confirmed.ok, false);
+  assert.equal(confirmed.code, 'stale_operation');
+  assert.equal(inventory.getState().bagSlots[0].quantity, 2);
+});
+
+test('applyStartingLoadout is atomic and preserves prior state on failure', () => {
+  const inventory = store(2);
+  inventory.addItem('iron_sword', 1);
+  inventory.setGold(9);
+  const before = inventory.toDocument();
+  assert.throws(
+    () => inventory.applyStartingLoadout({
+      capacity: 2,
+      currency: { gold: 1 },
+      items: [
+        { itemKey: 'wooden_shield', quantity: 1 },
+        { itemKey: 'leather_armour', quantity: 1 },
+        { itemKey: 'leather_boots', quantity: 1 },
+      ],
+    }),
+    /could not place|Inventory is full/,
+  );
+  assert.deepEqual(inventory.toDocument(), before);
+});
+
+test('applyStartingLoadout replaces state only after the full loadout succeeds', () => {
+  const inventory = store(40);
+  inventory.addItem('copper_ring', 1);
+  const events = [];
+  inventory.subscribe((change) => events.push(change));
+  inventory.applyStartingLoadout(
+    yaml.load(readFileSync(new URL('../config/player-starting-loadout.yaml', import.meta.url), 'utf8')),
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0].kind, 'replace');
+  assert.equal(inventory.getState().currency.gold, 25);
+  assert.ok(inventory.getState().bagSlots.some((slot) => slot?.itemKey === 'iron_sword'));
+  assert.equal(
+    inventory.getState().bagSlots.some((slot) => slot?.itemKey === 'copper_ring'),
+    false,
+  );
+});

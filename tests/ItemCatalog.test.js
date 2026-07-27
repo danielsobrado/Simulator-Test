@@ -114,7 +114,7 @@ test('rejects unregistered actions when requireActions is set', () => {
   );
 });
 
-test('returns immutable definitions', () => {
+test('returns immutable definitions and hides the backing map', () => {
   const catalog = ItemCatalog.fromDocument({
     items: { iron_sword: validItem() },
   });
@@ -123,6 +123,7 @@ test('returns immutable definitions', () => {
     definition.label = 'mutated';
   });
   assert.equal(catalog.get('iron_sword').label, 'Test Sword');
+  assert.equal(catalog.definitions, undefined);
 });
 
 test('rejects missing labels and categories', () => {

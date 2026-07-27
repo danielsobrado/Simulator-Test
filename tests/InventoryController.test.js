@@ -99,3 +99,42 @@ test('double-activate equips from the bag', () => {
   assert.equal(store.getState().equipment.weaponSets.set1.mainHand.itemKey, 'iron_sword');
   controller.dispose();
 });
+
+test('dropOn clears drag before store subscribers observe the move', () => {
+  const { controller, store } = createController();
+  const frames = [];
+  controller.subscribe((state) => {
+    frames.push({
+      drag: state.drag,
+      slot0: state.inventory.bagSlots[0]?.itemKey ?? null,
+      slot5: state.inventory.bagSlots[5]?.itemKey ?? null,
+    });
+  });
+  frames.length = 0;
+  controller.beginDrag(bagLocation(0));
+  frames.length = 0;
+  const result = controller.dropOn(bagLocation(5));
+  assert.equal(result.ok, true);
+  assert.ok(frames.length >= 1);
+  for (const frame of frames) {
+    if (frame.slot5 === 'iron_sword') {
+      assert.equal(frame.drag, null, 'drag must already be clear when the move is visible');
+    }
+  }
+  assert.equal(store.getState().bagSlots[5].itemKey, 'iron_sword');
+  controller.dispose();
+});
+
+test('double-activate on a consumable stages use without consuming', () => {
+  const { controller, store } = createController();
+  const potionIndex = store.getState().bagSlots.findIndex((slot) => slot?.itemKey === 'healing_potion');
+  const before = store.getState().bagSlots[potionIndex].quantity;
+  const result = controller.doubleActivate(bagLocation(potionIndex));
+  assert.equal(result.ok, true);
+  assert.equal(result.pending, true);
+  assert.ok(result.token?.operationId);
+  assert.equal(store.getState().bagSlots[potionIndex].quantity, before);
+  assert.equal(store.confirmUse(result.token).ok, true);
+  assert.equal(store.getState().bagSlots[potionIndex].quantity, before - 1);
+  controller.dispose();
+});

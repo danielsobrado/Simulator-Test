@@ -31,6 +31,7 @@ export class EditorController {
     terrainConfig,
     constructionStore = null,
     constructionView = null,
+    worldInputBlockedProvider = null,
   }) {
     this.tileMap = tileMap;
     this.heightField = heightField;
@@ -43,6 +44,7 @@ export class EditorController {
     this.terrainConfig = terrainConfig;
     this.constructionStore = constructionStore;
     this.constructionView = constructionView;
+    this.worldInputBlockedProvider = worldInputBlockedProvider;
     /**
      * Set by the composition root to `() => viewModeController.camera`.
      *
@@ -417,7 +419,26 @@ export class EditorController {
     this.editorCamera.reset();
   }
 
+  isWorldInputBlocked() {
+    return Boolean(this.worldInputBlockedProvider?.());
+  }
+
+  /** Drop in-progress paint/construction gestures when a gameplay overlay opens. */
+  cancelBlockedWorldInteraction() {
+    if (this.painting) {
+      this.painting = false;
+      this.stroke = null;
+      this.strokeKind = null;
+      this.lastPaintKey = null;
+    }
+    this.cancelConstructionGesture();
+    this.movingObjectId = null;
+  }
+
   onPointerDown(event) {
+    if (this.isWorldInputBlocked()) {
+      return;
+    }
     if (event.button !== PRIMARY_POINTER_BUTTON || this.spacePressed) {
       return;
     }
@@ -463,6 +484,12 @@ export class EditorController {
   }
 
   onPointerMove(event) {
+    if (this.isWorldInputBlocked()) {
+      if (this.painting || this.constructionDrawing || this.constructionAnchorDrag) {
+        this.cancelBlockedWorldInteraction();
+      }
+      return;
+    }
     const cell = this.terrainView.pickCell(event.clientX, event.clientY, this.activeCamera);
     this.hoveredCell = cell;
     this.updatePreviews();
@@ -892,6 +919,9 @@ export class EditorController {
   }
 
   onKeyDown(event) {
+    if (this.isWorldInputBlocked()) {
+      return;
+    }
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return;
     }

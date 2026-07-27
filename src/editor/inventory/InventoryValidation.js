@@ -51,6 +51,20 @@ function normalizeEntry(raw, catalog, path) {
   });
 }
 
+function assertEquippedEntry(entry, slot, path, catalog) {
+  if (entry == null) return;
+  if (entry.quantity !== 1) {
+    fail('invalid_document', `${path} must have quantity 1.`);
+  }
+  const definition = catalog.require(entry.itemKey);
+  if (!definition.equipmentSlots.includes(slot)) {
+    fail(
+      'invalid_document',
+      `${path} item "${entry.itemKey}" cannot occupy slot "${slot}".`,
+    );
+  }
+}
+
 function normalizeWeaponSet(raw, catalog, path) {
   const set = { mainHand: null, offHand: null };
   if (raw == null) return set;
@@ -59,8 +73,38 @@ function normalizeWeaponSet(raw, catalog, path) {
   }
   for (const slot of WEAPON_HAND_SLOTS) {
     set[slot] = normalizeEntry(raw[slot] ?? null, catalog, `${path}.${slot}`);
+    assertEquippedEntry(set[slot], slot, `${path}.${slot}`, catalog);
+  }
+  if (set.mainHand && catalog.isTwoHanded(set.mainHand.itemKey) && set.offHand) {
+    fail(
+      'invalid_document',
+      `${path}: two-handed main hand cannot share the set with an off-hand item.`,
+    );
   }
   return set;
+}
+
+function collectInstanceIds(state, into) {
+  for (const entry of state.bagSlots) {
+    if (entry?.instanceId) into.push({ id: entry.instanceId, path: 'bag' });
+  }
+  for (const slot of ARMOUR_SLOTS) {
+    const entry = state.equipment.armour[slot];
+    if (entry?.instanceId) into.push({ id: entry.instanceId, path: `armour.${slot}` });
+  }
+  for (const slot of ACCESSORY_SLOTS) {
+    const entry = state.equipment.accessories[slot];
+    if (entry?.instanceId) into.push({ id: entry.instanceId, path: `accessories.${slot}` });
+  }
+  for (const setId of WEAPON_SET_IDS) {
+    const setKey = weaponSetKey(setId);
+    for (const slot of WEAPON_HAND_SLOTS) {
+      const entry = state.equipment.weaponSets[setKey][slot];
+      if (entry?.instanceId) {
+        into.push({ id: entry.instanceId, path: `weaponSets.${setKey}.${slot}` });
+      }
+    }
+  }
 }
 
 /**
@@ -103,6 +147,12 @@ export function normalizeInventoryDocument(document, catalog, {
       catalog,
       `equipment.armour.${slot}`,
     );
+    assertEquippedEntry(
+      equipment.armour[slot],
+      slot,
+      `equipment.armour.${slot}`,
+      catalog,
+    );
   }
   const accessorySource = equipmentSource.accessories ?? {};
   for (const slot of ACCESSORY_SLOTS) {
@@ -110,6 +160,12 @@ export function normalizeInventoryDocument(document, catalog, {
       accessorySource[slot] ?? null,
       catalog,
       `equipment.accessories.${slot}`,
+    );
+    assertEquippedEntry(
+      equipment.accessories[slot],
+      slot,
+      `equipment.accessories.${slot}`,
+      catalog,
     );
   }
   const weaponSetsSource = equipmentSource.weaponSets ?? {};
@@ -130,7 +186,7 @@ export function normalizeInventoryDocument(document, catalog, {
   const gold = document.currency?.gold ?? 0;
   assertNonNegativeInteger(gold, 'currency.gold');
 
-  return {
+  const state = {
     version: INVENTORY_DOCUMENT_VERSION,
     capacity,
     bagSlots,
@@ -138,6 +194,69 @@ export function normalizeInventoryDocument(document, catalog, {
     activeWeaponSet,
     currency: { gold },
   };
+
+  const instanceRefs = [];
+  collectInstanceIds(state, instanceRefs);
+  const seen = new Set();
+  for (const ref of instanceRefs) {
+    if (seen.has(ref.id)) {
+      fail('invalid_document', `Duplicate instanceId "${ref.id}".`);
+    }
+    seen.add(ref.id);
+  }
+
+  return state;
+}
+
+/**
+ * Validate the complete equipment configuration of a live/draft state.
+ * Used after move planning so both directions of a swap are checked.
+ */
+export function validateEquipmentState(state, catalog) {
+  for (const slot of ARMOUR_SLOTS) {
+    const entry = state.equipment.armour[slot];
+    if (!entry) continue;
+    if (entry.quantity !== 1) {
+      return failResult('invalid_quantity', `Equipment slot "${slot}" must hold quantity 1.`);
+    }
+    if (!catalog.canEquipInSlot(entry.itemKey, slot)) {
+      return failResult('incompatible_equipment', `Item cannot occupy slot "${slot}".`);
+    }
+  }
+  for (const slot of ACCESSORY_SLOTS) {
+    const entry = state.equipment.accessories[slot];
+    if (!entry) continue;
+    if (entry.quantity !== 1) {
+      return failResult('invalid_quantity', `Equipment slot "${slot}" must hold quantity 1.`);
+    }
+    if (!catalog.canEquipInSlot(entry.itemKey, slot)) {
+      return failResult('incompatible_equipment', `Item cannot occupy slot "${slot}".`);
+    }
+  }
+  for (const setId of WEAPON_SET_IDS) {
+    const setKey = weaponSetKey(setId);
+    const set = state.equipment.weaponSets[setKey];
+    for (const slot of WEAPON_HAND_SLOTS) {
+      const entry = set[slot];
+      if (!entry) continue;
+      if (entry.quantity !== 1) {
+        return failResult('invalid_quantity', `Weapon slot "${setKey}.${slot}" must hold quantity 1.`);
+      }
+      if (!catalog.canEquipInSlot(entry.itemKey, slot)) {
+        return failResult(
+          'incompatible_equipment',
+          `Item cannot occupy weapon slot "${setKey}.${slot}".`,
+        );
+      }
+    }
+    if (set.mainHand && catalog.isTwoHanded(set.mainHand.itemKey) && set.offHand) {
+      return failResult(
+        'incompatible_equipment',
+        'Two-handed main hand cannot share a set with an off-hand item.',
+      );
+    }
+  }
+  return okResult();
 }
 
 export function cloneInventoryState(state) {
@@ -152,16 +271,16 @@ export function cloneInventoryState(state) {
       accessories: Object.fromEntries(
         Object.entries(state.equipment.accessories).map(([slot, entry]) => [slot, cloneInventoryEntry(entry)]),
       ),
-      weaponSets: {
-        set1: {
-          mainHand: cloneInventoryEntry(state.equipment.weaponSets.set1.mainHand),
-          offHand: cloneInventoryEntry(state.equipment.weaponSets.set1.offHand),
-        },
-        set2: {
-          mainHand: cloneInventoryEntry(state.equipment.weaponSets.set2.mainHand),
-          offHand: cloneInventoryEntry(state.equipment.weaponSets.set2.offHand),
-        },
-      },
+      weaponSets: Object.fromEntries(
+        WEAPON_SET_IDS.map((setId) => {
+          const key = weaponSetKey(setId);
+          const set = state.equipment.weaponSets[key];
+          return [key, {
+            mainHand: cloneInventoryEntry(set.mainHand),
+            offHand: cloneInventoryEntry(set.offHand),
+          }];
+        }),
+      ),
     },
     activeWeaponSet: state.activeWeaponSet,
     currency: { gold: state.currency.gold },
@@ -174,4 +293,12 @@ export function okResult(extra = {}) {
 
 export function failResult(code, message, extra = {}) {
   return { ok: false, code, message, ...extra };
+}
+
+export function entryMatchesStaged(entry, staged) {
+  if (!entry || !staged) return false;
+  if (entry.itemKey !== staged.itemKey) return false;
+  if ((entry.instanceId ?? null) !== (staged.instanceId ?? null)) return false;
+  if (entry.quantity < staged.quantity) return false;
+  return true;
 }

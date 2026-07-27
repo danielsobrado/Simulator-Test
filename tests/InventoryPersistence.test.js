@@ -221,3 +221,99 @@ test('explicit empty replace clears inventory for a new-game reset', () => {
   assert.ok(harness.inventoryStore.getState().bagSlots.every((slot) => slot == null));
   harness.dispose();
 });
+
+test('rejects bread equipped as chest armour', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.equipment.armour.chest = {
+    itemKey: 'bread',
+    quantity: 1,
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /cannot occupy slot "chest"/,
+  );
+  harness.dispose();
+});
+
+test('rejects potion stacks in weapon slots', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.equipment.weaponSets.set1.mainHand = {
+    itemKey: 'healing_potion',
+    quantity: 10,
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /quantity 1|cannot occupy/,
+  );
+  harness.dispose();
+});
+
+test('rejects a shield in the head slot', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.equipment.armour.head = {
+    itemKey: 'wooden_shield',
+    quantity: 1,
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /cannot occupy slot "head"/,
+  );
+  harness.dispose();
+});
+
+test('rejects a two-handed weapon with an occupied off-hand', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.equipment.weaponSets.set1.mainHand = {
+    itemKey: 'steel_greatsword',
+    quantity: 1,
+    instanceId: 'gs-1',
+  };
+  document.playerState.inventory.equipment.weaponSets.set1.offHand = {
+    itemKey: 'wooden_shield',
+    quantity: 1,
+    instanceId: 'sh-1',
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /two-handed main hand/,
+  );
+  harness.dispose();
+});
+
+test('rejects equipped entries with quantity greater than one', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.equipment.armour.chest = {
+    itemKey: 'leather_armour',
+    quantity: 2,
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /must have quantity 1|exceeds stackLimit/,
+  );
+  harness.dispose();
+});
+
+test('rejects duplicate instance IDs across the document', () => {
+  const harness = createHarness();
+  const document = harness.controller.toDocument();
+  document.playerState.inventory.bagSlots[0] = {
+    itemKey: 'iron_sword',
+    quantity: 1,
+    instanceId: 'dup-1',
+  };
+  document.playerState.inventory.equipment.weaponSets.set1.mainHand = {
+    itemKey: 'steel_greatsword',
+    quantity: 1,
+    instanceId: 'dup-1',
+  };
+  assert.throws(
+    () => harness.controller.loadDocument(document),
+    /Duplicate instanceId/,
+  );
+  harness.dispose();
+});

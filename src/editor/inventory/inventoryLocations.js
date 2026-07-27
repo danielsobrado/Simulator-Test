@@ -30,16 +30,18 @@ export function parseLocation(key) {
   if (typeof key !== 'string' || key.length === 0) return null;
   const [kind, a, b] = key.split(':');
   if (kind === LOCATION_KINDS.bag) {
+    if (typeof a !== 'string' || a.length === 0 || !/^\d+$/.test(a)) return null;
     const index = Number(a);
-    if (!Number.isInteger(index)) return null;
+    if (!Number.isInteger(index) || index < 0) return null;
     return bagLocation(index);
   }
   if (kind === LOCATION_KINDS.equipment && a) {
     return equipmentLocation(a);
   }
   if (kind === LOCATION_KINDS.weapon && a && b) {
+    if (!/^\d+$/.test(a)) return null;
     const set = Number(a);
-    if (!Number.isInteger(set)) return null;
+    if (!Number.isInteger(set) || set < 1) return null;
     return weaponLocation(set, b);
   }
   return null;

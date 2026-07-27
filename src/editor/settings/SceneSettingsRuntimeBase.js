@@ -326,7 +326,7 @@ export class SceneSettingsRuntime {
   }
 
   async addLocalAsset({ layer, file, label, scale = 1, tileIds = undefined }) {
-    if (!(file instanceof Blob)) throw new Eror('Choose a local GLB first.');
+    if (!(file instanceof Blob)) throw new Error('Choose a local GLB first.');
     const id = `local-${slug(label || file.name)}-${Date.now().toString(36)}`;
     await saveToBrowser(`${LOCAL_ASSET_BROWSER_PREFIX}${id}`, {
       kind: 'simcity-dnd-local-glb',

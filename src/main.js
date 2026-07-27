@@ -408,6 +408,7 @@ async function startEditor() {
     constructionView,
     biomeAssetPalette,
     inventoryStore,
+    worldInputBlockedProvider: () => gameplayOverlayController.isWorldInputBlocked(),
   });
   controller.focusProvider = () => {
     const renderFocus = viewModeController.getFocusWorld();
@@ -416,6 +417,11 @@ async function startEditor() {
   // Pickers follow whichever camera is actually rendering, so construction
   // editing works from the player's first-person view as well as the orbit one.
   controller.cameraProvider = () => viewModeController.camera;
+  gameplayOverlayController.subscribe((state) => {
+    if (state.activeOverlay != null) {
+      controller.cancelBlockedWorldInteraction();
+    }
+  });
 
   const sceneSettingsRuntime = new SceneSettingsRuntime({
     controller,
