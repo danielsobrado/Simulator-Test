@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { COLLISION_LAYERS } from '../src/editor/collision/CollisionLayers.js';
 import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
+import { CharacterMotor } from '../src/editor/collision/character/CharacterMotor.js';
 import { COLLIDER_TYPE_CAPSULE } from '../src/editor/collision/colliders/ColliderRecords.js';
+import { TerrainCollisionProvider } from '../src/editor/collision/providers/TerrainCollisionProvider.js';
 import { TreeCollisionProvider } from '../src/editor/collision/providers/TreeCollisionProvider.js';
 
 function placement(overrides = {}) {
@@ -130,4 +132,53 @@ test('canonical trunk records are unaffected by floating-origin state', () => {
   const second = harness.provider.buildOwnerChunk(0, 0).colliders[0];
   assert.deepEqual(second.position, first.position);
   assert.deepEqual(second.aabb, first.aabb);
+});
+
+test('manifest-derived trunks block the P2 character motor', () => {
+  const harness = createHarness([placement({
+    height: 0,
+    scale: 1,
+    heightScale: 1,
+    rotationY: 0,
+  })]);
+  const built = harness.provider.buildOwnerChunk(0, 0);
+  harness.world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, ...built });
+  const runtime = {
+    checkMovementReadiness: () => Object.freeze({ ready: true, missing: Object.freeze([]) }),
+    querySweptCapsule: ({ start, end, radius, bodyHeight, layers, out = [] }) => {
+      out.length = 0;
+      return harness.world.collectCandidates({
+        minX: Math.min(start.x, end.x) - radius,
+        maxX: Math.max(start.x, end.x) + radius,
+        minY: Math.min(start.y, end.y),
+        maxY: Math.max(start.y, end.y) + bodyHeight,
+        minZ: Math.min(start.z, end.z) - radius,
+        maxZ: Math.max(start.z, end.z) + radius,
+      }, layers, out);
+    },
+  };
+  const terrain = new TerrainCollisionProvider({ getHeight: () => 0, sampleDistance: 0.35 });
+  const motor = new CharacterMotor({
+    collisionRuntime: runtime,
+    terrainProvider: terrain,
+    config: {
+      radius: 0.35,
+      bodyHeight: 1.8,
+      skinWidth: 0.03,
+      maxSlopeDegrees: 50,
+      maxSubstepDistance: 0.35,
+      maxIterations: 4,
+    },
+    stepHeight: 1.1,
+    groundSnapDistance: 0.6,
+  });
+  const result = motor.move({
+    start: { x: 10, y: 0, z: -7 },
+    displacement: { x: 0, z: -5 },
+    grounded: true,
+  });
+
+  assert.equal(result.blocked, true);
+  assert.ok(result.position.z > -9.2, `tree was crossed at z=${result.position.z}`);
+  assert.deepEqual(result.contacts, ['tree:tree%3A0%3A0%3A7:trunk']);
 });
