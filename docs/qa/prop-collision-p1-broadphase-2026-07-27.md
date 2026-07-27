@@ -40,10 +40,12 @@ The deterministic sample query crosses the tree fixture. Its candidate list must
 1. Confirm the visual tree, rocks, walls, doorway, steps, ramps, and boundary construction align with their collider boxes.
 2. Confirm the construction crossing X=128 appears in both adjacent collision chunks.
 3. Move the camera/player focus across a chunk boundary and confirm the active window never becomes empty after initial readiness.
-4. Trigger a floating-origin rebase and confirm collider boxes remain attached to the canonical fixture.
-5. Inspect `window.__editor.collision.getStatus()` and confirm ready/desired counts converge.
-6. Open the normal application without collision QA/debug flags and confirm no collision runtime is created.
-7. Build the production bundle and confirm no collision bootstrap animation-frame polling occurs.
+4. Reverse movement direction before the queue drains and confirm the new predicted direction is built first.
+5. Trigger a floating-origin rebase and confirm collider boxes remain attached to the canonical fixture.
+6. Inspect `window.__editor.collision.getStatus()` and confirm ready/desired counts converge.
+7. Confirm repeated candidate queries return source IDs in the same order after chunk unload/reload.
+8. Open the normal application without collision QA/debug flags and confirm no collision runtime is created.
+9. Build the production bundle and confirm no collision bootstrap animation-frame polling occurs.
 
 ## Automated gates
 
@@ -55,10 +57,16 @@ npm run build
 Review regressions cover:
 
 - extreme-velocity prediction bounds;
-- stale queue pruning and failed-attempt limits;
+- bounded resident radius, build count, collider span, and bin allocation;
+- stale queue pruning, latest-direction reprioritisation, and failed-attempt limits;
 - active-only huge-range queries;
+- deterministic candidate ordering;
 - capped readiness output;
-- monotonic owner revisions;
+- canonical owner overlap and monotonic owner revisions;
+- deeply immutable prototype metadata;
+- branded collider/prototype descriptors;
+- registered mesh prototype references;
+- clean world and residency disposal;
 - production bootstrap termination.
 
 Relevant counters:
