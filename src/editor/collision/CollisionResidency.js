@@ -8,6 +8,24 @@ function chebyshevDistance(leftX, leftZ, rightX, rightZ) {
   return Math.max(Math.abs(leftX - rightX), Math.abs(leftZ - rightZ));
 }
 
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function clampPredictedChunk(current, predicted, maximumDistance) {
+  if (maximumDistance <= 0) return current;
+  const deltaX = clamp(predicted.chunkX - current.chunkX, -maximumDistance, maximumDistance);
+  const deltaZ = clamp(predicted.chunkZ - current.chunkZ, -maximumDistance, maximumDistance);
+  if (deltaX === predicted.chunkX - current.chunkX
+      && deltaZ === predicted.chunkZ - current.chunkZ) {
+    return predicted;
+  }
+  return Object.freeze({
+    chunkX: current.chunkX + deltaX,
+    chunkZ: current.chunkZ + deltaZ,
+  });
+}
+
 function routeChunks(start, end) {
   const chunks = [];
   let x = start.chunkX;
@@ -39,6 +57,7 @@ export class CollisionResidency {
     config,
     buildOwnerChunk,
     now = () => performance.now(),
+    logger = console,
   }) {
     if (!world) throw new Error('Collision residency requires a world.');
     if (typeof buildOwnerChunk !== 'function') {
@@ -48,6 +67,7 @@ export class CollisionResidency {
     this.config = config;
     this.buildOwnerChunk = buildOwnerChunk;
     this.now = now;
+    this.logger = logger;
     this.desiredKeys = new Set();
     this.loadedKeys = new Set();
     this.queue = [];
@@ -56,6 +76,7 @@ export class CollisionResidency {
     this.predictedChunk = null;
     this.lastBuildError = null;
     this.builds = 0;
+    this.sequence = 0;
   }
 
   schedule(chunkX, chunkZ, priority) {
@@ -69,19 +90,35 @@ export class CollisionResidency {
       existing.priority = Math.min(existing.priority, priority);
       return;
     }
-    const job = { key, chunkX, chunkZ, priority, sequence: this.builds + this.queue.length };
+    const job = { key, chunkX, chunkZ, priority, sequence: this.sequence };
+    this.sequence += 1;
     this.queuedByKey.set(key, job);
     this.queue.push(job);
+  }
+
+  pruneQueue() {
+    let writeIndex = 0;
+    for (const job of this.queue) {
+      if (!this.desiredKeys.has(job.key)
+          || this.world.isOwnerChunkReady(job.chunkX, job.chunkZ)) {
+        this.queuedByKey.delete(job.key);
+        continue;
+      }
+      this.queue[writeIndex] = job;
+      writeIndex += 1;
+    }
+    this.queue.length = writeIndex;
   }
 
   update({ focus, velocity = { x: 0, z: 0 } }) {
     const chunkWorldSize = this.world.chunkWorldSize;
     const current = collisionChunkForCanonical(focus.x, focus.z, chunkWorldSize);
-    const predicted = collisionChunkForCanonical(
+    const rawPredicted = collisionChunkForCanonical(
       focus.x + velocity.x * this.config.prefetchSeconds,
       focus.z + velocity.z * this.config.prefetchSeconds,
       chunkWorldSize,
     );
+    const predicted = clampPredictedChunk(current, rawPredicted, this.config.unloadRadius);
     this.currentChunk = current;
     this.predictedChunk = predicted;
     this.desiredKeys.clear();
@@ -104,7 +141,7 @@ export class CollisionResidency {
       this.schedule(chunk.chunkX, chunk.chunkZ, index === 0 ? 0 : 0.25 + index * 0.01);
     }
 
-    for (const key of [...this.loadedKeys]) {
+    for (const key of this.loadedKeys) {
       const chunk = parseCollisionChunkKey(key);
       const currentDistance = chebyshevDistance(
         chunk.chunkX,
@@ -123,17 +160,20 @@ export class CollisionResidency {
       this.loadedKeys.delete(key);
     }
 
+    this.pruneQueue();
     this.queue.sort((left, right) => left.priority - right.priority || left.sequence - right.sequence);
     this.updateCounters();
   }
 
   flush() {
     const startedAt = this.now();
+    let attempted = 0;
     let built = 0;
-    while (this.queue.length > 0 && built < this.config.buildsPerFrame) {
-      if (built > 0 && this.now() - startedAt >= this.config.buildBudgetMs) break;
+    while (this.queue.length > 0 && attempted < this.config.buildsPerFrame) {
+      if (attempted > 0 && this.now() - startedAt >= this.config.buildBudgetMs) break;
       const job = this.queue.shift();
       this.queuedByKey.delete(job.key);
+      attempted += 1;
       if (!this.desiredKeys.has(job.key)) continue;
       try {
         const result = this.buildOwnerChunk(job.chunkX, job.chunkZ);
@@ -142,25 +182,27 @@ export class CollisionResidency {
         }
         const revision = result?.revision ?? 0;
         const colliders = result?.colliders ?? [];
-        this.world.replaceOwnerChunk({
+        const replaced = this.world.replaceOwnerChunk({
           chunkX: job.chunkX,
           chunkZ: job.chunkZ,
           revision,
           colliders,
         });
         this.loadedKeys.add(job.key);
-        this.builds += 1;
-        built += 1;
+        if (replaced) {
+          this.builds += 1;
+          built += 1;
+        }
         this.lastBuildError = null;
       } catch (error) {
         this.lastBuildError = error;
-        console.error(`Collision chunk build failed for ${job.key}.`, error);
+        this.logger.error?.(`Collision chunk build failed for ${job.key}.`, error);
       }
     }
     PerfCounters.inc('collisionBuilds', built);
     PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
-    return Object.freeze({ built, remaining: this.queue.length });
+    return Object.freeze({ attempted, built, remaining: this.queue.length });
   }
 
   checkDestination(aabb) {
