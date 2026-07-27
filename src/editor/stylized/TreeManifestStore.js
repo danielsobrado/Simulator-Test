@@ -1,4 +1,5 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import { cellCenterToWorld } from '../world/WorldCoordinates.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import {
   blockersForChunk,
@@ -47,6 +48,12 @@ function createForestField(terrainView, config, regionalCharacterField = null) {
   });
 }
 
+function percentile90(values) {
+  if (values.length === 0) return 1;
+  values.sort((left, right) => left - right);
+  return values[Math.min(values.length - 1, Math.floor(values.length * 0.9))];
+}
+
 export class TreeManifestStore {
   constructor({
     terrainView,
@@ -76,11 +83,9 @@ export class TreeManifestStore {
     });
     this.pathClearance = createPathClearanceField(terrainView, config);
     this.editStore = new ForestEditStore(terrainView.worldStore.forestEdits);
-    // The world store only ever replaces this document wholesale, so identity is
-    // a sound change signal — and unlike a JSON round-trip it costs nothing to
-    // check once per chunk manifest build.
     this.editDocumentRef = terrainView.worldStore.forestEdits ?? null;
     this.cache = new Map();
+    this.contextCache = new Map();
     this.pendingKeys = new Set();
     this.activeKeys = new Set();
     this.queue = new StylizedBuildQueue({
@@ -89,22 +94,73 @@ export class TreeManifestStore {
     });
   }
 
+  constructionQueryBounds(chunkX, chunkZ, clearRadius) {
+    const chunkSize = this.terrainView.worldStore.chunkSize;
+    const tileSize = this.terrainView.worldStore.tileSize;
+    const haloCells = Math.ceil(clearRadius / tileSize) + 2;
+    return {
+      minX: chunkX * chunkSize - haloCells,
+      maxX: (chunkX + 1) * chunkSize - 1 + haloCells,
+      minZ: chunkZ * chunkSize - haloCells,
+      maxZ: (chunkZ + 1) * chunkSize - 1 + haloCells,
+    };
+  }
+
+  constructionBlockers(bounds) {
+    const objects = this.objectMap?.queryBounds
+      ? this.objectMap.queryBounds(bounds)
+      : this.objectMap?.list?.() ?? [];
+    const tileSize = this.terrainView.worldStore.tileSize;
+    return objects.map((object) => {
+      const footprint = this.objectMap.getBounds(
+        object.x,
+        object.z,
+        object.definitionKey,
+        object.rotation,
+      );
+      const minimum = cellCenterToWorld(footprint.minX, footprint.minZ, tileSize);
+      const maximum = cellCenterToWorld(footprint.maxX, footprint.maxZ, tileSize);
+      const halfWidth = footprint.width * tileSize * 0.5;
+      const halfDepth = footprint.depth * tileSize * 0.5;
+      return {
+        stableId: `construction:${object.id}`,
+        x: (minimum.x + maximum.x) * 0.5,
+        z: (minimum.z + maximum.z) * 0.5,
+        radius: Math.hypot(halfWidth, halfDepth),
+      };
+    });
+  }
+
   context(chunkX, chunkZ, rockSource) {
     const editDocument = this.terrainView.worldStore.forestEdits ?? null;
     if (editDocument !== this.editDocumentRef) {
       this.editStore.loadDocument(editDocument);
       this.editDocumentRef = editDocument;
+      this.contextCache.clear();
     }
     const clearRadius = this.config.trees.clearRadius ?? this.terrainView.worldStore.tileSize;
     const rocks = Array.isArray(rockSource)
       ? rockSource
       : rockSource?.getBlockersForChunk?.(chunkX, chunkZ, 1) ?? [];
-    const construction = this.objectMap?.list?.().map((object) => ({
-      stableId: `construction:${object.id}`,
-      x: object.x,
-      z: object.z,
-      radius: clearRadius,
-    })) ?? [];
+    const constructionBounds = this.constructionQueryBounds(chunkX, chunkZ, clearRadius);
+    const constructionRevision = this.objectMap?.signatureForBounds?.(constructionBounds)
+      ?? this.objectMap?.revision
+      ?? 0;
+    const key = `${chunkX}:${chunkZ}`;
+    const inputSignature = [
+      this.revisionTracker.signature(chunkX, chunkZ, 1),
+      placementSignature(rocks),
+      constructionRevision,
+      this.prototypeCount,
+      this.forestField?.signature ?? 'uniform',
+      this.speciesRegistry.signature,
+      this.pathClearance.signature,
+      this.editStore.revision,
+    ].join('|');
+    const cached = this.contextCache.get(key);
+    if (cached?.inputSignature === inputSignature) return cached.context;
+
+    const construction = this.constructionBlockers(constructionBounds);
     const blockers = blockersForChunk({
       placements: [...rocks, ...construction],
       chunkX,
@@ -112,19 +168,13 @@ export class TreeManifestStore {
       chunkWorldSize: this.terrainView.chunkWorldSize,
       expand: clearRadius,
     });
-    return {
+    const context = Object.freeze({
       clearRadius,
       blockers,
-      signature: [
-        this.revisionTracker.signature(chunkX, chunkZ, 1),
-        placementSignature(blockers),
-        this.prototypeCount,
-        this.forestField?.signature ?? 'uniform',
-        this.speciesRegistry.signature,
-        this.pathClearance.signature,
-        this.editStore.revision,
-      ].join('|'),
-    };
+      signature: `${inputSignature}|${placementSignature(blockers)}`,
+    });
+    this.contextCache.set(key, { inputSignature, context });
+    return context;
   }
 
   get(chunkX, chunkZ, rockSource) {
@@ -136,42 +186,41 @@ export class TreeManifestStore {
       : null;
   }
 
-  /**
-   * Centroid of a chunk's trees, used to project its LOD band. The LOD plan asks
-   * for this once per chunk per frame while the placements it averages only change
-   * when the manifest is rebuilt, so the result is memoized on the cache entry.
-   */
   lodAnchor(chunkX, chunkZ) {
     const entry = this.cache.get(`${chunkX}:${chunkZ}`);
-    const placements = entry?.placements;
-    if (!placements || placements.length === 0) return null;
+    if (!entry) return null;
     if (entry.anchor !== undefined) return entry.anchor;
+    const placements = entry.placements;
+    if (placements.length === 0) {
+      const x = (chunkX + 0.5) * this.terrainView.chunkWorldSize;
+      const z = -(chunkZ + 0.5) * this.terrainView.chunkWorldSize;
+      entry.anchor = Object.freeze({
+        x,
+        y: this.terrainView.getCanonicalHeight(x, z),
+        z,
+        heightScale: 1,
+      });
+      return entry.anchor;
+    }
     let sumX = 0;
     let sumY = 0;
     let sumZ = 0;
+    const scales = [];
     for (const placement of placements) {
       sumX += placement.x;
       sumY += placement.height;
       sumZ += placement.z;
+      scales.push(placement.heightScale ?? placement.scale ?? 1);
     }
     entry.anchor = Object.freeze({
       x: sumX / placements.length,
       y: sumY / placements.length,
       z: sumZ / placements.length,
+      heightScale: percentile90(scales),
     });
     return entry.anchor;
   }
 
-  /**
-   * Canopy clusters and emergent trees for a chunk's distant band, memoized on the
-   * cache entry.
-   *
-   * Both derive only from the chunk's placements, but the LOD rebuild recomputed
-   * them every time it ran — a connected-components pass plus a full sort of the
-   * placements to keep the tallest 4%. Together that was the largest share of the
-   * rebuild after terrain sampling. Cache entries are replaced wholesale on
-   * rebuild, so the memo cannot outlive its placements.
-   */
   canopyAggregate(chunkX, chunkZ, minimumWidth, minimumHeight) {
     const entry = this.cache.get(`${chunkX}:${chunkZ}`);
     if (!entry) return null;
@@ -337,12 +386,17 @@ export class TreeManifestStore {
     return placements;
   }
 
+  invalidateAll() {
+    this.cache.clear();
+    this.contextCache.clear();
+  }
+
   fell(stableId) {
     const changed = this.editStore.fell(stableId);
     if (changed) {
       this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
       this.editDocumentRef = this.terrainView.worldStore.forestEdits;
-      this.cache.clear();
+      this.invalidateAll();
     }
     return changed;
   }
@@ -351,7 +405,7 @@ export class TreeManifestStore {
     const planted = this.editStore.plant(record);
     this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
     this.editDocumentRef = this.terrainView.worldStore.forestEdits;
-    this.cache.clear();
+    this.invalidateAll();
     return planted;
   }
 
@@ -359,14 +413,17 @@ export class TreeManifestStore {
     this.editStore.setPatchState(patchId, state, progress);
     this.terrainView.worldStore.forestEdits = this.editStore.toDocument();
     this.editDocumentRef = this.terrainView.worldStore.forestEdits;
-    this.cache.clear();
+    this.invalidateAll();
   }
 
   schedule(chunkX, chunkZ, rockSource) {
     const key = `${chunkX}:${chunkZ}`;
-    if (this.pendingKeys.has(key)) return;
+    const focus = this.terrainView.focusChunk;
+    const priority = focus
+      ? Math.max(Math.abs(chunkX - focus.chunkX), Math.abs(chunkZ - focus.chunkZ))
+      : 0;
     this.pendingKeys.add(key);
-    this.queue.enqueue({ key, chunkX, chunkZ, rockSource });
+    this.queue.enqueue({ key, chunkX, chunkZ, rockSource, priority });
   }
 
   getOrSchedule(chunkX, chunkZ, rockSource) {
@@ -379,6 +436,9 @@ export class TreeManifestStore {
     this.activeKeys = keys;
     for (const key of this.cache.keys()) {
       if (!keys.has(key)) this.cache.delete(key);
+    }
+    for (const key of this.contextCache.keys()) {
+      if (!keys.has(key)) this.contextCache.delete(key);
     }
   }
 
@@ -399,5 +459,6 @@ export class TreeManifestStore {
     this.pendingKeys.clear();
     this.activeKeys.clear();
     this.cache.clear();
+    this.contextCache.clear();
   }
 }

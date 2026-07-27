@@ -1,6 +1,17 @@
 import * as THREE from 'three/webgpu';
-import { vec3 } from 'three/tsl';
+import {
+  attribute,
+  clamp,
+  dot,
+  positionLocal,
+  sin,
+  vec2,
+  vec3,
+} from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { treeWindTimeFor } from '../forest/TreeWindTime.js';
+
+const TWO_PI = Math.PI * 2;
 
 function unionBounds(parts, kind = null) {
   const box = new THREE.Box3();
@@ -17,6 +28,25 @@ function makeMaterial(color, side = THREE.FrontSide) {
   const value = new THREE.Color(color);
   const material = new THREE.MeshLambertNodeMaterial({ side });
   material.colorNode = vec3(value.r, value.g, value.b);
+  return material;
+}
+
+function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
+  const material = makeMaterial(color, side);
+  const time = treeWindTimeFor(config);
+  if (!time || !bounds) return material;
+  const minimumY = bounds.min.y;
+  const height = Math.max(0.001, bounds.max.y - minimumY);
+  const normalizedHeight = clamp(positionLocal.y.sub(minimumY).div(height), 0, 1);
+  const heightMask = normalizedHeight.mul(normalizedHeight);
+  const windDirection = vec2(config.wind.direction[0], config.wind.direction[1]);
+  const phase = attribute('instanceStableSeed', 'float').mul(TWO_PI);
+  const wave = sin(dot(positionLocal.xz, windDirection).mul(config.wind.frequency)
+    .add(time.mul(config.wind.speed))
+    .add(phase));
+  const sway = windDirection.mul(wave.mul(config.trees.windStrength).mul(heightMask));
+  const dip = wave.abs().mul(config.trees.windStrength).mul(config.trees.dip).mul(heightMask);
+  material.positionNode = positionLocal.add(vec3(sway.x, dip.negate(), sway.y));
   return material;
 }
 
@@ -98,10 +128,8 @@ export function createTreeProxyPrototype(parts, config) {
   });
   const canopyGeometry = mergeGeometries(crownLobeGeometries, false);
   crownLobeGeometries.forEach((geometry) => geometry.dispose());
-  // `trunkBounds` includes every branch merged into the bark part. Using that
-  // full horizontal extent as a cylinder diameter turns spreading limbs into a
-  // massive solid bole at proxy distance. Preserve a naturally wide source
-  // trunk, but cap it against the canopy silhouette so branches cannot inflate it.
+  canopyGeometry.computeBoundingBox();
+  canopyGeometry.computeBoundingSphere();
   const branchInclusiveDiameter = Math.max(trunkSize.x, trunkSize.z);
   const proxyTrunkDiameter = Math.min(branchInclusiveDiameter, crownWidth * 0.14);
   const trunkGeometry = new THREE.CylinderGeometry(
@@ -115,6 +143,7 @@ export function createTreeProxyPrototype(parts, config) {
   trunkGeometry.computeBoundingBox();
   trunkGeometry.computeBoundingSphere();
   const proxyTrunkBounds = trunkGeometry.boundingBox.clone();
+  const fallbackCanopyGeometry = createCrossCanopyGeometry(leafBounds);
 
   return {
     height: Math.max(0.1, combinedBounds.max.y - combinedBounds.min.y),
@@ -123,7 +152,11 @@ export function createTreeProxyPrototype(parts, config) {
     proxyParts: [
       {
         geometry: canopyGeometry,
-        material: makeMaterial(config.trees.leafTop),
+        material: makeTreeLeafMaterial(
+          config.trees.leafTop,
+          config,
+          canopyGeometry.boundingBox,
+        ),
         kind: 'leaf',
       },
       {
@@ -134,8 +167,13 @@ export function createTreeProxyPrototype(parts, config) {
     ],
     fallbackImpostorParts: [
       {
-        geometry: createCrossCanopyGeometry(leafBounds),
-        material: makeMaterial(config.trees.leafTop, THREE.DoubleSide),
+        geometry: fallbackCanopyGeometry,
+        material: makeTreeLeafMaterial(
+          config.trees.leafTop,
+          config,
+          fallbackCanopyGeometry.boundingBox,
+          THREE.DoubleSide,
+        ),
         kind: 'leaf',
       },
       {
@@ -155,16 +193,15 @@ export function createCanopyClusterPart(config) {
   geometry.computeBoundingSphere();
   return {
     geometry,
-    material: makeMaterial(config.trees.leafBottom),
+    material: makeTreeLeafMaterial(
+      config.trees.leafBottom,
+      config,
+      geometry.boundingBox,
+    ),
     kind: 'leaf',
   };
 }
 
-/**
- * Deadwood beside `dead` trees. Shrubs used to live here too, tied to saplings at
- * patch edges — `StylizedBushView` now owns undergrowth as its own clustered
- * layer, so this is deadwood only.
- */
 export function createForestUnderstoryPrototypes(config) {
   const logGeometry = new THREE.CylinderGeometry(0.12, 0.17, 1.8, 6, 1);
   logGeometry.rotateZ(Math.PI * 0.5);
@@ -195,10 +232,6 @@ export function createRockProxyPrototype(prototype, proxyColor = '#b8ad98') {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   const material = prototype.material.clone();
-  // The source material uses a packed atlas whose UV islands match the authored
-  // rocks. A generated dodecahedron has unrelated UVs and mostly samples the
-  // atlas' black gutters, so it becomes a dark blob at the exact LOD boundary
-  // where its silhouette should stay stable.
   if ('map' in material) material.map = null;
   if ('color' in material) material.color = new THREE.Color(proxyColor);
   material.flatShading = true;

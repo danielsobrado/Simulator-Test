@@ -4,6 +4,8 @@ import { hash32 } from './scatterMath.js';
 import { aggregateCanopyClusters } from './lod/canopyCluster.js';
 import { writeInstances } from './lod/StylizedLodRuntime.js';
 
+const UNTINTED = Object.freeze([1, 1, 1]);
+
 function createInstances(count) {
   return Array.from({ length: count }, () => []);
 }
@@ -13,9 +15,6 @@ function stableSeed(placement) {
   return hash32(placement.index ?? 0) / 0xffffffff;
 }
 
-// A full rebuild composes a matrix for every visible tree across every resident
-// chunk. `compose` copies out of its arguments, so only the returned matrix has to
-// be fresh — reusing the intermediates drops four allocations per instance.
 const scratchPosition = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 const scratchScale = new THREE.Vector3();
@@ -44,6 +43,81 @@ function recordBatchStats(statsByMode, stats) {
   target.requested += stats.requested;
   target.accepted += stats.accepted;
   target.dropped += stats.dropped;
+}
+
+function morphologyFor(placement) {
+  const crownScale = placement.crownScale ?? 1;
+  const crownAspect = placement.crownAspect ?? 1;
+  return [
+    crownScale * crownAspect,
+    crownScale,
+    placement.trunkScale ?? 1,
+  ];
+}
+
+function leafAppearance(placement, resolveLeafTint) {
+  const seed = stableSeed(placement);
+  const tint = resolveLeafTint?.(placement) ?? UNTINTED;
+  const variation = 0.9 + (placement.colorSeed ?? seed) * 0.2;
+  const morphology = morphologyFor(placement);
+  return {
+    morphology,
+    colorVariation: variation,
+    leafTint: tint,
+    impostorAppearance: [
+      morphology[0],
+      tint[0] * variation,
+      tint[1] * variation,
+      tint[2] * variation,
+    ],
+  };
+}
+
+function geometryInstance(placement, fade, resolveLeafTint) {
+  const heightScale = placement.heightScale ?? placement.scale;
+  const appearance = leafAppearance(placement, resolveLeafTint);
+  return {
+    matrix: createMatrix({
+      x: placement.x,
+      y: placement.height,
+      z: placement.z,
+      rotationY: placement.rotationY,
+      scaleX: heightScale,
+      scaleY: heightScale,
+      scaleZ: heightScale,
+    }),
+    fade,
+    seed: stableSeed(placement),
+    colorVariation: appearance.colorVariation,
+    leafTint: appearance.leafTint,
+    morphology: appearance.morphology,
+  };
+}
+
+function impostorRecord(placement, atlas, fade, resolveLeafTint) {
+  const heightScale = placement.heightScale ?? placement.scale;
+  const appearance = leafAppearance(placement, resolveLeafTint);
+  return {
+    x: placement.x,
+    y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * heightScale,
+    z: placement.z,
+    scale: heightScale,
+    radius: atlas.radius * heightScale * Math.max(1, appearance.impostorAppearance[0]),
+    yaw: placement.rotationY,
+    fade,
+    seed: placement.windSeed ?? stableSeed(placement),
+    appearance: appearance.impostorAppearance,
+    speciesId: placement.speciesId,
+    ageClass: placement.ageClass,
+    crownAspect: placement.crownAspect,
+    colorSeed: placement.colorSeed,
+    windPhase: placement.windSeed,
+  };
+}
+
+export function selectTreePhysicalRepresentation({ band, hasImpostor }) {
+  if (band === 'impostor') return hasImpostor ? 'impostor' : 'fallback';
+  return band;
 }
 
 export function rebuildTreeLod({
@@ -92,8 +166,6 @@ export function rebuildTreeLod({
       if (representation.band === 'cluster') {
         const minimumWidth = prototypeWidth * 1.6;
         const minimumHeight = prototypeHeight * 0.55;
-        // Prefer the store's memo; fall back for callers that pass a bare
-        // placement source (the impostor unit test does).
         const aggregate = manifestStore.canopyAggregate?.(
           entry.chunkX,
           entry.chunkZ,
@@ -137,22 +209,21 @@ export function rebuildTreeLod({
           const prototypeIndex = resolvePrototypeIndex?.(placement)
             ?? placement.prototypeIndex;
           const atlas = impostorAtlases[prototypeIndex];
-          if (!atlas || !impostorBatches[prototypeIndex]) continue;
-          impostors[prototypeIndex].push({
-            x: placement.x,
-            y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * placement.scale,
-            z: placement.z,
-            scale: placement.scale,
-            radius: atlas.radius * placement.scale,
-            yaw: placement.rotationY,
-            fade: representation.fade,
-            seed: placement.windSeed ?? stableSeed(placement),
-            speciesId: placement.speciesId,
-            ageClass: placement.ageClass,
-            crownAspect: placement.crownAspect,
-            colorSeed: placement.colorSeed,
-            windPhase: placement.windSeed,
-          });
+          const batch = impostorBatches[prototypeIndex];
+          if (atlas && batch) {
+            impostors[prototypeIndex].push(impostorRecord(
+              placement,
+              atlas,
+              representation.fade,
+              resolveLeafTint,
+            ));
+          } else {
+            fallback[prototypeIndex].push(geometryInstance(
+              placement,
+              representation.fade,
+              resolveLeafTint,
+            ));
+          }
         }
         continue;
       }
@@ -175,49 +246,32 @@ export function rebuildTreeLod({
             colorVariation: 0.82 + (placement.colorSeed ?? seed) * 0.16,
           });
         }
-        // No `leafTint` on impostor records: `instanceImpostorParams` is a full
-        // vec4 (yaw, fade, seed, radius) and the GPU batch's culling buffers are
-        // laid out to match, so carrying a tint means a new attribute through both
-        // batch paths. Until then the impostor band renders its baked green while
-        // the proxy and cluster bands either side of it turn.
-        if (representation.band === 'impostor' && impostorBatches.length > 0) {
+
+        if (representation.band === 'impostor') {
           const atlas = impostorAtlases[prototypeIndex];
           const batch = impostorBatches[prototypeIndex];
-          if (atlas && batch) {
-            impostors[prototypeIndex].push({
-              x: placement.x,
-              y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * placement.scale,
-              z: placement.z,
-              scale: placement.scale,
-              radius: atlas.radius * placement.scale,
-              yaw: placement.rotationY,
-              fade: representation.fade,
-              seed,
-              speciesId: placement.speciesId,
-              ageClass: placement.ageClass,
-              crownAspect: placement.crownAspect,
-              colorSeed: placement.colorSeed,
-              windPhase: placement.windSeed,
-            });
-            continue;
+          const physical = selectTreePhysicalRepresentation({
+            band: representation.band,
+            hasImpostor: Boolean(atlas && batch),
+          });
+          if (physical === 'impostor') {
+            impostors[prototypeIndex].push(impostorRecord(
+              placement,
+              atlas,
+              representation.fade,
+              resolveLeafTint,
+            ));
+          } else {
+            fallback[prototypeIndex].push(geometryInstance(
+              placement,
+              representation.fade,
+              resolveLeafTint,
+            ));
           }
+          continue;
         }
 
-        const instance = {
-          matrix: createMatrix({
-            x: placement.x,
-            y: placement.height,
-            z: placement.z,
-            rotationY: placement.rotationY,
-            scaleX: (placement.heightScale ?? placement.scale) * (placement.crownScale ?? 1),
-            scaleY: placement.heightScale ?? placement.scale,
-            scaleZ: (placement.heightScale ?? placement.scale) * (placement.crownScale ?? 1),
-          }),
-          fade: representation.fade,
-          seed,
-          colorVariation: 0.9 + (placement.colorSeed ?? seed) * 0.2,
-          leafTint: resolveLeafTint?.(placement),
-        };
+        const instance = geometryInstance(placement, representation.fade, resolveLeafTint);
         const target = representation.band === 'near' ? near : proxy;
         target[prototypeIndex].push(instance);
       }
@@ -248,7 +302,7 @@ export function rebuildTreeLod({
     const records = impostors[index] ?? [];
     const stats = impostorBatches[index].setRecords(records);
     recordBatchStats(statsByMode, stats);
-    impostorCount += records.length;
+    impostorCount += stats.accepted;
   }
   for (const mode of ['cpu', 'gpu']) {
     PerfCounters.set(`treeImpostorRecordsRequested.${mode}`, statsByMode[mode].requested);

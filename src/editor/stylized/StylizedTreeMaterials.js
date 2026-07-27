@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
+  attribute,
   clamp,
   dot,
   max,
@@ -20,31 +21,19 @@ import {
   vec3,
 } from 'three/tsl';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
+import { registerTreeWindTime } from './forest/TreeWindTime.js';
+
+const TWO_PI = Math.PI * 2;
 
 function colorNode(value) {
   const color = new THREE.Color(value);
   return vec3(color.r, color.g, color.b);
 }
 
-/**
- * Per-species colour overrides. Generated broadleaf prototypes each own their
- * materials, so a palette here reads as a distinct species without needing a
- * second material pipeline.
- */
 function paletteValue(palette, config, key) {
   return palette?.[key] ?? config.trees[key];
 }
 
-/**
- * View-angle rim on the canopy edge — the "fluffy" term from the CC0 Godot
- * foliage shader (godotshaders.com/shader/stylized-fluffy-tree-leaves), which
- * mixes toward a rim colour by `pow(1 - dot(N, V), power)`.
- *
- * It matters more here than it would on a card-based canopy: our crowns are solid
- * lobes, so without a rim their edge is a hard lit-surface boundary against the
- * sky. Lifting the grazing angles pushes that edge back toward light and gives the
- * mass a soft outline. Zero strength leaves the colour untouched.
- */
 function applyCanopyRim(baseColor, config, palette) {
   const strength = paletteValue(palette, config, 'rimStrength');
   if (!(strength > 0)) return baseColor;
@@ -67,6 +56,7 @@ export function createStylizedLeafMaterial({
   alphaTest = 0,
   preserveSourceColor = false,
 }) {
+  registerTreeWindTime(config, time);
   const normalizedHeight = clamp(
     positionLocal.y.sub(bounds.minY).div(Math.max(0.001, bounds.maxY - bounds.minY)),
     0,
@@ -76,14 +66,18 @@ export function createStylizedLeafMaterial({
   const localXZ = positionLocal.xz;
   const windDirection = vec2(config.wind.direction[0], config.wind.direction[1]);
   const windPerpendicular = vec2(windDirection.y.negate(), windDirection.x);
+  const phase = attribute('instanceStableSeed', 'float').mul(TWO_PI);
   const primary = sin(dot(localXZ, windDirection).mul(config.wind.frequency)
-    .add(time.mul(config.wind.speed)));
+    .add(time.mul(config.wind.speed))
+    .add(phase));
   const flutter = sin(time.mul(config.wind.speed * config.trees.flutterSpeed)
     .add(positionLocal.y.mul(2.3))
-    .add(positionLocal.x))
+    .add(positionLocal.x)
+    .add(phase.mul(1.73)))
     .mul(config.trees.flutterAmplitude);
   const turbulence = sin(dot(localXZ, windPerpendicular).mul(config.wind.frequency * 1.9)
-    .add(time.mul(config.wind.speed * 0.7)))
+    .add(time.mul(config.wind.speed * 0.7))
+    .add(phase.mul(0.61)))
     .mul(config.wind.turbulence * 0.25);
   const wave = primary.add(flutter).add(turbulence);
   const sway = windDirection.mul(wave.mul(config.trees.windStrength).mul(heightMask));
@@ -97,8 +91,6 @@ export function createStylizedLeafMaterial({
     colorNode(paletteValue(palette, config, 'leafTop')),
     gradient,
   );
-  // Authored variants keep their embedded diffuse texture. The normal stylized
-  // prototypes continue to use the per-species gradient and only read map alpha.
   const baseColor = preserveSourceColor && map
     ? texture(map, uv()).rgb.mul(colorNode(source?.color ?? '#ffffff'))
     : paletteColor;
@@ -120,11 +112,6 @@ export function createStylizedLeafMaterial({
   material.colorNode = applyCanopyRim(leafColor, config, palette);
   if (map) {
     material.opacityNode = texture(map, uv()).a;
-    // Cards pass a lower cut than the GLB prototypes: the CC0 foliage alpha is
-    // antialiased and a 0.5 cut eats its soft edges. This governs the base
-    // material only — `createDitheredMaterial` turns opacity into a binary step
-    // for the LOD bands and floors the cut at 0.5, which is correct for a 0/1
-    // value. So what this actually decides is what the impostor baker sees.
     material.alphaTest = alphaTest > 0
       ? alphaTest
       : (source?.alphaTest > 0 ? source.alphaTest : 0.5);
@@ -133,10 +120,6 @@ export function createStylizedLeafMaterial({
   return material;
 }
 
-/**
- * Close-range material for an authored trunk/branch mesh. Variants can keep
- * their source appearance or opt into the packed procedural bark texture pair.
- */
 function bumpNormal(height) {
   const positionDerivativeX = positionView.dFdx();
   const positionDerivativeY = positionView.dFdy();

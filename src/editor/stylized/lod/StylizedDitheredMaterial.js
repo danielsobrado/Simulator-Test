@@ -4,6 +4,7 @@ import {
   float,
   fract,
   positionLocal,
+  positionWorld,
   sin,
   step,
   texture,
@@ -28,18 +29,37 @@ export function createSourceOpacityNode(material) {
   return opacity;
 }
 
+function applyMorphology(material, sourceMaterial, kind) {
+  if (kind !== 'leaf' && kind !== 'trunk') return;
+  const morphology = attribute('instanceMorphology', 'vec3');
+  const sourcePosition = sourceMaterial.positionNode ?? positionLocal;
+  const scaleX = kind === 'leaf' ? morphology.x : morphology.z;
+  const scaleZ = kind === 'leaf' ? morphology.y : morphology.z;
+  material.positionNode = vec3(
+    sourcePosition.x.mul(scaleX),
+    sourcePosition.y,
+    sourcePosition.z.mul(scaleZ),
+  );
+}
+
 /**
  * `tinted` adds a per-instance vec3 on top of the scalar brightness variation.
- * The scalar cannot carry hue, and hue is what separates an autumn grove from a
- * green one — but only leaf parts opt in, so a tinted crown does not drag its
- * trunk with it, and untinted callers (bushes, rocks) declare no extra attribute.
+ * `kind` selects the per-instance tree morphology transform. Other scatter layers
+ * keep the identity morphology written by the shared instance runtime.
  */
-export function createDitheredMaterial(sourceMaterial, { tinted = false } = {}) {
+export function createDitheredMaterial(sourceMaterial, {
+  tinted = false,
+  kind = null,
+} = {}) {
   const material = sourceMaterial.clone();
   const fade = attribute('instanceLodFade', 'float');
   const seed = attribute('instanceStableSeed', 'float');
   const colorVariation = attribute('instanceColorVariation', 'float');
-  const seededPosition = positionLocal.add(vec3(seed, seed.mul(1.37), seed.mul(2.11)));
+  const seededPosition = positionWorld.mul(1.71).add(vec3(
+    seed.mul(19.19),
+    seed.mul(31.37),
+    seed.mul(47.11),
+  ));
   const threshold = fract(sin(dot(seededPosition, HASH_VECTOR)).mul(HASH_SCALE));
   const sourceOpacity = createSourceOpacityNode(material);
   const coverage = sourceOpacity ? sourceOpacity.mul(fade) : fade;
@@ -50,6 +70,7 @@ export function createDitheredMaterial(sourceMaterial, { tinted = false } = {}) 
       : colorVariation;
     material.colorNode = material.colorNode.mul(variation);
   }
+  applyMorphology(material, sourceMaterial, kind);
   material.alphaTest = Math.max(0.5, sourceMaterial.alphaTest ?? 0);
   material.transparent = false;
   material.depthWrite = true;

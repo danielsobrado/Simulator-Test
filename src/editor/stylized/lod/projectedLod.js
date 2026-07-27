@@ -59,6 +59,25 @@ export function selectProjectedLod({
   return pixels <= threshold * (1 + hysteresisRatio) ? previous : next;
 }
 
+/**
+ * Collapse logical bands that share the same outer radius onto one physical
+ * representation. This prevents transitions such as proxy → impostor from writing
+ * the same proxy mesh twice when a layer only implements near/proxy rendering.
+ */
+export function normalizeLodBandForRadii({
+  band,
+  meshRadius,
+  proxyRadius,
+  impostorRadius,
+  clusterRadius,
+}) {
+  let result = band;
+  if (result === 'cluster' && clusterRadius <= impostorRadius) result = 'impostor';
+  if (result === 'impostor' && impostorRadius <= proxyRadius) result = 'proxy';
+  if (result === 'proxy' && proxyRadius <= meshRadius) result = 'near';
+  return result;
+}
+
 export function clampLodToRadii({
   band,
   chunkDistance,
@@ -67,17 +86,26 @@ export function clampLodToRadii({
   impostorRadius,
   clusterRadius,
 }) {
-  if (chunkDistance > clusterRadius) return 'culled';
-  if (band === 'near' && chunkDistance > meshRadius) {
-    if (chunkDistance <= proxyRadius) return 'proxy';
-    if (chunkDistance <= impostorRadius) return 'impostor';
-    return 'cluster';
+  let result = band;
+  if (chunkDistance > clusterRadius) {
+    result = 'culled';
+  } else if (band === 'near' && chunkDistance > meshRadius) {
+    if (chunkDistance <= proxyRadius) result = 'proxy';
+    else if (chunkDistance <= impostorRadius) result = 'impostor';
+    else result = 'cluster';
+  } else if (band === 'proxy' && chunkDistance > proxyRadius) {
+    result = chunkDistance <= impostorRadius ? 'impostor' : 'cluster';
+  } else if (band === 'impostor' && chunkDistance > impostorRadius) {
+    result = 'cluster';
   }
-  if (band === 'proxy' && chunkDistance > proxyRadius) {
-    return chunkDistance <= impostorRadius ? 'impostor' : 'cluster';
-  }
-  if (band === 'impostor' && chunkDistance > impostorRadius) return 'cluster';
-  return band;
+
+  return normalizeLodBandForRadii({
+    band: result,
+    meshRadius,
+    proxyRadius,
+    impostorRadius,
+    clusterRadius,
+  });
 }
 
 export function updateLodTransition({

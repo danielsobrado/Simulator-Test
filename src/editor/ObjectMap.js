@@ -1,3 +1,5 @@
+import { ObjectSpatialIndex } from './ObjectSpatialIndex.js';
+
 function normalizeRotation(rotation) {
   return ((Number(rotation) % 4) + 4) % 4;
 }
@@ -14,6 +16,13 @@ export class ObjectMap {
     this.objectsById = new Map();
     this.occupancy = new Map();
     this.nextId = 1;
+    this.replacing = false;
+    this.spatialIndex = new ObjectSpatialIndex({
+      bucketSize: tileMap.chunkSize,
+      boundsForObject: (object) => this.getBounds(
+        object.x, object.z, object.definitionKey, object.rotation,
+      ),
+    });
   }
 
   get size() {
@@ -85,6 +94,18 @@ export class ObjectMap {
     return cells;
   }
 
+  get revision() {
+    return this.spatialIndex.revision;
+  }
+
+  queryBounds(bounds) {
+    return this.spatialIndex.query(bounds).map(cloneObject);
+  }
+
+  signatureForBounds(bounds) {
+    return this.spatialIndex.signature(bounds);
+  }
+
   validatePlacement({ definitionKey, x, z, rotation = 0, ignoreObjectId = null }) {
     const definition = this.getDefinition(definitionKey);
     const cells = this.getCells(x, z, definitionKey, rotation);
@@ -129,6 +150,7 @@ export class ObjectMap {
     this.nextId += 1;
     this.objectsById.set(object.id, object);
     this.writeOccupancy(object, object.id);
+    this.spatialIndex.add(object);
     return cloneObject(object);
   }
 
@@ -150,9 +172,11 @@ export class ObjectMap {
       throw new Error(validation.reason);
     }
 
+    this.spatialIndex.remove(current);
     this.writeOccupancy(current, null);
     this.objectsById.set(numericId, next);
     this.writeOccupancy(next, numericId);
+    this.spatialIndex.add(next);
     return cloneObject(next);
   }
 
@@ -164,6 +188,7 @@ export class ObjectMap {
     }
     this.writeOccupancy(object, null);
     this.objectsById.delete(numericId);
+    this.spatialIndex.remove(object);
     return cloneObject(object);
   }
 
@@ -187,6 +212,7 @@ export class ObjectMap {
     }
     this.objectsById.set(snapshot.id, snapshot);
     this.writeOccupancy(snapshot, snapshot.id);
+    if (!this.replacing) this.spatialIndex.add(snapshot);
     this.nextId = Math.max(this.nextId, snapshot.id + 1);
     return cloneObject(snapshot);
   }
@@ -214,6 +240,7 @@ export class ObjectMap {
     const snapshots = this.list();
     this.objectsById.clear();
     this.occupancy.clear();
+    this.spatialIndex.clear();
     return snapshots;
   }
 
@@ -228,12 +255,14 @@ export class ObjectMap {
     this.objectsById = new Map();
     this.occupancy = new Map();
     this.nextId = 1;
+    this.replacing = true;
 
     try {
-      for (const object of objects) {
-        this.restore(object);
-      }
+      for (const object of objects) this.restore(object);
+      this.replacing = false;
+      this.spatialIndex.replace(this.objectsById.values());
     } catch (error) {
+      this.replacing = false;
       this.objectsById = previousObjects;
       this.occupancy = previousOccupancy;
       this.nextId = previousNextId;

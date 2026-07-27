@@ -1,7 +1,6 @@
 /**
- * Limits heavy stylized rebuilds per frame (grass / flowers).
+ * Limits heavy stylized rebuilds per frame.
  */
-
 export class StylizedBuildQueue {
   constructor({
     buildsPerFrame = 1,
@@ -17,6 +16,7 @@ export class StylizedBuildQueue {
     // the frame three separately "cheap" queues can still stack into one hitch.
     this.shouldYield = typeof shouldYield === 'function' ? shouldYield : null;
     this.queue = [];
+    this.nextSequence = 0;
   }
 
   get size() {
@@ -30,7 +30,17 @@ export class StylizedBuildQueue {
   enqueue(job) {
     const key = job.key;
     this.queue = this.queue.filter((entry) => entry.key !== key);
-    this.queue.push(job);
+    const queued = {
+      ...job,
+      queuePriority: Number.isFinite(job.priority) ? job.priority : Number.POSITIVE_INFINITY,
+      queueSequence: this.nextSequence,
+    };
+    this.nextSequence += 1;
+    this.queue.push(queued);
+    this.queue.sort((left, right) => (
+      left.queuePriority - right.queuePriority
+      || left.queueSequence - right.queueSequence
+    ));
   }
 
   flush(run) {
