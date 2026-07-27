@@ -25,7 +25,8 @@ player:
 trees:
   enabled: true
   minimumTrunkRadius: 0.16
-  # Keys are prototype indices ("0") or explicit "prototype:0" identifiers.
+  # Prefer the configured asset id/scene path. Multi-prototype assets use #0, #1,
+  # and so on. Generated prototypes fall back to "prototype:0" or numeric keys.
   # Supported fields: radius, height, centerX, centerZ, baseY.
   prototypeOverrides: {}
 
