@@ -322,6 +322,8 @@ export class TreeManifestStore {
         prototypeIndex: 0,
         radius: context.clearRadius,
         priority: 0,
+        speciesId: plant.speciesId,
+        ageClass: plant.ageClass,
       };
       const ecological = this.speciesRegistry.select(candidate, {
         ...habitat,
@@ -330,8 +332,6 @@ export class TreeManifestStore {
       return Object.freeze({
         ...candidate,
         ...ecological,
-        speciesId: plant.speciesId,
-        ageClass: plant.ageClass,
         patchId: habitat.patchId ?? `planted:${plant.stableId}`,
         forestProfileKey: habitat.profileKey,
         forestStructure: habitat.structure ?? 'planted',
