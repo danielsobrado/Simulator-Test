@@ -1,6 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
-import { hash32 } from './scatterMath.js';
+import {
+  treeMorphology,
+  treeRenderSeed,
+} from './forest/TreeAppearance.js';
 import { aggregateCanopyClusters } from './lod/canopyCluster.js';
 import { writeInstances } from './lod/StylizedLodRuntime.js';
 
@@ -8,11 +11,6 @@ const UNTINTED = Object.freeze([1, 1, 1]);
 
 function createInstances(count) {
   return Array.from({ length: count }, () => []);
-}
-
-function stableSeed(placement) {
-  if (Number.isFinite(placement.priority)) return placement.priority;
-  return hash32(placement.index ?? 0) / 0xffffffff;
 }
 
 const scratchPosition = new THREE.Vector3();
@@ -45,21 +43,11 @@ function recordBatchStats(statsByMode, stats) {
   target.dropped += stats.dropped;
 }
 
-function morphologyFor(placement) {
-  const crownScale = placement.crownScale ?? 1;
-  const crownAspect = placement.crownAspect ?? 1;
-  return [
-    crownScale * crownAspect,
-    crownScale,
-    placement.trunkScale ?? 1,
-  ];
-}
-
 function leafAppearance(placement, resolveLeafTint) {
-  const seed = stableSeed(placement);
+  const seed = treeRenderSeed(placement);
   const tint = resolveLeafTint?.(placement) ?? UNTINTED;
   const variation = 0.9 + (placement.colorSeed ?? seed) * 0.2;
-  const morphology = morphologyFor(placement);
+  const morphology = treeMorphology(placement);
   return {
     morphology,
     colorVariation: variation,
@@ -87,7 +75,7 @@ function geometryInstance(placement, fade, resolveLeafTint) {
       scaleZ: heightScale,
     }),
     fade,
-    seed: stableSeed(placement),
+    seed: treeRenderSeed(placement),
     colorVariation: appearance.colorVariation,
     leafTint: appearance.leafTint,
     morphology: appearance.morphology,
@@ -97,6 +85,7 @@ function geometryInstance(placement, fade, resolveLeafTint) {
 function impostorRecord(placement, atlas, fade, resolveLeafTint) {
   const heightScale = placement.heightScale ?? placement.scale;
   const appearance = leafAppearance(placement, resolveLeafTint);
+  const seed = treeRenderSeed(placement);
   return {
     x: placement.x,
     y: placement.height + (atlas.centerY ?? atlas.height * 0.5) * heightScale,
@@ -105,13 +94,13 @@ function impostorRecord(placement, atlas, fade, resolveLeafTint) {
     radius: atlas.radius * heightScale * Math.max(1, appearance.impostorAppearance[0]),
     yaw: placement.rotationY,
     fade,
-    seed: placement.windSeed ?? stableSeed(placement),
+    seed,
     appearance: appearance.impostorAppearance,
     speciesId: placement.speciesId,
     ageClass: placement.ageClass,
     crownAspect: placement.crownAspect,
     colorSeed: placement.colorSeed,
-    windPhase: placement.windSeed,
+    windPhase: seed,
   };
 }
 
@@ -231,7 +220,7 @@ export function rebuildTreeLod({
       for (const placement of placements) {
         const prototypeIndex = resolvePrototypeIndex?.(placement)
           ?? placement.prototypeIndex;
-        const seed = stableSeed(placement);
+        const seed = treeRenderSeed(placement);
         if (representation.band === 'near' && placement.ageClass === 'dead') {
           understory[0].push({
             matrix: createMatrix({
