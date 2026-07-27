@@ -6,6 +6,9 @@ import {
 
 const DEBUG_KEYS = Object.freeze(['colliders', 'broadphase', 'support', 'contacts']);
 const TREE_OVERRIDE_KEYS = new Set(['radius', 'height', 'centerX', 'centerZ', 'baseY']);
+const ROCK_OVERRIDE_KEYS = new Set(['tier', 'shape', 'collisionScale']);
+const ROCK_TIERS = new Set(['auto', 'decorative', 'blocking', 'walkable']);
+const ROCK_SHAPES = new Set(['auto', 'sphere', 'ellipsoid', 'capsule', 'compound']);
 const TRUE_VALUES = new Set(['', '1', 'true', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'off']);
 
@@ -43,8 +46,11 @@ export const COLLISION_CONFIG_DEFAULTS = deepFreeze({
   rocks: {
     enabled: true,
     minimumCollidableHeight: 0.3,
+    minimumCollidableWidth: 0.4,
     minimumWalkableHeight: 0.7,
+    minimumWalkableWidth: 1.2,
     maximumProxyTriangles: 96,
+    prototypeOverrides: {},
   },
   objects: {
     enabled: true,
@@ -85,6 +91,14 @@ function assertPositive(value, path) {
   }
 }
 
+function assertEnum(value, values, path) {
+  if (typeof value !== 'string' || !values.has(value)) {
+    throw new Error(
+      `Invalid collision configuration: ${path} must be one of ${[...values].join(', ')}.`,
+    );
+  }
+}
+
 function assertNonNegativeInteger(value, path, maximum = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
     throw new Error(
@@ -118,6 +132,27 @@ function validateTreeOverrides(overrides) {
     if ('height' in override) assertPositive(override.height, `${path}.height`);
     for (const field of ['centerX', 'centerZ', 'baseY']) {
       if (field in override) assertFinite(override[field], `${path}.${field}`);
+    }
+  }
+}
+
+function validateRockOverrides(overrides) {
+  assertObject(overrides, 'collision.rocks.prototypeOverrides');
+  for (const [key, override] of Object.entries(overrides)) {
+    if (!key.trim()) {
+      throw new Error('Invalid collision configuration: rock override keys must not be empty.');
+    }
+    const path = `collision.rocks.prototypeOverrides.${key}`;
+    assertObject(override, path);
+    for (const field of Object.keys(override)) {
+      if (!ROCK_OVERRIDE_KEYS.has(field)) {
+        throw new Error(`Invalid collision configuration: unsupported ${path}.${field}.`);
+      }
+    }
+    if ('tier' in override) assertEnum(override.tier, ROCK_TIERS, `${path}.tier`);
+    if ('shape' in override) assertEnum(override.shape, ROCK_SHAPES, `${path}.shape`);
+    if ('collisionScale' in override) {
+      assertPositive(override.collisionScale, `${path}.collisionScale`);
     }
   }
 }
@@ -183,14 +218,27 @@ export function validateCollisionConfig(config) {
   }
   assertPositive(config.trees.minimumTrunkRadius, 'collision.trees.minimumTrunkRadius');
   validateTreeOverrides(config.trees.prototypeOverrides);
-  assertPositive(config.rocks.minimumCollidableHeight, 'collision.rocks.minimumCollidableHeight');
-  assertPositive(config.rocks.minimumWalkableHeight, 'collision.rocks.minimumWalkableHeight');
+
+  for (const field of [
+    'minimumCollidableHeight',
+    'minimumCollidableWidth',
+    'minimumWalkableHeight',
+    'minimumWalkableWidth',
+  ]) {
+    assertPositive(config.rocks[field], `collision.rocks.${field}`);
+  }
   if (config.rocks.minimumWalkableHeight < config.rocks.minimumCollidableHeight) {
     throw new Error(
       'Invalid collision configuration: collision.rocks.minimumWalkableHeight must not be below minimumCollidableHeight.',
     );
   }
+  if (config.rocks.minimumWalkableWidth < config.rocks.minimumCollidableWidth) {
+    throw new Error(
+      'Invalid collision configuration: collision.rocks.minimumWalkableWidth must not be below minimumCollidableWidth.',
+    );
+  }
   assertPositiveInteger(config.rocks.maximumProxyTriangles, 'collision.rocks.maximumProxyTriangles');
+  validateRockOverrides(config.rocks.prototypeOverrides);
   assertPositive(config.constructions.curveSegmentLength, 'collision.constructions.curveSegmentLength');
 
   assertObject(config.debug, 'collision.debug');
@@ -198,8 +246,8 @@ export function validateCollisionConfig(config) {
   return config;
 }
 
-function cloneTreeOverrides(overrides = {}) {
-  assertObject(overrides, 'collision.trees.prototypeOverrides');
+function cloneOverrides(overrides, path) {
+  assertObject(overrides, path);
   return Object.fromEntries(Object.entries(overrides).map(([key, value]) => [
     key,
     value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : value,
@@ -216,9 +264,19 @@ function mergeCollisionConfig(input = {}) {
     trees: {
       ...COLLISION_CONFIG_DEFAULTS.trees,
       ...(input.trees ?? {}),
-      prototypeOverrides: cloneTreeOverrides(input.trees?.prototypeOverrides ?? {}),
+      prototypeOverrides: cloneOverrides(
+        input.trees?.prototypeOverrides ?? {},
+        'collision.trees.prototypeOverrides',
+      ),
     },
-    rocks: { ...COLLISION_CONFIG_DEFAULTS.rocks, ...(input.rocks ?? {}) },
+    rocks: {
+      ...COLLISION_CONFIG_DEFAULTS.rocks,
+      ...(input.rocks ?? {}),
+      prototypeOverrides: cloneOverrides(
+        input.rocks?.prototypeOverrides ?? {},
+        'collision.rocks.prototypeOverrides',
+      ),
+    },
     objects: { ...COLLISION_CONFIG_DEFAULTS.objects, ...(input.objects ?? {}) },
     constructions: {
       ...COLLISION_CONFIG_DEFAULTS.constructions,
