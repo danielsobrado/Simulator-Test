@@ -95,6 +95,29 @@ test('deep water switches to buoyant swimming and accepts vertical controls', ()
   assert.ok(descending.verticalVelocity < floating.verticalVelocity);
 });
 
+test('held descend input can reach deep water instead of fighting buoyancy', () => {
+  let state = {
+    ...createPlayerState({ x: 0, z: 0, groundHeight: -20, eyeHeight: config.eyeHeight }),
+    y: 1.8,
+    grounded: false,
+  };
+  for (let frame = 0; frame < 80; frame += 1) {
+    state = stepPlayerPhysics({
+      state,
+      input: input({ descend: 1 }),
+      deltaSeconds: 0.05,
+      config,
+      forward,
+      right,
+      getGroundHeight: () => -20,
+      getWaterSample: waterAt(2),
+    });
+  }
+
+  assert.equal(state.waterState, PLAYER_WATER_SUBMERGED);
+  assert.ok(state.y < -5);
+});
+
 test('submerged players surface smoothly and leaving water restores gravity', () => {
   let state = {
     ...createPlayerState({ x: 0, z: 0, groundHeight: 0, eyeHeight: config.eyeHeight }),
