@@ -1,5 +1,9 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey, parseCollisionChunkKey } from './CollisionIds.js';
+import {
+  MAX_COLLISION_BUILDS_PER_FRAME,
+  MAX_COLLISION_STREAMING_RADIUS,
+} from './CollisionLimits.js';
 import { collisionChunkForCanonical } from './colliders/ColliderBounds.js';
 
 export const COLLISION_NOT_READY_POLICY = 'retain-previous-valid-position';
@@ -57,6 +61,36 @@ function routeChunks(start, end) {
   return chunks;
 }
 
+function validateResidencyConfig(config) {
+  if (!config || typeof config !== 'object') {
+    throw new Error('Collision residency config must be an object.');
+  }
+  for (const field of ['residentRadius', 'unloadRadius']) {
+    const value = config[field];
+    if (!Number.isSafeInteger(value) || value < 0 || value > MAX_COLLISION_STREAMING_RADIUS) {
+      throw new Error(
+        `Collision residency ${field} must be within 0 and ${MAX_COLLISION_STREAMING_RADIUS}.`,
+      );
+    }
+  }
+  if (config.unloadRadius < config.residentRadius) {
+    throw new Error('Collision residency unloadRadius must cover residentRadius.');
+  }
+  if (!Number.isFinite(config.prefetchSeconds) || config.prefetchSeconds <= 0) {
+    throw new Error('Collision residency prefetchSeconds must be positive and finite.');
+  }
+  if (!Number.isSafeInteger(config.buildsPerFrame)
+      || config.buildsPerFrame < 1
+      || config.buildsPerFrame > MAX_COLLISION_BUILDS_PER_FRAME) {
+    throw new Error(
+      `Collision residency buildsPerFrame must be within 1 and ${MAX_COLLISION_BUILDS_PER_FRAME}.`,
+    );
+  }
+  if (!Number.isFinite(config.buildBudgetMs) || config.buildBudgetMs <= 0) {
+    throw new Error('Collision residency buildBudgetMs must be positive and finite.');
+  }
+}
+
 export class CollisionResidency {
   constructor({
     world,
@@ -69,6 +103,8 @@ export class CollisionResidency {
     if (typeof buildOwnerChunk !== 'function') {
       throw new Error('Collision residency requires a buildOwnerChunk callback.');
     }
+    if (typeof now !== 'function') throw new Error('Collision residency now must be a function.');
+    validateResidencyConfig(config);
     this.world = world;
     this.config = config;
     this.buildOwnerChunk = buildOwnerChunk;
@@ -137,6 +173,7 @@ export class CollisionResidency {
     this.currentChunk = current;
     this.predictedChunk = predicted;
     this.desiredKeys.clear();
+    for (const job of this.queue) job.priority = Number.POSITIVE_INFINITY;
 
     for (let offsetZ = -this.config.residentRadius; offsetZ <= this.config.residentRadius; offsetZ += 1) {
       for (let offsetX = -this.config.residentRadius; offsetX <= this.config.residentRadius; offsetX += 1) {
@@ -266,6 +303,11 @@ export class CollisionResidency {
       this.world.unloadOwnerChunk(chunk.chunkX, chunk.chunkZ);
     }
     this.loadedKeys.clear();
+    this.currentChunk = null;
+    this.predictedChunk = null;
+    this.lastBuildError = null;
+    this.builds = 0;
+    this.sequence = 0;
     this.updateCounters();
   }
 }
