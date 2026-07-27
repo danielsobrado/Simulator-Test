@@ -141,10 +141,7 @@ export class CollisionResidency {
 
   retryReady(key) {
     const retry = this.retryByKey.get(key);
-    if (!retry) return true;
-    if (this.now() < retry.at) return false;
-    this.retryByKey.delete(key);
-    return true;
+    return !retry || this.now() >= retry.at;
   }
 
   recordRetry(key) {
@@ -341,7 +338,7 @@ export class CollisionResidency {
       }
     }
     if (frameError) this.lastBuildError = frameError;
-    else if (attempted > 0) this.lastBuildError = null;
+    else if (attempted > 0 && this.retryByKey.size === 0) this.lastBuildError = null;
     PerfCounters.inc('collisionBuilds', built);
     PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
