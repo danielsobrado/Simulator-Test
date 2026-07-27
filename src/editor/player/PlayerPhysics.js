@@ -121,6 +121,13 @@ function defaultMovementResult({
   };
 }
 
+function supportSearchDown(state, delta, config) {
+  if (state.grounded) return config.groundSnapDistance;
+  const fallingSpeed = Math.max(0, -(state.verticalVelocity ?? 0));
+  const predictedFall = fallingSpeed * delta + config.gravity * delta * delta * 0.5;
+  return Math.max(config.groundSnapDistance, predictedFall + PLAYER_GROUND_EPSILON);
+}
+
 export function createPlayerState({ x, z, groundHeight, eyeHeight }) {
   return {
     x,
@@ -193,6 +200,7 @@ export function stepPlayerPhysics({
       displacement: { x: desiredX - state.x, z: desiredZ - state.z },
       grounded: state.grounded,
       allowStep: state.grounded && !isSwimmingWaterState(movementState.waterState),
+      supportDownDistance: supportSearchDown(state, delta, config),
     })
     : defaultMovementResult({
       state,
