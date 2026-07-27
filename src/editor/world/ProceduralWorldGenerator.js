@@ -3,9 +3,11 @@ import {
   WORLD_DEFAULT_SEED,
   WORLD_GENERATOR_VERSION,
 } from './worldConstants.js';
-import { WATER_DOMAIN_VERSION } from '../water/WaterConstants.js';
-import { resolveWaterDomainVersion } from '../water/WaterConfig.js';
-import { sampleGeneratorWater } from '../water/GeneratorWaterAdapter.js';
+import {
+  getRuntimeWaterDomainConfig,
+  resolveWaterDomainConfig,
+} from '../water/WaterConfig.js';
+import { WaterTerrainModel } from '../water/WaterTerrainModel.js';
 
 function fade(value) {
   return value * value * (3 - 2 * value);
@@ -47,13 +49,23 @@ function fractalNoise(x, z, seed) {
   return total / weight;
 }
 
+function serializableWaterDomain(config) {
+  return {
+    version: config.version,
+    cellSizeMeters: config.cellSizeMeters,
+    shoreDistanceMeters: config.shoreDistanceMeters,
+    ocean: { ...config.ocean },
+    river: { ...config.river },
+  };
+}
+
 export class ProceduralWorldGenerator {
   constructor({
     seed = WORLD_DEFAULT_SEED,
     version = WORLD_GENERATOR_VERSION,
     heightScale = WORLD_DEFAULT_HEIGHT_SCALE,
     seaLevel = -1.5,
-    waterDomainVersion = WATER_DOMAIN_VERSION,
+    waterDomain = getRuntimeWaterDomainConfig(),
   } = {}) {
     if (!Number.isSafeInteger(seed)) {
       throw new Error('World generator seed must be a safe integer.');
@@ -68,16 +80,27 @@ export class ProceduralWorldGenerator {
     this.version = version;
     this.heightScale = heightScale;
     this.seaLevel = seaLevel;
-    this.waterDomainVersion = resolveWaterDomainVersion(waterDomainVersion);
+    this.waterDomain = resolveWaterDomainConfig(waterDomain);
+    this.waterTerrainModel = new WaterTerrainModel({
+      seed,
+      seaLevel,
+      config: this.waterDomain,
+      sampleBaseHeight: (cellX, cellZ) => this.sampleBaseHeight(cellX, cellZ),
+      sampleBaseTile: (cellX, cellZ) => this.sampleBaseTile(cellX, cellZ),
+    });
   }
 
-  sampleHeight(vertexX, vertexZ) {
+  sampleBaseHeight(vertexX, vertexZ) {
     const continental = fractalNoise(vertexX / 420, vertexZ / 420, this.seed + 11);
     const hills = fractalNoise(vertexX / 96, vertexZ / 96, this.seed + 29);
     const detail = fractalNoise(vertexX / 28, vertexZ / 28, this.seed + 47);
     return continental * this.heightScale
       + hills * this.heightScale * 0.34
       + detail * this.heightScale * 0.08;
+  }
+
+  sampleHeight(vertexX, vertexZ) {
+    return this.waterTerrainModel.sampleHeight(vertexX, vertexZ);
   }
 
   sampleClimate(cellX, cellZ) {
@@ -87,12 +110,12 @@ export class ProceduralWorldGenerator {
     return Object.freeze({ temperature, moisture });
   }
 
-  sampleTile(cellX, cellZ) {
+  sampleBaseTile(cellX, cellZ) {
     const height = (
-      this.sampleHeight(cellX, cellZ)
-      + this.sampleHeight(cellX + 1, cellZ)
-      + this.sampleHeight(cellX, cellZ + 1)
-      + this.sampleHeight(cellX + 1, cellZ + 1)
+      this.sampleBaseHeight(cellX, cellZ)
+      + this.sampleBaseHeight(cellX + 1, cellZ)
+      + this.sampleBaseHeight(cellX, cellZ + 1)
+      + this.sampleBaseHeight(cellX + 1, cellZ + 1)
     ) * 0.25;
     const { temperature, moisture } = this.sampleClimate(cellX, cellZ);
 
@@ -123,8 +146,12 @@ export class ProceduralWorldGenerator {
     return temperature > 0.25 ? 3 : 4;
   }
 
+  sampleTile(cellX, cellZ) {
+    return this.sampleBaseTile(cellX, cellZ);
+  }
+
   sampleWater(cellX, cellZ) {
-    return sampleGeneratorWater(this, cellX, cellZ);
+    return this.waterTerrainModel.sampleWater(cellX, cellZ);
   }
 
   toMetadata() {
@@ -133,7 +160,8 @@ export class ProceduralWorldGenerator {
       version: this.version,
       heightScale: this.heightScale,
       seaLevel: this.seaLevel,
-      waterDomainVersion: this.waterDomainVersion,
+      waterDomainVersion: this.waterDomain.version,
+      waterDomain: serializableWaterDomain(this.waterDomain),
     });
   }
 }
