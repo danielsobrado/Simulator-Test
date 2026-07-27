@@ -1,5 +1,8 @@
 const counts = Object.create(null);
 
+export const PERF_COUNTER_WATER_GENERATION_MS = 'waterGenerationMs';
+export const PERF_COUNTER_WATER_UPLOAD_BYTES = 'waterUploadBytes';
+
 export const PerfCounters = {
   inc(name, amount = 1) {
     counts[name] = (counts[name] ?? 0) + amount;
