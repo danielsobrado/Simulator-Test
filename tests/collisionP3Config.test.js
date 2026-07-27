@@ -29,6 +29,12 @@ test('P3 tree overrides are copied and deeply immutable', () => {
 test('P3 tree overrides reject unsafe fields and values', () => {
   assert.throws(
     () => createCollisionConfig({
+      trees: { prototypeOverrides: { 0: null } },
+    }),
+    /must be an object/,
+  );
+  assert.throws(
+    () => createCollisionConfig({
       trees: { prototypeOverrides: { 0: { radius: 0 } } },
     }),
     /radius must be positive/,
