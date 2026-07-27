@@ -40,6 +40,7 @@ export function createCollisionRuntime({ terrainView, editorConfig, search = '' 
   const world = new CollisionWorld({
     chunkWorldSize: terrainView.chunkWorldSize,
     binSize: collisionConfig.streaming.binSize,
+    maxChunksPerCollider: collisionConfig.streaming.maxChunksPerCollider,
   });
   const residency = new CollisionResidency({
     world,
