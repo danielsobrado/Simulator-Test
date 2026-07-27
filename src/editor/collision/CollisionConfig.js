@@ -1,3 +1,9 @@
+import {
+  MAX_COLLIDER_CHUNKS,
+  MAX_COLLISION_BUILDS_PER_FRAME,
+  MAX_COLLISION_STREAMING_RADIUS,
+} from './CollisionLimits.js';
+
 const DEBUG_KEYS = Object.freeze(['colliders', 'broadphase', 'support', 'contacts']);
 const TRUE_VALUES = new Set(['', '1', 'true', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'off']);
@@ -71,15 +77,19 @@ function assertPositive(value, path) {
   }
 }
 
-function assertNonNegativeInteger(value, path) {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`Invalid collision configuration: ${path} must be a non-negative integer.`);
+function assertNonNegativeInteger(value, path, maximum = Number.MAX_SAFE_INTEGER) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new Error(
+      `Invalid collision configuration: ${path} must be a non-negative integer not exceeding ${maximum}.`,
+    );
   }
 }
 
-function assertPositiveInteger(value, path) {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new Error(`Invalid collision configuration: ${path} must be a positive integer.`);
+function assertPositiveInteger(value, path, maximum = Number.MAX_SAFE_INTEGER) {
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+    throw new Error(
+      `Invalid collision configuration: ${path} must be a positive integer not exceeding ${maximum}.`,
+    );
   }
 }
 
@@ -91,20 +101,33 @@ export function validateCollisionConfig(config) {
   }
 
   assertObject(config.streaming, 'collision.streaming');
-  assertNonNegativeInteger(config.streaming.residentRadius, 'collision.streaming.residentRadius');
-  assertNonNegativeInteger(config.streaming.unloadRadius, 'collision.streaming.unloadRadius');
+  assertNonNegativeInteger(
+    config.streaming.residentRadius,
+    'collision.streaming.residentRadius',
+    MAX_COLLISION_STREAMING_RADIUS,
+  );
+  assertNonNegativeInteger(
+    config.streaming.unloadRadius,
+    'collision.streaming.unloadRadius',
+    MAX_COLLISION_STREAMING_RADIUS,
+  );
   if (config.streaming.unloadRadius < config.streaming.residentRadius) {
     throw new Error(
       'Invalid collision configuration: collision.streaming.unloadRadius must cover residentRadius.',
     );
   }
   assertPositive(config.streaming.prefetchSeconds, 'collision.streaming.prefetchSeconds');
-  assertPositiveInteger(config.streaming.buildsPerFrame, 'collision.streaming.buildsPerFrame');
+  assertPositiveInteger(
+    config.streaming.buildsPerFrame,
+    'collision.streaming.buildsPerFrame',
+    MAX_COLLISION_BUILDS_PER_FRAME,
+  );
   assertPositive(config.streaming.buildBudgetMs, 'collision.streaming.buildBudgetMs');
   assertPositive(config.streaming.binSize, 'collision.streaming.binSize');
   assertPositiveInteger(
     config.streaming.maxChunksPerCollider,
     'collision.streaming.maxChunksPerCollider',
+    MAX_COLLIDER_CHUNKS,
   );
 
   assertObject(config.player, 'collision.player');
