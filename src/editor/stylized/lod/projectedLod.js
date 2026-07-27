@@ -22,6 +22,10 @@ function baseBand(pixels, thresholds) {
   return 'culled';
 }
 
+function representation(band, fade, ditherDirection = 1) {
+  return Object.freeze({ band, fade, ditherDirection });
+}
+
 export function projectedPixelHeight({ camera, worldPosition, worldHeight, viewportHeight }) {
   if (!camera || !Number.isFinite(worldHeight) || worldHeight <= 0
       || !Number.isFinite(viewportHeight) || viewportHeight <= 0) {
@@ -122,7 +126,7 @@ export function updateLodTransition({
         target,
         startedAt: timestamp,
         complete: true,
-        representations: Object.freeze([{ band: target, fade: 1 }]),
+        representations: Object.freeze([representation(target, 1)]),
       };
     }
     return {
@@ -131,8 +135,8 @@ export function updateLodTransition({
       startedAt: timestamp,
       complete: false,
       representations: Object.freeze([
-        { band: 'culled', fade: 1 },
-        { band: target, fade: 0 },
+        representation('culled', 1, -1),
+        representation(target, 0, 1),
       ]),
     };
   }
@@ -153,7 +157,7 @@ export function updateLodTransition({
     return {
       ...nextState,
       complete: true,
-      representations: Object.freeze([{ band: nextState.target, fade: 1 }]),
+      representations: Object.freeze([representation(nextState.target, 1)]),
     };
   }
 
@@ -164,7 +168,7 @@ export function updateLodTransition({
       target: nextState.target,
       startedAt: nextState.startedAt,
       complete: true,
-      representations: Object.freeze([{ band: nextState.target, fade: 1 }]),
+      representations: Object.freeze([representation(nextState.target, 1)]),
     };
   }
 
@@ -172,8 +176,8 @@ export function updateLodTransition({
     ...nextState,
     complete: false,
     representations: Object.freeze([
-      { band: nextState.from, fade: 1 - progress },
-      { band: nextState.target, fade: progress },
+      representation(nextState.from, 1 - progress, -1),
+      representation(nextState.target, progress, 1),
     ]),
   };
 }
