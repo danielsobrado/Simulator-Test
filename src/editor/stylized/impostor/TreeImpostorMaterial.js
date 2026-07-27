@@ -28,7 +28,7 @@ const HASH_VECTOR = vec3(12.9898, 78.233, 37.719);
 const HASH_SCALE = 43758.5453;
 const TWO_PI = Math.PI * 2;
 
-function createMaterial({ atlas, readTransform, readParameters }) {
+function createMaterial({ atlas, readTransform, readParameters, readAppearance }) {
   const cameraRight = uniform(new THREE.Vector3(1, 0, 0));
   const cameraUp = uniform(new THREE.Vector3(0, 1, 0));
   const sphericalBlend = uniform(0);
@@ -36,7 +36,9 @@ function createMaterial({ atlas, readTransform, readParameters }) {
   const windStrength = uniform(0.03);
   const transform = readTransform();
   const parameters = readParameters();
+  const appearance = readAppearance();
   const scale = transform.w;
+  const widthScale = appearance.x;
   const right = normalize(cameraRight);
   const up = normalize(mix(vec3(0, 1, 0), cameraUp, sphericalBlend));
   const backward = normalize(cross(right, up));
@@ -45,7 +47,7 @@ function createMaterial({ atlas, readTransform, readParameters }) {
     .mul(windStrength)
     .mul(scale);
   const worldPosition = transform.xyz
-    .add(right.mul(local.x.mul(atlas.width).mul(scale)))
+    .add(right.mul(local.x.mul(atlas.width).mul(scale).mul(widthScale)))
     .add(up.mul(local.y.mul(atlas.height).mul(scale)))
     .add(right.mul(canopyOffset));
 
@@ -87,16 +89,18 @@ function createMaterial({ atlas, readTransform, readParameters }) {
       .add(up.mul(viewNormal.y))
       .add(backward.mul(viewNormal.z)),
   );
-  const threshold = fract(sin(dot(
-    vec3(uv().x, uv().y, parameters.z),
-    HASH_VECTOR,
-  )).mul(HASH_SCALE));
+  const seededPosition = worldPosition.mul(1.71).add(vec3(
+    parameters.z.mul(19.19),
+    parameters.z.mul(31.37),
+    parameters.z.mul(47.11),
+  ));
+  const threshold = fract(sin(dot(seededPosition, HASH_VECTOR)).mul(HASH_SCALE));
   const coverage = albedo.a.mul(parameters.y);
   const visible = step(threshold, coverage);
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
-  material.colorNode = albedo.rgb;
+  material.colorNode = albedo.rgb.mul(appearance.yzw);
   material.normalNode = worldNormal;
   material.opacityNode = visible;
   material.alphaTest = 0.5;
@@ -114,6 +118,7 @@ export function createCpuTreeImpostorMaterial(atlas) {
     atlas,
     readTransform: () => attribute('instanceTransform', 'vec4'),
     readParameters: () => attribute('instanceImpostorParams', 'vec4'),
+    readAppearance: () => attribute('instanceImpostorAppearance', 'vec4'),
   });
 }
 
@@ -121,6 +126,7 @@ export function createGpuTreeImpostorMaterial({
   atlas,
   transformRead,
   parameterRead,
+  appearanceRead,
   visibleRead,
   instanceIndex,
   originUniform,
@@ -132,6 +138,7 @@ export function createGpuTreeImpostorMaterial({
       return vec4(transform.xyz.sub(originUniform), transform.w);
     },
     readParameters: () => parameterRead.element(visibleRead.element(instanceIndex)),
+    readAppearance: () => appearanceRead.element(visibleRead.element(instanceIndex)),
   });
 }
 
