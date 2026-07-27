@@ -23,6 +23,22 @@ const config = Object.freeze({
   prototypeOverrides: Object.freeze({}),
 });
 
+function rockViewFor(prototypes = []) {
+  return {
+    prototypes,
+    prototypeIndicesByAsset: new Map(),
+    prototypeHeights: prototypes.map(() => 1),
+    prototypeRevision: 0,
+    revisionTracker: { revision: 0 },
+    biomeAssetPalette: { revision: 0 },
+    pathClearance: { signature: 'path:1' },
+    clusterField: { signature: 'cluster:1' },
+    regionalCharacterField: { signature: 'regions:1' },
+    config: { rocks: { burial: 0.2 } },
+    manifestForChunk: () => Object.freeze([]),
+  };
+}
+
 test('rock source derives profiles lazily when streamed variants arrive', () => {
   const placements = Object.freeze([Object.freeze({
     stableId: 'rock:0:0:1',
@@ -35,19 +51,8 @@ test('rock source derives profiles lazily when streamed variants arrive', () => 
     rotationY: 0,
     prototypeIndex: 0,
   })]);
-  const rockView = {
-    prototypes: [],
-    prototypeIndicesByAsset: new Map(),
-    prototypeHeights: [],
-    prototypeRevision: 0,
-    revisionTracker: { revision: 0 },
-    biomeAssetPalette: { revision: 0 },
-    pathClearance: { signature: 'path:1' },
-    clusterField: { signature: 'cluster:1' },
-    regionalCharacterField: { signature: 'regions:1' },
-    config: { rocks: { burial: 0.2 } },
-    manifestForChunk: () => placements,
-  };
+  const rockView = rockViewFor();
+  rockView.manifestForChunk = () => placements;
   const source = createRockCollisionSource({ rockView, config });
 
   assert.equal(source.getProfiles().length, 0);
@@ -67,22 +72,32 @@ test('rock source derives profiles lazily when streamed variants arrive', () => 
   assert.equal(source.burialFor(placements[0], profiles[0]), 0.2);
 });
 
+test('failed same-count profile replacement retains and retries the previous cache', () => {
+  const rockView = rockViewFor([prototype(1, 1, 1)]);
+  rockView.prototypeRevision = 1;
+  const source = createRockCollisionSource({ rockView, config });
+  const initial = source.getProfiles();
+  assert.equal(initial[0].width, 1);
+
+  rockView.prototypes[0] = { geometry: { computeBoundingBox() { this.boundingBox = null; } } };
+  rockView.prototypeRevision = 2;
+  assert.throws(() => source.getProfiles(), /no bounding box/);
+
+  rockView.prototypes[0] = prototype(2, 1, 1);
+  const recovered = source.getProfiles();
+  assert.equal(recovered[0].width, 2);
+  assert.notEqual(recovered, initial);
+});
+
 test('render-only rock state does not invalidate collision authority', () => {
-  const rockView = {
-    prototypes: [prototype()],
-    prototypeIndicesByAsset: new Map([['rock.glb', Object.freeze([0])]]),
-    prototypeHeights: [1],
-    prototypeRevision: 1,
-    revisionTracker: { revision: 2 },
-    biomeAssetPalette: { revision: 3 },
-    pathClearance: { signature: 'path:1' },
-    clusterField: { signature: 'cluster:1' },
-    regionalCharacterField: { signature: 'regions:1' },
-    config: { rocks: { burial: 0.1 } },
-    signature: 'render:near',
-    chunkLodStates: new Map(),
-    manifestForChunk: () => Object.freeze([]),
-  };
+  const rockView = rockViewFor([prototype()]);
+  rockView.prototypeIndicesByAsset.set('rock.glb', Object.freeze([0]));
+  rockView.prototypeRevision = 1;
+  rockView.revisionTracker.revision = 2;
+  rockView.biomeAssetPalette.revision = 3;
+  rockView.config.rocks.burial = 0.1;
+  rockView.signature = 'render:near';
+  rockView.chunkLodStates = new Map();
   const source = createRockCollisionSource({ rockView, config });
   const before = source.epoch();
   rockView.signature = 'render:proxy';
