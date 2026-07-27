@@ -1,4 +1,4 @@
-import { registerCollisionTreeSource } from '../collision/CollisionPlayerBridge.js';
+import { registerCollisionNaturalSource } from '../collision/CollisionPlayerBridge.js';
 import { StylizedSurfaceView as StylizedSurfaceViewBase } from './StylizedSurfaceViewBase.js';
 import { loadOptionalTreeVariants } from './loadOptionalTreeVariants.js';
 import { installTerrainWaterQueries } from '../water/TerrainWaterQueries.js';
@@ -8,13 +8,13 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
     super(options);
     installTerrainWaterQueries(options.terrainView);
     this.collisionSourceDisposed = false;
-    this.releaseCollisionTreeSource = null;
+    this.releaseCollisionNaturalSource = null;
     this.ready = this.ready.then((result) => {
       if (!this.collisionSourceDisposed
           && !this.impostorBakeMode
-          && this.treeView?.manifestStore) {
-        this.releaseCollisionTreeSource = registerCollisionTreeSource({
-          treeView: this.treeView,
+          && (this.treeView?.manifestStore || this.rockView)) {
+        this.releaseCollisionNaturalSource = registerCollisionNaturalSource({
+          treeView: this.treeView?.manifestStore ? this.treeView : null,
           rockSource: this.rockView,
         });
       }
@@ -51,8 +51,8 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
 
   dispose() {
     this.collisionSourceDisposed = true;
-    this.releaseCollisionTreeSource?.();
-    this.releaseCollisionTreeSource = null;
+    this.releaseCollisionNaturalSource?.();
+    this.releaseCollisionNaturalSource = null;
     super.dispose();
   }
 }
