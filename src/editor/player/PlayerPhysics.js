@@ -134,16 +134,17 @@ export function stepPlayerPhysics({
     bounds?.maxZ,
   );
   let groundEyeY = getGroundHeight(nextX, nextZ) + config.eyeHeight;
+  let nextSample = sampleWater(nextX, nextZ);
+  let water = sampleWaterState({ state: movementState, sample: nextSample, eyeY: state.y, config });
 
-  if (!isSwimmingWaterState(currentWater.waterState)
+  if (!isSwimmingWaterState(water.waterState)
       && groundEyeY - state.y > config.stepHeight) {
     nextX = state.x;
     nextZ = state.z;
     groundEyeY = getGroundHeight(nextX, nextZ) + config.eyeHeight;
+    nextSample = sampleWater(nextX, nextZ);
+    water = sampleWaterState({ state: movementState, sample: nextSample, eyeY: state.y, config });
   }
-
-  const nextSample = sampleWater(nextX, nextZ);
-  let water = sampleWaterState({ state: movementState, sample: nextSample, eyeY: state.y, config });
   let verticalVelocity = state.verticalVelocity;
   let nextY = state.y;
   let grounded = state.grounded;
@@ -190,6 +191,12 @@ export function stepPlayerPhysics({
     eyeY: nextY,
     config,
   });
+  if (!isSwimmingWaterState(water.waterState)
+      && nextY <= groundEyeY + PLAYER_GROUND_EPSILON) {
+    nextY = groundEyeY;
+    verticalVelocity = 0;
+    grounded = true;
+  }
 
   return {
     x: nextX,
