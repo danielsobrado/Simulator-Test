@@ -1,3 +1,4 @@
+import { MAX_COLLISION_BINS_PER_CHUNK } from './CollisionLimits.js';
 import { COLLISION_LAYERS, collisionLayersMatch } from './CollisionLayers.js';
 import { canonicalAabbsIntersect, createCanonicalAabb } from './colliders/ColliderBounds.js';
 
@@ -7,7 +8,9 @@ function clamp(value, minimum, maximum) {
 
 export class CollisionSpatialBins {
   constructor({ chunkBounds, binSize, maxBinsPerCollider = 64 }) {
-    if (!(binSize > 0)) throw new Error('Collision binSize must be positive.');
+    if (!Number.isFinite(binSize) || binSize <= 0) {
+      throw new Error('Collision binSize must be positive and finite.');
+    }
     if (!Number.isSafeInteger(maxBinsPerCollider) || maxBinsPerCollider < 1) {
       throw new Error('maxBinsPerCollider must be a positive integer.');
     }
@@ -16,6 +19,12 @@ export class CollisionSpatialBins {
     this.maxBinsPerCollider = maxBinsPerCollider;
     this.columns = Math.max(1, Math.ceil((chunkBounds.maxX - chunkBounds.minX) / binSize));
     this.rows = Math.max(1, Math.ceil((chunkBounds.maxZ - chunkBounds.minZ) / binSize));
+    if (!Number.isSafeInteger(this.columns) || !Number.isSafeInteger(this.rows)
+        || this.columns > Math.floor(MAX_COLLISION_BINS_PER_CHUNK / this.rows)) {
+      throw new Error(
+        `Collision binSize creates more than ${MAX_COLLISION_BINS_PER_CHUNK} bins per chunk.`,
+      );
+    }
     this.bins = new Array(this.columns * this.rows).fill(null);
     this.large = [];
     this.sourceBins = new Map();
