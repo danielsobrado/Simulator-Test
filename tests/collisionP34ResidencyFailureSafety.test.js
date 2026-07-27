@@ -62,7 +62,7 @@ test('commit callback failure rolls the world back and retries after backoff', (
   assert.equal(residency.getStatus().deferredRetries, 0);
 });
 
-test('failed owner builds do not retry every animation frame', () => {
+test('failed owner builds use exponential backoff instead of retrying every frame', () => {
   const world = createWorld();
   let clock = 0;
   let attempts = 0;
@@ -89,4 +89,14 @@ test('failed owner builds do not retry every animation frame', () => {
   residency.update({ focus: { x: 1, z: 1 } });
   assert.equal(residency.flush().attempted, 1);
   assert.equal(attempts, 2);
+
+  clock += COLLISION_RETRY_BASE_MS;
+  residency.update({ focus: { x: 1, z: 1 } });
+  assert.equal(residency.flush().attempted, 0);
+  assert.equal(attempts, 2);
+
+  clock += COLLISION_RETRY_BASE_MS;
+  residency.update({ focus: { x: 1, z: 1 } });
+  assert.equal(residency.flush().attempted, 1);
+  assert.equal(attempts, 3);
 });
