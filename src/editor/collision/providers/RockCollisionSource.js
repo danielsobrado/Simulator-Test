@@ -60,10 +60,6 @@ function sourceEpoch(rockView) {
   ].join(':');
 }
 
-function prototypeId(profile) {
-  return `rock-walkable:${encodeURIComponent(profile.id)}`;
-}
-
 export function createRockCollisionSource({ rockView, config }) {
   if (!rockView || !Array.isArray(rockView.prototypes)
       || typeof rockView.manifestForChunk !== 'function') {
@@ -73,7 +69,22 @@ export function createRockCollisionSource({ rockView, config }) {
   let observedPrototypeRevision = -1;
   let profiles = EMPTY_PROFILES;
   let profileSignature = 'profiles:empty';
+  let nextGeometryToken = 1;
   const meshPrototypes = new Map();
+  const geometryTokens = new WeakMap();
+
+  function geometryToken(geometry) {
+    let token = geometryTokens.get(geometry);
+    if (token) return token;
+    token = nextGeometryToken;
+    nextGeometryToken += 1;
+    geometryTokens.set(geometry, token);
+    return token;
+  }
+
+  function meshPrototypeId(profile, geometry) {
+    return `rock-walkable:${encodeURIComponent(profile.id)}:g${geometryToken(geometry)}`;
+  }
 
   function ensureProfiles() {
     const revision = rockView.prototypeRevision ?? 0;
@@ -112,7 +123,7 @@ export function createRockCollisionSource({ rockView, config }) {
     if (!profile || !visual) {
       throw new Error(`Walkable rock collision prototype ${prototypeIndex} is unavailable.`);
     }
-    const id = prototypeId(profile);
+    const id = meshPrototypeId(profile, visual);
     const cached = meshPrototypes.get(id);
     if (cached) return world.registerPrototype(cached);
 
@@ -134,6 +145,7 @@ export function createRockCollisionSource({ rockView, config }) {
         metadata: {
           source: 'rock',
           assetKey: profile.id,
+          geometryToken: geometryToken(visual),
           proxyNode: authored?.name ?? null,
           generated: proxy.generated,
           overlap: proxy.overlap,
