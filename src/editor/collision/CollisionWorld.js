@@ -9,7 +9,11 @@ import {
   collisionChunkRangeForAabb,
   collisionChunksForAabb,
 } from './colliders/ColliderBounds.js';
-import { COLLIDER_TYPE_MESH_INSTANCE } from './colliders/ColliderRecords.js';
+import {
+  COLLIDER_TYPE_MESH_INSTANCE,
+  isColliderPrototypeDescriptor,
+  isColliderRecordDescriptor,
+} from './colliders/ColliderRecords.js';
 
 const MAX_REPORTED_MISSING_CHUNKS = 64;
 
@@ -29,15 +33,6 @@ function compareColliderSourceIds(left, right) {
   if (left.sourceId < right.sourceId) return -1;
   if (left.sourceId > right.sourceId) return 1;
   return 0;
-}
-
-function assertPrototypeDescriptor(prototype) {
-  if (!prototype || typeof prototype !== 'object' || typeof prototype.id !== 'string'
-      || !prototype.id || !Object.isFrozen(prototype)
-      || !Object.isFrozen(prototype.bounds)
-      || !Object.isFrozen(prototype.metadata)) {
-    throw new Error('Collision prototype must be an immutable descriptor.');
-  }
 }
 
 export class CollisionWorld {
@@ -81,7 +76,9 @@ export class CollisionWorld {
   }
 
   registerPrototype(prototype) {
-    assertPrototypeDescriptor(prototype);
+    if (!isColliderPrototypeDescriptor(prototype)) {
+      throw new Error('Collision prototype must be created by createColliderPrototype.');
+    }
     const previous = this.prototypes.get(prototype.id);
     if (previous && previous !== prototype) {
       throw new Error(`Collision prototype ${prototype.id} is already registered.`);
@@ -109,6 +106,9 @@ export class CollisionWorld {
     references.set(ownerKey, []);
 
     for (const collider of colliders) {
+      if (!isColliderRecordDescriptor(collider)) {
+        throw new Error('Collision owner chunks require validated collider records.');
+      }
       if (collider.ownerChunkX !== chunkX || collider.ownerChunkZ !== chunkZ) {
         throw new Error(`Collider ${collider.sourceId} has the wrong canonical owner chunk.`);
       }
