@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { COLLISION_LAYER_WALKABLE } from './CollisionLayers.js';
+import { COLLIDER_TYPE_MESH_INSTANCE } from './colliders/ColliderRecords.js';
 
 const COLORS = Object.freeze({
   chunk: 0x46a3ff,
@@ -8,6 +9,7 @@ const COLORS = Object.freeze({
   walkable: 0x55dd88,
   rockBlocking: 0xff9f43,
   rockWalkablePending: 0xb084ff,
+  rockWalkableMesh: 0x36d399,
 });
 const PROTOTYPE_COLORS = Object.freeze([
   0xff7b72,
@@ -31,6 +33,10 @@ function prototypeColor(prototypeId) {
 }
 
 function colliderColor(collider) {
+  if (collider.type === COLLIDER_TYPE_MESH_INSTANCE
+      && collider.prototypeId?.startsWith('rock-walkable:')) {
+    return COLORS.rockWalkableMesh;
+  }
   if (collider.prototypeId?.startsWith('rock-tier-walkable:')) {
     return COLORS.rockWalkablePending;
   }
@@ -87,6 +93,22 @@ export class CollisionDebugView {
     this.root.add(helper);
   }
 
+  addMeshHelper(collider, color, name) {
+    const prototype = this.world.getPrototype(collider.prototypeId);
+    const geometry = prototype?.resource?.geometry;
+    if (!geometry) return false;
+    const helper = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geometry, 12),
+      new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.9 }),
+    );
+    helper.name = name;
+    helper.renderOrder = 1000;
+    helper.matrixAutoUpdate = false;
+    helper.matrix.fromArray(collider.transform);
+    this.root.add(helper);
+    return true;
+  }
+
   rebuild() {
     for (const child of this.root.children) disposeHelper(child);
     this.root.clear();
@@ -102,7 +124,11 @@ export class CollisionDebugView {
           maxY: Math.max(minY + 0.2, maxY),
         }, COLORS.chunk, `collision-chunk-${chunk.status.key}`);
         for (const [index, bin] of chunk.bins.entries()) {
-          this.addHelper({ ...bin, minY, maxY: minY + 0.08 }, COLORS.bin, `collision-bin-${chunk.status.key}-${index}`);
+          this.addHelper(
+            { ...bin, minY, maxY: minY + 0.08 },
+            COLORS.bin,
+            `collision-bin-${chunk.status.key}-${index}`,
+          );
         }
       }
 
@@ -110,11 +136,13 @@ export class CollisionDebugView {
         for (const collider of chunk.colliders) {
           if (drawnColliders.has(collider.sourceId)) continue;
           drawnColliders.add(collider.sourceId);
-          this.addHelper(
-            collider.aabb,
-            colliderColor(collider),
-            `collision-collider-${collider.prototypeId ?? 'unprofiled'}-${collider.sourceId}`,
-          );
+          const color = colliderColor(collider);
+          const name = `collision-collider-${collider.prototypeId ?? 'unprofiled'}-${collider.sourceId}`;
+          if (collider.type === COLLIDER_TYPE_MESH_INSTANCE
+              && this.addMeshHelper(collider, color, name)) {
+            continue;
+          }
+          this.addHelper(collider.aabb, color, name);
         }
       }
     }
