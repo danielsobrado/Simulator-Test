@@ -46,9 +46,12 @@ export function createDitheredMaterial(sourceMaterial, {
   kind = null,
 } = {}) {
   const material = sourceMaterial.clone();
-  const signedFade = attribute('instanceLodFade', 'float');
-  const seed = attribute('instanceStableSeed', 'float');
-  const colorVariation = attribute('instanceColorVariation', 'float');
+  // Packed per-instance scalars; see createGeometry in StylizedLodRuntime for why these
+  // share one attribute rather than taking a vertex buffer each.
+  const dither = attribute('instanceDither', 'vec3');
+  const signedFade = dither.x;
+  const seed = dither.y;
+  const colorVariation = dither.z;
   const sourceOpacity = createSourceOpacityNode(material);
   const coverage = sourceOpacity
     ? sourceOpacity.mul(signedFade.abs())

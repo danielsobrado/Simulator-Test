@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import {
   treeColorVariation,
+  treeLeanAngles,
   treeMorphology,
   treeRenderSeed,
 } from './forest/TreeAppearance.js';
@@ -63,12 +64,15 @@ function leafAppearance(placement, resolveLeafTint) {
 function geometryInstance(placement, fade, ditherDirection, resolveLeafTint) {
   const heightScale = placement.heightScale ?? placement.scale;
   const appearance = leafAppearance(placement, resolveLeafTint);
+  const lean = treeLeanAngles(placement);
   return {
     matrix: createMatrix({
       x: placement.x,
       y: placement.height,
       z: placement.z,
+      rotationX: lean.rotationX,
       rotationY: placement.rotationY,
+      rotationZ: lean.rotationZ,
       scaleX: heightScale,
       scaleY: heightScale,
       scaleZ: heightScale,

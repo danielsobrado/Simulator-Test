@@ -3,6 +3,7 @@ import {
   attribute,
   clamp,
   dot,
+  float,
   max,
   mix,
   normalView,
@@ -66,7 +67,7 @@ export function createStylizedLeafMaterial({
   const localXZ = positionLocal.xz;
   const windDirection = vec2(config.wind.direction[0], config.wind.direction[1]);
   const windPerpendicular = vec2(windDirection.y.negate(), windDirection.x);
-  const phase = attribute('instanceStableSeed', 'float').mul(TWO_PI);
+  const phase = attribute('instanceDither', 'vec3').y.mul(TWO_PI);
   const primary = sin(dot(localXZ, windDirection).mul(config.wind.frequency)
     .add(time.mul(config.wind.speed))
     .add(phase));
@@ -79,9 +80,13 @@ export function createStylizedLeafMaterial({
     .add(time.mul(config.wind.speed * 0.7))
     .add(phase.mul(0.61)))
     .mul(config.wind.turbulence * 0.25);
+  // Soft stiffness from per-instance morphology.z (trunk scale channel): thicker /
+  // flare trunks sway less. Keeps wind response in the same range as clod trees.
+  const stiffness = clamp(attribute('instanceMorphology', 'vec3').z, 0.65, 1.35);
+  const windScale = float(1).div(stiffness).mul(0.95);
   const wave = primary.add(flutter).add(turbulence);
-  const sway = windDirection.mul(wave.mul(config.trees.windStrength).mul(heightMask));
-  const dip = wave.abs().mul(config.trees.windStrength).mul(config.trees.dip).mul(heightMask);
+  const sway = windDirection.mul(wave.mul(config.trees.windStrength).mul(heightMask).mul(windScale));
+  const dip = wave.abs().mul(config.trees.windStrength).mul(config.trees.dip).mul(heightMask).mul(windScale);
   const finalPosition = positionLocal.add(vec3(sway.x, dip.negate(), sway.y));
 
   const gradient = pow(normalizedHeight, config.trees.gradientPower);

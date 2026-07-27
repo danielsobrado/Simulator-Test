@@ -17,14 +17,14 @@ Before changing terrain generation, chunk streaming, rendering, or residency
 behavior, read and follow the [player movement performance QA guide](docs/perf-qa.md).
 Use its deterministic harness to compare streaming-sensitive changes.
 
-Added 2026-07-25: `qa:perf` needs the app already serving (`npm run dev`), and its
+ `qa:perf` needs the app already serving (`npm run dev`), and its
 hitch count tracks how much chunk streaming is still in flight — always compare
 runs at the same `--warmup`, and prefer an A/B against the unmodified code over
 comparing to the recorded baseline on a different machine.
 
 ## Asset startup
 
-Added 2026-07-26: only the trees and the shared scene may block the first frame.
+Only the trees and the shared scene may block the first frame.
 Every other authored variant streams in per biome through
 `StylizedVariantResidency`, one install per frame — see
 [asset startup and variant residency](docs/asset-startup-and-variant-residency.md).

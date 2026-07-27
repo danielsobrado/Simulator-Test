@@ -8,6 +8,7 @@ import {
   isSwimmingWaterState,
   resolvePlayerWaterState,
 } from './PlayerWaterState.js';
+import { emitAudio } from '../audio/index.js';
 
 const UP_NORMAL = Object.freeze({ x: 0, y: 1, z: 0 });
 const EMPTY_CONTACTS = Object.freeze([]);
@@ -244,6 +245,7 @@ export function stepPlayerPhysics({
     if (grounded && input.jump) {
       verticalVelocity = config.jumpSpeed;
       grounded = false;
+      emitAudio('player.jump');
     }
 
     if (grounded) {

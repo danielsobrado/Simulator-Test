@@ -43,7 +43,7 @@ function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
   const normalizedHeight = clamp(positionLocal.y.sub(minimumY).div(height), 0, 1);
   const heightMask = normalizedHeight.mul(normalizedHeight);
   const windDirection = vec2(wind.direction[0], wind.direction[1]);
-  const phase = attribute('instanceStableSeed', 'float').mul(TWO_PI);
+  const phase = attribute('instanceDither', 'vec3').y.mul(TWO_PI);
   const wave = sin(dot(positionLocal.xz, windDirection).mul(wind.frequency)
     .add(time.mul(wind.speed))
     .add(phase));

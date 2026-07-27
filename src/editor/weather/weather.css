@@ -1,0 +1,34 @@
+.weather-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 96px;
+  z-index: 40;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(12, 16, 22, 0.78);
+  color: #e8eef2;
+  font: 12px/1.35 "Segoe UI", system-ui, sans-serif;
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.weather-panel-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.weather-panel-row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.weather-panel select,
+.weather-panel input[type="range"] {
+  width: 100%;
+}

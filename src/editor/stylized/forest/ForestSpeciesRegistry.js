@@ -1,4 +1,5 @@
 import { hash32 } from '../scatterMath.js';
+import { deriveForestPlacementMorphology } from './morphology/index.js';
 
 const AGE_CLASSES = Object.freeze({
   sapling: Object.freeze({ height: 0.48, trunk: 0.58, crown: 0.55, spacing: 0.55 }),
@@ -211,8 +212,18 @@ export class ForestSpeciesRegistry {
         Math.floor(prototypeRoll * this.prototypeCount),
       );
     const heightScale = candidate.scale * age.height * individualVariation;
-    const crownScale = age.crown * (0.92 + stableUnit(candidate.stableId, 59) * 0.16);
-    const trunkScale = age.trunk * (0.94 + stableUnit(candidate.stableId, 61) * 0.12);
+    const morphology = deriveForestPlacementMorphology({
+      stableId: candidate.stableId,
+      speciesId,
+      habitat,
+    });
+    const crownScale = age.crown
+      * (0.92 + stableUnit(candidate.stableId, 59) * 0.16)
+      * morphology.crownWidth;
+    const trunkScale = age.trunk
+      * (0.94 + stableUnit(candidate.stableId, 61) * 0.12)
+      * morphology.rootFlare;
+    const crownAspect = species.crownAspect * morphology.crownFlattening;
     const spacingRadius = species.spacing * age.spacing * crownScale;
     return Object.freeze({
       speciesId,
@@ -224,7 +235,14 @@ export class ForestSpeciesRegistry {
       crownScale,
       spacingRadius,
       radius: spacingRadius,
-      crownAspect: species.crownAspect,
+      crownAspect,
+      leanX: morphology.leanX,
+      leanZ: morphology.leanZ,
+      branchDroop: morphology.branchDroop,
+      foliageDensity: morphology.foliageDensity,
+      health01: morphology.health01,
+      stiffness: morphology.stiffness,
+      instanceMorphology: morphology,
       speciesColor: species.color,
       colorSeed: stableUnit(candidate.stableId, 67),
       windSeed: stableUnit(candidate.stableId, 71),

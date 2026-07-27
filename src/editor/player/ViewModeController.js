@@ -1,4 +1,5 @@
 import { PRIMARY_POINTER_BUTTON } from '../constants.js';
+import { emitAudio } from '../audio/index.js';
 import {
   PLAYER_MODE_EDIT,
   PLAYER_MODE_WALK,
@@ -85,6 +86,7 @@ export class ViewModeController {
     this.playerController.setEnabled(false);
     this.editorCamera.setEnabled(true);
     this.editorCamera.focusWorld(focus.x, focus.z);
+    emitAudio('camera.mode.orbit');
     this.emit();
   }
 
@@ -112,6 +114,7 @@ export class ViewModeController {
     if (requestPointerLock) {
       this.playerController.requestPointerLock();
     }
+    emitAudio('camera.mode.player');
     this.emit();
   }
 

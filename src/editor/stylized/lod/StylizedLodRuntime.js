@@ -14,20 +14,21 @@ const WAITING_FADE = Number.EPSILON;
 const UNTINTED = Object.freeze([1, 1, 1]);
 const IDENTITY_MORPHOLOGY = Object.freeze([1, 1, 1]);
 
+/**
+ * WebGPU allows a pipeline only 8 vertex buffers, and every non-interleaved attribute
+ * costs one. A tree leaf part already spends seven — position, normal, uv, the instance
+ * matrix, morphology, leaf tint — so the three per-instance scalars share a single vec3
+ * rather than taking a buffer each. Exceeding the limit does not degrade gracefully: the
+ * pipeline fails to create and the mesh disappears entirely.
+ *
+ * x = signed LOD fade, y = stable dither seed, z = colour variation.
+ */
 function createGeometry(source, capacity, tinted, morphed) {
   const geometry = source.clone();
-  geometry.setAttribute(
-    'instanceLodFade',
-    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
-  );
-  geometry.setAttribute(
-    'instanceStableSeed',
-    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
-  );
-  geometry.setAttribute(
-    'instanceColorVariation',
-    new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
-  );
+  const dither = new Float32Array(capacity * 3);
+  // Colour variation is a multiplier, so it must default to 1 rather than 0.
+  for (let index = 0; index < capacity; index += 1) dither[index * 3 + 2] = 1;
+  geometry.setAttribute('instanceDither', new THREE.InstancedBufferAttribute(dither, 3));
   if (morphed) {
     geometry.setAttribute(
       'instanceMorphology',
@@ -87,6 +88,20 @@ function writeScalarInstance(attribute, index, value, range) {
   widenDirtyRange(range, index);
 }
 
+function writeDitherInstance(attribute, index, fade, seed, colorVariation, range) {
+  const array = attribute.array;
+  const offset = index * 3;
+  if (
+    array[offset] === fade
+    && array[offset + 1] === seed
+    && array[offset + 2] === colorVariation
+  ) return;
+  array[offset] = fade;
+  array[offset + 1] = seed;
+  array[offset + 2] = colorVariation;
+  widenDirtyRange(range, index);
+}
+
 function writeVector3Instance(attribute, index, value, range) {
   const array = attribute.array;
   const offset = index * 3;
@@ -115,9 +130,7 @@ function writeMatrixInstance(attribute, index, matrix, range) {
 }
 
 const MATRIX_RANGE = { min: Infinity, max: -1 };
-const FADE_RANGE = { min: Infinity, max: -1 };
-const SEED_RANGE = { min: Infinity, max: -1 };
-const COLOR_RANGE = { min: Infinity, max: -1 };
+const DITHER_RANGE = { min: Infinity, max: -1 };
 const TINT_RANGE = { min: Infinity, max: -1 };
 const MORPHOLOGY_RANGE = { min: Infinity, max: -1 };
 
@@ -132,30 +145,24 @@ export function writeInstances(renderers, instancesByPrototype) {
       if (dropped > 0) PerfCounters.inc('stylizedInstancesDroppedByCapacity', dropped);
       const previousCount = mesh.count;
       mesh.count = writableCount;
-      const fades = mesh.geometry.getAttribute('instanceLodFade');
-      const seeds = mesh.geometry.getAttribute('instanceStableSeed');
-      const colors = mesh.geometry.getAttribute('instanceColorVariation');
+      const dither = mesh.geometry.getAttribute('instanceDither');
       const tints = mesh.geometry.getAttribute('instanceLeafTint');
       const morphologies = mesh.geometry.getAttribute('instanceMorphology');
       const matrixRange = resetDirtyRange(MATRIX_RANGE);
-      const fadeRange = resetDirtyRange(FADE_RANGE);
-      const seedRange = resetDirtyRange(SEED_RANGE);
-      const colorRange = resetDirtyRange(COLOR_RANGE);
+      const ditherRange = resetDirtyRange(DITHER_RANGE);
       const tintRange = resetDirtyRange(TINT_RANGE);
       const morphologyRange = resetDirtyRange(MORPHOLOGY_RANGE);
       for (let index = 0; index < writableCount; index += 1) {
         const instance = instances[index];
         writeMatrixInstance(mesh.instanceMatrix, index, instance.matrix, matrixRange);
-        writeScalarInstance(
-          fades,
+        writeDitherInstance(
+          dither,
           index,
           instance.fade * (instance.ditherDirection ?? 1),
-          fadeRange,
+          instance.seed,
+          instance.colorVariation ?? 1,
+          ditherRange,
         );
-        writeScalarInstance(seeds, index, instance.seed, seedRange);
-        if (colors) {
-          writeScalarInstance(colors, index, instance.colorVariation ?? 1, colorRange);
-        }
         if (tints) {
           writeVector3Instance(tints, index, instance.leafTint ?? UNTINTED, tintRange);
         }
@@ -169,9 +176,7 @@ export function writeInstances(renderers, instancesByPrototype) {
         }
       }
       markAttributeSubrangeUpdated(mesh.instanceMatrix, matrixRange.min, matrixRange.max);
-      markAttributeSubrangeUpdated(fades, fadeRange.min, fadeRange.max);
-      markAttributeSubrangeUpdated(seeds, seedRange.min, seedRange.max);
-      if (colors) markAttributeSubrangeUpdated(colors, colorRange.min, colorRange.max);
+      markAttributeSubrangeUpdated(dither, ditherRange.min, ditherRange.max);
       if (tints) markAttributeSubrangeUpdated(tints, tintRange.min, tintRange.max);
       if (morphologies) {
         markAttributeSubrangeUpdated(

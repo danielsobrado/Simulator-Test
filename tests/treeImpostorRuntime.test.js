@@ -7,13 +7,11 @@ import { TREE_IMPOSTOR_MANIFEST_VERSION } from '../src/editor/stylized/impostor/
 
 function createRenderer(capacity = 4) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
+  // Fade, seed and colour variation share one vec3 so the pipeline stays under the
+  // 8 vertex buffer limit — see createGeometry in StylizedLodRuntime.
   geometry.setAttribute(
-    'instanceLodFade',
-    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
-  );
-  geometry.setAttribute(
-    'instanceStableSeed',
-    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
+    'instanceDither',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
   );
   return new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial(), capacity);
 }

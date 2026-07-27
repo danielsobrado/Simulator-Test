@@ -7,7 +7,8 @@ import {
 } from './proceduralGeometry.js';
 
 // Matches the tree crowns, so a shrub under a tree is lit on the same terms.
-const BUSH_NORMAL_SPHERIFY = 0.85;
+// Slightly softer than crowns so understory reads denser/leafier at contact range.
+const BUSH_NORMAL_SPHERIFY = 0.9;
 
 /**
  * Procedural understory prototypes: the rounded dome bushes and fern tufts that
@@ -213,6 +214,12 @@ export const FOREST_BUSH_PROTOTYPES = Object.freeze([
   'bush_dome',
   'bush_dome_small',
   'bush_dome_wide',
+]);
+
+/** Optional fern tuft for denser understory floors; opt-in via prototype list. */
+export const FOREST_UNDERSTORY_PROTOTYPES = Object.freeze([
+  ...FOREST_BUSH_PROTOTYPES,
+  'fern_tuft',
 ]);
 
 function addFoliageColorVariation(geometry, key) {

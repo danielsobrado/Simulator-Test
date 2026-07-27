@@ -3,7 +3,9 @@ import './editor/performance/frameRateDisplay.css';
 import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';
 import './editor/map/worldMap.css';
+import './editor/inventory/inventory.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
+import './editor/audio/index.js';
 import { LoadingOverlay } from './editor/ui/LoadingOverlay.js';
 import { LoadingTracker } from './editor/ui/LoadingTracker.js';
 import { assetFileName, bindAssetProgress, watchWalkModeEntry } from './editor/ui/loadingSources.js';
@@ -16,6 +18,7 @@ import { WorldMapUi } from './editor/map/WorldMapUi.js';
 import { GameplayOverlayController } from './editor/ui/GameplayOverlayController.js';
 import { InventoryController } from './editor/inventory/InventoryController.js';
 import { InventoryStore } from './editor/inventory/InventoryStore.js';
+import { InventoryUi } from './editor/inventory/InventoryUi.js';
 import { ITEM_CATALOG, PLAYER_STARTING_LOADOUT } from './editor/inventory/itemCatalogRuntime.js';
 import { ProceduralAssetManager } from './editor/workshop/ProceduralAssetManager.js';
 import { ProceduralWorkshopUi } from './editor/workshop/ProceduralWorkshopUi.js';
@@ -37,6 +40,15 @@ import { PLAYER_MODE_WALK } from './editor/player/playerConstants.js';
 import { isTreeImpostorBakeMode } from './editor/stylized/impostorBakeMode.js';
 import { StylizedSurfaceView } from './editor/stylized/StylizedSurfaceView.js';
 import { BiomeAssetPalette } from './editor/stylized/BiomeAssetPalette.js';
+import { createWeatherController } from './editor/weather/weather_controller.js';
+import { createWeatherUi } from './editor/weather/weather_ui.js';
+import {
+  createWeatherTerrainSamplers,
+  raycastTerrainHeightfield,
+} from './editor/weather/weather_terrain_adapters.js';
+import { createSpellRuntime } from './editor/spells/spell_runtime.js';
+import './editor/weather/weather.css';
+import './editor/spells/spell_menu.css';
 import { applySceneAssetSettings } from './editor/settings/SceneSettings.js';
 import {
   loadBootSceneSettings,
@@ -344,6 +356,7 @@ async function startEditor() {
     overlayController: gameplayOverlayController,
     catalog: ITEM_CATALOG,
   });
+  const inventoryUi = new InventoryUi({ root, controller: inventoryController });
   const worldMapController = new WorldMapController({
     worldStore,
     floatingOrigin,
@@ -520,6 +533,7 @@ async function startEditor() {
       gameplayOverlayController,
       inventoryController,
       inventoryStore,
+      inventoryUi,
       config,
       ui,
       proceduralWorkshop,
@@ -550,6 +564,48 @@ async function startEditor() {
 
   await stylizedSurface.ready;
   assetStartupTelemetry.markAssetsReady();
+
+  const weatherSettings = {
+    weatherMode: config.weather?.mode ?? 'off',
+    weatherIntensity: config.weather?.intensity ?? 0.7,
+    weatherWindX: config.weather?.windX ?? -0.42,
+    weatherWindZ: config.weather?.windZ ?? 0.18,
+  };
+  const weatherEnabled = config.weather?.enabled !== false;
+  const weatherController = weatherEnabled
+    ? createWeatherController({
+      scene: terrainView.scene,
+      camera: viewModeController.camera,
+      isWebGpu: true,
+      worldCells: 1e9,
+      samplers: createWeatherTerrainSamplers(terrainView),
+      getSettings: () => weatherSettings,
+      getCamera: () => viewModeController.camera,
+      getSunDirection: () => stylizedSurface.skyView?.sunDirectionValue ?? undefined,
+    })
+    : null;
+  const weatherUi = weatherEnabled
+    ? createWeatherUi({
+      root,
+      settings: weatherSettings,
+      onChange: (next) => {
+        Object.assign(weatherSettings, next);
+        weatherController?.applySettings();
+      },
+    })
+    : null;
+
+  const spellsEnabled = config.spells?.enabled !== false;
+  const spellRuntime = spellsEnabled
+    ? createSpellRuntime({
+      scene: terrainView.scene,
+      getCamera: () => viewModeController.camera,
+      isWalkMode: () => viewModeController.mode === PLAYER_MODE_WALK,
+      subscribeViewMode: (listener) => viewModeController.subscribe(listener),
+      raycastTerrain: (ray, maxRange) => raycastTerrainHeightfield(terrainView, ray, maxRange),
+    })
+    : null;
+  spellRuntime?.precompile?.(terrainView.renderer);
 
   const perfQaConfig = parseQaParams(window.location.search);
   if (perfQaConfig?.scenarioId === 'object-town') {
@@ -615,6 +671,7 @@ async function startEditor() {
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
+  let lastWeatherTimestamp = null;
   terrainView.setAnimationLoop((timestamp) => {
     if (!active) return;
 
@@ -682,6 +739,22 @@ async function startEditor() {
     stylizedSurface.update(frameTimestamp, viewModeController.camera);
     if (profiling) perfQa.mark('stylized');
 
+    if (weatherController) {
+      const camera = viewModeController.camera;
+      const effectCenter = camera.position;
+      const deltaSeconds = lastWeatherTimestamp == null
+        ? 0
+        : Math.min(0.05, Math.max(0, (frameTimestamp - lastWeatherTimestamp) / 1000));
+      lastWeatherTimestamp = frameTimestamp;
+      weatherController.update(
+        deltaSeconds,
+        frameTimestamp * 0.001,
+        camera.position,
+        effectCenter,
+      );
+    }
+    spellRuntime?.update(frameTimestamp);
+
     objectView.update(frameTimestamp, viewModeController.camera);
     if (profiling) perfQa.mark('objects');
 
@@ -727,8 +800,12 @@ async function startEditor() {
     voxelPrototypeUi.dispose();
     voxelPrototype.dispose();
     stylizedSurface.dispose();
+    weatherController?.dispose();
+    weatherUi?.dispose();
+    spellRuntime?.dispose();
     worldMapUi.dispose();
     worldMapController.dispose();
+    inventoryUi.dispose();
     inventoryController.dispose();
     gameplayOverlayController.dispose();
     macroFarTerrain.dispose();

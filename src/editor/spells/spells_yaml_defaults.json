@@ -1,0 +1,196 @@
+{
+  "spells": {
+    "menu": {
+      "root_id": "spell-menu",
+      "title": "Spells"
+    },
+    "fire": {
+      "id": "fire",
+      "label": "Fire",
+      "cast_duration_ms": 2600,
+      "audio": {
+        "volume": 0.38
+      },
+      "vfx": {
+        "flame_scale": 1,
+        "world_width": 1.6,
+        "world_height": 5,
+        "hand_forward_m": 0.5,
+        "hand_right_m": 0.35,
+        "hand_up_m": -0.35,
+        "glow_color": [
+          1,
+          0.48,
+          0.14
+        ],
+        "glow_intensity": 3.6,
+        "glow_distance": 8.5,
+        "glow_decay": 2,
+        "glow_local_y_ratio": 0.34
+      }
+    },
+    "water": {
+      "id": "water",
+      "label": "Water",
+      "cast_duration_ms": 2200,
+      "audio": {
+        "volume": 0.34
+      },
+      "vfx": {
+        "flame_scale": 1,
+        "world_width": 1.2,
+        "world_height": 4.5,
+        "hand_forward_m": 0.5,
+        "hand_right_m": 0.35,
+        "hand_up_m": -0.35,
+        "glow_color": [
+          0.35,
+          0.78,
+          1
+        ],
+        "glow_intensity": 1.8,
+        "glow_distance": 6.5,
+        "glow_decay": 2,
+        "glow_local_y_ratio": 0.38
+      }
+    },
+    "air": {
+      "id": "air",
+      "label": "Air",
+      "cast_duration_ms": 1800,
+      "audio": {
+        "volume": 0.28
+      },
+      "vfx": {
+        "flame_scale": 1,
+        "world_width": 1.45,
+        "world_height": 5.4,
+        "hand_forward_m": 0.5,
+        "hand_right_m": 0.35,
+        "hand_up_m": -0.35,
+        "glow_color": [
+          0.84,
+          0.98,
+          1
+        ],
+        "glow_intensity": 1.2,
+        "glow_distance": 6,
+        "glow_decay": 2,
+        "glow_local_y_ratio": 0.42
+      }
+    },
+    "earth": {
+      "id": "earth",
+      "label": "Earth",
+      "cast_duration_ms": 1700,
+      "audio": {
+        "volume": 0.32
+      },
+      "gameplay": {
+        "terrain_edit_enabled": true,
+        "operation": "remove",
+        "shape": "sphere",
+        "radius_m": 2.4,
+        "height_m": 2.4,
+        "strength": 0.72,
+        "falloff": 0.35,
+        "material": 0,
+        "max_range_m": 10,
+        "command_expiry_ms": 3000,
+        "convergence_timeout_ms": 5000
+      },
+      "vfx": {
+        "hand_forward_m": 0.5,
+        "hand_right_m": 0.35,
+        "hand_up_m": -0.35,
+        "impact_radius": 3.2,
+        "crack_radius": 4.5,
+        "dust_radius": 3.8,
+        "shard_count": 24,
+        "shard_min_height": 0.45,
+        "shard_max_height": 1.8,
+        "shard_lifetime_ms": 1300,
+        "glow_color": [
+          0.75,
+          0.48,
+          0.22
+        ],
+        "glow_intensity": 0.7,
+        "glow_distance": 5,
+        "glow_decay": 2
+      }
+    },
+    "lightning": {
+      "id": "lightning",
+      "label": "Lightning",
+      "cast_duration_ms": 1250,
+      "audio": {
+        "volume": 0.36
+      },
+      "vfx": {
+        "hand_forward_m": 0.58,
+        "hand_right_m": 0.34,
+        "hand_up_m": -0.32,
+        "max_range": 28,
+        "segment_count": 52,
+        "branch_count": 8,
+        "branch_length_min": 0.45,
+        "branch_length_max": 1.8,
+        "jitter": 0.34,
+        "core_width": 0.018,
+        "glow_width": 0.11,
+        "refresh_hz": 36,
+        "impact_radius": 0.55,
+        "spark_count": 24,
+        "core_color": [
+          1,
+          1,
+          1
+        ],
+        "glow_color": [
+          0.18,
+          0.62,
+          1
+        ],
+        "source_light_intensity": 2.5,
+        "impact_light_intensity": 5.5,
+        "glow_distance": 9,
+        "glow_decay": 2
+      }
+    },
+    "fireball": {
+      "id": "fireball",
+      "label": "Fireball",
+      "cast_duration_ms": 4200,
+      "audio": {
+        "volume": 0.4
+      },
+      "vfx": {
+        "hand_forward_m": 0.68,
+        "hand_right_m": 0.35,
+        "hand_up_m": -0.3,
+        "launch_speed": 19,
+        "lift_speed": 2.8,
+        "gravity": 13.5,
+        "projectile_radius": 0.42,
+        "impact_radius": 3.4,
+        "impact_duration_ms": 850,
+        "trail_count": 18,
+        "spark_count": 28,
+        "core_color": [
+          1,
+          0.88,
+          0.3
+        ],
+        "glow_color": [
+          1,
+          0.19,
+          0.025
+        ],
+        "glow_intensity": 5.5,
+        "glow_distance": 10,
+        "glow_decay": 2
+      }
+    }
+  }
+}

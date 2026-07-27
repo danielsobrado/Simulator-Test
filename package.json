@@ -27,6 +27,7 @@
     "verify:asset-serving": "node scripts/verify-asset-serving.mjs",
     "qa:workshop:install": "playwright install chromium",
     "qa:workshop": "node scripts/run-workshop-qa.mjs",
+    "qa:inventory": "node scripts/run-inventory-qa.mjs",
     "verify": "npm run validate:assets:production && npm test && npm run build",
     "extract:grass-profiles": "node scripts/extract-grass-blade-profiles.mjs"
   },

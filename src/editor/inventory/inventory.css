@@ -1,0 +1,530 @@
+/*
+ * Inventory overlay — carved green-grey stone with gold filigree.
+ *
+ * Every texture is layered *over* a gradient that already reads correctly on its own, so
+ * the panel is complete before any authored art exists and the WebP files in
+ * public/assets/ui/inventory/ are a pure upgrade rather than a dependency. See
+ * docs/plans/inventory-ui-asset-prompts.md for how those textures are produced.
+ */
+
+.inventory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+
+  /*
+   * No backdrop-filter here. The world keeps rendering behind the inventory, and a
+   * full-viewport blurred layer over the live WebGPU canvas re-blurs the whole framebuffer
+   * every frame — loadingOverlay.css documents that this cost most of the frame rate. A
+   * heavier dim buys the same separation for free.
+   */
+  background: rgb(6 9 7 / 78%);
+}
+
+.inventory-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 980px;
+  max-height: 100%;
+  padding: 18px 20px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--text);
+  box-shadow:
+    0 28px 70px rgb(0 0 0 / 60%),
+    inset 0 1px 0 rgb(255 255 255 / 6%);
+
+  /*
+   * The stone is the surface, not a grain sprinkled over it. The gradient sits on top as a
+   * translucent veil, so the granite reads through at roughly 30% while the panel keeps
+   * the dark green cast of the rest of the chrome.
+   *
+   * An earlier version had these layers the other way round with background-blend-mode:
+   * soft-light. On a near-black panel that is indistinguishable from no texture at all.
+   * The tile is 512px rather than 256px for the same reason: downscaling this far averages
+   * the mineral speckle away, and the grain is the whole point.
+   */
+  background-color: var(--surface-1);
+  background-image:
+    linear-gradient(150deg, rgb(28 38 31 / 42%), rgb(21 29 24 / 55%) 45%, rgb(14 19 16 / 70%)),
+    url('/assets/ui/inventory/stone-tile.webp');
+  background-size: auto, 512px 512px;
+}
+
+/* Bronze filigree frame, drawn in CSS and replaced by border-image when art lands. */
+.inventory-panel__frame {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+/*
+ * Nine-slice carved frame. Commented out until stone-edge.webp exists: @supports cannot
+ * test whether an image actually loads, and a failed border-image falls back to a 12px
+ * solid border, which reads far worse than the plain hairline above. Uncomment once the
+ * asset is in place — see docs/plans/inventory-ui-asset-prompts.md.
+ *
+ * .inventory-panel__frame {
+ *   border-width: 12px;
+ *   border-image-source: url('/assets/ui/inventory/stone-edge.webp');
+ *   border-image-slice: 24 fill;
+ *   border-image-repeat: round;
+ * }
+ */
+
+/* ------------------------------------------------------------------ header */
+
+.inventory-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inventory-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.inventory-header__hint {
+  flex: 1;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.inventory-close {
+  min-width: 30px;
+  min-height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 120ms ease;
+}
+
+.inventory-close:hover { background: var(--surface-3); }
+
+/* ------------------------------------------------------------------ character */
+
+.inventory-character {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 18px;
+  align-items: start;
+  justify-items: center;
+}
+
+/*
+ * The tab strip is exactly as wide as the slot beneath it and sits flush against it, so
+ * the tabs read as attached to the weapon slot. Their `border-bottom: none` only works if
+ * there is no gap and no width mismatch — otherwise the missing edge shows as a notch.
+ */
+.inventory-weapon-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+  width: 88px;
+}
+
+.inventory-set-tabs {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+
+.inventory-set-tab {
+  flex: 1;
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid var(--border-strong);
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.inventory-set-tab:hover { background: var(--surface-3); }
+
+.inventory-set-tab.is-active {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-3));
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.inventory-doll {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  grid-template-areas:
+    '.     head  neck  .'
+    'hands chest chest ring1'
+    'legs  chest chest ring2'
+    'feet  cloak .     .';
+  gap: 8px;
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------------ slots */
+
+.inventory-slot {
+  position: relative;
+  display: block;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  /* Translucent so the panel's granite reads through the slot frame — the slots should
+     look carved into the stone rather than laid on top of it. */
+  background: linear-gradient(180deg, rgb(37 49 40 / 55%), rgb(21 29 24 / 55%));
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.inventory-slot[data-size='small'] { width: 56px; height: 56px; }
+.inventory-slot[data-size='large'] { width: 120px; height: 120px; }
+.inventory-slot[data-size='tall'] { width: 88px; height: 152px; }
+
+.inventory-slot__well {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  background-color: rgb(6 9 7 / 62%);
+  background-image: url('/assets/ui/inventory/slot-well.webp');
+  background-size: cover;
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 62%),
+    inset 0 -1px 0 rgb(255 255 255 / 5%);
+  overflow: hidden;
+}
+
+.inventory-slot__icon {
+  max-width: 84%;
+  max-height: 84%;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 55%));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.inventory-slot__placeholder {
+  color: color-mix(in srgb, var(--text-dim) 55%, transparent);
+  font-size: 22px;
+  line-height: 1;
+  user-select: none;
+}
+
+.inventory-slot[data-size='large'] .inventory-slot__placeholder,
+.inventory-slot[data-size='tall'] .inventory-slot__placeholder { font-size: 34px; }
+
+.inventory-slot__quantity {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgb(6 9 7 / 82%);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/*
+ * Rarity is a corner notch, not a wash of colour. It is always accompanied by the rarity
+ * word in the tooltip, the details footer and the slot's aria-label, so it is never the
+ * only channel carrying the information.
+ */
+.inventory-slot__rarity {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-left: 9px solid transparent;
+}
+
+.inventory-slot[data-rarity='uncommon'] .inventory-slot__rarity { border-top-color: #6fae72; }
+.inventory-slot[data-rarity='rare'] .inventory-slot__rarity { border-top-color: #6c95d6; }
+.inventory-slot[data-rarity='epic'] .inventory-slot__rarity { border-top-color: #a97bd4; }
+.inventory-slot[data-rarity='legendary'] .inventory-slot__rarity { border-top-color: var(--accent); }
+
+.inventory-slot:hover,
+.inventory-slot.is-hovered { border-color: var(--border-strong); }
+
+.inventory-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.inventory-slot.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.inventory-slot.is-drag-source { opacity: 0.38; }
+
+.inventory-slot.is-invalid { animation: inventory-reject 320ms ease; }
+
+@keyframes inventory-reject {
+  0%, 100% { border-color: var(--border); }
+  25%, 75% { border-color: var(--danger); box-shadow: 0 0 0 1px rgb(231 159 159 / 30%); }
+}
+
+/* ------------------------------------------------------------------ gold */
+
+.inventory-gold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 14px;
+  margin: 0 auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-0));
+}
+
+.inventory-gold__coin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  background-image: url('/assets/ui/inventory/gold-coin.webp');
+  background-size: contain;
+  box-shadow: inset 0 -2px 3px rgb(0 0 0 / 35%);
+}
+
+.inventory-gold__value {
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-gold__label {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+/* ------------------------------------------------------------------ bag */
+
+.inventory-bag {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgb(6 9 7 / 45%);
+}
+
+.inventory-bag .inventory-slot {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* ------------------------------------------------------------------ details */
+
+.inventory-details {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.inventory-details__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.inventory-details__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inventory-details__meta {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.inventory-details__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.inventory-details__actions button,
+.inventory-context-menu button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 120ms ease;
+}
+
+.inventory-details__actions button:hover,
+.inventory-context-menu button:hover {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-3));
+}
+
+.inventory-details__actions button[data-danger='true'],
+.inventory-context-menu button[data-danger='true'] {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--danger);
+}
+
+[data-rarity='uncommon'].inventory-details__name { color: #7cc07f; }
+[data-rarity='rare'].inventory-details__name { color: #86a9e2; }
+[data-rarity='epic'].inventory-details__name { color: #bb92e0; }
+[data-rarity='legendary'].inventory-details__name { color: var(--accent); }
+
+/* ------------------------------------------------------------------ floating layers */
+
+.inventory-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  max-width: 280px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: rgb(10 14 11 / 96%);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 45%);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.inventory-tooltip__name { font-weight: 700; }
+.inventory-tooltip__name[data-rarity='uncommon'] { color: #7cc07f; }
+.inventory-tooltip__name[data-rarity='rare'] { color: #86a9e2; }
+.inventory-tooltip__name[data-rarity='epic'] { color: #bb92e0; }
+.inventory-tooltip__name[data-rarity='legendary'] { color: var(--accent); }
+
+.inventory-tooltip__traits,
+.inventory-tooltip__stats { color: var(--text-dim); font-size: 11px; }
+.inventory-tooltip__stats { margin-top: 3px; white-space: pre; }
+.inventory-tooltip__hint { margin-top: 5px; color: var(--accent); font-size: 11px; }
+
+.inventory-context-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 148px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: rgb(10 14 11 / 97%);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 50%);
+}
+
+.inventory-context-menu button { text-align: left; }
+
+.inventory-drag-ghost {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  transform: translate(-50%, -50%);
+  border-radius: 6px;
+  background: rgb(21 29 24 / 88%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 55%);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.inventory-drag-ghost img { max-width: 84%; max-height: 84%; }
+.inventory-drag-ghost .inventory-slot__placeholder { font-size: 24px; }
+
+.inventory-panel.is-dragging { cursor: grabbing; }
+.inventory-panel.is-dragging .inventory-slot { cursor: grabbing; }
+
+/* ------------------------------------------------------------------ responsive */
+
+@media (max-width: 900px) {
+  .inventory-overlay { padding: 10px; }
+
+  .inventory-header__hint { display: none; }
+
+  /* Halve the grid rather than shrinking cells below a usable touch target. */
+  .inventory-bag { grid-template-columns: repeat(5, 1fr); }
+
+  .inventory-character {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .inventory-slot[data-size='small'] { width: 48px; height: 48px; }
+  .inventory-slot[data-size='large'] { width: 104px; height: 104px; }
+  .inventory-slot[data-size='tall'] { width: 76px; height: 130px; }
+
+  /* Keep the tab strip matched to the narrower weapon slot. */
+  .inventory-weapon-column { width: 76px; }
+
+  .inventory-bag .inventory-slot { min-width: 44px; min-height: 44px; }
+
+  .inventory-details {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventory-slot,
+  .inventory-close,
+  .inventory-set-tab,
+  .inventory-details__actions button,
+  .inventory-context-menu button { transition: none; }
+
+  .inventory-slot.is-invalid { animation: none; border-color: var(--danger); }
+}

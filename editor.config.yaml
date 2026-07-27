@@ -812,11 +812,11 @@ stylizedSurface:
     edgeAffinity: 0.5
     clusterSupercellSize: 74
     clusterSampleSpacing: 5
-    clusterDensity: 0.82
-    clusterRadiusMin: 0.26
-    clusterRadiusMax: 0.58
-    clusterEdgeWidth: 0.4
-    clusterBoundaryWarp: 0.26
+    clusterDensity: 0.88
+    clusterRadiusMin: 0.28
+    clusterRadiusMax: 0.62
+    clusterEdgeWidth: 0.42
+    clusterBoundaryWarp: 0.28
     preferredSlope: 0.3
     maximumSlope: 1.5
     flatBias: 0.85
@@ -1232,3 +1232,15 @@ simulation:
     birthRatePerMonth: 0.002
     deathRatePerMonth: 0.0015
     migrationThreshold: 0.4
+
+# Walk-mode weather overlays (clod-poc port). Sky lighting stays with StylizedSkyView.
+weather:
+  enabled: true
+  mode: off
+  intensity: 0.7
+  windX: -0.42
+  windZ: 0.18
+
+# Walk-mode spell VFX (keys 1–6). Earth is VFX-only — no CLOD terrain dig.
+spells:
+  enabled: true

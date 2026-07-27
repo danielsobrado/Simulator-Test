@@ -1,0 +1,30 @@
+
+export const DEFAULT_ENVIRONMENTAL_MASK_SETTINGS = Object.freeze({
+  enabled: true,
+  riverCobble: Object.freeze({ enabled: true, strength: 1, minDepthM: 0.06, maxDepthM: 1.4, minFlowStrength: 0.015, maxFlowStrength: 1.8, maxShoreDistanceM: 10, minNormalY: 0.58 }),
+  riverMist: Object.freeze({ enabled: true, strength: 1, minFlowStrength: 0.01, maxShoreDistanceM: 14, particles: Object.freeze({ spawnRadiusM: 54, spacingM: 5.5, sampleHintM: 16, emitIntervalS: 0.12, maxParticles: 240, maxEmittersPerTick: 18, scanCellsPerFrame: 28, pointSizeM: 3.4, opacity: 0.32, spawnProbability: 0.72, riseSpeedMps: 0.16, driftSpeedMps: 0.13, minLifetimeS: 2.8, maxLifetimeS: 5.5, surfaceOffsetM: 0.22, colorRgb: [0.82, 0.91, 0.94] }) }),
+  rapidSplash: Object.freeze({ enabled: true, strength: 1, flowStart: 0.35, flowEnd: 1.2, bedDropStart: 0.35, bedDropEnd: 1.8 }),
+  sunbeamMote: Object.freeze({
+    enabled: true,
+    strength: 1,
+    visibilityStart: 0.45,
+    visibilityEnd: 0.9,
+    particles: Object.freeze({
+      maxParticles: 1200,
+      spawnRadiusM: 42,
+      fadeStartM: 34,
+      fadeEndM: 42,
+      updatePeriodFrames: 8,
+      density: 0.72,
+      opacity: 0.82,
+      forwardScatterPower: 8,
+      mistFloor: 0.18,
+      warmColorRgb: [0.85, 0.75, 0.45],
+      coldColorRgb: [0.78, 0.9, 1],
+    }),
+  }),
+  calmPool: Object.freeze({ enabled: true, strength: 1, minDepthM: 0.45, maxFlowStrength: 0.08 }),
+  frost: Object.freeze({ enabled: true, strength: 1, visibilityStart: 0.2, visibilityEnd: 0.85, wetnessSuppression: 0.7 }),
+  dew: Object.freeze({ enabled: true, strength: 1, wetnessStart: 0.25, wetnessEnd: 0.85 }),
+  shoreDebris: Object.freeze({ enabled: true, strength: 1 }),
+});

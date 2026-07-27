@@ -1,0 +1,67 @@
+import * as THREE from "three";
+const BILLBOARD_MATERIAL_KEY = "billboardMaterial";
+function createPropBillboardGeometry(width, height) {
+  const hw = width * 0.5;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array([
+    -hw,
+    0,
+    0,
+    hw,
+    0,
+    0,
+    hw,
+    height,
+    0,
+    -hw,
+    height,
+    0
+  ]);
+  const normals = new Float32Array([
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1
+  ]);
+  const uvs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  return geometry;
+}
+function createBillboardMaterial(base) {
+  const mat = base.clone();
+  if (mat instanceof THREE.MeshStandardMaterial) {
+    mat.side = THREE.DoubleSide;
+    mat.transparent = false;
+  }
+  return mat;
+}
+function assignBillboardMaterial(geometry, material) {
+  geometry.userData[BILLBOARD_MATERIAL_KEY] = material;
+}
+function getBillboardMaterial(geometry) {
+  const value = geometry.userData[BILLBOARD_MATERIAL_KEY];
+  return value instanceof THREE.Material ? value : void 0;
+}
+function disposeBillboardGeometryResources(geometry) {
+  if (!geometry) return;
+  getBillboardMaterial(geometry)?.dispose();
+  geometry.dispose();
+}
+export {
+  assignBillboardMaterial,
+  createBillboardMaterial,
+  createPropBillboardGeometry,
+  disposeBillboardGeometryResources,
+  getBillboardMaterial
+};

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   treeBaseSeed,
   treeColorVariation,
+  treeLeanAngles,
   treeMorphology,
   treeRenderSeed,
 } from '../src/editor/stylized/forest/TreeAppearance.js';
@@ -13,6 +14,24 @@ test('tree morphology separates horizontal crown, vertical crown, and trunk scal
     crownAspect: 0.5,
     trunkScale: 1.2,
   }), [0.4, 0.8, 1.2]);
+});
+
+test('tree morphology thins crowns with foliage density', () => {
+  const [horizontal, vertical, trunk] = treeMorphology({
+    crownScale: 1,
+    crownAspect: 1,
+    trunkScale: 1,
+    foliageDensity: 0.64,
+  });
+  assert.equal(trunk, 1);
+  assert.ok(Math.abs(horizontal - 0.8) < 1e-12);
+  assert.ok(Math.abs(vertical - 0.64) < 1e-12);
+});
+
+test('tree lean angles follow leanX/leanZ and branch droop', () => {
+  const lean = treeLeanAngles({ leanX: 0.1, leanZ: -0.05, branchDroop: 0.2 });
+  assert.ok(lean.rotationZ < 0);
+  assert.ok(lean.rotationX < 0);
 });
 
 test('tree render seed prefers the ecological wind seed across every LOD', () => {

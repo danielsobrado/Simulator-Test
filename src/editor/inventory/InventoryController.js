@@ -25,6 +25,8 @@ export class InventoryController {
     this.contextMenu = null;
     this.tooltip = null;
     this._openWithoutOverlay = false;
+    this._closing = false;
+    this.keyNavigationHandler = null;
 
     this.unregisterOverlay = this.overlayController
       ? this.overlayController.registerOverlay(GAMEPLAY_OVERLAY.inventory, {
@@ -39,6 +41,11 @@ export class InventoryController {
   }
 
   get isOpen() {
+    // GameplayOverlayController invokes onClose() before it clears activeOverlay, so
+    // during the close callback it still reports this overlay as open. Subscribers that
+    // render from isOpen would then paint the panel as visible and never hear about the
+    // close, leaving it stranded on screen. The flag closes that window.
+    if (this._closing) return false;
     return this.overlayController
       ? this.overlayController.isOpen(GAMEPLAY_OVERLAY.inventory)
       : this._openWithoutOverlay === true;
@@ -96,12 +103,17 @@ export class InventoryController {
   }
 
   handleOverlayClose() {
-    this.cancelDrag();
-    this.contextMenu = null;
-    this.tooltip = null;
-    this.selectedLocation = null;
-    this.hoveredLocation = null;
-    this.emit();
+    this._closing = true;
+    try {
+      this.cancelDrag();
+      this.contextMenu = null;
+      this.tooltip = null;
+      this.selectedLocation = null;
+      this.hoveredLocation = null;
+      this.emit();
+    } finally {
+      this._closing = false;
+    }
   }
 
   /** @returns {boolean} true when a local interaction was cancelled. */
@@ -118,6 +130,18 @@ export class InventoryController {
     return false;
   }
 
+  /**
+   * The view registers slot navigation here rather than listening for keydown itself.
+   * GameplayOverlayController calls stopImmediatePropagation on every key while an
+   * overlay is open, so a listener attached by the view would never fire; this handler
+   * runs inside the one keydown path the coordinator does forward.
+   *
+   * @param {((event: KeyboardEvent) => boolean) | null} handler
+   */
+  setKeyNavigationHandler(handler) {
+    this.keyNavigationHandler = handler ?? null;
+  }
+
   handleKeyDown(event) {
     if (!this.isOpen) return false;
     if (event.code === 'Digit1' || event.key === '1') {
@@ -128,7 +152,7 @@ export class InventoryController {
       this.switchWeaponSet(2);
       return true;
     }
-    return false;
+    return this.keyNavigationHandler?.(event) === true;
   }
 
   selectLocation(location) {
@@ -276,6 +300,7 @@ export class InventoryController {
   dispose() {
     this.unregisterOverlay?.();
     this.unsubscribeStore?.();
+    this.keyNavigationHandler = null;
     this.listeners.clear();
   }
 }
