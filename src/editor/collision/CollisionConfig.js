@@ -200,9 +200,10 @@ export function validateCollisionConfig(config) {
 
 function cloneTreeOverrides(overrides = {}) {
   assertObject(overrides, 'collision.trees.prototypeOverrides');
-  return Object.fromEntries(
-    Object.entries(overrides).map(([key, value]) => [key, { ...value }]),
-  );
+  return Object.fromEntries(Object.entries(overrides).map(([key, value]) => [
+    key,
+    value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : value,
+  ]));
 }
 
 function mergeCollisionConfig(input = {}) {
