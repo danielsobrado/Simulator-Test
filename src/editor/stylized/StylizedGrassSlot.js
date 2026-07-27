@@ -24,13 +24,19 @@ const TWO_PI = Math.PI * 2;
 // Sunflower packing: successive blades land the most irrelevant angle apart, so a
 // clump fills its disc evenly at any blade count instead of forming rings.
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-// In blade-widths, not metres: the shader scales the whole clump by the instance's
-// blade width. With the upstream 0.06 m blade width this is a 0.75 m radius against
-// a mean clump spacing of 0.82 m. That generous overlap hides the streamed clump
-// representation and reads like upstream's independently scattered blades.
-// `clumpsFormCarpet` in grassLodMath guards this against future density changes.
-const CLUMP_RADIUS = 12.5;
-const DEFAULT_TILT_MAX = 0.16;
+// In metres. Against a mean clump spacing of 0.82 m this overlaps generously,
+// which is what hides the streamed clump representation and makes the field read
+// like upstream's independently scattered blades. `clumpsFormCarpet` in
+// grassLodMath guards it against future density changes.
+//
+// This used to be 12.5 *blade-widths*, resolved against the instance width in the
+// shader. That tied the footprint to the blade silhouette: the 0.06 m blade it was
+// tuned against gave 0.75 m, but narrowing blades to stop them reading as ribbons
+// would have shrunk it to ~0.29 m and turned the carpet into pom-poms. The two are
+// separate channels now — `position` carries only the blade's own half-width, in
+// blade-widths, and `bladeCenter` carries the clump offset, in metres.
+const DEFAULT_CLUMP_RADIUS = 0.75;
+const DEFAULT_TILT_MAX = 0.28;
 
 function fract(value) {
   return value - Math.floor(value);
@@ -70,6 +76,7 @@ export function createClumpGeometry({
   bladesPerClump,
   segments = BLADE_SEGMENTS,
   tiltMax = DEFAULT_TILT_MAX,
+  clumpRadius = DEFAULT_CLUMP_RADIUS,
   instanceBase,
   instanceParams,
   profiles,
@@ -80,14 +87,16 @@ export function createClumpGeometry({
   const verticesPerBlade = segments * 2 + 1;
   const vertexCount = bladesPerClump * verticesPerBlade;
   const positions = new Float32Array(vertexCount * 3);
-  // WebGPU allows eight vertex buffers per pipeline and `position`, `normal` and
-  // the two shared instance attributes claim four of them, so the per-blade data
-  // is packed rather than given one buffer per concept. Unpacked it was nine
-  // buffers and the pipeline simply failed to create — a blank field, not a slow
-  // one. See the accessor comments below for what sits in each channel.
+  // WebGPU allows eight vertex buffers per pipeline and `position` plus the two
+  // shared instance attributes claim three of them, so the per-blade data is
+  // packed rather than given one buffer per concept. Unpacked it was nine buffers
+  // and the pipeline simply failed to create — a blank field, not a slow one.
+  // Four packed buffers plus those three leaves one spare. See the accessor
+  // comments below for what sits in each channel.
   const bladeAxes = new Float32Array(vertexCount * 4);
-  const bladeCenters = new Float32Array(vertexCount * 3);
+  const bladeCenters = new Float32Array(vertexCount * 4);
   const bladeShapes = new Float32Array(vertexCount * 4);
+  const bladeWinds = new Float32Array(vertexCount * 4);
   const indices = [];
 
   for (let bladeIndex = 0; bladeIndex < bladesPerClump; bladeIndex += 1) {
@@ -97,7 +106,7 @@ export function createClumpGeometry({
     // dense settings ask for. `sqrt` keeps area density uniform across the disc
     // instead of crowding the centre.
     const phase = bladeIndex * GOLDEN_ANGLE;
-    const radial = CLUMP_RADIUS * Math.sqrt((bladeIndex + 0.5) / bladesPerClump);
+    const radial = clumpRadius * Math.sqrt((bladeIndex + 0.5) / bladesPerClump);
     const centerX = Math.cos(phase) * radial;
     const centerZ = Math.sin(phase) * radial;
     // Facing must not follow the placement spiral. Tangential blades reveal the
@@ -123,6 +132,18 @@ export function createClumpGeometry({
     // which is what collapses a dense field into a single flat green.
     const tintPhase = bladeRandom01(bladeIndex, 4);
     const shadePhase = bladeRandom01(bladeIndex, 5);
+    // Width is rolled per blade for the same reason colour is: `instanceParams.x`
+    // is the clump's width, so without this all 96 blades of a clump are exactly
+    // as wide as each other and the batching unit becomes visible as patches of
+    // one gauge. The shader leans this roll against the blade's own length, so a
+    // long blade tends to come out slender and a short one broad.
+    const widthPhase = bladeRandom01(bladeIndex, 7);
+    // Wind rolls. A clump is under a metre across and the gust wave is ~13 m long,
+    // so every blade in it sits on effectively one point of that wave; without a
+    // per-blade phase and stiffness the clump sways as a single surface.
+    const windPhase = bladeRandom01(bladeIndex, 8);
+    const stiffness = bladeRandom01(bladeIndex, 9);
+    const flutter = bladeRandom01(bladeIndex, 10);
     // Which authored silhouette this blade wears. Rolled per blade rather than
     // assigned per clump: a clump is a hidden batching unit, and giving one shape
     // to all 96 of its blades would make that unit visible as patches of a single
@@ -142,9 +163,14 @@ export function createClumpGeometry({
       bladeAxes[vertex * 4 + 1] = leanZ;
       bladeAxes[vertex * 4 + 2] = facingX;
       bladeAxes[vertex * 4 + 3] = facingZ;
-      bladeCenters[vertex * 3] = centerX;
-      bladeCenters[vertex * 3 + 1] = centerZ;
-      bladeCenters[vertex * 3 + 2] = lengthPhase;
+      bladeCenters[vertex * 4] = centerX;
+      bladeCenters[vertex * 4 + 1] = centerZ;
+      bladeCenters[vertex * 4 + 2] = lengthPhase;
+      bladeCenters[vertex * 4 + 3] = widthPhase;
+      bladeWinds[vertex * 4] = windPhase;
+      bladeWinds[vertex * 4 + 1] = stiffness;
+      bladeWinds[vertex * 4 + 2] = flutter;
+      bladeWinds[vertex * 4 + 3] = 0;
       bladeShapes[vertex * 4] = tintPhase;
       bladeShapes[vertex * 4 + 1] = shadePhase;
       // The arc is in blade lengths, not blade widths, so it cannot be folded into
@@ -154,17 +180,21 @@ export function createClumpGeometry({
       bladeShapes[vertex * 4 + 3] = axisZ * shape.curve[row];
     };
 
+    // `position` holds the blade's own half-width offset only, still in
+    // blade-widths, so the shader can scale it by the instance's width without
+    // dragging the clump's layout along with it. The offset the blade sits at
+    // inside its clump is in `bladeCenter`, in metres.
     for (let segment = 0; segment < segments; segment += 1) {
       const t = segment / segments;
       const width = shape.halfWidth[segment] * PEAK_HALF_WIDTH;
       const left = (vertexBase + segment * 2) * 3;
       const right = left + 3;
-      positions[left] = centerX - axisX * width;
+      positions[left] = -axisX * width;
       positions[left + 1] = t;
-      positions[left + 2] = centerZ - axisZ * width;
-      positions[right] = centerX + axisX * width;
+      positions[left + 2] = -axisZ * width;
+      positions[right] = axisX * width;
       positions[right + 1] = t;
-      positions[right + 2] = centerZ + axisZ * width;
+      positions[right + 2] = axisZ * width;
       for (const vertex of [vertexBase + segment * 2, vertexBase + segment * 2 + 1]) {
         writeBladeVertex(vertex, segment);
       }
@@ -172,9 +202,9 @@ export function createClumpGeometry({
 
     const tipVertex = vertexBase + segments * 2;
     const tip = tipVertex * 3;
-    positions[tip] = centerX;
+    positions[tip] = 0;
     positions[tip + 1] = 1;
-    positions[tip + 2] = centerZ;
+    positions[tip + 2] = 0;
     writeBladeVertex(tipVertex, segments);
 
     for (let segment = 0; segment < segments - 1; segment += 1) {
@@ -192,10 +222,13 @@ export function createClumpGeometry({
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   // xy = wind/tilt lean, zw = the blade's facing in XZ (its y is always 0).
   geometry.setAttribute('bladeAxis', new THREE.BufferAttribute(bladeAxes, 4));
-  // xy = the blade's offset within its clump, z = its length phase.
-  geometry.setAttribute('bladeCenter', new THREE.BufferAttribute(bladeCenters, 3));
+  // xy = the blade's offset within its clump in metres, z = its length phase,
+  // w = its width roll.
+  geometry.setAttribute('bladeCenter', new THREE.BufferAttribute(bladeCenters, 4));
   // xy = the two colour rolls, zw = the authored profile's arc at this row.
   geometry.setAttribute('bladeShape', new THREE.BufferAttribute(bladeShapes, 4));
+  // x = gust phase offset, y = stiffness, z = flutter amount, w = spare.
+  geometry.setAttribute('bladeWind', new THREE.BufferAttribute(bladeWinds, 4));
   geometry.setIndex(indices);
   geometry.setAttribute('instanceBase', instanceBase);
   geometry.setAttribute('instanceParams', instanceParams);
@@ -250,7 +283,9 @@ export class StylizedGrassSlot {
     sunDirection,
     forestFieldProvider = null,
     bladeProfileProvider = null,
+    tuning,
   }) {
+    this.tuning = tuning;
     this.terrainSlot = terrainSlot;
     this.terrainView = terrainView;
     this.objectMap = objectMap;
@@ -340,6 +375,7 @@ export class StylizedGrassSlot {
     const bands = {
       bladesPerClump: this.bladesPerClump,
       tiltMax: this.config.grass.tiltMax ?? DEFAULT_TILT_MAX,
+      clumpRadius: this.config.grass.clumpRadius ?? DEFAULT_CLUMP_RADIUS,
       instanceBase: this.instanceBase,
       instanceParams: this.instanceParams,
     };
@@ -367,6 +403,7 @@ export class StylizedGrassSlot {
       time: this.time,
       sunDirection: this.sunDirection,
       config: this.config,
+      tuning: this.tuning,
     });
     this.mesh.geometry = this.geometry;
     this.mesh.material = this.material;

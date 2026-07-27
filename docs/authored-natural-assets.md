@@ -150,6 +150,20 @@ direction. Canonical Azgaar biome IDs remain unchanged:
 - land accents: savanna, grassland, forest biomes, wetland and farm;
 - aquatic accents: marine (`0`) and wetland (`12`).
 
+Variants are not all resident from the start. `StylizedVariantResidency` streams
+rock, bush, ground-detail and aquatic variants in as the camera approaches the
+biomes they are authored for, one install per frame, from a prefetch window
+wider than the layer's own residency. Only the trees and the shared scene are
+loaded before the first frame. See
+[asset startup and variant residency](asset-startup-and-variant-residency.md).
+
+This makes `tileIds` load-bearing in a second way. A variant that declares none
+is eligible in every biome the layer is — unchanged behaviour for placement, but
+it also means residency can never withhold it, so it loads on every world. All
+twelve `rockVariants` and all five `bushVariants` are currently untagged and
+therefore always load. Tagging a new variant with the biomes it belongs to is
+what keeps it off worlds that do not contain them.
+
 `RegionalCharacterField` adds a shared, coarse world-space influence over the
 individual layer rules. It deterministically coordinates broad meadow,
 woodland, scrub and rocky districts at roughly 420 m scale. Forest suitability,

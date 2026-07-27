@@ -91,14 +91,40 @@ export class AssetStartupTelemetry {
     this.meshoptDecodes = [];
     this.ktx2Transcodes = [];
     this.ktx2Support = null;
+    this.assetListeners = new Set();
+  }
+
+  /**
+   * Observe individual asset loads as they start and finish.
+   *
+   * Every stylized GLB already flows through `beginAsset`/`endAsset`, so this is
+   * what lets the loading overlay name the file it is on without a second round of
+   * instrumentation in each loader. Listener failures are swallowed: telemetry
+   * must never be able to break a load it is only watching.
+   */
+  onAsset(listener) {
+    this.assetListeners.add(listener);
+    return () => this.assetListeners.delete(listener);
+  }
+
+  notifyAsset(event) {
+    for (const listener of this.assetListeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.warn('Asset telemetry listener failed.', error);
+      }
+    }
   }
 
   beginAsset(url) {
+    this.notifyAsset({ phase: 'begin', url });
     return { url, startedAt: this.clock() };
   }
 
   endAsset(token, error = null) {
     const endedAt = this.clock();
+    this.notifyAsset({ phase: 'end', url: token.url, failed: Boolean(error) });
     this.assets.push({
       url: token.url,
       durationMs: round(endedAt - token.startedAt),

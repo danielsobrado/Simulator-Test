@@ -492,13 +492,43 @@ stylizedSurface:
     influenceTextureSize: 32
     outerRingDensity: 0.45
     tileIds: [3, 4, 5, 6, 7, 8, 9, 12, 14]
-    # Match the upstream Spring preset's blade silhouette. Density is adapted to
-    # the streamed clump representation, but the rendered blade dimensions are not.
-    minWidth: 0.06
-    maxWidth: 0.06
-    minLength: 0.15
-    maxLength: 0.25
-    tiltMax: 0.16
+    # Blade silhouette. The upstream Spring preset's 0.06 m width was carried over
+    # unchanged while the length was adapted down to world scale, which left a blade
+    # 6 cm wide and 15–25 cm long — a 3:1 strip, and the reason the foreground read
+    # as green ribbons rather than grass. Narrowing to 1.4–3.2 cm puts the blade
+    # near 9:1 and cuts fragment overdraw from roughly 1.7 to 0.7 blade-areas per
+    # square metre, which is what makes ground visible between the blades again.
+    #
+    # Narrowing is only safe because `clumpRadius` below is now independent of it.
+    minWidth: 0.014
+    maxWidth: 0.032
+    minLength: 0.10
+    maxLength: 0.32
+    # Length is rolled flat and then raised to this power, which skews it toward the
+    # short end. A flat roll over the range above concentrates the field around "all
+    # medium" and reads as a mown lawn or a standing crop; real sward is mostly short
+    # with a scattered tall minority. At 5.0 that is roughly 77% under 0.16 m, 14%
+    # between 0.16 and 0.24 m, and 9% above — the split is pinned by
+    # `bladeLengthFraction` in tests/grassLodMath.test.js rather than left to this
+    # comment.
+    #
+    # It also drops mean blade length from 0.21 m to 0.14 m, and apparent coverage
+    # with it, from roughly 0.70 to 0.45 blade-areas per m². If the field reads too
+    # thin, `bladesPerCell` is the compensation — it costs raster, not streaming.
+    lengthSkew: 5.0
+    # `minWidth`/`maxWidth` are rolled per clump. This spreads the blades inside one
+    # clump multiplicatively around that roll (±spread/2), so a clump is not 96
+    # blades of one gauge, and `widthLengthCorrelation` decides how much of the
+    # spread the blade's own length claims — 1 makes every long blade the narrowest
+    # one, 0 makes width and length independent.
+    bladeWidthSpread: 0.45
+    widthLengthCorrelation: 0.6
+    # Clump footprint, in metres, and independent of blade width. At the 0.82 m mean
+    # clump spacing that 576/96 gives, this overlaps into continuous cover; drop it
+    # under ~0.41 and the field reads as discrete tufts on bare ground.
+    # `clumpsFormCarpet` guards the relationship.
+    clumpRadius: 0.75
+    tiltMax: 0.28
     # Blade silhouettes lifted from the authored grass GLBs. Those assets are alpha
     # cards — their meshes are parallel-sided ribbons and the shape lives in the
     # texture alpha — so drawing them directly would mean alpha blending at 144
@@ -610,6 +640,20 @@ stylizedSurface:
     frequency: 0.47
     turbulence: 0.04
     lean: 0.05
+    # How much of a gust the stiffest blade refuses. Phase separation alone still
+    # moves every blade the same distance, which reads as the whole sward shearing;
+    # this is what makes it a field of blades with different give.
+    stiffnessRange: 0.55
+    # Fast, small, tip-only shiver riding across the gust. Kept off the lower blade
+    # so it reads as a tip catching the air rather than the blade vibrating, and
+    # faded out before blades are small enough that it becomes pure temporal noise.
+    flutter:
+      strength: 0.035
+      speed: 3.4
+      frequency: 1.9
+      heightStart: 0.62
+      fadeStart: 22
+      fadeEnd: 38
   color:
     bottom: '#4f7c13'
     top: '#79a01c'
@@ -637,15 +681,42 @@ stylizedSurface:
     # Roots of a dense sward sit in near-total shade. Applied over the bottom
     # `height` of every blade, this is what gives the carpet visible depth
     # instead of the flat sheet a uniformly lit field turns into.
+    #
+    # Retuned from 0.45/0.35 when translucency stopped being additive. The old
+    # values were set while the backlight landed the same absolute glow on roots and
+    # tips alike, so it was quietly acting as a fill light over the darkest third of
+    # every blade. Now that transmission scales with albedo a dark root transmits
+    # proportionally little, that fill is gone, and the old depth collapsed the near
+    # foreground into a flat dark mass. The roots did not get darker — they stopped
+    # being propped up.
     rootShade:
-      strength: 0.45
-      height: 0.35
+      strength: 0.28
+      height: 0.24
+  # Per-blade shading normal, blended between world-up and the blade's own facing.
+  # A constant world-up lights every blade in the field identically, which is what
+  # leaves a field of good silhouettes still reading as one painted surface.
+  #
+  # Keep world-up the majority term. A fully lateral normal striped the field into
+  # hard light and dark, and because neighbouring blade facings are uncorrelated it
+  # shimmers as blades cross pixels — which is also why the contribution fades out
+  # with distance rather than being drawn all the way to the horizon.
+  bladeNormal:
+    strength: 0.32
+    fadeStart: 30
+    fadeEnd: 60
   translucency:
     color: '#c1e54d'
-    # Backlight is added on top of the blade colour, so strength above ~1.3 clips
-    # on its own before the blade is even mixed in: at the old 2.5 this term peaked
-    # at linear (1.33, 1.96, 0.19) and turned grass facing the sun to yellow-white.
-    strength: 1.0
+    # Transmitted light is now modulated by the blade's own albedo rather than added
+    # as an independent radiance, so this is a ceiling on how far a fully backlit
+    # blade may brighten relative to itself, not an absolute value. 1.3 against this
+    # colour's 0.78 linear green caps a backlit blade at roughly double its own
+    # brightness, and a shaded root at double a small number is still dark.
+    #
+    # The old additive term did not scale with the blade, so the same absolute glow
+    # landed on roots and tips alike: at 2.5 it peaked at linear (1.33, 1.96, 0.19)
+    # and turned grass facing the sun yellow-white, and even at 1.0 it washed the
+    # field wherever the blade colour underneath it was dark.
+    strength: 1.3
     power: 6.4
     tipBias: 1.0
   patch:

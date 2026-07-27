@@ -1,4 +1,5 @@
 import { validateSimulationConfig } from './validateSimulationConfig.js';
+import { clumpsFormCarpet, clumpsPerCell } from '../editor/stylized/grassLodMath.js';
 
 const REQUIRED_POSITIVE_PATHS = Object.freeze([
   Object.freeze(['map', 'tileSize']),
@@ -184,9 +185,13 @@ function validateStylizedSurface(config) {
     ['stylizedSurface', 'grass', 'maxWidth'],
     ['stylizedSurface', 'grass', 'minLength'],
     ['stylizedSurface', 'grass', 'maxLength'],
+    ['stylizedSurface', 'grass', 'lengthSkew'],
     ['stylizedSurface', 'grass', 'tiltMax'],
+    ['stylizedSurface', 'grass', 'clumpRadius'],
     ['stylizedSurface', 'wind', 'speed'],
     ['stylizedSurface', 'wind', 'frequency'],
+    ['stylizedSurface', 'wind', 'flutter', 'speed'],
+    ['stylizedSurface', 'wind', 'flutter', 'frequency'],
     ['stylizedSurface', 'color', 'brightness'],
     ['stylizedSurface', 'color', 'gradientEnd'],
     ['stylizedSurface', 'color', 'gradientPower'],
@@ -296,6 +301,16 @@ function validateStylizedSurface(config) {
     ['stylizedSurface', 'wind', 'strength'],
     ['stylizedSurface', 'wind', 'turbulence'],
     ['stylizedSurface', 'wind', 'lean'],
+    ['stylizedSurface', 'wind', 'stiffnessRange'],
+    ['stylizedSurface', 'wind', 'flutter', 'strength'],
+    ['stylizedSurface', 'wind', 'flutter', 'heightStart'],
+    ['stylizedSurface', 'wind', 'flutter', 'fadeStart'],
+    ['stylizedSurface', 'wind', 'flutter', 'fadeEnd'],
+    ['stylizedSurface', 'grass', 'bladeWidthSpread'],
+    ['stylizedSurface', 'grass', 'widthLengthCorrelation'],
+    ['stylizedSurface', 'bladeNormal', 'strength'],
+    ['stylizedSurface', 'bladeNormal', 'fadeStart'],
+    ['stylizedSurface', 'bladeNormal', 'fadeEnd'],
     ['stylizedSurface', 'color', 'gradientStart'],
     ['stylizedSurface', 'translucency', 'strength'],
     ['stylizedSurface', 'translucency', 'tipBias'],
@@ -425,7 +440,32 @@ function validateStylizedSurface(config) {
   if (surface.color.gradientEnd <= surface.color.gradientStart) {
     throw new Error('Invalid editor configuration: stylized grass gradientEnd must exceed gradientStart.');
   }
+  if (surface.wind.flutter.fadeEnd <= surface.wind.flutter.fadeStart) {
+    throw new Error('Invalid editor configuration: stylizedSurface.wind.flutter.fadeEnd must exceed fadeStart.');
+  }
+  if (surface.bladeNormal.fadeEnd <= surface.bladeNormal.fadeStart) {
+    throw new Error('Invalid editor configuration: stylizedSurface.bladeNormal.fadeEnd must exceed fadeStart.');
+  }
+  // Clumps are a batching unit the player must never be able to see. Below this
+  // they stop overlapping and the field reads as discrete tufts on bare ground,
+  // which is a look regression no test of the renderer would catch — so it fails
+  // here, where the value is edited, rather than in review of a screenshot.
+  if (!clumpsFormCarpet(
+    surface.grass.clumpRadius,
+    clumpsPerCell(surface.grass.bladesPerCell, surface.grass.bladesPerClump),
+    config.map.tileSize,
+  )) {
+    throw new Error(
+      'Invalid editor configuration: stylizedSurface.grass.clumpRadius is too small for '
+      + 'bladesPerCell/bladesPerClump at this tileSize — clumps would read as separate tufts.',
+    );
+  }
   const unitFields = [
+    surface.grass.bladeWidthSpread,
+    surface.grass.widthLengthCorrelation,
+    surface.wind.stiffnessRange,
+    surface.wind.flutter.heightStart,
+    surface.bladeNormal.strength,
     surface.patch.strength,
     surface.dirt.coverage,
     surface.dirt.bladeCut,

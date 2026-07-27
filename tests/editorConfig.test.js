@@ -68,6 +68,50 @@ test('accepts positive nested map, world, camera, player, renderer, and terrain 
   assert.equal(validateEditorConfig(config), config);
 });
 
+function loadShippedConfig() {
+  return yaml.load(readFileSync(new URL('../editor.config.yaml', import.meta.url), 'utf8'));
+}
+
+test('the shipped config passes validation', () => {
+  const config = loadShippedConfig();
+  assert.equal(validateEditorConfig(config), config);
+});
+
+test('rejects a clump radius that would break the field into tufts', () => {
+  // The clump is a batching unit the player must never resolve. Below roughly half
+  // the clump spacing they stop overlapping and the carpet becomes pom-poms on
+  // bare ground — a look regression nothing else in the suite would catch, so the
+  // guard lives where the value is edited.
+  const config = loadShippedConfig();
+  config.stylizedSurface.grass.clumpRadius = 0.3;
+
+  assert.throws(
+    () => validateEditorConfig(config),
+    /grass\.clumpRadius is too small/,
+  );
+});
+
+test('narrowing blades no longer drags the clump footprint down with it', () => {
+  // The radius used to be denominated in blade-widths, so this edit alone would
+  // have shrunk every clump by more than half. It is in metres now and the guard
+  // above confirms the field still forms a carpet.
+  const config = loadShippedConfig();
+  config.stylizedSurface.grass.minWidth = 0.008;
+  config.stylizedSurface.grass.maxWidth = 0.012;
+
+  assert.equal(validateEditorConfig(config), config);
+});
+
+test('requires the tip-flutter fade to span a range', () => {
+  const config = loadShippedConfig();
+  config.stylizedSurface.wind.flutter.fadeEnd = config.stylizedSurface.wind.flutter.fadeStart;
+
+  assert.throws(
+    () => validateEditorConfig(config),
+    /flutter\.fadeEnd must exceed fadeStart/,
+  );
+});
+
 test('starts with streamed voxel chunks hidden', () => {
   const config = yaml.load(readFileSync(
     new URL('../editor.config.yaml', import.meta.url),

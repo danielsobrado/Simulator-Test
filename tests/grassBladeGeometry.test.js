@@ -36,7 +36,7 @@ test('each band emits the triangle count its segment budget promises', () => {
       `segments=${segments} triangle count disagrees with trianglesPerBlade`,
     );
     assert.equal(geometry.attributes.position.count, (segments * 2 + 1) * BLADES_PER_CLUMP);
-    for (const name of ['bladeAxis', 'bladeCenter', 'bladeShape']) {
+    for (const name of ['bladeAxis', 'bladeCenter', 'bladeShape', 'bladeWind']) {
       assert.equal(geometry.attributes[name].count, geometry.attributes.position.count);
     }
     // WebGPU allows eight vertex buffers per pipeline. Exceeding it does not
@@ -144,6 +144,74 @@ test('the arc is a per-vertex attribute, not baked into position', () => {
   );
 });
 
+test('position carries only the blade half-width, not the clump layout', () => {
+  // These are separate channels precisely so blade width and clump footprint can
+  // be tuned apart: `position` is in blade-widths and the shader scales it by the
+  // instance width, while `bladeCenter.xy` is in metres and is not scaled at all.
+  // Baking the clump offset back into `position` would make narrowing the blades
+  // shrink every clump and break the field into tufts.
+  const clumpRadius = 0.75;
+  const geometry = createClumpGeometry({
+    bladesPerClump: BLADES_PER_CLUMP,
+    segments: GRASS_BLADE_SEGMENTS,
+    clumpRadius,
+    ...sharedAttributes(),
+  });
+  const position = geometry.getAttribute('position');
+  const centre = geometry.getAttribute('bladeCenter');
+  const verticesPerBlade = GRASS_BLADE_SEGMENTS * 2 + 1;
+  for (let blade = 0; blade < BLADES_PER_CLUMP; blade += 1) {
+    const vertex = blade * verticesPerBlade;
+    // Every blade's own strip is centred on its origin — half-width either side.
+    assert.ok(Math.abs(position.getX(vertex) + position.getX(vertex + 1)) < 1e-6);
+    assert.ok(Math.abs(position.getZ(vertex) + position.getZ(vertex + 1)) < 1e-6);
+    // Half-widths are in blade-widths, so they stay small regardless of the
+    // clump radius the layout was built at.
+    assert.ok(Math.hypot(position.getX(vertex), position.getZ(vertex)) <= 0.5 + 1e-6);
+    // ...and the clump layout is in metres, bounded by the radius it was given.
+    assert.ok(Math.hypot(centre.getX(vertex), centre.getY(vertex)) <= clumpRadius + 1e-6);
+  }
+  // A different radius moves the layout and leaves the silhouette untouched.
+  const wide = createClumpGeometry({
+    bladesPerClump: BLADES_PER_CLUMP,
+    segments: GRASS_BLADE_SEGMENTS,
+    clumpRadius: clumpRadius * 2,
+    ...sharedAttributes(),
+  });
+  assert.deepEqual(
+    Array.from(wide.getAttribute('position').array),
+    Array.from(position.array),
+  );
+  assert.ok(
+    Math.abs(wide.getAttribute('bladeCenter').getX(0) - centre.getX(0) * 2) < 1e-6,
+  );
+});
+
+test('every blade carries its own width and wind rolls', () => {
+  // Same reason as the colour rolls: a clump is one instance, so without per-blade
+  // values all 96 of its blades are one gauge moving on one phase, and the hidden
+  // batching unit becomes visible.
+  const geometry = build(GRASS_BLADE_SEGMENTS, sharedAttributes());
+  const centre = geometry.getAttribute('bladeCenter');
+  const wind = geometry.getAttribute('bladeWind');
+  const verticesPerBlade = GRASS_BLADE_SEGMENTS * 2 + 1;
+  const widths = new Set();
+  const winds = new Set();
+  for (let blade = 0; blade < BLADES_PER_CLUMP; blade += 1) {
+    const vertex = blade * verticesPerBlade;
+    widths.add(centre.getW(vertex));
+    winds.add(`${wind.getX(vertex)}:${wind.getY(vertex)}:${wind.getZ(vertex)}`);
+    // Per blade, not per vertex — a blade whose width roll changed up its length
+    // would taper for the wrong reason.
+    for (let offset = 1; offset < verticesPerBlade; offset += 1) {
+      assert.equal(centre.getW(vertex + offset), centre.getW(vertex));
+      assert.equal(wind.getX(vertex + offset), wind.getX(vertex));
+    }
+  }
+  assert.equal(widths.size, BLADES_PER_CLUMP);
+  assert.equal(winds.size, BLADES_PER_CLUMP);
+});
+
 test('the far band is a fifth of the near band per clump', () => {
   const attributes = sharedAttributes();
   const near = build(GRASS_BLADE_SEGMENTS, attributes);
@@ -197,13 +265,15 @@ test('a single-segment blade is one upright triangle rooted on the ground', () =
 
 test('clump blades fill the disc evenly instead of forming rings', () => {
   // The old layout put every blade on one of three radii, which reads as
-  // concentric rings once a clump carries a few dozen blades.
+  // concentric rings once a clump carries a few dozen blades. The layout lives in
+  // `bladeCenter` now — `position` holds only each blade's own half-width.
   const geometry = build(1, sharedAttributes());
-  const position = geometry.getAttribute('position');
+  const centre = geometry.getAttribute('bladeCenter');
+  const verticesPerBlade = 3;
   const radii = new Set();
-  for (let index = 0; index < position.count; index += 1) {
-    if (position.getY(index) === 0) continue;
-    radii.add(Math.hypot(position.getX(index), position.getZ(index)).toFixed(3));
+  for (let blade = 0; blade < BLADES_PER_CLUMP; blade += 1) {
+    const vertex = blade * verticesPerBlade;
+    radii.add(Math.hypot(centre.getX(vertex), centre.getY(vertex)).toFixed(3));
   }
   assert.equal(radii.size, BLADES_PER_CLUMP, 'every blade should sit at its own radius');
 });

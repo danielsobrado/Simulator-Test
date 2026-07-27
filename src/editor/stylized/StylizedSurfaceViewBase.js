@@ -26,6 +26,7 @@ import { StylizedWaterSlot } from './StylizedWaterSlot.js';
 import { StylizedVariantResidency } from './StylizedVariantResidency.js';
 import { StylizedWildlifeView } from './StylizedWildlifeView.js';
 import { RegionalCharacterField } from './RegionalCharacterField.js';
+import { GrassTuning } from './GrassTuning.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 
 export class StylizedSurfaceView {
@@ -161,6 +162,9 @@ export class StylizedSurfaceView {
     // `load` swallows its own failures into a fallback set, so this promise settles
     // either way — it exists to tell the Settings control when the list is final.
     this.bladeProfiles.ready = this.bladeProfiles.load(baseUrl);
+    // One tuning object for the whole field: its uniforms are shared node objects,
+    // so a slider write reaches every slot's material without touching geometry.
+    this.grassTuning = new GrassTuning(config);
     this.slots = this.enabled && !this.impostorBakeMode
       ? terrainView.slots.map((terrainSlot) => new StylizedGrassSlot({
         terrainSlot,
@@ -170,6 +174,7 @@ export class StylizedSurfaceView {
         sunDirection,
         forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
         bladeProfileProvider: () => this.bladeProfiles,
+        tuning: this.grassTuning,
       }))
       : [];
     this.waterSlots = this.enabled && !this.impostorBakeMode && config.water?.enabled

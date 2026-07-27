@@ -1,0 +1,128 @@
+/*
+ * The overlay sits above the viewport but does not capture input: boot keeps the
+ * editor interactive, and walk-mode streaming must never trap the player behind a
+ * modal while the world fills in around them.
+ */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgb(6 10 8 / 42%);
+  backdrop-filter: blur(2px);
+  animation: loading-overlay-in 140ms ease-out;
+}
+
+@keyframes loading-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.loading-panel {
+  width: min(420px, calc(100vw - 48px));
+  padding: 20px 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-1);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 45%);
+}
+
+.loading-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.loading-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.loading-percent {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.loading-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.loading-bar-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  /* Slower than a frame so streaming updates read as motion, not as jitter. */
+  transition: width 220ms ease-out;
+}
+
+.loading-detail {
+  min-height: 1.2em;
+  margin: 10px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.loading-steps {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.loading-steps li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.loading-step-mark {
+  text-align: center;
+  font-size: 11px;
+}
+
+.loading-steps li[data-state='active'] {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.loading-steps li[data-state='active'] .loading-step-mark { color: var(--accent); }
+.loading-steps li[data-state='done'] .loading-step-mark { color: var(--accent); opacity: 0.7; }
+.loading-steps li[data-state='failed'] { color: var(--danger); }
+
+.loading-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loading-error {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-overlay { animation: none; }
+  .loading-bar-fill { transition: none; }
+}

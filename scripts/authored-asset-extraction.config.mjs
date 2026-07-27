@@ -132,17 +132,42 @@ export const AUTHORED_ASSET_EXTRACTIONS = Object.freeze([
     'assets/trees/stylized_tree.glb',
     'assets/extracted/trees/stylized-oak',
     [
-      // 182 154 triangles as authored — 40x the next-heaviest runtime tree, and
-      // it scatters into the near band alongside up to 72 accepted trees per
-      // chunk over a 3x3 window. Individually modelled leaves are what cost that
-      // much and what survive decimation worst, so this stops at 5% rather than
-      // chasing tree-02's 4 599: the crown keeps its shape at walking distance.
+      // 182 154 triangles as authored — 40x the next-heaviest runtime tree, and it
+      // scatters into the near band alongside up to 72 accepted trees per chunk
+      // over a 3x3 window. So it does need decimating. But the two roots respond to
+      // `simplifyRatio` in completely different ways, and a single ratio cannot
+      // balance them:
+      //
+      //   ratio  leaves (`oak 01`)   branches (`oak 01.001`)
+      //   0.05    2 982   ( 5.0%)     59 901  (48.9%)
+      //   0.15    8 946   (15.0%)     59 888  (48.9%)
+      //   0.30   17 894   (30.0%)     64 436  (52.6%)
+      //   0.60   35 790   (60.0%)     80 777  (65.9%)
+      //
+      // The leaves are 29 826 independent quad cards, so they track the ratio
+      // exactly — the simplifier just deletes whole cards. The branches are open
+      // ended limb cylinders whose every rim is a border edge, and meshopt will not
+      // collapse borders, so they floor at ~48.9% until the ratio climbs past 0.55.
+      // Neither `simplifyError` (swept 0.02–0.40: moves branches by 456 triangles
+      // in total) nor a `weld()` pass shifts that floor.
+      //
+      // This previously ran at 0.05, on the stated belief that the leaves were what
+      // survived decimation worst. The measurements say the reverse: the crown is
+      // the only thing that decimates, and at 0.05 it kept 1 491 of 29 826 leaf
+      // cards over a 15.6 m canopy, which rendered as a bare branch skeleton with
+      // sparse specks. The saving was illusory too — the branches cost ~59 900
+      // triangles whatever this is set to, so 0.05 bought almost nothing and paid
+      // for it with the entire crown.
+      //
+      // 0.30 is the knee: 6x the foliage for 31% more triangles than the broken
+      // setting. Check `npm run validate:extracted-assets`, which now fails if the
+      // two parts diverge like this again.
       grouped({
         name: 'stylized-oak',
         roots: ['oak 01', 'oak 01.001'],
         scale: 14,
         publishDir: 'public/assets/trees',
-        simplifyRatio: 0.05,
+        simplifyRatio: 0.3,
         simplifyError: 0.02,
       }),
     ],
