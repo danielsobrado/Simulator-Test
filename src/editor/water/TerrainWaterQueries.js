@@ -28,12 +28,20 @@ function assertTerrainView(terrainView) {
 
 export function sampleWorldStoreWater(worldStore, cellX, cellZ) {
   assertWorldStore(worldStore);
-  const bedHeight = worldStore.sampleHeight(cellX, cellZ);
   const tileX = Math.floor(cellX);
   const tileZ = Math.floor(cellZ);
   const tileId = worldStore.getTile(tileX, tileZ);
   const base = worldStore.generator.sampleWater(cellX, cellZ);
-  const explicitTileOverride = worldStore.tileOverrides?.has(cellKey(tileX, tileZ)) ?? false;
+  const hasExplicitTileOverrides = worldStore.tileOverrides instanceof Map
+    && worldStore.tileOverrides.size > 0;
+  const explicitTileOverride = hasExplicitTileOverrides
+    && worldStore.tileOverrides.has(cellKey(tileX, tileZ));
+  const canUseBaseBed = worldStore.heightOverrides instanceof Map
+    && worldStore.heightOverrides.size === 0;
+  const bedHeight = canUseBaseBed
+    ? base.bedHeight
+    : worldStore.sampleHeight(cellX, cellZ);
+
   if (tileId !== WATER_TILE_ID
       && (base.kind !== WATER_KIND_RIVER || explicitTileOverride)) {
     return createNoWaterSample(bedHeight);

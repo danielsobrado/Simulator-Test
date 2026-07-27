@@ -1,4 +1,5 @@
-export const WATER_DOMAIN_VERSION = 1;
+export const WATER_DOMAIN_LEGACY_VERSION = 0;
+export const WATER_DOMAIN_VERSION = 2;
 
 export const WATER_KIND_NONE = 0;
 export const WATER_KIND_OCEAN = 1;

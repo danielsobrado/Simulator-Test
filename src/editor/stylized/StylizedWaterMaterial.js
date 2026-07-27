@@ -24,6 +24,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
+import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -82,8 +83,10 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
 }
 
 export function createStylizedWaterMaterial({
+  surfaceMaskTexture,
   waterFieldTexture,
   waterFieldSize,
+  waterSurfaceOrigin,
   chunkCenter,
   chunkWorldSize,
   time,
@@ -94,8 +97,10 @@ export function createStylizedWaterMaterial({
   const fieldUv = terrainUv
     .mul((waterFieldSize - 1) / waterFieldSize)
     .add(0.5 / waterFieldSize);
+  const surface = texture(surfaceMaskTexture, terrainUv);
+  const exactCoverage = createSurfaceClassNodes(surface).water;
   const waterField = texture(waterFieldTexture, fieldUv);
-  const waterCoverage = clamp(waterField.r, 0, 1);
+  const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
@@ -132,7 +137,7 @@ export function createStylizedWaterMaterial({
   const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
     .mul(fade)
     .mul(waterCoverage);
-  const surfaceHeight = waterField.g.add(water.heightOffset);
+  const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
 
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,

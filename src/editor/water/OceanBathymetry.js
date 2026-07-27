@@ -30,17 +30,17 @@ function valueNoise(x, z, seed) {
 }
 
 export function oceanDepthProfile(distanceMeters, config) {
-  const shelfMeters = config.coastalShelfMeters;
-  const shelfAmount = smoothstep(distanceMeters / shelfMeters);
-  const deepRange = Math.max(shelfMeters, config.shoreDistanceMeters - shelfMeters);
-  const deepAmount = smoothstep((distanceMeters - shelfMeters) / deepRange);
-  return lerp(0, config.shelfDepth, shelfAmount)
-    + (config.maximumDepth - config.shelfDepth) * deepAmount;
+  const distance = clamp(distanceMeters, 0, config.shoreDistanceMeters);
+  if (distance <= config.coastalShelfMeters) {
+    return config.shelfDepth * distance / config.coastalShelfMeters;
+  }
+  const deepAmount = (distance - config.coastalShelfMeters)
+    / (config.shoreDistanceMeters - config.coastalShelfMeters);
+  return lerp(config.shelfDepth, config.maximumDepth, deepAmount);
 }
 
 export function sampleOceanBed({
   baseHeight,
-  filteredBaseHeight,
   surfaceHeight,
   distanceMeters,
   cellX,
@@ -49,20 +49,12 @@ export function sampleOceanBed({
   config,
 }) {
   const profileDepth = oceanDepthProfile(distanceMeters, config);
-  const retainedDepth = Math.max(0, surfaceHeight - filteredBaseHeight) * 0.35;
   const detailScaleCells = Math.max(1, 192 / config.cellSizeMeters);
   const detail = valueNoise(cellX / detailScaleCells, cellZ / detailScaleCells, seed + 2909)
     * config.maximumDepth
     * 0.08
     * smoothstep(distanceMeters / config.coastalShelfMeters);
-  const targetDepth = clamp(
-    Math.min(
-      distanceMeters * config.maximumBedSlope,
-      Math.max(retainedDepth, profileDepth + detail),
-    ),
-    0,
-    config.maximumDepth,
-  );
+  const targetDepth = clamp(profileDepth + detail, 0, config.maximumDepth);
   const baseDepth = Math.max(0, surfaceHeight - baseHeight);
   const blendedDepth = lerp(baseDepth, targetDepth, smoothstep(distanceMeters / config.cellSizeMeters));
   return surfaceHeight - clamp(blendedDepth, 0, config.maximumDepth);

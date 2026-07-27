@@ -2,25 +2,24 @@
 
 Date: 2026-07-27
 
-Status: implemented on `agent/w1-water-geography`
+Status: implemented on `agent/w1-water-geography`; hardened by the W0–W1 review-fix PR.
 
-Dependency: W0 water-domain contract in PR #36 (`agent/w0-water-contract`)
+Dependency: W0 water-domain contract from PR #36.
 
 ## Delivered
 
 W1 makes water geography and the terrain beneath it authoritative before W2 adds depth-aware optics.
 
-- Procedural ocean bathymetry derived from deterministic shore distance.
-- Imported Azgaar ocean bathymetry without changing land/water classification.
-- Imported river centre lines converted into indexed world-space channels.
-- River depth derived from imported width and water-domain configuration.
-- Continuous downstream river surface profiles that do not depend on page-local minima.
+- Procedural and imported ocean bathymetry derived from deterministic shore distance.
+- Imported Azgaar river centre lines converted into indexed world-space channels.
+- Width-based river depth and continuous downstream surface profiles.
 - River beds carved into the CPU-authoritative terrain heightfield.
 - Worker-generated semantic water fields.
 - Per-terrain-slot half-float water textures.
-- Water rendering positioned and masked from the semantic field rather than one global sea-level mask.
-- Live tile and height edits regenerate the semantic water field.
-- Water generation time and upload bytes reported through performance counters.
+- Local surface placement instead of one global sea-level plane.
+- Live tile and height edits regenerate and upload semantic water data.
+- Near and macro-far terrain use the same transformed water contract.
+- Water generation time and upload bytes are reported through performance counters.
 
 ## Canonical terrain ownership
 
@@ -28,40 +27,52 @@ W1 makes water geography and the terrain beneath it authoritative before W2 adds
 
 ```text
 raw generator height and tile classification
-  -> ocean shore-distance profile
+  -> cached ocean classification and shore distance
+  -> slope-bounded ocean bathymetry
   -> indexed river-channel profile
-  -> authoritative generated terrain height
-  -> canonical WaterSample
+  -> authoritative transformed vertex height
+  -> bilinear CPU terrain and WaterSample queries
   -> worker page heights and water field
-  -> CPU collision and GPU rendering
+  -> collision, picking, vegetation, near rendering, and macro rendering
 ```
 
-There is no separate render-only riverbed mesh. The same transformed height is used by page generation, terrain textures, player grounding, picking, vegetation placement, and water depth.
+There is no render-only riverbed mesh.
 
 ## Ocean bathymetry
 
-The original coastline classification remains authoritative. Water cells receive a deterministic depth profile:
+The original land/water classification remains authoritative.
 
-- Near-shore depth starts from zero.
-- Depth grows through a configurable coastal shelf.
-- Offshore depth approaches the configured maximum.
-- Broad deterministic variation retains seabed character.
-- The configured maximum bed slope limits abrupt underwater drops.
-- A bounded cached distance field keeps work proportional to resident terrain, not total map size.
+- Mixed coastline vertices remain unchanged.
+- Fully submerged vertices follow a piecewise depth profile.
+- Depth reaches `shelfDepth` at `coastalShelfMeters`.
+- Depth reaches `maximumDepth` at `shoreDistanceMeters`.
+- Both profile segments are validated against `maximumBedSlope`.
+- Broad deterministic noise retains low-frequency seabed character.
+- Canonical classification and transformed vertices use bounded block caches.
+
+Default version-2 profile:
+
+```text
+shore distance: 48 m
+coastal shelf: 20 m
+shelf depth: 4 m
+maximum depth: 24 m
+maximum profile slope: 0.75
+```
 
 ## River channels
 
-Imported Azgaar river points are converted from atlas coordinates to canonical world cells. Each river is oriented from higher terrain toward lower terrain, then assigned a deterministic longitudinal surface profile.
-
-For each segment:
+Imported Azgaar river points are converted from atlas coordinates to canonical world cells. Each river is oriented from higher terrain toward lower terrain and assigned a deterministic longitudinal surface profile.
 
 - Imported width resolves channel radius.
+- A 0.75-cell minimum radius guarantees contact with the terrain vertex grid.
 - Width and `widthDepthRatio` resolve channel depth.
-- `bankExponent` controls the smooth channel cross-section.
-- `minimumGradient` ensures downstream progression.
-- A spatial index limits queries to nearby segments.
-- Stable river body IDs derive from imported river IDs.
-- Tributary or overlapping segment samples select compatible minimum bed and surface values.
+- `bankExponent` controls the cross-section.
+- `minimumGradient` enforces downstream progression.
+- A spatial index limits segment candidates.
+- One selected segment owns body, flow, surface, coverage, and shore distance.
+- The minimum overlapping bed owns terrain carving.
+- Invalid points and dimensions are rejected or skipped safely.
 
 ## Streamed water field
 
@@ -71,63 +82,84 @@ Each generated page contains:
 page.waterFieldPixels
 page.waterFieldWidth
 page.waterFieldHeight
+page.waterFieldSurfaceOrigin
+page.waterFieldRevision
 ```
 
-The format is `RGBA16F`:
+The texture is `RGBA16F`:
 
 | Channel | Meaning |
 |---|---|
-| R | Coverage |
-| G | Surface height |
+| R | Analytic coverage |
+| G | Surface-height offset from `waterFieldSurfaceOrigin` |
 | B | Water depth |
 | A | Shore distance |
 
-The field is `65 x 65` for a standard `64 x 64` page. This intentionally differs from the earlier `64 x 64` estimate: water-surface height is vertex-owned, so retaining the shared edge makes adjacent pages bit-identical and removes interpolation seams.
+For a 64×64 page, the field is 65×65 so adjacent pages share the complete vertex edge. A one-cell sampling halo supplies stable dry-boundary surface values.
 
-A standard field uses 33,800 bytes. At 49 resident slots, the steady texture allocation is approximately 1.58 MiB before staging.
+The exact 64×64 surface mask remains the cell-coverage authority. The shader combines exact cell coverage with analytic coverage, while semantic height comes from the field.
 
-## Rendering boundary
+A field uses 33,800 texture bytes. At 49 resident slots, steady texture allocation is approximately 1.58 MiB before staging.
 
-W1 changes only semantic placement and coverage:
+## Precision
 
-- The water mesh samples local surface height from the water field.
-- Coverage comes from the water field rather than `surfaceMaskTexture`.
-- The existing stylised FBM and Voronoi colour treatment remains.
+Absolute river elevations are not stored directly in half float. Each page stores a full-precision surface origin and half-float local offsets. This avoids metre-scale terracing in high-elevation rivers while preserving compact GPU storage.
 
-Actual depth tint, absorption, refraction, geographic foam, and underwater rendering remain W2 and W3 work.
+## Live edits
 
-## Live edits and persistence
-
-- Height overrides update water depth because the field is regenerated from `InfiniteWorldStore.sampleHeight`.
-- Tile overrides can add or remove water classification.
+- Height edits regenerate depth and increment `waterFieldRevision`.
+- Tile edits add or remove exact water coverage.
 - Painted water uses the authoritative sea level.
-- Explicit land painting can suppress an imported analytic river at that cell.
-- Generated water fields are not persisted.
-- Water-domain settings are stored in generator metadata.
-- Older version 6 saves without full W1 settings remain compatible through W0 defaults.
-- Saves carrying different explicit water-domain settings are rejected instead of silently regenerating different terrain.
+- Explicit land painting can suppress an imported analytic river cell.
+- Render slots upload when the field revision changes, even if the page object is unchanged.
+
+## Persistence
+
+W1 terrain semantics are water-domain version 2.
+
+- Generated fields are not persisted.
+- Version 2 generator metadata stores normalized water-domain settings.
+- Missing, version 0, and version 1 persisted water contracts require an explicit migration.
+- Newer versions are rejected.
+- Equivalent settings compare independently of object property order.
+
+Silent regeneration into different terrain is not allowed.
+
+## Performance
+
+- Ocean classifications and transformed vertex heights use bounded typed-block caches.
+- Neighbouring fields reuse canonical halo data.
+- Half-float conversion reuses shared bit-conversion views.
+- Worker and main-thread generation timings are not double-counted.
+
+Focused repeated-field diagnostics are approximately 1–3 ms after cache warm-up. Cold generation remains dependent on coastline complexity and worker state and requires headed release measurement.
 
 ## Validation
 
-Focused Node tests: 17 passed.
+Focused Node tests: 31 passed.
 
 Coverage includes:
 
-- Ocean coastline preservation and offshore depth progression.
-- Ocean determinism.
-- Imported river carving, bank blending, and downstream surface continuity.
-- Ocean and river water-field edges bit-identical across chunks.
-- CPU and half-float field agreement within format tolerance.
-- Floating-origin parity.
-- Live height and tile overrides, including painted water.
-- W0 sample invariants, metadata compatibility, and configuration validation.
-
-Full visual acceptance still requires a physical WebGPU browser and representative imported Azgaar maps.
+- W0 sample invariants and immutable contracts.
+- Water-domain version and settings compatibility.
+- Ocean maximum depth and slope limits.
+- Coastline vertex ownership.
+- Fractional heightfield parity.
+- Narrow and overlapping river behaviour.
+- River bank blending and downstream continuity.
+- Ocean and river shared-edge continuity.
+- Relative half-float precision at high elevations.
+- Dry shoreline surface and depth inheritance.
+- Live field revision changes.
+- Page dimension validation.
+- Floating-origin parity and live edits.
+- Macro-far terrain parity.
+- Negative-coordinate cache behaviour and bounded eviction.
 
 ## Deferred
 
-- Depth-driven surface colour and transparency.
-- Beer-Lambert-style absorption.
+- Depth-driven colour and transparency.
+- Beer–Lambert-style absorption.
 - Opaque scene colour/depth refraction.
 - Geographic shore foam.
 - Underwater rendering.

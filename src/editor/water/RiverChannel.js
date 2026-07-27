@@ -36,6 +36,9 @@ export class RiverChannel {
     config,
     blockSize = 64,
   }) {
+    if (!Number.isInteger(blockSize) || blockSize < 1) {
+      throw new Error('River channel blockSize must be a positive integer.');
+    }
     this.config = config;
     this.blockSize = blockSize;
     this.segments = createRiverSurfaceSegments({ source, sampleBaseHeight, seaLevel, config });
@@ -68,41 +71,41 @@ export class RiverChannel {
   }
 
   sample(cellX, cellZ) {
+    if (!Number.isFinite(cellX) || !Number.isFinite(cellZ)) {
+      throw new Error('River channel coordinates must be finite.');
+    }
     let selected = null;
     let bedHeight = Number.POSITIVE_INFINITY;
-    let surfaceHeight = Number.POSITIVE_INFINITY;
-    let coverage = 0;
-    let shoreDistance = 0;
 
     for (const segment of this.candidates(cellX, cellZ)) {
       const sample = pointSegmentSample(cellX, cellZ, segment);
       if (sample.distance > segment.radiusCells) continue;
       const radial = clamp(1 - sample.distance / segment.radiusCells, 0, 1);
       const influence = smoothstep(radial);
+      if (influence <= 0) continue;
       const localSurface = segment.startSurface
         + (segment.endSurface - segment.startSurface) * sample.amount;
       const localBed = localSurface
         - segment.channelDepth * radial ** this.config.river.bankExponent;
       bedHeight = Math.min(bedHeight, localBed);
-      surfaceHeight = Math.min(surfaceHeight, localSurface);
-      coverage = Math.max(coverage, influence);
-      shoreDistance = Math.max(
-        shoreDistance,
-        (segment.radiusCells - sample.distance) * this.config.cellSizeMeters,
-      );
       if (!selected || influence > selected.influence
           || (influence === selected.influence && localSurface < selected.surfaceHeight)) {
-        selected = { segment, influence, surfaceHeight: localSurface };
+        selected = {
+          segment,
+          influence,
+          surfaceHeight: localSurface,
+          shoreDistance: (segment.radiusCells - sample.distance) * this.config.cellSizeMeters,
+        };
       }
     }
 
     if (!selected) return null;
     return Object.freeze({
       bodyId: selected.segment.bodyId,
-      coverage,
-      surfaceHeight,
+      coverage: selected.influence,
+      surfaceHeight: selected.surfaceHeight,
       bedHeight,
-      shoreDistance,
+      shoreDistance: selected.shoreDistance,
       flowX: selected.segment.flowX,
       flowZ: selected.segment.flowZ,
     });
