@@ -66,7 +66,7 @@ function automaticShape(width, height, depth) {
   const horizontalRatio = horizontalMaximum / horizontalMinimum;
   const totalRatio = Math.max(width, height, depth) / Math.min(width, height, depth);
   if (height / horizontalMaximum >= ROCK_COLLISION_CAPSULE_VERTICAL_RATIO
-      && horizontalRatio < ROCK_COLLISION_COMPOUND_HORIZONTAL_RATIO) {
+      && horizontalRatio <= ROCK_COLLISION_SPHERE_ASPECT_LIMIT) {
     return ROCK_COLLISION_SHAPE_CAPSULE;
   }
   if (horizontalRatio >= ROCK_COLLISION_COMPOUND_HORIZONTAL_RATIO) {
@@ -212,7 +212,7 @@ export function classifyRockCollision(profile, placementScale, config) {
   if (profile.forcedTier) return profile.forcedTier;
   const height = profile.height * placementScale;
   const width = Math.max(profile.width, profile.depth) * placementScale;
-  if (height < config.minimumCollidableHeight && width < config.minimumCollidableWidth) {
+  if (height < config.minimumCollidableHeight || width < config.minimumCollidableWidth) {
     return ROCK_COLLISION_TIER_DECORATIVE;
   }
   if (height >= config.minimumWalkableHeight && width >= config.minimumWalkableWidth) {
