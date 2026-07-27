@@ -13,6 +13,7 @@ Dependency: W0 and W1 are merged on `main`. W2 optics remain independent and are
 - Wading drag while retaining ground contact.
 - Buoyant swimming with configurable horizontal and vertical speed.
 - `Space` swims upward; `Ctrl` or `C` swims downward.
+- Explicit vertical controls override the surface spring, allowing sustained deep diving.
 - Jumping is disabled while swimming.
 - Leaving water restores normal gravity and ground collision.
 - Steep banks continue to enforce the configured step-height limit while swimming.
@@ -51,9 +52,11 @@ Swimming uses:
 
 - `swimSpeed` for horizontal movement;
 - `verticalSwimSpeed` for explicit ascent and descent;
-- `buoyancy` as a spring toward the natural surface-floating height;
+- `buoyancy` as a spring toward the natural surface-floating height when no vertical control is held;
 - `swimDrag` to damp vertical velocity;
 - the existing terrain heightfield as the seabed collision authority.
+
+Explicit ascent or descent temporarily disables the surface spring. This lets the player dive to the seabed or swim back upward instead of reaching a shallow equilibrium under the surface.
 
 The destination water state is resolved before applying step-height rules. Swimming therefore allows movement through deep water but cannot bypass a steep dry bank.
 
@@ -90,7 +93,7 @@ These values are validated during editor startup. They do not change generated t
 
 ## Validation
 
-Focused dependency-free Node suite: 9 tests passed.
+Focused dependency-free Node suite: 10 tests passed.
 
 Coverage includes:
 
@@ -99,6 +102,7 @@ Coverage includes:
 - wading drag;
 - buoyant surface movement;
 - ascend and descend controls;
+- sustained deep diving;
 - submerged-to-surface recovery;
 - water exit restoring gravity;
 - steep-bank step-height enforcement;
