@@ -15,8 +15,10 @@ Dependency: W0 and W1 are merged on `main`. W2 optics remain independent and are
 - `Space` swims upward; `Ctrl` or `C` swims downward.
 - Jumping is disabled while swimming.
 - Leaving water restores normal gravity and ground collision.
+- Steep banks continue to enforce the configured step-height limit while swimming.
 - Player status exposes water state, depth, surface height, body ID, and head-submersion state.
 - Underwater fog, background tint, light reduction, sky suppression, god-ray suppression, and a reduced camera near plane.
+- The water surface renders from below while submerged.
 - Time-based visual blending when crossing the water surface.
 - Surface visual state is restored when leaving walk mode or disposing the controller.
 
@@ -53,6 +55,8 @@ Swimming uses:
 - `swimDrag` to damp vertical velocity;
 - the existing terrain heightfield as the seabed collision authority.
 
+The destination water state is resolved before applying step-height rules. Swimming therefore allows movement through deep water but cannot bypass a steep dry bank.
+
 No collision readbacks or render-derived water queries are introduced.
 
 ## Underwater rendering boundary
@@ -62,8 +66,9 @@ W3 changes camera-local atmosphere only:
 - scene background and exponential fog blend toward underwater colours;
 - directional and hemisphere lighting are reduced;
 - the sky and cloud-transmission domes are hidden when fully submerged;
-- god rays are suspended while underwater;
-- the first-person near plane blends from 0.5 m to the configured underwater value.
+- god rays are suspended while underwater without mutating saved settings;
+- the first-person near plane blends from 0.5 m to the configured underwater value;
+- the water material is double-sided so the surface remains visible from below.
 
 W3 does not add refraction, Beer–Lambert absorption, caustics, surface foam, or depth-driven water colour. Those remain W2 or later polish work.
 
@@ -81,11 +86,11 @@ underwater:
   nearPlane: 0.15
 ```
 
-These values do not change generated terrain or persisted water-domain version 2 metadata.
+These values are validated during editor startup. They do not change generated terrain or persisted water-domain version 2 metadata.
 
 ## Validation
 
-Focused dependency-free Node suite: 8 tests passed.
+Focused dependency-free Node suite: 9 tests passed.
 
 Coverage includes:
 
@@ -96,6 +101,7 @@ Coverage includes:
 - ascend and descend controls;
 - submerged-to-surface recovery;
 - water exit restoring gravity;
+- steep-bank step-height enforcement;
 - dry-land backwards compatibility;
 - bounded underwater visual blending;
 - underwater configuration validation.
