@@ -6,7 +6,6 @@ import {
   SURFACE_CLASSIFICATION_THRESHOLD,
   createSurfaceClassNodes,
 } from '../src/editor/stylized/SurfaceMaskNodes.js';
-import { resolveWaterSurfaceHeight } from '../src/editor/stylized/StylizedWaterSlot.js';
 
 function source(path) {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -21,23 +20,15 @@ test('surface classification centralizes a hard categorical threshold', () => {
   assert.ok(nodes.landGrass?.isNode);
 });
 
-test('water surface height comes from authoritative world sea level', () => {
-  const terrainView = {
-    worldStore: { generator: { toMetadata: () => ({ seaLevel: -2.75 }) } },
-    streamingConfig: { seaLevel: -1.5 },
-  };
-
-  assert.equal(resolveWaterSurfaceHeight(terrainView), -2.75);
-  assert.equal(resolveWaterSurfaceHeight({ streamingConfig: { seaLevel: -1.5 } }), -1.5);
-  assert.equal(resolveWaterSurfaceHeight({}), 0);
-});
-
-test('water is level and vegetation consumes the live land-grass mask', () => {
+test('water rides the streamed field and vegetation consumes the live land-grass mask', () => {
   const water = source('../src/editor/stylized/StylizedWaterMaterial.js');
   const grass = source('../src/editor/stylized/StylizedGrassMaterial.js');
   const flowers = source('../src/editor/stylized/StylizedFlowerMaterial.js');
 
-  assert.match(water, /surfaceHeight = float\(waterLevel\)/);
+  // W3/W4 replaced the single flat sea level with a per-chunk water field, so
+  // the surface height is read from that field instead of from a scalar level
+  // or from terrain height.
+  assert.match(water, /surfaceHeight = waterField\.g\.add\(waterSurfaceOrigin\)/);
   assert.doesNotMatch(water, /terrainHeight\.add\(water\.heightOffset\)/);
   assert.match(grass, /opacityNode = surfaceClass\.landGrass/);
   assert.match(flowers, /alive = .*\.mul\(surfaceClass\.landGrass\)/);

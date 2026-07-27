@@ -43,12 +43,11 @@ function prototype(index) {
   };
 }
 
-test('keeps the geometric proxy visible while textured impostors are unavailable', () => {
+test('falls back to cross-card geometry while textured impostors are unavailable', () => {
   const near = createRenderer();
   const proxy = createRenderer();
   const fallback = createRenderer();
   const cluster = createRenderer();
-  fallback.count = 1;
 
   try {
     rebuildTreeLod({
@@ -84,9 +83,11 @@ test('keeps the geometric proxy visible while textured impostors are unavailable
       clusterRenderers: [[cluster]],
     });
 
+    // Prototypes without a baked atlas render `fallbackImpostorParts` — the
+    // cross-card canopy — so the impostor band never goes empty.
     assert.equal(near.count, 0);
-    assert.equal(proxy.count, 1);
-    assert.equal(fallback.count, 0);
+    assert.equal(proxy.count, 0);
+    assert.equal(fallback.count, 1);
     assert.equal(cluster.count, 0);
   } finally {
     [near, proxy, fallback, cluster].forEach(disposeRenderer);

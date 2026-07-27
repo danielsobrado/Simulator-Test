@@ -33,16 +33,19 @@ function makeMaterial(color, side = THREE.FrontSide) {
 
 function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
   const material = makeMaterial(color, side);
+  const wind = config.wind;
   const time = treeWindTimeFor(config);
-  if (!time || !bounds) return material;
+  // `treeWindTimeFor` always yields a node, so a config without a wind block has
+  // to be rejected here or prototype construction throws on it.
+  if (!time || !bounds || !Array.isArray(wind?.direction)) return material;
   const minimumY = bounds.min.y;
   const height = Math.max(0.001, bounds.max.y - minimumY);
   const normalizedHeight = clamp(positionLocal.y.sub(minimumY).div(height), 0, 1);
   const heightMask = normalizedHeight.mul(normalizedHeight);
-  const windDirection = vec2(config.wind.direction[0], config.wind.direction[1]);
+  const windDirection = vec2(wind.direction[0], wind.direction[1]);
   const phase = attribute('instanceStableSeed', 'float').mul(TWO_PI);
-  const wave = sin(dot(positionLocal.xz, windDirection).mul(config.wind.frequency)
-    .add(time.mul(config.wind.speed))
+  const wave = sin(dot(positionLocal.xz, windDirection).mul(wind.frequency)
+    .add(time.mul(wind.speed))
     .add(phase));
   const sway = windDirection.mul(wave.mul(config.trees.windStrength).mul(heightMask));
   const dip = wave.abs().mul(config.trees.windStrength).mul(config.trees.dip).mul(heightMask);

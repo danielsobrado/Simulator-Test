@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPlayerState, stepPlayerPhysics } from '../src/editor/player/PlayerPhysics.js';
+import { isSwimmingWaterState } from '../src/editor/player/PlayerWaterState.js';
 import { getCanonicalWater } from '../src/editor/water/TerrainWaterQueries.js';
 import { createWaterSample } from '../src/editor/water/WaterSample.js';
 
@@ -46,7 +47,12 @@ test('swimmers drift with the bounded canonical current when idle', () => {
     getGroundHeight: () => 0,
     getWaterSample: () => riverSample,
   });
-  assert.equal(next.waterState, 'swimming');
+  // A 2 m river is over the player's head on the first step, before buoyancy
+  // has lifted them: the state is `submerged`, which still swims and so still
+  // drifts. Assert the class rather than the label so buoyancy tuning does not
+  // rewrite a test about currents.
+  assert.ok(isSwimmingWaterState(next.waterState), `unexpected water state ${next.waterState}`);
+  assert.equal(next.headSubmerged, true);
   assert.ok(Math.abs(next.x - 0.1) < 1e-9);
 });
 
