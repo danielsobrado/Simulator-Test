@@ -75,9 +75,9 @@ export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
     maxChunkX: assertSafeChunkCoordinate(
       Math.floor((aabb.maxX + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
     ),
-    minChunkZ: assertSafeChunkCoordinate(Math.floor((-aabb.maxZ) / chunkWorldSize)),
+    minChunkZ: assertSafeChunkCoordinate(Math.floor((-aabb.maxZ + 0) / chunkWorldSize)),
     maxChunkZ: assertSafeChunkCoordinate(
-      Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
+      Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON + 0) / chunkWorldSize),
     ),
   });
 }

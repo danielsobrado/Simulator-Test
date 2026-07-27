@@ -142,7 +142,8 @@ export function createStylizedWaterMaterial({
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,
-    side: THREE.FrontSide,
+    // Side is assigned by StylizedWaterSlot (DoubleSide) so the surface stays
+    // visible from underwater. Do not set FrontSide here.
   });
   material.positionNode = positionLocal.add(vec3(0, 0, surfaceHeight));
   material.colorNode = color;

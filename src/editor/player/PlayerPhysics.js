@@ -11,6 +11,8 @@ import {
 
 const UP_NORMAL = Object.freeze({ x: 0, y: 1, z: 0 });
 const EMPTY_CONTACTS = Object.freeze([]);
+/** Allows a short overshoot past configured verticalSwimSpeed before drag settles it. */
+const VERTICAL_SWIM_SPEED_OVERSHOOT = 1.5;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -76,7 +78,7 @@ function applySwimmingVertical({
     ? (targetY - state.y) * waterConfig.buoyancy
     : 0;
   const dragAcceleration = (desiredVelocity - state.verticalVelocity) * waterConfig.swimDrag;
-  const maximumVelocity = waterConfig.verticalSwimSpeed * 1.5;
+  const maximumVelocity = waterConfig.verticalSwimSpeed * VERTICAL_SWIM_SPEED_OVERSHOOT;
   let verticalVelocity = clamp(
     state.verticalVelocity + (springAcceleration + dragAcceleration) * delta,
     -maximumVelocity,

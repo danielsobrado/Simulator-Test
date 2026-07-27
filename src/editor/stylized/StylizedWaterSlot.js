@@ -44,6 +44,7 @@ export class StylizedWaterSlot {
       time: this.time,
       config,
     });
+    // W3: keep the water surface visible from below while submerged.
     this.material.side = THREE.DoubleSide;
     this.material.needsUpdate = true;
     this.mesh = new THREE.Mesh(terrainView.geometry, this.material);

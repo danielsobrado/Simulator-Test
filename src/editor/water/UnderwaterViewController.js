@@ -26,7 +26,9 @@ export class UnderwaterViewController {
     this.surfaceBackground = cloneColor(this.scene.background, '#0a100c');
     this.surfaceFogColor = cloneColor(this.scene.fog?.color, '#9ab4c0');
     this.surfaceFogDensity = this.scene.fog?.density ?? 0;
-    this.surfaceFogExists = Boolean(this.scene.fog?.isFogExp2);
+    // Latch existence once. Diving creates a temporary FogExp2; re-reading
+    // existence from the live scene after surfacing would leak that fog forever.
+    this.originalFogExists = Boolean(this.scene.fog?.isFogExp2);
     this.surfaceNearPlane = this.camera.near;
     this.surfaceHemisphereIntensity = this.hemisphere?.intensity ?? 0;
     this.surfaceDirectionalIntensity = this.directional?.intensity ?? 0;
@@ -51,8 +53,7 @@ export class UnderwaterViewController {
   captureSurfaceEnvironment() {
     if (this.blend > 0) return;
     this.surfaceBackground.copy(cloneColor(this.scene.background, '#0a100c'));
-    this.surfaceFogExists = Boolean(this.scene.fog?.isFogExp2);
-    if (this.surfaceFogExists) {
+    if (this.originalFogExists && this.scene.fog?.isFogExp2) {
       this.surfaceFogColor.copy(this.scene.fog.color);
       this.surfaceFogDensity = this.scene.fog.density;
     }
@@ -132,7 +133,7 @@ export class UnderwaterViewController {
   restoreSurfaceEnvironment() {
     this.blend = 0;
     this.scene.background = this.surfaceBackground;
-    if (this.surfaceFogExists) {
+    if (this.originalFogExists) {
       if (!this.scene.fog?.isFogExp2) {
         this.scene.fog = new THREE.FogExp2(this.surfaceFogColor, this.surfaceFogDensity);
       }

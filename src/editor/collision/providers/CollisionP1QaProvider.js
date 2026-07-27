@@ -82,8 +82,12 @@ function colliderForEntry(entry, groundHeight, chunkWorldSize) {
 }
 
 export function createCollisionP1QaProvider({ terrainView, playerConfig, collisionConfig }) {
+  const stepHeight = playerConfig?.stepHeight;
+  if (!(stepHeight > 0)) {
+    throw new Error('Collision P1 QA provider requires a positive player.stepHeight.');
+  }
   const descriptor = createCollisionP0QaFixture({
-    stepHeight: playerConfig.stepHeight,
+    stepHeight,
     maxSlopeDegrees: collisionConfig.player.maxSlopeDegrees,
     chunkWorldSize: terrainView.chunkWorldSize,
   });

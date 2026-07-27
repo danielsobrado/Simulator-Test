@@ -84,8 +84,12 @@ export function createCollisionP0QaScene({ terrainView, playerConfig, collisionC
   if (!terrainView?.scene || !terrainView?.floatingOrigin) {
     throw new Error('Collision P0 QA scene requires an initialized terrain view.');
   }
+  const stepHeight = playerConfig?.stepHeight;
+  if (!(stepHeight > 0)) {
+    throw new Error('Collision P0 QA scene requires a positive player.stepHeight.');
+  }
   const descriptor = createCollisionP0QaFixture({
-    stepHeight: playerConfig.stepHeight,
+    stepHeight,
     maxSlopeDegrees: collisionConfig.player.maxSlopeDegrees,
     chunkWorldSize: terrainView.chunkWorldSize,
   });

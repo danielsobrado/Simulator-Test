@@ -39,9 +39,13 @@ function compareColliderSourceIds(left, right) {
 }
 
 function assertBinAllocation(chunkWorldSize, binSize) {
+  // Match CollisionSpatialBins: reject when columns × rows exceeds the bin cap.
+  // Standard chunks are square, so columns === rows, but keep the general form.
   const columns = Math.max(1, Math.ceil(chunkWorldSize / binSize));
+  const rows = columns;
   if (!Number.isSafeInteger(columns)
-      || columns > Math.floor(MAX_COLLISION_BINS_PER_CHUNK / columns)) {
+      || !Number.isSafeInteger(rows)
+      || columns > Math.floor(MAX_COLLISION_BINS_PER_CHUNK / rows)) {
     throw new Error(
       `Collision binSize creates more than ${MAX_COLLISION_BINS_PER_CHUNK} bins per chunk.`,
     );
