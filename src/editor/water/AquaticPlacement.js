@@ -1,4 +1,4 @@
-import { WATER_KIND_NONE } from './WaterConstants.js';
+import { WATER_KIND_NONE, WATER_KINDS } from './WaterConstants.js';
 
 export const AQUATIC_PLACEMENT_ROOTED = 'rooted';
 export const AQUATIC_PLACEMENT_SURFACE = 'surface';
@@ -16,12 +16,19 @@ const DEFAULT_RULE = Object.freeze({
   minimumShoreDistance: 0,
   maximumShoreDistance: Number.POSITIVE_INFINITY,
   maximumCurrent: Number.POSITIVE_INFINITY,
-  minimumCurrent: 0,
   allowedKinds: null,
 });
 
 function finiteOr(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function resolveAllowedKinds(value) {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value) || value.length === 0 || value.some((kind) => !WATER_KINDS.includes(kind))) {
+    throw new Error('Aquatic allowedKinds must contain supported water kinds.');
+  }
+  return Object.freeze([...new Set(value)]);
 }
 
 export function resolveAquaticPlacementRule(layerRule = null, prototypeRule = null) {
@@ -41,10 +48,7 @@ export function resolveAquaticPlacementRule(layerRule = null, prototypeRule = nu
     minimumShoreDistance: finiteOr(source.minimumShoreDistance, DEFAULT_RULE.minimumShoreDistance),
     maximumShoreDistance: finiteOr(source.maximumShoreDistance, DEFAULT_RULE.maximumShoreDistance),
     maximumCurrent: finiteOr(source.maximumCurrent, DEFAULT_RULE.maximumCurrent),
-    minimumCurrent: finiteOr(source.minimumCurrent, DEFAULT_RULE.minimumCurrent),
-    allowedKinds: Array.isArray(source.allowedKinds)
-      ? Object.freeze([...new Set(source.allowedKinds)])
-      : null,
+    allowedKinds: resolveAllowedKinds(source.allowedKinds),
   };
   if (rule.minimumCoverage < 0 || rule.minimumCoverage > 1) {
     throw new Error('Aquatic minimumCoverage must be within [0, 1].');
@@ -52,11 +56,13 @@ export function resolveAquaticPlacementRule(layerRule = null, prototypeRule = nu
   for (const [minimum, maximum, label] of [
     [rule.minimumDepth, rule.maximumDepth, 'depth'],
     [rule.minimumShoreDistance, rule.maximumShoreDistance, 'shore distance'],
-    [rule.minimumCurrent, rule.maximumCurrent, 'current'],
   ]) {
     if (minimum < 0 || maximum < minimum) {
       throw new Error(`Aquatic ${label} range is invalid.`);
     }
+  }
+  if (rule.maximumCurrent < 0) {
+    throw new Error('Aquatic maximumCurrent must be non-negative.');
   }
   return Object.freeze(rule);
 }
@@ -70,7 +76,6 @@ export function evaluateAquaticPlacement({ waterSample, layerRule = null, protot
       || waterSample.depth > rule.maximumDepth
       || waterSample.shoreDistance < rule.minimumShoreDistance
       || waterSample.shoreDistance > rule.maximumShoreDistance
-      || current < rule.minimumCurrent
       || current > rule.maximumCurrent
       || (rule.allowedKinds && !rule.allowedKinds.includes(waterSample.kind))) {
     return null;
