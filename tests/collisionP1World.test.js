@@ -118,6 +118,76 @@ test('equal or stale owner revisions cannot overwrite valid data', () => {
   assert.equal(world.getCollider(conflicting.sourceId), null);
 });
 
+test('colliders must overlap their declared canonical owner chunk', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const wrongOwner = box({
+    sourceId: 'qa:wrong-owner',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 132,
+    maxX: 136,
+    minZ: -8,
+    maxZ: -4,
+  });
+  assert.throws(
+    () => world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [wrongOwner] }),
+    /does not overlap its canonical owner chunk/,
+  );
+  assert.equal(world.getStatus().colliders, 0);
+});
+
+test('colliders spanning too many chunks are rejected atomically', () => {
+  const world = new CollisionWorld({
+    chunkWorldSize: 128,
+    binSize: 16,
+    maxChunksPerCollider: 2,
+  });
+  const oversized = box({
+    sourceId: 'qa:oversized',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 1,
+    maxX: 300,
+    minZ: -8,
+    maxZ: -4,
+  });
+  assert.throws(
+    () => world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [oversized] }),
+    /exceeding the limit of 2/,
+  );
+  assert.equal(world.getStatus().colliders, 0);
+  assert.equal(world.getStatus().activeChunks, 0);
+});
+
+test('candidate order is stable regardless of owner build order', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const laterLexically = box({
+    sourceId: 'qa:z-last',
+    ownerChunkX: 1,
+    ownerChunkZ: 0,
+    minX: 132,
+    maxX: 136,
+    minZ: -8,
+    maxZ: -4,
+  });
+  const earlierLexically = box({
+    sourceId: 'qa:a-first',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 4,
+    maxX: 8,
+    minZ: -8,
+    maxZ: -4,
+  });
+  world.replaceOwnerChunk({ chunkX: 1, chunkZ: 0, revision: 1, colliders: [laterLexically] });
+  world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [earlierLexically] });
+
+  assert.deepEqual(
+    world.collectCandidates(queryBounds(0, 140, -12, 0)).map((entry) => entry.sourceId),
+    ['qa:a-first', 'qa:z-last'],
+  );
+});
+
 test('candidate queries inspect active chunks instead of enumerating world distance', () => {
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
   const record = box({
@@ -168,4 +238,26 @@ test('negative canonical chunks, unloading, and floating origin remain determini
   world.unloadOwnerChunk(-1, -1);
   assert.equal(world.getCollider('qa:negative'), null);
   assert.equal(world.collectCandidates(queryBounds(-13, -7, 7, 13)).length, 0);
+});
+
+test('dispose clears live and last-query status', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const record = box({
+    sourceId: 'qa:dispose',
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    minX: 4,
+    maxX: 8,
+    minZ: -8,
+    maxZ: -4,
+  });
+  world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [record] });
+  world.collectCandidates(queryBounds(3, 9, -9, -3));
+  world.dispose();
+
+  const status = world.getStatus();
+  assert.equal(status.activeChunks, 0);
+  assert.equal(status.colliders, 0);
+  assert.equal(status.lastQueryCandidates, 0);
+  assert.equal(status.lastQueryChunks, 0);
 });
