@@ -14,6 +14,11 @@ const thresholds = {
   clusterPixels: 0.45,
 };
 
+function ditherVisible(representation, threshold) {
+  const oriented = representation.ditherDirection < 0 ? 1 - threshold : threshold;
+  return oriented <= representation.fade;
+}
+
 test('clusterPixels 0 disables the aggregate canopy band instead of matching everything', () => {
   // `pixels >= 0` is true for every tree, so a naive threshold read would turn the
   // whole world into cluster blobs — the band has to drop out entirely.
@@ -78,9 +83,31 @@ test('LOD transitions draw both representations until complete', () => {
   const halfway = updateLodTransition({ state: started, target: 'proxy', timestamp: 650, durationMs: 300 });
   assert.equal(halfway.representations.length, 2);
   assert.equal(halfway.representations[0].band, 'near');
+  assert.equal(halfway.representations[0].ditherDirection, -1);
   assert.equal(halfway.representations[1].band, 'proxy');
+  assert.equal(halfway.representations[1].ditherDirection, 1);
   const done = updateLodTransition({ state: halfway, target: 'proxy', timestamp: 850, durationMs: 300 });
-  assert.deepEqual(done.representations, [{ band: 'proxy', fade: 1 }]);
+  assert.deepEqual(done.representations, [{
+    band: 'proxy',
+    fade: 1,
+    ditherDirection: 1,
+  }]);
+});
+
+test('incoming and outgoing masks are complementary throughout a transition', () => {
+  const initial = updateLodTransition({ state: null, target: 'near', timestamp: 0, durationMs: 400 });
+  const settled = updateLodTransition({ state: initial, target: 'near', timestamp: 500, durationMs: 400 });
+  const started = updateLodTransition({ state: settled, target: 'proxy', timestamp: 600, durationMs: 400 });
+  const quarter = updateLodTransition({ state: started, target: 'proxy', timestamp: 700, durationMs: 400 });
+  const [outgoing, incoming] = quarter.representations;
+
+  assert.equal(outgoing.fade, 0.75);
+  assert.equal(incoming.fade, 0.25);
+  for (const threshold of [0.05, 0.15, 0.35, 0.55, 0.75, 0.95]) {
+    const coverage = Number(ditherVisible(outgoing, threshold))
+      + Number(ditherVisible(incoming, threshold));
+    assert.equal(coverage, 1, `threshold ${threshold} must be covered exactly once`);
+  }
 });
 
 test('newly resident LOD bands fade in from culled', () => {
@@ -92,7 +119,7 @@ test('newly resident LOD bands fade in from culled', () => {
   });
   assert.equal(state.complete, false);
   assert.deepEqual(state.representations, [
-    { band: 'culled', fade: 1 },
-    { band: 'cluster', fade: 0 },
+    { band: 'culled', fade: 1, ditherDirection: -1 },
+    { band: 'cluster', fade: 0, ditherDirection: 1 },
   ]);
 });
