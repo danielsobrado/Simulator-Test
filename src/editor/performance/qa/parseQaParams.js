@@ -62,6 +62,18 @@ const SCENARIOS = Object.freeze({
       yawDegrees: 0,
     },
   },
+  'collision-p4': {
+    id: 'collision-p4',
+    label: 'Collision P4 production rock primitive',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 4,
+      speed: 'run',
+      warmup: 8,
+      spawn: { x: 0, z: 0 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {

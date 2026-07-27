@@ -4,12 +4,15 @@ import { CollisionResidency } from './CollisionResidency.js';
 import { CollisionWorld } from './CollisionWorld.js';
 import { createSweptCapsuleAabb } from './colliders/ColliderBounds.js';
 import { createCollisionP1QaProvider } from './providers/CollisionP1QaProvider.js';
+import { NaturalCollisionProvider } from './providers/NaturalCollisionProvider.js';
+import { RockCollisionProvider } from './providers/RockCollisionProvider.js';
+import { createRockCollisionSource } from './providers/RockCollisionSource.js';
 import { TreeCollisionProvider } from './providers/TreeCollisionProvider.js';
 import { createTreeCollisionSource } from './providers/TreeCollisionSource.js';
 
 const EMPTY_COLLIDERS = Object.freeze([]);
 const FIXTURE_QA_SCENARIOS = new Set(['collision-p1', 'collision-p2']);
-const COLLISION_QA_SCENARIOS = new Set([...FIXTURE_QA_SCENARIOS, 'collision-p3']);
+const COLLISION_QA_SCENARIOS = new Set([...FIXTURE_QA_SCENARIOS, 'collision-p3', 'collision-p4']);
 
 function hasDebugEnabled(debug) {
   return Object.values(debug).some(Boolean);
@@ -21,12 +24,48 @@ function qaScenario(search) {
   return COLLISION_QA_SCENARIOS.has(scenario) ? scenario : null;
 }
 
+function residencyConfig(streaming, activeQaScenario) {
+  if (activeQaScenario !== 'collision-p4') return streaming;
+  return Object.freeze({
+    ...streaming,
+    residentRadius: Math.max(streaming.residentRadius, 2),
+    unloadRadius: Math.max(streaming.unloadRadius, 3),
+  });
+}
+
 function createEmptyProvider() {
   return Object.freeze({
     descriptor: null,
     buildOwnerChunk: () => Object.freeze({ revision: 0, colliders: EMPTY_COLLIDERS }),
     getStatus: () => Object.freeze({ id: 'empty', colliderCount: 0 }),
   });
+}
+
+function createNaturalComponents({ treeSource, collisionConfig }) {
+  const components = [];
+  if (collisionConfig.trees.enabled && treeSource?.treeView) {
+    const provider = new TreeCollisionProvider({
+      source: createTreeCollisionSource({
+        treeView: treeSource.treeView,
+        rockSource: treeSource.rockSource,
+        config: collisionConfig.trees,
+      }),
+      buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
+      buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
+    });
+    components.push(Object.freeze({ id: 'trees', counterName: 'Tree', provider }));
+  }
+  if (collisionConfig.rocks.enabled && treeSource?.rockSource) {
+    const provider = new RockCollisionProvider({
+      source: createRockCollisionSource({
+        rockView: treeSource.rockSource,
+        config: collisionConfig.rocks,
+      }),
+      config: collisionConfig.rocks,
+    });
+    components.push(Object.freeze({ id: 'rocks', counterName: 'Rock', provider }));
+  }
+  return components;
 }
 
 function createProvider({
@@ -43,18 +82,13 @@ function createProvider({
       collisionConfig,
     });
   }
-  if (collisionConfig.trees.enabled && treeSource) {
-    return new TreeCollisionProvider({
-      source: createTreeCollisionSource({
-        treeView: treeSource.treeView,
-        rockSource: treeSource.rockSource,
-        config: collisionConfig.trees,
-      }),
-      buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
-      buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
-    });
-  }
-  return createEmptyProvider();
+  const components = createNaturalComponents({ treeSource, collisionConfig });
+  if (components.length === 0) return createEmptyProvider();
+  return new NaturalCollisionProvider({
+    components,
+    buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
+    buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
+  });
 }
 
 export function shouldCreateCollisionRuntime(collisionConfig, search = '') {
@@ -86,8 +120,10 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
   });
   const residency = new CollisionResidency({
     world,
-    config: collisionConfig.streaming,
+    config: residencyConfig(collisionConfig.streaming, activeQaScenario),
     buildOwnerChunk: provider.buildOwnerChunk.bind(provider),
+    onOwnerChunkCommitted: provider.commitOwnerChunk?.bind(provider) ?? null,
+    onOwnerChunkUnloaded: provider.unloadOwnerChunk?.bind(provider) ?? null,
   });
   const debugView = debug.colliders || debug.broadphase
     ? new CollisionDebugView({

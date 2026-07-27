@@ -6,14 +6,15 @@ import { TerrainCollisionProvider } from './providers/TerrainCollisionProvider.j
 const params = new URLSearchParams(window.location.search);
 const qaScenario = params.get('qa');
 const fixtureQa = qaScenario === 'collision-p1' || qaScenario === 'collision-p2';
-const qaMode = fixtureQa || qaScenario === 'collision-p3';
+const productionQa = qaScenario === 'collision-p3' || qaScenario === 'collision-p4';
+const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
 let player = null;
 let frameId = null;
 let sampleCandidateIds = null;
-let p3Target = null;
-let p3Positioned = false;
+let qaTarget = null;
+let targetPositioned = false;
 let disposed = false;
 
 function publish(status) {
@@ -25,11 +26,12 @@ function publish(status) {
     motor: motor?.getStatus() ?? null,
     player: player?.getStatus() ?? null,
     sampleCandidateIds,
-    target: p3Target,
+    target: qaTarget,
   });
   if (qaScenario === 'collision-p1') window.__collisionP1Qa = payload;
   if (qaScenario === 'collision-p2') window.__collisionP2Qa = payload;
   if (qaScenario === 'collision-p3') window.__collisionP3Qa = payload;
+  if (qaScenario === 'collision-p4') window.__collisionP4Qa = payload;
 }
 
 function sampleCandidates() {
@@ -45,14 +47,20 @@ function sampleCandidates() {
   }).map((collider) => collider.sourceId));
 }
 
-function positionP3Player(status) {
-  if (qaScenario !== 'collision-p3' || p3Positioned) return false;
-  const sample = status.provider?.sample;
+function productionSample(status) {
+  if (qaScenario === 'collision-p3') return status.provider?.sample ?? null;
+  if (qaScenario === 'collision-p4') return status.provider?.rockSample ?? null;
+  return null;
+}
+
+function positionProductionPlayer(status) {
+  if (!productionQa || targetPositioned) return false;
+  const sample = productionSample(status);
   if (!sample) return false;
   const distance = sample.radius + motor.config.radius + 1.5;
   const render = player.terrainView.floatingOrigin.toRender(sample.x, sample.z + distance);
-  p3Target = Object.freeze({ ...sample });
-  p3Positioned = true;
+  qaTarget = Object.freeze({ ...sample });
+  targetPositioned = true;
   player.setPose({ x: render.x, z: render.z, yaw: 0, pitch: 0 });
   return true;
 }
@@ -65,8 +73,9 @@ function updateQa() {
   }
   const status = runtime?.getStatus();
   if (status?.residency.ready) {
-    if (positionP3Player(status)) {
-      publish('positioning');
+    if (productionQa && !qaTarget) {
+      if (positionProductionPlayer(status)) publish('positioning');
+      else publish(qaScenario === 'collision-p4' ? 'waiting-rocks' : 'waiting-trees');
     } else {
       sampleCandidates();
       publish('ready');
@@ -79,10 +88,11 @@ function updateQa() {
 
 function attach({ player: nextPlayer, collisionConfig, treeSource }) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
-  const requiresTrees = qaScenario === 'collision-p3'
-    || (!fixtureQa && collisionConfig.enabled && collisionConfig.trees.enabled);
-  if (requiresTrees && !treeSource) {
-    publish('waiting-trees');
+  const requiresNaturalSource = productionQa
+    || (!fixtureQa && collisionConfig.enabled
+      && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled));
+  if (requiresNaturalSource && !treeSource) {
+    publish('waiting-natural-props');
     return;
   }
 

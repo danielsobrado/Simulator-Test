@@ -6,6 +6,8 @@ const COLORS = Object.freeze({
   bin: 0x6f7f91,
   blocking: 0xff6655,
   walkable: 0x55dd88,
+  rockBlocking: 0xff9f43,
+  rockWalkablePending: 0xb084ff,
 });
 const PROTOTYPE_COLORS = Object.freeze([
   0xff7b72,
@@ -29,6 +31,12 @@ function prototypeColor(prototypeId) {
 }
 
 function colliderColor(collider) {
+  if (collider.prototypeId?.startsWith('rock-tier-walkable:')) {
+    return COLORS.rockWalkablePending;
+  }
+  if (collider.prototypeId?.startsWith('rock-tier-blocking:')) {
+    return COLORS.rockBlocking;
+  }
   const byPrototype = prototypeColor(collider.prototypeId);
   if (byPrototype !== null) return byPrototype;
   return (collider.layers & COLLISION_LAYER_WALKABLE) !== 0
