@@ -1,6 +1,7 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey } from './CollisionIds.js';
 import { COLLISION_LAYERS } from './CollisionLayers.js';
+import { MAX_COLLIDER_CHUNKS } from './CollisionLimits.js';
 import { CollisionChunk } from './CollisionChunk.js';
 import {
   canonicalAabbsIntersect,
@@ -8,6 +9,7 @@ import {
   collisionChunkRangeForAabb,
   collisionChunksForAabb,
 } from './colliders/ColliderBounds.js';
+import { COLLIDER_TYPE_MESH_INSTANCE } from './colliders/ColliderRecords.js';
 
 const MAX_REPORTED_MISSING_CHUNKS = 64;
 
@@ -29,6 +31,15 @@ function compareColliderSourceIds(left, right) {
   return 0;
 }
 
+function assertPrototypeDescriptor(prototype) {
+  if (!prototype || typeof prototype !== 'object' || typeof prototype.id !== 'string'
+      || !prototype.id || !Object.isFrozen(prototype)
+      || !Object.isFrozen(prototype.bounds)
+      || !Object.isFrozen(prototype.metadata)) {
+    throw new Error('Collision prototype must be an immutable descriptor.');
+  }
+}
+
 export class CollisionWorld {
   constructor({
     chunkWorldSize,
@@ -36,13 +47,21 @@ export class CollisionWorld {
     maxBinsPerCollider = 64,
     maxChunksPerCollider = 64,
   }) {
-    if (!(chunkWorldSize > 0)) throw new Error('Collision chunkWorldSize must be positive.');
-    if (!(binSize > 0)) throw new Error('Collision binSize must be positive.');
+    if (!Number.isFinite(chunkWorldSize) || chunkWorldSize <= 0) {
+      throw new Error('Collision chunkWorldSize must be positive and finite.');
+    }
+    if (!Number.isFinite(binSize) || binSize <= 0) {
+      throw new Error('Collision binSize must be positive and finite.');
+    }
     if (!Number.isSafeInteger(maxBinsPerCollider) || maxBinsPerCollider < 1) {
       throw new Error('Collision maxBinsPerCollider must be a positive safe integer.');
     }
-    if (!Number.isSafeInteger(maxChunksPerCollider) || maxChunksPerCollider < 1) {
-      throw new Error('Collision maxChunksPerCollider must be a positive safe integer.');
+    if (!Number.isSafeInteger(maxChunksPerCollider)
+        || maxChunksPerCollider < 1
+        || maxChunksPerCollider > MAX_COLLIDER_CHUNKS) {
+      throw new Error(
+        `Collision maxChunksPerCollider must be within 1 and ${MAX_COLLIDER_CHUNKS}.`,
+      );
     }
     this.chunkWorldSize = chunkWorldSize;
     this.binSize = binSize;
@@ -62,6 +81,7 @@ export class CollisionWorld {
   }
 
   registerPrototype(prototype) {
+    assertPrototypeDescriptor(prototype);
     const previous = this.prototypes.get(prototype.id);
     if (previous && previous !== prototype) {
       throw new Error(`Collision prototype ${prototype.id} is already registered.`);
@@ -94,6 +114,12 @@ export class CollisionWorld {
       }
       if (!canonicalAabbsIntersect(collider.aabb, ownerBounds)) {
         throw new Error(`Collider ${collider.sourceId} does not overlap its canonical owner chunk.`);
+      }
+      if (collider.type === COLLIDER_TYPE_MESH_INSTANCE
+          && !this.prototypes.has(collider.prototypeId)) {
+        throw new Error(
+          `Mesh collider ${collider.sourceId} references unknown prototype ${collider.prototypeId}.`,
+        );
       }
       if (sourceIds.has(collider.sourceId)) {
         throw new Error(`Duplicate collider source id in owner chunk: ${collider.sourceId}.`);
