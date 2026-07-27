@@ -2,6 +2,7 @@ import { Box3, Matrix4, Quaternion, Vector3 } from 'three';
 
 const EPSILON = 1e-6;
 const MATRIX_ELEMENTS = 16;
+const TRANSFORM_CACHE = new WeakMap();
 
 const LOCAL_BOX = new Box3();
 const WORLD_BOX = new Box3();
@@ -18,17 +19,22 @@ function matrixFromArray(transform) {
 }
 
 export function createMeshInstanceTransform(transform) {
+  const cached = Object.isFrozen(transform) ? TRANSFORM_CACHE.get(transform) : null;
+  if (cached) return cached;
+
   const matrix = matrixFromArray(transform);
   matrix.decompose(POSITION, QUATERNION, SCALE);
-  const uniformScale = (Math.abs(SCALE.x) + Math.abs(SCALE.y) + Math.abs(SCALE.z)) / 3;
-  if (!(uniformScale > EPSILON)
-      || Math.abs(Math.abs(SCALE.x) - uniformScale) > EPSILON
-      || Math.abs(Math.abs(SCALE.y) - uniformScale) > EPSILON
-      || Math.abs(Math.abs(SCALE.z) - uniformScale) > EPSILON) {
+  const uniformScale = (SCALE.x + SCALE.y + SCALE.z) / 3;
+  if (!(SCALE.x > EPSILON) || !(SCALE.y > EPSILON) || !(SCALE.z > EPSILON)
+      || Math.abs(SCALE.x - uniformScale) > EPSILON
+      || Math.abs(SCALE.y - uniformScale) > EPSILON
+      || Math.abs(SCALE.z - uniformScale) > EPSILON) {
     throw new Error('Mesh collider instances require a positive uniform scale.');
   }
   const inverse = matrix.clone().invert();
-  return Object.freeze({ matrix, inverse, scale: uniformScale });
+  const resolved = Object.freeze({ matrix, inverse, scale: uniformScale });
+  if (Object.isFrozen(transform)) TRANSFORM_CACHE.set(transform, resolved);
+  return resolved;
 }
 
 export function transformPrototypeBounds(bounds, matrix) {
