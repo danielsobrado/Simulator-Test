@@ -77,7 +77,11 @@ export class ObjectLodController {
         target: sourceBand,
         startedAt: timestamp,
         complete: true,
-        representations: Object.freeze([{ band: sourceBand, fade: 1 }]),
+        representations: Object.freeze([Object.freeze({
+          band: sourceBand,
+          fade: 1,
+          ditherDirection: 1,
+        })]),
       });
     }
   }
@@ -133,6 +137,7 @@ export class ObjectLodController {
         buckets[band].push({
           matrix: placement.matrix,
           fade: representation.fade,
+          ditherDirection: representation.ditherDirection ?? 1,
           quantizedFade: quantizeFade(representation.fade, this.fadeSteps),
           seed: stableSeed(placement.object.id),
           objectId: placement.object.id,
@@ -146,7 +151,7 @@ export class ObjectLodController {
     const signatures = {};
     for (const [band, instances] of Object.entries(buckets)) {
       signatures[band] = instances.map((instance) => (
-        `${instance.objectId}:${instance.quantizedFade}`
+        `${instance.objectId}:${instance.quantizedFade}:${instance.ditherDirection}`
       )).join('|');
     }
     this.transitioning = transitions > 0;
