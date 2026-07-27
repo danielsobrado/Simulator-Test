@@ -1,6 +1,7 @@
+import { MAX_COLLIDER_CHUNKS } from '../CollisionLimits.js';
+
 const AXES = Object.freeze(['X', 'Y', 'Z']);
 const CHUNK_BOUNDARY_EPSILON = 1e-9;
-const DEFAULT_MAX_ENUMERATED_CHUNKS = 4096;
 
 function assertFinite(value, name) {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
@@ -92,9 +93,12 @@ export function collisionChunksForAabb(
   aabb,
   chunkWorldSize,
   target = [],
-  maximumChunks = DEFAULT_MAX_ENUMERATED_CHUNKS,
+  maximumChunks = MAX_COLLIDER_CHUNKS,
 ) {
   assertPositiveSafeInteger(maximumChunks, 'maximumChunks');
+  if (maximumChunks > MAX_COLLIDER_CHUNKS) {
+    throw new Error(`maximumChunks must not exceed ${MAX_COLLIDER_CHUNKS}.`);
+  }
   target.length = 0;
   const range = collisionChunkRangeForAabb(aabb, chunkWorldSize);
   const chunkCount = collisionChunkCountForRange(range);
