@@ -31,7 +31,13 @@ export class UnderwaterViewController {
     this.surfaceDirectionalIntensity = this.directional?.intensity ?? 0;
     this.surfaceSkyVisible = this.skyMesh?.visible ?? true;
     this.surfaceCloudVisible = this.cloudMaskMesh?.visible ?? true;
-    this.surfaceGodRaysEnabled = terrainView.godRays?.enabled ?? false;
+    this.godRays = terrainView.godRays ?? null;
+    this.originalGodRaysRender = this.godRays?.render ?? null;
+    if (this.godRays && this.originalGodRaysRender) {
+      this.godRays.render = (camera) => (this.blend > 0
+        ? false
+        : this.originalGodRaysRender.call(this.godRays, camera));
+    }
     this.underwaterBackground = new THREE.Color(config.backgroundColor);
     this.underwaterFogColor = new THREE.Color(config.fogColor);
     this.appliedBackground = new THREE.Color();
@@ -50,9 +56,6 @@ export class UnderwaterViewController {
     if (this.directional) this.surfaceDirectionalIntensity = this.directional.intensity;
     if (this.skyMesh) this.surfaceSkyVisible = this.skyMesh.visible;
     if (this.cloudMaskMesh) this.surfaceCloudVisible = this.cloudMaskMesh.visible;
-    if (this.terrainView.godRays) {
-      this.surfaceGodRaysEnabled = this.terrainView.godRays.enabled;
-    }
   }
 
   setSurfaceFogDensity(value) {
@@ -85,14 +88,11 @@ export class UnderwaterViewController {
     if (this.skyMesh) this.skyMesh.visible = showSky && this.surfaceSkyVisible;
     if (this.cloudMaskMesh) this.cloudMaskMesh.visible = showSky && this.surfaceCloudVisible;
 
-    if (this.terrainView.godRays) {
-      this.terrainView.godRays.enabled = this.blend > 0
-        ? false
-        : this.surfaceGodRaysEnabled;
+    const nearPlane = mixNumber(this.surfaceNearPlane, this.config.nearPlane, this.blend);
+    if (Math.abs(this.camera.near - nearPlane) > 1e-6) {
+      this.camera.near = nearPlane;
+      this.camera.updateProjectionMatrix();
     }
-
-    this.camera.near = mixNumber(this.surfaceNearPlane, this.config.nearPlane, this.blend);
-    this.camera.updateProjectionMatrix();
   }
 
   update(timestamp) {
@@ -103,7 +103,8 @@ export class UnderwaterViewController {
     this.lastTimestamp = current;
     const status = this.playerController.getStatus();
     const submerged = status.enabled && status.headSubmerged;
-    if (this.blend === 0) this.captureSurfaceEnvironment();
+    if (this.blend === 0 && !submerged) this.captureSurfaceEnvironment();
+    if (this.blend === 0 && submerged) this.captureSurfaceEnvironment();
     this.blend = advanceUnderwaterBlend(
       this.blend,
       submerged,
@@ -134,15 +135,17 @@ export class UnderwaterViewController {
     if (this.directional) this.directional.intensity = this.surfaceDirectionalIntensity;
     if (this.skyMesh) this.skyMesh.visible = this.surfaceSkyVisible;
     if (this.cloudMaskMesh) this.cloudMaskMesh.visible = this.surfaceCloudVisible;
-    if (this.terrainView.godRays) {
-      this.terrainView.godRays.enabled = this.surfaceGodRaysEnabled;
+    if (Math.abs(this.camera.near - this.surfaceNearPlane) > 1e-6) {
+      this.camera.near = this.surfaceNearPlane;
+      this.camera.updateProjectionMatrix();
     }
-    this.camera.near = this.surfaceNearPlane;
-    this.camera.updateProjectionMatrix();
   }
 
   dispose() {
     this.restoreSurfaceEnvironment();
+    if (this.godRays && this.originalGodRaysRender) {
+      this.godRays.render = this.originalGodRaysRender;
+    }
     this.lastTimestamp = null;
   }
 }
