@@ -25,5 +25,10 @@ export function collisionChunkKey(chunkX, chunkZ) {
 export function parseCollisionChunkKey(key) {
   const match = /^(-?\d+):(-?\d+)$/.exec(String(key));
   if (!match) throw new Error(`Invalid collision chunk key: ${key}.`);
-  return Object.freeze({ chunkX: Number(match[1]), chunkZ: Number(match[2]) });
+  const chunkX = Number(match[1]);
+  const chunkZ = Number(match[2]);
+  if (!Number.isSafeInteger(chunkX) || !Number.isSafeInteger(chunkZ)) {
+    throw new Error(`Collision chunk key is outside the safe integer range: ${key}.`);
+  }
+  return Object.freeze({ chunkX, chunkZ });
 }
