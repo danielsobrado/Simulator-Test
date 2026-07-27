@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION,
+  TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING,
   TREE_IMPOSTOR_MANIFEST_VERSION,
   TREE_IMPOSTOR_NORMAL_ENCODING,
   createTreeImpostorSourceSignature,
@@ -63,6 +65,7 @@ test('validates a compatible contiguous manifest', () => {
   assert.equal(result.prototypes.length, 2);
   assert.equal(result.prototypes[1].prototypeIndex, 1);
   assert.equal(result.prototypes[1].normalEncoding, TREE_IMPOSTOR_NORMAL_ENCODING);
+  assert.equal(result.requiresRuntimeBake, false);
 });
 
 test('normalises encoding metadata produced by the bundle writer', () => {
@@ -72,20 +75,36 @@ test('normalises encoding metadata produced by the bundle writer', () => {
   assert.equal(result.prototypes[0].normalEncoding, TREE_IMPOSTOR_NORMAL_ENCODING);
 });
 
-test('rejects stale source signatures', () => {
+test('accepts legacy atlases only as runtime-bake migration inputs', () => {
+  const value = prototype();
+  delete value.normalEncoding;
+  const result = validateTreeImpostorManifest({
+    ...manifest([value]),
+    version: TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION,
+    sourceSignature: 'tree-impostor-v1-12345678',
+  }, {
+    expectedSourceSignature: 'tree-impostor-v2-deadbeef',
+  });
+
+  assert.equal(result.requiresRuntimeBake, true);
+  assert.equal(result.normalEncoding, TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING);
+  assert.equal(result.prototypes[0].normalEncoding, TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING);
+});
+
+test('rejects stale source signatures for renderable v3 assets', () => {
   assert.throws(() => validateTreeImpostorManifest(manifest(), {
     expectedSourceSignature: 'tree-impostor-v2-deadbeef',
   }), /does not match/);
 });
 
-test('rejects stale manifest versions and incompatible normal encodings', () => {
+test('rejects unsupported manifest versions and incompatible normal encodings', () => {
   assert.throws(() => validateTreeImpostorManifest({
     ...manifest(),
-    version: TREE_IMPOSTOR_MANIFEST_VERSION - 1,
+    version: TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION - 1,
   }), /unsupported/);
   assert.throws(() => validateTreeImpostorManifest(manifest([{
     ...prototype(),
-    normalEncoding: 'view-normal-rgb-coverage-a',
+    normalEncoding: TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING,
   }])), /normal encoding/);
 });
 
