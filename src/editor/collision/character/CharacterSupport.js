@@ -1,3 +1,4 @@
+import { COLLIDER_TYPE_MESH_INSTANCE } from '../colliders/ColliderRecords.js';
 import { findPrimitiveTopSupport } from './CharacterContacts.js';
 
 const SUPPORT_EPSILON = 1e-6;
@@ -17,6 +18,7 @@ export function findCharacterSupport({
   maximumUp = 0,
   maximumDown = 0,
   maximumSlopeCosine = 0,
+  findMeshTopSupport = null,
 }) {
   if (!terrainProvider) throw new Error('Character support requires a terrain provider.');
   const terrain = terrainProvider.sample(x, z, radius);
@@ -29,13 +31,24 @@ export function findCharacterSupport({
     : null;
 
   for (const collider of candidates) {
-    const support = findPrimitiveTopSupport({
-      x,
-      z,
-      radius,
-      collider,
-      maximumSlopeCosine,
-    });
+    const support = collider.type === COLLIDER_TYPE_MESH_INSTANCE
+      ? findMeshTopSupport?.({
+        x,
+        z,
+        radius,
+        referenceY,
+        maximumUp,
+        maximumDown,
+        maximumSlopeCosine,
+        collider,
+      }) ?? null
+      : findPrimitiveTopSupport({
+        x,
+        z,
+        radius,
+        collider,
+        maximumSlopeCosine,
+      });
     if (!support
         || !withinSupportWindow(support.height, referenceY, maximumUp, maximumDown)) {
       continue;
