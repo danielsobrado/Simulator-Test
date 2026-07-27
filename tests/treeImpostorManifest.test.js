@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION,
+  TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING,
   TREE_IMPOSTOR_MANIFEST_VERSION,
+  TREE_IMPOSTOR_NORMAL_ENCODING,
   createTreeImpostorSourceSignature,
   validateTreeImpostorManifest,
 } from '../src/editor/stylized/impostor/TreeImpostorManifest.js';
@@ -20,6 +23,7 @@ function prototype(index = 0) {
     depth: 6,
     centerY: 4.5,
     radius: 5,
+    normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
     albedo: `/assets/impostors/trees/prototype-${index}-albedo.png`,
     normal: `/assets/impostors/trees/prototype-${index}-normal.png`,
   };
@@ -29,7 +33,7 @@ function manifest(prototypes = [prototype()]) {
   return {
     version: TREE_IMPOSTOR_MANIFEST_VERSION,
     generatedAt: '2026-07-23T00:00:00.000Z',
-    sourceSignature: 'tree-impostor-v1-12345678',
+    sourceSignature: 'tree-impostor-v2-12345678',
     prototypes,
   };
 }
@@ -60,12 +64,48 @@ test('validates a compatible contiguous manifest', () => {
   });
   assert.equal(result.prototypes.length, 2);
   assert.equal(result.prototypes[1].prototypeIndex, 1);
+  assert.equal(result.prototypes[1].normalEncoding, TREE_IMPOSTOR_NORMAL_ENCODING);
+  assert.equal(result.requiresRuntimeBake, false);
 });
 
-test('rejects stale source signatures', () => {
+test('normalises encoding metadata produced by the bundle writer', () => {
+  const value = prototype();
+  delete value.normalEncoding;
+  const result = validateTreeImpostorManifest(manifest([value]));
+  assert.equal(result.prototypes[0].normalEncoding, TREE_IMPOSTOR_NORMAL_ENCODING);
+});
+
+test('accepts legacy atlases only as runtime-bake migration inputs', () => {
+  const value = prototype();
+  delete value.normalEncoding;
+  const result = validateTreeImpostorManifest({
+    ...manifest([value]),
+    version: TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION,
+    sourceSignature: 'tree-impostor-v1-12345678',
+  }, {
+    expectedSourceSignature: 'tree-impostor-v2-deadbeef',
+  });
+
+  assert.equal(result.requiresRuntimeBake, true);
+  assert.equal(result.normalEncoding, TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING);
+  assert.equal(result.prototypes[0].normalEncoding, TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING);
+});
+
+test('rejects stale source signatures for renderable v3 assets', () => {
   assert.throws(() => validateTreeImpostorManifest(manifest(), {
-    expectedSourceSignature: 'tree-impostor-v1-deadbeef',
+    expectedSourceSignature: 'tree-impostor-v2-deadbeef',
   }), /does not match/);
+});
+
+test('rejects unsupported manifest versions and incompatible normal encodings', () => {
+  assert.throws(() => validateTreeImpostorManifest({
+    ...manifest(),
+    version: TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION - 1,
+  }), /unsupported/);
+  assert.throws(() => validateTreeImpostorManifest(manifest([{
+    ...prototype(),
+    normalEncoding: TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING,
+  }])), /normal encoding/);
 });
 
 test('rejects missing or non-contiguous prototypes', () => {
@@ -86,6 +126,7 @@ test('source signature changes with geometry or bake configuration', () => {
   const configChanged = createTreeImpostorSourceSignature([
     [{ kind: 'leaf', geometry: geometry(1), sourceMap: null }],
   ], { ...config, lod: { impostor: { columns: 16 } } });
+  assert.match(first, /^tree-impostor-v2-/);
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });

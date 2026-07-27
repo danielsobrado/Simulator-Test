@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { normalizeBaseUrl, resolveAssetUrl } from '../../assets/assetUrl.js';
 import {
   TREE_IMPOSTOR_MANIFEST_VERSION,
+  TREE_IMPOSTOR_NORMAL_ENCODING,
   validateTreeImpostorManifest,
 } from './TreeImpostorManifest.js';
 
@@ -99,6 +100,12 @@ export class TreeImpostorAssetLoader {
       expectedPrototypeCount: this.expectedPrototypeCount,
       expectedSourceSignature: this.expectedSourceSignature,
     });
+    if (manifest.requiresRuntimeBake) {
+      console.info(
+        `[tree-impostor] Manifest v${manifest.version} has no foliage mask; runtime v${TREE_IMPOSTOR_MANIFEST_VERSION} bake required.`,
+      );
+      return null;
+    }
     const assetVersion = manifest.generatedAt ?? manifest.sourceSignature;
     const resolveVersionedPath = (path) => versionAssetUrl(this.resolve(path), assetVersion);
     const results = await Promise.allSettled(manifest.prototypes.map(async (prototype) => {
@@ -130,6 +137,9 @@ export async function createTreeImpostorBundle(atlases, sourceSignature) {
     if (!atlas.albedoCanvas || !atlas.normalCanvas) {
       throw new Error('Only runtime-baked impostors can be exported as a bundle.');
     }
+    if (atlas.normalEncoding !== TREE_IMPOSTOR_NORMAL_ENCODING) {
+      throw new Error(`Tree impostor prototype ${atlas.prototypeIndex} has no foliage-mask normal atlas.`);
+    }
     prototypes.push({
       prototypeIndex: atlas.prototypeIndex,
       columns: atlas.columns,
@@ -143,6 +153,7 @@ export async function createTreeImpostorBundle(atlases, sourceSignature) {
       depth: atlas.depth,
       centerY: atlas.centerY,
       radius: atlas.radius,
+      normalEncoding: atlas.normalEncoding,
       albedoDataUrl: await canvasToDataUrl(atlas.albedoCanvas),
       normalDataUrl: await canvasToDataUrl(atlas.normalCanvas),
     });

@@ -22,6 +22,10 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import {
+  TREE_COLOR_VARIATION_MIN,
+  TREE_COLOR_VARIATION_RANGE,
+} from '../forest/TreeAppearance.js';
 import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
 
 const TWO_PI = Math.PI * 2;
@@ -80,12 +84,20 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
     rowBlend,
   );
   const albedo = blendAtlas(atlas.albedo);
-  const encodedNormal = blendAtlas(atlas.normal).rgb;
-  const viewNormal = encodedNormal.mul(2).sub(1);
+  const normalSample = blendAtlas(atlas.normal);
+  const viewNormal = normalSample.rgb.mul(2).sub(1);
   const worldNormal = normalize(
     right.mul(viewNormal.x)
       .add(up.mul(viewNormal.y))
       .add(backward.mul(viewNormal.z)),
+  );
+  const variation = parameters.z
+    .mul(TREE_COLOR_VARIATION_RANGE)
+    .add(TREE_COLOR_VARIATION_MIN);
+  const colorMultiplier = mix(
+    vec3(variation),
+    appearance.yzw.mul(variation),
+    normalSample.a,
   );
   const signedFade = parameters.y;
   const coverage = albedo.a.mul(signedFade.abs());
@@ -96,7 +108,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
-  material.colorNode = albedo.rgb.mul(appearance.yzw);
+  material.colorNode = albedo.rgb.mul(colorMultiplier);
   material.normalNode = worldNormal;
   material.opacityNode = visible;
   material.alphaTest = 0.5;

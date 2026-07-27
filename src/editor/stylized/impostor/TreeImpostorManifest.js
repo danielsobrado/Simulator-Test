@@ -1,5 +1,9 @@
-export const TREE_IMPOSTOR_MANIFEST_VERSION = 2;
+export const TREE_IMPOSTOR_MANIFEST_VERSION = 3;
+export const TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION = 2;
+export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-a';
+export const TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING = 'view-normal-rgb-coverage-a';
 
+const SOURCE_SIGNATURE_VERSION = 2;
 const REQUIRED_NUMERIC_FIELDS = Object.freeze([
   'columns',
   'rows',
@@ -94,12 +98,13 @@ export function createTreeImpostorSourceSignature(prototypes, config) {
     trees: config?.trees ?? null,
     treeVariants: config?.assets?.treeVariants ?? null,
     impostor: config?.lod?.impostor ?? null,
+    normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
   });
   let hash = hashText(0x811c9dc5, configuration);
   prototypes.forEach((parts, prototypeIndex) => {
     hash = hashText(hash, `${prototypeIndex}:${prototypeToken(parts)};`);
   });
-  return `tree-impostor-v1-${hash.toString(16).padStart(8, '0')}`;
+  return `tree-impostor-v${SOURCE_SIGNATURE_VERSION}-${hash.toString(16).padStart(8, '0')}`;
 }
 
 function assertPositiveInteger(value, field, prototypeIndex) {
@@ -120,7 +125,7 @@ function assertAssetPath(value, field, prototypeIndex) {
   }
 }
 
-function validatePrototype(prototype, expectedIndex) {
+function validatePrototype(prototype, expectedIndex, normalEncoding) {
   if (!prototype || typeof prototype !== 'object') {
     throw new Error(`Tree impostor prototype ${expectedIndex} is invalid.`);
   }
@@ -147,9 +152,14 @@ function validatePrototype(prototype, expectedIndex) {
   if (!Number.isInteger(gutter) || gutter < 0 || gutter * 2 >= prototype.tileSize) {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid gutter.`);
   }
+  if (prototype.normalEncoding && prototype.normalEncoding !== normalEncoding) {
+    throw new Error(
+      `Tree impostor prototype ${expectedIndex} has unsupported normal encoding ${prototype.normalEncoding}.`,
+    );
+  }
   assertAssetPath(prototype.albedo, 'albedo', expectedIndex);
   assertAssetPath(prototype.normal, 'normal', expectedIndex);
-  return Object.freeze({ ...prototype, gutter });
+  return Object.freeze({ ...prototype, gutter, normalEncoding });
 }
 
 export function validateTreeImpostorManifest(manifest, {
@@ -159,7 +169,8 @@ export function validateTreeImpostorManifest(manifest, {
   if (!manifest || typeof manifest !== 'object') {
     throw new Error('Tree impostor manifest is invalid.');
   }
-  if (manifest.version !== TREE_IMPOSTOR_MANIFEST_VERSION) {
+  const legacy = manifest.version === TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION;
+  if (!legacy && manifest.version !== TREE_IMPOSTOR_MANIFEST_VERSION) {
     throw new Error(
       `Tree impostor manifest version ${manifest.version} is unsupported; expected ${TREE_IMPOSTOR_MANIFEST_VERSION}.`,
     );
@@ -167,7 +178,7 @@ export function validateTreeImpostorManifest(manifest, {
   if (typeof manifest.sourceSignature !== 'string' || manifest.sourceSignature.length < 8) {
     throw new Error('Tree impostor manifest sourceSignature is invalid.');
   }
-  if (expectedSourceSignature && manifest.sourceSignature !== expectedSourceSignature) {
+  if (!legacy && expectedSourceSignature && manifest.sourceSignature !== expectedSourceSignature) {
     throw new Error('Tree impostor manifest does not match the current tree source assets.');
   }
   if (!Array.isArray(manifest.prototypes) || manifest.prototypes.length === 0) {
@@ -181,14 +192,21 @@ export function validateTreeImpostorManifest(manifest, {
       `Tree impostor manifest has ${manifest.prototypes.length} prototypes; expected ${expectedPrototypeCount}.`,
     );
   }
+  const normalEncoding = legacy
+    ? TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING
+    : TREE_IMPOSTOR_NORMAL_ENCODING;
   const ordered = [...manifest.prototypes].sort((left, right) => (
     left.prototypeIndex - right.prototypeIndex
   ));
-  const prototypes = ordered.map((prototype, index) => validatePrototype(prototype, index));
+  const prototypes = ordered.map((prototype, index) => (
+    validatePrototype(prototype, index, normalEncoding)
+  ));
   return Object.freeze({
-    version: TREE_IMPOSTOR_MANIFEST_VERSION,
+    version: manifest.version,
     generatedAt: manifest.generatedAt ?? null,
     sourceSignature: manifest.sourceSignature,
+    normalEncoding,
+    requiresRuntimeBake: legacy,
     prototypes: Object.freeze(prototypes),
   });
 }
