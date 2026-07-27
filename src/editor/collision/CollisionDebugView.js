@@ -20,6 +20,17 @@ function disposeHelper(helper) {
   helper.material?.dispose?.();
 }
 
+function colliderHeightRange(colliders) {
+  if (colliders.length === 0) return { minY: 0, maxY: 1 };
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const collider of colliders) {
+    minY = Math.min(minY, collider.aabb.minY);
+    maxY = Math.max(maxY, collider.aabb.maxY);
+  }
+  return { minY, maxY };
+}
+
 export class CollisionDebugView {
   constructor({ scene, floatingOrigin, world, debug }) {
     this.scene = scene;
@@ -48,13 +59,7 @@ export class CollisionDebugView {
 
     for (const chunk of snapshot.chunks) {
       if (this.debug.broadphase) {
-        const colliders = chunk.colliders;
-        let minY = 0;
-        let maxY = 1;
-        if (colliders.length > 0) {
-          minY = Math.min(...colliders.map((collider) => collider.aabb.minY));
-          maxY = Math.max(...colliders.map((collider) => collider.aabb.maxY));
-        }
+        const { minY, maxY } = colliderHeightRange(chunk.colliders);
         this.addHelper({
           ...chunk.bounds,
           minY,
