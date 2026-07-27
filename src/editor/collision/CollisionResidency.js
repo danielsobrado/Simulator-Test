@@ -106,7 +106,7 @@ export class CollisionResidency {
     if (typeof now !== 'function') throw new Error('Collision residency now must be a function.');
     validateResidencyConfig(config);
     this.world = world;
-    this.config = config;
+    this.config = Object.freeze({ ...config });
     this.buildOwnerChunk = buildOwnerChunk;
     this.now = now;
     this.logger = logger ?? console;
