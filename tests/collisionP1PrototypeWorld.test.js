@@ -42,7 +42,28 @@ test('world construction rejects non-finite and excessive work settings', () => 
   );
 });
 
-test('mesh colliders require a registered immutable prototype', () => {
+test('world rejects hand-built records that bypass descriptor validation', () => {
+  const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
+  const forged = Object.freeze({
+    sourceId: 'qa:forged',
+    type: 'box',
+    layers: 1,
+    ownerChunkX: 0,
+    ownerChunkZ: 0,
+    aabb: BOUNDS,
+    position: Object.freeze([6, 0, -6]),
+    rotationY: 0,
+    dimensions: Object.freeze([4, 3, 4]),
+    prototypeId: null,
+  });
+
+  assert.throws(
+    () => world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: [forged] }),
+    /validated collider records/,
+  );
+});
+
+test('mesh colliders require a registered validated prototype', () => {
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
   const collider = createMeshInstanceCollider({
     sourceId: 'rock:mesh',
@@ -58,8 +79,13 @@ test('mesh colliders require a registered immutable prototype', () => {
     /unknown prototype rock-large/,
   );
   assert.throws(
-    () => world.registerPrototype({ id: 'rock-large', bounds: BOUNDS, metadata: {} }),
-    /immutable descriptor/,
+    () => world.registerPrototype(Object.freeze({
+      id: 'rock-large',
+      kind: 'mesh',
+      bounds: BOUNDS,
+      metadata: Object.freeze({}),
+    })),
+    /created by createColliderPrototype/,
   );
 
   const prototype = createColliderPrototype({
