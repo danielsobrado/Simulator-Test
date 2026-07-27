@@ -32,6 +32,12 @@ const SCENARIOS = Object.freeze({
     keys: () => [],
     defaults: { duration: 1, speed: 'walk', warmup: 2 },
   },
+  'collision-p1': {
+    id: 'collision-p1',
+    label: 'Collision P1 broadphase residency',
+    keys: () => [],
+    defaults: { duration: 3, speed: 'walk', warmup: 3 },
+  },
 });
 
 function readNumber(params, key, fallback) {
