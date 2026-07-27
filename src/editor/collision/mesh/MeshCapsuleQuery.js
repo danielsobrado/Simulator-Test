@@ -1,5 +1,6 @@
 import { Box3, Line3, Vector3 } from 'three';
 import { INTERSECTED } from 'three-mesh-bvh';
+import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import { createMeshInstanceTransform } from './MeshInstanceTransform.js';
 
 const EPSILON = 1e-8;
@@ -20,7 +21,6 @@ function localCapsule(capsule, instance) {
   return {
     line: new Line3(lower, upper),
     radius: capsule.radius / instance.scale,
-    footY: new Vector3(capsule.x, capsule.y, capsule.z).applyMatrix4(instance.inverse).y,
   };
 }
 
@@ -28,37 +28,34 @@ function queryBoxForLine(line, radius) {
   return new Box3().setFromPoints([line.start, line.end]).expandByScalar(radius + QUERY_PADDING);
 }
 
-function transformedWorldNormal(localNormal, matrix) {
-  return localNormal.clone().transformDirection(matrix).normalize();
-}
-
 export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 0, out = {} }) {
   const resource = prototype?.resource;
   if (!resource?.bvh || resource.disposed) return null;
   const instance = createMeshInstanceTransform(collider.transform);
   const local = localCapsule(capsule, instance);
-  const localSkin = skinWidth / instance.scale;
-  const effectiveRadius = local.radius + localSkin;
+  const effectiveRadius = local.radius + skinWidth / instance.scale;
   const queryBounds = queryBoxForLine(local.line, effectiveRadius);
   const trianglePoint = new Vector3();
   const segmentPoint = new Vector3();
   const localNormal = new Vector3();
+  const worldNormal = new Vector3();
   let best = null;
+  let triangleTests = 0;
 
   resource.bvh.shapecast({
     intersectsBounds: (box) => (box.intersectsBox(queryBounds) ? INTERSECTED : false),
     intersectsTriangle: (triangle, triangleIndex) => {
+      triangleTests += 1;
       const distance = triangle.closestPointToSegment(local.line, trianglePoint, segmentPoint);
       const depth = effectiveRadius - distance;
       if (!(depth > EPSILON)) return false;
 
       localNormal.subVectors(segmentPoint, trianglePoint);
-      let worldNormal;
       if (localNormal.lengthSq() > EPSILON * EPSILON) {
-        worldNormal = transformedWorldNormal(localNormal.normalize(), instance.matrix);
+        worldNormal.copy(localNormal).normalize().transformDirection(instance.matrix).normalize();
       } else {
         triangle.getNormal(localNormal);
-        worldNormal = transformedWorldNormal(localNormal, instance.matrix);
+        worldNormal.copy(localNormal).transformDirection(instance.matrix).normalize();
       }
       const horizontal = normaliseHorizontal(worldNormal);
       if (!horizontal) return false;
@@ -76,7 +73,10 @@ export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 
     },
   });
 
+  PerfCounters.inc('collisionMeshQueries');
+  PerfCounters.inc('collisionMeshTriangleTests', triangleTests);
   if (!best) return null;
+  PerfCounters.inc('collisionMeshContacts');
   out.sourceId = collider.sourceId;
   out.collider = collider;
   out.normalX = best.normalX;
@@ -146,27 +146,32 @@ export function findMeshTopSupport({
   );
   const worldNormal = new Vector3();
   const worldPoint = new Vector3();
+  const samplePoint = new Vector3();
+  const offsets = sampleOffsets(radius);
   let best = null;
+  let triangleTests = 0;
 
   resource.bvh.shapecast({
     intersectsBounds: (box) => (box.intersectsBox(queryBounds) ? INTERSECTED : false),
     intersectsTriangle: (triangle, triangleIndex) => {
+      triangleTests += 1;
       triangle.getNormal(worldNormal);
       worldNormal.transformDirection(instance.matrix).normalize();
       if (worldNormal.y < maximumSlopeCosine) return false;
 
-      for (const [offsetX, offsetZ] of sampleOffsets(radius)) {
-        const sampleWorld = new Vector3(x + offsetX, referenceY, z + offsetZ);
-        const sampleLocal = sampleWorld.applyMatrix4(instance.inverse);
-        const barycentric = barycentricXZ(sampleLocal.x, sampleLocal.z, triangle);
+      for (const [offsetX, offsetZ] of offsets) {
+        samplePoint.set(x + offsetX, referenceY, z + offsetZ).applyMatrix4(instance.inverse);
+        const barycentric = barycentricXZ(samplePoint.x, samplePoint.z, triangle);
         if (!barycentric) continue;
         const localY = triangle.a.y * barycentric.u
           + triangle.b.y * barycentric.v
           + triangle.c.y * barycentric.w;
-        worldPoint.set(sampleLocal.x, localY, sampleLocal.z).applyMatrix4(instance.matrix);
+        worldPoint.set(samplePoint.x, localY, samplePoint.z).applyMatrix4(instance.matrix);
         const horizontalDistance = Math.hypot(offsetX, offsetZ);
-        const hemisphereRise = Math.sqrt(Math.max(0, radius * radius
-          - horizontalDistance * horizontalDistance)) - radius;
+        const hemisphereRise = Math.sqrt(Math.max(
+          0,
+          radius * radius - horizontalDistance * horizontalDistance,
+        )) - radius;
         const height = worldPoint.y + hemisphereRise;
         if (height > referenceY + maximumUp + EPSILON
             || height < referenceY - maximumDown - EPSILON) {
@@ -186,7 +191,10 @@ export function findMeshTopSupport({
     },
   });
 
+  PerfCounters.inc('collisionMeshSupportQueries');
+  PerfCounters.inc('collisionMeshSupportTriangleTests', triangleTests);
   if (!best) return null;
+  PerfCounters.inc('collisionMeshSupportHits');
   return Object.freeze({
     sourceId: collider.sourceId,
     height: best.height,
