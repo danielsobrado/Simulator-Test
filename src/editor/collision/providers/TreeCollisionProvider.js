@@ -1,7 +1,10 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
-import { collisionChunkKey, parseCollisionChunkKey } from '../CollisionIds.js';
+import {
+  collisionChunkKey,
+  createCollisionSourceId,
+  parseCollisionChunkKey,
+} from '../CollisionIds.js';
 import { COLLISION_LAYERS } from '../CollisionLayers.js';
-import { createCollisionSourceId } from '../CollisionIds.js';
 import { createCanonicalAabb } from '../colliders/ColliderBounds.js';
 import {
   COLLIDER_TYPE_CAPSULE,
@@ -85,6 +88,12 @@ function sampleFromCollider(collider) {
   });
 }
 
+function compareSourceIds(left, right) {
+  if (left.sourceId < right.sourceId) return -1;
+  if (left.sourceId > right.sourceId) return 1;
+  return 0;
+}
+
 export class TreeCollisionProvider {
   constructor({
     source,
@@ -139,7 +148,7 @@ export class TreeCollisionProvider {
         minimumTrunkRadius: this.source.minimumTrunkRadius,
       }));
     }
-    colliders.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+    colliders.sort(compareSourceIds);
     const signature = [
       snapshot.signature,
       this.source.profileSignature,
@@ -148,13 +157,25 @@ export class TreeCollisionProvider {
     return { signature, colliders };
   }
 
+  refreshSample() {
+    this.sample = null;
+    const keys = [...this.chunkStates.keys()].sort();
+    for (const key of keys) {
+      const sample = this.chunkStates.get(key)?.sample;
+      if (!sample) continue;
+      this.sample = sample;
+      break;
+    }
+  }
+
   recordChunk(key, revision, data) {
     this.chunkStates.set(key, Object.freeze({
       revision,
       signature: data.signature,
       colliderCount: data.colliders.length,
+      sample: sampleFromCollider(data.colliders[0]),
     }));
-    if (!this.sample && data.colliders.length > 0) this.sample = sampleFromCollider(data.colliders[0]);
+    this.refreshSample();
     this.updateCounters();
   }
 
@@ -168,12 +189,17 @@ export class TreeCollisionProvider {
     return Object.freeze({ revision, colliders: Object.freeze(data.colliders) });
   }
 
+  removeUnloadedState(key) {
+    this.chunkStates.delete(key);
+    this.pendingRefreshKeys.delete(key);
+    this.refreshSample();
+  }
+
   enqueueLoadedChunks(world) {
     for (const key of this.chunkStates.keys()) {
       const { chunkX, chunkZ } = parseCollisionChunkKey(key);
       if (!world.isOwnerChunkReady(chunkX, chunkZ)) {
-        this.chunkStates.delete(key);
-        this.pendingRefreshKeys.delete(key);
+        this.removeUnloadedState(key);
         continue;
       }
       if (this.pendingRefreshKeys.has(key)) continue;
@@ -190,7 +216,7 @@ export class TreeCollisionProvider {
     } else {
       for (const key of this.chunkStates.keys()) {
         const { chunkX, chunkZ } = parseCollisionChunkKey(key);
-        if (!world.isOwnerChunkReady(chunkX, chunkZ)) this.chunkStates.delete(key);
+        if (!world.isOwnerChunkReady(chunkX, chunkZ)) this.removeUnloadedState(key);
       }
     }
 
@@ -206,7 +232,7 @@ export class TreeCollisionProvider {
       if (!previous) continue;
       const { chunkX, chunkZ } = parseCollisionChunkKey(key);
       if (!world.isOwnerChunkReady(chunkX, chunkZ)) {
-        this.chunkStates.delete(key);
+        this.removeUnloadedState(key);
         continue;
       }
       attempted += 1;
