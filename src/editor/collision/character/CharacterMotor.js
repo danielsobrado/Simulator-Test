@@ -85,17 +85,24 @@ export class CharacterMotor {
     this.contactScratch = {};
     this.previousValidPosition = null;
     this.lastResult = null;
+    this.primitiveTests = 0;
   }
 
   reset(position) {
     assertFinitePoint(position, 'reset position');
     this.previousValidPosition = copyPosition(position);
     this.lastResult = null;
+    this.primitiveTests = 0;
+  }
+
+  overlaps(capsule, collider) {
+    this.primitiveTests += 1;
+    return capsuleOverlapsPrimitive(capsule, collider, this.config.skinWidth);
   }
 
   collides(capsule, candidates) {
     for (const collider of candidates) {
-      if (capsuleOverlapsPrimitive(capsule, collider, this.config.skinWidth)) return true;
+      if (this.overlaps(capsule, collider)) return true;
     }
     return false;
   }
@@ -109,6 +116,7 @@ export class CharacterMotor {
     for (; iterations < this.config.maxIterations; iterations += 1) {
       let deepest = null;
       for (const collider of candidates) {
+        this.primitiveTests += 1;
         const contact = findPrimitiveSideContact(
           resolved,
           collider,
@@ -157,6 +165,7 @@ export class CharacterMotor {
       throw new Error('Character motor displacement must contain finite x and z.');
     }
     if (!this.previousValidPosition) this.previousValidPosition = copyPosition(start);
+    this.primitiveTests = 0;
 
     const maximumDistance = this.config.maxSubstepDistance * MAX_CHARACTER_SUBSTEPS;
     const boundedDisplacement = safeDisplacement(displacement, maximumDistance);
@@ -195,6 +204,7 @@ export class CharacterMotor {
 
     if (!readiness.ready) {
       PerfCounters.inc('collisionNotReadyStops');
+      PerfCounters.set('collisionPrimitiveTests', 0);
       const support = this.terrainProvider.sample(
         this.previousValidPosition.x,
         this.previousValidPosition.z,
@@ -214,6 +224,7 @@ export class CharacterMotor {
         contacts: Object.freeze([]),
         iterations: 0,
         substeps: 0,
+        primitiveTests: 0,
         readiness,
       });
       this.lastResult = result;
@@ -291,6 +302,7 @@ export class CharacterMotor {
     PerfCounters.set('collisionContacts', contactIds.length);
     PerfCounters.set('collisionSolverIterations', totalIterations);
     PerfCounters.set('collisionSubsteps', substeps);
+    PerfCounters.set('collisionPrimitiveTests', this.primitiveTests);
     if (stepped) PerfCounters.inc('collisionStepUps');
 
     const result = Object.freeze({
@@ -307,6 +319,7 @@ export class CharacterMotor {
       contacts: Object.freeze([...contactIds]),
       iterations: totalIterations,
       substeps,
+      primitiveTests: this.primitiveTests,
       readiness,
     });
     this.lastResult = result;
@@ -324,6 +337,7 @@ export class CharacterMotor {
         supportNormal: Object.freeze({ x: 0, y: 1, z: 0 }),
         supportWalkable: true,
         contacts: Object.freeze([]),
+        primitiveTests: 0,
         previousValidPosition: this.previousValidPosition,
       });
     }
@@ -339,6 +353,7 @@ export class CharacterMotor {
       contacts: this.lastResult.contacts,
       iterations: this.lastResult.iterations,
       substeps: this.lastResult.substeps,
+      primitiveTests: this.lastResult.primitiveTests,
       previousValidPosition: this.previousValidPosition,
     });
   }
@@ -347,5 +362,6 @@ export class CharacterMotor {
     this.candidateBuffer.length = 0;
     this.previousValidPosition = null;
     this.lastResult = null;
+    this.primitiveTests = 0;
   }
 }
