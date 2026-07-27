@@ -7,6 +7,7 @@ import {
   applyWaterDomainConfig,
   validateWaterDomainConfig,
 } from '../editor/water/WaterConfig.js';
+import { validateUnderwaterConfig } from '../editor/water/UnderwaterConfig.js';
 import { validateEditorConfig } from './validateEditorConfig.js';
 import { validateStylizedLodConfig } from './validateStylizedLodConfig.js';
 
@@ -29,6 +30,7 @@ export function loadEditorConfig() {
   applyRuntimeOverrides(config);
   validateEditorConfig(config);
   validateWaterDomainConfig(config);
+  validateUnderwaterConfig(config.player.water.underwater);
   validateStylizedLodConfig(config);
   return Object.freeze(config);
 }
