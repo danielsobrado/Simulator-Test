@@ -482,7 +482,7 @@ export class EditorUi {
             <input data-role="file-input" type="file" accept="application/json,.json" hidden />
           </section>
 
-          <section class="panel">
+          <section class="panel panel--minimap">
             <h2>Local overview</h2>
             <div class="minimap-frame">
               <canvas data-role="minimap" width="${MINIMAP_SIZE}" height="${MINIMAP_SIZE}"></canvas>

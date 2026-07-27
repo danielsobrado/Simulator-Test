@@ -79,12 +79,44 @@
 
 [data-view-mode='player'] .sidebar {
   pointer-events: none;
+}
+
+/* Dim the editing panels, but keep the minimap HUD at full strength. */
+[data-view-mode='player'] .sidebar > *:not(.panel--minimap) {
   opacity: 0.62;
 }
 
 [data-view-mode='player'] .statusbar,
 [data-view-mode='player'] .toast {
   display: none;
+}
+
+/* Player mode lifts the minimap out of the sidebar into a top-right HUD. */
+[data-view-mode='player'] .panel--minimap,
+[data-view-mode='player-spawn'] .panel--minimap {
+  position: fixed;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  width: 188px;
+  padding: 8px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 12px;
+  background: rgb(16 23 19 / 88%);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 38%);
+  backdrop-filter: blur(10px);
+}
+
+[data-view-mode='player'] .panel--minimap > h2,
+[data-view-mode='player'] .panel--minimap > .panel-note,
+[data-view-mode='player-spawn'] .panel--minimap > h2,
+[data-view-mode='player-spawn'] .panel--minimap > .panel-note {
+  display: none;
+}
+
+[data-view-mode='player'] .panel--minimap .minimap-frame,
+[data-view-mode='player-spawn'] .panel--minimap .minimap-frame {
+  border-radius: 50%;
 }
 
 [data-awaiting-spawn='true'] [data-role='viewport'] {
