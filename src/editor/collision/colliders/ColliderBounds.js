@@ -2,6 +2,12 @@ import { MAX_COLLIDER_CHUNKS } from '../CollisionLimits.js';
 
 const AXES = Object.freeze(['X', 'Y', 'Z']);
 const CHUNK_BOUNDARY_EPSILON = 1e-9;
+const CHUNK_RANGE_FIELDS = Object.freeze([
+  'minChunkX',
+  'maxChunkX',
+  'minChunkZ',
+  'maxChunkZ',
+]);
 
 function assertFinite(value, name) {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
@@ -77,6 +83,11 @@ export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
 }
 
 export function collisionChunkCountForRange(range) {
+  for (const field of CHUNK_RANGE_FIELDS) {
+    if (!Number.isSafeInteger(range?.[field])) {
+      throw new Error('Collision chunk range coordinates must be safe integers.');
+    }
+  }
   const columns = range.maxChunkX - range.minChunkX + 1;
   const rows = range.maxChunkZ - range.minChunkZ + 1;
   if (!Number.isSafeInteger(columns) || !Number.isSafeInteger(rows)
@@ -99,6 +110,7 @@ export function collisionChunksForAabb(
   if (maximumChunks > MAX_COLLIDER_CHUNKS) {
     throw new Error(`maximumChunks must not exceed ${MAX_COLLIDER_CHUNKS}.`);
   }
+  if (!Array.isArray(target)) throw new Error('Collision chunk target must be an array.');
   target.length = 0;
   const range = collisionChunkRangeForAabb(aabb, chunkWorldSize);
   const chunkCount = collisionChunkCountForRange(range);
