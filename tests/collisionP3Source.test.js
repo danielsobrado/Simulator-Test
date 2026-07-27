@@ -69,9 +69,10 @@ test('tree collision source reads canonical manifests and includes planted trees
   };
   const treeView = {
     prototypes: [trunkPrototype()],
+    prototypeIndicesByAsset: new Map([['/assets/trees/oak.glb', Object.freeze([0])]]),
     prototypeSignature: 'prototype:1',
+    revisionTracker: { revision: 6 },
     manifestStore,
-    terrainView: { worldStore: { revision: 4 } },
     objectMap: { revision: 3 },
     biomeAssetPalette: { revision: 5 },
     resolvePalettePrototypeIndex: (record) => record.prototypeIndex,
@@ -87,8 +88,32 @@ test('tree collision source reads canonical manifests and includes planted trees
   assert.equal(snapshot.placements[1].planted, true);
   assert.equal(Object.isFrozen(snapshot), true);
   assert.equal(Object.isFrozen(source.profiles), true);
+  assert.equal(source.profiles[0].id, '/assets/trees/oak.glb');
   assert.match(snapshot.signature, /^context:1\|2:/);
   assert.equal(source.resolvePrototypeIndex(snapshot.placements[0]), 0);
+});
+
+test('multiple prototypes from one asset receive stable suffixed keys', () => {
+  const treeView = {
+    prototypes: [trunkPrototype(), trunkPrototype()],
+    prototypeIndicesByAsset: new Map([['oak-pack', Object.freeze([0, 1])]]),
+    prototypeSignature: 'prototype:2',
+    revisionTracker: { revision: 0 },
+    manifestStore: {
+      editStore: { revision: 0 },
+      get: () => Object.freeze([]),
+      build: () => Object.freeze([]),
+      context: () => ({ signature: 'empty' }),
+    },
+    objectMap: { revision: 0 },
+    biomeAssetPalette: { revision: 0 },
+    resolvePalettePrototypeIndex: (record) => record.prototypeIndex,
+  };
+  const source = createTreeCollisionSource({
+    treeView,
+    config: { minimumTrunkRadius: 0.16, prototypeOverrides: {} },
+  });
+  assert.deepEqual(source.profiles.map((profile) => profile.id), ['oak-pack#0', 'oak-pack#1']);
 });
 
 test('tree placement signatures ignore render LOD fields but track collision authority', () => {
