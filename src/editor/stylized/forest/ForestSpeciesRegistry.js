@@ -186,13 +186,17 @@ export class ForestSpeciesRegistry {
     const palette = configured.filter((id) => this.species.has(id));
     const usable = palette.length > 0 ? palette : ['broadleaf_round'];
     const weights = this.paletteWeights(usable, habitat);
-    const speciesId = this.selectSpecies(candidate, habitat, usable, weights);
+    const speciesId = this.species.has(candidate.speciesId)
+      ? candidate.speciesId
+      : this.selectSpecies(candidate, habitat, usable, weights);
     const species = this.species.get(speciesId);
-    const ageClass = weightedAge(
-      habitat.patchEdge,
-      habitat.patchCoverage,
-      stableUnit(candidate.stableId, 43),
-    );
+    const ageClass = AGE_CLASSES[candidate.ageClass]
+      ? candidate.ageClass
+      : weightedAge(
+        habitat.patchEdge,
+        habitat.patchCoverage,
+        stableUnit(candidate.stableId, 43),
+      );
     const age = AGE_CLASSES[ageClass];
     const individualVariation = 0.9 + stableUnit(candidate.stableId, 47) * 0.2;
     const speciesPrototypes = this.prototypesFor(speciesId, habitat.tileId);
