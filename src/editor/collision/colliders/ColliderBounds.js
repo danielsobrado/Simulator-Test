@@ -47,14 +47,21 @@ export function collisionChunkCanonicalBounds(chunkX, chunkZ, chunkWorldSize) {
   });
 }
 
+export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
+  if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
+  return Object.freeze({
+    minChunkX: Math.floor(aabb.minX / chunkWorldSize),
+    maxChunkX: Math.floor((aabb.maxX + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
+    minChunkZ: Math.floor((-aabb.maxZ) / chunkWorldSize),
+    maxChunkZ: Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize),
+  });
+}
+
 export function collisionChunksForAabb(aabb, chunkWorldSize, target = []) {
   target.length = 0;
-  const minChunkX = Math.floor(aabb.minX / chunkWorldSize);
-  const maxChunkX = Math.floor((aabb.maxX + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize);
-  const minChunkZ = Math.floor((-aabb.maxZ) / chunkWorldSize);
-  const maxChunkZ = Math.floor((-aabb.minZ + CHUNK_BOUNDARY_EPSILON) / chunkWorldSize);
-  for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
-    for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+  const range = collisionChunkRangeForAabb(aabb, chunkWorldSize);
+  for (let chunkZ = range.minChunkZ; chunkZ <= range.maxChunkZ; chunkZ += 1) {
+    for (let chunkX = range.minChunkX; chunkX <= range.maxChunkX; chunkX += 1) {
       target.push(Object.freeze({ chunkX, chunkZ }));
     }
   }
