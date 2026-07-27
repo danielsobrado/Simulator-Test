@@ -12,6 +12,12 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function boundedDisplacement(velocity, seconds, maximumDistance) {
+  const displacement = velocity * seconds;
+  if (Number.isNaN(displacement)) throw new Error('Collision prefetch velocity must be numeric.');
+  return clamp(displacement, -maximumDistance, maximumDistance);
+}
+
 function clampPredictedChunk(current, predicted, maximumDistance) {
   if (maximumDistance <= 0) return current;
   const deltaX = clamp(predicted.chunkX - current.chunkX, -maximumDistance, maximumDistance);
@@ -67,7 +73,7 @@ export class CollisionResidency {
     this.config = config;
     this.buildOwnerChunk = buildOwnerChunk;
     this.now = now;
-    this.logger = logger;
+    this.logger = logger ?? console;
     this.desiredKeys = new Set();
     this.loadedKeys = new Set();
     this.queue = [];
@@ -113,9 +119,18 @@ export class CollisionResidency {
   update({ focus, velocity = { x: 0, z: 0 } }) {
     const chunkWorldSize = this.world.chunkWorldSize;
     const current = collisionChunkForCanonical(focus.x, focus.z, chunkWorldSize);
+    const maximumPrefetchDistance = this.config.unloadRadius * chunkWorldSize;
     const rawPredicted = collisionChunkForCanonical(
-      focus.x + velocity.x * this.config.prefetchSeconds,
-      focus.z + velocity.z * this.config.prefetchSeconds,
+      focus.x + boundedDisplacement(
+        velocity.x,
+        this.config.prefetchSeconds,
+        maximumPrefetchDistance,
+      ),
+      focus.z + boundedDisplacement(
+        velocity.z,
+        this.config.prefetchSeconds,
+        maximumPrefetchDistance,
+      ),
       chunkWorldSize,
     );
     const predicted = clampPredictedChunk(current, rawPredicted, this.config.unloadRadius);
@@ -169,6 +184,7 @@ export class CollisionResidency {
     const startedAt = this.now();
     let attempted = 0;
     let built = 0;
+    let frameError = null;
     while (this.queue.length > 0 && attempted < this.config.buildsPerFrame) {
       if (attempted > 0 && this.now() - startedAt >= this.config.buildBudgetMs) break;
       const job = this.queue.shift();
@@ -193,12 +209,13 @@ export class CollisionResidency {
           this.builds += 1;
           built += 1;
         }
-        this.lastBuildError = null;
       } catch (error) {
-        this.lastBuildError = error;
+        frameError = error;
         this.logger.error?.(`Collision chunk build failed for ${job.key}.`, error);
       }
     }
+    if (frameError) this.lastBuildError = frameError;
+    else if (attempted > 0) this.lastBuildError = null;
     PerfCounters.inc('collisionBuilds', built);
     PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
