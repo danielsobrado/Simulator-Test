@@ -5,9 +5,7 @@ import {
   cameraPosition,
   clamp,
   cross,
-  dot,
   floor,
-  fract,
   length,
   min,
   mix,
@@ -23,9 +21,8 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { screenDitherThreshold } from '../lod/screenDither.js';
 
-const HASH_VECTOR = vec3(12.9898, 78.233, 37.719);
-const HASH_SCALE = 43758.5453;
 const TWO_PI = Math.PI * 2;
 
 function createMaterial({ atlas, readTransform, readParameters, readAppearance }) {
@@ -56,7 +53,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
   const columnPosition = localAzimuth.div(TWO_PI).mul(atlas.columns);
   const column0 = floor(columnPosition);
   const column1 = mod(column0.add(1), atlas.columns);
-  const columnBlend = fract(columnPosition);
+  const columnBlend = columnPosition.fract();
   const elevation = atan(viewDelta.y, length(viewDelta.xz));
   const lowElevation = atlas.lowElevationDegrees * Math.PI / 180;
   const highElevation = atlas.highElevationDegrees * Math.PI / 180;
@@ -67,7 +64,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
   ).mul(Math.max(0, atlas.rows - 1));
   const row0 = floor(rowPosition);
   const row1 = min(row0.add(1), Math.max(0, atlas.rows - 1));
-  const rowBlend = fract(rowPosition);
+  const rowBlend = rowPosition.fract();
   const gutter = Math.max(0, atlas.gutter ?? 0);
   const tileScale = Math.max(0.001, (atlas.tileSize - gutter * 2) / atlas.tileSize);
   const tileOffset = gutter / atlas.tileSize;
@@ -89,14 +86,8 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
       .add(up.mul(viewNormal.y))
       .add(backward.mul(viewNormal.z)),
   );
-  const seededPosition = worldPosition.mul(1.71).add(vec3(
-    parameters.z.mul(19.19),
-    parameters.z.mul(31.37),
-    parameters.z.mul(47.11),
-  ));
-  const threshold = fract(sin(dot(seededPosition, HASH_VECTOR)).mul(HASH_SCALE));
   const coverage = albedo.a.mul(parameters.y);
-  const visible = step(threshold, coverage);
+  const visible = step(screenDitherThreshold(parameters.z), coverage);
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
