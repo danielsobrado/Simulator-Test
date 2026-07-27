@@ -53,7 +53,7 @@ function sourceEpoch(treeView, rockSource) {
     treeView.objectMap?.revision ?? 0,
     treeView.biomeAssetPalette?.revision ?? 0,
     treeView.prototypeSignature ?? 'prototype:unknown',
-    rockSource?.revision ?? rockSource?.manifestStore?.revision ?? 0,
+    rockSource?.prototypeRevision ?? 0,
   ].join(':');
 }
 
