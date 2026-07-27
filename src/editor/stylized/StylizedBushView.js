@@ -380,7 +380,7 @@ export class StylizedBushView {
         entries.push({
           chunkX,
           chunkZ,
-          representations: [{ band: 'near', fade: 1 }],
+          representations: [{ band: 'near', fade: 1, ditherDirection: 1 }],
         });
       }
     }
@@ -436,6 +436,7 @@ export class StylizedBushView {
                 BUSH_SCRATCH.scale.setScalar(placement.scale),
               ),
               fade: representation.fade,
+              ditherDirection: representation.ditherDirection ?? 1,
               seed: placement.priority,
               colorVariation: 0.84 + placement.priority * 0.32,
             });
