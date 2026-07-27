@@ -13,6 +13,7 @@ export function tryCharacterStep({
   stepHeight,
   skinWidth,
   collides,
+  findMeshTopSupport = null,
 }) {
   if (!(stepHeight > 0) || typeof collides !== 'function') return null;
   const raisedY = capsule.y + stepHeight + skinWidth;
@@ -29,6 +30,7 @@ export function tryCharacterStep({
     maximumUp: 0,
     maximumDown: stepHeight + skinWidth,
     maximumSlopeCosine,
+    findMeshTopSupport,
   });
   if (!support?.walkable
       || support.height > capsule.y + stepHeight + STEP_EPSILON
