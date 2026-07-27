@@ -8,6 +8,7 @@ import {
   enrichPageRenderPixels,
   getSurfaceMaskSearchRadius,
 } from './ChunkRenderPixels.js';
+import { resolveWaterDomainVersion } from '../water/WaterConfig.js';
 import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
 
 function tileIndex(localX, localZ, chunkSize) {
@@ -24,6 +25,10 @@ function assertGeneratorMetadata(actual, expected) {
     if (actual?.[field] !== expected[field]) {
       throw new Error(`World generator ${field} does not match the active editor configuration.`);
     }
+  }
+  if (resolveWaterDomainVersion(actual?.waterDomainVersion)
+      !== resolveWaterDomainVersion(expected.waterDomainVersion)) {
+    throw new Error('World water-domain version does not match the active editor configuration.');
   }
 }
 
@@ -58,7 +63,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     }
     const pending = this.pendingChunks.get(key);
     if (pending) {
-      // Already in flight — nudge its priority in case it became more urgent.
       this.chunkWorker.reprioritize?.(chunkX, chunkZ, priority);
       return pending;
     }
@@ -100,7 +104,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     );
   }
 
-  /** Drop a not-yet-started generation request for a chunk leaving residency. */
   cancelChunk(chunkX, chunkZ) {
     return this.chunkWorker.cancel?.(chunkX, chunkZ) ?? false;
   }
@@ -108,8 +111,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   refreshPageRenderPixels(page) {
     const maskConfig = this.generator.getSurfaceMaskConfig?.(this.surfaceMaskConfig)
       ?? this.surfaceMaskConfig;
-    // Overrides invalidate worker-built scatter; main-thread grass/flower rebuild
-    // will regenerate from tiles/heights.
     delete page.grassScatter;
     delete page.flowerScatter;
     return enrichPageRenderPixels(
@@ -164,7 +165,6 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     }
 
     const pixelsMissing = !page.tilePixels || !page.surfaceMaskPixels;
-    // Neighbor painted roads/water sit outside this page's tiles but inside the path halo.
     const neighborHaloDirty = this.hasHaloTileOverrides(originX, originZ);
     if (appliedOverrides || pixelsMissing || page.renderPixelsDirty || neighborHaloDirty) {
       this.refreshPageRenderPixels(page);
