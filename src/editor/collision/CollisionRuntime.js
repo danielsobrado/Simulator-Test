@@ -4,12 +4,15 @@ import { CollisionResidency } from './CollisionResidency.js';
 import { CollisionWorld } from './CollisionWorld.js';
 import { createSweptCapsuleAabb } from './colliders/ColliderBounds.js';
 import { createCollisionP1QaProvider } from './providers/CollisionP1QaProvider.js';
+import { NaturalCollisionProvider } from './providers/NaturalCollisionProvider.js';
+import { RockCollisionProvider } from './providers/RockCollisionProvider.js';
+import { createRockCollisionSource } from './providers/RockCollisionSource.js';
 import { TreeCollisionProvider } from './providers/TreeCollisionProvider.js';
 import { createTreeCollisionSource } from './providers/TreeCollisionSource.js';
 
 const EMPTY_COLLIDERS = Object.freeze([]);
 const FIXTURE_QA_SCENARIOS = new Set(['collision-p1', 'collision-p2']);
-const COLLISION_QA_SCENARIOS = new Set([...FIXTURE_QA_SCENARIOS, 'collision-p3']);
+const COLLISION_QA_SCENARIOS = new Set([...FIXTURE_QA_SCENARIOS, 'collision-p3', 'collision-p4']);
 
 function hasDebugEnabled(debug) {
   return Object.values(debug).some(Boolean);
@@ -29,6 +32,33 @@ function createEmptyProvider() {
   });
 }
 
+function createNaturalComponents({ treeSource, collisionConfig }) {
+  const components = [];
+  if (collisionConfig.trees.enabled && treeSource?.treeView) {
+    const provider = new TreeCollisionProvider({
+      source: createTreeCollisionSource({
+        treeView: treeSource.treeView,
+        rockSource: treeSource.rockSource,
+        config: collisionConfig.trees,
+      }),
+      buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
+      buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
+    });
+    components.push(Object.freeze({ id: 'trees', counterName: 'Tree', provider }));
+  }
+  if (collisionConfig.rocks.enabled && treeSource?.rockSource) {
+    const provider = new RockCollisionProvider({
+      source: createRockCollisionSource({
+        rockView: treeSource.rockSource,
+        config: collisionConfig.rocks,
+      }),
+      config: collisionConfig.rocks,
+    });
+    components.push(Object.freeze({ id: 'rocks', counterName: 'Rock', provider }));
+  }
+  return components;
+}
+
 function createProvider({
   activeQaScenario,
   terrainView,
@@ -43,18 +73,13 @@ function createProvider({
       collisionConfig,
     });
   }
-  if (collisionConfig.trees.enabled && treeSource) {
-    return new TreeCollisionProvider({
-      source: createTreeCollisionSource({
-        treeView: treeSource.treeView,
-        rockSource: treeSource.rockSource,
-        config: collisionConfig.trees,
-      }),
-      buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
-      buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
-    });
-  }
-  return createEmptyProvider();
+  const components = createNaturalComponents({ treeSource, collisionConfig });
+  if (components.length === 0) return createEmptyProvider();
+  return new NaturalCollisionProvider({
+    components,
+    buildsPerFrame: collisionConfig.streaming.buildsPerFrame,
+    buildBudgetMs: collisionConfig.streaming.buildBudgetMs,
+  });
 }
 
 export function shouldCreateCollisionRuntime(collisionConfig, search = '') {
@@ -88,6 +113,8 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
     world,
     config: collisionConfig.streaming,
     buildOwnerChunk: provider.buildOwnerChunk.bind(provider),
+    onOwnerChunkCommitted: provider.commitOwnerChunk?.bind(provider) ?? null,
+    onOwnerChunkUnloaded: provider.unloadOwnerChunk?.bind(provider) ?? null,
   });
   const debugView = debug.colliders || debug.broadphase
     ? new CollisionDebugView({
