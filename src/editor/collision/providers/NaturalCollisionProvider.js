@@ -75,6 +75,34 @@ function retryDelay(attempts) {
   return Math.min(COLLISION_RETRY_MAX_MS, COLLISION_RETRY_BASE_MS * (2 ** exponent));
 }
 
+function samplePriority(sample) {
+  if (sample?.tier === 'walkable') return 2;
+  if (sample) return 1;
+  return 0;
+}
+
+function createAggregate() {
+  return {
+    chunks: 0,
+    colliders: 0,
+    decorative: 0,
+    blocking: 0,
+    walkable: 0,
+    walkablePending: 0,
+    generatedProxies: 0,
+  };
+}
+
+function addStats(target, data) {
+  target.chunks += 1;
+  target.colliders += data.colliderCount;
+  target.decorative += data.stats.decorative ?? 0;
+  target.blocking += data.stats.blocking ?? 0;
+  target.walkable += data.stats.walkable ?? 0;
+  target.walkablePending += data.stats.walkablePending ?? 0;
+  target.generatedProxies += data.stats.generatedProxies ?? 0;
+}
+
 export class NaturalCollisionProvider {
   constructor({
     components,
@@ -91,7 +119,7 @@ export class NaturalCollisionProvider {
       if (!component?.id
           || typeof component.counterName !== 'string'
           || !component.counterName.trim()
-          || !component.provider?.buildChunkData
+          || typeof component.provider?.buildChunkData !== 'function'
           || ids.has(component.id)) {
         throw new Error(
           'Natural collision components require unique IDs, counter names, and chunk builders.',
@@ -210,7 +238,10 @@ export class NaturalCollisionProvider {
     for (const key of [...this.chunkStates.keys()].sort()) {
       const state = this.chunkStates.get(key);
       for (const component of this.components) {
-        this.samples[component.id] ??= state.components[component.id]?.sample ?? null;
+        const candidate = state.components[component.id]?.sample ?? null;
+        if (samplePriority(candidate) > samplePriority(this.samples[component.id])) {
+          this.samples[component.id] = candidate;
+        }
       }
     }
   }
@@ -326,67 +357,54 @@ export class NaturalCollisionProvider {
     return Object.freeze({ attempted, rebuilt, remaining: this.pendingRefresh.length });
   }
 
-  updateCounters() {
-    const aggregates = Object.fromEntries(this.components.map((component) => [component.id, {
-      chunks: 0,
-      colliders: 0,
-      decorative: 0,
-      blocking: 0,
-      walkablePending: 0,
-    }]));
+  aggregateComponents() {
+    const aggregates = Object.fromEntries(
+      this.components.map((component) => [component.id, createAggregate()]),
+    );
     for (const state of this.chunkStates.values()) {
       for (const component of this.components) {
         const data = state.components[component.id];
-        if (!data) continue;
-        const aggregate = aggregates[component.id];
-        aggregate.chunks += 1;
-        aggregate.colliders += data.colliderCount;
-        aggregate.decorative += data.stats.decorative ?? 0;
-        aggregate.blocking += data.stats.blocking ?? 0;
-        aggregate.walkablePending += data.stats.walkablePending ?? 0;
+        if (data) addStats(aggregates[component.id], data);
       }
     }
+    return aggregates;
+  }
+
+  updateCounters() {
+    const aggregates = this.aggregateComponents();
     for (const component of this.components) {
       const aggregate = aggregates[component.id];
       PerfCounters.set(`collision${component.counterName}Chunks`, aggregate.chunks);
       PerfCounters.set(`collision${component.counterName}Colliders`, aggregate.colliders);
-      PerfCounters.set(`collision${component.counterName}RefreshQueueDepth`, this.pendingRefresh.length);
+      PerfCounters.set(
+        `collision${component.counterName}RefreshQueueDepth`,
+        this.pendingRefresh.length,
+      );
       if (component.id === 'rocks') {
         PerfCounters.set('collisionRockDecorativeInstances', aggregate.decorative);
         PerfCounters.set('collisionRockBlockingInstances', aggregate.blocking);
+        PerfCounters.set('collisionRockWalkableInstances', aggregate.walkable);
         PerfCounters.set('collisionRockWalkablePendingInstances', aggregate.walkablePending);
+        PerfCounters.set('collisionRockGeneratedProxyInstances', aggregate.generatedProxies);
       }
     }
     PerfCounters.set('collisionNaturalRefreshQueueDepth', this.pendingRefresh.length);
-    PerfCounters.set('collisionNaturalDeferredRetries', this.retryByKey.size + (this.sourceRetry ? 1 : 0));
+    PerfCounters.set(
+      'collisionNaturalDeferredRetries',
+      this.retryByKey.size + (this.sourceRetry ? 1 : 0),
+    );
   }
 
   getStatus() {
+    const aggregates = this.aggregateComponents();
     const components = {};
     for (const component of this.components) {
-      let chunks = 0;
-      let colliders = 0;
-      let decorative = 0;
-      let blocking = 0;
-      let walkablePending = 0;
-      for (const state of this.chunkStates.values()) {
-        const data = state.components[component.id];
-        if (!data) continue;
-        chunks += 1;
-        colliders += data.colliderCount;
-        decorative += data.stats.decorative ?? 0;
-        blocking += data.stats.blocking ?? 0;
-        walkablePending += data.stats.walkablePending ?? 0;
-      }
       components[component.id] = Object.freeze({
         id: component.id,
         profileCount: componentProfileCount(component),
-        chunks,
-        colliders,
-        decorative,
-        blocking,
-        walkablePending,
+        ...aggregates[component.id],
         sample: this.samples[component.id] ?? null,
+        details: component.provider.getStatus?.() ?? null,
       });
     }
     const treeSample = components.trees?.sample ?? null;
