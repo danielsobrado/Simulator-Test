@@ -26,7 +26,7 @@ function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }
   if (!Number.isSafeInteger(ownerChunkX) || !Number.isSafeInteger(ownerChunkZ)) {
     throw new Error('Collider owner chunk coordinates must be safe integers.');
   }
-  if (!Number.isInteger(layers) || layers <= 0 || (layers & ~COLLISION_LAYERS.all) !== 0) {
+  if (!Number.isSafeInteger(layers) || layers <= 0 || layers > COLLISION_LAYERS.all) {
     throw new Error('Collider layers must contain supported collision-layer bits.');
   }
   return {
