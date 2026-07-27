@@ -1,7 +1,10 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { collisionChunkKey } from './CollisionIds.js';
 import { COLLISION_LAYERS } from './CollisionLayers.js';
-import { MAX_COLLIDER_CHUNKS } from './CollisionLimits.js';
+import {
+  MAX_COLLIDER_CHUNKS,
+  MAX_COLLISION_BINS_PER_CHUNK,
+} from './CollisionLimits.js';
 import { CollisionChunk } from './CollisionChunk.js';
 import {
   canonicalAabbsIntersect,
@@ -35,6 +38,16 @@ function compareColliderSourceIds(left, right) {
   return 0;
 }
 
+function assertBinAllocation(chunkWorldSize, binSize) {
+  const columns = Math.max(1, Math.ceil(chunkWorldSize / binSize));
+  if (!Number.isSafeInteger(columns)
+      || columns > Math.floor(MAX_COLLISION_BINS_PER_CHUNK / columns)) {
+    throw new Error(
+      `Collision binSize creates more than ${MAX_COLLISION_BINS_PER_CHUNK} bins per chunk.`,
+    );
+  }
+}
+
 export class CollisionWorld {
   constructor({
     chunkWorldSize,
@@ -48,6 +61,7 @@ export class CollisionWorld {
     if (!Number.isFinite(binSize) || binSize <= 0) {
       throw new Error('Collision binSize must be positive and finite.');
     }
+    assertBinAllocation(chunkWorldSize, binSize);
     if (!Number.isSafeInteger(maxBinsPerCollider) || maxBinsPerCollider < 1) {
       throw new Error('Collision maxBinsPerCollider must be a positive safe integer.');
     }
