@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { createPlayerState, stepPlayerPhysics } from './PlayerPhysics.js';
+import { isSwimmingWaterState } from './PlayerWaterState.js';
+import { UnderwaterViewController } from '../water/UnderwaterViewController.js';
 
 const MOVEMENT_CODES = new Set([
   'KeyW',
@@ -8,6 +10,9 @@ const MOVEMENT_CODES = new Set([
   'KeyD',
   'ShiftLeft',
   'ShiftRight',
+  'ControlLeft',
+  'ControlRight',
+  'KeyC',
   'Space',
 ]);
 
@@ -36,6 +41,13 @@ export class PlayerController {
     this.forward = new THREE.Vector3();
     this.right = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
+    this.underwaterView = config.water?.underwater && terrainView.scene
+      ? new UnderwaterViewController({
+        terrainView,
+        playerController: this,
+        config: config.water.underwater,
+      })
+      : null;
 
     this.boundHandlers = {
       canvasPointer: (event) => this.onCanvasPointer(event),
@@ -74,50 +86,51 @@ export class PlayerController {
       position: Object.freeze({ x: this.state.x, y: this.state.y, z: this.state.z }),
       yaw: this.yaw,
       pitch: this.pitch,
+      waterState: this.state.waterState,
+      waterDepth: this.state.waterDepth,
+      waterSurfaceHeight: this.state.waterSurfaceHeight,
+      waterBodyId: this.state.waterBodyId,
+      headSubmerged: this.state.headSubmerged,
     });
   }
 
-  /**
-   * Explicit overlay block. Clears held movement and rejects look / lock / keys
-   * while active. The perf QA harness still bypasses pointer-lock requirements
-   * but respects this block unless the harness itself clears it.
-   */
   setUiBlocked(blocked) {
     const next = Boolean(blocked);
     if (this.uiBlocked === next) return;
     this.uiBlocked = next;
-    if (this.uiBlocked) {
-      this.resetInput();
-    }
+    if (this.uiBlocked) this.resetInput();
     this.emit();
   }
 
   setHarnessActive(active) {
     this.harnessActive = Boolean(active);
-    if (!this.harnessActive) {
-      this.resetInput();
-    }
+    if (!this.harnessActive) this.resetInput();
     this.emit();
   }
 
   setHarnessKeys(codes = []) {
     this.keys = new Set(codes);
-    this.jumpQueued = this.keys.has('Space') && this.state.grounded;
+    this.jumpQueued = this.keys.has('Space')
+      && this.state.grounded
+      && !isSwimmingWaterState(this.state.waterState);
     this.emit();
+  }
+
+  createState(x, z) {
+    return createPlayerState({
+      x,
+      z,
+      groundHeight: this.terrainView.getWorldHeight(x, z),
+      eyeHeight: this.config.eyeHeight,
+    });
   }
 
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
     if (Number.isFinite(x) && Number.isFinite(z)) {
-      this.state = createPlayerState({
-        x,
-        z,
-        groundHeight: this.terrainView.getWorldHeight(x, z),
-        eyeHeight: this.config.eyeHeight,
-      });
+      this.state = this.createState(x, z);
+      this.underwaterView?.restoreSurfaceEnvironment();
     }
-    if (Number.isFinite(yaw)) {
-      this.yaw = yaw;
-    }
+    if (Number.isFinite(yaw)) this.yaw = yaw;
     if (Number.isFinite(pitch)) {
       const maxPitch = THREE.MathUtils.degToRad(this.config.maxPitchDegrees);
       this.pitch = THREE.MathUtils.clamp(pitch, -maxPitch, maxPitch);
@@ -138,17 +151,13 @@ export class PlayerController {
     this.resetInput();
 
     if (this.enabled && spawn) {
-      this.state = createPlayerState({
-        x: spawn.x,
-        z: spawn.z,
-        groundHeight: this.terrainView.getWorldHeight(spawn.x, spawn.z),
-        eyeHeight: this.config.eyeHeight,
-      });
+      this.state = this.createState(spawn.x, spawn.z);
       this.applyCameraState();
     }
 
-    if (!this.enabled && this.pointerLocked) {
-      document.exitPointerLock();
+    if (!this.enabled) {
+      this.underwaterView?.restoreSurfaceEnvironment();
+      if (this.pointerLocked) document.exitPointerLock();
     }
     this.emit();
   }
@@ -176,13 +185,17 @@ export class PlayerController {
 
     this.camera.getWorldDirection(this.forward);
     this.forward.y = 0;
-    if (this.forward.lengthSq() > 0) {
-      this.forward.normalize();
-    }
+    if (this.forward.lengthSq() > 0) this.forward.normalize();
     this.right.crossVectors(this.forward, this.up).normalize();
 
     const acceptsMovement = !this.uiBlocked && (this.pointerLocked || this.harnessActive);
-    this.state = stepPlayerPhysics({
+    const ascend = acceptsMovement && this.keys.has('Space') ? 1 : 0;
+    const descend = acceptsMovement && (
+      this.keys.has('ControlLeft')
+      || this.keys.has('ControlRight')
+      || this.keys.has('KeyC')
+    ) ? 1 : 0;
+    const nextState = stepPlayerPhysics({
       state: this.state,
       input: {
         forward: acceptsMovement
@@ -193,15 +206,26 @@ export class PlayerController {
           : 0,
         running: acceptsMovement && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')),
         jump: acceptsMovement && this.jumpQueued,
+        ascend,
+        descend,
       },
       deltaSeconds,
       config: this.config,
       forward: this.forward,
       right: this.right,
       getGroundHeight: (x, z) => this.terrainView.getWorldHeight(x, z),
+      getWaterSample: typeof this.terrainView.getWorldWater === 'function'
+        ? (x, z) => this.terrainView.getWorldWater(x, z)
+        : null,
     });
+    const waterChanged = nextState.waterState !== this.state.waterState
+      || nextState.headSubmerged !== this.state.headSubmerged
+      || nextState.waterBodyId !== this.state.waterBodyId;
+    this.state = nextState;
     this.jumpQueued = false;
     this.applyCameraState();
+    this.underwaterView?.update(current);
+    if (waterChanged) this.emit();
   }
 
   getFocusWorld() {
@@ -223,48 +247,41 @@ export class PlayerController {
   }
 
   onCanvasPointer(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) {
-      return;
-    }
+    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.type === 'pointerdown' && event.button === 0) {
-      this.requestPointerLock();
-    }
+    if (event.type === 'pointerdown' && event.button === 0) this.requestPointerLock();
   }
 
   onContextMenu(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) {
-      return;
-    }
+    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   }
 
   onKeyDown(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    if (!this.enabled
+        || this.harnessActive
+        || this.uiBlocked
+        || event.target instanceof HTMLInputElement
+        || event.target instanceof HTMLTextAreaElement) {
       return;
     }
-    if (event.code !== 'Escape') {
-      event.stopImmediatePropagation();
-    }
-    if (!MOVEMENT_CODES.has(event.code)) {
-      return;
-    }
+    if (event.code !== 'Escape') event.stopImmediatePropagation();
+    if (!MOVEMENT_CODES.has(event.code)) return;
     event.preventDefault();
     this.keys.add(event.code);
-    if (event.code === 'Space' && !event.repeat && this.state.grounded) {
+    if (event.code === 'Space'
+        && !event.repeat
+        && this.state.grounded
+        && !isSwimmingWaterState(this.state.waterState)) {
       this.jumpQueued = true;
     }
   }
 
   onKeyUp(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) {
-      return;
-    }
-    if (event.code !== 'Escape') {
-      event.stopImmediatePropagation();
-    }
+    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
+    if (event.code !== 'Escape') event.stopImmediatePropagation();
     if (MOVEMENT_CODES.has(event.code)) {
       event.preventDefault();
       this.keys.delete(event.code);
@@ -272,9 +289,7 @@ export class PlayerController {
   }
 
   onMouseMove(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked || !this.pointerLocked) {
-      return;
-    }
+    if (!this.enabled || this.harnessActive || this.uiBlocked || !this.pointerLocked) return;
     this.yaw -= event.movementX * this.config.mouseSensitivity;
     this.pitch -= event.movementY * this.config.mouseSensitivity;
     const maxPitch = THREE.MathUtils.degToRad(this.config.maxPitchDegrees);
@@ -283,18 +298,14 @@ export class PlayerController {
   }
 
   resetInput() {
-    if (this.harnessActive) {
-      return;
-    }
+    if (this.harnessActive) return;
     this.keys.clear();
     this.jumpQueued = false;
   }
 
   emit() {
     const state = this.getStatus();
-    for (const listener of this.listeners) {
-      listener(state);
-    }
+    for (const listener of this.listeners) listener(state);
   }
 
   dispose() {
@@ -307,6 +318,7 @@ export class PlayerController {
     window.removeEventListener('blur', this.boundHandlers.blur);
     document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
     document.removeEventListener('pointerlockchange', this.boundHandlers.pointerLockChange);
+    this.underwaterView?.dispose();
     this.listeners.clear();
   }
 }

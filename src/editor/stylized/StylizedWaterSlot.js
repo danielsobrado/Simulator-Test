@@ -44,6 +44,8 @@ export class StylizedWaterSlot {
       time: this.time,
       config,
     });
+    this.material.side = THREE.DoubleSide;
+    this.material.needsUpdate = true;
     this.mesh = new THREE.Mesh(terrainView.geometry, this.material);
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.visible = false;
