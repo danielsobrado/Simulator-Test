@@ -1,100 +1,80 @@
-import {
-  WATER_BODY_ID_NONE,
-  WATER_BODY_ID_PROCEDURAL_OCEAN,
-  WATER_KIND_OCEAN,
-  WATER_KIND_RIVER,
-  WATER_SAMPLE_FLAG_INCOMPLETE_BED,
-} from './WaterConstants.js';
-import { resolveWaterDomainVersion } from './WaterConfig.js';
-import { createNoWaterSample, createWaterSample } from './WaterSample.js';
+import { resolveWaterDomainConfig, resolveWaterDomainVersion } from './WaterConfig.js';
+import { WaterTerrainModel } from './WaterTerrainModel.js';
 
-const WATER_TILE_ID = 0;
+const WATER_ADAPTER_MARKER = Symbol('water-domain-adapter');
 
-function assertCoordinate(value, fieldName) {
-  if (!Number.isFinite(value)) {
-    throw new Error(`Water query ${fieldName} must be finite.`);
-  }
-}
-
-function sampleBedHeight(generator, cellX, cellZ) {
-  const x0 = Math.floor(cellX);
-  const z0 = Math.floor(cellZ);
-  const x1 = x0 + 1;
-  const z1 = z0 + 1;
-  const tx = cellX - x0;
-  const tz = cellZ - z0;
-  const northWest = generator.sampleHeight(x0, z0);
-  const northEast = generator.sampleHeight(x1, z0);
-  const southWest = generator.sampleHeight(x0, z1);
-  const southEast = generator.sampleHeight(x1, z1);
-  const north = northWest + (northEast - northWest) * tx;
-  const south = southWest + (southEast - southWest) * tx;
-  return north + (south - north) * tz;
-}
-
-export function sampleGeneratorWater(generator, cellX, cellZ) {
-  assertCoordinate(cellX, 'cellX');
-  assertCoordinate(cellZ, 'cellZ');
-  const bedHeight = sampleBedHeight(generator, cellX, cellZ);
-  const tileX = Math.floor(cellX);
-  const tileZ = Math.floor(cellZ);
-  if (generator.sampleTile(tileX, tileZ) !== WATER_TILE_ID) {
-    return createNoWaterSample(bedHeight);
-  }
-
-  const river = typeof generator.isRiver === 'function' && generator.isRiver(tileX, tileZ);
-  if (river) {
-    return createWaterSample({
-      kind: WATER_KIND_RIVER,
-      bodyId: WATER_BODY_ID_NONE,
-      surfaceHeight: Math.max(generator.seaLevel, bedHeight),
-      bedHeight,
-      flags: WATER_SAMPLE_FLAG_INCOMPLETE_BED,
-    });
-  }
-
-  return createWaterSample({
-    kind: WATER_KIND_OCEAN,
-    bodyId: WATER_BODY_ID_PROCEDURAL_OCEAN,
-    surfaceHeight: generator.seaLevel,
-    bedHeight,
-  });
-}
-
-export function ensureWaterDomainGenerator(generator, metadata = {}) {
+function assertGenerator(generator) {
   if (!generator || typeof generator.sampleHeight !== 'function'
       || typeof generator.sampleTile !== 'function' || typeof generator.toMetadata !== 'function') {
     throw new Error('Water-domain generators must expose height, tile, and metadata queries.');
   }
-  const version = resolveWaterDomainVersion(
-    metadata.waterDomainVersion ?? generator.toMetadata().waterDomainVersion,
-  );
+}
 
-  if (typeof generator.sampleWater !== 'function') {
-    Object.defineProperty(generator, 'sampleWater', {
-      configurable: false,
-      enumerable: false,
-      value(cellX, cellZ) {
-        return sampleGeneratorWater(this, cellX, cellZ);
-      },
-      writable: false,
-    });
+function serializableConfig(config) {
+  return {
+    version: config.version,
+    cellSizeMeters: config.cellSizeMeters,
+    shoreDistanceMeters: config.shoreDistanceMeters,
+    ocean: { ...config.ocean },
+    river: { ...config.river },
+  };
+}
+
+export function ensureWaterDomainGenerator(generator, metadata = {}) {
+  assertGenerator(generator);
+  if (generator[WATER_ADAPTER_MARKER]) return generator;
+  if (generator.waterTerrainModel && typeof generator.sampleWater === 'function') {
+    resolveWaterDomainVersion(
+      metadata.waterDomainVersion ?? generator.toMetadata().waterDomainVersion,
+    );
+    return generator;
   }
 
+  const config = resolveWaterDomainConfig(metadata.waterDomain);
+  const version = resolveWaterDomainVersion(
+    metadata.waterDomainVersion ?? config.version,
+  );
+  const baseSampleHeight = generator.sampleHeight.bind(generator);
+  const baseSampleTile = generator.sampleTile.bind(generator);
   const baseToMetadata = generator.toMetadata.bind(generator);
-  if (baseToMetadata().waterDomainVersion === undefined) {
-    Object.defineProperty(generator, 'toMetadata', {
-      configurable: false,
-      enumerable: false,
+  const model = new WaterTerrainModel({
+    source: generator.source ?? null,
+    seed: generator.seed,
+    seaLevel: generator.seaLevel,
+    config,
+    sampleBaseHeight: baseSampleHeight,
+    sampleBaseTile: baseSampleTile,
+    isBaseRiverCell: typeof generator.isRiver === 'function'
+      ? generator.isRiver.bind(generator)
+      : null,
+  });
+
+  Object.defineProperties(generator, {
+    [WATER_ADAPTER_MARKER]: {
+      value: true,
+    },
+    waterTerrainModel: {
+      value: model,
+    },
+    sampleHeight: {
+      value(cellX, cellZ) {
+        return model.sampleHeight(cellX, cellZ);
+      },
+    },
+    sampleWater: {
+      value(cellX, cellZ) {
+        return model.sampleWater(cellX, cellZ);
+      },
+    },
+    toMetadata: {
       value() {
         return Object.freeze({
           ...baseToMetadata(),
           waterDomainVersion: version,
+          waterDomain: serializableConfig(config),
         });
       },
-      writable: false,
-    });
-  }
-
+    },
+  });
   return generator;
 }
