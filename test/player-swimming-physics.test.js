@@ -128,6 +128,32 @@ test('submerged players surface smoothly and leaving water restores gravity', ()
   assert.ok(exited.verticalVelocity < state.verticalVelocity);
 });
 
+test('swimming cannot bypass the configured step height at a steep bank', () => {
+  const state = {
+    ...createPlayerState({ x: 0, z: 0, groundHeight: 0, eyeHeight: config.eyeHeight }),
+    waterState: PLAYER_WATER_SWIMMING,
+    waterDepth: 1.8,
+    waterSurfaceHeight: 1.8,
+    waterBodyId: 5,
+    grounded: false,
+  };
+  const next = stepPlayerPhysics({
+    state,
+    input: input({ forward: 1 }),
+    deltaSeconds: 0.05,
+    config,
+    forward,
+    right,
+    getGroundHeight: (x) => (x > 0.1 ? 4 : 0),
+    getWaterSample: (x) => (x > 0.1
+      ? { coverage: 0, surfaceHeight: 4, bodyId: 0 }
+      : { coverage: 1, surfaceHeight: 1.8, bodyId: 5 }),
+  });
+
+  assert.equal(next.x, 0);
+  assert.equal(next.waterState, PLAYER_WATER_SWIMMING);
+});
+
 test('legacy dry-land physics remains unchanged without water configuration', () => {
   const dryConfig = {
     walkSpeed: 10,
