@@ -2,7 +2,7 @@
 
 Date: **2026-07-27**  
 Branch: `agent/prop-collision-p3`  
-Base: `40daff29ead32e909ba2cb58299b57063c4f72e4`  
+Base: `48e49ea3dc5dbb87cd82c751f3cf7e3a990a9273`  
 Parent plan: [`prop-collision-implementation-plan-2026-07-27.md`](prop-collision-implementation-plan-2026-07-27.md)
 
 ## Delivered
@@ -25,13 +25,14 @@ The collision source consumes:
 - canonical placements from `TreeManifestStore`;
 - the same palette-resolved prototype index used by rendering;
 - canonical placement X/Z, terrain height, rotation, authored scale, species, age, and stable ID;
-- forest edits, path clearance, construction blockers, rock blockers, terrain revisions, and biome-palette revisions.
+- forest edits, path clearance, construction blockers, rock blockers, terrain-edit revisions, and biome-palette revisions.
 
 The source does not consume:
 
 - `InstancedMesh` matrices;
 - proxy or impostor geometry;
 - LOD bands, fades, dither state, wind deformation, or canopy clusters;
+- ordinary terrain streaming revisions;
 - GPU buffers or readbacks.
 
 ### Trunk profile derivation
@@ -43,6 +44,7 @@ Each baked tree prototype receives one immutable collision profile.
 - Radius is sampled from the lower trunk band rather than full trunk/branch bounds.
 - Several vertical slices are evaluated and a conservative lower-radius profile is selected.
 - Sparse low-poly trunks use a complete lower-band fallback.
+- Two-ring cylinders use the grounded ring when no intermediate vertices exist.
 - Invalid or implausibly broad results fail with the prototype ID and require an explicit override.
 - Radius is clamped to `minimumTrunkRadius`.
 - Height, centre offset, and grounded base are retained in prototype-local coordinates.
@@ -59,7 +61,7 @@ prototypeOverrides:
     baseY: 0.05
 ```
 
-Numeric prototype keys are also accepted.
+Numeric prototype keys are also accepted. Override records are cloned before validation and deeply frozen with the final collision configuration.
 
 ### Instance colliders
 
@@ -79,11 +81,14 @@ Tree colliders use the existing collision owner chunks and spatial bins.
 
 - Initial chunks are built synchronously under collision residency count/time budgets.
 - Loaded chunks retain a tree collision signature.
+- A dedicated stylized edit revision changes only for resets and edited cells/vertices; normal chunk streaming does not invalidate tree collision.
+- Rock `prototypeRevision` invalidates blockers when the available rock manifest changes, not when rock LOD changes.
 - Source-authority changes enqueue only currently loaded collision chunks.
+- Every dequeued refresh job counts against the per-frame attempt limit, including stale jobs.
 - Rebuilds compare canonical manifest, resolved prototype, and profile signatures.
 - Unchanged chunks retain their previous data and revision.
 - Changed chunks replace all tree colliders atomically.
-- Felling removes the stable collider.
+- Felling removes the stable collider and any sampled QA target.
 - Planting adds a stable collider.
 - Failed refreshes retain the previous valid collision chunk.
 - Render-only LOD changes never rebuild collision.
@@ -104,7 +109,7 @@ collisionTreeColliders
 collisionTreeRefreshQueueDepth
 ```
 
-Runtime status includes provider profile count, loaded chunks, active tree colliders, queued refreshes, last error, and a sample tree target for P3 QA.
+Runtime status includes provider profile count, loaded chunks, active tree colliders, queued refreshes, last error, and a current sample tree target for P3 QA.
 
 ## P3 QA
 
@@ -128,7 +133,7 @@ window.__editor.characterMotor
 ## Automated coverage added
 
 - lower-trunk extraction ignores leaves and upper branches;
-- sparse low-poly fallback;
+- sparse lower-band and two-ring-cylinder fallbacks;
 - invalid profile override requirements;
 - profile immutability and deterministic signatures;
 - authored placement scale and rotation;
@@ -138,6 +143,7 @@ window.__editor.characterMotor
 - floating-origin invariance;
 - canonical manifest-source boundary;
 - collision-authority placement signatures;
+- edit-only revision tracking;
 - production configuration and override validation;
 - production runtime composition;
 - manifest-derived trunk blocking through the P2 character motor.
