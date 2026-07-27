@@ -1,6 +1,6 @@
 let currentPlayer = null;
 let currentConfig = null;
-let currentTreeSource = null;
+let currentNaturalSource = null;
 const listeners = new Set();
 
 function composition() {
@@ -8,7 +8,7 @@ function composition() {
   return Object.freeze({
     player: currentPlayer,
     collisionConfig: currentConfig,
-    treeSource: currentTreeSource,
+    treeSource: currentNaturalSource,
   });
 }
 
@@ -33,20 +33,25 @@ export function registerCollisionPlayer(player) {
   };
 }
 
-export function registerCollisionTreeSource(source) {
-  if (!source?.treeView) {
-    throw new Error('Collision tree-source registration requires an initialized tree view.');
+export function registerCollisionNaturalSource(source) {
+  if (!source?.treeView && !source?.rockSource) {
+    throw new Error('Collision natural-source registration requires trees or rocks.');
   }
-  currentTreeSource = Object.freeze({
-    treeView: source.treeView,
+  const registered = Object.freeze({
+    treeView: source.treeView ?? null,
     rockSource: source.rockSource ?? null,
   });
+  currentNaturalSource = registered;
   publish();
   return () => {
-    if (currentTreeSource?.treeView !== source.treeView) return;
-    currentTreeSource = null;
+    if (currentNaturalSource !== registered) return;
+    currentNaturalSource = null;
     publish();
   };
+}
+
+export function registerCollisionTreeSource(source) {
+  return registerCollisionNaturalSource(source);
 }
 
 export function subscribeCollisionComposition(listener) {
