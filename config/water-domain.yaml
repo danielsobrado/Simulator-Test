@@ -22,3 +22,10 @@ player:
     verticalSwimSpeed: 3
     buoyancy: 18
     swimDrag: 4
+    underwater:
+      backgroundColor: '#0b3342'
+      fogColor: '#1b6070'
+      fogDensity: 0.055
+      lightScale: 0.38
+      transitionSeconds: 0.28
+      nearPlane: 0.15
