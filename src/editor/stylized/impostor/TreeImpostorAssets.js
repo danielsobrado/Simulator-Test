@@ -100,6 +100,12 @@ export class TreeImpostorAssetLoader {
       expectedPrototypeCount: this.expectedPrototypeCount,
       expectedSourceSignature: this.expectedSourceSignature,
     });
+    if (manifest.requiresRuntimeBake) {
+      console.info(
+        `[tree-impostor] Manifest v${manifest.version} has no foliage mask; runtime v${TREE_IMPOSTOR_MANIFEST_VERSION} bake required.`,
+      );
+      return null;
+    }
     const assetVersion = manifest.generatedAt ?? manifest.sourceSignature;
     const resolveVersionedPath = (path) => versionAssetUrl(this.resolve(path), assetVersion);
     const results = await Promise.allSettled(manifest.prototypes.map(async (prototype) => {
