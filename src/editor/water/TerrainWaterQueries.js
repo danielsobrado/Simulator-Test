@@ -39,22 +39,24 @@ export function sampleWorldStoreWater(worldStore, cellX, cellZ) {
     return createNoWaterSample(bedHeight);
   }
 
-  const kind = base.kind === WATER_KIND_NONE ? WATER_KIND_OCEAN : base.kind;
+  const addedWater = base.kind === WATER_KIND_NONE;
+  const kind = addedWater ? WATER_KIND_OCEAN : base.kind;
   const incompleteRiver = kind === WATER_KIND_RIVER
     && (base.flags & WATER_SAMPLE_FLAG_INCOMPLETE_BED) !== 0;
+  const surfaceHeight = addedWater
+    ? worldStore.generator.seaLevel
+    : incompleteRiver
+      ? Math.max(base.surfaceHeight, bedHeight)
+      : base.surfaceHeight;
   return createWaterSample({
     kind,
-    bodyId: base.kind === WATER_KIND_NONE
-      ? WATER_BODY_ID_PROCEDURAL_OCEAN
-      : base.bodyId,
-    coverage: base.kind === WATER_KIND_NONE ? 1 : base.coverage,
-    surfaceHeight: incompleteRiver
-      ? Math.max(base.surfaceHeight, bedHeight)
-      : base.surfaceHeight,
+    bodyId: addedWater ? WATER_BODY_ID_PROCEDURAL_OCEAN : base.bodyId,
+    coverage: addedWater ? 1 : base.coverage,
+    surfaceHeight,
     bedHeight,
-    shoreDistance: base.shoreDistance,
-    flowX: base.flowX,
-    flowZ: base.flowZ,
+    shoreDistance: addedWater ? 0 : base.shoreDistance,
+    flowX: addedWater ? 0 : base.flowX,
+    flowZ: addedWater ? 0 : base.flowZ,
     flags: base.flags,
   });
 }
