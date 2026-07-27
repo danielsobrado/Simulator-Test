@@ -1,0 +1,46 @@
+# Static player-collision configuration.
+#
+# The collision runtime remains disabled until the P2 character motor is integrated.
+# P0 loads and validates this contract so later phases do not introduce hidden
+# constants or implicit coordinate conventions.
+enabled: false
+schemaVersion: 1
+
+streaming:
+  residentRadius: 1
+  unloadRadius: 2
+  prefetchSeconds: 0.5
+  buildsPerFrame: 1
+  buildBudgetMs: 2
+  binSize: 12
+
+player:
+  radius: 0.35
+  bodyHeight: 1.8
+  skinWidth: 0.03
+  maxSlopeDegrees: 50
+  maxSubstepDistance: 0.35
+  maxIterations: 4
+
+trees:
+  enabled: true
+  minimumTrunkRadius: 0.16
+
+rocks:
+  enabled: true
+  minimumCollidableHeight: 0.3
+  minimumWalkableHeight: 0.7
+  maximumProxyTriangles: 96
+
+objects:
+  enabled: true
+
+constructions:
+  enabled: true
+  curveSegmentLength: 1.25
+
+debug:
+  colliders: false
+  broadphase: false
+  support: false
+  contacts: false
