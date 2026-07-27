@@ -74,6 +74,20 @@ test('sparse low-poly trunks use the complete lower-band fallback', () => {
   assert.ok(profile.radius >= 0.39 && profile.radius <= 0.41);
 });
 
+test('two-ring cylinder trunks derive from the grounded ring', () => {
+  const profile = deriveTreeCollisionProfile({
+    parts: [part('trunk', [
+      ...ring(0, 0.45),
+      ...ring(10, 0.35),
+    ])],
+    prototypeIndex: 0,
+    config,
+  });
+  assert.ok(profile.radius >= 0.44 && profile.radius <= 0.46);
+  assert.equal(profile.baseY, 0);
+  assert.equal(profile.height, 10);
+});
+
 test('invalid lower trunks require and accept explicit overrides', () => {
   const parts = [part('trunk', [[0, 0, 0], [0, 10, 0]])];
   assert.throws(
