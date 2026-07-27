@@ -7,9 +7,12 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
   constructor(options) {
     super(options);
     installTerrainWaterQueries(options.terrainView);
+    this.collisionSourceDisposed = false;
     this.releaseCollisionTreeSource = null;
     this.ready = this.ready.then((result) => {
-      if (!this.impostorBakeMode && this.treeView?.manifestStore) {
+      if (!this.collisionSourceDisposed
+          && !this.impostorBakeMode
+          && this.treeView?.manifestStore) {
         this.releaseCollisionTreeSource = registerCollisionTreeSource({
           treeView: this.treeView,
           rockSource: this.rockView,
@@ -47,6 +50,7 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
   }
 
   dispose() {
+    this.collisionSourceDisposed = true;
     this.releaseCollisionTreeSource?.();
     this.releaseCollisionTreeSource = null;
     super.dispose();
