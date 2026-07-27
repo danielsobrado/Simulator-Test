@@ -1,3 +1,5 @@
+import { createMeshColliderPrototype } from '../mesh/MeshColliderPrototype.js';
+import { createRockCollisionProxy } from './RockCollisionProxy.js';
 import { prototypeCollisionKeys } from './PrototypeCollisionKeys.js';
 import {
   deriveRockCollisionProfiles,
@@ -54,6 +56,10 @@ function sourceEpoch(rockView) {
   ].join(':');
 }
 
+function prototypeId(profile) {
+  return `rock-walkable:${encodeURIComponent(profile.id)}`;
+}
+
 export function createRockCollisionSource({ rockView, config }) {
   if (!rockView || !Array.isArray(rockView.prototypes)
       || typeof rockView.manifestForChunk !== 'function') {
@@ -63,6 +69,7 @@ export function createRockCollisionSource({ rockView, config }) {
   let observedPrototypeRevision = -1;
   let profiles = EMPTY_PROFILES;
   let profileSignature = 'profiles:empty';
+  const meshPrototypes = new Map();
 
   function ensureProfiles() {
     const revision = rockView.prototypeRevision ?? 0;
@@ -91,14 +98,68 @@ export function createRockCollisionSource({ rockView, config }) {
     return profiles;
   }
 
+  function ensureWalkablePrototype(prototypeIndex, world) {
+    if (!world?.registerPrototype) {
+      throw new Error('Walkable rock collision requires a collision world.');
+    }
+    const currentProfiles = ensureProfiles();
+    const profile = currentProfiles[prototypeIndex];
+    const visual = rockView.prototypes[prototypeIndex]?.geometry;
+    if (!profile || !visual) {
+      throw new Error(`Walkable rock collision prototype ${prototypeIndex} is unavailable.`);
+    }
+    const id = prototypeId(profile);
+    const cached = meshPrototypes.get(id);
+    if (cached) return world.registerPrototype(cached);
+
+    const proxy = createRockCollisionProxy({
+      visualGeometry: visual,
+      authoredGeometry: rockView.collisionProxyGeometries?.[prototypeIndex] ?? null,
+      config,
+      prototypeId: profile.id,
+      allowGenerated: config.allowGeneratedProxyFallback,
+    });
+    let descriptor;
+    try {
+      descriptor = createMeshColliderPrototype({
+        id,
+        geometry: proxy.geometry,
+        maximumTriangles: config.maximumProxyTriangles,
+        maxLeafTriangles: config.bvhMaxLeafTriangles,
+        metadata: {
+          source: 'rock',
+          assetKey: profile.id,
+          generated: proxy.generated,
+          overlap: proxy.overlap,
+        },
+      });
+    } finally {
+      proxy.geometry.dispose();
+    }
+    meshPrototypes.set(id, descriptor);
+    return world.registerPrototype(descriptor);
+  }
+
+  function meshPrototypeStatus() {
+    let triangles = 0;
+    let generated = 0;
+    for (const prototype of meshPrototypes.values()) {
+      triangles += prototype.resource?.triangleCount ?? 0;
+      if (prototype.metadata.generated) generated += 1;
+    }
+    return Object.freeze({ count: meshPrototypes.size, triangles, generated });
+  }
+
   return Object.freeze({
-    descriptor: Object.freeze({ id: 'production-rock-primitives' }),
+    descriptor: Object.freeze({ id: 'production-rock-collision' }),
     getProfiles: () => ensureProfiles(),
     getCachedProfileCount: () => profiles.length,
     getProfileSignature() {
       ensureProfiles();
       return profileSignature;
     },
+    getMeshPrototype: ensureWalkablePrototype,
+    getMeshPrototypeStatus: meshPrototypeStatus,
     epoch() {
       ensureProfiles();
       return `${sourceEpoch(rockView)}:${profileSignature}`;
@@ -131,6 +192,10 @@ export function createRockCollisionSource({ rockView, config }) {
         signature: `${profileSignature}|${rockCollisionPlacementSignature(placements)}`,
         placements,
       });
+    },
+    dispose() {
+      for (const prototype of meshPrototypes.values()) prototype.resource?.dispose?.();
+      meshPrototypes.clear();
     },
   });
 }
