@@ -1,5 +1,8 @@
 import * as THREE from 'three/webgpu';
+import { markAttributeRangeUpdated } from '../attributeUpload.js';
 import { createCpuTreeImpostorMaterial, updateImpostorCameraUniforms } from './TreeImpostorMaterial.js';
+
+const DEFAULT_APPEARANCE = Object.freeze([1, 1, 1, 1]);
 
 function createGeometry(capacity) {
   const positions = new Float32Array([
@@ -28,6 +31,10 @@ function createGeometry(capacity) {
   geometry.setAttribute(
     'instanceImpostorParams',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4),
+  );
+  geometry.setAttribute(
+    'instanceImpostorAppearance',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4).fill(1), 4),
   );
   geometry.instanceCount = 0;
   return geometry;
@@ -65,6 +72,7 @@ export class CpuTreeImpostorBatch {
     this.frustum.setFromProjectionMatrix(this.projectionView);
     const transforms = this.geometry.getAttribute('instanceTransform');
     const parameters = this.geometry.getAttribute('instanceImpostorParams');
+    const appearances = this.geometry.getAttribute('instanceImpostorAppearance');
     let count = 0;
 
     for (const record of this.records) {
@@ -75,21 +83,29 @@ export class CpuTreeImpostorBatch {
       );
       this.sphere.radius = record.radius;
       if (!this.frustum.intersectsSphere(this.sphere)) continue;
-      const transformOffset = count * 4;
-      transforms.array[transformOffset] = record.x - origin.x;
-      transforms.array[transformOffset + 1] = record.y;
-      transforms.array[transformOffset + 2] = record.z - origin.z;
-      transforms.array[transformOffset + 3] = record.scale;
-      parameters.array[transformOffset] = record.yaw;
-      parameters.array[transformOffset + 1] = record.fade;
-      parameters.array[transformOffset + 2] = record.seed;
-      parameters.array[transformOffset + 3] = record.radius;
+      const offset = count * 4;
+      transforms.array[offset] = record.x - origin.x;
+      transforms.array[offset + 1] = record.y;
+      transforms.array[offset + 2] = record.z - origin.z;
+      transforms.array[offset + 3] = record.scale;
+      parameters.array[offset] = record.yaw;
+      parameters.array[offset + 1] = record.fade;
+      parameters.array[offset + 2] = record.seed;
+      parameters.array[offset + 3] = record.radius;
+      const appearance = record.appearance ?? DEFAULT_APPEARANCE;
+      appearances.array[offset] = appearance[0];
+      appearances.array[offset + 1] = appearance[1];
+      appearances.array[offset + 2] = appearance[2];
+      appearances.array[offset + 3] = appearance[3];
       count += 1;
     }
 
     this.geometry.instanceCount = count;
-    transforms.needsUpdate = true;
-    parameters.needsUpdate = true;
+    if (count > 0) {
+      markAttributeRangeUpdated(transforms, count, { counter: 'treeImpostorAttributeBytesUploaded' });
+      markAttributeRangeUpdated(parameters, count, { counter: 'treeImpostorAttributeBytesUploaded' });
+      markAttributeRangeUpdated(appearances, count, { counter: 'treeImpostorAttributeBytesUploaded' });
+    }
     return count;
   }
 
