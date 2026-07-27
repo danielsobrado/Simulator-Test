@@ -67,7 +67,7 @@ function applySwimmingVertical({
 }) {
   const waterConfig = config.water;
   const targetY = water.waterSurfaceHeight + config.eyeHeight - waterConfig.swimDepth;
-  const verticalInput = clamp(input.ascend - input.descend, -1, 1);
+  const verticalInput = clamp((input.ascend ?? 0) - (input.descend ?? 0), -1, 1);
   const desiredVelocity = verticalInput * waterConfig.verticalSwimSpeed;
   const springAcceleration = (targetY - state.y) * waterConfig.buoyancy;
   const dragAcceleration = (desiredVelocity - state.verticalVelocity) * waterConfig.swimDrag;
