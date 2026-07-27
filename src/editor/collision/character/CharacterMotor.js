@@ -1,5 +1,6 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import { COLLISION_LAYERS } from '../CollisionLayers.js';
+import { COLLIDER_TYPE_MESH_INSTANCE } from '../colliders/ColliderRecords.js';
 import {
   createCharacterCapsule,
   moveCharacterCapsule,
@@ -95,7 +96,22 @@ export class CharacterMotor {
     this.primitiveTests = 0;
   }
 
+  contact(capsule, collider, out = this.contactScratch) {
+    this.primitiveTests += 1;
+    return collider.type === COLLIDER_TYPE_MESH_INSTANCE
+      ? this.collisionRuntime.findMeshSideContact?.(
+        capsule,
+        collider,
+        this.config.skinWidth,
+        out,
+      ) ?? null
+      : findPrimitiveSideContact(capsule, collider, this.config.skinWidth, out);
+  }
+
   overlaps(capsule, collider) {
+    if (collider.type === COLLIDER_TYPE_MESH_INSTANCE) {
+      return this.contact(capsule, collider, {}) !== null;
+    }
     this.primitiveTests += 1;
     return capsuleOverlapsPrimitive(capsule, collider, this.config.skinWidth);
   }
@@ -116,13 +132,7 @@ export class CharacterMotor {
     for (; iterations < this.config.maxIterations; iterations += 1) {
       let deepest = null;
       for (const collider of candidates) {
-        this.primitiveTests += 1;
-        const contact = findPrimitiveSideContact(
-          resolved,
-          collider,
-          this.config.skinWidth,
-          this.contactScratch,
-        );
+        const contact = this.contact(resolved, collider);
         if (!contact) continue;
         if (!deepest
             || contact.depth > deepest.depth + CONTACT_DEPTH_EPSILON
@@ -154,15 +164,23 @@ export class CharacterMotor {
     return { capsule: resolved, iterations, blocked, exhausted };
   }
 
+  meshSupport(options) {
+    return this.collisionRuntime.findMeshTopSupport?.(options) ?? null;
+  }
+
   move({
     start,
     displacement,
     grounded,
     allowStep = grounded,
+    supportDownDistance = this.groundSnapDistance,
   }) {
     assertFinitePoint(start, 'start');
     if (!displacement || !Number.isFinite(displacement.x) || !Number.isFinite(displacement.z)) {
       throw new Error('Character motor displacement must contain finite x and z.');
+    }
+    if (!Number.isFinite(supportDownDistance) || supportDownDistance < 0) {
+      throw new Error('Character motor supportDownDistance must be non-negative.');
     }
     if (!this.previousValidPosition) this.previousValidPosition = copyPosition(start);
     this.primitiveTests = 0;
@@ -187,7 +205,7 @@ export class CharacterMotor {
     };
     const queryStart = {
       x: start.x,
-      y: start.y - this.groundSnapDistance,
+      y: start.y - Math.max(this.groundSnapDistance, supportDownDistance),
       z: start.z,
     };
     const queryEnd = {
@@ -275,6 +293,7 @@ export class CharacterMotor {
           stepHeight: this.stepHeight,
           skinWidth: this.config.skinWidth,
           collides: (candidateCapsule, records) => this.collides(candidateCapsule, records),
+          findMeshTopSupport: (options) => this.meshSupport(options),
         });
         if (step) {
           capsule = step.capsule;
@@ -293,8 +312,9 @@ export class CharacterMotor {
       terrainProvider: this.terrainProvider,
       candidates,
       maximumUp: grounded ? this.stepHeight : 0,
-      maximumDown: this.groundSnapDistance,
+      maximumDown: supportDownDistance,
       maximumSlopeCosine: this.maximumSlopeCosine,
+      findMeshTopSupport: (options) => this.meshSupport(options),
     }) ?? this.terrainProvider.sample(capsule.x, capsule.z, capsule.radius);
     const position = copyPosition({ x: capsule.x, y: capsule.y, z: capsule.z });
     this.previousValidPosition = position;
