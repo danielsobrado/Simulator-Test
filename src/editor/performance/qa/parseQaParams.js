@@ -74,27 +74,31 @@ const SCENARIOS = Object.freeze({
       yawDegrees: 0,
     },
   },
+  'collision-p5': {
+    id: 'collision-p5',
+    label: 'Collision P5 walkable rock BVH',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 6,
+      speed: 'run',
+      warmup: 10,
+      spawn: { x: 0, z: 0 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {
-  if (!params.has(key)) {
-    return fallback;
-  }
+  if (!params.has(key)) return fallback;
   const value = Number(params.get(key));
   return Number.isFinite(value) ? value : fallback;
 }
 
 function readBoolean(params, key, fallback) {
-  if (!params.has(key)) {
-    return fallback;
-  }
+  if (!params.has(key)) return fallback;
   const raw = params.get(key);
-  if (raw === '' || raw === '1' || raw === 'true') {
-    return true;
-  }
-  if (raw === '0' || raw === 'false') {
-    return false;
-  }
+  if (raw === '' || raw === '1' || raw === 'true') return true;
+  if (raw === '0' || raw === 'false') return false;
   return fallback;
 }
 
@@ -110,9 +114,7 @@ export function parseQaParams(search = '') {
     typeof search === 'string' && search.startsWith('?') ? search.slice(1) : search,
   );
   const qaRaw = params.get('qa');
-  if (qaRaw === null) {
-    return null;
-  }
+  if (qaRaw === null) return null;
 
   const scenarioId = qaRaw === '' || qaRaw === '1' || qaRaw === 'true'
     ? 'move'
