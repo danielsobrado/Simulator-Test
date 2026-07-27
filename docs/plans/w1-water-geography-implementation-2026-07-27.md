@@ -108,7 +108,7 @@ Actual depth tint, absorption, refraction, geographic foam, and underwater rende
 
 ## Validation
 
-Focused Node tests: 12 passed.
+Focused Node tests: 13 passed.
 
 Coverage includes:
 
@@ -116,7 +116,7 @@ Coverage includes:
 - Ocean determinism.
 - Imported river carving and downstream surface continuity.
 - River bank blending.
-- Shared water-field edges bit-identical across chunks.
+- Ocean and river water-field edges bit-identical across chunks.
 - CPU and half-float field agreement within format tolerance.
 - W0 sample invariants, metadata compatibility, and configuration validation.
 
