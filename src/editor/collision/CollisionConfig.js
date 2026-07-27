@@ -198,6 +198,13 @@ export function validateCollisionConfig(config) {
   return config;
 }
 
+function cloneTreeOverrides(overrides = {}) {
+  assertObject(overrides, 'collision.trees.prototypeOverrides');
+  return Object.fromEntries(
+    Object.entries(overrides).map(([key, value]) => [key, { ...value }]),
+  );
+}
+
 function mergeCollisionConfig(input = {}) {
   assertObject(input, 'collision');
   return {
@@ -208,10 +215,7 @@ function mergeCollisionConfig(input = {}) {
     trees: {
       ...COLLISION_CONFIG_DEFAULTS.trees,
       ...(input.trees ?? {}),
-      prototypeOverrides: {
-        ...COLLISION_CONFIG_DEFAULTS.trees.prototypeOverrides,
-        ...(input.trees?.prototypeOverrides ?? {}),
-      },
+      prototypeOverrides: cloneTreeOverrides(input.trees?.prototypeOverrides ?? {}),
     },
     rocks: { ...COLLISION_CONFIG_DEFAULTS.rocks, ...(input.rocks ?? {}) },
     objects: { ...COLLISION_CONFIG_DEFAULTS.objects, ...(input.objects ?? {}) },
