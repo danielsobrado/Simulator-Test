@@ -26,9 +26,12 @@ function clampToBounds(value, minimum, maximum) {
 
 function noWaterSample(groundHeight) {
   return {
+    kind: 0,
     bodyId: 0,
     coverage: 0,
     surfaceHeight: groundHeight,
+    flowX: 0,
+    flowZ: 0,
   };
 }
 
@@ -50,6 +53,9 @@ function sampleWaterState({ state, sample, eyeY, config }) {
       waterDepth: 0,
       waterSurfaceHeight: null,
       waterBodyId: 0,
+      waterKind: 0,
+      waterFlowX: 0,
+      waterFlowZ: 0,
       headSubmerged: false,
     };
   }
@@ -133,6 +139,9 @@ export function createPlayerState({ x, z, groundHeight, eyeHeight }) {
     waterDepth: 0,
     waterSurfaceHeight: null,
     waterBodyId: 0,
+    waterKind: 0,
+    waterFlowX: 0,
+    waterFlowZ: 0,
     headSubmerged: false,
   };
 }
@@ -161,13 +170,16 @@ export function stepPlayerPhysics({
   const length = Math.hypot(movementX, movementZ);
   const speed = movementSpeed(movementState, input, config);
   const scale = length > 0 ? speed * delta / length : 0;
+  const currentScale = isSwimmingWaterState(movementState.waterState)
+    ? Math.max(0, Number(config.water?.currentDriftSpeed) || 0) * delta
+    : 0;
   const desiredX = clampToBounds(
-    state.x + movementX * scale,
+    state.x + movementX * scale + (movementState.waterFlowX ?? 0) * currentScale,
     bounds?.minX,
     bounds?.maxX,
   );
   const desiredZ = clampToBounds(
-    state.z + movementZ * scale,
+    state.z + movementZ * scale + (movementState.waterFlowZ ?? 0) * currentScale,
     bounds?.minZ,
     bounds?.maxZ,
   );

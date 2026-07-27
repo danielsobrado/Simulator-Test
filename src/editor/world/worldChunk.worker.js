@@ -26,6 +26,7 @@ self.addEventListener('message', (event) => {
       page.tiles.buffer,
       page.heights.buffer,
       page.waterFieldPixels.buffer,
+      page.waterFlowPixels.buffer,
     ];
     if (page.tilePixels?.buffer) {
       transfer.push(page.tilePixels.buffer);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { registerCollisionPlayer } from '../collision/CollisionPlayerBridge.js';
 import { createPlayerState, stepPlayerPhysics } from './PlayerPhysics.js';
+import { createPlayerWaterEvents } from './PlayerWaterEvents.js';
 import { isSwimmingWaterState } from './PlayerWaterState.js';
 import { UnderwaterViewController } from '../water/UnderwaterViewController.js';
 
@@ -49,6 +50,7 @@ export class PlayerController {
     this.jumpQueued = false;
     this.lastTimestamp = null;
     this.listeners = new Set();
+    this.waterEventListeners = new Set();
     this.forward = new THREE.Vector3();
     this.right = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
@@ -116,6 +118,9 @@ export class PlayerController {
       waterDepth: this.state.waterDepth,
       waterSurfaceHeight: this.state.waterSurfaceHeight,
       waterBodyId: this.state.waterBodyId,
+      waterKind: this.state.waterKind,
+      waterFlowX: this.state.waterFlowX,
+      waterFlowZ: this.state.waterFlowZ,
       headSubmerged: this.state.headSubmerged,
     });
   }
@@ -220,8 +225,10 @@ export class PlayerController {
 
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
     if (Number.isFinite(x) && Number.isFinite(z)) {
+      const previous = this.state;
       this.state = this.createState(x, z);
       this.resetCollision();
+      this.emitWaterEvents(previous, this.state, performance.now());
       this.underwaterView?.restoreSurfaceEnvironment();
     }
     if (Number.isFinite(yaw)) this.yaw = yaw;
@@ -239,14 +246,24 @@ export class PlayerController {
     return () => this.listeners.delete(listener);
   }
 
+  subscribeWaterEvents(listener) {
+    if (typeof listener !== 'function') {
+      throw new Error('Water event listener must be a function.');
+    }
+    this.waterEventListeners.add(listener);
+    return () => this.waterEventListeners.delete(listener);
+  }
+
   setEnabled(enabled, spawn = null) {
     this.enabled = Boolean(enabled);
     this.lastTimestamp = null;
     this.resetInput();
 
     if (this.enabled && spawn) {
+      const previous = this.state;
       this.state = this.createState(spawn.x, spawn.z);
       this.resetCollision();
+      this.emitWaterEvents(previous, this.state, performance.now());
       this.applyCameraState();
     }
 
@@ -295,8 +312,9 @@ export class PlayerController {
       || this.keys.has('ControlRight')
       || this.keys.has('KeyC')
     ) ? 1 : 0;
+    const previousState = this.state;
     const nextState = stepPlayerPhysics({
-      state: this.state,
+      state: previousState,
       input: {
         forward: acceptsMovement
           ? Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'))
@@ -321,16 +339,17 @@ export class PlayerController {
         ? (request) => this.resolveHorizontalMotion(request)
         : null,
     });
-    const waterChanged = nextState.waterState !== this.state.waterState
-      || nextState.headSubmerged !== this.state.headSubmerged
-      || nextState.waterBodyId !== this.state.waterBodyId;
-    const collisionChanged = nextState.collisionReady !== this.state.collisionReady
-      || nextState.collisionBlocked !== this.state.collisionBlocked
-      || nextState.supportSourceId !== this.state.supportSourceId;
+    const waterChanged = nextState.waterState !== previousState.waterState
+      || nextState.headSubmerged !== previousState.headSubmerged
+      || nextState.waterBodyId !== previousState.waterBodyId;
+    const collisionChanged = nextState.collisionReady !== previousState.collisionReady
+      || nextState.collisionBlocked !== previousState.collisionBlocked
+      || nextState.supportSourceId !== previousState.supportSourceId;
     this.state = nextState;
     this.jumpQueued = false;
     this.applyCameraState();
     this.underwaterView?.update(current);
+    this.emitWaterEvents(previousState, nextState, current);
     if (waterChanged || collisionChanged) this.emit();
   }
 
@@ -416,6 +435,13 @@ export class PlayerController {
     this.jumpQueued = false;
   }
 
+  emitWaterEvents(previousState, currentState, timestamp) {
+    if (this.waterEventListeners.size === 0) return;
+    for (const event of createPlayerWaterEvents(previousState, currentState, timestamp)) {
+      for (const listener of this.waterEventListeners) listener(event);
+    }
+  }
+
   emit() {
     const state = this.getStatus();
     for (const listener of this.listeners) listener(state);
@@ -434,5 +460,6 @@ export class PlayerController {
     document.removeEventListener('pointerlockchange', this.boundHandlers.pointerLockChange);
     this.underwaterView?.dispose();
     this.listeners.clear();
+    this.waterEventListeners.clear();
   }
 }

@@ -19,6 +19,19 @@ function thresholdActive(value, threshold, hysteresis, wasActive) {
   return value >= boundary;
 }
 
+function dryState(surfaceHeight = null, bodyId = 0, kind = 0) {
+  return Object.freeze({
+    waterState: PLAYER_WATER_DRY,
+    waterDepth: 0,
+    waterSurfaceHeight: surfaceHeight,
+    waterBodyId: bodyId,
+    waterKind: kind,
+    waterFlowX: 0,
+    waterFlowZ: 0,
+    headSubmerged: false,
+  });
+}
+
 export function isSwimmingWaterState(value) {
   return SWIMMING_STATES.has(value);
 }
@@ -31,26 +44,12 @@ export function resolvePlayerWaterState({
   config,
 }) {
   const previousState = previous?.waterState ?? PLAYER_WATER_DRY;
-  if (!isCoveredWater(waterSample)) {
-    return Object.freeze({
-      waterState: PLAYER_WATER_DRY,
-      waterDepth: 0,
-      waterSurfaceHeight: null,
-      waterBodyId: 0,
-      headSubmerged: false,
-    });
-  }
+  if (!isCoveredWater(waterSample)) return dryState();
 
   const footY = eyeY - eyeHeight;
   const waterDepth = Math.max(0, waterSample.surfaceHeight - footY);
   if (waterDepth <= 0) {
-    return Object.freeze({
-      waterState: PLAYER_WATER_DRY,
-      waterDepth: 0,
-      waterSurfaceHeight: waterSample.surfaceHeight,
-      waterBodyId: waterSample.bodyId ?? 0,
-      headSubmerged: false,
-    });
+    return dryState(waterSample.surfaceHeight, waterSample.bodyId ?? 0, waterSample.kind ?? 0);
   }
 
   const hysteresis = config.transitionHysteresis;
@@ -78,6 +77,9 @@ export function resolvePlayerWaterState({
     waterDepth,
     waterSurfaceHeight: waterSample.surfaceHeight,
     waterBodyId: waterSample.bodyId ?? 0,
+    waterKind: waterSample.kind ?? 0,
+    waterFlowX: Number.isFinite(waterSample.flowX) ? waterSample.flowX : 0,
+    waterFlowZ: Number.isFinite(waterSample.flowZ) ? waterSample.flowZ : 0,
     headSubmerged: swimming && headSubmerged,
   });
 }

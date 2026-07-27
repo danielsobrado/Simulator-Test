@@ -22,6 +22,7 @@ player:
     verticalSwimSpeed: 3
     buoyancy: 18
     swimDrag: 4
+    currentDriftSpeed: 0.65
     underwater:
       backgroundColor: '#0b3342'
       fogColor: '#1b6070'

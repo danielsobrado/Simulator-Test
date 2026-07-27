@@ -1,4 +1,5 @@
 const WATER_FIELD_CHANNELS = 4;
+const WATER_FLOW_CHANNELS = 2;
 const WATER_FIELD_HALO = 1;
 const DIAGONAL_WEIGHT = Math.SQRT1_2;
 
@@ -58,6 +59,15 @@ export function halfToFloat(value) {
   return conversionFloat[0];
 }
 
+export function encodeWaterFlowComponent(value) {
+  const clamped = Math.max(-1, Math.min(1, Number.isFinite(value) ? value : 0));
+  return Math.round((clamped * 0.5 + 0.5) * 255);
+}
+
+export function decodeWaterFlowComponent(value) {
+  return Math.max(-1, Math.min(1, Number(value) / 255 * 2 - 1));
+}
+
 function sampleIndex(x, z, width) {
   return z * width + x;
 }
@@ -85,6 +95,35 @@ function resolveDrySurfaceHeight(samples, sampleWidth, localX, localZ, fallback)
   }
 
   return totalWeight > 0 ? weightedSurface / totalWeight : fallback;
+}
+
+function resolveDryFlow(samples, sampleWidth, localX, localZ) {
+  let weightedX = 0;
+  let weightedZ = 0;
+  let totalWeight = 0;
+  const centerX = localX + WATER_FIELD_HALO;
+  const centerZ = localZ + WATER_FIELD_HALO;
+  for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
+    for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+      if (offsetX === 0 && offsetZ === 0) continue;
+      const neighbor = samples[sampleIndex(
+        centerX + offsetX,
+        centerZ + offsetZ,
+        sampleWidth,
+      )];
+      if (!(neighbor.coverage > 0)) continue;
+      const distanceWeight = offsetX !== 0 && offsetZ !== 0 ? DIAGONAL_WEIGHT : 1;
+      const weight = neighbor.coverage * distanceWeight;
+      weightedX += (Number.isFinite(neighbor.flowX) ? neighbor.flowX : 0) * weight;
+      weightedZ += (Number.isFinite(neighbor.flowZ) ? neighbor.flowZ : 0) * weight;
+      totalWeight += weight;
+    }
+  }
+  if (totalWeight <= 0) return { x: 0, z: 0 };
+  const x = weightedX / totalWeight;
+  const z = weightedZ / totalWeight;
+  const length = Math.hypot(x, z);
+  return length > 1e-8 ? { x: x / length, z: z / length } : { x: 0, z: 0 };
 }
 
 export function createWaterField({
@@ -150,6 +189,7 @@ export function createWaterField({
     : 0;
 
   const pixels = new Uint16Array(vertexCount * WATER_FIELD_CHANNELS);
+  const flowPixels = new Uint8Array(vertexCount * WATER_FLOW_CHANNELS);
   for (let localZ = 0; localZ < height; localZ += 1) {
     for (let localX = 0; localX < width; localX += 1) {
       const sample = samples[sampleIndex(
@@ -159,16 +199,22 @@ export function createWaterField({
       )];
       const vertexIndex = localZ * width + localX;
       const index = vertexIndex * WATER_FIELD_CHANNELS;
+      const flowIndex = vertexIndex * WATER_FLOW_CHANNELS;
       const depth = sample.coverage > 0 || !Number.isFinite(sample.bedHeight)
         ? sample.depth
         : Math.max(0, surfaceHeights[vertexIndex] - sample.bedHeight);
+      const flow = sample.coverage > 0
+        ? { x: sample.flowX, z: sample.flowZ }
+        : resolveDryFlow(samples, sampleWidth, localX, localZ);
       pixels[index] = floatToHalf(sample.coverage);
       pixels[index + 1] = floatToHalf(surfaceHeights[vertexIndex] - surfaceOrigin);
       pixels[index + 2] = floatToHalf(depth);
       pixels[index + 3] = floatToHalf(sample.shoreDistance);
+      flowPixels[flowIndex] = encodeWaterFlowComponent(flow.x);
+      flowPixels[flowIndex + 1] = encodeWaterFlowComponent(flow.z);
     }
   }
-  return Object.freeze({ pixels, width, height, surfaceOrigin });
+  return Object.freeze({ pixels, flowPixels, width, height, surfaceOrigin });
 }
 
 function resolveChunkSize(page) {
@@ -197,6 +243,9 @@ export function enrichPageWaterField(page, sampleWater) {
   page.waterFieldWidth = field.width;
   page.waterFieldHeight = field.height;
   page.waterFieldSurfaceOrigin = field.surfaceOrigin;
+  page.waterFlowPixels = field.flowPixels;
+  page.waterFlowWidth = field.width;
+  page.waterFlowHeight = field.height;
   const previousRevision = Number.isSafeInteger(page.waterFieldRevision)
     ? page.waterFieldRevision
     : 0;

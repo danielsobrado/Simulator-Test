@@ -6,6 +6,7 @@ import {
   WATER_KIND_RIVER,
   WATER_SAMPLE_FLAG_INCOMPLETE_BED,
 } from './WaterConstants.js';
+import { createWaterNavigationSample } from './WaterNavigation.js';
 import { createNoWaterSample, createWaterSample } from './WaterSample.js';
 
 const WATER_TILE_ID = 0;
@@ -24,6 +25,21 @@ function assertTerrainView(terrainView) {
     throw new Error('Terrain water queries require a floating origin.');
   }
   assertWorldStore(terrainView.worldStore);
+}
+
+function toCanonicalWorldSample(sample) {
+  if (sample.kind === WATER_KIND_NONE || (sample.flowX === 0 && sample.flowZ === 0)) return sample;
+  return createWaterSample({
+    kind: sample.kind,
+    bodyId: sample.bodyId,
+    coverage: sample.coverage,
+    surfaceHeight: sample.surfaceHeight,
+    bedHeight: sample.bedHeight,
+    shoreDistance: sample.shoreDistance,
+    flowX: sample.flowX,
+    flowZ: -sample.flowZ,
+    flags: sample.flags,
+  });
 }
 
 export function sampleWorldStoreWater(worldStore, cellX, cellZ) {
@@ -75,17 +91,25 @@ export function getCanonicalWater(terrainView, worldX, worldZ) {
     throw new Error('Canonical water coordinates must be finite.');
   }
   const tileSize = terrainView.worldStore.tileSize;
-  return sampleWorldStoreWater(
+  return toCanonicalWorldSample(sampleWorldStoreWater(
     terrainView.worldStore,
     worldX / tileSize,
     -worldZ / tileSize,
-  );
+  ));
 }
 
 export function getWorldWater(terrainView, renderX, renderZ) {
   assertTerrainView(terrainView);
   const canonical = terrainView.floatingOrigin.toCanonical(renderX, renderZ);
   return getCanonicalWater(terrainView, canonical.x, canonical.z);
+}
+
+export function getCanonicalWaterNavigation(terrainView, worldX, worldZ, config = {}) {
+  return createWaterNavigationSample(getCanonicalWater(terrainView, worldX, worldZ), config);
+}
+
+export function getWorldWaterNavigation(terrainView, renderX, renderZ, config = {}) {
+  return createWaterNavigationSample(getWorldWater(terrainView, renderX, renderZ), config);
 }
 
 export function installTerrainWaterQueries(terrainView) {
@@ -106,6 +130,26 @@ export function installTerrainWaterQueries(terrainView) {
       enumerable: false,
       value(renderX, renderZ) {
         return getWorldWater(this, renderX, renderZ);
+      },
+      writable: false,
+    });
+  }
+  if (typeof terrainView.getCanonicalWaterNavigation !== 'function') {
+    Object.defineProperty(terrainView, 'getCanonicalWaterNavigation', {
+      configurable: false,
+      enumerable: false,
+      value(worldX, worldZ, config = {}) {
+        return getCanonicalWaterNavigation(this, worldX, worldZ, config);
+      },
+      writable: false,
+    });
+  }
+  if (typeof terrainView.getWorldWaterNavigation !== 'function') {
+    Object.defineProperty(terrainView, 'getWorldWaterNavigation', {
+      configurable: false,
+      enumerable: false,
+      value(renderX, renderZ, config = {}) {
+        return getWorldWaterNavigation(this, renderX, renderZ, config);
       },
       writable: false,
     });

@@ -187,9 +187,9 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     }
 
     const pixelsMissing = !page.tilePixels || !page.surfaceMaskPixels;
-    const waterFieldMissing = !page.waterFieldPixels;
+    const waterFieldsMissing = !page.waterFieldPixels || !page.waterFlowPixels;
     const neighborHaloDirty = this.hasHaloTileOverrides(originX, originZ);
-    if (appliedTileOverrides || appliedHeightOverrides || pixelsMissing || waterFieldMissing
+    if (appliedTileOverrides || appliedHeightOverrides || pixelsMissing || waterFieldsMissing
         || page.renderPixelsDirty || neighborHaloDirty) {
       this.refreshPageRenderPixels(page);
     }

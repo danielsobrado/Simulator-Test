@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
+import { evaluateAquaticPlacement } from '../water/AquaticPlacement.js';
 import { instanceCapacity } from './scatterMath.js';
 import { buildStableChunkManifest } from './StableScatterManifest.js';
 import {
@@ -73,11 +74,9 @@ export class StylizedGroundDetailView {
     this.prototypes = [];
     this.prototypeHeightOffsets = [];
     this.prototypePlacementRules = [];
+    this.prototypeWaterRules = [];
     this.prototypeBiomeRules = [];
     this.prototypeIndexForRoll = null;
-    // Bumped by every `appendVariants`. The resident-window key below is
-    // otherwise blind to the prototype set, so a variant that streams in while
-    // the camera stands still would not schedule the rebuild that shows it.
     this.prototypeRevision = 0;
     this.meshes = [];
     this.manifestCache = new Map();
@@ -89,15 +88,6 @@ export class StylizedGroundDetailView {
     terrainView.scene.add(this.root);
   }
 
-  /**
-   * Install more authored variants alongside whatever is already resident.
-   *
-   * Variants stream in as the camera approaches the biomes they belong to, so
-   * this is additive: prototypes keep the indices they were registered under and
-   * only the new ones get renderers. Rebuilding the layer from scratch instead
-   * would re-extract every geometry already on screen and drop its instances for
-   * a frame.
-   */
   appendVariants(authoredVariants = []) {
     if (!this.layerConfig?.enabled || this.disposed || authoredVariants.length === 0) return;
     const firstNewPrototype = this.prototypes.length;
@@ -115,12 +105,18 @@ export class StylizedGroundDetailView {
             ?? this.layerConfig.heightOffset
             ?? 0,
         );
-        this.prototypePlacementRules.push(
-          definition.prototypePlacements?.[groupIndex] ?? definition.placement ?? null,
+        const placementRule = definition.prototypePlacements?.[groupIndex]
+          ?? definition.placement
+          ?? null;
+        this.prototypePlacementRules.push(placementRule);
+        this.prototypeWaterRules.push(
+          definition.prototypeWater?.[groupIndex]
+            ?? definition.water
+            ?? (placementRule?.strategy === 'shoreline-colonies'
+              ? this.layerConfig.surfaceWater
+              : null),
         );
         this.prototypeBiomeRules.push({
-          // A variant with no `tileIds` stays eligible everywhere the layer is,
-          // which is the pre-existing behaviour.
           tileIds: definition.tileIds ?? null,
           weight: definition.prototypeWeights?.[groupIndex] ?? definition.weight ?? 1,
           character: definition.character ?? null,
@@ -162,8 +158,6 @@ export class StylizedGroundDetailView {
       root: this.root,
       partsByPrototype: this.prototypes.slice(firstNewPrototype),
       capacity,
-      // Offset keeps mesh names unique: `createInstancedRenderers` numbers from
-      // zero and each append starts a fresh batch.
       name: `stylized-${this.layerName}-${firstNewPrototype}`,
       castShadow: this.layerConfig.castShadow === true,
     }));
@@ -178,8 +172,11 @@ export class StylizedGroundDetailView {
       this.layerConfig.perChunk,
       this.layerConfig.tileIds.join(','),
       JSON.stringify(this.layerConfig.densityByTile ?? null),
+      JSON.stringify(this.layerConfig.water ?? null),
+      JSON.stringify(this.layerConfig.surfaceWater ?? null),
       JSON.stringify(this.prototypeBiomeRules),
       JSON.stringify(this.prototypePlacementRules),
+      JSON.stringify(this.prototypeWaterRules),
       this.regionalCharacterField?.signature ?? 'uniform-regions',
       forestField?.signature ?? 'uniform-forest',
       this.biomeAssetPalette?.revision ?? 0,
@@ -227,18 +224,29 @@ export class StylizedGroundDetailView {
             tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
           },
         )) return null;
-        // Which plants grow in a biome is `tileIds`; how much of anything grows
-        // there is this. A desert and a tundra are on the layer so they get the
-        // right sparse silhouettes, not so they get a meadow's worth of them.
+
+        let metadata = null;
+        if (this.layerName === 'aquaticPlant') {
+          const waterSample = this.terrainView.getCanonicalWater?.(candidate.x, candidate.z);
+          metadata = evaluateAquaticPlacement({
+            waterSample,
+            layerRule: this.layerConfig.water,
+            prototypeRule: this.prototypeWaterRules[candidate.prototypeIndex],
+          });
+          if (!metadata) return null;
+        }
+
         const tileDensity = this.layerConfig.densityByTile?.[candidate.tileId] ?? 1;
         if (tileDensity < 1 && candidate.priority >= tileDensity) return null;
-        if (!this.regionalCharacterField) return true;
+        if (!this.regionalCharacterField) return metadata ?? true;
         const regionalMeadow = this.regionalCharacterField.sampleChannel(
           candidate.x,
           candidate.z,
           'meadow',
         );
-        return candidate.priority < regionalMeadow ? { regionalMeadow } : null;
+        return candidate.priority < regionalMeadow
+          ? { ...(metadata ?? {}), regionalMeadow }
+          : null;
       },
     });
     this.manifestCache.set(cacheKey, { key, placements });
@@ -283,12 +291,14 @@ export class StylizedGroundDetailView {
         const key = `${chunkX}:${chunkZ}`;
         activeChunks.add(key);
         for (const placement of this.manifestForChunk(chunkX, chunkZ)) {
+          const placementHeight = Number.isFinite(placement.waterPlacementHeight)
+            ? placement.waterPlacementHeight
+            : placement.height;
           instances[placement.prototypeIndex].push({
             matrix: new THREE.Matrix4().compose(
               DETAIL_SCRATCH.position.set(
                 placement.x,
-                placement.height
-                  + (this.prototypeHeightOffsets[placement.prototypeIndex] ?? 0),
+                placementHeight + (this.prototypeHeightOffsets[placement.prototypeIndex] ?? 0),
                 placement.z,
               ),
               DETAIL_SCRATCH.quaternion.setFromAxisAngle(DETAIL_UP, placement.rotationY),
@@ -322,6 +332,7 @@ export class StylizedGroundDetailView {
     this.prototypes.length = 0;
     this.prototypeHeightOffsets.length = 0;
     this.prototypePlacementRules.length = 0;
+    this.prototypeWaterRules.length = 0;
     this.prototypeBiomeRules.length = 0;
     this.prototypeIndicesByAsset.clear();
     this.prototypeIndexForRoll = null;
