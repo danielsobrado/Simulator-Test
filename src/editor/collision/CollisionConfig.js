@@ -5,6 +5,7 @@ import {
 } from './CollisionLimits.js';
 
 const DEBUG_KEYS = Object.freeze(['colliders', 'broadphase', 'support', 'contacts']);
+const TREE_OVERRIDE_KEYS = new Set(['radius', 'height', 'centerX', 'centerZ', 'baseY']);
 const TRUE_VALUES = new Set(['', '1', 'true', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'off']);
 
@@ -37,6 +38,7 @@ export const COLLISION_CONFIG_DEFAULTS = deepFreeze({
   trees: {
     enabled: true,
     minimumTrunkRadius: 0.16,
+    prototypeOverrides: {},
   },
   rocks: {
     enabled: true,
@@ -71,6 +73,12 @@ function assertBoolean(value, path) {
   }
 }
 
+function assertFinite(value, path) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`Invalid collision configuration: ${path} must be finite.`);
+  }
+}
+
 function assertPositive(value, path) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid collision configuration: ${path} must be positive.`);
@@ -90,6 +98,27 @@ function assertPositiveInteger(value, path, maximum = Number.MAX_SAFE_INTEGER) {
     throw new Error(
       `Invalid collision configuration: ${path} must be a positive integer not exceeding ${maximum}.`,
     );
+  }
+}
+
+function validateTreeOverrides(overrides) {
+  assertObject(overrides, 'collision.trees.prototypeOverrides');
+  for (const [key, override] of Object.entries(overrides)) {
+    if (!key.trim()) {
+      throw new Error('Invalid collision configuration: tree override keys must not be empty.');
+    }
+    const path = `collision.trees.prototypeOverrides.${key}`;
+    assertObject(override, path);
+    for (const field of Object.keys(override)) {
+      if (!TREE_OVERRIDE_KEYS.has(field)) {
+        throw new Error(`Invalid collision configuration: unsupported ${path}.${field}.`);
+      }
+    }
+    if ('radius' in override) assertPositive(override.radius, `${path}.radius`);
+    if ('height' in override) assertPositive(override.height, `${path}.height`);
+    for (const field of ['centerX', 'centerZ', 'baseY']) {
+      if (field in override) assertFinite(override[field], `${path}.${field}`);
+    }
   }
 }
 
@@ -153,6 +182,7 @@ export function validateCollisionConfig(config) {
     assertBoolean(config[section].enabled, `collision.${section}.enabled`);
   }
   assertPositive(config.trees.minimumTrunkRadius, 'collision.trees.minimumTrunkRadius');
+  validateTreeOverrides(config.trees.prototypeOverrides);
   assertPositive(config.rocks.minimumCollidableHeight, 'collision.rocks.minimumCollidableHeight');
   assertPositive(config.rocks.minimumWalkableHeight, 'collision.rocks.minimumWalkableHeight');
   if (config.rocks.minimumWalkableHeight < config.rocks.minimumCollidableHeight) {
@@ -175,7 +205,14 @@ function mergeCollisionConfig(input = {}) {
     ...input,
     streaming: { ...COLLISION_CONFIG_DEFAULTS.streaming, ...(input.streaming ?? {}) },
     player: { ...COLLISION_CONFIG_DEFAULTS.player, ...(input.player ?? {}) },
-    trees: { ...COLLISION_CONFIG_DEFAULTS.trees, ...(input.trees ?? {}) },
+    trees: {
+      ...COLLISION_CONFIG_DEFAULTS.trees,
+      ...(input.trees ?? {}),
+      prototypeOverrides: {
+        ...COLLISION_CONFIG_DEFAULTS.trees.prototypeOverrides,
+        ...(input.trees?.prototypeOverrides ?? {}),
+      },
+    },
     rocks: { ...COLLISION_CONFIG_DEFAULTS.rocks, ...(input.rocks ?? {}) },
     objects: { ...COLLISION_CONFIG_DEFAULTS.objects, ...(input.objects ?? {}) },
     constructions: {
