@@ -36,21 +36,48 @@ function nodeNamesForVariant(variant) {
   ];
 }
 
+function selectedNodeIndices(document, variant) {
+  const nodes = document.nodes ?? [];
+  const selectedNames = variant.rootNames ?? [];
+  if (selectedNames.length === 0) return nodes.map((_node, index) => index);
+
+  const indicesByName = new Map(nodes.map((node, index) => [node.name, index]));
+  const selected = new Set();
+  const visit = (index) => {
+    if (!Number.isSafeInteger(index) || selected.has(index)) return;
+    selected.add(index);
+    for (const child of nodes[index]?.children ?? []) visit(child);
+  };
+  for (const name of selectedNames) visit(indicesByName.get(name));
+  return [...selected];
+}
+
 function validateCollisionNodes(document, variant, collisionConfig) {
-  const nodes = (document.nodes ?? []).filter(
+  const nodes = document.nodes ?? [];
+  const selected = selectedNodeIndices(document, variant)
+    .map((index) => nodes[index])
+    .filter(Boolean);
+  const meshNodes = selected.filter((node) => Number.isSafeInteger(node.mesh));
+  const collisionNodes = meshNodes.filter(
     (node) => COLLIDER_NODE_PATTERN.test(node.name ?? ''),
   );
-  for (const node of nodes) {
+  const visualNodes = meshNodes.filter(
+    (node) => !COLLIDER_NODE_PATTERN.test(node.name ?? ''),
+  );
+
+  for (const node of selected.filter((node) => COLLIDER_NODE_PATTERN.test(node.name ?? ''))) {
     if (!Number.isSafeInteger(node.mesh)) {
       throw new Error(`${variant.scene} collision node ${node.name} contains no mesh.`);
     }
   }
-  if (collisionConfig.rocks.requireAuthoredProxy && nodes.length === 0) {
+  if (collisionConfig.rocks.requireAuthoredProxy
+      && collisionNodes.length < visualNodes.length) {
     throw new Error(
-      `${variant.scene} requires a COLLIDER or COLLIDER_WALKABLE mesh node.`,
+      `${variant.scene} exposes ${visualNodes.length} rendered rock prototypes but only `
+      + `${collisionNodes.length} COLLIDER or COLLIDER_WALKABLE mesh nodes.`,
     );
   }
-  return nodes.length;
+  return collisionNodes.length;
 }
 
 async function validateStylizedAssets(editorConfig, collisionConfig) {
