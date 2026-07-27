@@ -1,15 +1,12 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
+import {
+  PERF_COUNTER_WATER_UPLOAD_BYTES,
+  PerfCounters,
+} from '../performance/qa/PerfCounters.js';
 import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
 
-const DEFAULT_WATER_LEVEL = 0;
-
-export function resolveWaterSurfaceHeight(terrainView) {
-  const generatorLevel = terrainView?.worldStore?.generator?.toMetadata?.().seaLevel;
-  if (Number.isFinite(generatorLevel)) return generatorLevel;
-  const configuredLevel = terrainView?.streamingConfig?.seaLevel;
-  return Number.isFinite(configuredLevel) ? configuredLevel : DEFAULT_WATER_LEVEL;
-}
+const WATER_FIELD_CHANNELS = 4;
 
 export class StylizedWaterSlot {
   constructor({ terrainSlot, terrainView, config }) {
@@ -17,11 +14,30 @@ export class StylizedWaterSlot {
     this.terrainView = terrainView;
     this.config = config;
     this.time = uniform(0);
+    this.fieldSize = terrainView.chunkSize + 1;
+    this.waterFieldPixels = new Uint16Array(
+      this.fieldSize * this.fieldSize * WATER_FIELD_CHANNELS,
+    );
+    this.waterFieldTexture = new THREE.DataTexture(
+      this.waterFieldPixels,
+      this.fieldSize,
+      this.fieldSize,
+      THREE.RGBAFormat,
+      THREE.HalfFloatType,
+    );
+    this.waterFieldTexture.magFilter = THREE.LinearFilter;
+    this.waterFieldTexture.minFilter = THREE.LinearFilter;
+    this.waterFieldTexture.generateMipmaps = false;
+    this.waterFieldTexture.colorSpace = THREE.NoColorSpace;
+    this.waterFieldTexture.unpackAlignment = 1;
+    this.waterFieldTexture.needsUpdate = true;
+    this.uploadedPage = null;
+    this.uploadedRevision = -1;
     this.material = createStylizedWaterMaterial({
-      surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
+      waterFieldTexture: this.waterFieldTexture,
+      waterFieldSize: this.fieldSize,
       chunkCenter: terrainSlot.chunkCenter,
       chunkWorldSize: terrainView.chunkWorldSize,
-      waterLevel: resolveWaterSurfaceHeight(terrainView),
       time: this.time,
       config,
     });
@@ -34,6 +50,19 @@ export class StylizedWaterSlot {
     terrainView.scene.add(this.mesh);
   }
 
+  uploadField(page) {
+    if (page.waterFieldWidth !== this.fieldSize || page.waterFieldHeight !== this.fieldSize
+        || page.waterFieldPixels?.length !== this.waterFieldPixels.length) {
+      throw new Error('Terrain page water field does not match its render slot.');
+    }
+    this.waterFieldPixels.set(page.waterFieldPixels);
+    this.waterFieldTexture.needsUpdate = true;
+    this.uploadedPage = page;
+    this.uploadedRevision = page.revision;
+    PerfCounters.inc(PERF_COUNTER_WATER_UPLOAD_BYTES, page.waterFieldPixels.byteLength);
+    PerfCounters.inc('textureBytesUploaded', page.waterFieldPixels.byteLength);
+  }
+
   update(timestamp) {
     if (!this.config.water.enabled) {
       this.mesh.visible = false;
@@ -41,13 +70,23 @@ export class StylizedWaterSlot {
     }
     this.time.value = timestamp / 1000;
     const descriptor = this.terrainSlot.descriptor;
-    this.mesh.visible = Boolean(this.terrainSlot.mesh.visible && descriptor);
-    if (!this.mesh.visible || !descriptor) return;
+    const page = this.terrainSlot.page;
+    const ready = Boolean(
+      this.terrainSlot.mesh.visible
+      && descriptor
+      && page?.waterFieldPixels,
+    );
+    this.mesh.visible = ready;
+    if (!ready) return;
+    if (page !== this.uploadedPage || page.revision !== this.uploadedRevision) {
+      this.uploadField(page);
+    }
     this.mesh.position.copy(this.terrainSlot.mesh.position);
   }
 
   dispose() {
     this.terrainView.scene.remove(this.mesh);
+    this.waterFieldTexture.dispose();
     this.material.dispose();
   }
 }
