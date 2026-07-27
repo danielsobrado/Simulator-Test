@@ -63,17 +63,26 @@ function convexFallback(sourceGeometry, maximumTriangles) {
     MINIMUM_PROXY_POINTS,
     Math.min(points.length, Math.floor((maximumTriangles + 4) / 2)),
   );
+  let lastError = null;
   while (maximumPoints >= MINIMUM_PROXY_POINTS) {
-    const proxy = new ConvexGeometry(sampledPoints(points, maximumPoints));
-    proxy.computeBoundingBox();
-    const triangles = triangleCount(proxy);
-    if (triangles > 0 && triangles <= maximumTriangles && !proxy.boundingBox?.isEmpty()) {
-      return proxy;
+    let proxy;
+    try {
+      proxy = new ConvexGeometry(sampledPoints(points, maximumPoints));
+      proxy.computeBoundingBox();
+      const triangles = triangleCount(proxy);
+      if (triangles > 0 && triangles <= maximumTriangles && !proxy.boundingBox?.isEmpty()) {
+        return proxy;
+      }
+    } catch (error) {
+      lastError = error;
     }
-    proxy.dispose();
+    proxy?.dispose();
     maximumPoints -= 1;
   }
-  throw new Error(`Generated walkable rock proxy cannot fit ${maximumTriangles} triangles.`);
+  throw new Error(
+    `Generated walkable rock proxy cannot fit ${maximumTriangles} triangles.`,
+    lastError ? { cause: lastError } : undefined,
+  );
 }
 
 function overlapRatio(visual, proxy) {
@@ -85,8 +94,10 @@ function overlapRatio(visual, proxy) {
   const overlapX = Math.max(0, Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x));
   const overlapY = Math.max(0, Math.min(a.max.y, b.max.y) - Math.max(a.min.y, b.min.y));
   const overlapZ = Math.max(0, Math.min(a.max.z, b.max.z) - Math.max(a.min.z, b.min.z));
-  const visualVolume = Math.max(1e-9,
-    (a.max.x - a.min.x) * (a.max.y - a.min.y) * (a.max.z - a.min.z));
+  const visualVolume = Math.max(
+    1e-9,
+    (a.max.x - a.min.x) * (a.max.y - a.min.y) * (a.max.z - a.min.z),
+  );
   return (overlapX * overlapY * overlapZ) / visualVolume;
 }
 
