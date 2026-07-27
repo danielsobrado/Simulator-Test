@@ -9,6 +9,8 @@ import {
   TREE_COLLISION_SLICE_COUNT,
 } from './TreeCollisionConstants.js';
 
+const MINIMUM_AGGREGATE_POINTS = 3;
+
 function readPosition(attribute, index) {
   if (typeof attribute.getX === 'function') {
     return {
@@ -77,10 +79,27 @@ function updateSlice(slice, point) {
   slice.maxZ = Math.max(slice.maxZ, point.z);
 }
 
+function sliceCenter(slice) {
+  return {
+    x: (slice.minX + slice.maxX) * 0.5,
+    z: (slice.minZ + slice.maxZ) * 0.5,
+  };
+}
+
 function sliceIndexFor(y, minimum, maximum) {
   const range = Math.max(Number.EPSILON, maximum - minimum);
   const normalized = Math.max(0, Math.min(1 - Number.EPSILON, (y - minimum) / range));
   return Math.floor(normalized * TREE_COLLISION_SLICE_COUNT);
+}
+
+function candidateForSlice(slice) {
+  if (slice.count < MINIMUM_AGGREGATE_POINTS || slice.radii.length === 0) return null;
+  const center = sliceCenter(slice);
+  return {
+    centerX: center.x,
+    centerZ: center.z,
+    radius: percentile(slice.radii, TREE_COLLISION_RADIUS_PERCENTILE),
+  };
 }
 
 function deriveLowerTrunk(parts) {
@@ -106,38 +125,39 @@ function deriveLowerTrunk(parts) {
   const bandMinimum = bounds.minY + height * TREE_COLLISION_LOWER_BAND_START_RATIO;
   const bandMaximum = bounds.minY + height * TREE_COLLISION_LOWER_BAND_END_RATIO;
   const slices = Array.from({ length: TREE_COLLISION_SLICE_COUNT }, createSlice);
+  const aggregate = createSlice();
 
   forEachTrunkPosition(parts, (point) => {
     if (point.y < bandMinimum || point.y > bandMaximum) return;
     updateSlice(slices[sliceIndexFor(point.y, bandMinimum, bandMaximum)], point);
+    updateSlice(aggregate, point);
   });
 
-  const centres = slices.map((slice) => ({
-    x: (slice.minX + slice.maxX) * 0.5,
-    z: (slice.minZ + slice.maxZ) * 0.5,
-  }));
+  const centres = slices.map(sliceCenter);
+  const aggregateCenter = sliceCenter(aggregate);
   forEachTrunkPosition(parts, (point) => {
     if (point.y < bandMinimum || point.y > bandMaximum) return;
     const index = sliceIndexFor(point.y, bandMinimum, bandMaximum);
     const centre = centres[index];
     slices[index].radii.push(Math.hypot(point.x - centre.x, point.z - centre.z));
+    aggregate.radii.push(Math.hypot(
+      point.x - aggregateCenter.x,
+      point.z - aggregateCenter.z,
+    ));
   });
 
   const candidates = slices
-    .map((slice, index) => {
-      if (slice.count < TREE_COLLISION_MINIMUM_SLICE_POINTS || slice.radii.length === 0) return null;
-      return {
-        centerX: centres[index].x,
-        centerZ: centres[index].z,
-        radius: percentile(slice.radii, TREE_COLLISION_RADIUS_PERCENTILE),
-      };
-    })
+    .map((slice) => (
+      slice.count >= TREE_COLLISION_MINIMUM_SLICE_POINTS
+        ? candidateForSlice(slice)
+        : null
+    ))
     .filter(Boolean)
     .sort((left, right) => left.radius - right.radius);
 
   const selected = candidates.length > 0
     ? candidates[Math.floor((candidates.length - 1) * TREE_COLLISION_PROFILE_SELECTION_RATIO)]
-    : null;
+    : candidateForSlice(aggregate);
   return {
     bounds,
     height,
