@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { COLLISION_RETRY_BASE_MS } from '../src/editor/collision/CollisionLimits.js';
 import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
 import { createCanonicalAabb } from '../src/editor/collision/colliders/ColliderBounds.js';
 import {
@@ -98,14 +99,15 @@ test('natural provider refresh keeps unchanged tree and replaces only rock contr
   assert.equal(provider.getStatus().components.rocks.colliders, 1);
 });
 
-test('failed refresh retains valid data and retries on the next frame', () => {
+test('failed refresh retains valid data and retries after bounded backoff', () => {
   const tree = component('trees', 'Tree', collider('tree:1', COLLIDER_TYPE_CAPSULE, 2));
   const rock = component('rocks', 'Rock', collider('rock:1', COLLIDER_TYPE_SPHERE, 4));
+  let clock = 0;
   const provider = new NaturalCollisionProvider({
     components: [tree.record, rock.record],
     buildsPerFrame: 1,
     buildBudgetMs: 100,
-    now: () => 0,
+    now: () => clock,
     logger: Object.freeze({ error() {} }),
   });
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
@@ -116,12 +118,15 @@ test('failed refresh retains valid data and retries on the next frame', () => {
   const failed = provider.refresh(world);
   assert.equal(failed.attempted, 1);
   assert.equal(failed.rebuilt, 0);
-  assert.equal(failed.remaining, 1);
+  assert.equal(failed.remaining, 0);
+  assert.equal(provider.getStatus().deferredRetries, 1);
   assert.ok(world.getCollider('tree:1'));
   assert.ok(world.getCollider('rock:1'));
   assert.equal(world.getCollider('rock:2'), null);
   assert.match(provider.getStatus().lastError, /fixture failure/);
 
+  assert.equal(provider.refresh(world).attempted, 0);
+  clock += COLLISION_RETRY_BASE_MS;
   const retried = provider.refresh(world);
   assert.equal(retried.attempted, 1);
   assert.equal(retried.rebuilt, 1);
