@@ -298,8 +298,7 @@ export function buildChunkLodPlan({
         target,
         ready ? 'ready' : 'waiting',
         ...state.representations.map((representation) => (
-          `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}:$
-{representation.ditherDirection}`
+          `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}:${representation.ditherDirection}`
         )),
       ].join(':'));
     }
