@@ -6,11 +6,21 @@ export const COLLIDER_TYPE_CAPSULE = 'capsule';
 export const COLLIDER_TYPE_BOX = 'box';
 export const COLLIDER_TYPE_MESH_INSTANCE = 'mesh-instance';
 
+const COLLIDER_RECORD_BRAND = Symbol('collision-record');
+const COLLIDER_PROTOTYPE_BRAND = Symbol('collision-prototype');
 const PRIMITIVE_TYPES = new Set([
   COLLIDER_TYPE_SPHERE,
   COLLIDER_TYPE_CAPSULE,
   COLLIDER_TYPE_BOX,
 ]);
+
+export function isColliderRecordDescriptor(value) {
+  return value?.[COLLIDER_RECORD_BRAND] === true;
+}
+
+export function isColliderPrototypeDescriptor(value) {
+  return value?.[COLLIDER_PROTOTYPE_BRAND] === true;
+}
 
 function freezeVector(value, name, dimensions = 3, { positive = false } = {}) {
   if (!Array.isArray(value) || value.length !== dimensions
@@ -66,6 +76,7 @@ function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }
     throw new Error('Collider layers must contain supported collision-layer bits.');
   }
   return {
+    [COLLIDER_RECORD_BRAND]: true,
     sourceId,
     type,
     layers,
@@ -129,6 +140,7 @@ export function createColliderPrototype({ id, kind, bounds, metadata = {} }) {
     throw new Error('Collider prototype metadata must be a plain object.');
   }
   return Object.freeze({
+    [COLLIDER_PROTOTYPE_BRAND]: true,
     id: String(id),
     kind: String(kind),
     bounds: createCanonicalAabb(bounds),
