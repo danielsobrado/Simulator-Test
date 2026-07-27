@@ -91,11 +91,19 @@ function validateResidencyConfig(config) {
   }
 }
 
+function optionalCallback(value, name) {
+  if (value == null) return null;
+  if (typeof value !== 'function') throw new Error(`Collision residency ${name} must be a function.`);
+  return value;
+}
+
 export class CollisionResidency {
   constructor({
     world,
     config,
     buildOwnerChunk,
+    onOwnerChunkCommitted = null,
+    onOwnerChunkUnloaded = null,
     now = () => performance.now(),
     logger = console,
   }) {
@@ -108,6 +116,8 @@ export class CollisionResidency {
     this.world = world;
     this.config = Object.freeze({ ...config });
     this.buildOwnerChunk = buildOwnerChunk;
+    this.onOwnerChunkCommitted = optionalCallback(onOwnerChunkCommitted, 'commit callback');
+    this.onOwnerChunkUnloaded = optionalCallback(onOwnerChunkUnloaded, 'unload callback');
     this.now = now;
     this.logger = logger ?? console;
     this.desiredKeys = new Set();
@@ -150,6 +160,12 @@ export class CollisionResidency {
       writeIndex += 1;
     }
     this.queue.length = writeIndex;
+  }
+
+  unload(chunkX, chunkZ) {
+    if (!this.world.unloadOwnerChunk(chunkX, chunkZ)) return false;
+    this.onOwnerChunkUnloaded?.(chunkX, chunkZ);
+    return true;
   }
 
   update({ focus, velocity = { x: 0, z: 0 } }) {
@@ -208,7 +224,7 @@ export class CollisionResidency {
         predicted.chunkZ,
       );
       if (Math.min(currentDistance, predictedDistance) <= this.config.unloadRadius) continue;
-      this.world.unloadOwnerChunk(chunk.chunkX, chunk.chunkZ);
+      this.unload(chunk.chunkX, chunk.chunkZ);
       this.loadedKeys.delete(key);
     }
 
@@ -231,7 +247,7 @@ export class CollisionResidency {
       try {
         const result = this.buildOwnerChunk(job.chunkX, job.chunkZ);
         if (result && typeof result.then === 'function') {
-          throw new Error('P1 collision residency builders must be synchronous.');
+          throw new Error('Collision residency builders must be synchronous.');
         }
         const revision = result?.revision ?? 0;
         const colliders = result?.colliders ?? [];
@@ -243,6 +259,12 @@ export class CollisionResidency {
         });
         this.loadedKeys.add(job.key);
         if (replaced) {
+          this.onOwnerChunkCommitted?.({
+            chunkX: job.chunkX,
+            chunkZ: job.chunkZ,
+            revision,
+            providerData: result?.providerData ?? null,
+          });
           this.builds += 1;
           built += 1;
         }
@@ -300,7 +322,7 @@ export class CollisionResidency {
     this.desiredKeys.clear();
     for (const key of this.loadedKeys) {
       const chunk = parseCollisionChunkKey(key);
-      this.world.unloadOwnerChunk(chunk.chunkX, chunk.chunkZ);
+      this.unload(chunk.chunkX, chunk.chunkZ);
     }
     this.loadedKeys.clear();
     this.currentChunk = null;
