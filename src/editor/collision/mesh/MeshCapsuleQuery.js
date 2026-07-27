@@ -28,8 +28,15 @@ function queryBoxForLine(line, radius) {
   return new Box3().setFromPoints([line.start, line.end]).expandByScalar(radius + QUERY_PADDING);
 }
 
-function orientTriangleNormal(normal, line, trianglePoint, scratch) {
+function orientTriangleNormal(normal, line, trianglePoint, scratch, bounds) {
   line.at(0.5, scratch).sub(trianglePoint);
+  if (scratch.lengthSq() <= EPSILON * EPSILON) {
+    scratch.set(
+      trianglePoint.x - (bounds.minX + bounds.maxX) * 0.5,
+      trianglePoint.y - (bounds.minY + bounds.maxY) * 0.5,
+      trianglePoint.z - (bounds.minZ + bounds.maxZ) * 0.5,
+    );
+  }
   if (scratch.lengthSq() > EPSILON * EPSILON && normal.dot(scratch) < 0) normal.negate();
   return normal;
 }
@@ -62,7 +69,13 @@ export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 
         localNormal.normalize();
       } else {
         triangle.getNormal(localNormal);
-        orientTriangleNormal(localNormal, local.line, trianglePoint, orientation);
+        orientTriangleNormal(
+          localNormal,
+          local.line,
+          trianglePoint,
+          orientation,
+          prototype.bounds,
+        );
       }
       worldNormal.copy(localNormal).transformDirection(instance.matrix).normalize();
       const horizontal = normaliseHorizontal(worldNormal);
