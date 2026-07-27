@@ -1102,7 +1102,7 @@ export class EditorUi {
               });
             session?.start('apply');
             if (!this.sceneSettingsRuntime) {
-              controller.loadDocument(document);
+              controller.loadDocument(document, { preserveInventory: true });
               this.syncImportedBiomeTiles(document);
               this.minimapCenter = controller.getFocusCell?.() ?? this.minimapCenter;
               this.updateMinimap();

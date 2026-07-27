@@ -238,7 +238,7 @@ export class SceneSettingsRuntime {
       });
       return worldDocument;
     }
-    this.controller.loadDocument(worldDocument);
+    this.controller.loadDocument(worldDocument, { preserveInventory: true });
     // A world save carries its own look and `loadDocument` has already applied
     // it — putting the pre-import capture back on top would discard it. Only a
     // bare map (an Azgaar export, a terrain-only document) needs the look that

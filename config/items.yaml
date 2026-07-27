@@ -1,0 +1,210 @@
+# Authoritative item definitions for the player inventory.
+# Icons are path placeholders until the visual pass supplies WebP assets.
+
+items:
+  iron_sword:
+    label: Iron Sword
+    category: weapon
+    icon: /assets/items/iron-sword.webp
+    stackLimit: 1
+    equipmentSlots:
+      - mainHand
+    weaponType: sword
+    hands: 1
+    value: 45
+    weight: 3.2
+    rarity: common
+    tags:
+      - melee
+      - metal
+
+  steel_greatsword:
+    label: Steel Greatsword
+    category: weapon
+    icon: /assets/items/steel-greatsword.webp
+    stackLimit: 1
+    equipmentSlots:
+      - mainHand
+    weaponType: greatsword
+    hands: 2
+    value: 120
+    weight: 6.5
+    rarity: uncommon
+    tags:
+      - melee
+      - metal
+      - two-handed
+
+  wooden_shield:
+    label: Wooden Shield
+    category: armour
+    icon: /assets/items/wooden-shield.webp
+    stackLimit: 1
+    equipmentSlots:
+      - offHand
+    value: 22
+    weight: 4.1
+    rarity: common
+    tags:
+      - shield
+      - wood
+
+  leather_armour:
+    label: Leather Armour
+    category: armour
+    icon: /assets/items/leather-armour.webp
+    stackLimit: 1
+    equipmentSlots:
+      - chest
+    value: 55
+    weight: 5.0
+    rarity: common
+    tags:
+      - armour
+      - leather
+
+  leather_cap:
+    label: Leather Cap
+    category: armour
+    icon: /assets/items/leather-cap.webp
+    stackLimit: 1
+    equipmentSlots:
+      - head
+    value: 18
+    weight: 0.8
+    rarity: common
+    tags:
+      - armour
+      - leather
+
+  leather_gloves:
+    label: Leather Gloves
+    category: armour
+    icon: /assets/items/leather-gloves.webp
+    stackLimit: 1
+    equipmentSlots:
+      - hands
+    value: 12
+    weight: 0.4
+    rarity: common
+    tags:
+      - armour
+      - leather
+
+  leather_leggings:
+    label: Leather Leggings
+    category: armour
+    icon: /assets/items/leather-leggings.webp
+    stackLimit: 1
+    equipmentSlots:
+      - legs
+    value: 28
+    weight: 2.0
+    rarity: common
+    tags:
+      - armour
+      - leather
+
+  leather_boots:
+    label: Leather Boots
+    category: armour
+    icon: /assets/items/leather-boots.webp
+    stackLimit: 1
+    equipmentSlots:
+      - feet
+    value: 20
+    weight: 1.2
+    rarity: common
+    tags:
+      - armour
+      - leather
+
+  copper_ring:
+    label: Copper Ring
+    category: accessory
+    icon: /assets/items/copper-ring.webp
+    stackLimit: 1
+    equipmentSlots:
+      - ring1
+      - ring2
+    value: 15
+    weight: 0.05
+    rarity: common
+    tags:
+      - jewellery
+      - metal
+
+  wool_cloak:
+    label: Wool Cloak
+    category: accessory
+    icon: /assets/items/wool-cloak.webp
+    stackLimit: 1
+    equipmentSlots:
+      - cloak
+    value: 30
+    weight: 1.5
+    rarity: common
+    tags:
+      - cloak
+      - cloth
+
+  pendant:
+    label: Simple Pendant
+    category: accessory
+    icon: /assets/items/pendant.webp
+    stackLimit: 1
+    equipmentSlots:
+      - neck
+    value: 25
+    weight: 0.1
+    rarity: common
+    tags:
+      - jewellery
+
+  healing_potion:
+    label: Healing Potion
+    category: consumable
+    icon: /assets/items/healing-potion.webp
+    stackLimit: 10
+    action: consume_healing_potion
+    value: 20
+    weight: 0.2
+    rarity: common
+    tags:
+      - potion
+      - healing
+
+  torch:
+    label: Torch
+    category: misc
+    icon: /assets/items/torch.webp
+    stackLimit: 20
+    value: 2
+    weight: 0.3
+    rarity: common
+    tags:
+      - light
+      - tool
+
+  rope:
+    label: Rope
+    category: misc
+    icon: /assets/items/rope.webp
+    stackLimit: 5
+    value: 8
+    weight: 1.0
+    rarity: common
+    tags:
+      - tool
+
+  bread:
+    label: Bread
+    category: consumable
+    icon: /assets/items/bread.webp
+    stackLimit: 10
+    action: consume_food
+    value: 3
+    weight: 0.3
+    rarity: common
+    tags:
+      - food

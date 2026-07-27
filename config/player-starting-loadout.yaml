@@ -1,0 +1,21 @@
+# Default player inventory for new characters and development demos.
+# Consumed by InventoryStore.applyStartingLoadout — not hardcoded in UI.
+
+capacity: 40
+currency:
+  gold: 25
+items:
+  - itemKey: iron_sword
+    quantity: 1
+  - itemKey: wooden_shield
+    quantity: 1
+  - itemKey: leather_armour
+    quantity: 1
+  - itemKey: healing_potion
+    quantity: 3
+  - itemKey: torch
+    quantity: 5
+  - itemKey: rope
+    quantity: 1
+  - itemKey: bread
+    quantity: 2

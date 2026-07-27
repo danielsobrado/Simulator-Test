@@ -28,6 +28,7 @@ export class PlayerController {
     this.pitch = 0;
     this.enabled = false;
     this.harnessActive = false;
+    this.uiBlocked = false;
     this.keys = new Set();
     this.jumpQueued = false;
     this.lastTimestamp = null;
@@ -66,6 +67,7 @@ export class PlayerController {
     return Object.freeze({
       enabled: this.enabled,
       harnessActive: this.harnessActive,
+      uiBlocked: this.uiBlocked,
       pointerLocked: this.pointerLocked,
       grounded: this.state.grounded,
       running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
@@ -73,6 +75,21 @@ export class PlayerController {
       yaw: this.yaw,
       pitch: this.pitch,
     });
+  }
+
+  /**
+   * Explicit overlay block. Clears held movement and rejects look / lock / keys
+   * while active. The perf QA harness still bypasses pointer-lock requirements
+   * but respects this block unless the harness itself clears it.
+   */
+  setUiBlocked(blocked) {
+    const next = Boolean(blocked);
+    if (this.uiBlocked === next) return;
+    this.uiBlocked = next;
+    if (this.uiBlocked) {
+      this.resetInput();
+    }
+    this.emit();
   }
 
   setHarnessActive(active) {
@@ -137,7 +154,7 @@ export class PlayerController {
   }
 
   requestPointerLock() {
-    if (this.enabled && !this.pointerLocked) {
+    if (this.enabled && !this.uiBlocked && !this.pointerLocked) {
       this.canvas.requestPointerLock();
     }
   }
@@ -164,7 +181,7 @@ export class PlayerController {
     }
     this.right.crossVectors(this.forward, this.up).normalize();
 
-    const acceptsMovement = this.pointerLocked || this.harnessActive;
+    const acceptsMovement = !this.uiBlocked && (this.pointerLocked || this.harnessActive);
     this.state = stepPlayerPhysics({
       state: this.state,
       input: {
@@ -206,7 +223,7 @@ export class PlayerController {
   }
 
   onCanvasPointer(event) {
-    if (!this.enabled || this.harnessActive) {
+    if (!this.enabled || this.harnessActive || this.uiBlocked) {
       return;
     }
     event.preventDefault();
@@ -217,7 +234,7 @@ export class PlayerController {
   }
 
   onContextMenu(event) {
-    if (!this.enabled || this.harnessActive) {
+    if (!this.enabled || this.harnessActive || this.uiBlocked) {
       return;
     }
     event.preventDefault();
@@ -225,7 +242,7 @@ export class PlayerController {
   }
 
   onKeyDown(event) {
-    if (!this.enabled || this.harnessActive || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    if (!this.enabled || this.harnessActive || this.uiBlocked || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return;
     }
     if (event.code !== 'Escape') {
@@ -242,7 +259,7 @@ export class PlayerController {
   }
 
   onKeyUp(event) {
-    if (!this.enabled || this.harnessActive) {
+    if (!this.enabled || this.harnessActive || this.uiBlocked) {
       return;
     }
     if (event.code !== 'Escape') {
@@ -255,7 +272,7 @@ export class PlayerController {
   }
 
   onMouseMove(event) {
-    if (!this.enabled || this.harnessActive || !this.pointerLocked) {
+    if (!this.enabled || this.harnessActive || this.uiBlocked || !this.pointerLocked) {
       return;
     }
     this.yaw -= event.movementX * this.config.mouseSensitivity;

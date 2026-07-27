@@ -19,6 +19,7 @@ export class TerrainAwareEditorController extends EditorController {
     this.biomeAssetPalette = options.biomeAssetPalette ?? null;
     this.sceneSettingsProvider = null;
     this.sceneSettingsConsumer = null;
+    this.inventoryStore = options.inventoryStore ?? null;
   }
 
   getState() {
@@ -234,15 +235,32 @@ export class TerrainAwareEditorController extends EditorController {
           },
         }
         : {}),
+      ...(this.inventoryStore
+        ? { playerState: { inventory: this.inventoryStore.toDocument() } }
+        : {}),
     };
   }
 
-  loadDocument(document) {
+  loadDocument(document, { preserveInventory = false } = {}) {
     const previousProceduralAssets = this.proceduralAssetManager?.toDocument() ?? null;
     const previousConstructions = this.constructionStore?.toDocument() ?? null;
     const previousBiomeAssets = this.biomeAssetPalette?.toDocument() ?? null;
     const previousSceneSettings = this.sceneSettingsProvider?.() ?? null;
+    const previousInventory = this.inventoryStore?.toDocument() ?? null;
+    let inventoryCommitted = false;
     try {
+      if (this.inventoryStore) {
+        const incoming = document.playerState?.inventory;
+        if (preserveInventory && incoming == null) {
+          // Keep the live player inventory across Azgaar / terrain-only imports.
+        } else if (incoming != null) {
+          this.inventoryStore.replaceDocument(incoming, { emit: false });
+          inventoryCommitted = true;
+        } else {
+          this.inventoryStore.replaceDocument(null, { emit: false });
+          inventoryCommitted = true;
+        }
+      }
       this.proceduralAssetManager?.replaceAll(document.proceduralAssets ?? []);
       this.constructionStore?.replaceAll(document.constructions ?? []);
       if (document.visualConfig?.sceneSettings && this.sceneSettingsConsumer) {
@@ -260,6 +278,13 @@ export class TerrainAwareEditorController extends EditorController {
         this.voxelStampStore,
         () => this.validateLoadedObjectSurfaces(),
       );
+      if (inventoryCommitted) {
+        this.inventoryStore.emit({
+          kind: 'replace',
+          before: previousInventory,
+          after: this.inventoryStore.toDocument(),
+        });
+      }
     } catch (error) {
       if (previousProceduralAssets) {
         this.proceduralAssetManager.replaceAll(previousProceduralAssets);
@@ -272,6 +297,9 @@ export class TerrainAwareEditorController extends EditorController {
       }
       if (previousSceneSettings && this.sceneSettingsConsumer) {
         this.sceneSettingsConsumer(previousSceneSettings);
+      }
+      if (inventoryCommitted && previousInventory && this.inventoryStore) {
+        this.inventoryStore.replaceDocument(previousInventory, { emit: false });
       }
       throw error;
     }

@@ -13,6 +13,10 @@ import { InfiniteTerrainView } from './editor/InfiniteTerrainView.js';
 import { MacroFarTerrainView } from './editor/world/MacroFarTerrainView.js';
 import { WorldMapController } from './editor/map/WorldMapController.js';
 import { WorldMapUi } from './editor/map/WorldMapUi.js';
+import { GameplayOverlayController } from './editor/ui/GameplayOverlayController.js';
+import { InventoryController } from './editor/inventory/InventoryController.js';
+import { InventoryStore } from './editor/inventory/InventoryStore.js';
+import { ITEM_CATALOG, PLAYER_STARTING_LOADOUT } from './editor/inventory/itemCatalogRuntime.js';
 import { ProceduralAssetManager } from './editor/workshop/ProceduralAssetManager.js';
 import { ProceduralWorkshopUi } from './editor/workshop/ProceduralWorkshopUi.js';
 import { ObjectMap } from './editor/ObjectMap.js';
@@ -319,12 +323,27 @@ async function startEditor() {
     farPlane: nearView.farPlane,
   });
 
-  // Declared before PlayerController so WorldMapController's window keydown
-  // listener registers first: PlayerController stops propagation for every
-  // non-Escape key while walking, which would otherwise swallow "M".
+  // Overlay shortcuts are owned by GameplayOverlayController so inventory and
+  // the world map no longer depend on listener registration order versus the
+  // player controller's capture-phase key handling.
   let playerController;
   let viewModeController;
   let controller;
+  const gameplayOverlayController = new GameplayOverlayController({
+    getPlayerController: () => playerController,
+  });
+  const inventoryStore = new InventoryStore(ITEM_CATALOG, null, {
+    capacity: PLAYER_STARTING_LOADOUT.capacity,
+  });
+  inventoryStore.applyStartingLoadout(PLAYER_STARTING_LOADOUT);
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('inventoryDemo') === '1') {
+    // Starting loadout already applied; demo flag keeps the same seeded bag for screenshots.
+  }
+  const inventoryController = new InventoryController({
+    store: inventoryStore,
+    overlayController: gameplayOverlayController,
+    catalog: ITEM_CATALOG,
+  });
   const worldMapController = new WorldMapController({
     worldStore,
     floatingOrigin,
@@ -332,6 +351,7 @@ async function startEditor() {
     getViewModeController: () => viewModeController,
     getPlayerController: () => playerController,
     getCampaign: () => controller?.campaign ?? null,
+    overlayController: gameplayOverlayController,
   });
   const worldMapUi = new WorldMapUi({ root, controller: worldMapController });
 
@@ -387,6 +407,7 @@ async function startEditor() {
     constructionStore,
     constructionView,
     biomeAssetPalette,
+    inventoryStore,
   });
   controller.focusProvider = () => {
     const renderFocus = viewModeController.getFocusWorld();
@@ -490,6 +511,9 @@ async function startEditor() {
     window.__editor = {
       controller,
       worldMapController,
+      gameplayOverlayController,
+      inventoryController,
+      inventoryStore,
       config,
       ui,
       proceduralWorkshop,
@@ -699,6 +723,8 @@ async function startEditor() {
     stylizedSurface.dispose();
     worldMapUi.dispose();
     worldMapController.dispose();
+    inventoryController.dispose();
+    gameplayOverlayController.dispose();
     macroFarTerrain.dispose();
     proceduralWorkshop.dispose();
     viewModeUi.dispose();

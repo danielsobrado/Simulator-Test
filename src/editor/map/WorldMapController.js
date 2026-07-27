@@ -5,6 +5,10 @@ import { findNearestLandCell } from './worldMapCoordinates.js';
 const WATER_TILE_ID = 0;
 const MAX_LAND_SNAP_RINGS = 24;
 
+/**
+ * World-map overlay behaviour. Shortcut routing and pointer-lock ownership live
+ * in GameplayOverlayController; this class only owns map UI state and teleport.
+ */
 export class WorldMapController {
   constructor({
     worldStore,
@@ -13,6 +17,7 @@ export class WorldMapController {
     getViewModeController,
     getPlayerController,
     getCampaign,
+    overlayController = null,
   }) {
     this.worldStore = worldStore;
     this.floatingOrigin = floatingOrigin;
@@ -20,17 +25,19 @@ export class WorldMapController {
     this.getViewModeController = getViewModeController;
     this.getPlayerController = getPlayerController;
     this.getCampaign = getCampaign;
+    this.overlayController = overlayController;
 
     this.isOpen = false;
-    this.wasPointerLocked = false;
     this.listeners = new Set();
 
-    this.boundHandlers = {
-      keyDown: (event) => this.onKeyDown(event),
-      keyUp: (event) => this.onKeyUp(event),
-    };
-    window.addEventListener('keydown', this.boundHandlers.keyDown, true);
-    window.addEventListener('keyup', this.boundHandlers.keyUp, true);
+    if (this.overlayController) {
+      this.unregisterOverlay = this.overlayController.registerOverlay('world-map', {
+        onOpen: () => this.handleOverlayOpen(),
+        onClose: () => this.handleOverlayClose(),
+      });
+    } else {
+      this.unregisterOverlay = null;
+    }
   }
 
   getCampaignData() {
@@ -65,33 +72,43 @@ export class WorldMapController {
     }
   }
 
-  open() {
+  handleOverlayOpen() {
     if (this.isOpen) return;
-    const playerController = this.getPlayerController?.();
-    this.wasPointerLocked = Boolean(playerController?.pointerLocked);
-    if (this.wasPointerLocked) {
-      document.exitPointerLock();
-    }
     this.isOpen = true;
     this.emit();
   }
 
-  close() {
+  handleOverlayClose() {
     if (!this.isOpen) return;
     this.isOpen = false;
-    if (this.wasPointerLocked) {
-      const playerController = this.getPlayerController?.();
-      playerController?.requestPointerLock();
-    }
-    this.wasPointerLocked = false;
     this.emit();
   }
 
+  open() {
+    if (this.overlayController) {
+      this.overlayController.open('world-map');
+      return;
+    }
+    this.handleOverlayOpen();
+  }
+
+  close() {
+    if (this.overlayController) {
+      this.overlayController.close('world-map');
+      return;
+    }
+    this.handleOverlayClose();
+  }
+
   toggle() {
+    if (this.overlayController) {
+      this.overlayController.toggle('world-map');
+      return;
+    }
     if (this.isOpen) {
-      this.close();
+      this.handleOverlayClose();
     } else {
-      this.open();
+      this.handleOverlayOpen();
     }
   }
 
@@ -149,6 +166,9 @@ export class WorldMapController {
     }
     const render = this.floatingOrigin.toRender(target.x, target.z);
 
+    // Close first so uiBlocked clears before requesting pointer lock.
+    this.close();
+
     if (viewModeController.mode === PLAYER_MODE_WALK) {
       playerController.setPose({ x: render.x, z: render.z });
       playerController.requestPointerLock();
@@ -158,39 +178,11 @@ export class WorldMapController {
         requestPointerLock: true,
       });
     }
-    this.close();
-  }
-
-  onKeyDown(event) {
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-      return;
-    }
-    if (event.code === 'KeyM' && !event.repeat) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      this.toggle();
-      return;
-    }
-    if (this.isOpen) {
-      if (event.code === 'Escape') {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        this.close();
-        return;
-      }
-      event.stopImmediatePropagation();
-    }
-  }
-
-  onKeyUp(event) {
-    if (this.isOpen) {
-      event.stopImmediatePropagation();
-    }
   }
 
   dispose() {
-    window.removeEventListener('keydown', this.boundHandlers.keyDown, true);
-    window.removeEventListener('keyup', this.boundHandlers.keyUp, true);
+    this.unregisterOverlay?.();
+    this.unregisterOverlay = null;
     this.listeners.clear();
   }
 }
