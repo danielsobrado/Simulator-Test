@@ -47,8 +47,12 @@ function sourceEpoch(treeView, rockSource) {
   return [
     treeView.terrainView?.worldStore?.revision ?? 0,
     manifestStore?.editStore?.revision ?? 0,
+    manifestStore?.pathClearance?.signature ?? 'path:unknown',
+    manifestStore?.forestField?.signature ?? 'forest:uniform',
+    manifestStore?.speciesRegistry?.signature ?? 'species:unknown',
     treeView.objectMap?.revision ?? 0,
     treeView.biomeAssetPalette?.revision ?? 0,
+    treeView.prototypeSignature ?? 'prototype:unknown',
     rockSource?.revision ?? rockSource?.manifestStore?.revision ?? 0,
   ].join(':');
 }
