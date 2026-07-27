@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import {
+  treeColorVariation,
   treeMorphology,
   treeRenderSeed,
 } from './forest/TreeAppearance.js';
@@ -44,19 +45,17 @@ function recordBatchStats(statsByMode, stats) {
 }
 
 function leafAppearance(placement, resolveLeafTint) {
-  const seed = treeRenderSeed(placement);
   const tint = resolveLeafTint?.(placement) ?? UNTINTED;
-  const variation = 0.9 + (placement.colorSeed ?? seed) * 0.2;
   const morphology = treeMorphology(placement);
   return {
     morphology,
-    colorVariation: variation,
+    colorVariation: treeColorVariation(placement),
     leafTint: tint,
     impostorAppearance: [
       morphology[0],
-      tint[0] * variation,
-      tint[1] * variation,
-      tint[2] * variation,
+      tint[0],
+      tint[1],
+      tint[2],
     ],
   };
 }
