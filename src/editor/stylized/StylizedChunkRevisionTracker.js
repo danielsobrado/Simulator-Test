@@ -9,6 +9,7 @@ export class StylizedChunkRevisionTracker {
     this.worldStore = worldStore;
     this.chunkSize = worldStore.chunkSize;
     this.epoch = 0;
+    this.revision = 0;
     this.revisions = new Map();
     // Memoized all-zero signatures, one per shape, valid while no chunk is dirty.
     this.zeroSignatures = new Map();
@@ -18,6 +19,7 @@ export class StylizedChunkRevisionTracker {
   onWorldChange(change) {
     if (change.kind === 'reset') {
       this.epoch += 1;
+      this.revision += 1;
       this.revisions.clear();
       // The memoized strings embed the epoch, so they cannot outlive it.
       this.zeroSignatures.clear();
@@ -52,6 +54,7 @@ export class StylizedChunkRevisionTracker {
   touch(chunkX, chunkZ) {
     const key = keyFor(chunkX, chunkZ);
     this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+    this.revision += 1;
   }
 
   /**
