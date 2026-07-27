@@ -91,16 +91,22 @@ test('non-water samples retain ground height with zero semantic depth', () => {
   });
 });
 
-test('procedural water queries are deterministic and versioned', () => {
+test('procedural water queries are deterministic and use heightfield interpolation', () => {
   const generator = new ProceduralWorldGenerator({ seed: 918273, seaLevel: 100 });
   const coordinate = { x: 12.5, z: -8.5 };
+  const expectedBed = (
+    generator.sampleHeight(12, -9)
+    + generator.sampleHeight(13, -9)
+    + generator.sampleHeight(12, -8)
+    + generator.sampleHeight(13, -8)
+  ) * 0.25;
 
   const first = generator.sampleWater(coordinate.x, coordinate.z);
   const second = generator.sampleWater(coordinate.x, coordinate.z);
   assert.deepEqual(first, second);
   assert.equal(first.kind, WATER_KIND_OCEAN);
   assert.equal(first.surfaceHeight, generator.seaLevel);
-  assert.equal(first.bedHeight, generator.sampleHeight(coordinate.x, coordinate.z));
+  assert.equal(first.bedHeight, expectedBed);
   assert.equal(generator.toMetadata().waterDomainVersion, WATER_DOMAIN_VERSION);
 });
 
