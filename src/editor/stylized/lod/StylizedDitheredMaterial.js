@@ -46,13 +46,17 @@ export function createDitheredMaterial(sourceMaterial, {
   kind = null,
 } = {}) {
   const material = sourceMaterial.clone();
-  const fade = attribute('instanceLodFade', 'float');
-  const direction = attribute('instanceLodDitherDirection', 'float');
+  const signedFade = attribute('instanceLodFade', 'float');
   const seed = attribute('instanceStableSeed', 'float');
   const colorVariation = attribute('instanceColorVariation', 'float');
   const sourceOpacity = createSourceOpacityNode(material);
-  const coverage = sourceOpacity ? sourceOpacity.mul(fade) : fade;
-  material.opacityNode = step(orientedScreenDitherThreshold(seed, direction), coverage);
+  const coverage = sourceOpacity
+    ? sourceOpacity.mul(signedFade.abs())
+    : signedFade.abs();
+  material.opacityNode = step(
+    orientedScreenDitherThreshold(seed, signedFade),
+    coverage,
+  );
   if (material.colorNode) {
     const variation = tinted
       ? attribute('instanceLeafTint', 'vec3').mul(colorVariation)
