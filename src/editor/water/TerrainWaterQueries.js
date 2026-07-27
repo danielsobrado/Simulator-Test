@@ -1,3 +1,4 @@
+import { cellKey } from '../world/WorldCoordinates.js';
 import {
   WATER_BODY_ID_PROCEDURAL_OCEAN,
   WATER_KIND_NONE,
@@ -9,26 +10,35 @@ import { createNoWaterSample, createWaterSample } from './WaterSample.js';
 
 const WATER_TILE_ID = 0;
 
-function assertTerrainView(terrainView) {
-  const worldStore = terrainView?.worldStore;
-  if (!worldStore?.generator || !terrainView?.floatingOrigin) {
-    throw new Error('Terrain water queries require a world store and floating origin.');
-  }
-  if (typeof worldStore.generator.sampleWater !== 'function'
+function assertWorldStore(worldStore) {
+  if (!worldStore?.generator
+      || typeof worldStore.generator.sampleWater !== 'function'
       || typeof worldStore.sampleHeight !== 'function'
       || typeof worldStore.getTile !== 'function') {
     throw new Error('The active world store does not implement water-domain queries.');
   }
 }
 
-function sampleCurrentWater(worldStore, cellX, cellZ) {
+function assertTerrainView(terrainView) {
+  if (!terrainView?.floatingOrigin) {
+    throw new Error('Terrain water queries require a floating origin.');
+  }
+  assertWorldStore(terrainView.worldStore);
+}
+
+export function sampleWorldStoreWater(worldStore, cellX, cellZ) {
+  assertWorldStore(worldStore);
   const bedHeight = worldStore.sampleHeight(cellX, cellZ);
-  const tileId = worldStore.getTile(Math.floor(cellX), Math.floor(cellZ));
-  if (tileId !== WATER_TILE_ID) {
+  const tileX = Math.floor(cellX);
+  const tileZ = Math.floor(cellZ);
+  const tileId = worldStore.getTile(tileX, tileZ);
+  const base = worldStore.generator.sampleWater(cellX, cellZ);
+  const explicitTileOverride = worldStore.tileOverrides?.has(cellKey(tileX, tileZ)) ?? false;
+  if (tileId !== WATER_TILE_ID
+      && (base.kind !== WATER_KIND_RIVER || explicitTileOverride)) {
     return createNoWaterSample(bedHeight);
   }
 
-  const base = worldStore.generator.sampleWater(cellX, cellZ);
   const kind = base.kind === WATER_KIND_NONE ? WATER_KIND_OCEAN : base.kind;
   const incompleteRiver = kind === WATER_KIND_RIVER
     && (base.flags & WATER_SAMPLE_FLAG_INCOMPLETE_BED) !== 0;
@@ -55,7 +65,7 @@ export function getCanonicalWater(terrainView, worldX, worldZ) {
     throw new Error('Canonical water coordinates must be finite.');
   }
   const tileSize = terrainView.worldStore.tileSize;
-  return sampleCurrentWater(
+  return sampleWorldStoreWater(
     terrainView.worldStore,
     worldX / tileSize,
     -worldZ / tileSize,
