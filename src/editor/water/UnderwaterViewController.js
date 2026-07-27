@@ -42,6 +42,7 @@ export class UnderwaterViewController {
     this.underwaterFogColor = new THREE.Color(config.fogColor);
     this.appliedBackground = new THREE.Color();
     this.appliedFogColor = new THREE.Color();
+    this.appliedFogDensity = this.surfaceFogDensity;
   }
 
   captureSurfaceEnvironment() {
@@ -58,10 +59,6 @@ export class UnderwaterViewController {
     if (this.cloudMaskMesh) this.surfaceCloudVisible = this.cloudMaskMesh.visible;
   }
 
-  setSurfaceFogDensity(value) {
-    if (Number.isFinite(value) && value >= 0) this.surfaceFogDensity = value;
-  }
-
   applyEnvironment() {
     this.appliedBackground.copy(this.surfaceBackground).lerp(this.underwaterBackground, this.blend);
     this.scene.background = this.appliedBackground;
@@ -71,11 +68,12 @@ export class UnderwaterViewController {
     }
     this.appliedFogColor.copy(this.surfaceFogColor).lerp(this.underwaterFogColor, this.blend);
     this.scene.fog.color.copy(this.appliedFogColor);
-    this.scene.fog.density = mixNumber(
+    this.appliedFogDensity = mixNumber(
       this.surfaceFogDensity,
       this.config.fogDensity,
       this.blend,
     );
+    this.scene.fog.density = this.appliedFogDensity;
 
     const lightBlend = mixNumber(1, this.config.lightScale, this.blend);
     if (this.hemisphere) {
@@ -101,10 +99,14 @@ export class UnderwaterViewController {
       ? 0
       : Math.min(MAX_DELTA_SECONDS, Math.max(0, (current - this.lastTimestamp) / 1000));
     this.lastTimestamp = current;
+    if (this.blend > 0
+        && this.scene.fog?.isFogExp2
+        && Math.abs(this.scene.fog.density - this.appliedFogDensity) > 1e-6) {
+      this.surfaceFogDensity = this.scene.fog.density;
+    }
     const status = this.playerController.getStatus();
     const submerged = status.enabled && status.headSubmerged;
-    if (this.blend === 0 && !submerged) this.captureSurfaceEnvironment();
-    if (this.blend === 0 && submerged) this.captureSurfaceEnvironment();
+    if (this.blend === 0) this.captureSurfaceEnvironment();
     this.blend = advanceUnderwaterBlend(
       this.blend,
       submerged,
