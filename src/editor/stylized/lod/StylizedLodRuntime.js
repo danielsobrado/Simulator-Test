@@ -21,6 +21,10 @@ function createGeometry(source, capacity, tinted, morphed) {
     new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
   );
   geometry.setAttribute(
+    'instanceLodDitherDirection',
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
+  );
+  geometry.setAttribute(
     'instanceStableSeed',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
   );
@@ -116,6 +120,7 @@ function writeMatrixInstance(attribute, index, matrix, range) {
 
 const MATRIX_RANGE = { min: Infinity, max: -1 };
 const FADE_RANGE = { min: Infinity, max: -1 };
+const DIRECTION_RANGE = { min: Infinity, max: -1 };
 const SEED_RANGE = { min: Infinity, max: -1 };
 const COLOR_RANGE = { min: Infinity, max: -1 };
 const TINT_RANGE = { min: Infinity, max: -1 };
@@ -133,12 +138,14 @@ export function writeInstances(renderers, instancesByPrototype) {
       const previousCount = mesh.count;
       mesh.count = writableCount;
       const fades = mesh.geometry.getAttribute('instanceLodFade');
+      const directions = mesh.geometry.getAttribute('instanceLodDitherDirection');
       const seeds = mesh.geometry.getAttribute('instanceStableSeed');
       const colors = mesh.geometry.getAttribute('instanceColorVariation');
       const tints = mesh.geometry.getAttribute('instanceLeafTint');
       const morphologies = mesh.geometry.getAttribute('instanceMorphology');
       const matrixRange = resetDirtyRange(MATRIX_RANGE);
       const fadeRange = resetDirtyRange(FADE_RANGE);
+      const directionRange = resetDirtyRange(DIRECTION_RANGE);
       const seedRange = resetDirtyRange(SEED_RANGE);
       const colorRange = resetDirtyRange(COLOR_RANGE);
       const tintRange = resetDirtyRange(TINT_RANGE);
@@ -147,6 +154,12 @@ export function writeInstances(renderers, instancesByPrototype) {
         const instance = instances[index];
         writeMatrixInstance(mesh.instanceMatrix, index, instance.matrix, matrixRange);
         writeScalarInstance(fades, index, instance.fade, fadeRange);
+        writeScalarInstance(
+          directions,
+          index,
+          instance.ditherDirection ?? 1,
+          directionRange,
+        );
         writeScalarInstance(seeds, index, instance.seed, seedRange);
         if (colors) {
           writeScalarInstance(colors, index, instance.colorVariation ?? 1, colorRange);
@@ -165,6 +178,7 @@ export function writeInstances(renderers, instancesByPrototype) {
       }
       markAttributeSubrangeUpdated(mesh.instanceMatrix, matrixRange.min, matrixRange.max);
       markAttributeSubrangeUpdated(fades, fadeRange.min, fadeRange.max);
+      markAttributeSubrangeUpdated(directions, directionRange.min, directionRange.max);
       markAttributeSubrangeUpdated(seeds, seedRange.min, seedRange.max);
       if (colors) markAttributeSubrangeUpdated(colors, colorRange.min, colorRange.max);
       if (tints) markAttributeSubrangeUpdated(tints, tintRange.min, tintRange.max);
@@ -207,8 +221,8 @@ function waitingState(target, timestamp) {
     complete: false,
     waitingForData: true,
     representations: Object.freeze([
-      { band: 'culled', fade: 1 },
-      { band: target, fade: WAITING_FADE },
+      Object.freeze({ band: 'culled', fade: 1, ditherDirection: -1 }),
+      Object.freeze({ band: target, fade: WAITING_FADE, ditherDirection: 1 }),
     ]),
   };
 }
@@ -284,7 +298,8 @@ export function buildChunkLodPlan({
         target,
         ready ? 'ready' : 'waiting',
         ...state.representations.map((representation) => (
-          `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}`
+          `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}:$
+{representation.ditherDirection}`
         )),
       ].join(':'));
     }
