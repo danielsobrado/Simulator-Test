@@ -6,6 +6,7 @@ import {
   clamp,
   cross,
   floor,
+  fract,
   length,
   min,
   mix,
@@ -53,7 +54,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
   const columnPosition = localAzimuth.div(TWO_PI).mul(atlas.columns);
   const column0 = floor(columnPosition);
   const column1 = mod(column0.add(1), atlas.columns);
-  const columnBlend = columnPosition.fract();
+  const columnBlend = fract(columnPosition);
   const elevation = atan(viewDelta.y, length(viewDelta.xz));
   const lowElevation = atlas.lowElevationDegrees * Math.PI / 180;
   const highElevation = atlas.highElevationDegrees * Math.PI / 180;
@@ -64,7 +65,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
   ).mul(Math.max(0, atlas.rows - 1));
   const row0 = floor(rowPosition);
   const row1 = min(row0.add(1), Math.max(0, atlas.rows - 1));
-  const rowBlend = rowPosition.fract();
+  const rowBlend = fract(rowPosition);
   const gutter = Math.max(0, atlas.gutter ?? 0);
   const tileScale = Math.max(0.001, (atlas.tileSize - gutter * 2) / atlas.tileSize);
   const tileOffset = gutter / atlas.tileSize;
