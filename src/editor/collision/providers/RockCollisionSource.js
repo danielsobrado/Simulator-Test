@@ -69,22 +69,25 @@ export function createRockCollisionSource({ rockView, config }) {
     if (revision === observedPrototypeRevision && profiles.length === rockView.prototypes.length) {
       return profiles;
     }
-    observedPrototypeRevision = revision;
     if (rockView.prototypes.length === 0) {
       profiles = EMPTY_PROFILES;
       profileSignature = 'profiles:empty';
+      observedPrototypeRevision = revision;
       return profiles;
     }
     const prototypeKeys = prototypeCollisionKeys({
       prototypeCount: rockView.prototypes.length,
       prototypeIndicesByAsset: rockView.prototypeIndicesByAsset,
     });
-    profiles = deriveRockCollisionProfiles({
+    const nextProfiles = deriveRockCollisionProfiles({
       prototypes: rockView.prototypes,
       prototypeKeys,
       config,
     });
-    profileSignature = rockCollisionProfileSignature(profiles);
+    const nextSignature = rockCollisionProfileSignature(nextProfiles);
+    profiles = nextProfiles;
+    profileSignature = nextSignature;
+    observedPrototypeRevision = revision;
     return profiles;
   }
 
@@ -101,7 +104,10 @@ export function createRockCollisionSource({ rockView, config }) {
     },
     resolvePrototypeIndex: (placement) => placement.prototypeIndex,
     burialFor(placement, profile) {
-      const scale = placement.scale;
+      const scale = placement.scale ?? 1;
+      if (!Number.isFinite(scale) || scale <= 0) {
+        throw new Error(`Rock placement ${placement.stableId} has an invalid burial scale.`);
+      }
       const burialFraction = Math.max(0, Number(rockView.config?.rocks?.burial) || 0);
       const prototypeHeight = rockView.prototypeHeights?.[placement.prototypeIndex]
         ?? profile.height;
