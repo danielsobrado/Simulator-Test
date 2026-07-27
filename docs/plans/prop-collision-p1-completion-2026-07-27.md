@@ -2,7 +2,7 @@
 
 Date: **2026-07-27**  
 Branch: `agent/prop-collision-p1`  
-Base: `main` at `85ecad4e24f812b6f0f68f4412bd8a79f2d48636`  
+Latest reviewed `main`: `c47a93501887e7070c71e34649cdbb3f8655fd2a`  
 Parent plan: [`prop-collision-implementation-plan-2026-07-27.md`](prop-collision-implementation-plan-2026-07-27.md)
 
 ## Implemented
@@ -61,11 +61,12 @@ P1 does not change player movement. The runtime activates only when:
 
 ## Current-main integration
 
-The final branch was rebuilt from `main` at `85ecad4e24f812b6f0f68f4412bd8a79f2d48636` after newer forest rendering and inventory-planning commits landed.
+The latest `main` was reviewed at `c47a93501887e7070c71e34649cdbb3f8655fd2a` after additional object/tree LOD and dither changes landed.
 
-- No forest, tree LOD, impostor, dither, or inventory-plan file is modified by P1.
-- Current `TreeManifestStore` behaviour is preserved.
+- No forest, object LOD, tree LOD, impostor, dither, inventory-plan, or related test file is modified by P1.
+- Current `TreeManifestStore`, `StylizedLodRuntime`, and `ObjectLodController` behaviour is preserved.
 - P1 remains an independent static collision subsystem and QA runtime.
+- The pull request targets current `main`; the reviewed newer commits are non-overlapping and GitHub can merge them without whole-file conflict resolution.
 
 ## Browser API
 
