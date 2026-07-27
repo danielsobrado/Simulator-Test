@@ -287,7 +287,7 @@ export class StylizedRockView {
         entries.push({
           chunkX,
           chunkZ,
-          representations: [{ band: 'near', fade: 1 }],
+          representations: [{ band: 'near', fade: 1, ditherDirection: 1 }],
         });
       }
     }
@@ -412,6 +412,7 @@ export class StylizedRockView {
                 ROCK_SCRATCH.scale.setScalar(placement.scale),
               ),
               fade: representation.fade,
+              ditherDirection: representation.ditherDirection ?? 1,
               seed: placement.priority,
               colorVariation: 1 - colorRange * 0.5 + placement.priority * colorRange,
             };
