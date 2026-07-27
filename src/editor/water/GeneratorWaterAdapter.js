@@ -1,7 +1,6 @@
 import {
   WATER_BODY_ID_NONE,
   WATER_BODY_ID_PROCEDURAL_OCEAN,
-  WATER_DOMAIN_VERSION,
   WATER_KIND_OCEAN,
   WATER_KIND_RIVER,
   WATER_SAMPLE_FLAG_INCOMPLETE_BED,
@@ -17,10 +16,26 @@ function assertCoordinate(value, fieldName) {
   }
 }
 
+function sampleBedHeight(generator, cellX, cellZ) {
+  const x0 = Math.floor(cellX);
+  const z0 = Math.floor(cellZ);
+  const x1 = x0 + 1;
+  const z1 = z0 + 1;
+  const tx = cellX - x0;
+  const tz = cellZ - z0;
+  const northWest = generator.sampleHeight(x0, z0);
+  const northEast = generator.sampleHeight(x1, z0);
+  const southWest = generator.sampleHeight(x0, z1);
+  const southEast = generator.sampleHeight(x1, z1);
+  const north = northWest + (northEast - northWest) * tx;
+  const south = southWest + (southEast - southWest) * tx;
+  return north + (south - north) * tz;
+}
+
 export function sampleGeneratorWater(generator, cellX, cellZ) {
   assertCoordinate(cellX, 'cellX');
   assertCoordinate(cellZ, 'cellZ');
-  const bedHeight = generator.sampleHeight(cellX, cellZ);
+  const bedHeight = sampleBedHeight(generator, cellX, cellZ);
   const tileX = Math.floor(cellX);
   const tileZ = Math.floor(cellZ);
   if (generator.sampleTile(tileX, tileZ) !== WATER_TILE_ID) {
@@ -82,8 +97,4 @@ export function ensureWaterDomainGenerator(generator, metadata = {}) {
   }
 
   return generator;
-}
-
-export function waterDomainMetadata() {
-  return Object.freeze({ waterDomainVersion: WATER_DOMAIN_VERSION });
 }
