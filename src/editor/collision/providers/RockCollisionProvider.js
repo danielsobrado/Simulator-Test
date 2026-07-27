@@ -155,6 +155,10 @@ export class RockCollisionProvider {
     return this.source.getProfiles().length;
   }
 
+  getCachedProfileCount() {
+    return this.source.getCachedProfileCount?.() ?? 0;
+  }
+
   buildChunkData(chunkX, chunkZ) {
     const snapshot = this.source.snapshotChunk(chunkX, chunkZ);
     const profiles = this.source.getProfiles();
@@ -215,7 +219,7 @@ export class RockCollisionProvider {
   getStatus() {
     return Object.freeze({
       id: this.descriptor.id,
-      profileCount: this.getProfileCount(),
+      profileCount: this.getCachedProfileCount(),
     });
   }
 }
