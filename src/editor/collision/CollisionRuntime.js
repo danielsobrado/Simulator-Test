@@ -24,6 +24,15 @@ function qaScenario(search) {
   return COLLISION_QA_SCENARIOS.has(scenario) ? scenario : null;
 }
 
+function residencyConfig(streaming, activeQaScenario) {
+  if (activeQaScenario !== 'collision-p4') return streaming;
+  return Object.freeze({
+    ...streaming,
+    residentRadius: Math.max(streaming.residentRadius, 2),
+    unloadRadius: Math.max(streaming.unloadRadius, 3),
+  });
+}
+
 function createEmptyProvider() {
   return Object.freeze({
     descriptor: null,
@@ -111,7 +120,7 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
   });
   const residency = new CollisionResidency({
     world,
-    config: collisionConfig.streaming,
+    config: residencyConfig(collisionConfig.streaming, activeQaScenario),
     buildOwnerChunk: provider.buildOwnerChunk.bind(provider),
     onOwnerChunkCommitted: provider.commitOwnerChunk?.bind(provider) ?? null,
     onOwnerChunkUnloaded: provider.unloadOwnerChunk?.bind(provider) ?? null,
