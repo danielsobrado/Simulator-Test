@@ -150,14 +150,15 @@ function validatePrototype(prototype, expectedIndex) {
   if (!Number.isInteger(gutter) || gutter < 0 || gutter * 2 >= prototype.tileSize) {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid gutter.`);
   }
-  if (prototype.normalEncoding !== TREE_IMPOSTOR_NORMAL_ENCODING) {
+  const normalEncoding = prototype.normalEncoding ?? TREE_IMPOSTOR_NORMAL_ENCODING;
+  if (normalEncoding !== TREE_IMPOSTOR_NORMAL_ENCODING) {
     throw new Error(
-      `Tree impostor prototype ${expectedIndex} has unsupported normal encoding ${prototype.normalEncoding}.`,
+      `Tree impostor prototype ${expectedIndex} has unsupported normal encoding ${normalEncoding}.`,
     );
   }
   assertAssetPath(prototype.albedo, 'albedo', expectedIndex);
   assertAssetPath(prototype.normal, 'normal', expectedIndex);
-  return Object.freeze({ ...prototype, gutter });
+  return Object.freeze({ ...prototype, gutter, normalEncoding });
 }
 
 export function validateTreeImpostorManifest(manifest, {
