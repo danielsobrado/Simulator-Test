@@ -32,14 +32,14 @@ test('production configuration enables tree collision and keeps overrides explic
   assert.match(yaml, /^  prototypeOverrides: \{\}$/m);
 });
 
-test('stylized trees publish manifests and the unified bootstrap waits for them', () => {
+test('stylized trees remain part of the natural collision source', () => {
   const surface = readFileSync(
     new URL('../src/editor/stylized/StylizedSurfaceView.js', import.meta.url),
     'utf8',
   );
-  assert.match(surface, /registerCollisionTreeSource/);
+  assert.match(surface, /registerCollisionNaturalSource/);
   assert.match(surface, /treeView: this\.treeView/);
-  assert.match(surface, /releaseCollisionTreeSource/);
+  assert.match(surface, /releaseCollisionNaturalSource/);
 
   const bootstrap = readFileSync(
     new URL('../src/editor/collision/CollisionP2Bootstrap.js', import.meta.url),
