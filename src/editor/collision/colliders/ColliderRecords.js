@@ -43,7 +43,12 @@ function cloneMetadata(value, path = 'metadata', ancestors = new WeakSet()) {
     }
     clone = {};
     for (const [key, entry] of Object.entries(value)) {
-      clone[key] = cloneMetadata(entry, `${path}.${key}`, ancestors);
+      Object.defineProperty(clone, key, {
+        value: cloneMetadata(entry, `${path}.${key}`, ancestors),
+        enumerable: true,
+        configurable: false,
+        writable: false,
+      });
     }
   }
   ancestors.delete(value);
@@ -51,7 +56,9 @@ function cloneMetadata(value, path = 'metadata', ancestors = new WeakSet()) {
 }
 
 function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }) {
-  if (!sourceId || typeof sourceId !== 'string') throw new Error('Collider sourceId is required.');
+  if (typeof sourceId !== 'string' || !sourceId.trim()) {
+    throw new Error('Collider sourceId is required.');
+  }
   if (!Number.isSafeInteger(ownerChunkX) || !Number.isSafeInteger(ownerChunkZ)) {
     throw new Error('Collider owner chunk coordinates must be safe integers.');
   }
