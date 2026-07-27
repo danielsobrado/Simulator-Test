@@ -7,7 +7,7 @@ import {
   uv,
   vec3,
 } from 'three/tsl';
-import { screenDitherThreshold } from './screenDither.js';
+import { orientedScreenDitherThreshold } from './screenDither.js';
 
 export function createSourceOpacityNode(material) {
   if (material.opacityNode) return material.opacityNode;
@@ -47,11 +47,12 @@ export function createDitheredMaterial(sourceMaterial, {
 } = {}) {
   const material = sourceMaterial.clone();
   const fade = attribute('instanceLodFade', 'float');
+  const direction = attribute('instanceLodDitherDirection', 'float');
   const seed = attribute('instanceStableSeed', 'float');
   const colorVariation = attribute('instanceColorVariation', 'float');
   const sourceOpacity = createSourceOpacityNode(material);
   const coverage = sourceOpacity ? sourceOpacity.mul(fade) : fade;
-  material.opacityNode = step(screenDitherThreshold(seed), coverage);
+  material.opacityNode = step(orientedScreenDitherThreshold(seed, direction), coverage);
   if (material.colorNode) {
     const variation = tinted
       ? attribute('instanceLeafTint', 'vec3').mul(colorVariation)
