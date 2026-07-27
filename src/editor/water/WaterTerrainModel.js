@@ -1,4 +1,10 @@
-import { WATER_BODY_ID_NONE, WATER_BODY_ID_PROCEDURAL_OCEAN, WATER_KIND_OCEAN, WATER_KIND_RIVER, WATER_SAMPLE_FLAG_INCOMPLETE_BED } from './WaterConstants.js';
+import {
+  WATER_BODY_ID_NONE,
+  WATER_BODY_ID_PROCEDURAL_OCEAN,
+  WATER_KIND_OCEAN,
+  WATER_KIND_RIVER,
+  WATER_SAMPLE_FLAG_INCOMPLETE_BED,
+} from './WaterConstants.js';
 import { createNoWaterSample, createWaterSample } from './WaterSample.js';
 import { sampleOceanBed } from './OceanBathymetry.js';
 import { RiverChannel } from './RiverChannel.js';
@@ -7,7 +13,15 @@ import { WaterDistanceField } from './WaterDistanceField.js';
 const WATER_TILE_ID = 0;
 
 export class WaterTerrainModel {
-  constructor({ source = null, seed, seaLevel, config, sampleBaseHeight, sampleBaseTile, isBaseRiverCell = null }) {
+  constructor({
+    source = null,
+    seed,
+    seaLevel,
+    config,
+    sampleBaseHeight,
+    sampleBaseTile,
+    isBaseRiverCell = null,
+  }) {
     this.source = source;
     this.seed = seed;
     this.seaLevel = seaLevel;
@@ -25,7 +39,10 @@ export class WaterTerrainModel {
     });
     this.oceanDistance = new WaterDistanceField({
       isWaterCell: (cellX, cellZ) => this.isOceanCell(cellX, cellZ),
-      maxDistanceCells: Math.max(1, Math.ceil(config.shoreDistanceMeters / config.cellSizeMeters)),
+      maxDistanceCells: Math.max(
+        1,
+        Math.ceil(config.shoreDistanceMeters / config.cellSizeMeters),
+      ),
     });
   }
 
@@ -35,7 +52,8 @@ export class WaterTerrainModel {
   }
 
   isOceanCell(cellX, cellZ) {
-    return this.sampleBaseTile(cellX, cellZ) === WATER_TILE_ID && !this.isRiverCell(cellX, cellZ);
+    return this.sampleBaseTile(cellX, cellZ) === WATER_TILE_ID
+      && !this.isRiverCell(cellX, cellZ);
   }
 
   filteredBaseHeight(cellX, cellZ, centerHeight) {
@@ -50,7 +68,8 @@ export class WaterTerrainModel {
 
   oceanBedHeight(cellX, cellZ, baseHeight) {
     if (!this.isOceanCell(Math.floor(cellX), Math.floor(cellZ))) return baseHeight;
-    const distanceMeters = this.oceanDistance.sample(cellX, cellZ) * this.config.cellSizeMeters;
+    const distanceMeters = this.oceanDistance.sample(cellX, cellZ)
+      * this.config.cellSizeMeters;
     return sampleOceanBed({
       baseHeight,
       filteredBaseHeight: this.filteredBaseHeight(cellX, cellZ, baseHeight),
@@ -67,11 +86,15 @@ export class WaterTerrainModel {
     const baseHeight = this.sampleBaseHeight(cellX, cellZ);
     const oceanBed = this.oceanBedHeight(cellX, cellZ, baseHeight);
     const river = this.riverChannel?.sample(cellX, cellZ) ?? null;
-    return river ? Math.min(oceanBed, river.bedHeight) : oceanBed;
+    if (!river) return oceanBed;
+    const carvedBed = Math.min(oceanBed, river.bedHeight);
+    return oceanBed + (carvedBed - oceanBed) * river.coverage;
   }
 
   interpolatedHeight(cellX, cellZ) {
-    if (Number.isInteger(cellX) && Number.isInteger(cellZ)) return this.sampleHeight(cellX, cellZ);
+    if (Number.isInteger(cellX) && Number.isInteger(cellZ)) {
+      return this.sampleHeight(cellX, cellZ);
+    }
     const x0 = Math.floor(cellX);
     const z0 = Math.floor(cellZ);
     const x1 = x0 + 1;
@@ -83,7 +106,7 @@ export class WaterTerrainModel {
     const southWest = this.sampleHeight(x0, z1);
     const southEast = this.sampleHeight(x1, z1);
     const north = northWest + (northEast - northWest) * tx;
-    const south = southWest + (southEast - southWest) * tx;
+    const south = southWest + (southEast - northWest) * 0 + (southEast - southWest) * tx;
     return north + (south - north) * tz;
   }
 
@@ -102,7 +125,8 @@ export class WaterTerrainModel {
         flowZ: river.flowZ,
       });
     }
-    if (!this.riverChannel && this.isBaseRiverCell?.(Math.floor(cellX), Math.floor(cellZ))) {
+    if (!this.riverChannel
+        && this.isBaseRiverCell?.(Math.floor(cellX), Math.floor(cellZ))) {
       return createWaterSample({
         kind: WATER_KIND_RIVER,
         bodyId: WATER_BODY_ID_NONE,
@@ -111,13 +135,16 @@ export class WaterTerrainModel {
         flags: WATER_SAMPLE_FLAG_INCOMPLETE_BED,
       });
     }
-    if (!this.isOceanCell(Math.floor(cellX), Math.floor(cellZ))) return createNoWaterSample(bedHeight);
+    if (!this.isOceanCell(Math.floor(cellX), Math.floor(cellZ))) {
+      return createNoWaterSample(bedHeight);
+    }
     return createWaterSample({
       kind: WATER_KIND_OCEAN,
       bodyId: WATER_BODY_ID_PROCEDURAL_OCEAN,
       surfaceHeight: this.seaLevel,
       bedHeight,
-      shoreDistance: this.oceanDistance.sample(cellX, cellZ) * this.config.cellSizeMeters,
+      shoreDistance: this.oceanDistance.sample(cellX, cellZ)
+        * this.config.cellSizeMeters,
     });
   }
 }
