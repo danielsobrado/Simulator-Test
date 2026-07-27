@@ -1,10 +1,12 @@
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import yaml from 'js-yaml';
 import sharp from 'sharp';
 import {
   validateTreeImpostorManifest,
 } from '../src/editor/stylized/impostor/TreeImpostorManifest.js';
 
+const CONFIG_PATH = resolve('editor.config.yaml');
 const MANIFEST_PATH = resolve('public/assets/impostors/trees/manifest.json');
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const REQUIRED = process.argv.includes('--required');
@@ -48,6 +50,12 @@ async function alphaCoverage(buffer, label) {
   return visible;
 }
 
+async function runtimeBakeEnabled() {
+  const config = yaml.load(await readFile(CONFIG_PATH, 'utf8'));
+  const settings = config?.stylizedSurface?.lod?.impostor;
+  return settings?.enabled !== false && settings?.runtimeBake !== false;
+}
+
 async function main() {
   if (!await exists(MANIFEST_PATH)) {
     if (REQUIRED) {
@@ -59,6 +67,12 @@ async function main() {
   const manifest = validateTreeImpostorManifest(
     JSON.parse(await readFile(MANIFEST_PATH, 'utf8')),
   );
+  if (manifest.requiresRuntimeBake && !await runtimeBakeEnabled()) {
+    throw new Error(
+      `Tree impostor manifest v${manifest.version} requires runtime bake, but runtimeBake is disabled.`,
+    );
+  }
+
   for (const prototype of manifest.prototypes) {
     const expectedWidth = prototype.columns * prototype.tileSize;
     const expectedHeight = prototype.rows * prototype.tileSize;
@@ -74,6 +88,8 @@ async function main() {
         );
       }
     }
+    if (manifest.requiresRuntimeBake) continue;
+
     const albedoPixels = await alphaCoverage(buffers.albedo, `albedo atlas ${prototype.albedo}`);
     const foliagePixels = await alphaCoverage(buffers.normal, `normal atlas ${prototype.normal}`);
     if (albedoPixels === 0) {
@@ -85,8 +101,12 @@ async function main() {
       );
     }
   }
+
+  const mode = manifest.requiresRuntimeBake
+    ? `legacy v${manifest.version}; exact runtime v3 bake enabled`
+    : manifest.normalEncoding;
   console.log(
-    `validated ${manifest.prototypes.length} tree impostor prototypes (${manifest.sourceSignature})`,
+    `validated ${manifest.prototypes.length} tree impostor prototypes (${manifest.sourceSignature}; ${mode})`,
   );
 }
 
