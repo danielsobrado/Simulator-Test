@@ -5,7 +5,8 @@ import { TerrainCollisionProvider } from './providers/TerrainCollisionProvider.j
 
 const params = new URLSearchParams(window.location.search);
 const qaScenario = params.get('qa');
-const qaMode = ['collision-p1', 'collision-p2', 'collision-p3'].includes(qaScenario);
+const fixtureQa = qaScenario === 'collision-p1' || qaScenario === 'collision-p2';
+const qaMode = fixtureQa || qaScenario === 'collision-p3';
 let runtime = null;
 let motor = null;
 let player = null;
@@ -79,7 +80,7 @@ function updateQa() {
 function attach({ player: nextPlayer, collisionConfig, treeSource }) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
   const requiresTrees = qaScenario === 'collision-p3'
-    || (collisionConfig.enabled && collisionConfig.trees.enabled);
+    || (!fixtureQa && collisionConfig.enabled && collisionConfig.trees.enabled);
   if (requiresTrees && !treeSource) {
     publish('waiting-trees');
     return;
