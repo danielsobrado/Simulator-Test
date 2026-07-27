@@ -3,13 +3,14 @@ import { ProceduralWorldGenerator } from './ProceduralWorldGenerator.js';
 import { ensureWaterDomainGenerator } from '../water/GeneratorWaterAdapter.js';
 
 export function createWorldGenerator(metadata, baseTerrain = null) {
-  const generator = !baseTerrain
-    ? new ProceduralWorldGenerator(metadata)
-    : baseTerrain.kind === 'azgaar-macro-v1'
-      ? new AzgaarMacroWorldGenerator(baseTerrain, metadata)
-      : null;
-  if (!generator) {
-    throw new Error(`Unsupported base terrain source: ${baseTerrain.kind ?? 'unknown'}.`);
+  if (!baseTerrain) {
+    return ensureWaterDomainGenerator(new ProceduralWorldGenerator(metadata), metadata);
   }
-  return ensureWaterDomainGenerator(generator, metadata);
+  if (baseTerrain.kind === 'azgaar-macro-v1') {
+    return ensureWaterDomainGenerator(
+      new AzgaarMacroWorldGenerator(baseTerrain, metadata),
+      metadata,
+    );
+  }
+  throw new Error(`Unsupported base terrain source: ${baseTerrain.kind ?? 'unknown'}.`);
 }
