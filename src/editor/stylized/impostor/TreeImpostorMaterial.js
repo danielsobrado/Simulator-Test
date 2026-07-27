@@ -5,7 +5,6 @@ import {
   cameraPosition,
   clamp,
   cross,
-  dot,
   floor,
   fract,
   length,
@@ -23,9 +22,8 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { screenDitherThreshold } from '../lod/screenDither.js';
 
-const HASH_VECTOR = vec3(12.9898, 78.233, 37.719);
-const HASH_SCALE = 43758.5453;
 const TWO_PI = Math.PI * 2;
 
 function createMaterial({ atlas, readTransform, readParameters, readAppearance }) {
@@ -89,14 +87,8 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
       .add(up.mul(viewNormal.y))
       .add(backward.mul(viewNormal.z)),
   );
-  const seededPosition = worldPosition.mul(1.71).add(vec3(
-    parameters.z.mul(19.19),
-    parameters.z.mul(31.37),
-    parameters.z.mul(47.11),
-  ));
-  const threshold = fract(sin(dot(seededPosition, HASH_VECTOR)).mul(HASH_SCALE));
   const coverage = albedo.a.mul(parameters.y);
-  const visible = step(threshold, coverage);
+  const visible = step(screenDitherThreshold(parameters.z), coverage);
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
