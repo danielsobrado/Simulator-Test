@@ -98,7 +98,7 @@ export function createMeshColliderPrototype({
 
   const bvh = new MeshBVH(proxy, {
     strategy: CENTER,
-    maxLeafTris: maxLeafTriangles,
+    targetLeafSize: maxLeafTriangles,
     indirect: true,
   });
   const resource = {
