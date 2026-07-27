@@ -3,6 +3,9 @@ import {
   WORLD_DEFAULT_SEED,
   WORLD_GENERATOR_VERSION,
 } from './worldConstants.js';
+import { WATER_DOMAIN_VERSION } from '../water/WaterConstants.js';
+import { resolveWaterDomainVersion } from '../water/WaterConfig.js';
+import { sampleGeneratorWater } from '../water/GeneratorWaterAdapter.js';
 
 function fade(value) {
   return value * value * (3 - 2 * value);
@@ -50,6 +53,7 @@ export class ProceduralWorldGenerator {
     version = WORLD_GENERATOR_VERSION,
     heightScale = WORLD_DEFAULT_HEIGHT_SCALE,
     seaLevel = -1.5,
+    waterDomainVersion = WATER_DOMAIN_VERSION,
   } = {}) {
     if (!Number.isSafeInteger(seed)) {
       throw new Error('World generator seed must be a safe integer.');
@@ -64,6 +68,7 @@ export class ProceduralWorldGenerator {
     this.version = version;
     this.heightScale = heightScale;
     this.seaLevel = seaLevel;
+    this.waterDomainVersion = resolveWaterDomainVersion(waterDomainVersion);
   }
 
   sampleHeight(vertexX, vertexZ) {
@@ -118,12 +123,17 @@ export class ProceduralWorldGenerator {
     return temperature > 0.25 ? 3 : 4;
   }
 
+  sampleWater(cellX, cellZ) {
+    return sampleGeneratorWater(this, cellX, cellZ);
+  }
+
   toMetadata() {
     return Object.freeze({
       seed: this.seed,
       version: this.version,
       heightScale: this.heightScale,
       seaLevel: this.seaLevel,
+      waterDomainVersion: this.waterDomainVersion,
     });
   }
 }

@@ -8,6 +8,7 @@ import {
   enrichPageRenderPixels,
   getSurfaceMaskSearchRadius,
 } from './ChunkRenderPixels.js';
+import { resolveWaterDomainVersion } from '../water/WaterConfig.js';
 import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
 
 function tileIndex(localX, localZ, chunkSize) {
@@ -24,6 +25,10 @@ function assertGeneratorMetadata(actual, expected) {
     if (actual?.[field] !== expected[field]) {
       throw new Error(`World generator ${field} does not match the active editor configuration.`);
     }
+  }
+  if (resolveWaterDomainVersion(actual?.waterDomainVersion)
+      !== resolveWaterDomainVersion(expected.waterDomainVersion)) {
+    throw new Error('World water-domain version does not match the active editor configuration.');
   }
 }
 

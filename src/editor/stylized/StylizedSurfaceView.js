@@ -1,7 +1,13 @@
 import { StylizedSurfaceView as StylizedSurfaceViewBase } from './StylizedSurfaceViewBase.js';
 import { loadOptionalTreeVariants } from './loadOptionalTreeVariants.js';
+import { installTerrainWaterQueries } from '../water/TerrainWaterQueries.js';
 
 export class StylizedSurfaceView extends StylizedSurfaceViewBase {
+  constructor(options) {
+    super(options);
+    installTerrainWaterQueries(options.terrainView);
+  }
+
   async bootstrapLayers() {
     if (!this.enabled) return null;
     const needsScene = this.config.trees.enabled;
