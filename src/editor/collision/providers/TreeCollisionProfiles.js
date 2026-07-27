@@ -10,6 +10,7 @@ import {
 } from './TreeCollisionConstants.js';
 
 const MINIMUM_AGGREGATE_POINTS = 3;
+const LOWEST_RING_EPSILON = 1e-6;
 
 function readPosition(attribute, index) {
   if (typeof attribute.getX === 'function') {
@@ -102,6 +103,24 @@ function candidateForSlice(slice) {
   };
 }
 
+function collectLowestRing(parts) {
+  let lowestY = Number.POSITIVE_INFINITY;
+  let lowest = createSlice();
+  forEachTrunkPosition(parts, (point) => {
+    if (point.y < lowestY - LOWEST_RING_EPSILON) {
+      lowestY = point.y;
+      lowest = createSlice();
+    }
+    if (Math.abs(point.y - lowestY) <= LOWEST_RING_EPSILON) updateSlice(lowest, point);
+  });
+  const center = sliceCenter(lowest);
+  forEachTrunkPosition(parts, (point) => {
+    if (Math.abs(point.y - lowestY) > LOWEST_RING_EPSILON) return;
+    lowest.radii.push(Math.hypot(point.x - center.x, point.z - center.z));
+  });
+  return lowest;
+}
+
 function deriveLowerTrunk(parts) {
   const bounds = {
     minX: Number.POSITIVE_INFINITY,
@@ -157,7 +176,7 @@ function deriveLowerTrunk(parts) {
 
   const selected = candidates.length > 0
     ? candidates[Math.floor((candidates.length - 1) * TREE_COLLISION_PROFILE_SELECTION_RATIO)]
-    : candidateForSlice(aggregate);
+    : candidateForSlice(aggregate) ?? candidateForSlice(collectLowestRing(parts));
   return {
     bounds,
     height,
