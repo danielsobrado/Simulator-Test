@@ -100,6 +100,7 @@ Actual depth tint, absorption, refraction, geographic foam, and underwater rende
 
 - Height overrides update water depth because the field is regenerated from `InfiniteWorldStore.sampleHeight`.
 - Tile overrides can add or remove water classification.
+- Painted water uses the authoritative sea level.
 - Explicit land painting can suppress an imported analytic river at that cell.
 - Generated water fields are not persisted.
 - Water-domain settings are stored in generator metadata.
@@ -108,16 +109,17 @@ Actual depth tint, absorption, refraction, geographic foam, and underwater rende
 
 ## Validation
 
-Focused Node tests: 13 passed.
+Focused Node tests: 17 passed.
 
 Coverage includes:
 
 - Ocean coastline preservation and offshore depth progression.
 - Ocean determinism.
-- Imported river carving and downstream surface continuity.
-- River bank blending.
+- Imported river carving, bank blending, and downstream surface continuity.
 - Ocean and river water-field edges bit-identical across chunks.
 - CPU and half-float field agreement within format tolerance.
+- Floating-origin parity.
+- Live height and tile overrides, including painted water.
 - W0 sample invariants, metadata compatibility, and configuration validation.
 
 Full visual acceptance still requires a physical WebGPU browser and representative imported Azgaar maps.
