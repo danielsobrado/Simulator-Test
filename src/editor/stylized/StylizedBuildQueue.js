@@ -16,6 +16,8 @@ export class StylizedBuildQueue {
     // the frame three separately "cheap" queues can still stack into one hitch.
     this.shouldYield = typeof shouldYield === 'function' ? shouldYield : null;
     this.queue = [];
+    this.entriesByKey = new Map();
+    this.sortDirty = false;
     this.nextSequence = 0;
   }
 
@@ -25,34 +27,58 @@ export class StylizedBuildQueue {
 
   clear() {
     this.queue.length = 0;
+    this.entriesByKey.clear();
+    this.sortDirty = false;
+    this.nextSequence = 0;
   }
 
   enqueue(job) {
     const key = job.key;
-    this.queue = this.queue.filter((entry) => entry.key !== key);
+    const priority = Number.isFinite(job.priority)
+      ? job.priority
+      : Number.POSITIVE_INFINITY;
+    const existing = this.entriesByKey.get(key);
+    if (existing) {
+      Object.assign(existing, job);
+      if (existing.queuePriority === priority) return false;
+      existing.queuePriority = priority;
+      this.sortDirty = true;
+      return true;
+    }
+
     const queued = {
       ...job,
-      queuePriority: Number.isFinite(job.priority) ? job.priority : Number.POSITIVE_INFINITY,
+      queuePriority: priority,
       queueSequence: this.nextSequence,
     };
     this.nextSequence += 1;
     this.queue.push(queued);
+    this.entriesByKey.set(key, queued);
+    this.sortDirty = true;
+    return true;
+  }
+
+  sortQueue() {
+    if (!this.sortDirty) return;
     this.queue.sort((left, right) => (
       left.queuePriority - right.queuePriority
       || left.queueSequence - right.queueSequence
     ));
+    this.sortDirty = false;
   }
 
   flush(run) {
     const startedAt = this.now();
     let built = 0;
     if (this.shouldYield?.()) return { built: 0, remaining: this.queue.length };
+    this.sortQueue();
     while (
       this.queue.length > 0
       && built < this.buildsPerFrame
       && this.now() - startedAt < this.budgetMs
     ) {
       const job = this.queue.shift();
+      this.entriesByKey.delete(job.key);
       // Only count successful work so stale/no-op jobs cannot starve real rebuilds.
       if (run(job)) {
         built += 1;
