@@ -2,11 +2,13 @@ name: P5 collision verification
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches:
-      - agent/prop-collision-p5-walkable-rocks
-    paths:
-      - .github/workflows/p5-verify.yml
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
