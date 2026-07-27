@@ -3,6 +3,10 @@ import { COLLISION_LAYERS } from './CollisionLayers.js';
 import { CollisionResidency } from './CollisionResidency.js';
 import { CollisionWorld } from './CollisionWorld.js';
 import { createSweptCapsuleAabb } from './colliders/ColliderBounds.js';
+import {
+  findMeshSideContact,
+  findMeshTopSupport,
+} from './mesh/MeshCapsuleQuery.js';
 import { createCollisionP1QaProvider } from './providers/CollisionP1QaProvider.js';
 import { NaturalCollisionProvider } from './providers/NaturalCollisionProvider.js';
 import { RockCollisionProvider } from './providers/RockCollisionProvider.js';
@@ -12,7 +16,12 @@ import { createTreeCollisionSource } from './providers/TreeCollisionSource.js';
 
 const EMPTY_COLLIDERS = Object.freeze([]);
 const FIXTURE_QA_SCENARIOS = new Set(['collision-p1', 'collision-p2']);
-const COLLISION_QA_SCENARIOS = new Set([...FIXTURE_QA_SCENARIOS, 'collision-p3', 'collision-p4']);
+const COLLISION_QA_SCENARIOS = new Set([
+  ...FIXTURE_QA_SCENARIOS,
+  'collision-p3',
+  'collision-p4',
+  'collision-p5',
+]);
 
 function hasDebugEnabled(debug) {
   return Object.values(debug).some(Boolean);
@@ -25,7 +34,7 @@ function qaScenario(search) {
 }
 
 function residencyConfig(streaming, activeQaScenario) {
-  if (activeQaScenario !== 'collision-p4') return streaming;
+  if (activeQaScenario !== 'collision-p4' && activeQaScenario !== 'collision-p5') return streaming;
   return Object.freeze({
     ...streaming,
     residentRadius: Math.max(streaming.residentRadius, 2),
@@ -91,6 +100,11 @@ function createProvider({
   });
 }
 
+function attachProviderWorld(provider, world) {
+  provider.attachWorld?.(world);
+  for (const component of provider.components ?? []) component.provider.attachWorld?.(world);
+}
+
 export function shouldCreateCollisionRuntime(collisionConfig, search = '') {
   return collisionConfig.enabled
     || qaScenario(search) !== null
@@ -118,6 +132,7 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
     binSize: collisionConfig.streaming.binSize,
     maxChunksPerCollider: collisionConfig.streaming.maxChunksPerCollider,
   });
+  attachProviderWorld(provider, world);
   const residency = new CollisionResidency({
     world,
     config: residencyConfig(collisionConfig.streaming, activeQaScenario),
@@ -165,6 +180,14 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
     querySweptCapsule({ start, end, radius, bodyHeight, layers = COLLISION_LAYERS.all, out }) {
       const aabb = createSweptCapsuleAabb({ start, end, radius, bodyHeight });
       return world.collectCandidates(aabb, layers, out);
+    },
+    findMeshSideContact(capsule, collider, skinWidth, out) {
+      const prototype = world.getPrototype(collider.prototypeId);
+      return findMeshSideContact({ capsule, collider, prototype, skinWidth, out });
+    },
+    findMeshTopSupport(options) {
+      const prototype = world.getPrototype(options.collider.prototypeId);
+      return findMeshTopSupport({ ...options, prototype });
     },
     checkMovementReadiness({ start, end, radius, bodyHeight }) {
       return residency.checkDestination(createSweptCapsuleAabb({
