@@ -61,7 +61,7 @@ function leafAppearance(placement, resolveLeafTint) {
   };
 }
 
-function geometryInstance(placement, fade, resolveLeafTint) {
+function geometryInstance(placement, fade, ditherDirection, resolveLeafTint) {
   const heightScale = placement.heightScale ?? placement.scale;
   const appearance = leafAppearance(placement, resolveLeafTint);
   return {
@@ -75,6 +75,7 @@ function geometryInstance(placement, fade, resolveLeafTint) {
       scaleZ: heightScale,
     }),
     fade,
+    ditherDirection,
     seed: treeRenderSeed(placement),
     colorVariation: appearance.colorVariation,
     leafTint: appearance.leafTint,
@@ -82,7 +83,7 @@ function geometryInstance(placement, fade, resolveLeafTint) {
   };
 }
 
-function impostorRecord(placement, atlas, fade, resolveLeafTint) {
+function impostorRecord(placement, atlas, fade, ditherDirection, resolveLeafTint) {
   const heightScale = placement.heightScale ?? placement.scale;
   const appearance = leafAppearance(placement, resolveLeafTint);
   const seed = treeRenderSeed(placement);
@@ -93,7 +94,7 @@ function impostorRecord(placement, atlas, fade, resolveLeafTint) {
     scale: heightScale,
     radius: atlas.radius * heightScale * Math.max(1, appearance.impostorAppearance[0]),
     yaw: placement.rotationY,
-    fade,
+    fade: fade * ditherDirection,
     seed,
     appearance: appearance.impostorAppearance,
     speciesId: placement.speciesId,
@@ -152,6 +153,7 @@ export function rebuildTreeLod({
 
     for (const representation of entry.representations) {
       if (representation.band === 'culled' || representation.fade <= 0) continue;
+      const ditherDirection = representation.ditherDirection ?? 1;
       if (representation.band === 'cluster') {
         const minimumWidth = prototypeWidth * 1.6;
         const minimumHeight = prototypeHeight * 0.55;
@@ -180,6 +182,7 @@ export function rebuildTreeLod({
               scaleZ: cluster.depth,
             }),
             fade: representation.fade,
+            ditherDirection,
             seed: cluster.seed,
             colorVariation: 0.9 + cluster.seed * 0.2,
             leafTint: resolveLeafTint?.(cluster),
@@ -204,12 +207,14 @@ export function rebuildTreeLod({
               placement,
               atlas,
               representation.fade,
+              ditherDirection,
               resolveLeafTint,
             ));
           } else {
             fallback[prototypeIndex].push(geometryInstance(
               placement,
               representation.fade,
+              ditherDirection,
               resolveLeafTint,
             ));
           }
@@ -231,6 +236,7 @@ export function rebuildTreeLod({
               scaleX: 0.8 + placement.scale * 0.2,
             }),
             fade: representation.fade,
+            ditherDirection,
             seed,
             colorVariation: 0.82 + (placement.colorSeed ?? seed) * 0.16,
           });
@@ -248,19 +254,26 @@ export function rebuildTreeLod({
               placement,
               atlas,
               representation.fade,
+              ditherDirection,
               resolveLeafTint,
             ));
           } else {
             fallback[prototypeIndex].push(geometryInstance(
               placement,
               representation.fade,
+              ditherDirection,
               resolveLeafTint,
             ));
           }
           continue;
         }
 
-        const instance = geometryInstance(placement, representation.fade, resolveLeafTint);
+        const instance = geometryInstance(
+          placement,
+          representation.fade,
+          ditherDirection,
+          resolveLeafTint,
+        );
         const target = representation.band === 'near' ? near : proxy;
         target[prototypeIndex].push(instance);
       }
