@@ -1,0 +1,24 @@
+waterDomain:
+  version: 1
+  shoreDistanceMeters: 48
+  ocean:
+    coastalShelfMeters: 32
+    shelfDepth: 4
+    maximumDepth: 24
+    maximumBedSlope: 0.75
+  river:
+    minimumDepth: 0.8
+    maximumDepth: 8
+    widthDepthRatio: 0.18
+    bankExponent: 1.8
+    minimumGradient: 0.0002
+player:
+  water:
+    wadeDepth: 0.7
+    swimDepth: 1.35
+    transitionHysteresis: 0.12
+    wadeDrag: 0.35
+    swimSpeed: 5
+    verticalSwimSpeed: 3
+    buoyancy: 18
+    swimDrag: 4
