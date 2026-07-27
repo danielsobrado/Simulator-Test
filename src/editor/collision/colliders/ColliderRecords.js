@@ -21,6 +21,35 @@ function freezeVector(value, name, dimensions = 3, { positive = false } = {}) {
   return Object.freeze([...value]);
 }
 
+function cloneMetadata(value, path = 'metadata', ancestors = new WeakSet()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`Collision ${path} numbers must be finite.`);
+    return value;
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Collision ${path} must contain JSON-like values.`);
+  }
+  if (ancestors.has(value)) throw new Error(`Collision ${path} must not contain cycles.`);
+
+  ancestors.add(value);
+  let clone;
+  if (Array.isArray(value)) {
+    clone = value.map((entry, index) => cloneMetadata(entry, `${path}[${index}]`, ancestors));
+  } else {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(`Collision ${path} must contain plain objects.`);
+    }
+    clone = {};
+    for (const [key, entry] of Object.entries(value)) {
+      clone[key] = cloneMetadata(entry, `${path}.${key}`, ancestors);
+    }
+  }
+  ancestors.delete(value);
+  return Object.freeze(clone);
+}
+
 function commonRecord({ sourceId, type, layers, ownerChunkX, ownerChunkZ, aabb }) {
   if (!sourceId || typeof sourceId !== 'string') throw new Error('Collider sourceId is required.');
   if (!Number.isSafeInteger(ownerChunkX) || !Number.isSafeInteger(ownerChunkZ)) {
@@ -89,10 +118,13 @@ export function createMeshInstanceCollider({
 export function createColliderPrototype({ id, kind, bounds, metadata = {} }) {
   if (!id) throw new Error('Collider prototype id is required.');
   if (!kind) throw new Error('Collider prototype kind is required.');
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error('Collider prototype metadata must be a plain object.');
+  }
   return Object.freeze({
     id: String(id),
     kind: String(kind),
     bounds: createCanonicalAabb(bounds),
-    metadata: Object.freeze({ ...metadata }),
+    metadata: cloneMetadata(metadata),
   });
 }
