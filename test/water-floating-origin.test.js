@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { FloatingOrigin } from '../src/editor/world/FloatingOrigin.js';
-import { InfiniteWorldStore } from '../src/editor/world/InfiniteWorldStore.js';
 import { ProceduralWorldGenerator } from '../src/editor/world/ProceduralWorldGenerator.js';
 import {
   getCanonicalWater,
@@ -12,12 +11,24 @@ import { WATER_KIND_NONE, WATER_KIND_OCEAN } from '../src/editor/water/WaterCons
 
 function createTerrainView({ seaLevel = -1.5 } = {}) {
   const generator = new ProceduralWorldGenerator({ seed: 918273, seaLevel });
+  let heightOverride = null;
+  let tileOverride = null;
+  const worldStore = {
+    tileSize: 2,
+    generator,
+    sampleHeight: (cellX, cellZ) => (
+      heightOverride ?? generator.sampleWater(cellX, cellZ).bedHeight
+    ),
+    getTile: (cellX, cellZ) => tileOverride ?? generator.sampleTile(cellX, cellZ),
+    setHeight: (_x, _z, value) => {
+      heightOverride = value;
+    },
+    setTile: (_x, _z, value) => {
+      tileOverride = value;
+    },
+  };
   return {
-    worldStore: new InfiniteWorldStore({
-      chunkSize: 64,
-      tileSize: 2,
-      generator,
-    }),
+    worldStore,
     floatingOrigin: new FloatingOrigin({ threshold: 64, snapSize: 64 }),
   };
 }
@@ -50,17 +61,14 @@ test('terrain-view installation exposes canonical and render-space methods', () 
 
 test('terrain water queries consume live tile and height overrides', () => {
   const terrainView = createTerrainView({ seaLevel: 100 });
-  const worldStore = terrainView.worldStore;
-  for (const [x, z] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-    worldStore.setHeight(x, z, 25, { silent: true });
-  }
+  terrainView.worldStore.setHeight(0, 0, 25);
 
   const water = getCanonicalWater(terrainView, 1, -1);
   assert.equal(water.kind, WATER_KIND_OCEAN);
   assert.equal(water.bedHeight, 25);
   assert.equal(water.depth, 75);
 
-  worldStore.setTile(0, 0, 4, { silent: true });
+  terrainView.worldStore.setTile(0, 0, 4);
   const land = getCanonicalWater(terrainView, 1, -1);
   assert.equal(land.kind, WATER_KIND_NONE);
   assert.equal(land.bedHeight, 25);
