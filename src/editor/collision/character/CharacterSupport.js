@@ -17,12 +17,8 @@ export function findCharacterSupport({
   maximumUp = 0,
   maximumDown = 0,
   maximumSlopeCosine = 0,
-  onPrimitiveTest = null,
 }) {
   if (!terrainProvider) throw new Error('Character support requires a terrain provider.');
-  if (onPrimitiveTest !== null && typeof onPrimitiveTest !== 'function') {
-    throw new Error('Character support primitive-test callback must be a function.');
-  }
   const terrain = terrainProvider.sample(x, z, radius);
   let best = withinSupportWindow(terrain.height, referenceY, maximumUp, maximumDown)
     ? Object.freeze({
@@ -33,7 +29,6 @@ export function findCharacterSupport({
     : null;
 
   for (const collider of candidates) {
-    onPrimitiveTest?.(collider);
     const support = findPrimitiveTopSupport({
       x,
       z,
