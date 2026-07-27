@@ -1,6 +1,16 @@
 import * as THREE from 'three/webgpu';
-import { normalView, texture, uv } from 'three/tsl';
+import {
+  float,
+  normalView,
+  texture,
+  uv,
+  vec4,
+} from 'three/tsl';
+import { createDilatedAtlasTile } from './TreeImpostorAtlasPixels.js';
 import { createCaptureDirections } from './impostorFrame.js';
+import { TREE_IMPOSTOR_NORMAL_ENCODING } from './TreeImpostorManifest.js';
+
+export { createDilatedAtlasTile as createDilatedTile } from './TreeImpostorAtlasPixels.js';
 
 function createCanvas(width, height) {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
@@ -26,10 +36,10 @@ function createBakeMaterial(part, normalPass) {
     const material = new THREE.MeshBasicNodeMaterial({
       side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide,
     });
-    material.colorNode = normalView.mul(0.5).add(0.5);
+    const foliageMask = float(part.kind === 'leaf' ? 1 : 0);
+    material.colorNode = vec4(normalView.mul(0.5).add(0.5), foliageMask);
     if (sourceMap) {
-      material.opacityNode = texture(sourceMap, uv()).a;
-      material.alphaTest = 0.5;
+      material.maskNode = texture(sourceMap, uv()).a.greaterThan(0.5);
     }
     material.transparent = false;
     material.depthWrite = true;
@@ -86,64 +96,7 @@ async function renderScene(renderer, scene, camera) {
   if (result && typeof result.then === 'function') await result;
 }
 
-function sourceOffset(sourceSize, x, y) {
-  return ((sourceSize - y - 1) * sourceSize + x) * 4;
-}
-
-function nearestOpaquePixel(pixels, sourceSize, centerX, centerY, radius) {
-  let closest = null;
-  let closestDistance = Number.POSITIVE_INFINITY;
-  const minimumX = Math.max(0, centerX - radius);
-  const maximumX = Math.min(sourceSize - 1, centerX + radius);
-  const minimumY = Math.max(0, centerY - radius);
-  const maximumY = Math.min(sourceSize - 1, centerY + radius);
-
-  for (let y = minimumY; y <= maximumY; y += 1) {
-    for (let x = minimumX; x <= maximumX; x += 1) {
-      const offset = sourceOffset(sourceSize, x, y);
-      if (pixels[offset + 3] === 0) continue;
-      const distance = (x - centerX) ** 2 + (y - centerY) ** 2;
-      if (distance >= closestDistance) continue;
-      closestDistance = distance;
-      closest = offset;
-    }
-  }
-  return closest;
-}
-
-export function createDilatedTile(pixels, sourceSize, tileSize, gutter) {
-  const result = new Uint8ClampedArray(tileSize * tileSize * 4);
-  const dilationRadius = Math.max(1, gutter);
-  for (let y = 0; y < tileSize; y += 1) {
-    const rawSourceY = y - gutter;
-    const sourceY = Math.max(0, Math.min(sourceSize - 1, rawSourceY));
-    for (let x = 0; x < tileSize; x += 1) {
-      const rawSourceX = x - gutter;
-      const sourceX = Math.max(0, Math.min(sourceSize - 1, rawSourceX));
-      const directOffset = sourceOffset(sourceSize, sourceX, sourceY);
-      const targetOffset = (y * tileSize + x) * 4;
-      const insideSource = rawSourceX >= 0
-        && rawSourceX < sourceSize
-        && rawSourceY >= 0
-        && rawSourceY < sourceSize;
-      const alpha = insideSource ? pixels[directOffset + 3] : 0;
-      const colorOffset = alpha > 0
-        ? directOffset
-        : nearestOpaquePixel(pixels, sourceSize, sourceX, sourceY, dilationRadius);
-
-      if (colorOffset !== null) {
-        result[targetOffset] = pixels[colorOffset];
-        result[targetOffset + 1] = pixels[colorOffset + 1];
-        result[targetOffset + 2] = pixels[colorOffset + 2];
-      }
-      result[targetOffset + 3] = alpha;
-    }
-  }
-  return result;
-}
-
-function writeTile(context, pixels, sourceSize, tileSize, gutter, column, row) {
-  const data = createDilatedTile(pixels, sourceSize, tileSize, gutter);
+function writeTile(context, data, tileSize, column, row) {
   context.putImageData(new ImageData(data, tileSize, tileSize), column * tileSize, row * tileSize);
 }
 
@@ -264,10 +217,13 @@ export class TreeImpostorBaker {
         );
         writeTile(
           albedoContext,
-          albedoPixels,
-          renderSize,
+          createDilatedAtlasTile(
+            albedoPixels,
+            renderSize,
+            settings.tileSize,
+            gutter,
+          ),
           settings.tileSize,
-          gutter,
           direction.column,
           direction.row,
         );
@@ -284,10 +240,17 @@ export class TreeImpostorBaker {
         );
         writeTile(
           normalContext,
-          normalPixels,
-          renderSize,
+          createDilatedAtlasTile(
+            normalPixels,
+            renderSize,
+            settings.tileSize,
+            gutter,
+            {
+              coveragePixels: albedoPixels,
+              alphaPixels: normalPixels,
+            },
+          ),
           settings.tileSize,
-          gutter,
           direction.column,
           direction.row,
         );
@@ -314,6 +277,7 @@ export class TreeImpostorBaker {
       depth: Math.max(0.1, size.z),
       centerY: center.y,
       radius,
+      normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
       albedoCanvas,
       normalCanvas,
       albedo: configureAtlasTexture(albedoCanvas, THREE.SRGBColorSpace),
