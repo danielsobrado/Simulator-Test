@@ -7,6 +7,34 @@ const COLORS = Object.freeze({
   blocking: 0xff6655,
   walkable: 0x55dd88,
 });
+const PROTOTYPE_COLORS = Object.freeze([
+  0xff7b72,
+  0xf2cc60,
+  0x7ee787,
+  0x79c0ff,
+  0xd2a8ff,
+  0xffa657,
+  0x56d4dd,
+  0xf778ba,
+]);
+
+function prototypeColor(prototypeId) {
+  if (!prototypeId) return null;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < prototypeId.length; index += 1) {
+    hash ^= prototypeId.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return PROTOTYPE_COLORS[hash % PROTOTYPE_COLORS.length];
+}
+
+function colliderColor(collider) {
+  const byPrototype = prototypeColor(collider.prototypeId);
+  if (byPrototype !== null) return byPrototype;
+  return (collider.layers & COLLISION_LAYER_WALKABLE) !== 0
+    ? COLORS.walkable
+    : COLORS.blocking;
+}
 
 function boxFromAabb(aabb) {
   return new THREE.Box3(
@@ -74,11 +102,10 @@ export class CollisionDebugView {
         for (const collider of chunk.colliders) {
           if (drawnColliders.has(collider.sourceId)) continue;
           drawnColliders.add(collider.sourceId);
-          const walkable = (collider.layers & COLLISION_LAYER_WALKABLE) !== 0;
           this.addHelper(
             collider.aabb,
-            walkable ? COLORS.walkable : COLORS.blocking,
-            `collision-collider-${collider.sourceId}`,
+            colliderColor(collider),
+            `collision-collider-${collider.prototypeId ?? 'unprofiled'}-${collider.sourceId}`,
           );
         }
       }

@@ -1,3 +1,4 @@
+import { registerCollisionTreeSource } from '../collision/CollisionPlayerBridge.js';
 import { StylizedSurfaceView as StylizedSurfaceViewBase } from './StylizedSurfaceViewBase.js';
 import { loadOptionalTreeVariants } from './loadOptionalTreeVariants.js';
 import { installTerrainWaterQueries } from '../water/TerrainWaterQueries.js';
@@ -6,6 +7,19 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
   constructor(options) {
     super(options);
     installTerrainWaterQueries(options.terrainView);
+    this.collisionSourceDisposed = false;
+    this.releaseCollisionTreeSource = null;
+    this.ready = this.ready.then((result) => {
+      if (!this.collisionSourceDisposed
+          && !this.impostorBakeMode
+          && this.treeView?.manifestStore) {
+        this.releaseCollisionTreeSource = registerCollisionTreeSource({
+          treeView: this.treeView,
+          rockSource: this.rockView,
+        });
+      }
+      return result;
+    });
   }
 
   async bootstrapLayers() {
@@ -33,5 +47,12 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
       console.warn('Some stylized assets failed to load; remaining layers stay active.', error);
       return null;
     }
+  }
+
+  dispose() {
+    this.collisionSourceDisposed = true;
+    this.releaseCollisionTreeSource?.();
+    this.releaseCollisionTreeSource = null;
+    super.dispose();
   }
 }

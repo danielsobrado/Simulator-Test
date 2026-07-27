@@ -1,9 +1,8 @@
 # Static player-collision configuration.
 #
-# P2 integrates the capsule motor and primitive solver. Normal worlds keep the
-# runtime disabled until P3 adds production tree colliders; collision QA and
-# explicit debug switches can activate the deterministic fixture now.
-enabled: false
+# P3 enables the production runtime with canonical tree-trunk colliders. Later
+# phases add rocks, placed objects, constructions, and walkable mesh proxies.
+enabled: true
 schemaVersion: 1
 
 streaming:
@@ -26,6 +25,10 @@ player:
 trees:
   enabled: true
   minimumTrunkRadius: 0.16
+  # Prefer the configured asset id/scene path. Multi-prototype assets use #0, #1,
+  # and so on. Generated prototypes fall back to "prototype:0" or numeric keys.
+  # Supported fields: radius, height, centerX, centerZ, baseY.
+  prototypeOverrides: {}
 
 rocks:
   enabled: true
