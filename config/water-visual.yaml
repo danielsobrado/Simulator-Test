@@ -1,0 +1,31 @@
+water:
+  qualityTier: high
+  currentAnimationSpeed: 0.22
+  currentInfluence: 0.85
+  caustics:
+    intensity: 0.18
+    scale: 0.45
+    speed: 0.11
+    contrast: 2.2
+    depthFadeStart: 0.35
+    depthFadeEnd: 4.5
+
+aquaticPlants:
+  water:
+    placement: rooted
+    minimumCoverage: 0.55
+    minimumDepth: 0.08
+    maximumDepth: 3.2
+    minimumShoreDistance: 0
+    maximumShoreDistance: 14
+    maximumCurrent: 1
+    allowedKinds: [1, 2, 3]
+  surface:
+    placement: surface
+    minimumCoverage: 0.7
+    minimumDepth: 0.2
+    maximumDepth: 2.6
+    minimumShoreDistance: 0
+    maximumShoreDistance: 12
+    maximumCurrent: 0.1
+    allowedKinds: [1, 2]
