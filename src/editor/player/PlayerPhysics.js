@@ -9,6 +9,9 @@ import {
   resolvePlayerWaterState,
 } from './PlayerWaterState.js';
 
+const UP_NORMAL = Object.freeze({ x: 0, y: 1, z: 0 });
+const EMPTY_CONTACTS = Object.freeze([]);
+
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -87,13 +90,43 @@ function applySwimmingVertical({
   return { nextY, verticalVelocity, grounded: false };
 }
 
+function defaultMovementResult({
+  state,
+  nextX,
+  nextZ,
+  getGroundHeight,
+  eyeHeight,
+}) {
+  const supportHeight = getGroundHeight(nextX, nextZ);
+  return {
+    position: { x: nextX, y: state.y - eyeHeight, z: nextZ },
+    ready: true,
+    blocked: false,
+    stepped: false,
+    slopeConstrained: false,
+    supportSourceId: 'terrain',
+    supportHeight,
+    supportNormal: UP_NORMAL,
+    contacts: EMPTY_CONTACTS,
+    previousValidPosition: { x: nextX, y: supportHeight, z: nextZ },
+  };
+}
+
 export function createPlayerState({ x, z, groundHeight, eyeHeight }) {
   return {
     x,
     y: groundHeight + eyeHeight,
+    footY: groundHeight,
     z,
     verticalVelocity: 0,
     grounded: true,
+    supportSourceId: 'terrain',
+    supportNormal: UP_NORMAL,
+    collisionReady: true,
+    collisionBlocked: false,
+    collisionStepped: false,
+    collisionContacts: EMPTY_CONTACTS,
+    previousValidPosition: Object.freeze({ x, y: groundHeight, z }),
     waterState: PLAYER_WATER_DRY,
     waterDepth: 0,
     waterSurfaceHeight: null,
@@ -111,6 +144,7 @@ export function stepPlayerPhysics({
   right,
   getGroundHeight,
   getWaterSample = null,
+  resolveHorizontalMotion = null,
   bounds = null,
 }) {
   const delta = clamp(deltaSeconds, 0, PLAYER_MAX_DELTA_SECONDS);
@@ -125,17 +159,40 @@ export function stepPlayerPhysics({
   const length = Math.hypot(movementX, movementZ);
   const speed = movementSpeed(movementState, input, config);
   const scale = length > 0 ? speed * delta / length : 0;
-  let nextX = clampToBounds(
+  const desiredX = clampToBounds(
     state.x + movementX * scale,
     bounds?.minX,
     bounds?.maxX,
   );
-  let nextZ = clampToBounds(
+  const desiredZ = clampToBounds(
     state.z + movementZ * scale,
     bounds?.minZ,
     bounds?.maxZ,
   );
-  let groundEyeY = getGroundHeight(nextX, nextZ) + config.eyeHeight;
+  const currentFootY = Number.isFinite(state.footY)
+    ? state.footY
+    : state.y - config.eyeHeight;
+  let movement = typeof resolveHorizontalMotion === 'function'
+    ? resolveHorizontalMotion({
+      start: { x: state.x, y: currentFootY, z: state.z },
+      displacement: { x: desiredX - state.x, z: desiredZ - state.z },
+      grounded: state.grounded,
+      allowStep: state.grounded && !isSwimmingWaterState(movementState.waterState),
+    })
+    : defaultMovementResult({
+      state,
+      nextX: desiredX,
+      nextZ: desiredZ,
+      getGroundHeight,
+      eyeHeight: config.eyeHeight,
+    });
+
+  let nextX = movement.position.x;
+  let nextZ = movement.position.z;
+  let supportHeight = Number.isFinite(movement.supportHeight)
+    ? movement.supportHeight
+    : getGroundHeight(nextX, nextZ);
+  let groundEyeY = supportHeight + config.eyeHeight;
   let nextSample = sampleWater(nextX, nextZ);
   let water = sampleWaterState({ state: movementState, sample: nextSample, eyeY: state.y, config });
 
@@ -143,10 +200,19 @@ export function stepPlayerPhysics({
       && groundEyeY - state.y > config.stepHeight) {
     nextX = state.x;
     nextZ = state.z;
-    groundEyeY = getGroundHeight(nextX, nextZ) + config.eyeHeight;
+    supportHeight = getGroundHeight(nextX, nextZ);
+    groundEyeY = supportHeight + config.eyeHeight;
     nextSample = sampleWater(nextX, nextZ);
     water = sampleWaterState({ state: movementState, sample: nextSample, eyeY: state.y, config });
+    movement = defaultMovementResult({
+      state,
+      nextX,
+      nextZ,
+      getGroundHeight,
+      eyeHeight: config.eyeHeight,
+    });
   }
+
   let verticalVelocity = state.verticalVelocity;
   let nextY = state.y;
   let grounded = state.grounded;
@@ -200,12 +266,24 @@ export function stepPlayerPhysics({
     grounded = true;
   }
 
+  const supportSourceId = grounded ? movement.supportSourceId ?? 'terrain' : null;
+  const supportNormal = grounded ? movement.supportNormal ?? UP_NORMAL : UP_NORMAL;
   return {
     x: nextX,
     y: nextY,
+    footY: nextY - config.eyeHeight,
     z: nextZ,
     verticalVelocity,
     grounded,
+    supportSourceId,
+    supportNormal,
+    collisionReady: movement.ready !== false,
+    collisionBlocked: Boolean(movement.blocked),
+    collisionStepped: Boolean(movement.stepped),
+    collisionContacts: movement.contacts ?? EMPTY_CONTACTS,
+    previousValidPosition: movement.previousValidPosition
+      ?? state.previousValidPosition
+      ?? Object.freeze({ x: nextX, y: supportHeight, z: nextZ }),
     ...water,
   };
 }

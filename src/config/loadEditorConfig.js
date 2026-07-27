@@ -3,6 +3,7 @@ import collisionConfigSource from '../../config/collision.yaml?raw';
 import configSource from '../../editor.config.yaml?raw';
 import waterConfigSource from '../../config/water-domain.yaml?raw';
 import { createCollisionConfig } from '../editor/collision/CollisionConfig.js';
+import { registerCollisionConfig } from '../editor/collision/CollisionPlayerBridge.js';
 import {
   applyWaterDomainConfig,
   validateWaterDomainConfig,
@@ -32,5 +33,6 @@ export function loadEditorConfig() {
   validateWaterDomainConfig(config);
   validateUnderwaterConfig(config.player.water.underwater);
   validateStylizedLodConfig(config);
+  registerCollisionConfig(config.collision);
   return Object.freeze(config);
 }

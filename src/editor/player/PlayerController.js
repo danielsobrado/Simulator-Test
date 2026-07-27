@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerCollisionPlayer } from '../collision/CollisionPlayerBridge.js';
 import { createPlayerState, stepPlayerPhysics } from './PlayerPhysics.js';
 import { isSwimmingWaterState } from './PlayerWaterState.js';
 import { UnderwaterViewController } from '../water/UnderwaterViewController.js';
@@ -15,6 +16,16 @@ const MOVEMENT_CODES = new Set([
   'KeyC',
   'Space',
 ]);
+
+const INACTIVE_COLLISION_STATUS = Object.freeze({
+  active: false,
+  ready: true,
+  blocked: false,
+  stepped: false,
+  supportSourceId: 'terrain',
+  supportNormal: Object.freeze({ x: 0, y: 1, z: 0 }),
+  contacts: Object.freeze([]),
+});
 
 export class PlayerController {
   constructor({ canvas, terrainView, config, farPlane = 5000 }) {
@@ -41,6 +52,8 @@ export class PlayerController {
     this.forward = new THREE.Vector3();
     this.right = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
+    this.collisionRuntime = null;
+    this.characterMotor = null;
     this.underwaterView = config.water?.underwater && terrainView.scene
       ? new UnderwaterViewController({
         terrainView,
@@ -69,6 +82,7 @@ export class PlayerController {
     document.addEventListener('mousemove', this.boundHandlers.mouseMove);
     document.addEventListener('pointerlockchange', this.boundHandlers.pointerLockChange);
     this.applyCameraState();
+    this.releaseCollisionPlayer = registerCollisionPlayer(this);
   }
 
   get pointerLocked() {
@@ -76,6 +90,7 @@ export class PlayerController {
   }
 
   getStatus() {
+    const collision = this.characterMotor?.getStatus() ?? INACTIVE_COLLISION_STATUS;
     return Object.freeze({
       enabled: this.enabled,
       harnessActive: this.harnessActive,
@@ -84,14 +99,92 @@ export class PlayerController {
       grounded: this.state.grounded,
       running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
       position: Object.freeze({ x: this.state.x, y: this.state.y, z: this.state.z }),
+      footY: this.state.footY,
       yaw: this.yaw,
       pitch: this.pitch,
+      supportSourceId: this.state.supportSourceId,
+      supportNormal: Object.freeze({ ...this.state.supportNormal }),
+      collision: Object.freeze({
+        ...collision,
+        supportNormal: Object.freeze({ ...collision.supportNormal }),
+        contacts: Object.freeze([...(collision.contacts ?? [])]),
+        previousValidPosition: collision.previousValidPosition
+          ? Object.freeze({ ...collision.previousValidPosition })
+          : null,
+      }),
       waterState: this.state.waterState,
       waterDepth: this.state.waterDepth,
       waterSurfaceHeight: this.state.waterSurfaceHeight,
       waterBodyId: this.state.waterBodyId,
       headSubmerged: this.state.headSubmerged,
     });
+  }
+
+  attachCollision({ runtime, motor }) {
+    if (!runtime || !motor) throw new Error('Player collision attachment requires runtime and motor.');
+    this.collisionRuntime = runtime;
+    this.characterMotor = motor;
+    this.collisionRuntime.resetTracking?.();
+    this.resetCollision();
+    this.emit();
+  }
+
+  detachCollision() {
+    this.collisionRuntime = null;
+    this.characterMotor = null;
+    this.emit();
+  }
+
+  resetCollision() {
+    if (!this.characterMotor) return;
+    this.collisionRuntime?.resetTracking?.();
+    const canonical = this.terrainView.floatingOrigin.toCanonical(this.state.x, this.state.z);
+    this.characterMotor.reset({
+      x: canonical.x,
+      y: this.state.y - this.config.eyeHeight,
+      z: canonical.z,
+    });
+  }
+
+  resolveHorizontalMotion(request) {
+    if (!this.characterMotor) return null;
+    const canonical = this.terrainView.floatingOrigin.toCanonical(
+      request.start.x,
+      request.start.z,
+    );
+    const result = this.characterMotor.move({
+      ...request,
+      start: {
+        x: canonical.x,
+        y: request.start.y,
+        z: canonical.z,
+      },
+    });
+    const render = this.terrainView.floatingOrigin.toRender(
+      result.position.x,
+      result.position.z,
+    );
+    const previousRender = result.previousValidPosition
+      ? this.terrainView.floatingOrigin.toRender(
+        result.previousValidPosition.x,
+        result.previousValidPosition.z,
+      )
+      : null;
+    return {
+      ...result,
+      position: {
+        x: render.x,
+        y: result.position.y,
+        z: render.z,
+      },
+      previousValidPosition: previousRender
+        ? Object.freeze({
+          x: previousRender.x,
+          y: result.previousValidPosition.y,
+          z: previousRender.z,
+        })
+        : null,
+    };
   }
 
   setUiBlocked(blocked) {
@@ -128,6 +221,7 @@ export class PlayerController {
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
     if (Number.isFinite(x) && Number.isFinite(z)) {
       this.state = this.createState(x, z);
+      this.resetCollision();
       this.underwaterView?.restoreSurfaceEnvironment();
     }
     if (Number.isFinite(yaw)) this.yaw = yaw;
@@ -152,6 +246,7 @@ export class PlayerController {
 
     if (this.enabled && spawn) {
       this.state = this.createState(spawn.x, spawn.z);
+      this.resetCollision();
       this.applyCameraState();
     }
 
@@ -182,6 +277,11 @@ export class PlayerController {
     const current = Number.isFinite(timestamp) ? timestamp : performance.now();
     const deltaSeconds = this.lastTimestamp === null ? 0 : (current - this.lastTimestamp) / 1000;
     this.lastTimestamp = current;
+
+    if (this.collisionRuntime) {
+      const focus = this.terrainView.floatingOrigin.toCanonical(this.state.x, this.state.z);
+      this.collisionRuntime.update(focus, current);
+    }
 
     this.camera.getWorldDirection(this.forward);
     this.forward.y = 0;
@@ -217,15 +317,21 @@ export class PlayerController {
       getWaterSample: typeof this.terrainView.getWorldWater === 'function'
         ? (x, z) => this.terrainView.getWorldWater(x, z)
         : null,
+      resolveHorizontalMotion: this.characterMotor
+        ? (request) => this.resolveHorizontalMotion(request)
+        : null,
     });
     const waterChanged = nextState.waterState !== this.state.waterState
       || nextState.headSubmerged !== this.state.headSubmerged
       || nextState.waterBodyId !== this.state.waterBodyId;
+    const collisionChanged = nextState.collisionReady !== this.state.collisionReady
+      || nextState.collisionBlocked !== this.state.collisionBlocked
+      || nextState.supportSourceId !== this.state.supportSourceId;
     this.state = nextState;
     this.jumpQueued = false;
     this.applyCameraState();
     this.underwaterView?.update(current);
-    if (waterChanged) this.emit();
+    if (waterChanged || collisionChanged) this.emit();
   }
 
   getFocusWorld() {
@@ -237,6 +343,13 @@ export class PlayerController {
       ...this.state,
       x: this.state.x - shiftX,
       z: this.state.z - shiftZ,
+      previousValidPosition: this.state.previousValidPosition
+        ? Object.freeze({
+          ...this.state.previousValidPosition,
+          x: this.state.previousValidPosition.x - shiftX,
+          z: this.state.previousValidPosition.z - shiftZ,
+        })
+        : null,
     };
     this.applyCameraState();
   }
@@ -309,6 +422,7 @@ export class PlayerController {
   }
 
   dispose() {
+    this.releaseCollisionPlayer?.();
     for (const eventName of ['pointerdown', 'pointerup', 'pointermove']) {
       this.canvas.removeEventListener(eventName, this.boundHandlers.canvasPointer, true);
     }
