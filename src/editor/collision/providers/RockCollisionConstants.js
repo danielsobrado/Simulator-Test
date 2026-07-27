@@ -1,0 +1,13 @@
+export const ROCK_COLLISION_TIER_DECORATIVE = 'decorative';
+export const ROCK_COLLISION_TIER_BLOCKING = 'blocking';
+export const ROCK_COLLISION_TIER_WALKABLE = 'walkable';
+
+export const ROCK_COLLISION_SHAPE_SPHERE = 'sphere';
+export const ROCK_COLLISION_SHAPE_ELLIPSOID = 'ellipsoid';
+export const ROCK_COLLISION_SHAPE_CAPSULE = 'capsule';
+export const ROCK_COLLISION_SHAPE_COMPOUND = 'compound';
+
+export const ROCK_COLLISION_SIGNATURE_SCALE = 1000;
+export const ROCK_COLLISION_SPHERE_ASPECT_LIMIT = 1.2;
+export const ROCK_COLLISION_CAPSULE_VERTICAL_RATIO = 1.35;
+export const ROCK_COLLISION_COMPOUND_HORIZONTAL_RATIO = 1.65;
