@@ -1,5 +1,7 @@
-export const TREE_IMPOSTOR_MANIFEST_VERSION = 2;
+export const TREE_IMPOSTOR_MANIFEST_VERSION = 3;
+export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-a';
 
+const SOURCE_SIGNATURE_VERSION = 2;
 const REQUIRED_NUMERIC_FIELDS = Object.freeze([
   'columns',
   'rows',
@@ -94,12 +96,13 @@ export function createTreeImpostorSourceSignature(prototypes, config) {
     trees: config?.trees ?? null,
     treeVariants: config?.assets?.treeVariants ?? null,
     impostor: config?.lod?.impostor ?? null,
+    normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
   });
   let hash = hashText(0x811c9dc5, configuration);
   prototypes.forEach((parts, prototypeIndex) => {
     hash = hashText(hash, `${prototypeIndex}:${prototypeToken(parts)};`);
   });
-  return `tree-impostor-v1-${hash.toString(16).padStart(8, '0')}`;
+  return `tree-impostor-v${SOURCE_SIGNATURE_VERSION}-${hash.toString(16).padStart(8, '0')}`;
 }
 
 function assertPositiveInteger(value, field, prototypeIndex) {
@@ -146,6 +149,11 @@ function validatePrototype(prototype, expectedIndex) {
   const gutter = prototype.gutter ?? 0;
   if (!Number.isInteger(gutter) || gutter < 0 || gutter * 2 >= prototype.tileSize) {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid gutter.`);
+  }
+  if (prototype.normalEncoding !== TREE_IMPOSTOR_NORMAL_ENCODING) {
+    throw new Error(
+      `Tree impostor prototype ${expectedIndex} has unsupported normal encoding ${prototype.normalEncoding}.`,
+    );
   }
   assertAssetPath(prototype.albedo, 'albedo', expectedIndex);
   assertAssetPath(prototype.normal, 'normal', expectedIndex);
