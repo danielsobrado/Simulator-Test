@@ -65,6 +65,7 @@ test('primitive records and canonical bounds are deeply immutable', () => {
   assert.equal(Object.isFrozen(collider.aabb), true);
   assert.equal(Object.isFrozen(collider.position), true);
   assert.throws(() => { collider.position[0] = 9; }, TypeError);
+  assert.throws(() => primitive({ sourceId: '   ' }), /sourceId is required/);
 });
 
 test('primitive records reject invalid dimensions and layer bits', () => {
@@ -94,6 +95,21 @@ test('prototype metadata is copied and deeply immutable', () => {
   assert.equal(Object.isFrozen(prototype.metadata.lod), true);
   assert.equal(Object.isFrozen(prototype.metadata.lod.triangleCounts), true);
   assert.throws(() => { prototype.metadata.lod.triangleCounts[0] = 999; }, TypeError);
+});
+
+test('prototype metadata copies reserved keys without prototype mutation', () => {
+  const metadata = JSON.parse('{"__proto__":{"polluted":true}}');
+  const prototype = createColliderPrototype({
+    id: 'safe-keys',
+    kind: 'mesh',
+    bounds: BOUNDS,
+    metadata,
+  });
+
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(Object.hasOwn(prototype.metadata, '__proto__'), true);
+  assert.equal(prototype.metadata.__proto__.polluted, true);
+  assert.equal(Object.getPrototypeOf(prototype.metadata), Object.prototype);
 });
 
 test('prototype metadata rejects cycles and non-plain resources', () => {
