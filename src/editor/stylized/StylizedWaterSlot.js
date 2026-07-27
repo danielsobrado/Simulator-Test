@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
+import { installTerrainWaterQueries } from '../water/TerrainWaterQueries.js';
 
 const DEFAULT_WATER_LEVEL = 0;
 
@@ -13,6 +14,7 @@ export function resolveWaterSurfaceHeight(terrainView) {
 
 export class StylizedWaterSlot {
   constructor({ terrainSlot, terrainView, config }) {
+    installTerrainWaterQueries(terrainView);
     this.terrainSlot = terrainSlot;
     this.terrainView = terrainView;
     this.config = config;
