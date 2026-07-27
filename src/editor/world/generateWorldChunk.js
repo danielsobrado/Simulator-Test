@@ -1,4 +1,5 @@
 import { enrichPageVegetationScatter } from '../stylized/vegetationScatter.js';
+import { enrichPageWaterField } from '../water/WaterField.js';
 import { chunkKey } from './WorldCoordinates.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import {
@@ -70,9 +71,12 @@ export function generateBaseWorldChunk(request) {
     tiles,
     heights,
   };
+  const timings = {};
+  const waterStartedAt = performance.now();
+  enrichPageWaterField(page, (cellX, cellZ) => generator.sampleWater(cellX, cellZ));
+  timings.waterGenerationMs = performance.now() - waterStartedAt;
 
   const maskConfig = resolveMaskConfig(request);
-  const timings = {};
   const tilePixelsStartedAt = performance.now();
   enrichPageRenderPixels(
     page,
