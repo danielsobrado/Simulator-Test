@@ -23,6 +23,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
@@ -85,6 +86,7 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
 export function createStylizedWaterMaterial({
   surfaceMaskTexture,
   waterFieldTexture,
+  waterFlowTexture,
   waterFieldSize,
   waterSurfaceOrigin,
   chunkCenter,
@@ -93,6 +95,7 @@ export function createStylizedWaterMaterial({
   config,
 }) {
   const water = config.water;
+  const quality = resolveWaterQualityFeatures(water);
   const terrainUv = uv();
   const fieldUv = terrainUv
     .mul((waterFieldSize - 1) / waterFieldSize)
@@ -105,13 +108,31 @@ export function createStylizedWaterMaterial({
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
   );
+  const fallbackFlow = vec2(water.flowX, water.flowZ);
+  let currentFlow = fallbackFlow;
+  if (quality.flow) {
+    const encodedFlow = texture(waterFlowTexture, fieldUv).rg;
+    const decodedCellFlow = encodedFlow.mul(2).sub(1);
+    const decodedFlow = vec2(decodedCellFlow.x, decodedCellFlow.y.negate());
+    const currentMask = step(0.05, length(decodedFlow));
+    currentFlow = mix(
+      fallbackFlow,
+      decodedFlow.mul(water.currentInfluence),
+      currentMask,
+    );
+  }
+  const currentOffset = currentFlow.mul(time.mul(water.currentAnimationSpeed));
+  const legacyNoiseOffset = vec2(time.mul(water.noiseFlowSpeed), 0);
+  const legacySurfaceOffset = fallbackFlow.mul(time);
+  const noiseOffset = quality.flow ? currentOffset : legacyNoiseOffset;
+  const surfaceOffset = quality.flow ? currentOffset : legacySurfaceOffset;
 
   const noiseFac = stylizedFbm(
-    worldXZ.mul(water.noiseScale).add(vec2(time.mul(water.noiseFlowSpeed), 0)),
+    worldXZ.mul(water.noiseScale).add(noiseOffset),
   );
   const distort = noiseFac.sub(0.5).mul(water.distortAmount);
   const sampleUv = worldXZ.mul(water.scale)
-    .add(vec2(water.flowX, water.flowZ).mul(time))
+    .add(surfaceOffset)
     .add(vec2(distort, distort));
 
   const edge = voronoiF1(sampleUv, time, water.cellSpeed)
@@ -126,11 +147,26 @@ export function createStylizedWaterMaterial({
   const seg0 = clamp(ramp.div(midPos), 0, 1);
   const seg1 = clamp(ramp.sub(midPos).div(max(float(1).sub(midPos), 1e-4)), 0, 1);
   const inSeg1 = step(midPos, ramp);
-  const color = mix(
+  let color = mix(
     mix(colorNode(water.deepColor), colorNode(water.midColor), seg0),
     mix(colorNode(water.midColor), colorNode(water.highlightColor), seg1),
     inSeg1,
   );
+  if (quality.caustics) {
+    const caustics = water.caustics;
+    const causticUv = worldXZ.mul(caustics.scale)
+      .add(currentFlow.mul(time.mul(caustics.speed)));
+    const causticNoise = stylizedFbm(causticUv);
+    const shallow = oneMinus(smoothstep(
+      caustics.depthFadeStart,
+      caustics.depthFadeEnd,
+      waterField.b,
+    ));
+    const causticAmount = pow(clamp(causticNoise, 0, 1), caustics.contrast)
+      .mul(caustics.intensity * quality.causticStrength)
+      .mul(shallow);
+    color = color.add(colorNode(water.highlightColor).mul(causticAmount));
+  }
 
   const distance = length(positionWorld.xz.sub(cameraPosition.xz));
   const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
