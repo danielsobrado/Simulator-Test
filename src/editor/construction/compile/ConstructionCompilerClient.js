@@ -1,7 +1,13 @@
+import { constructionCollisionSource } from '../../collision/providers/ConstructionCollisionSource.js';
 import { compileConstructionPlan } from './compileConstructionPlan.js';
 
 function staleError() {
   return new DOMException('A newer construction compile replaced this result.', 'AbortError');
+}
+
+function publishCollision(record, plan) {
+  if (plan?.collision) constructionCollisionSource.applyPlan(record, plan.collision);
+  return plan;
 }
 
 export class ConstructionCompilerClient {
@@ -43,11 +49,17 @@ export class ConstructionCompilerClient {
         ...(options.collision ?? {}),
       }),
     });
-    if (!this.worker) return Promise.resolve(compileConstructionPlan(record, compileOptions));
+    if (!this.worker) {
+      return Promise.resolve(publishCollision(
+        record,
+        compileConstructionPlan(record, compileOptions),
+      ));
+    }
     return new Promise((resolve, reject) => {
       this.pending.set(requestId, {
         constructionId: record.id,
         revision: record.revision,
+        record,
         resolve,
         reject,
       });
@@ -64,7 +76,7 @@ export class ConstructionCompilerClient {
     } else if (error) {
       pending.reject(new Error(error));
     } else {
-      pending.resolve(plan);
+      pending.resolve(publishCollision(pending.record, plan));
     }
   }
 
