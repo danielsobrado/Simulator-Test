@@ -123,6 +123,7 @@ function runChecks(config, caseConfig, run) {
     rendererBackendCheck(report),
     captureViewportCheck(config, report),
     screenshotCheck(run, report),
+    productionDebugCheck(report),
     check(
       'scenario-match',
       report?.scenario?.id === caseConfig.scenario,
@@ -145,8 +146,6 @@ function runChecks(config, caseConfig, run) {
       config.gates.maxHitches,
     ),
   ];
-
-  if (caseConfig.compareFrameToBaseline) checks.push(productionDebugCheck(report));
 
   if (caseConfig.collisionRequired) {
     checks.push(
@@ -276,7 +275,7 @@ function canonicalSignatureStabilityCheck(config, caseConfig, caseRuns) {
   );
 }
 
-function caseChecks(config, caseConfig, caseRuns, regressionMs) {
+function caseChecks(config, caseConfig, caseRuns) {
   const checks = [
     check('repeat-count', caseRuns.length === config.repeats, caseRuns.length, config.repeats),
     check(
@@ -288,14 +287,6 @@ function caseChecks(config, caseConfig, caseRuns, regressionMs) {
   ];
   const signatureCheck = canonicalSignatureStabilityCheck(config, caseConfig, caseRuns);
   if (signatureCheck) checks.push(signatureCheck);
-  if (caseConfig.compareFrameToBaseline) {
-    checks.push(check(
-      'frame-p95-regression',
-      regressionMs !== null && regressionMs <= config.gates.frameP95RegressionMs,
-      round(regressionMs),
-      config.gates.frameP95RegressionMs,
-    ));
-  }
   return Object.freeze(checks);
 }
 
@@ -321,18 +312,12 @@ export function buildCollisionAcceptanceReport({
       .sort((left, right) => left.repeat - right.repeat)
       .map((run) => summariseRun(config, caseConfig, run));
     const frameP95Ms = median(caseRuns.map((run) => run.frameP95Ms));
-    const regressionMs = caseConfig.compareFrameToBaseline
-      && frameP95Ms !== null
-      && baselineFrameP95Ms !== null
-      ? frameP95Ms - baselineFrameP95Ms
-      : null;
-    const checks = caseChecks(config, caseConfig, caseRuns, regressionMs);
+    const checks = caseChecks(config, caseConfig, caseRuns);
     return Object.freeze({
       id: caseConfig.id,
       label: caseConfig.label,
       scenario: caseConfig.scenario,
       collisionRequired: caseConfig.collisionRequired,
-      compareFrameToBaseline: caseConfig.compareFrameToBaseline,
       minimumCounts: caseConfig.minimumCounts,
       minimumProviderComponents: caseConfig.minimumProviderComponents,
       coverage: caseConfig.coverage,
@@ -340,7 +325,6 @@ export function buildCollisionAcceptanceReport({
       checks,
       runs: Object.freeze(caseRuns),
       frameP95MedianMs: round(frameP95Ms),
-      frameP95RegressionMs: round(regressionMs),
       collisionP95MaxMs: round(maximum(caseRuns.map((run) => run.collisionP95Ms))),
       hitchCountMax: maximum(caseRuns.map((run) => run.hitchCount)),
       readinessMissesMax: maximum(caseRuns.map((run) => run.readinessMisses)),
@@ -406,10 +390,10 @@ export function renderCollisionAcceptanceMarkdown(report) {
     `Viewport: ${report.config.viewport.width}×${report.config.viewport.height}`
       + ` @ ${report.config.viewport.deviceScaleFactor}x`,
     '',
-    `Baseline frame p95: ${markdownCell(report.baseline.frameP95MedianMs)} ms`,
+    `Open-ground frame p95: ${markdownCell(report.baseline.frameP95MedianMs)} ms`,
     '',
-    '| Case | Runs | Result | Frame p95 | Regression | Collision p95 max | Hitches max |',
-    '|---|---:|---|---:|---:|---:|---:|',
+    '| Case | Runs | Result | Frame p95 | Collision p95 max | Hitches max |',
+    '|---|---:|---|---:|---:|---:|',
   ];
 
   for (const caseSummary of report.cases) {
@@ -418,7 +402,6 @@ export function renderCollisionAcceptanceMarkdown(report) {
       + ` | ${caseSummary.runs.length}`
       + ` | ${caseSummary.passed ? 'PASS' : 'FAIL'}`
       + ` | ${markdownCell(caseSummary.frameP95MedianMs)}`
-      + ` | ${markdownCell(caseSummary.frameP95RegressionMs)}`
       + ` | ${markdownCell(caseSummary.collisionP95MaxMs)}`
       + ` | ${markdownCell(caseSummary.hitchCountMax)} |`,
     );
