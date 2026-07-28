@@ -7,6 +7,7 @@ import {
 } from '../scripts/lib/collisionAcceptanceReport.mjs';
 
 const ADAPTER = Object.freeze({
+  ok: true,
   vendor: 'test-vendor',
   architecture: 'test-gpu',
   description: 'Test GPU',
@@ -44,6 +45,7 @@ function config({
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
+        minimumCounts: {},
         coverage: ['baseline'],
       },
       {
@@ -55,6 +57,10 @@ function config({
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
+        minimumCounts: {
+          broadphaseQueries: 1,
+          candidates: 1,
+        },
         coverage: ['collision'],
       },
     ],
@@ -68,6 +74,8 @@ function perfReport({
   collisionP95Ms = 0,
   adapter = ADAPTER,
   hitches = 0,
+  broadphaseQueries = 10,
+  candidates = 20,
   readinessMisses = 0,
   failedChunks = 0,
   finalQueueDepth = 0,
@@ -85,6 +93,8 @@ function perfReport({
       enabled: collisionEnabled,
       timingsMs: { total: { p95Ms: collisionP95Ms } },
       counts: {
+        broadphaseQueries,
+        candidates,
         readinessMisses,
         failedChunks,
         finalQueueDepth,
@@ -214,6 +224,31 @@ test('non-comparable fixtures do not use the open-ground frame gate', () => {
     false,
   );
   assert.equal(report.gates.execution.passed, true);
+});
+
+test('missing hardware evidence and zero query work fail the run', () => {
+  const report = buildCollisionAcceptanceReport({
+    config: config(),
+    runs: passingRuns({
+      collision: {
+        adapter: null,
+        broadphaseQueries: 0,
+        candidates: 0,
+      },
+    }),
+  });
+  const run = report.cases.find((entry) => entry.id === 'collision').runs[0];
+
+  assert.equal(run.passed, false);
+  assert.equal(
+    run.checks.find((entry) => entry.id === 'hardware-adapter').passed,
+    false,
+  );
+  assert.equal(
+    run.checks.find((entry) => entry.id === 'minimum-count:candidates').passed,
+    false,
+  );
+  assert.equal(report.gates.execution.passed, false);
 });
 
 test('readiness misses and incomplete repeats fail the collision case', () => {
