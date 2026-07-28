@@ -1011,6 +1011,11 @@ export class EditorController {
     this.constructionStroke = null;
     this.constructionAnchorDrag = null;
     this.hoveredArc = null;
+    // Disarm here too, not only on pointer-up. Cancelling clears
+    // `constructionDrawing`, which is the flag pointer-up checks before
+    // disarming — so arming a cut and then switching tool or mode left it armed,
+    // and the next ordinary drag silently carved holes instead of drawing.
+    this.constructionCutArmed = false;
     this.constructionView?.clearDraft();
   }
 

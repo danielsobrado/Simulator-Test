@@ -639,15 +639,21 @@ button, input, select { font: inherit; }
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
   backdrop-filter: blur(8px);
 }
+/* Square icon buttons, sized to match the construction tool's gizmo cluster so
+   the editor's two toolbars read as one system. The label lives in aria-label
+   and title; see `workshopGizmoToolsMarkup`. */
 .workshop-gizmo-tools button {
+  display: grid;
+  width: 30px;
+  height: 30px;
   min-height: 30px;
-  padding: 5px 9px;
+  padding: 0;
+  place-items: center;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: #e8f1e7;
   cursor: pointer;
-  font-size: 11px;
 }
 .workshop-gizmo-tools button:hover { background: rgb(255 255 255 / 10%); }
 .workshop-gizmo-tools button:disabled {
