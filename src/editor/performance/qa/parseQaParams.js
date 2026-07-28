@@ -98,6 +98,18 @@ const SCENARIOS = Object.freeze({
       yawDegrees: 0,
     },
   },
+  'collision-p7': {
+    id: 'collision-p7',
+    label: 'Collision P7 construction wall',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 1.2,
+      speed: 'run',
+      warmup: 8,
+      spawn: { x: 0, z: 0 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {

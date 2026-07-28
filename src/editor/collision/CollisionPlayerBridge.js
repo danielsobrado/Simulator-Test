@@ -1,7 +1,10 @@
+import { constructionCollisionSource } from './providers/ConstructionCollisionSource.js';
+
 let currentPlayer = null;
 let currentConfig = null;
 let currentNaturalSource = null;
 let currentObjectSource = null;
+let currentConstructionSource = constructionCollisionSource;
 const listeners = new Set();
 
 function composition() {
@@ -11,6 +14,7 @@ function composition() {
     collisionConfig: currentConfig,
     treeSource: currentNaturalSource,
     objectSource: currentObjectSource,
+    constructionSource: currentConstructionSource,
   });
 }
 
@@ -22,6 +26,7 @@ function publish() {
 
 export function registerCollisionConfig(config) {
   if (!config) throw new Error('Collision config registration requires a config.');
+  constructionCollisionSource.setConfig(config.constructions);
   currentConfig = config;
   publish();
 }
@@ -67,6 +72,19 @@ export function registerCollisionObjectSource(source) {
   return () => {
     if (currentObjectSource !== registered) return;
     currentObjectSource = null;
+    publish();
+  };
+}
+
+export function registerCollisionConstructionSource(source) {
+  if (!source?.list || !source?.getPlan || !source?.signature) {
+    throw new Error('Collision construction-source registration requires compiled plans.');
+  }
+  currentConstructionSource = source;
+  publish();
+  return () => {
+    if (currentConstructionSource !== source) return;
+    currentConstructionSource = constructionCollisionSource;
     publish();
   };
 }

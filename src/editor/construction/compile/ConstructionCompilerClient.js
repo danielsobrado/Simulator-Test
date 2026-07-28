@@ -1,15 +1,22 @@
-import { planConstruction } from '../planning/ConstructionPlanner.js';
+import { constructionCollisionSource } from '../../collision/providers/ConstructionCollisionSource.js';
+import { compileConstructionPlan } from './compileConstructionPlan.js';
 
 function staleError() {
   return new DOMException('A newer construction compile replaced this result.', 'AbortError');
 }
 
+function publishCollision(record, plan) {
+  if (plan?.collision) constructionCollisionSource.applyPlan(record, plan.collision);
+  return plan;
+}
+
 export class ConstructionCompilerClient {
-  constructor({ workerFactory } = {}) {
+  constructor({ workerFactory, collisionConfig = {} } = {}) {
     this.revisions = new Map();
     this.pending = new Map();
     this.nextRequestId = 1;
     this.worker = null;
+    this.collisionConfig = Object.freeze({ ...collisionConfig });
     if (typeof Worker !== 'undefined') {
       this.worker = workerFactory
         ? workerFactory()
@@ -35,15 +42,29 @@ export class ConstructionCompilerClient {
         this.pending.delete(id);
       }
     }
-    if (!this.worker) return Promise.resolve(planConstruction(record, options));
+    const compileOptions = Object.freeze({
+      ...options,
+      collision: Object.freeze({
+        ...constructionCollisionSource.getConfig(),
+        ...this.collisionConfig,
+        ...(options.collision ?? {}),
+      }),
+    });
+    if (!this.worker) {
+      return Promise.resolve(publishCollision(
+        record,
+        compileConstructionPlan(record, compileOptions),
+      ));
+    }
     return new Promise((resolve, reject) => {
       this.pending.set(requestId, {
         constructionId: record.id,
         revision: record.revision,
+        record,
         resolve,
         reject,
       });
-      this.worker.postMessage({ requestId, record, options, previousRevision });
+      this.worker.postMessage({ requestId, record, options: compileOptions, previousRevision });
     });
   }
 
@@ -56,7 +77,7 @@ export class ConstructionCompilerClient {
     } else if (error) {
       pending.reject(new Error(error));
     } else {
-      pending.resolve(plan);
+      pending.resolve(publishCollision(pending.record, plan));
     }
   }
 
@@ -71,4 +92,3 @@ export class ConstructionCompilerClient {
     this.worker = null;
   }
 }
-
