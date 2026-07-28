@@ -16,6 +16,12 @@ import {
   sampleShellPath,
   shellSectionPoints,
 } from './ConstructionShell.js';
+import {
+  buildRuinDebugMeshes,
+  disposeRuinDebugMeshes,
+  isConstructionRuinDebugEnabled,
+} from './ConstructionRuinDebug.js';
+import { sampleRuinEnvelopeHeight } from '../masonry/RuinEnvelope.js';
 
 const HANDLE_RADIUS = 0.16;
 
@@ -88,6 +94,9 @@ export class ConstructionView {
     this.previewedConstructionId = null;
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
+    this.ruinDebugEnabled = typeof window !== 'undefined'
+      ? isConstructionRuinDebugEnabled(window.location.search)
+      : false;
     this.stats = {
       modulesResident: 0,
       modulesRebuilt: 0,
@@ -183,6 +192,11 @@ export class ConstructionView {
   removeRecord(constructionId) {
     const entry = this.entries.get(constructionId);
     if (!entry) return;
+    if (entry.ruinDebugMeshes?.length) {
+      for (const mesh of entry.ruinDebugMeshes) entry.group.remove(mesh);
+      disposeRuinDebugMeshes(entry.ruinDebugMeshes);
+      entry.ruinDebugMeshes = [];
+    }
     if (entry.shellMesh) entry.shellMesh.geometry.dispose();
     for (const module of entry.modules.values()) {
       for (const mesh of module.meshes ?? []) mesh.geometry.dispose();
@@ -349,6 +363,7 @@ export class ConstructionView {
     if (!entry) return;
     entry.plan = plan;
     if (entry.shellMesh) entry.shellMesh.userData.structuralPlan = plan;
+    this.rebuildRecordShell(entry, plan);
     const planned = new Set();
     for (const module of plan.modules) {
       planned.add(module.id);
@@ -388,6 +403,41 @@ export class ConstructionView {
     }
     this.refreshResidentCount();
     this.updateShellVisibility(entry);
+    this.refreshRuinDebug(entry, plan);
+  }
+
+  /**
+   * Rebuild the whole-record ribbon once the plan's ruin envelope is known so
+   * uncovered modules do not keep a nominal-height crown after compile.
+   */
+  rebuildRecordShell(entry, plan) {
+    if (!entry.shellPath) return;
+    const envelope = plan?.ruinEnvelope;
+    const heightAt = envelope
+      ? (s) => sampleRuinEnvelopeHeight(envelope, s)
+      : null;
+    const geometry = buildShellGeometry(entry.shellPath.points, {
+      record: entry.record,
+      terrainView: this.terrainView,
+      origin: entry.origin,
+      heightAt,
+    });
+    if (!geometry) return;
+    const material = entry.record.id === this.selectedId
+      ? this.selectedMaterial
+      : this.wallMaterial;
+    if (entry.shellMesh) {
+      entry.group.remove(entry.shellMesh);
+      entry.shellMesh.geometry.dispose();
+    }
+    const shellMesh = new THREE.Mesh(geometry, material);
+    shellMesh.name = `construction-shell:${entry.record.id}`;
+    shellMesh.userData.constructionId = entry.record.id;
+    shellMesh.userData.structuralPlan = plan;
+    shellMesh.castShadow = true;
+    shellMesh.receiveShadow = true;
+    entry.group.add(shellMesh);
+    entry.shellMesh = shellMesh;
   }
 
   /**
@@ -405,10 +455,15 @@ export class ConstructionView {
     const points = total > 0
       ? shellSectionPoints(entry.shellPath, from / total, to / total)
       : entry.shellPath.points;
+    const envelope = plan.ruinEnvelope;
+    const heightAt = envelope
+      ? (s) => sampleRuinEnvelopeHeight(envelope, s)
+      : null;
     const geometry = buildShellGeometry(points, {
       record: entry.record,
       terrainView: this.terrainView,
       origin: entry.origin,
+      heightAt,
     });
     if (!geometry) return;
     if (resident.shellMesh) {
@@ -428,6 +483,27 @@ export class ConstructionView {
     mesh.visible = resident.meshes.length === 0;
     entry.group.add(mesh);
     resident.shellMesh = mesh;
+  }
+
+  refreshRuinDebug(entry, plan) {
+    if (entry.ruinDebugMeshes?.length) {
+      for (const mesh of entry.ruinDebugMeshes) entry.group.remove(mesh);
+      disposeRuinDebugMeshes(entry.ruinDebugMeshes);
+      entry.ruinDebugMeshes = [];
+    }
+    if (!this.ruinDebugEnabled || !plan?.ruinDiagnostics) return;
+    const meshes = buildRuinDebugMeshes({
+      survivors: plan.ruinDiagnostics.survivors ?? [],
+      removals: plan.ruinDiagnostics.removals ?? [],
+      arcTable: entry.arcTable,
+      origin: entry.origin,
+      groundHeightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z) ?? 0,
+    });
+    for (const mesh of meshes) {
+      mesh.userData.constructionId = entry.record.id;
+      entry.group.add(mesh);
+    }
+    entry.ruinDebugMeshes = meshes;
   }
 
   enqueueModuleBuild(constructionId, module, requestedBand = null) {

@@ -60,7 +60,8 @@ const ALLOWED_CROWN = new Set([
 ]);
 const ALLOWED_OPENINGS = new Set([
   'protectLowerJambs', 'jambMinimumSupport', 'archRequiresBothSprings',
-  'removeFloatingKeystone',
+  'removeFloatingKeystone', 'springFieldSupportRatio', 'voussoirContactRatio',
+  'partialArchMaxCantilever',
 ]);
 const ALLOWED_LOD = new Set([
   'preserveDamageVoids', 'coarseMayMergeAcrossClusters', 'shellSampleSpacing',
@@ -185,6 +186,9 @@ function validateProfile(profile, label) {
   if (typeof profile.openings.removeFloatingKeystone !== 'boolean') {
     fail(`${label}.openings.removeFloatingKeystone must be boolean.`);
   }
+  finiteInRange(profile.openings.springFieldSupportRatio, `${label}.openings.springFieldSupportRatio`, 0, 1);
+  finiteInRange(profile.openings.voussoirContactRatio, `${label}.openings.voussoirContactRatio`, 0, 1);
+  finiteInRange(profile.openings.partialArchMaxCantilever, `${label}.openings.partialArchMaxCantilever`, 0, 5);
 
   assertPlainObject(profile.lod, `${label}.lod`);
   assertNoUnknownKeys(profile.lod, ALLOWED_LOD, `${label}.lod`);

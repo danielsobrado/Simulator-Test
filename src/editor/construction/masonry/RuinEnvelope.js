@@ -1,6 +1,31 @@
 /**
  * Shell-LOD crown envelope from resolved ruin survivors.
+ *
+ * Samples are the transferable authority — `heightAt` is a same-thread
+ * convenience and is stripped by worker `postMessage` structured clone.
  */
+
+export function sampleRuinEnvelopeHeight(envelope, s) {
+  const samples = envelope?.samples;
+  if (!Array.isArray(samples) || samples.length === 0) {
+    return typeof envelope?.fallbackHeightAt === 'function'
+      ? envelope.fallbackHeightAt(s)
+      : 0;
+  }
+  if (s <= samples[0].s) return samples[0].height;
+  const last = samples[samples.length - 1];
+  if (s >= last.s) return last.height;
+  let low = 0;
+  let high = samples.length - 1;
+  while (low + 1 < high) {
+    const mid = (low + high) >> 1;
+    if (samples[mid].s <= s) low = mid;
+    else high = mid;
+  }
+  const span = samples[high].s - samples[low].s;
+  const t = span > 1e-9 ? (s - samples[low].s) / span : 0;
+  return samples[low].height + (samples[high].height - samples[low].height) * t;
+}
 
 export function createRuinEnvelope({
   survivors,
@@ -38,28 +63,20 @@ export function createRuinEnvelope({
     return Math.min(sample.height, blended);
   });
 
-  function heightAt(s) {
-    if (samples.length === 0) return fallbackHeightAt?.(s) ?? 0;
-    if (s <= samples[0].s) return smoothed[0];
-    if (s >= samples[samples.length - 1].s) return smoothed[smoothed.length - 1];
-    let low = 0;
-    let high = samples.length - 1;
-    while (low + 1 < high) {
-      const mid = (low + high) >> 1;
-      if (samples[mid].s <= s) low = mid;
-      else high = mid;
-    }
-    const span = samples[high].s - samples[low].s;
-    const t = span > 1e-9 ? (s - samples[low].s) / span : 0;
-    return smoothed[low] + (smoothed[high] - smoothed[low]) * t;
-  }
+  const frozenSamples = Object.freeze(samples.map((sample, index) => Object.freeze({
+    s: sample.s,
+    height: smoothed[index],
+    fromSurvivors: sample.fromSurvivors,
+  })));
+
+  const envelope = Object.freeze({
+    samples: frozenSamples,
+  });
 
   return Object.freeze({
-    samples: Object.freeze(samples.map((sample, index) => Object.freeze({
-      s: sample.s,
-      height: smoothed[index],
-      fromSurvivors: sample.fromSurvivors,
-    }))),
-    heightAt,
+    ...envelope,
+    heightAt(s) {
+      return sampleRuinEnvelopeHeight(envelope, s);
+    },
   });
 }

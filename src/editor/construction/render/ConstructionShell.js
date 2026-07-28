@@ -91,11 +91,19 @@ export function shellSectionPoints(sampled, fromFraction = 0, toFraction = 1) {
  * @param points from `shellSectionPoints`; the caller decides how much of the
  *   path a given shell covers.
  */
-export function buildShellGeometry(points, { record, terrainView, origin }) {
+/**
+ * Extrude one run of sampled points into the closed ribbon, origin-local.
+ *
+ * @param options.heightAt optional wall-height function of absolute arc length
+ *   `entry.distance`. Ruined shells pass the survivor envelope so far LOD
+ *   follows the resolved crown instead of the nominal record height.
+ */
+export function buildShellGeometry(points, { record, terrainView, origin, heightAt = null }) {
   if (!points || points.length < 2) return null;
   const positions = [];
   const indices = [];
   const halfWidth = record.dimensions.thickness / 2;
+  const nominalHeight = record.dimensions.height;
   for (const entry of points) {
     const leftX = entry.x + entry.normalX * halfWidth - origin.x;
     const leftZ = entry.z + entry.normalZ * halfWidth - origin.z;
@@ -103,7 +111,10 @@ export function buildShellGeometry(points, { record, terrainView, origin }) {
     const rightZ = entry.z - entry.normalZ * halfWidth - origin.z;
     const centerHeight = terrainView.getCanonicalHeight(entry.x, entry.z) ?? 0;
     const bottom = centerHeight - FOUNDATION_OVERLAP;
-    const top = centerHeight + record.dimensions.height;
+    const wallHeight = typeof heightAt === 'function'
+      ? Math.max(0, heightAt(entry.distance))
+      : nominalHeight;
+    const top = centerHeight + wallHeight;
     positions.push(
       leftX, bottom, leftZ,
       rightX, bottom, rightZ,
@@ -146,6 +157,11 @@ export function buildShellGeometry(points, { record, terrainView, origin }) {
 }
 
 /** The whole-record ribbon, for the states that have no per-module plan yet. */
-export function buildWallGeometry(record, terrainView, origin) {
-  return buildShellGeometry(sampleShellPath(record).points, { record, terrainView, origin });
+export function buildWallGeometry(record, terrainView, origin, { heightAt = null } = {}) {
+  return buildShellGeometry(sampleShellPath(record).points, {
+    record,
+    terrainView,
+    origin,
+    heightAt,
+  });
 }

@@ -59,6 +59,9 @@ export const CONSTRUCTION_RUIN_PROFILES = Object.freeze({
       "jambMinimumSupport": 0.42,
       "archRequiresBothSprings": true,
       "removeFloatingKeystone": true,
+      "springFieldSupportRatio": 0.48,
+      "voussoirContactRatio": 0.22,
+      "partialArchMaxCantilever": 0.18,
     }),
     "lod": Object.freeze({
       "preserveDamageVoids": true,
@@ -124,6 +127,9 @@ export const CONSTRUCTION_RUIN_PROFILES = Object.freeze({
       "jambMinimumSupport": 0.42,
       "archRequiresBothSprings": true,
       "removeFloatingKeystone": true,
+      "springFieldSupportRatio": 0.48,
+      "voussoirContactRatio": 0.22,
+      "partialArchMaxCantilever": 0.18,
     }),
     "lod": Object.freeze({
       "preserveDamageVoids": true,

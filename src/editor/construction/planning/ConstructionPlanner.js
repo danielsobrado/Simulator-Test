@@ -331,6 +331,7 @@ export function planConstruction(input, {
 
   let ruinStats = null;
   let ruinEnvelope = null;
+  let ruinDiagnostics = null;
   let finalModules = modules;
   if (masonry && record.top.style === 'ruined') {
     const resolved = resolveRuinSupport({
@@ -338,6 +339,7 @@ export function planConstruction(input, {
       profile: constructionRuinProfile(record.style.key),
     });
     ruinStats = resolved.stats;
+    ruinDiagnostics = resolved.diagnostics;
     finalModules = resolved.modules.map((module) => {
       const survivorHash = ruinSurvivorSignature(module.placements);
       return Object.freeze({
@@ -378,6 +380,7 @@ export function planConstruction(input, {
     })(),
     ruinStats,
     ruinEnvelope,
+    ruinDiagnostics,
     stats: Object.freeze({
       sampleCount: sampled.points.length,
       moduleCount: finalModules.length,

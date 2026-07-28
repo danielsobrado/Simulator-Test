@@ -2,12 +2,14 @@
  * Wall-wide support resolver for ruined masonry.
  */
 
+import { resolveArchCompression } from './RuinArchCompression.js';
+import { resolveRuinClusters } from './RuinClusterResolver.js';
+import { coverageWithinSpan, findOverlapCandidates } from './RuinSupportIntervals.js';
+import { RUIN_DEBUG_STATE } from './RuinDebugStates.js';
 import {
   CONSTRUCTION_SUPPORT_ROLE,
   RUIN_REMOVAL_REASON,
 } from './ConstructionSupportRoles.js';
-import { resolveRuinClusters } from './RuinClusterResolver.js';
-import { coverageWithinSpan, findOverlapCandidates } from './RuinSupportIntervals.js';
 
 function emptyStats() {
   return {
@@ -317,7 +319,7 @@ export function resolveRuinSupport({
     }
   }
 
-  // Arch rings require surviving left + right jamb groups for the same opening.
+  // Arch rings: compression from spring abutments, not mere jamb-group presence.
   const archGroups = new Map();
   const jambsByOpening = new Map();
   for (const stone of survivors.values()) {
@@ -341,34 +343,86 @@ export function resolveRuinSupport({
     }
   }
 
-  for (const [groupId, arches] of archGroups) {
-    const prefix = openingPrefixFromGroupId(groupId);
-    const jambs = prefix ? jambsByOpening.get(prefix) : null;
-    const leftOk = Boolean(jambs?.left.some((stone) => survivors.has(stone._ruinId)));
-    const rightOk = Boolean(jambs?.right.some((stone) => survivors.has(stone._ruinId)));
-    const springsOk = leftOk && rightOk;
+  const fieldPool = [...survivors.values()].filter((stone) => (
+    isLatticeRole(stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD)
+  ));
 
-    if (profile.openings.archRequiresBothSprings && !springsOk) {
-      for (const unit of arches) {
-        if (survivors.has(unit._ruinId)) {
-          queue.push({ id: unit._ruinId, reason: RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED });
-        }
+  for (const [, arches] of archGroups) {
+    const prefix = openingPrefixFromGroupId(arches[0]?.support?.groupId);
+    const jambs = prefix ? jambsByOpening.get(prefix) : null;
+    const resolved = resolveArchCompression({
+      arches,
+      leftJambs: jambs?.left ?? [],
+      rightJambs: jambs?.right ?? [],
+      fieldPool,
+      survivors,
+      profile,
+    });
+    for (const [id, reason] of resolved.remove) {
+      if (survivors.has(id)) {
+        queue.push({ id, reason });
       }
-      // Upper jambs without an arch also collapse when their spring side is gone.
-      if (jambs) {
-        for (const side of [jambs.left, jambs.right]) {
-          const ordered = [...side].sort(compareJambOrder);
-          for (let index = 1; index < ordered.length; index += 1) {
-            const stone = ordered[index];
-            if (!survivors.has(stone._ruinId)) continue;
-            if (!survivors.has(ordered[index - 1]._ruinId)) {
-              queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED });
-            }
+    }
+    if (resolved.kept > 0) {
+      stats.archesKept += 1;
+    }
+
+    // Upper jambs collapse when their spring abutment is gone.
+    if (jambs) {
+      const sideOk = [
+        [jambs.left, resolved.leftSpringSupported],
+        [jambs.right, resolved.rightSpringSupported],
+      ];
+      for (const [side, springOk] of sideOk) {
+        const ordered = [...side].sort(compareJambOrder);
+        for (let index = 1; index < ordered.length; index += 1) {
+          const stone = ordered[index];
+          if (!survivors.has(stone._ruinId)) continue;
+          if (!springOk || !survivors.has(ordered[index - 1]._ruinId)) {
+            queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED });
           }
         }
       }
-    } else {
-      stats.archesKept += 1;
+    }
+  }
+
+  const supportMeta = new Map();
+  for (const course of courseKeys) {
+    const stones = byCourse.get(course) ?? [];
+    const lowerPool = [
+      ...(byCourse.get(course - 1) ?? []),
+      ...(byCourse.get(course - 2) ?? []),
+    ].sort(compareSupportOrder);
+    for (const stone of stones) {
+      if (!survivors.has(stone._ruinId)) continue;
+      const role = stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD;
+      if (role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION) {
+        supportMeta.set(stone._ruinId, {
+          ratio: 1,
+          crossModule: false,
+          footing: true,
+        });
+        continue;
+      }
+      const coverage = evaluateSupport(stone, lowerPool, profile, survivors);
+      let crossModule = false;
+      for (const lower of findOverlapCandidates(
+        lowerPool,
+        stone.support.span[0],
+        stone.support.span[1],
+        profile.support.maximumCantilever,
+      )) {
+        if (!survivors.has(lower._ruinId)) continue;
+        if (lower.moduleId != null && stone.moduleId != null && lower.moduleId !== stone.moduleId) {
+          crossModule = true;
+          break;
+        }
+      }
+      supportMeta.set(stone._ruinId, {
+        ratio: coverage.ratio,
+        crossModule,
+        footing: false,
+      });
     }
   }
 
@@ -487,6 +541,7 @@ export function resolveRuinSupport({
   }
 
   const finalByModule = new Map(modules.map((module) => [module.id, []]));
+  const debugSurvivors = [];
   for (const stone of survivors.values()) {
     const moduleId = stone.moduleId;
     const course = stone.support?.courseIndex ?? 0;
@@ -498,6 +553,15 @@ export function resolveRuinSupport({
         nearVoid = true;
         break;
       }
+    }
+    const meta = supportMeta.get(stone._ruinId) ?? { ratio: 1, crossModule: false, footing: false };
+    let debugState = RUIN_DEBUG_STATE.SUPPORTED;
+    if (meta.footing || stone.support?.role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION) {
+      debugState = RUIN_DEBUG_STATE.FOOTING;
+    } else if (meta.crossModule) {
+      debugState = RUIN_DEBUG_STATE.CROSS_MODULE;
+    } else if (meta.ratio < profile.support.strongOverlapRatio) {
+      debugState = RUIN_DEBUG_STATE.WEAK;
     }
     const {
       _ruinId,
@@ -512,11 +576,40 @@ export function resolveRuinSupport({
         ...(stone.ruin ?? {}),
         damageVoid: nearVoid,
         exposedTop: true,
+        debugState,
+        supportRatio: meta.ratio,
       }),
     });
+    debugSurvivors.push(Object.freeze({
+      stableIndex: finalStone.stableIndex,
+      moduleId: ownedModuleId,
+      s: finalStone.s,
+      y: finalStone.y,
+      width: finalStone.width ?? finalStone.packedWidth,
+      height: finalStone.height,
+      depth: finalStone.depth ?? stone.depth ?? 0.45,
+      debugState,
+      supportRatio: meta.ratio,
+    }));
     if (!finalByModule.has(moduleId)) finalByModule.set(moduleId, []);
     finalByModule.get(moduleId).push(finalStone);
   }
+
+  const compactRemovals = removed.map((entry) => Object.freeze({
+    reason: entry.reason,
+    clusterId: entry.clusterId,
+    placement: Object.freeze({
+      stableIndex: entry.placement.stableIndex,
+      moduleId: entry.placement.moduleId,
+      category: entry.placement.category,
+      s: entry.placement.s,
+      y: entry.placement.y,
+      width: entry.placement.width ?? entry.placement.packedWidth,
+      height: entry.placement.height,
+      depth: entry.placement.depth ?? 0.45,
+      support: entry.placement.support ?? null,
+    }),
+  }));
 
   const resolvedModules = modules.map((module) => Object.freeze({
     ...module,
@@ -526,6 +619,10 @@ export function resolveRuinSupport({
   return {
     modules: Object.freeze(resolvedModules),
     removed: Object.freeze(removed),
+    diagnostics: Object.freeze({
+      survivors: Object.freeze(debugSurvivors),
+      removals: Object.freeze(compactRemovals),
+    }),
     supportGraph: Object.freeze({ reverseDepsSize: reverseDeps.size }),
     stats: Object.freeze(stats),
   };
