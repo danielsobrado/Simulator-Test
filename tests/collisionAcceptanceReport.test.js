@@ -22,6 +22,7 @@ const ADAPTER = Object.freeze({
 function config({
   requiredCoverage = ['baseline', 'collision'],
   compareCollisionToBaseline = true,
+  collisionP95Ms = 0.83,
 } = {}) {
   return validateCollisionAcceptanceConfig({
     version: 1,
@@ -31,7 +32,7 @@ function config({
     timeoutPaddingSeconds: 30,
     viewport: VIEWPORT,
     gates: {
-      collisionP95Ms: 0.83,
+      collisionP95Ms,
       frameP95RegressionMs: 0.83,
       maxHitches: 0,
       maxReadinessMisses: 0,
@@ -79,6 +80,8 @@ function perfReport({
   frameP95Ms,
   screenshotPath,
   collisionP95Ms = 0,
+  collisionSamples = 120,
+  canonicalSignature = collisionEnabled ? 'abc123' : null,
   adapter = ADAPTER,
   viewport = VIEWPORT,
   debugEnabled = false,
@@ -114,7 +117,12 @@ function perfReport({
     },
     collision: {
       enabled: collisionEnabled,
-      timingsMs: { total: { p95Ms: collisionP95Ms } },
+      timingsMs: {
+        total: {
+          samples: collisionSamples,
+          p95Ms: collisionP95Ms,
+        },
+      },
       counts: {
         broadphaseQueries,
         candidates,
@@ -123,10 +131,11 @@ function perfReport({
         finalQueueDepth,
       },
       readiness: { ready, failure },
-      canonicalSignature: collisionEnabled ? 'abc123' : null,
+      canonicalSignature,
       gate: {
         passed: !collisionEnabled || (
-          collisionP95Ms <= 0.83
+          collisionSamples > 0
+          && collisionP95Ms <= 0.83
           && ready
           && failure === null
         ),
@@ -262,10 +271,52 @@ test('non-comparable fixtures do not use the open-ground frame or debug gate', (
   assert.equal(report.gates.execution.passed, true);
 });
 
-test('missing hardware, viewport, screenshot, and query work fail the run', () => {
+test('YAML threshold is authoritative over the in-app provisional gate', () => {
+  const report = buildCollisionAcceptanceReport({
+    config: config({ collisionP95Ms: 1.1 }),
+    runs: passingRuns({ collision: { collisionP95Ms: 1 } }),
+  });
+  const collisionRun = report.cases.find((entry) => entry.id === 'collision').runs[0];
+
+  assert.equal(collisionRun.report?.collision?.gate, undefined);
+  assert.equal(
+    collisionRun.checks.find((entry) => entry.id === 'collision-p95').passed,
+    true,
+  );
+  assert.equal(report.gates.execution.passed, true);
+});
+
+test('missing samples fail even when measured p95 is zero', () => {
+  const report = buildCollisionAcceptanceReport({
+    config: config(),
+    runs: passingRuns({ collision: { collisionSamples: 0, collisionP95Ms: 0 } }),
+  });
+  const run = report.cases.find((entry) => entry.id === 'collision').runs[0];
+
+  assert.equal(
+    run.checks.find((entry) => entry.id === 'collision-samples').passed,
+    false,
+  );
+  assert.equal(report.gates.execution.passed, false);
+});
+
+test('canonical signatures must be stable across repeats', () => {
+  const runs = passingRuns();
+  runs[3].report.collision.canonicalSignature = 'different-signature';
+  const report = buildCollisionAcceptanceReport({ config: config(), runs });
+  const collisionCase = report.cases.find((entry) => entry.id === 'collision');
+
+  assert.equal(
+    collisionCase.checks.find((entry) => entry.id === 'canonical-signature-stable').passed,
+    false,
+  );
+  assert.equal(report.gates.execution.passed, false);
+});
+
+test('missing hardware identity, viewport, screenshot, and query work fail the run', () => {
   const runs = passingRuns({
     collision: {
-      adapter: null,
+      adapter: { ok: true, vendor: '', architecture: '', description: '', fallback: false },
       viewport: { width: 800, height: 600, deviceScaleFactor: 1 },
       broadphaseQueries: 0,
       candidates: 0,
