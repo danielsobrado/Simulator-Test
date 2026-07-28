@@ -2,6 +2,7 @@ const COLLISION_PLAN_VERSION = 1;
 const FOUNDATION_OVERLAP = 0.08;
 const EPSILON = 1e-6;
 const HASH_QUANTUM = 1e4;
+const MAX_STRAIGHT_BOX_LENGTH = 48;
 const OPENING_KINDS = new Set(['door', 'window', 'arch', 'gate', 'breach']);
 
 function createHasher() {
@@ -111,9 +112,10 @@ function segmentIsStraight(points, range) {
 function boundariesForSegment(sampled, range, openings, curveSegmentLength) {
   const boundaries = [range.start, range.end];
   const straight = segmentIsStraight(sampled.points, range);
-  if (!straight || openings.length > 0) {
-    const length = range.end - range.start;
-    const count = Math.max(1, Math.ceil(length / curveSegmentLength));
+  const length = range.end - range.start;
+  const maximumLength = straight ? MAX_STRAIGHT_BOX_LENGTH : curveSegmentLength;
+  if (length > maximumLength) {
+    const count = Math.max(1, Math.ceil(length / maximumLength));
     for (let index = 1; index < count; index += 1) {
       boundaries.push(range.start + length * index / count);
     }
