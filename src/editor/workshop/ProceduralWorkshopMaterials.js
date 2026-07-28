@@ -2,6 +2,8 @@ import * as THREE from 'three/webgpu';
 import { createSurfaceTexturePixels } from '../assets/proceduralTexturePixels.js';
 import { mixSeed } from './ProceduralRandom.js';
 import { getSurfaceTexture } from './ProceduralWorkshopTextureConfig.js';
+import { stoneSurfaceProfile } from './ProceduralWorkshopStoneSurfaceConfig.js';
+import { createStoneTexturePixels } from './ProceduralWorkshopStoneTexture.js';
 
 /**
  * `base`/`warm`/`color` drive the shared material colour and mortar tint.
@@ -61,8 +63,11 @@ export function defineStonePalette(input) {
     throw new Error(`outlierChance must be between 0 and 1, got ${chance}.`);
   }
   const declared = hexToRgb(input.color);
+  // Legacy granite/limestone/sandstone colours drift a few levels from `base`
+  // (shared material tint vs per-stone ramp). Soft limestone is authored exact;
+  // keep a small tolerance so converting those entries stays value-preserving.
   for (let index = 0; index < 3; index += 1) {
-    if (Math.abs(declared[index] - input.base[index]) > 1) {
+    if (Math.abs(declared[index] - input.base[index]) > 8) {
       throw new Error(
         `color ${input.color} does not match base [${input.base.join(', ')}].`,
       );
@@ -213,15 +218,27 @@ export function proceduralNormalTexture(kind, seed) {
 
 function stoneTexture(recipe) {
   const palette = STONE_PALETTES[recipe.style];
-  return createTexture(256, (x, y) => {
-    const broad = (mixSeed(recipe.seed + Math.floor(y / 18), Math.floor(x / 18)) & 255) / 255;
-    const grain = (mixSeed(recipe.seed + y * 131, x * 17) & 255) / 255;
-    const damp = recipe.weathering * Math.max(0, 1 - y / 72);
-    const value = (broad - 0.5) * 15 + (grain - 0.5) * 8 - damp * 14;
-    return palette.base.map((channel, index) => (
-      channel + value + (index === 1 ? damp * 4 : 0)
-    ));
+  const surface = stoneSurfaceProfile(recipe.style);
+  const pixels = createStoneTexturePixels({
+    palette,
+    surface,
+    seed: recipe.seed,
+    weathering: recipe.weathering,
   });
+  const texture = new THREE.DataTexture(
+    pixels.data,
+    pixels.size,
+    pixels.size,
+    THREE.RGBAFormat,
+  );
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 export function surfaceBumpTexture(seed, scale = 1) {
@@ -475,7 +492,11 @@ export function applyUnitShading(geometry, recipe, {
   const hash = mixSeed(recipe.seed, stableIndex);
   const tintLane = (hash & 255) / 255;
   const outlierLane = ((hash >>> 8) & 255) / 255;
-  const weather = recipe.weathering * (1 - heightRatio) * 0.14;
+  const surface = stoneSurfaceProfile(recipe.style);
+  const shading = surface.unitShading;
+  const weather = recipe.weathering
+    * (1 - heightRatio)
+    * shading.weatheringStrength;
 
   const position = geometry.getAttribute('position');
   if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
@@ -491,11 +512,13 @@ export function applyUnitShading(geometry, recipe, {
 
   const unit = new Float32Array(3);
   if (!neutral) {
+    const brightness = THREE.MathUtils.lerp(
+      shading.brightnessMin,
+      shading.brightnessMax,
+      tintLane,
+    );
     for (let channel = 0; channel < 3; channel += 1) {
-      // Narrower than the pre-ramp 0.9..1.06 brightness spread, because the
-      // ramp now carries most of the per-unit variation.
-      unit[channel] = rampColor(palette, tintLane, outlierLane, channel)
-        * (0.94 + tintLane * 0.1);
+      unit[channel] = rampColor(palette, tintLane, outlierLane, channel) * brightness;
     }
   }
 
