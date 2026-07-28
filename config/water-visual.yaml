@@ -13,6 +13,7 @@ water:
     deepDepth: 6
     maximumOpticalDistance: 14
     minimumViewCosine: 0.22
+    surfaceTransitionDepth: 0.75
     surfaceDetailStrength: 0.28
     underwaterTintStrength: 0.35
   caustics:
