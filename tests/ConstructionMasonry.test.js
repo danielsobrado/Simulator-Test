@@ -15,6 +15,8 @@ import {
   sampleCubicBezierPath,
 } from '../src/editor/construction/curve/CubicBezierPath.js';
 import { constructionJointProfile } from '../src/editor/construction/config/ConstructionJointProfiles.generated.js';
+import { constructionRuinProfile } from '../src/editor/construction/config/ConstructionRuinConfig.generated.js';
+import { resolveRuinSupport } from '../src/editor/construction/masonry/RuinSupportResolver.js';
 
 const STYLE = constructionStyle('coursed-rubble');
 
@@ -69,6 +71,9 @@ function pack(context, {
     seedOffset,
     topHeightAt: context.profile.heightAt,
     ruinFactorAt: context.profile.ruinFactorAt,
+    ruinStateAt: context.profile.ruinStateAt,
+    topStyle: context.record.top.style,
+    deferRuinRemoval: context.record.top.style === 'ruined',
     ...(wallRange ? { wallRange } : {}),
     ...(courseHeight ? { courseHeight } : {}),
     ...(budget === undefined ? {} : { budget }),
@@ -293,8 +298,16 @@ test('raising one end does not re-roll the masonry at the other', () => {
 
 test('a ruined wall drops from the top and keeps a footing', () => {
   const context = setup(straightPath(30), { top: { style: 'ruined', base: 4 } });
-  const { stones, stats } = pack(context);
-  assert.ok(stats.dropped > 0, 'a ruin must drop something');
+  const packed = pack(context);
+  assert.ok(packed.stats.dropped > 0 || packed.stats.ruinCandidates > 0, 'a ruin must mark damage');
+
+  const resolved = resolveRuinSupport({
+    modules: [{ id: 'm0', placements: packed.stones }],
+    profile: constructionRuinProfile('coursed-rubble'),
+  });
+  const stones = resolved.modules[0].placements;
+  assert.ok(resolved.stats.finalRemoved > 0, 'support-aware ruin must remove stones');
+  assert.ok(stones.length < packed.stones.length, 'survivors are fewer than candidates');
 
   const heights = stones.map(({ heightRatio }) => heightRatio);
   const low = heights.filter((value) => value < 0.25).length;

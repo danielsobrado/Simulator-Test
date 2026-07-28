@@ -4,7 +4,12 @@ import { createCurveArcTable } from '../masonry/CurveArcTable.js';
 import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { createConstructionMaterials } from './ConstructionMaterials.js';
-import { coarsePlacements, moduleProjectedPixels, selectConstructionLod } from './ConstructionLod.js';
+import { coarsePlacements, moduleProjectedPixels } from './ConstructionLod.js';
+import {
+  evaluateBuildRequest,
+  moduleBuildKey,
+  resolveRequestedLodBand,
+} from '../compile/ConstructionLodState.js';
 import {
   buildShellGeometry,
   buildWallGeometry,
@@ -108,6 +113,19 @@ export class ConstructionView {
       flattenedCorners: 0,
       edgeWearTriangles: 0,
       edgeWearBuildMs: 0,
+      nearSoftStones: 0,
+      coarseSoftStones: 0,
+      nearSoftTriangles: 0,
+      coarseSoftTriangles: 0,
+      appearanceDescriptors: 0,
+      appearanceDescriptorMs: 0,
+      lodReductionMs: 0,
+      lodTransitionsStarted: 0,
+      lodTransitionsCompleted: 0,
+      duplicateBuildsSuppressed: 0,
+      staleBuildsDiscarded: 0,
+      nearBuilds: 0,
+      coarseBuilds: 0,
       buildMs: 0,
       stoneBuildMs: 0,
       mortarBuildMs: 0,
@@ -343,6 +361,13 @@ export class ConstructionView {
         ...existing,
         hash: module.contentHash,
         meshes: existing?.meshes ?? [],
+        requestedBand: existing?.requestedBand ?? null,
+        builtBand: existing?.builtBand ?? null,
+        visibleBand: existing?.visibleBand ?? existing?.band ?? null,
+        requestedAt: existing?.requestedAt ?? 0,
+        visibleSince: existing?.visibleSince ?? 0,
+        pendingBuildKey: null,
+        transition: null,
       };
       entry.modules.set(module.id, resident);
       this.buildModuleShell(entry, module, resident, plan);
@@ -405,11 +430,34 @@ export class ConstructionView {
     resident.shellMesh = mesh;
   }
 
-  enqueueModuleBuild(constructionId, module) {
+  enqueueModuleBuild(constructionId, module, requestedBand = null) {
+    const entry = this.entries.get(constructionId);
+    const resident = entry?.modules.get(module.id);
+    const band = requestedBand
+      ?? resident?.requestedBand
+      ?? resident?.band
+      ?? 'near';
+    if (resident) {
+      const buildKey = moduleBuildKey({
+        constructionId,
+        revision: entry.record.revision,
+        moduleId: module.id,
+        contentHash: module.contentHash,
+        requestedBand: band,
+      });
+      const decision = evaluateBuildRequest({ resident, buildKey });
+      if (!decision.enqueue) {
+        this.stats.duplicateBuildsSuppressed += 1;
+        return;
+      }
+      resident.pendingBuildKey = buildKey;
+      resident.requestedBand = band;
+      resident.requestedAt = performance.now();
+    }
     this.buildQueue = this.buildQueue.filter((job) => (
       job.constructionId !== constructionId || job.module.id !== module.id
     ));
-    this.buildQueue.push({ constructionId, module });
+    this.buildQueue.push({ constructionId, module, requestedBand: band });
     this.stats.queueDepth = this.buildQueue.length;
   }
 
@@ -433,6 +481,7 @@ export class ConstructionView {
     let nearCount = 0;
     let coarseCount = 0;
     let shellCount = 0;
+    const now = performance.now();
     for (const entry of this.entries.values()) {
       if (!entry.plan) continue;
       const pinned = entry.record.id === this.selectedId;
@@ -449,22 +498,42 @@ export class ConstructionView {
           toRender: (x, z) => this.floatingOrigin.toRender(x, z),
           cameraY: camera.position.y,
         });
-        const band = selectConstructionLod({ pixels, previous: resident.band ?? null, pinned });
-        if (band !== resident.band) {
-          resident.band = band;
+        const previousVisible = resident.visibleBand ?? resident.band ?? null;
+        const band = resolveRequestedLodBand({
+          pixels,
+          previousVisible,
+          pinned,
+          now,
+          visibleSince: resident.visibleSince ?? 0,
+          styleKey: entry.record.style?.key,
+          force: !resident.builtBand || resident.meshes.length === 0,
+          // Metre hysteresis (`transition.hysteresisMetres`) activates only when
+          // distanceMetres / nearDistanceMetres / shellDistanceMetres are passed.
+          // Pixel hysteresis from selectConstructionLod remains the live path.
+        });
+        resident.requestedBand = band;
+        if (band !== previousVisible) {
+          this.stats.lodTransitionsStarted += 1;
           this.stats.lodTransitions += 1;
-          // near↔coarse is a build-time detail change. Rebuild when the resident
-          // mesh was built for a different band; keep the old mesh visible until
-          // the queue drains so the swap never flashes empty.
-          if (
+          const needsRebuild = (
             (band === 'near' || band === 'coarse')
             && resident.builtBand
             && resident.builtBand !== band
-          ) {
-            this.enqueueModuleBuild(entry.record.id, module);
+          );
+          if (needsRebuild) {
+            this.enqueueModuleBuild(entry.record.id, module, band);
+            // Keep showing the previous band until the destination mesh lands.
+          } else {
+            resident.visibleBand = band;
+            resident.visibleSince = now;
+            resident.band = band;
           }
+        } else {
+          resident.band = band;
+          resident.visibleBand = band;
         }
-        const visible = band !== 'shell' && resident.meshes.length > 0;
+        const shown = resident.visibleBand ?? resident.band ?? band;
+        const visible = shown !== 'shell' && resident.meshes.length > 0;
         for (const mesh of resident.meshes) mesh.visible = visible;
         // Each module's ribbon covers exactly the arc its masonry vacated.
         if (resident.shellMesh) resident.shellMesh.visible = !visible;
@@ -510,7 +579,23 @@ export class ConstructionView {
     if (!resident) return;
     // Prefer the LOD band updateLod already chose; default to near so the first
     // build is full detail until the camera has had a frame to classify it.
-    const lodBand = resident.band === 'coarse' ? 'coarse' : 'near';
+    const lodBand = (resident.requestedBand ?? resident.band) === 'coarse'
+      ? 'coarse'
+      : 'near';
+    const expectedKey = moduleBuildKey({
+      constructionId: entry.record.id,
+      revision: entry.record.revision,
+      moduleId: module.id,
+      contentHash: module.contentHash,
+      requestedBand: lodBand,
+    });
+    if (
+      resident.pendingBuildKey
+      && resident.pendingBuildKey !== expectedKey
+    ) {
+      this.stats.staleBuildsDiscarded += 1;
+      return;
+    }
     const source = module.placements ?? [];
     const placements = lodBand === 'coarse'
       ? coarsePlacements(source, { styleKey: entry.record.style?.key })
@@ -525,7 +610,28 @@ export class ConstructionView {
         lodBand,
       })
       : { meshes: [], stats: null };
+    // Reject if the module drifted while we were building.
+    if (
+      !entry.modules.has(module.id)
+      || entry.modules.get(module.id).hash !== module.contentHash
+    ) {
+      this.stats.staleBuildsDiscarded += 1;
+      for (const mesh of built.meshes ?? []) mesh.geometry.dispose();
+      return;
+    }
+    if ((resident.requestedBand ?? lodBand) !== lodBand) {
+      this.stats.staleBuildsDiscarded += 1;
+      for (const mesh of built.meshes ?? []) mesh.geometry.dispose();
+      return;
+    }
     resident.builtBand = lodBand;
+    resident.visibleBand = lodBand;
+    resident.band = lodBand;
+    resident.visibleSince = performance.now();
+    resident.pendingBuildKey = null;
+    this.stats.lodTransitionsCompleted += 1;
+    if (lodBand === 'near') this.stats.nearBuilds += 1;
+    else this.stats.coarseBuilds += 1;
 
     // Remove the old meshes in the same tick the new ones go in, so a module
     // never flickers to empty mid-swap (doc 18 §6).
@@ -570,6 +676,13 @@ export class ConstructionView {
     let flattenedCorners = 0;
     let edgeWearTriangles = 0;
     let edgeWearBuildMs = 0;
+    let nearSoftStones = 0;
+    let coarseSoftStones = 0;
+    let nearSoftTriangles = 0;
+    let coarseSoftTriangles = 0;
+    let appearanceDescriptors = 0;
+    let appearanceDescriptorMs = 0;
+    let lodReductionMs = 0;
     let stoneBuildMs = 0;
     let mortarBuildMs = 0;
     for (const entry of this.entries.values()) {
@@ -590,6 +703,13 @@ export class ConstructionView {
         flattenedCorners += other.stats?.flattenedCorners ?? 0;
         edgeWearTriangles += other.stats?.edgeWearTriangles ?? 0;
         edgeWearBuildMs += other.stats?.edgeWearBuildMs ?? 0;
+        nearSoftStones += other.stats?.nearSoftStones ?? 0;
+        coarseSoftStones += other.stats?.coarseSoftStones ?? 0;
+        nearSoftTriangles += other.stats?.nearSoftTriangles ?? 0;
+        coarseSoftTriangles += other.stats?.coarseSoftTriangles ?? 0;
+        appearanceDescriptors += other.stats?.appearanceDescriptors ?? 0;
+        appearanceDescriptorMs += other.stats?.appearanceDescriptorMs ?? 0;
+        lodReductionMs += other.stats?.lodReductionMs ?? 0;
         stoneBuildMs += other.stats?.stoneBuildMs ?? 0;
         mortarBuildMs += other.stats?.mortarBuildMs ?? 0;
       }
@@ -610,6 +730,13 @@ export class ConstructionView {
     this.stats.flattenedCorners = flattenedCorners;
     this.stats.edgeWearTriangles = edgeWearTriangles;
     this.stats.edgeWearBuildMs = edgeWearBuildMs;
+    this.stats.nearSoftStones = nearSoftStones;
+    this.stats.coarseSoftStones = coarseSoftStones;
+    this.stats.nearSoftTriangles = nearSoftTriangles;
+    this.stats.coarseSoftTriangles = coarseSoftTriangles;
+    this.stats.appearanceDescriptors = appearanceDescriptors;
+    this.stats.appearanceDescriptorMs = appearanceDescriptorMs;
+    this.stats.lodReductionMs = lodReductionMs;
     this.stats.stoneBuildMs = stoneBuildMs;
     this.stats.mortarBuildMs = mortarBuildMs;
   }

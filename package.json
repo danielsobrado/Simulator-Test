@@ -31,6 +31,8 @@
     "qa:construction:joints": "node scripts/run-construction-joint-width-qa.mjs",
     "qa:construction:relief": "node scripts/run-construction-stone-relief-qa.mjs",
     "qa:construction:edge-wear": "node scripts/run-construction-stone-edge-wear-qa.mjs",
+    "qa:construction:lod": "node scripts/run-construction-stone-lod-qa.mjs",
+    "qa:construction:ruin": "node scripts/run-construction-ruin-qa.mjs",
     "verify": "npm run validate:assets:production && npm test && npm run build",
     "extract:grass-profiles": "node scripts/extract-grass-blade-profiles.mjs"
   },

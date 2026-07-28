@@ -1,4 +1,5 @@
 import { mixSeed } from '../../workshop/ProceduralRandom.js';
+import { constructionRuinProfile } from '../config/ConstructionRuinConfig.generated.js';
 
 /**
  * The wall-top height function, in arc length.
@@ -22,7 +23,6 @@ const MERLON_DUTY = 0.55;
 const DEFAULT_MERLON_HEIGHT = 0.72;
 const IRREGULAR_AMPLITUDE = 0.16;
 const IRREGULAR_WAVELENGTH = 4.7;
-const RUIN_WAVELENGTH = 6.3;
 const EPSILON = 1e-9;
 
 function hashUnit(seed, value) {
@@ -89,6 +89,7 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
   const base = top.base;
   const seed = record.seed >>> 0;
   const merlonSpacing = style?.merlonSpacing ?? 1.18;
+  const ruinProfile = constructionRuinProfile(record.style?.key);
 
   const resolved = top.profile
     .map((entry) => ({
@@ -117,11 +118,36 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
     return evaluateHermite(xs, ys, slopes, s);
   }
 
-  function ruinFactorAt(s) {
+  function resolvedRuinFactor(s) {
     if (top.style !== 'ruined') return 0;
-    const low = valueNoise(mixSeed(seed, 0x72), s, RUIN_WAVELENGTH);
-    const fine = valueNoise(mixSeed(seed, 0x73), s, RUIN_WAVELENGTH * 0.31);
-    return Math.max(0, Math.min(1, low * 0.72 + fine * 0.38 - 0.12));
+    const macro = ruinProfile.macro;
+    const low = valueNoise(mixSeed(seed, 0x72), s, macro.wavelength);
+    const fine = valueNoise(
+      mixSeed(seed, 0x73),
+      s,
+      macro.wavelength * macro.fineWavelengthRatio,
+    );
+    return Math.max(0, Math.min(1, low * macro.lowWeight + fine * macro.fineWeight + macro.bias));
+  }
+
+  function ruinStateAt(s) {
+    const nominalHeight = profileHeight(s);
+    const factor = resolvedRuinFactor(s);
+    const collapsedHeight = top.style === 'ruined'
+      ? Math.max(
+        ruinProfile.macro.minimumHeight,
+        nominalHeight * (1 - factor * ruinProfile.macro.collapseDepth),
+      )
+      : Math.max(0.2, nominalHeight);
+    return Object.freeze({
+      factor,
+      nominalHeight,
+      collapsedHeight,
+    });
+  }
+
+  function ruinFactorAt(s) {
+    return ruinStateAt(s).factor;
   }
 
   function heightAt(s) {
@@ -132,8 +158,7 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
       return Math.max(0.2, height + (wobble * 1.4 + fine * 0.6) * IRREGULAR_AMPLITUDE);
     }
     if (top.style === 'ruined') {
-      // Sag toward a low stub rather than to zero, so a ruin keeps a footing.
-      return Math.max(0.2, height * (1 - ruinFactorAt(s) * 0.82));
+      return ruinStateAt(s).collapsedHeight;
     }
     return Math.max(0.2, height);
   }
@@ -177,6 +202,7 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
     heightAt,
     slopeAt,
     ruinFactorAt,
+    ruinStateAt,
     crenellationsOver,
   });
 }

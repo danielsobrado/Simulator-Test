@@ -8,6 +8,9 @@ import {
   MAX_MODULE_STONES,
   packCurvedWall,
 } from '../masonry/CurvedCoursePacker.js';
+import { constructionRuinProfile } from '../config/ConstructionRuinConfig.generated.js';
+import { resolveRuinSupport } from '../masonry/RuinSupportResolver.js';
+import { createRuinEnvelope } from '../masonry/RuinEnvelope.js';
 
 const DEFAULT_MAX_MODULE_LENGTH = 12;
 const HASH_QUANTUM = 1e4;
@@ -39,6 +42,26 @@ function createHasher() {
       return (hash >>> 0).toString(16).padStart(8, '0');
     },
   };
+}
+
+function ruinSurvivorSignature(placements) {
+  const hasher = createHasher();
+  const ordered = [...(placements ?? [])].sort(
+    (a, b) => (a.stableIndex ?? 0) - (b.stableIndex ?? 0),
+  );
+  for (const placement of ordered) {
+    hasher.number(placement.stableIndex ?? 0);
+    hasher.number(placement.support?.courseIndex ?? -1);
+    hasher.text(placement.support?.role ?? '-');
+  }
+  return hasher.digest();
+}
+
+function combineHashes(left, right) {
+  const hasher = createHasher();
+  hasher.text(left);
+  hasher.text(right);
+  return hasher.digest();
 }
 
 function interpolate(left, right, targetDistance) {
@@ -259,9 +282,11 @@ export function planConstruction(input, {
           heightReference: wallTopHeight,
           topHeightAt: topProfile.heightAt,
           ruinFactorAt: topProfile.ruinFactorAt,
+          ruinStateAt: topProfile.ruinStateAt,
           slopeAt: topProfile.slopeAt,
           crenellationsOver: topProfile.crenellationsOver,
           topStyle: record.top.style,
+          deferRuinRemoval: record.top.style === 'ruined',
           // Openings whose void or dressings reach into this module. A wide
           // gate near a boundary has to be visible to both modules or the
           // course splits on one side and not the other.
@@ -303,12 +328,44 @@ export function planConstruction(input, {
       }));
     }
   }
+
+  let ruinStats = null;
+  let ruinEnvelope = null;
+  let finalModules = modules;
+  if (masonry && record.top.style === 'ruined') {
+    const resolved = resolveRuinSupport({
+      modules,
+      profile: constructionRuinProfile(record.style.key),
+    });
+    ruinStats = resolved.stats;
+    finalModules = resolved.modules.map((module) => {
+      const survivorHash = ruinSurvivorSignature(module.placements);
+      return Object.freeze({
+        ...module,
+        contentHash: combineHashes(module.contentHash, survivorHash),
+        masonryStats: Object.freeze({
+          ...(module.masonryStats ?? {}),
+          stones: module.placements?.length ?? 0,
+          ruinSurvivors: module.placements?.length ?? 0,
+        }),
+      });
+    });
+    const survivors = finalModules.flatMap((module) => module.placements ?? []);
+    ruinEnvelope = createRuinEnvelope({
+      survivors,
+      totalLength: sampled.totalDistance,
+      sampleSpacing: constructionRuinProfile(record.style.key).lod.shellSampleSpacing,
+      fallbackHeightAt: topProfile.heightAt,
+    });
+    stoneTotal = survivors.length;
+  }
+
   return Object.freeze({
     version: 1,
     constructionId: record.id,
     constructionRevision: record.revision,
     totalLength: sampled.totalDistance,
-    modules: Object.freeze(modules),
+    modules: Object.freeze(finalModules),
     terrainSamples: Object.freeze(structuredClone(terrainSamples)),
     bounds: Object.freeze(boundsForPoints(
       sampled.points,
@@ -316,12 +373,14 @@ export function planConstruction(input, {
     )),
     contentHash: (() => {
       const hasher = createHasher();
-      for (const module of modules) hasher.text(module.contentHash);
+      for (const module of finalModules) hasher.text(module.contentHash);
       return hasher.digest();
     })(),
+    ruinStats,
+    ruinEnvelope,
     stats: Object.freeze({
       sampleCount: sampled.points.length,
-      moduleCount: modules.length,
+      moduleCount: finalModules.length,
       openingCount: record.features.length,
       topPointCount: record.top.profile.length,
       stoneCount: stoneTotal,

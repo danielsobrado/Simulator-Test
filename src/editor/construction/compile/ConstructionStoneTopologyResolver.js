@@ -130,7 +130,10 @@ function resolveSideTopology({
   depth,
   variationScale,
   insetScale = 1,
+  bevelRings = 2,
+  allowCornerFlattening = true,
 }) {
+  void depth;
   const edgeInset = edgeInsetsFromCorners(edgeWear.cornerWidth, variationScale, insetScale);
   const cornerDepths = depthsFromCorners(edgeWear.cornerDepth, variationScale, insetScale);
   const faceAttempt = tryInset(sourceRing, edgeInset, edgeWear.safeguards);
@@ -138,7 +141,8 @@ function resolveSideTopology({
     return { valid: false, reason: faceAttempt.reason, areaRatio: faceAttempt.areaRatio };
   }
 
-  const shoulderInset = edgeInset.map((value) => value * 0.55);
+  const rings = bevelRings <= 1 ? 1 : 2;
+  const shoulderInset = edgeInset.map((value) => value * (rings === 1 ? 1 : 0.55));
   const shoulderAttempt = tryInset(sourceRing, shoulderInset, {
     ...edgeWear.safeguards,
     minimumFaceAreaRatio: Math.max(0.35, edgeWear.safeguards.minimumFaceAreaRatio * 0.85),
@@ -149,13 +153,18 @@ function resolveSideTopology({
   }
 
   const faceCornersRaw = faceAttempt.inset;
+  const flattening = allowCornerFlattening
+    ? edgeWear.cornerFlattening
+    : [0, 0, 0, 0];
   const softened = softenFlattenedCorners(
     faceCornersRaw,
     sourceRing,
-    edgeWear.cornerFlattening,
+    flattening,
   );
   const faceCorners = softened.corners;
-  const shoulderCorners = shoulderAttempt.inset;
+  // One-ring coarse: shoulder coincides with the face so the writer emits a
+  // single bevel band from source → face.
+  const shoulderCorners = rings === 1 ? faceCorners : shoulderAttempt.inset;
   const loops = buildLoops({
     sourceRing,
     faceCorners,
@@ -163,19 +172,25 @@ function resolveSideTopology({
     edgeWear,
     cornerDepths,
   });
+  if (rings === 1) {
+    loops.shoulderDepths = loops.outerDepths.map((value) => value);
+    loops.shoulderLoop = cloneRing(faceCorners);
+  }
 
   const maxShoulderDepth = Math.max(...loops.shoulderDepths);
   const maxOuterDepth = Math.max(...loops.outerDepths);
-  if (!(maxOuterDepth > maxShoulderDepth) || !(maxShoulderDepth > 0)) {
+  if (rings === 2) {
+    if (!(maxOuterDepth > maxShoulderDepth) || !(maxShoulderDepth > 0)) {
+      return { valid: false, reason: 'depth-order-invalid' };
+    }
+  } else if (!(maxOuterDepth > 0)) {
     return { valid: false, reason: 'depth-order-invalid' };
   }
 
   const requestedFaceRecession = faceRelief?.enabled ? faceRelief.edgeRecession : 0;
-  const faceEdgeRecession = Math.min(
-    requestedFaceRecession,
-    maxShoulderDepth * 0.72,
-  );
-  if (faceRelief?.enabled && !(faceEdgeRecession < maxShoulderDepth)) {
+  const depthBudget = rings === 1 ? maxOuterDepth * 0.72 : maxShoulderDepth * 0.72;
+  const faceEdgeRecession = Math.min(requestedFaceRecession, depthBudget);
+  if (faceRelief?.enabled && !(faceEdgeRecession < (rings === 1 ? maxOuterDepth : maxShoulderDepth))) {
     return { valid: false, reason: 'depth-order-invalid' };
   }
 
@@ -196,6 +211,7 @@ function resolveSideTopology({
     relief,
     areaRatio: faceAttempt.areaRatio,
     flattenedCorners: softened.flattened,
+    bevelRings: rings,
   };
 }
 
@@ -207,9 +223,12 @@ export function resolveStoneTopology({
   faceRelief,
   edgeWear,
   mortarConfig,
+  bevelRings = 2,
+  allowCornerFlattening = true,
 }) {
   void mortarConfig;
   const sourceRing = normalizeRing(stoneShape.corners);
+  const rings = bevelRings <= 1 ? 1 : 2;
   const diagnostics = {
     edgeWearRequested: Boolean(edgeWear?.front?.enabled || edgeWear?.back?.enabled),
     edgeWearApplied: false,
@@ -217,6 +236,7 @@ export function resolveStoneTopology({
     flatteningDropped: false,
     fallbackReason: null,
     areaRatio: null,
+    bevelRings: rings,
   };
 
   if (sourceRing.length < 4 || !(polygonArea(sourceRing) > 1e-8)) {
@@ -238,7 +258,7 @@ export function resolveStoneTopology({
       sourceRing,
       diagnostics: Object.freeze({
         ...diagnostics,
-        fallbackReason: 'source-ring-invalid',
+        fallbackReason: 'edge-wear-required',
       }),
     });
   }
@@ -260,6 +280,8 @@ export function resolveStoneTopology({
       depth: stoneShape.depth,
       variationScale: attempt.variationScale,
       insetScale: attempt.insetScale,
+      bevelRings: rings,
+      allowCornerFlattening,
     });
     if (!front.valid) {
       diagnostics.fallbackReason = front.reason;
@@ -272,6 +294,8 @@ export function resolveStoneTopology({
       depth: stoneShape.depth,
       variationScale: attempt.variationScale,
       insetScale: attempt.insetScale,
+      bevelRings: rings,
+      allowCornerFlattening,
     });
     if (!back.valid) {
       diagnostics.fallbackReason = back.reason;
@@ -305,6 +329,7 @@ export function resolveStoneTopology({
     depth: stoneShape.depth,
     width: stoneShape.width,
     height: stoneShape.height,
+    bevelRings: rings,
     front: Object.freeze({
       faceCorners: Object.freeze(cloneRing(chosen.front.faceCorners)),
       shoulderCorners: Object.freeze(cloneRing(chosen.front.shoulderCorners)),
@@ -316,6 +341,7 @@ export function resolveStoneTopology({
       faceEdgeRecession: chosen.front.faceEdgeRecession,
       relief: chosen.front.relief,
       flattenedCorners: chosen.front.flattenedCorners,
+      bevelRings: rings,
     }),
     back: Object.freeze({
       faceCorners: Object.freeze(cloneRing(chosen.back.faceCorners)),
@@ -328,6 +354,7 @@ export function resolveStoneTopology({
       faceEdgeRecession: chosen.back.faceEdgeRecession,
       relief: chosen.back.relief,
       flattenedCorners: chosen.back.flattenedCorners,
+      bevelRings: rings,
     }),
     diagnostics: Object.freeze(diagnostics),
   });

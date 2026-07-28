@@ -132,7 +132,22 @@ function mergeCornerRing(group, key, s, y) {
  * frame, so the cell's own corner is simply whichever leaf corner sits furthest
  * into that corner. Reconstructing it keeps the coarse band's stone count at or
  * below what it was before the lattice, instead of inheriting the split.
+ *
+ * Appearance identity: largest leaf wins; equal-area ties pick the lowest
+ * stableIndex so leaf order cannot repaint the merged stone.
  */
+export function selectDominantPlacement(leaves) {
+  return leaves.reduce((best, candidate) => {
+    if (!best) return candidate;
+    const bestArea = best.width * best.height;
+    const candidateArea = candidate.width * candidate.height;
+    if (candidateArea !== bestArea) {
+      return candidateArea > bestArea ? candidate : best;
+    }
+    return candidate.stableIndex < best.stableIndex ? candidate : best;
+  }, null);
+}
+
 function mergeCellLeaves(group) {
   const corners = CORNER_DIRECTIONS.map(([alongS, alongY], slot) => {
     let best = null;
@@ -160,12 +175,7 @@ function mergeCellLeaves(group) {
   const s = (minS + maxS) / 2;
   const y = (minY + maxY) / 2;
 
-  // Inherit shading, depth and straddle from the biggest leaf, so the merged
-  // stone keeps the identity the eye was most likely tracking.
-  const dominant = group.reduce(
-    (best, leaf) => (leaf.width * leaf.height > best.width * best.height ? leaf : best),
-    group[0],
-  );
+  const dominant = selectDominantPlacement(group);
 
   const mergedStoneCorners = corners.map(([cornerS, cornerY]) => [cornerS - s, cornerY - y]);
   const mergedMortarCorners = mergeCornerRing(group, 'mortarCorners', s, y);
@@ -326,6 +336,11 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
 
   const courses = new Map();
   for (const placement of mergeSplitCells(field)) {
+    // Never merge/stretch across an explicit damage void.
+    if (placement.ruin?.damageVoid) {
+      rest.push(amplifyCoarseJoints(placement, constructionJointProfile(styleKey)));
+      continue;
+    }
     const key = placement.courseIndex != null
       ? `course:${placement.courseIndex}`
       : `y:${Math.round(placement.y * 50) / 50}`;
@@ -343,8 +358,17 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
   for (let index = 0; index < ordered.length; index += 2) {
     const course = ordered[index];
     const above = ordered[index + 1];
-    const step = above ? Math.max(0, meanY(above) - meanY(course)) : 0;
+    // Do not stretch through a missing ruin course when the upper band was a
+    // damage void island rather than a thinned field course.
+    const aboveHasVoid = above?.some((placement) => placement.ruin?.damageVoid);
+    const step = above && !aboveHasVoid
+      ? Math.max(0, meanY(above) - meanY(course))
+      : 0;
     for (const placement of course) {
+      if (placement.ruin?.clusterId != null && aboveHasVoid) {
+        merged.push(amplifyCoarseJoints(placement, jointProfile));
+        continue;
+      }
       const stretched = stretchOverGap(placement, step);
       merged.push(amplifyCoarseJoints(stretched, jointProfile));
     }

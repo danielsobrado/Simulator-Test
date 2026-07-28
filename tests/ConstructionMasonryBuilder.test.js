@@ -458,7 +458,7 @@ test('soft limestone near field lattice stones use relief geometry', () => {
   for (const mesh of built.meshes) mesh.geometry.dispose();
 });
 
-test('soft limestone coarse field stones stay flat-faced', () => {
+test('soft limestone coarse field stones use soft-coarse geometry', () => {
   const { record, arcTable, placements } = packSoftLimestone(8);
   const materials = materialsFor(record);
   const built = buildModuleMasonry(placements.slice(0, 40), {
@@ -469,7 +469,8 @@ test('soft limestone coarse field stones stay flat-faced', () => {
     groundHeightAt: () => 0,
     lodBand: 'coarse',
   });
-  assert.equal(built.stats.reliefStones, 0);
+  assert.ok(built.stats.coarseSoftStones > 0);
+  assert.equal(built.stats.nearSoftStones, 0);
   assert.equal(built.stats.reliefFallbacks, 0);
   for (const mesh of built.meshes) mesh.geometry.dispose();
 });
@@ -684,10 +685,13 @@ test('soft limestone near field stones receive edge wear', () => {
   for (const mesh of built.meshes) mesh.geometry.dispose();
 });
 
-test('coarse lod never applies edge wear', () => {
+test('coarse soft limestone applies reduced soft geometry for field stones', () => {
   const { record, arcTable, placements } = packSoftLimestone(8);
   const materials = materialsFor(record);
-  const built = buildModuleMasonry(placements.slice(0, 40), {
+  const coarse = coarsePlacements(placements.slice(0, 80), {
+    styleKey: 'soft-limestone-rubble',
+  });
+  const built = buildModuleMasonry(coarse, {
     record,
     materials,
     arcTable,
@@ -695,9 +699,46 @@ test('coarse lod never applies edge wear', () => {
     groundHeightAt: () => 0,
     lodBand: 'coarse',
   });
-  assert.equal(built.stats.edgeWearStones, 0);
-  assert.equal(built.stats.edgeWearEligible, 0);
+  assert.ok(built.stats.coarseSoftStones > 0);
+  assert.ok(built.stats.edgeWearStones > 0);
+  assert.ok(built.stats.nearSoftStones === 0);
+  const stone = built.meshes.find((mesh) => (
+    mesh.userData.constructionMaterialSlot === CONSTRUCTION_MATERIAL_SLOT.STONE
+  ));
+  assert.equal(stone.userData.constructionGeometryTier, 'coarse-soft');
+  assert.equal(stone.userData.constructionLodBand, 'coarse');
   for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('soft-coarse mortar descriptors match legacy-coarse mortar descriptors', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const materials = materialsFor(record);
+  const coarse = coarsePlacements(placements.slice(0, 24), {
+    styleKey: 'soft-limestone-rubble',
+  });
+  const softCoarse = buildModuleMasonry(coarse, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+  });
+  const legacyCoarse = buildModuleMasonry(coarse, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+    disableRelief: true,
+    disableEdgeWear: true,
+  });
+  assert.equal(softCoarse.stats.mortarPrisms, legacyCoarse.stats.mortarPrisms);
+  assert.equal(softCoarse.stats.mortarTriangles, legacyCoarse.stats.mortarTriangles);
+  for (const mesh of [...softCoarse.meshes, ...legacyCoarse.meshes]) {
+    mesh.geometry.dispose();
+  }
 });
 
 test('mortar descriptors stay identical with edge wear enabled and disabled', () => {

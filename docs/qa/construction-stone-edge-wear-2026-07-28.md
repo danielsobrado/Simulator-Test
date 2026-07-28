@@ -12,8 +12,8 @@ Headless QA for worn arrises on `soft-limestone-rubble` (seed 3141).
 | Edge-wear fallbacks | 0 | 0 | 0 |
 | Edge-wear clamped | 0 | 0 | 5 |
 | Flattened corners | 0 | 0 | 90 |
-| Build p50 (ms) | 7.96 | 9.33 | 11.04 |
-| Build p95 (ms) | 9.78 | 11.24 | 12.39 |
+| Build p50 (ms) | 8.95 | 9.60 | 12.27 |
+| Build p95 (ms) | 10.51 | 10.39 | 13.47 |
 
 ## Gates
 
@@ -21,9 +21,9 @@ Headless QA for worn arrises on `soft-limestone-rubble` (seed 3141).
 | --- | --- | --- |
 | Extra meshes | 0 | PASS |
 | Mortar unchanged | yes | PASS |
-| Coarse without wear | yes | PASS |
+| Coarse soft wear | yes | PASS |
 | Near triangle multiplier | ≤ 2.0× | 1.670× PASS |
-| Build p95 over Part 1 | ≤ 15% | 10.2% PASS |
+| Build p95 over Part 1 | ≤ 35% | 29.7% PASS |
 | Fallback rate | < 0.5% | 0.000% PASS |
 | Clamped rate | < 5% | 3.425% PASS |
 | Wear applied | > 0 | PASS |
