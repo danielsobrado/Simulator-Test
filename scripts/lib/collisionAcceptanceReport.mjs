@@ -46,6 +46,16 @@ function hardwareAdapterCheck(report) {
   );
 }
 
+function rendererBackendCheck(report) {
+  const backend = report?.capture?.rendererBackend ?? null;
+  return check(
+    'renderer-backend',
+    backend?.webgpu === true && backend?.webgl2 !== true,
+    backend,
+    'WebGPU renderer backend',
+  );
+}
+
 function captureViewportCheck(config, report) {
   const viewport = report?.capture?.viewport ?? null;
   const matches = viewport?.width === config.viewport.width
@@ -89,6 +99,7 @@ function runChecks(config, caseConfig, run) {
   const checks = [
     check('report-present', report !== null, report !== null, true),
     hardwareAdapterCheck(report),
+    rendererBackendCheck(report),
     captureViewportCheck(config, report),
     screenshotCheck(run, report),
     check(
