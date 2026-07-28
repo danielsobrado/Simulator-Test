@@ -2,6 +2,7 @@ let currentPlayer = null;
 let currentConfig = null;
 let currentNaturalSource = null;
 let currentObjectSource = null;
+let currentConstructionSource = null;
 const listeners = new Set();
 
 function composition() {
@@ -11,6 +12,7 @@ function composition() {
     collisionConfig: currentConfig,
     treeSource: currentNaturalSource,
     objectSource: currentObjectSource,
+    constructionSource: currentConstructionSource,
   });
 }
 
@@ -67,6 +69,19 @@ export function registerCollisionObjectSource(source) {
   return () => {
     if (currentObjectSource !== registered) return;
     currentObjectSource = null;
+    publish();
+  };
+}
+
+export function registerCollisionConstructionSource(source) {
+  if (!source?.list || !source?.getPlan || !source?.signature) {
+    throw new Error('Collision construction-source registration requires compiled plans.');
+  }
+  currentConstructionSource = source;
+  publish();
+  return () => {
+    if (currentConstructionSource !== source) return;
+    currentConstructionSource = null;
     publish();
   };
 }
