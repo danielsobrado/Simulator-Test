@@ -29,6 +29,8 @@ requiredCoverage:
   - repeated-collision-chunk-crossing
   - floating-origin-rebase-during-movement
   - construction-edit-rebuild-nearby
+  - collision-unload-reload-cycle
+  - long-soak-10m
 
 cases:
   - id: open-ground-baseline
