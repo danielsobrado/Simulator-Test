@@ -7,12 +7,12 @@ import {
 
 function collisionHelp(player) {
   const collision = player?.collision;
-  if (!collision?.active || collision.ready) return null;
-  const failure = collision.readiness?.failed?.[0] ?? null;
+  if (!collision?.active || collision.ready || !collision.readiness) return null;
+  const failure = collision.readiness.failed?.[0] ?? null;
   if (failure) {
     return `Collision failed in ${failure.chunkKey ?? 'the destination'}: ${failure.message}`;
   }
-  const missing = collision.readiness?.missing?.length ?? 0;
+  const missing = collision.readiness.missing?.length ?? 0;
   return missing > 0
     ? `Loading collision safety data… ${missing} chunk${missing === 1 ? '' : 's'} remaining.`
     : 'Loading collision safety data…';
