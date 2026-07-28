@@ -25,7 +25,9 @@ function sameBounds(left, right) {
 }
 
 function sameVector(left, right) {
-  return left?.length === right?.length
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
     && left.every((value, index) => value === right[index]);
 }
 
@@ -39,7 +41,9 @@ function sameBox(left, right) {
 
 function sameGeometry(left, right) {
   return sameBounds(left?.bounds, right?.bounds)
-    && left?.boxes?.length === right?.boxes?.length
+    && Array.isArray(left?.boxes)
+    && Array.isArray(right?.boxes)
+    && left.boxes.length === right.boxes.length
     && left.boxes.every((box, index) => sameBox(box, right.boxes[index]));
 }
 
