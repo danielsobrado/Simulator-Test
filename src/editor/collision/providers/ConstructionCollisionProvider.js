@@ -4,6 +4,7 @@ import { COLLISION_LAYERS } from '../CollisionLayers.js';
 import { COLLIDER_TYPE_BOX, createPrimitiveCollider } from '../colliders/ColliderRecords.js';
 
 const CONSTRUCTION_COLLISION_SCHEMA = 'constructions:v1';
+const GROUND_BAND_EPSILON = 1e-6;
 
 function heightAt(terrainView, x, z) {
   const value = terrainView.getCanonicalHeight(x, z);
@@ -28,8 +29,11 @@ function createRecord(constructionId, box, terrainView, chunkWorldSize) {
     heightAt(terrainView, box.center[0], box.center[1]),
     heightAt(terrainView, endX, endZ),
   ];
-  const bottom = Math.min(...heights) + box.bottom - box.foundationOverlap;
-  const top = Math.max(...heights) + box.top;
+  const minimumGround = Math.min(...heights);
+  const maximumGround = Math.max(...heights);
+  const bandGround = box.bottom <= GROUND_BAND_EPSILON ? minimumGround : maximumGround;
+  const bottom = bandGround + box.bottom - box.foundationOverlap;
+  const top = maximumGround + box.top;
   const colliderHeight = Math.max(0.01, top - bottom);
   const owner = ownerFor(box.center[0], box.center[1], chunkWorldSize);
   return createPrimitiveCollider({
