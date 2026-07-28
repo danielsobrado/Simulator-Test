@@ -20,6 +20,7 @@ Delivered in W2A:
 - Beer-Lambert-style scalar transmission.
 - View-angle-aware optical distance.
 - Camera-submersion-aware underside transmission.
+- A smooth optical transition across the waterline.
 - Bounded minimum and maximum opacity.
 - Matching surface tint when viewed from below.
 - Quality-tier gating.
@@ -46,16 +47,24 @@ The authoritative vertical bed-to-surface depth comes from `waterField.b`.
 The approximate path through the water is:
 
 ```text
-verticalDistance = cameraBelowSurface
-  ? cameraSubmersionDepth
-  : waterColumnDepth
+cameraSubmersionDepth = max(surfaceHeight - cameraHeight, 0)
+underwaterBlend = smoothstep(
+  0,
+  surfaceTransitionDepth,
+  cameraSubmersionDepth
+)
+verticalDistance = mix(
+  waterColumnDepth,
+  cameraSubmersionDepth,
+  underwaterBlend
+)
 viewCosine = clamp(abs(viewDirection.y), minimumViewCosine, 1)
 opticalDistance = min(verticalDistance / viewCosine, maximumOpticalDistance)
 transmission = exp(-absorptionDensity * opticalDistance)
 opacity = mix(minimumOpacity, maximumOpacity, 1 - transmission)
 ```
 
-This makes grazing views less transparent than vertical views while keeping the result bounded. Above the surface, the bed-to-surface column controls transmission. Below the surface, actual camera submersion controls the path, preventing a deep seabed from making the underside opaque when the camera is only just underwater.
+This makes grazing views less transparent than vertical views while keeping the result bounded. Above the surface, the bed-to-surface column controls transmission. Across the configured transition band, the path changes continuously to actual camera submersion depth. Once fully underwater, deeper diving increases opacity again according to the camera-to-surface path.
 
 The surface colour uses a smooth geographic depth blend:
 
@@ -63,7 +72,7 @@ The surface colour uses a smooth geographic depth blend:
 shallowColor -> deepColor
 ```
 
-When the camera is below the water surface, the result blends toward `underwaterColor`. The existing Voronoi colour is mixed over this body colour using `surfaceDetailStrength` and the existing distance fade.
+When the camera moves below the water surface, the result blends toward `underwaterColor` using the same transition factor. The existing Voronoi colour is mixed over this body colour using `surfaceDetailStrength` and the existing distance fade.
 
 The current W2A blend is intentionally scalar. True wavelength-specific attenuation of the already-rendered terrain requires the opaque scene colour, which begins in W2B.
 
@@ -95,6 +104,7 @@ water:
     deepDepth: 6
     maximumOpticalDistance: 14
     minimumViewCosine: 0.22
+    surfaceTransitionDepth: 0.75
     surfaceDetailStrength: 0.28
     underwaterTintStrength: 0.35
 ```
@@ -103,7 +113,7 @@ These settings do not change terrain generation, water-body identity, swimming, 
 
 ## CPU reference
 
-`WaterOptics.js` mirrors the shader's scalar depth, submersion, view-angle, transmission, opacity, and depth-mix calculations.
+`WaterOptics.js` mirrors the shader's scalar depth, submersion transition, view-angle, transmission, opacity, and depth-mix calculations.
 
 It exists for:
 
@@ -118,15 +128,16 @@ It is not queried during rendering or player movement.
 
 Focused coverage includes:
 
-- monotonic opacity with increasing depth;
+- monotonic opacity with increasing depth above the surface;
 - decreasing transmission with increasing depth;
 - increased optical distance at grazing angles;
-- underwater camera-depth authority;
+- continuous waterline transition;
+- camera-submersion authority after the transition;
 - maximum optical-distance clamping;
 - opacity bounds;
 - shallow and deep colour-mix boundaries;
 - colour-format validation;
-- opacity and depth-range validation;
+- opacity, depth, and transition-range validation;
 - quality-tier feature selection;
 - shader source contract for semantic depth and the low-tier fallback.
 
@@ -138,7 +149,7 @@ Focused coverage includes:
 - Cross ocean and river chunk borders without optical seams.
 - Inspect high-elevation imported rivers.
 - Enter and leave the water repeatedly without a colour or alpha pop.
-- View the surface from just below and at greater submersion depths.
+- View the surface from just below, through the transition band, and at greater submersion depths.
 - Compare low, medium, high, and ultra tiers.
 - Measure first-use shader compilation and steady water-pass GPU time.
 
