@@ -6,7 +6,7 @@ import {
   resolveQaOutputDirectory,
 } from '../scripts/lib/qaRuntimeConfig.mjs';
 
-const root = path.resolve('/workspace/project');
+const root = path.resolve('virtual-project');
 
 test('QA output defaults to a named child under tmp', () => {
   assert.equal(
@@ -15,10 +15,17 @@ test('QA output defaults to a named child under tmp', () => {
   );
 });
 
-test('QA output accepts nested paths inside tmp', () => {
+test('QA output resolves relative paths from the repository root', () => {
   assert.equal(
-    resolveQaOutputDirectory(root, path.join(root, 'tmp', 'qa', 'run-1'), 'unused'),
+    resolveQaOutputDirectory(root, path.join('tmp', 'qa', 'run-1'), 'unused'),
     path.join(root, 'tmp', 'qa', 'run-1'),
+  );
+});
+
+test('QA output accepts absolute nested paths inside tmp', () => {
+  assert.equal(
+    resolveQaOutputDirectory(root, path.join(root, 'tmp', 'qa', 'run-2'), 'unused'),
+    path.join(root, 'tmp', 'qa', 'run-2'),
   );
 });
 
@@ -32,7 +39,7 @@ test('QA output rejects tmp itself and paths outside it', () => {
     /must be a child/,
   );
   assert.throws(
-    () => resolveQaOutputDirectory(root, path.join(root, 'tmp', '..', 'src'), 'unused'),
+    () => resolveQaOutputDirectory(root, path.join('tmp', '..', 'src'), 'unused'),
     /must be a child/,
   );
 });
