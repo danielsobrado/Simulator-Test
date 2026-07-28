@@ -8,6 +8,8 @@ const CORNER_DIRECTIONS = [
   [1, 1],
   [-1, 1],
 ];
+const MIN_STRETCH_COVERAGE_RATIO = 0.98;
+const MAX_STRETCH_GAP = 0.05;
 
 function cornerBounds(corners) {
   let minX = Infinity;
@@ -202,7 +204,8 @@ function courseCoversPlacement(placement, above) {
   // old reducer stretched those inputs unconditionally, so retain that contract.
   if (!(width > 0)) return true;
   const coverage = coverageWithinSpan(s0, s1, above.map(placementSpan));
-  return coverage.ratio >= 0.75 && coverage.largestGap <= width * 0.25;
+  return coverage.ratio >= MIN_STRETCH_COVERAGE_RATIO
+    && coverage.largestGap <= Math.min(MAX_STRETCH_GAP, width * 0.08);
 }
 
 function courseMeanY(course) {
