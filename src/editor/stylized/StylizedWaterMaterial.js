@@ -4,6 +4,7 @@ import {
   cameraPosition,
   clamp,
   dot,
+  exp,
   float,
   floor,
   fract,
@@ -104,6 +105,7 @@ export function createStylizedWaterMaterial({
   const exactCoverage = createSurfaceClassNodes(surface).water;
   const waterField = texture(waterFieldTexture, fieldUv);
   const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
+  const waterDepth = max(waterField.b, 0);
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
@@ -147,11 +149,54 @@ export function createStylizedWaterMaterial({
   const seg0 = clamp(ramp.div(midPos), 0, 1);
   const seg1 = clamp(ramp.sub(midPos).div(max(float(1).sub(midPos), 1e-4)), 0, 1);
   const inSeg1 = step(midPos, ramp);
-  let color = mix(
+  const legacyColor = mix(
     mix(colorNode(water.deepColor), colorNode(water.midColor), seg0),
     mix(colorNode(water.midColor), colorNode(water.highlightColor), seg1),
     inSeg1,
   );
+
+  const distance = length(positionWorld.xz.sub(cameraPosition.xz));
+  const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
+  let color = legacyColor;
+  let alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
+    .mul(fade)
+    .mul(waterCoverage);
+
+  if (quality.depthOptics) {
+    const optics = water.optics;
+    const viewVector = cameraPosition.sub(positionWorld);
+    const viewCosine = clamp(
+      abs(viewVector.y).div(max(length(viewVector), 1e-4)),
+      optics.minimumViewCosine,
+      1,
+    );
+    const opticalDistance = min(
+      waterDepth.div(viewCosine),
+      optics.maximumOpticalDistance,
+    );
+    const transmission = exp(opticalDistance.mul(-optics.absorptionDensity));
+    const absorbed = oneMinus(transmission);
+    const depthMix = smoothstep(optics.shallowDepth, optics.deepDepth, waterDepth);
+    const depthColor = mix(
+      colorNode(optics.shallowColor),
+      colorNode(optics.deepColor),
+      depthMix,
+    );
+    const underwaterMask = step(cameraPosition.y, positionWorld.y)
+      .mul(optics.underwaterTintStrength);
+    const bodyColor = mix(depthColor, colorNode(optics.underwaterColor), underwaterMask);
+    color = mix(
+      bodyColor,
+      legacyColor,
+      float(optics.surfaceDetailStrength).mul(fade),
+    );
+    alpha = mix(
+      float(optics.minimumOpacity),
+      float(optics.maximumOpacity),
+      absorbed,
+    ).mul(waterCoverage);
+  }
+
   if (quality.caustics) {
     const caustics = water.caustics;
     const causticUv = worldXZ.mul(caustics.scale)
@@ -160,7 +205,7 @@ export function createStylizedWaterMaterial({
     const shallow = oneMinus(smoothstep(
       caustics.depthFadeStart,
       caustics.depthFadeEnd,
-      waterField.b,
+      waterDepth,
     ));
     const causticAmount = pow(clamp(causticNoise, 0, 1), caustics.contrast)
       .mul(caustics.intensity * quality.causticStrength)
@@ -168,13 +213,7 @@ export function createStylizedWaterMaterial({
     color = color.add(colorNode(water.highlightColor).mul(causticAmount));
   }
 
-  const distance = length(positionWorld.xz.sub(cameraPosition.xz));
-  const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
-  const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
-    .mul(fade)
-    .mul(waterCoverage);
   const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
-
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,
