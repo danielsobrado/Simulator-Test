@@ -16,6 +16,11 @@ function validConfig() {
     baselineCase: 'baseline',
     hitchMs: 33.3,
     timeoutPaddingSeconds: 30,
+    viewport: {
+      width: 1600,
+      height: 900,
+      deviceScaleFactor: 1,
+    },
     gates: {
       collisionP95Ms: 0.83,
       frameP95RegressionMs: 0.83,
@@ -53,6 +58,7 @@ test('repository collision acceptance config is valid and keeps baseline collisi
   assert.equal(config.version, 1);
   assert.equal(config.repeats, 3);
   assert.equal(config.baselineCase, 'open-ground-baseline');
+  assert.deepEqual(config.viewport, { width: 1600, height: 900, deviceScaleFactor: 1 });
   assert.equal(baseline.collisionRequired, false);
   assert.equal(baseline.compareFrameToBaseline, false);
   assert.deepEqual(baseline.minimumCounts, {});
@@ -128,5 +134,14 @@ test('config validation rejects unknown minimum-count fields', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /not a supported collision count/,
+  );
+});
+
+test('config validation rejects an undersized capture viewport', () => {
+  const config = validConfig();
+  config.viewport.width = 200;
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(config),
+    /viewport.width/,
   );
 });
