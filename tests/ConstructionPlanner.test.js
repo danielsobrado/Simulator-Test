@@ -131,17 +131,20 @@ test('module content hashes only change where an anchor edit reaches', () => {
   assert.notEqual(before.contentHash, after.contentHash);
 });
 
-test('a material swap changes hashes while the curve does not', () => {
+test('a material swap leaves geometry hashes unchanged', () => {
   const source = record();
   const before = planConstruction(source, { maxModuleLength: 8 });
   const painted = structuredClone(source);
   painted.style.materials = { stone: 'granite-masonry', mortar: null, roof: null };
   painted.revision += 1;
   const after = planConstruction(painted, { maxModuleLength: 8 });
+
+  assert.equal(after.contentHash, before.contentHash);
   assert.equal(before.modules.length, after.modules.length);
   for (let index = 0; index < before.modules.length; index += 1) {
-    assert.notEqual(before.modules[index].contentHash, after.modules[index].contentHash);
+    assert.equal(before.modules[index].contentHash, after.modules[index].contentHash);
     assert.deepEqual(before.modules[index].pathInterval, after.modules[index].pathInterval);
+    assert.deepEqual(before.modules[index].placements, after.modules[index].placements);
   }
 });
 
