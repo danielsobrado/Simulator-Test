@@ -5,8 +5,13 @@ import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { createConstructionMaterials } from './ConstructionMaterials.js';
 import { coarsePlacements, moduleProjectedPixels, selectConstructionLod } from './ConstructionLod.js';
+import {
+  buildShellGeometry,
+  buildWallGeometry,
+  sampleShellPath,
+  shellSectionPoints,
+} from './ConstructionShell.js';
 
-const FOUNDATION_OVERLAP = 0.08;
 const HANDLE_RADIUS = 0.16;
 
 /**
@@ -54,72 +59,6 @@ function originForRecord(record) {
     x: quantizeOrigin((bounds.minX + bounds.maxX) / 2),
     z: quantizeOrigin((bounds.minZ + bounds.maxZ) / 2),
   };
-}
-
-/**
- * The semantic wall shell: a terrain-following extruded ribbon.
- *
- * Vertices are **origin-local**, never render-space. Baking
- * `floatingOrigin.toRender` into a vertex costs float32 precision at world
- * scale — at 3 km out a 2 mm mortar inset is not representable — and forces a
- * full rebuild on every rebase. Parenting to a group whose position carries the
- * render offset fixes both.
- */
-function buildWallGeometry(record, terrainView, origin) {
-  const sampled = sampleCubicBezierPath(record.path, {
-    chordError: 0.08,
-    maxSpacing: 0.65,
-  });
-  const positions = [];
-  const indices = [];
-  const halfWidth = record.dimensions.thickness / 2;
-  for (const entry of sampled.points) {
-    const leftX = entry.x + entry.normalX * halfWidth - origin.x;
-    const leftZ = entry.z + entry.normalZ * halfWidth - origin.z;
-    const rightX = entry.x - entry.normalX * halfWidth - origin.x;
-    const rightZ = entry.z - entry.normalZ * halfWidth - origin.z;
-    const centerHeight = terrainView.getCanonicalHeight(entry.x, entry.z) ?? 0;
-    const bottom = centerHeight - FOUNDATION_OVERLAP;
-    const top = centerHeight + record.dimensions.height;
-    positions.push(
-      leftX, bottom, leftZ,
-      rightX, bottom, rightZ,
-      leftX, top, leftZ,
-      rightX, top, rightZ,
-    );
-  }
-
-  for (let index = 0; index < sampled.points.length - 1; index += 1) {
-    const current = index * 4;
-    const next = current + 4;
-    indices.push(
-      current, current + 2, next + 2,
-      current, next + 2, next,
-      current + 1, next + 1, next + 3,
-      current + 1, next + 3, current + 3,
-      current + 2, current + 3, next + 3,
-      current + 2, next + 3, next + 2,
-      current, next, next + 1,
-      current, next + 1, current + 1,
-    );
-  }
-  const last = (sampled.points.length - 1) * 4;
-  indices.push(
-    0, 1, 3,
-    0, 3, 2,
-    last, last + 2, last + 3,
-    last, last + 3, last + 1,
-  );
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  geometry.userData.constructionId = record.id;
-  geometry.userData.constructionRevision = record.revision;
-  return geometry;
 }
 
 export class ConstructionView {
@@ -217,6 +156,7 @@ export class ConstructionView {
     if (entry.shellMesh) entry.shellMesh.geometry.dispose();
     for (const module of entry.modules.values()) {
       for (const mesh of module.meshes ?? []) mesh.geometry.dispose();
+      module.shellMesh?.geometry.dispose();
     }
     this.root.remove(entry.group);
     this.entries.delete(constructionId);
@@ -252,6 +192,7 @@ export class ConstructionView {
         group,
         origin,
         shellMesh: null,
+        shellPath: null,
         modules: new Map(),
         plan: null,
         arcTable: null,
@@ -274,6 +215,10 @@ export class ConstructionView {
     entry.arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
     entry.materials = this.createMaterials(record);
 
+    // Cached so a module shell is a slice of the same sampled curve the record
+    // shell used, rather than a second sampling that could seam differently.
+    entry.shellPath = sampleShellPath(record);
+
     if (entry.shellMesh) {
       entry.group.remove(entry.shellMesh);
       entry.shellMesh.geometry.dispose();
@@ -294,10 +239,12 @@ export class ConstructionView {
 
   applyResidentMaterials(entry, selected) {
     if (!entry.materials) return;
+    const shell = selected ? this.selectedMaterial : this.wallMaterial;
     for (const resident of entry.modules.values()) {
       for (const mesh of resident.meshes) {
         mesh.material = residentMaterial(mesh, entry.materials, selected);
       }
+      if (resident.shellMesh) resident.shellMesh.material = shell;
     }
   }
 
@@ -380,7 +327,13 @@ export class ConstructionView {
         this.stats.modulesSkippedByHash += 1;
         continue;
       }
-      entry.modules.set(module.id, { hash: module.contentHash, meshes: existing?.meshes ?? [] });
+      const resident = {
+        ...existing,
+        hash: module.contentHash,
+        meshes: existing?.meshes ?? [],
+      };
+      entry.modules.set(module.id, resident);
+      this.buildModuleShell(entry, module, resident, plan);
       this.enqueueModuleBuild(record.id, module);
     }
     for (const moduleId of [...entry.modules.keys()]) {
@@ -390,9 +343,54 @@ export class ConstructionView {
         entry.group.remove(mesh);
         mesh.geometry.dispose();
       }
+      if (stale.shellMesh) {
+        entry.group.remove(stale.shellMesh);
+        stale.shellMesh.geometry.dispose();
+      }
       entry.modules.delete(moduleId);
     }
     this.refreshResidentCount();
+    this.updateShellVisibility(entry);
+  }
+
+  /**
+   * The far band and the not-yet-built placeholder for one module.
+   *
+   * Per module, not per record: `updateLod` classifies each module separately,
+   * so a record-wide ribbon shown for one distant module would also be drawn
+   * through every near module's masonry — courses read as holes and the ribbon
+   * z-fights the stones it passes through.
+   */
+  buildModuleShell(entry, module, resident, plan) {
+    if (!entry.shellPath) return;
+    const total = plan.totalLength;
+    const [from, to] = module.pathInterval ?? [0, total];
+    const points = total > 0
+      ? shellSectionPoints(entry.shellPath, from / total, to / total)
+      : entry.shellPath.points;
+    const geometry = buildShellGeometry(points, {
+      record: entry.record,
+      terrainView: this.terrainView,
+      origin: entry.origin,
+    });
+    if (!geometry) return;
+    if (resident.shellMesh) {
+      entry.group.remove(resident.shellMesh);
+      resident.shellMesh.geometry.dispose();
+    }
+    const mesh = new THREE.Mesh(
+      geometry,
+      entry.record.id === this.selectedId ? this.selectedMaterial : this.wallMaterial,
+    );
+    mesh.name = `construction-shell:${entry.record.id}:${module.id}`;
+    mesh.userData.constructionId = entry.record.id;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    // Hidden until `updateLod` or the build queue asks for it, so a module that
+    // already has masonry does not flash its shell for a frame.
+    mesh.visible = resident.meshes.length === 0;
+    entry.group.add(mesh);
+    resident.shellMesh = mesh;
   }
 
   enqueueModuleBuild(constructionId, module) {
@@ -412,10 +410,11 @@ export class ConstructionView {
   /**
    * Choose an LOD band per module and show the matching geometry.
    *
-   * `shell` reuses the record's existing ribbon, so the far band costs nothing
-   * to build. `near` and `coarse` both draw the module's masonry; the coarse
-   * tier is a build-time detail reduction rather than a separate mesh set, so
-   * switching between them never waits on geometry.
+   * `shell` shows the module's own slice of the extruded ribbon, so the far
+   * band costs nothing to build and never overlaps a neighbouring module that
+   * is drawing masonry. `near` and `coarse` both draw the module's masonry; the
+   * coarse tier is a build-time detail reduction rather than a separate mesh
+   * set, so switching between them never waits on geometry.
    */
   updateLod(camera, viewportHeight) {
     if (!camera || !(viewportHeight > 0)) return;
@@ -425,7 +424,7 @@ export class ConstructionView {
     for (const entry of this.entries.values()) {
       if (!entry.plan) continue;
       const pinned = entry.record.id === this.selectedId;
-      let anyShell = false;
+      let uncovered = 0;
       for (const module of entry.plan.modules) {
         const resident = entry.modules.get(module.id);
         if (!resident) continue;
@@ -455,13 +454,18 @@ export class ConstructionView {
         }
         const visible = band !== 'shell' && resident.meshes.length > 0;
         for (const mesh of resident.meshes) mesh.visible = visible;
-        if (!visible) anyShell = true;
+        // Each module's ribbon covers exactly the arc its masonry vacated.
+        if (resident.shellMesh) resident.shellMesh.visible = !visible;
+        if (!visible) uncovered += 1;
         if (band === 'near') nearCount += 1;
         else if (band === 'coarse') coarseCount += 1;
         else shellCount += 1;
       }
-      // The shell covers whatever the module meshes are not drawing.
-      if (entry.shellMesh) entry.shellMesh.visible = anyShell;
+      // The record-wide ribbon is only the fallback for arcs no module owns a
+      // shell for; once every module has one it would just double the surface.
+      if (entry.shellMesh) {
+        entry.shellMesh.visible = uncovered > 0 && !this.modulesOwnTheirShells(entry);
+      }
     }
     this.stats.modulesNear = nearCount;
     this.stats.modulesCoarse = coarseCount;
@@ -562,19 +566,35 @@ export class ConstructionView {
     this.stats.mortarBuildMs = mortarBuildMs;
   }
 
+  /** True once every resident module can show a ribbon for its own arc. */
+  modulesOwnTheirShells(entry) {
+    if (entry.modules.size === 0) return false;
+    for (const resident of entry.modules.values()) {
+      if (!resident.shellMesh) return false;
+    }
+    return true;
+  }
+
   /**
-   * The shell is the fallback, not a second layer: it stays visible until every
-   * module has its own geometry, so a wall mid-build shows a plain ribbon
-   * rather than holes. Modules the budget refused keep it visible forever,
-   * which is the intended degradation.
+   * The shell is the fallback, not a second layer: a module without masonry yet
+   * shows a plain ribbon rather than a hole. Modules the budget refused keep
+   * theirs visible forever, which is the intended degradation.
+   *
+   * Per module wherever module shells exist — a record-wide ribbon shown for a
+   * single pending module is drawn straight through its finished neighbours.
    */
   updateShellVisibility(entry) {
-    if (!entry.shellMesh) return;
     let pending = 0;
     for (const resident of entry.modules.values()) {
-      if (resident.meshes.length === 0) pending += 1;
+      // Same rule `updateLod` applies, so a build landing mid-frame cannot
+      // un-hide the masonry of a module the camera already sent to the far band.
+      const bare = resident.meshes.length === 0 || resident.band === 'shell';
+      if (bare) pending += 1;
+      if (resident.shellMesh) resident.shellMesh.visible = bare;
     }
-    const covered = entry.modules.size > 0 && pending === 0;
+    if (!entry.shellMesh) return;
+    const covered = entry.modules.size > 0
+      && (pending === 0 || this.modulesOwnTheirShells(entry));
     entry.shellMesh.visible = !covered;
   }
 
@@ -688,11 +708,13 @@ export class ConstructionView {
     const targets = [];
     for (const entry of this.entries.values()) {
       if (!entry.group.visible) continue;
-      if (entry.shellMesh?.visible) {
-        targets.push(entry.shellMesh);
-        continue;
+      if (entry.shellMesh?.visible) targets.push(entry.shellMesh);
+      for (const resident of entry.modules.values()) {
+        // A module in the far band is pickable through its own ribbon; the
+        // masonry it replaced is hidden and would otherwise not be hit.
+        if (resident.shellMesh?.visible) targets.push(resident.shellMesh);
+        else targets.push(...resident.meshes);
       }
-      for (const resident of entry.modules.values()) targets.push(...resident.meshes);
     }
     return targets;
   }
