@@ -23,6 +23,7 @@ const summary = data.summary ?? data;
 const hitchFrames = data.hitchFrames ?? [];
 const counters = data.counters ?? {};
 const scenario = data.scenario ?? {};
+const collision = data.collision ?? null;
 
 console.log('=== PERF QA PARSE ===');
 console.log(`scenario: ${scenario.id ?? '?'} ${scenario.speed ?? ''}`);
@@ -33,6 +34,26 @@ console.log(`counters: ${JSON.stringify(counters)}`);
 console.log(`phase max stylized/render: ${summary.phases?.stylized?.maxMs} / ${summary.phases?.render?.maxMs}`);
 console.log(`phase max terrainCommit: ${summary.phases?.terrainCommit?.maxMs}`);
 console.log(`hitch dts: ${hitchFrames.map((frame) => frame.dtMs).join(', ')}`);
+
+if (collision) {
+  console.log('--- collision gate ---');
+  console.log(
+    `collision total p50/p95/p99/max: ${collision.timingsMs?.total?.p50Ms}`
+    + ` / ${collision.timingsMs?.total?.p95Ms}`
+    + ` / ${collision.timingsMs?.total?.p99Ms}`
+    + ` / ${collision.timingsMs?.total?.maxMs}`,
+  );
+  console.log(
+    `collision gate: ${collision.gate?.passed ? 'PASS' : 'FAIL'}`
+    + ` measured=${collision.gate?.measuredP95Ms}`
+    + ` target=${collision.gate?.provisionalP95TargetMs}`,
+  );
+  console.log(
+    `collision readiness: ${collision.readiness?.ready ? 'ready' : 'not-ready'}`
+    + ` failure=${collision.readiness?.failure?.message ?? 'none'}`,
+  );
+  console.log(`collision counts: ${JSON.stringify(collision.counts ?? {})}`);
+}
 
 const loadingHitches = hitchFrames
   .filter((frame) => (frame.streaming?.loading ?? 0) > 0)
@@ -73,3 +94,7 @@ console.log(`textureBytesUploaded=${counters.textureBytesUploaded ?? 0}`);
 
 console.log(`source: ${inputPath}`);
 console.log(`report: ${outPath} (${fs.statSync(outPath).size} bytes)`);
+
+if (scenario.id === 'collision-p8' && collision?.gate?.passed !== true) {
+  process.exitCode = 1;
+}

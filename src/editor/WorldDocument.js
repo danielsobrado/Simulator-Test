@@ -1,5 +1,7 @@
 import { INFINITE_WORLD_FORMAT_VERSION } from './world/worldConstants.js';
 
+export const WORLD_COLLISION_SCHEMA_VERSION = 1;
+
 function resolveWorldModels(heightFieldOrObjectMap, objectMap, voxelStampStore) {
   if (objectMap) {
     return {
@@ -28,6 +30,16 @@ function assertInfiniteWorldDocument(document) {
   }
 }
 
+function assertCollisionSchema(document) {
+  const version = document?.collisionSchema?.version;
+  if (version == null) return;
+  if (version !== WORLD_COLLISION_SCHEMA_VERSION) {
+    throw new Error(
+      `Unsupported world collision schema ${version}; expected ${WORLD_COLLISION_SCHEMA_VERSION}.`,
+    );
+  }
+}
+
 export function createWorldDocument(
   tileMap,
   heightFieldOrObjectMap,
@@ -41,6 +53,7 @@ export function createWorldDocument(
   }
   return {
     ...worldStore.toDocument(),
+    collisionSchema: Object.freeze({ version: WORLD_COLLISION_SCHEMA_VERSION }),
     objects: models.objectMap.toDocument(),
     ...(models.voxelStampStore
       ? {
@@ -60,6 +73,7 @@ export function loadWorldDocument(
   validate = null,
 ) {
   assertInfiniteWorldDocument(document);
+  assertCollisionSchema(document);
   const models = resolveWorldModels(heightFieldOrObjectMap, objectMap, voxelStampStore);
   const worldStore = resolveWorldStore(tileMap, models.heightField);
   if (!worldStore) {

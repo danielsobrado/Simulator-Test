@@ -1,4 +1,5 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import { COLLISION_GAUGE_COUNTERS } from './CollisionPerfCounters.js';
 import { collisionChunkKey, parseCollisionChunkKey } from './CollisionIds.js';
 import {
   COLLISION_RETRY_BASE_MS,
@@ -104,6 +105,21 @@ function optionalCallback(value, name) {
   return value;
 }
 
+function failureRecord(error, {
+  providerId,
+  phase,
+  chunkKey = null,
+} = {}) {
+  return Object.freeze({
+    providerId,
+    phase,
+    chunkKey,
+    sourceId: error?.sourceId ?? error?.cause?.sourceId ?? null,
+    prototypeId: error?.prototypeId ?? error?.cause?.prototypeId ?? null,
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
 export class CollisionResidency {
   constructor({
     world,
@@ -113,6 +129,7 @@ export class CollisionResidency {
     onOwnerChunkUnloaded = null,
     now = () => performance.now(),
     logger = console,
+    providerId = 'unknown',
   }) {
     if (!world) throw new Error('Collision residency requires a world.');
     if (typeof buildOwnerChunk !== 'function') {
@@ -127,6 +144,7 @@ export class CollisionResidency {
     this.onOwnerChunkUnloaded = optionalCallback(onOwnerChunkUnloaded, 'unload callback');
     this.now = now;
     this.logger = logger ?? console;
+    this.providerId = String(providerId || 'unknown');
     this.desiredKeys = new Set();
     this.loadedKeys = new Set();
     this.queue = [];
@@ -135,6 +153,7 @@ export class CollisionResidency {
     this.currentChunk = null;
     this.predictedChunk = null;
     this.lastBuildError = null;
+    this.lastFailure = null;
     this.builds = 0;
     this.sequence = 0;
   }
@@ -144,13 +163,22 @@ export class CollisionResidency {
     return !retry || this.now() >= retry.at;
   }
 
-  recordRetry(key) {
+  recordRetry(key, error, phase = 'chunk-build') {
     const previous = this.retryByKey.get(key);
     const attempts = (previous?.attempts ?? 0) + 1;
+    const failure = failureRecord(error, {
+      providerId: this.providerId,
+      phase,
+      chunkKey: key,
+    });
     this.retryByKey.set(key, Object.freeze({
       attempts,
       at: this.now() + retryDelay(attempts),
+      failure,
     }));
+    this.lastBuildError = error instanceof Error ? error : new Error(String(error));
+    this.lastFailure = failure;
+    return failure;
   }
 
   schedule(chunkX, chunkZ, priority) {
@@ -191,6 +219,10 @@ export class CollisionResidency {
         this.retryByKey.delete(key);
       }
     }
+    if (this.retryByKey.size === 0 && this.lastFailure?.phase === 'chunk-build') {
+      this.lastBuildError = null;
+      this.lastFailure = null;
+    }
   }
 
   notifyOwnerUnloaded(chunkX, chunkZ) {
@@ -198,8 +230,15 @@ export class CollisionResidency {
       this.onOwnerChunkUnloaded?.(chunkX, chunkZ);
       return null;
     } catch (error) {
+      const key = collisionChunkKey(chunkX, chunkZ);
+      const failure = failureRecord(error, {
+        providerId: this.providerId,
+        phase: 'owner-unload',
+        chunkKey: key,
+      });
       this.lastBuildError = error;
-      this.logger.error?.(`Collision owner unload callback failed for ${chunkX}:${chunkZ}.`, error);
+      this.lastFailure = failure;
+      this.logger.error?.('Collision owner unload callback failed.', failure, error);
       return error;
     }
   }
@@ -241,7 +280,11 @@ export class CollisionResidency {
         const chunkZ = current.chunkZ + offsetZ;
         const key = collisionChunkKey(chunkX, chunkZ);
         this.desiredKeys.add(key);
-        this.schedule(chunkX, chunkZ, chebyshevDistance(chunkX, chunkZ, current.chunkX, current.chunkZ) + 1);
+        this.schedule(
+          chunkX,
+          chunkZ,
+          chebyshevDistance(chunkX, chunkZ, current.chunkX, current.chunkZ) + 1,
+        );
       }
     }
 
@@ -333,22 +376,29 @@ export class CollisionResidency {
         if (this.commitOwnerChunk(job, result, revision, colliders)) built += 1;
       } catch (error) {
         frameError = error;
-        this.recordRetry(job.key);
-        this.logger.error?.(`Collision chunk build failed for ${job.key}.`, error);
+        const failure = this.recordRetry(job.key, error);
+        this.logger.error?.('Collision chunk build failed.', failure, error);
       }
     }
     if (frameError) this.lastBuildError = frameError;
-    else if (attempted > 0 && this.retryByKey.size === 0) this.lastBuildError = null;
+    else if (attempted > 0 && this.retryByKey.size === 0) {
+      this.lastBuildError = null;
+      this.lastFailure = null;
+    }
     PerfCounters.inc('collisionBuilds', built);
-    PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
+    if (attempted > 0) PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
     return Object.freeze({ attempted, built, remaining: this.queue.length });
   }
 
   checkDestination(aabb) {
     const readiness = this.world.checkAabbReadiness(aabb);
+    const failed = readiness.missing
+      .map((key) => this.retryByKey.get(key)?.failure ?? null)
+      .filter(Boolean);
     return Object.freeze({
       ...readiness,
+      failed: Object.freeze(failed),
       policy: COLLISION_NOT_READY_POLICY,
     });
   }
@@ -370,6 +420,7 @@ export class CollisionResidency {
       ready: this.desiredKeys.size > 0 && readyDesired === this.desiredKeys.size,
       notReadyPolicy: COLLISION_NOT_READY_POLICY,
       lastBuildError: this.lastBuildError?.message ?? null,
+      failure: this.lastFailure,
     });
   }
 
@@ -377,8 +428,9 @@ export class CollisionResidency {
     const status = this.getStatus();
     PerfCounters.set('collisionDesiredChunks', status.desiredChunks);
     PerfCounters.set('collisionReadyDesiredChunks', status.readyDesiredChunks);
-    PerfCounters.set('collisionBuildQueueDepth', status.queuedBuilds);
+    PerfCounters.set(COLLISION_GAUGE_COUNTERS.queueDepth, status.queuedBuilds);
     PerfCounters.set('collisionBuildDeferredRetries', status.deferredRetries);
+    PerfCounters.set(COLLISION_GAUGE_COUNTERS.failedChunks, status.deferredRetries);
     PerfCounters.set('collisionLoadedOwnerChunks', status.loadedOwnerChunks);
   }
 
@@ -395,6 +447,7 @@ export class CollisionResidency {
     this.currentChunk = null;
     this.predictedChunk = null;
     this.lastBuildError = null;
+    this.lastFailure = null;
     this.builds = 0;
     this.sequence = 0;
     this.updateCounters();
