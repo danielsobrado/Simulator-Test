@@ -45,6 +45,7 @@ export class ConstructionCompilerClient {
     const compileOptions = Object.freeze({
       ...options,
       collision: Object.freeze({
+        ...constructionCollisionSource.getConfig(),
         ...this.collisionConfig,
         ...(options.collision ?? {}),
       }),
