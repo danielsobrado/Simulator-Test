@@ -12,15 +12,13 @@ test('W2B samples opaque colour and copied depth through safe viewport UVs', () 
   assert.match(source, /viewportDepthTexture/);
   assert.match(source, /viewportSafeUV/);
   assert.match(source, /const baseViewportUv = viewportSafeUV\(screenUV\);/);
-  assert.match(
-    source,
-    /const distortedLinearDepth = linearDepth\(viewportDepthTexture\(distortedViewportUv\)\);/,
-  );
+  assert.match(source, /const distortedViewDistance = linearDepth\(/);
 });
 
-test('distorted foreground samples fall back before scene colour is read', () => {
-  assert.match(source, /const validDepth = step\(/);
-  assert.match(source, /waterLinearDepth\.add\(refraction\.depthBias\)/);
+test('distorted foreground samples fall back using view-distance metres', () => {
+  assert.match(source, /const depthRange = cameraFar\.sub\(cameraNear\);/);
+  assert.match(source, /const waterViewDistance = linearDepth\(\)\.mul\(depthRange\)\.add\(cameraNear\);/);
+  assert.match(source, /waterViewDistance\.add\(refraction\.depthBiasMeters\)/);
   assert.match(source, /const acceptedViewportUv = mix\(/);
   assert.match(source, /baseViewportUv,[\s\S]*distortedViewportUv,[\s\S]*validDepth/);
 });
@@ -33,4 +31,9 @@ test('captured scene colour uses RGB absorption and manual coverage compositing'
   assert.match(source, /sceneColor\.mul\(channelTransmission\)/);
   assert.match(source, /bodyColor\.mul\(oneMinus\(channelTransmission\)\)/);
   assert.match(source, /alpha = waterCoverage;/);
+});
+
+test('refraction uses only two additional FBM samples', () => {
+  const helper = source.match(/function refractionWarp\([\s\S]*?\n\}/)?.[0] ?? '';
+  assert.equal((helper.match(/stylizedFbm\(/g) ?? []).length, 2);
 });
