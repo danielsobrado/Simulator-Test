@@ -22,6 +22,8 @@ const LOCAL_POINT = new THREE.Vector3();
 const WORLD_POINT = new THREE.Vector3();
 const LOCAL_X = new THREE.Vector3(1, 0, 0);
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const BOX_CENTER = new THREE.Vector3();
+const BOX_SIZE = new THREE.Vector3();
 
 function layersFor(definition) {
   const key = objectCollisionLayers(definition.collision.policy);
@@ -61,8 +63,8 @@ function transformedBox(description, rootMatrix) {
   WORLD_MATRIX.multiplyMatrices(rootMatrix, LOCAL_MATRIX);
   WORLD_MATRIX.decompose(POSITION, QUATERNION, SCALE);
   LOCAL_BOX.setFromCenterAndSize(
-    new THREE.Vector3(),
-    new THREE.Vector3(...description.dimensions),
+    BOX_CENTER.set(0, 0, 0),
+    BOX_SIZE.set(...description.dimensions),
   );
   WORLD_BOX.copy(LOCAL_BOX).applyMatrix4(WORLD_MATRIX);
   return {
@@ -77,8 +79,16 @@ function transformedCapsule(description, rootMatrix) {
   LOCAL_POINT.set(...description.position);
   WORLD_POINT.copy(LOCAL_POINT).applyMatrix4(rootMatrix);
   const [radius, height] = description.dimensions;
-  LOCAL_BOX.min.set(description.position[0] - radius, description.position[1], description.position[2] - radius);
-  LOCAL_BOX.max.set(description.position[0] + radius, description.position[1] + height, description.position[2] + radius);
+  LOCAL_BOX.min.set(
+    description.position[0] - radius,
+    description.position[1],
+    description.position[2] - radius,
+  );
+  LOCAL_BOX.max.set(
+    description.position[0] + radius,
+    description.position[1] + height,
+    description.position[2] + radius,
+  );
   WORLD_BOX.copy(LOCAL_BOX).applyMatrix4(rootMatrix);
   rootMatrix.decompose(POSITION, QUATERNION, SCALE);
   return {
@@ -124,13 +134,17 @@ export function createObjectColliderRecords({
   object,
   definition,
   placementResolver,
+  placement = null,
   descriptions,
   chunkWorldSize,
 }) {
   const layers = layersFor(definition);
   if (layers === null || descriptions.length === 0) return Object.freeze([]);
-  const placement = placementResolver.resolve(object);
-  const rootMatrix = placementResolver.createCanonicalObjectMatrix(object, placement.surface);
+  const resolvedPlacement = placement ?? placementResolver.resolve(object);
+  const rootMatrix = placementResolver.createCanonicalObjectMatrix(
+    object,
+    resolvedPlacement.surface,
+  );
   const owner = ownerChunk(rootMatrix, chunkWorldSize);
   const records = descriptions.map((description) => {
     const transformed = transformDescription(description, rootMatrix);
