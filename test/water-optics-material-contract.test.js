@@ -18,6 +18,17 @@ test('medium and higher tiers derive opacity from semantic water depth', () => {
   assert.match(source, /float\(optics\.maximumOpacity\)/);
 });
 
+test('underwater optical distance follows camera submersion', () => {
+  assert.match(
+    source,
+    /const cameraSubmersionDepth = max\(positionWorld\.y\.sub\(cameraPosition\.y\), 0\);/,
+  );
+  assert.match(
+    source,
+    /const verticalDistance = mix\(waterDepth, cameraSubmersionDepth, underwaterMask\);/,
+  );
+});
+
 test('the low-tier legacy opacity path remains available', () => {
   assert.match(
     source,
