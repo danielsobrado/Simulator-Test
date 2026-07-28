@@ -2,6 +2,8 @@
  * Interval support helpers for ruin masonry.
  */
 
+const SORTED_INDEX_CACHE = new WeakMap();
+
 export function intervalOverlap(a0, a1, b0, b1) {
   const start = Math.max(a0, b0);
   const end = Math.min(a1, b1);
@@ -85,14 +87,38 @@ function sortedBySpanStart(candidates) {
   return true;
 }
 
+function sortedIntervalIndex(candidates) {
+  const cached = SORTED_INDEX_CACHE.get(candidates);
+  if (cached) return cached;
+
+  const prefixMaximumEnd = new Float64Array(candidates.length);
+  let maximum = -Infinity;
+  for (let index = 0; index < candidates.length; index += 1) {
+    maximum = Math.max(maximum, candidates[index].support.span[1]);
+    prefixMaximumEnd[index] = maximum;
+  }
+  const built = Object.freeze({ prefixMaximumEnd });
+  SORTED_INDEX_CACHE.set(candidates, built);
+  return built;
+}
+
+function firstPrefixReaching(prefixMaximumEnd, endExclusive, target) {
+  let low = 0;
+  let high = endExclusive;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (prefixMaximumEnd[middle] < target) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
 /**
  * Return every interval that may support [s0,s1].
  *
- * A lower pool can contain two overlapping courses. Binary search may locate
- * the first interval starting near the target, but more than one earlier
- * interval can still reach into it. Scan all earlier candidates after locating
- * the split so no valid support is silently omitted. Callers that provide a
- * course-major pool are handled by the linear fallback.
+ * Sorted pools use a prefix-maximum index so long intervals from an earlier
+ * overlapping course are not dropped and lookup remains O(log n + matches).
+ * Course-major unsorted pools use the complete linear fallback.
  */
 export function findOverlapCandidates(candidates, s0, s1, pad = 0) {
   if (!Array.isArray(candidates) || candidates.length === 0) return [];
@@ -112,8 +138,12 @@ export function findOverlapCandidates(candidates, s0, s1, pad = 0) {
   }
 
   const result = [];
-  for (let index = 0; index < low; index += 1) {
-    if (candidates[index].support.span[1] >= start) result.push(candidates[index]);
+  if (low > 0) {
+    const { prefixMaximumEnd } = sortedIntervalIndex(candidates);
+    const first = firstPrefixReaching(prefixMaximumEnd, low, start);
+    for (let index = first; index < low; index += 1) {
+      if (candidates[index].support.span[1] >= start) result.push(candidates[index]);
+    }
   }
   for (let index = low; index < candidates.length; index += 1) {
     const candidate = candidates[index];
