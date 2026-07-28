@@ -137,10 +137,10 @@ function perfReport({
       readiness: {
         ready,
         failure,
-        provider: {
-          components: {
-            trees: { colliders: treeColliders },
-          },
+      },
+      provider: {
+        components: {
+          trees: { colliders: treeColliders },
         },
       },
       canonicalSignature,
