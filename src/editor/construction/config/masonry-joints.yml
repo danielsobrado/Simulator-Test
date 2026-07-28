@@ -1,0 +1,31 @@
+version: 1
+
+# Joint width = total visible gap between neighbouring stones (metres).
+# Each stone retracts roughly half of that amount via scaleCorners.
+
+defaults:
+  headJoint:
+    min: 0.012
+    max: 0.030
+
+  bedJoint:
+    min: 0.0084
+    max: 0.021
+
+  coarseLodMultiplier: 1.0
+  mortarSafetyOverlap: 0.003
+
+  minimumRenderedWidth: 0.12
+  minimumRenderedHeight: 0.08
+
+styles:
+  soft-limestone-rubble:
+    headJoint:
+      min: 0.026
+      max: 0.040
+
+    bedJoint:
+      min: 0.020
+      max: 0.030
+
+    coarseLodMultiplier: 1.20
