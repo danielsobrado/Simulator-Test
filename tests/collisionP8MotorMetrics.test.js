@@ -36,18 +36,36 @@ function clock() {
   };
 }
 
-test('motor records total, narrow-phase, and support timings separately', () => {
-  PerfCounters.reset();
-  const motor = new CharacterMotor({
-    collisionRuntime: {
-      checkMovementReadiness: () => ({ ready: true, missing: [], failed: [] }),
-      querySweptCapsule: () => [],
-    },
+function motorFor(runtime, now = clock()) {
+  return new CharacterMotor({
+    collisionRuntime: runtime,
     terrainProvider: terrainProvider(),
     config: CONFIG,
     stepHeight: 1.1,
     groundSnapDistance: 0.6,
-    now: clock(),
+    now,
+  });
+}
+
+test('motor reset primes collision residency at the canonical pose', () => {
+  let primed = null;
+  const motor = motorFor({
+    prime: (focus) => { primed = focus; },
+    checkMovementReadiness: () => ({ ready: true, missing: [], failed: [] }),
+    querySweptCapsule: () => [],
+  });
+
+  motor.reset({ x: 512, y: 4, z: -256 });
+
+  assert.deepEqual(primed, { x: 512, z: -256 });
+  assert.deepEqual(motor.getStatus().previousValidPosition, { x: 512, y: 4, z: -256 });
+});
+
+test('motor records total, narrow-phase, and support timings separately', () => {
+  PerfCounters.reset();
+  const motor = motorFor({
+    checkMovementReadiness: () => ({ ready: true, missing: [], failed: [] }),
+    querySweptCapsule: () => [],
   });
   motor.reset({ x: 0, y: 0, z: 0 });
 
@@ -74,18 +92,11 @@ test('motor retains the previous valid position when collision readiness fails',
     missing: ['1:0'],
     failed: [{ chunkKey: '1:0', message: 'proxy failed' }],
   };
-  const motor = new CharacterMotor({
-    collisionRuntime: {
-      checkMovementReadiness: () => readiness,
-      querySweptCapsule: () => {
-        throw new Error('broadphase must not run while unready');
-      },
+  const motor = motorFor({
+    checkMovementReadiness: () => readiness,
+    querySweptCapsule: () => {
+      throw new Error('broadphase must not run while unready');
     },
-    terrainProvider: terrainProvider(),
-    config: CONFIG,
-    stepHeight: 1.1,
-    groundSnapDistance: 0.6,
-    now: clock(),
   });
   motor.reset({ x: 2, y: 0, z: 3 });
 
