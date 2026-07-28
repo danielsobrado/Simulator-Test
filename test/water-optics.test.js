@@ -41,6 +41,24 @@ test('grazing views increase optical distance without exceeding the cap', () => 
   assert.ok(grazing.opticalDistance <= optics.maximumOpticalDistance);
 });
 
+test('underwater optics use camera submersion instead of seabed depth', () => {
+  const justBelow = computeWaterOpticsSample({
+    depth: 20,
+    underwater: true,
+    cameraSubmersionDepth: 0.2,
+    config: optics,
+  });
+  const deepBelow = computeWaterOpticsSample({
+    depth: 20,
+    underwater: true,
+    cameraSubmersionDepth: 5,
+    config: optics,
+  });
+  assert.equal(justBelow.verticalDistance, 0.2);
+  assert.ok(justBelow.opacity < deepBelow.opacity);
+  assert.equal(justBelow.depthMix, 1);
+});
+
 test('optics validation rejects malformed colours and inverted ranges', () => {
   assert.equal(validateWaterOpticsConfig(structuredClone(optics)).deepDepth, 6);
   assert.throws(
