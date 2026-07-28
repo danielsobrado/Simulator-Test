@@ -219,6 +219,10 @@ export class CollisionResidency {
         this.retryByKey.delete(key);
       }
     }
+    if (this.retryByKey.size === 0 && this.lastFailure?.phase === 'chunk-build') {
+      this.lastBuildError = null;
+      this.lastFailure = null;
+    }
   }
 
   notifyOwnerUnloaded(chunkX, chunkZ) {
