@@ -16,6 +16,19 @@ water:
     surfaceTransitionDepth: 0.75
     surfaceDetailStrength: 0.28
     underwaterTintStrength: 0.35
+  refraction:
+    enabled: true
+    strength: 0.012
+    coarseScale: 0.045
+    fineScale: 0.16
+    coarseSpeed: 0.05
+    fineSpeed: 0.13
+    depthFadeStart: 0.08
+    depthFadeEnd: 1.8
+    depthBiasMeters: 0.15
+    mipLevel: 0
+    sceneColorStrength: 0.94
+    absorptionCoefficients: [0.72, 0.28, 0.12]
   caustics:
     intensity: 0.18
     scale: 0.45

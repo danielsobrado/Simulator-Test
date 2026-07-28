@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import {
   abs,
+  cameraFar,
+  cameraNear,
   cameraPosition,
   clamp,
   dot,
@@ -9,6 +11,7 @@ import {
   floor,
   fract,
   length,
+  linearDepth,
   max,
   min,
   mix,
@@ -16,6 +19,7 @@ import {
   positionLocal,
   positionWorld,
   pow,
+  screenUV,
   sin,
   smoothstep,
   step,
@@ -23,6 +27,9 @@ import {
   uv,
   vec2,
   vec3,
+  viewportDepthTexture,
+  viewportOpaqueMipTexture,
+  viewportSafeUV,
 } from 'three/tsl';
 import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
@@ -82,6 +89,15 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
   result = smoothMin(result, neighborDistance(p, time, cellSpeed, 0, 1), smoothness);
   result = smoothMin(result, neighborDistance(p, time, cellSpeed, 1, 1), smoothness);
   return result;
+}
+
+function refractionWarp(coarsePoint, finePoint) {
+  const coarse = stylizedFbm(coarsePoint).sub(0.5).mul(2);
+  const fine = stylizedFbm(finePoint).sub(0.5).mul(2);
+  return vec2(
+    coarse.mul(0.7).add(fine.mul(0.3)),
+    coarse.mul(-0.35).add(fine.mul(0.65)),
+  );
 }
 
 export function createStylizedWaterMaterial({
@@ -161,6 +177,9 @@ export function createStylizedWaterMaterial({
   let alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
     .mul(fade)
     .mul(waterCoverage);
+  let opticalDistance = float(0);
+  let bodyColor = legacyColor;
+  let surfaceDetailMix = float(0);
 
   if (quality.depthOptics) {
     const optics = water.optics;
@@ -177,7 +196,7 @@ export function createStylizedWaterMaterial({
       cameraSubmersionDepth,
     );
     const verticalDistance = mix(waterDepth, cameraSubmersionDepth, underwaterBlend);
-    const opticalDistance = min(
+    opticalDistance = min(
       verticalDistance.div(viewCosine),
       optics.maximumOpticalDistance,
     );
@@ -189,21 +208,72 @@ export function createStylizedWaterMaterial({
       colorNode(optics.deepColor),
       depthMix,
     );
-    const bodyColor = mix(
+    bodyColor = mix(
       depthColor,
       colorNode(optics.underwaterColor),
       underwaterBlend.mul(optics.underwaterTintStrength),
     );
-    color = mix(
-      bodyColor,
-      legacyColor,
-      float(optics.surfaceDetailStrength).mul(fade),
-    );
+    surfaceDetailMix = float(optics.surfaceDetailStrength).mul(fade);
+    color = mix(bodyColor, legacyColor, surfaceDetailMix);
     alpha = mix(
       float(optics.minimumOpacity),
       float(optics.maximumOpacity),
       absorbed,
     ).mul(waterCoverage);
+  }
+
+  if (quality.refraction && water.refraction.enabled) {
+    const refraction = water.refraction;
+    const coarsePoint = worldXZ
+      .mul(refraction.coarseScale)
+      .add(currentFlow.mul(time.mul(refraction.coarseSpeed)));
+    const finePoint = worldXZ
+      .mul(refraction.fineScale)
+      .sub(currentFlow.mul(time.mul(refraction.fineSpeed)))
+      .add(vec2(31.73, 11.29));
+    const depthFactor = smoothstep(
+      refraction.depthFadeStart,
+      refraction.depthFadeEnd,
+      waterDepth,
+    );
+    const distortionUv = refractionWarp(coarsePoint, finePoint)
+      .mul(refraction.strength * quality.refractionStrength)
+      .mul(depthFactor);
+    const baseViewportUv = viewportSafeUV(screenUV);
+    const distortedViewportUv = viewportSafeUV(baseViewportUv.add(distortionUv));
+    const depthRange = cameraFar.sub(cameraNear);
+    const waterViewDistance = linearDepth().mul(depthRange).add(cameraNear);
+    const distortedViewDistance = linearDepth(
+      viewportDepthTexture(distortedViewportUv),
+    ).mul(depthRange).add(cameraNear);
+    const validDepth = step(
+      waterViewDistance.add(refraction.depthBiasMeters),
+      distortedViewDistance,
+    );
+    const acceptedViewportUv = mix(
+      baseViewportUv,
+      distortedViewportUv,
+      validDepth,
+    );
+    const sceneColor = viewportOpaqueMipTexture(
+      acceptedViewportUv,
+      float(refraction.mipLevel),
+    ).rgb;
+    const coefficients = vec3(
+      refraction.absorptionCoefficients[0],
+      refraction.absorptionCoefficients[1],
+      refraction.absorptionCoefficients[2],
+    );
+    const channelTransmission = exp(coefficients.mul(opticalDistance).negate());
+    const refractedBody = sceneColor.mul(channelTransmission)
+      .add(bodyColor.mul(oneMinus(channelTransmission)));
+    const physicalColor = mix(
+      bodyColor,
+      refractedBody,
+      refraction.sceneColorStrength,
+    );
+    color = mix(physicalColor, legacyColor, surfaceDetailMix);
+    alpha = waterCoverage;
   }
 
   if (quality.caustics) {
