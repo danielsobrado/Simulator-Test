@@ -44,6 +44,12 @@ function hardwareAdapterCheck(report) {
   );
 }
 
+function productionDebugCheck(report) {
+  const debug = report?.config?.collision?.debug ?? null;
+  const disabled = debug !== null && Object.values(debug).every((value) => value === false);
+  return check('production-debug-disabled', disabled, debug, 'all collision debug flags false');
+}
+
 function minimumCountChecks(caseConfig, report) {
   return Object.entries(caseConfig.minimumCounts).map(([name, minimum]) => {
     const actual = count(report, name);
@@ -84,6 +90,8 @@ function runChecks(config, caseConfig, run) {
       config.gates.maxHitches,
     ),
   ];
+
+  if (caseConfig.compareFrameToBaseline) checks.push(productionDebugCheck(report));
 
   if (caseConfig.collisionRequired) {
     checks.push(
