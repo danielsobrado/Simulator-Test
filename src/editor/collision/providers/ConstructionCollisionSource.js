@@ -1,13 +1,33 @@
 import { ConstructionSpatialIndex } from '../../construction/ConstructionSpatialIndex.js';
 
+const DEFAULT_CONFIG = Object.freeze({ curveSegmentLength: 1.25 });
+
+function normalizeConfig(config = {}) {
+  const curveSegmentLength = config.curveSegmentLength ?? DEFAULT_CONFIG.curveSegmentLength;
+  if (!(curveSegmentLength > 0)) {
+    throw new Error('Construction collision curve segment length must be positive.');
+  }
+  return Object.freeze({ curveSegmentLength });
+}
+
 export class ConstructionCollisionSource {
   constructor() {
     this.activeRevisions = new Map();
     this.plans = new Map();
     this.spatialIndex = null;
     this.chunkWorldSize = null;
+    this.config = DEFAULT_CONFIG;
     this.appliedPlans = 0;
     this.rejectedPlans = 0;
+  }
+
+  setConfig(config) {
+    this.config = normalizeConfig(config);
+    return this.config;
+  }
+
+  getConfig() {
+    return this.config;
   }
 
   configure(chunkWorldSize) {
@@ -78,6 +98,10 @@ export class ConstructionCollisionSource {
     return this.plans.get(String(constructionId)) ?? null;
   }
 
+  getPlanCount() {
+    return this.plans.size;
+  }
+
   list(chunkX, chunkZ) {
     return this.spatialIndex?.list(chunkX, chunkZ) ?? [];
   }
@@ -99,6 +123,7 @@ export class ConstructionCollisionSource {
       appliedPlans: this.appliedPlans,
       rejectedPlans: this.rejectedPlans,
       spatialRevision: this.spatialIndex?.revision ?? 0,
+      config: this.config,
     });
   }
 }
