@@ -9,7 +9,8 @@ const fixtureQa = qaScenario === 'collision-p1' || qaScenario === 'collision-p2'
 const productionQa = qaScenario === 'collision-p3'
   || qaScenario === 'collision-p4'
   || qaScenario === 'collision-p5'
-  || qaScenario === 'collision-p6';
+  || qaScenario === 'collision-p6'
+  || qaScenario === 'collision-p7';
 const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
@@ -37,6 +38,7 @@ function publish(status) {
   if (qaScenario === 'collision-p4') window.__collisionP4Qa = payload;
   if (qaScenario === 'collision-p5') window.__collisionP5Qa = payload;
   if (qaScenario === 'collision-p6') window.__collisionP6Qa = payload;
+  if (qaScenario === 'collision-p7') window.__collisionP7Qa = payload;
 }
 
 function sampleCandidates() {
@@ -59,6 +61,9 @@ function productionSample(status) {
   }
   if (qaScenario === 'collision-p6') {
     return status.provider?.components?.objects?.sample ?? null;
+  }
+  if (qaScenario === 'collision-p7') {
+    return status.provider?.components?.constructions?.sample ?? null;
   }
   return null;
 }
@@ -89,6 +94,7 @@ function updateQa() {
       else if (qaScenario === 'collision-p3') publish('waiting-trees');
       else if (qaScenario === 'collision-p5') publish('waiting-walkable-rocks');
       else if (qaScenario === 'collision-p6') publish('waiting-objects');
+      else if (qaScenario === 'collision-p7') publish('waiting-constructions');
       else publish('waiting-rocks');
     } else {
       sampleCandidates();
@@ -100,13 +106,18 @@ function updateQa() {
   frameId = requestAnimationFrame(updateQa);
 }
 
-function attach({ player: nextPlayer, collisionConfig, treeSource, objectSource }) {
+function attach({
+  player: nextPlayer,
+  collisionConfig,
+  treeSource,
+  objectSource,
+  constructionSource,
+}) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
-  const requiresNaturalSource = qaScenario !== 'collision-p6' && (
-    productionQa
+  const naturalQa = ['collision-p3', 'collision-p4', 'collision-p5'].includes(qaScenario);
+  const requiresNaturalSource = naturalQa
     || (!fixtureQa && collisionConfig.enabled
-      && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled))
-  );
+      && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled));
   if (requiresNaturalSource && !treeSource) {
     publish('waiting-natural-props');
     return;
@@ -117,6 +128,12 @@ function attach({ player: nextPlayer, collisionConfig, treeSource, objectSource 
     publish('waiting-placed-objects');
     return;
   }
+  const requiresConstructionSource = qaScenario === 'collision-p7'
+    || (!fixtureQa && collisionConfig.enabled && collisionConfig.constructions.enabled);
+  if (requiresConstructionSource && !constructionSource) {
+    publish('waiting-constructions');
+    return;
+  }
 
   player = nextPlayer;
   runtime = createCollisionRuntime({
@@ -124,6 +141,7 @@ function attach({ player: nextPlayer, collisionConfig, treeSource, objectSource 
     editorConfig: { collision: collisionConfig, player: player.config },
     treeSource,
     objectSource,
+    constructionSource,
     search: window.location.search,
   });
   if (!runtime) {
