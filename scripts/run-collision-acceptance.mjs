@@ -22,6 +22,10 @@ import {
   removeDirectoryWithRetry,
   terminateChildProcess,
 } from './lib/processLifecycle.mjs';
+import {
+  normaliseQaBaseUrl,
+  resolveQaOutputDirectory,
+} from './lib/qaRuntimeConfig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,7 +74,7 @@ async function waitForServer(server, baseUrl, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
   while (Date.now() < deadline) {
-    if (server?.exitCode !== null) {
+    if (server.exitCode !== null) {
       throw new Error(`Collision QA Vite server exited with code ${server.exitCode}.`);
     }
     try {
@@ -148,26 +152,33 @@ async function runBattery() {
       ...baseConfig,
       repeats: positiveInteger(repeatOverride, '--repeats'),
     });
-  const outputDirectory = path.resolve(
-    readArgument('output', path.join(root, 'tmp', 'collision-acceptance')),
+  const outputDirectory = resolveQaOutputDirectory(
+    root,
+    readArgument('output'),
+    'collision-acceptance',
   );
-  const externalUrl = readArgument('url');
+  const externalUrl = normaliseQaBaseUrl(readArgument('url'));
   const headed = hasFlag('headed');
   const releaseMode = hasFlag('release');
   const requestedPort = readArgument('port');
-  const serverTimeoutMs = positiveInteger(readArgument('serverTimeoutMs', '120000'), '--serverTimeoutMs');
+  const serverTimeoutMs = positiveInteger(
+    readArgument('serverTimeoutMs', '120000'),
+    '--serverTimeoutMs',
+  );
 
   await removeDirectoryWithRetry(outputDirectory);
   await mkdir(path.join(outputDirectory, 'cases'), { recursive: true });
 
   let server = null;
   let serverOutput = '';
-  let baseUrl = externalUrl?.replace(/\/$/, '') ?? null;
+  let baseUrl = externalUrl;
   const runs = [];
 
   try {
     if (!baseUrl) {
-      const port = await preflightPort(requestedPort === null ? 0 : positiveInteger(requestedPort, '--port'));
+      const port = await preflightPort(
+        requestedPort === null ? 0 : positiveInteger(requestedPort, '--port'),
+      );
       baseUrl = `http://127.0.0.1:${port}`;
       server = startServer(port);
       server.stdout.on('data', (chunk) => { serverOutput += chunk.toString(); });
