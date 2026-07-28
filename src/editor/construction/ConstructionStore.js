@@ -21,7 +21,6 @@ export class ConstructionStore {
     this.listeners = new Set();
     this.nextId = 1;
     this.replaceAll(records);
-    ensureCollisionP7QaFixture(this, browserSearch());
   }
 
   get size() {
@@ -162,6 +161,7 @@ export class ConstructionStore {
     constructionCollisionSource.replaceActive(normalized);
     this.nextId = Math.max(1, ...normalized.map(({ id }) => numericSuffix(id) + 1));
     this.emit({ kind: 'replace', before: null, after: this.list() });
+    ensureCollisionP7QaFixture(this, browserSearch());
   }
 
   toDocument() {
