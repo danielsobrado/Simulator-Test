@@ -2,6 +2,23 @@ import fs from 'node:fs';
 import yaml from 'js-yaml';
 
 const SPEEDS = new Set(['walk', 'run']);
+const COUNT_FIELDS = new Set([
+  'broadphaseQueries',
+  'candidates',
+  'primitiveTests',
+  'bvhQueries',
+  'triangleTests',
+  'contacts',
+  'stepAttempts',
+  'stepSuccesses',
+  'activeChunks',
+  'activePrimitiveColliders',
+  'activeMeshInstances',
+  'prototypeBvhs',
+  'readinessMisses',
+  'failedChunks',
+  'finalQueueDepth',
+]);
 
 function assertObject(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -43,6 +60,17 @@ function optionalNumber(value, name, options = {}) {
   return value == null ? null : assertNumber(value, name, options);
 }
 
+function freezeMinimumCounts(rawCounts, name) {
+  const counts = assertObject(rawCounts ?? {}, name);
+  const entries = Object.entries(counts).map(([field, value]) => {
+    if (!COUNT_FIELDS.has(field)) {
+      throw new Error(`${name}.${field} is not a supported collision count.`);
+    }
+    return [field, assertNumber(value, `${name}.${field}`, { integer: true })];
+  });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
 function freezeCase(rawCase, index) {
   const source = assertObject(rawCase, `cases[${index}]`);
   const speed = assertString(source.speed, `cases[${index}].speed`);
@@ -78,6 +106,10 @@ function freezeCase(rawCase, index) {
       { minimum: 0.5 },
     ),
     speed,
+    minimumCounts: freezeMinimumCounts(
+      source.minimumCounts,
+      `cases[${index}].minimumCounts`,
+    ),
     coverage: stringList(source.coverage ?? [], `cases[${index}].coverage`),
     spawn,
     yawDegrees: optionalNumber(source.yawDegrees, `cases[${index}].yawDegrees`, {
