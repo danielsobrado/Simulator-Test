@@ -1,3 +1,5 @@
+import { validateWaterOpticsConfig } from './WaterOptics.js';
+
 export const WATER_QUALITY_LOW = 'low';
 export const WATER_QUALITY_MEDIUM = 'medium';
 export const WATER_QUALITY_HIGH = 'high';
@@ -11,10 +13,30 @@ export const WATER_QUALITY_TIERS = Object.freeze([
 ]);
 
 const FEATURES_BY_TIER = Object.freeze({
-  [WATER_QUALITY_LOW]: Object.freeze({ flow: false, caustics: false, causticStrength: 0 }),
-  [WATER_QUALITY_MEDIUM]: Object.freeze({ flow: true, caustics: false, causticStrength: 0 }),
-  [WATER_QUALITY_HIGH]: Object.freeze({ flow: true, caustics: true, causticStrength: 1 }),
-  [WATER_QUALITY_ULTRA]: Object.freeze({ flow: true, caustics: true, causticStrength: 1.35 }),
+  [WATER_QUALITY_LOW]: Object.freeze({
+    flow: false,
+    depthOptics: false,
+    caustics: false,
+    causticStrength: 0,
+  }),
+  [WATER_QUALITY_MEDIUM]: Object.freeze({
+    flow: true,
+    depthOptics: true,
+    caustics: false,
+    causticStrength: 0,
+  }),
+  [WATER_QUALITY_HIGH]: Object.freeze({
+    flow: true,
+    depthOptics: true,
+    caustics: true,
+    causticStrength: 1,
+  }),
+  [WATER_QUALITY_ULTRA]: Object.freeze({
+    flow: true,
+    depthOptics: true,
+    caustics: true,
+    causticStrength: 1.35,
+  }),
 });
 
 function assertFiniteRange(value, fieldName, minimum, maximum) {
@@ -39,6 +61,7 @@ export function validateWaterVisualConfig(waterConfig) {
   }
   assertFiniteRange(waterConfig.currentAnimationSpeed, 'stylizedSurface.water.currentAnimationSpeed', 0, 4);
   assertFiniteRange(waterConfig.currentInfluence, 'stylizedSurface.water.currentInfluence', 0, 2);
+  validateWaterOpticsConfig(waterConfig.optics);
 
   const caustics = waterConfig.caustics;
   if (!caustics || typeof caustics !== 'object' || Array.isArray(caustics)) {
