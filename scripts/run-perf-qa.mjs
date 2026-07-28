@@ -57,7 +57,6 @@ const deviceScaleFactor = positiveNumber('deviceScaleFactor', 1);
 const timeoutMs = positiveNumber(
   'timeoutMs',
   (Number(warmup) + Number(duration) + 90) * 1000,
-  { integer: true },
 );
 const outPath = path.resolve(readArg('out', path.join(outDir, 'perf-qa-latest.json')));
 const screenshotArg = readArg('screenshot');
@@ -171,6 +170,7 @@ const fs = require('fs');
     avgFps: report.summary.avgFps,
     hitchCount: report.summary.hitchCount,
     dt: report.summary.dt,
+    counters: report.counters,
     collision: report.collision
       ? {
         enabled: report.collision.enabled,
