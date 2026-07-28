@@ -101,6 +101,56 @@ export function curvedConstruction({
   });
 }
 
+export function closedConstruction({
+  id = 'construction-closed',
+  revision = 1,
+} = {}) {
+  return baseRecord({
+    id,
+    revision,
+    features: [],
+    path: {
+      closed: true,
+      anchors: [
+        { id: 'anchor-nw', position: [-4, -4] },
+        { id: 'anchor-ne', position: [4, -4] },
+        { id: 'anchor-se', position: [4, 4] },
+        { id: 'anchor-sw', position: [-4, 4] },
+      ],
+      segments: [
+        {
+          id: 'segment-north',
+          startAnchorId: 'anchor-nw',
+          endAnchorId: 'anchor-ne',
+          startHandle: [8 / 3, 0],
+          endHandle: [-8 / 3, 0],
+        },
+        {
+          id: 'segment-east',
+          startAnchorId: 'anchor-ne',
+          endAnchorId: 'anchor-se',
+          startHandle: [0, 8 / 3],
+          endHandle: [0, -8 / 3],
+        },
+        {
+          id: 'segment-south',
+          startAnchorId: 'anchor-se',
+          endAnchorId: 'anchor-sw',
+          startHandle: [-8 / 3, 0],
+          endHandle: [8 / 3, 0],
+        },
+        {
+          id: 'segment-west',
+          startAnchorId: 'anchor-sw',
+          endAnchorId: 'anchor-nw',
+          startHandle: [0, -8 / 3],
+          endHandle: [0, 8 / 3],
+        },
+      ],
+    },
+  });
+}
+
 export function doorFeature(overrides = {}) {
   return {
     id: 'door-main',
