@@ -11,6 +11,7 @@ const VIEWPORT = Object.freeze({
   height: 900,
   deviceScaleFactor: 1,
 });
+const WEBGPU_BACKEND = Object.freeze({ webgpu: true, webgl2: false, reason: null });
 const ADAPTER = Object.freeze({
   ok: true,
   vendor: 'test-vendor',
@@ -83,6 +84,7 @@ function perfReport({
   collisionSamples = 120,
   canonicalSignature = collisionEnabled ? 'abc123' : null,
   adapter = ADAPTER,
+  rendererBackend = WEBGPU_BACKEND,
   viewport = VIEWPORT,
   debugEnabled = false,
   hitches = 0,
@@ -103,6 +105,7 @@ function perfReport({
     adapter,
     capture: {
       viewport,
+      rendererBackend,
       screenshot: screenshotPath,
     },
     config: {
@@ -272,13 +275,15 @@ test('non-comparable fixtures do not use the open-ground frame or debug gate', (
 });
 
 test('YAML threshold is authoritative over the in-app provisional gate', () => {
+  const runs = passingRuns({ collision: { collisionP95Ms: 1 } });
+  assert.equal(runs[2].report.collision.gate.passed, false);
+
   const report = buildCollisionAcceptanceReport({
     config: config({ collisionP95Ms: 1.1 }),
-    runs: passingRuns({ collision: { collisionP95Ms: 1 } }),
+    runs,
   });
   const collisionRun = report.cases.find((entry) => entry.id === 'collision').runs[0];
 
-  assert.equal(collisionRun.report?.collision?.gate, undefined);
   assert.equal(
     collisionRun.checks.find((entry) => entry.id === 'collision-p95').passed,
     true,
@@ -313,10 +318,11 @@ test('canonical signatures must be stable across repeats', () => {
   assert.equal(report.gates.execution.passed, false);
 });
 
-test('missing hardware identity, viewport, screenshot, and query work fail the run', () => {
+test('missing renderer, hardware identity, viewport, screenshot, and query work fail the run', () => {
   const runs = passingRuns({
     collision: {
       adapter: { ok: true, vendor: '', architecture: '', description: '', fallback: false },
+      rendererBackend: { webgpu: false, webgl2: true, reason: null },
       viewport: { width: 800, height: 600, deviceScaleFactor: 1 },
       broadphaseQueries: 0,
       candidates: 0,
@@ -329,6 +335,7 @@ test('missing hardware identity, viewport, screenshot, and query work fail the r
   assert.equal(run.passed, false);
   for (const id of [
     'hardware-adapter',
+    'renderer-backend',
     'capture-viewport',
     'capture-screenshot',
     'minimum-count:candidates',
