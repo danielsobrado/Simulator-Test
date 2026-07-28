@@ -1,0 +1,52 @@
+version: 1
+
+defaults:
+  enabled: false
+
+  grid:
+    columns: 3
+    rows: 2
+
+  minimumStone:
+    width: 0.32
+    height: 0.18
+
+  recession:
+    ratioMin: 0.018
+    ratioMax: 0.040
+    minimum: 0.006
+    maximum: 0.022
+
+  edgeFalloffPower: 1.65
+  asymmetry: 0.28
+  saddleStrength: 0.12
+
+  maximumBevelFraction: 0.45
+  maximumMortarRecessFraction: 0.50
+
+  categories:
+    field: 1.0
+    coping: 0.0
+    ashlar: 0.0
+    quoin: 0.0
+    voussoir: 0.0
+    merlon: 0.0
+    recess: 0.0
+
+styles:
+  soft-limestone-rubble:
+    enabled: true
+
+    grid:
+      columns: 3
+      rows: 2
+
+    recession:
+      ratioMin: 0.020
+      ratioMax: 0.042
+      minimum: 0.007
+      maximum: 0.020
+
+    edgeFalloffPower: 1.55
+    asymmetry: 0.25
+    saddleStrength: 0.10
