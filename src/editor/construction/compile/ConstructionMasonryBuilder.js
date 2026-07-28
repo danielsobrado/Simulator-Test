@@ -3,12 +3,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   beveledBox,
   beveledQuadPrism,
+  createBeveledQuadProfile,
   harmonizeVertexColors,
 } from '../../workshop/ProceduralWorkshopGeometry.js';
 import { stoneJitter } from '../../workshop/ProceduralWorkshopIrregularity.js';
 import { applyUnitShading } from '../../workshop/ProceduralWorkshopMaterials.js';
+import { constructionStoneReliefProfile } from '../config/ConstructionStoneReliefProfiles.generated.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
 import { scaleCorners } from '../masonry/CourseLattice.js';
+import { sampleStoneFaceRelief } from '../masonry/StoneFaceReliefField.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from '../render/ConstructionMaterialSlots.js';
 import {
   CONSTRUCTION_MORTAR_CONFIG,
@@ -19,6 +22,7 @@ import {
   expandCorners,
   mortarCoreDepth,
 } from './ConstructionMortarCoreBuilder.js';
+import { reliefQuadPrism } from './ConstructionReliefQuadPrism.js';
 
 /**
  * Turn module-local stone placements into merged geometry.
@@ -109,8 +113,10 @@ export function rectangleCorners(width, height) {
 /**
  * Resolve the final stone shape once, after jitter, so visible stone and mortar
  * backing cannot disagree.
+ *
+ * `relief` is optional near-LOD face sculpting. It never feeds back into packing.
  */
-export function resolveStoneShape({ placement, params, shaped, detail }) {
+export function resolveStoneShape({ placement, params, shaped, detail, relief = null }) {
   const lattice = Boolean(placement.corners);
   const corners = lattice
     ? dampedCorners(placement, shaped)
@@ -133,6 +139,7 @@ export function resolveStoneShape({ placement, params, shaped, detail }) {
     protrusion: shaped.protrusion,
     lattice,
     detail,
+    relief,
   };
 }
 
@@ -211,32 +218,55 @@ export function createMortarDescriptor({
 }
 
 function createStoneGeometry(stoneShape) {
-  if (stoneShape.lattice) {
-    return beveledQuadPrism({
+  if (stoneShape.lattice && stoneShape.relief?.enabled) {
+    return reliefQuadPrism({
       corners: stoneShape.corners,
       depth: stoneShape.depth,
       position: stoneShape.position,
       rotation: stoneShape.rotation,
       bevelRatio: stoneShape.bevelRatio,
       detail: stoneShape.detail,
+      frontRelief: stoneShape.relief.front,
+      backRelief: stoneShape.relief.back,
     });
   }
-  return beveledBox({
-    width: stoneShape.width,
-    height: stoneShape.height,
-    depth: stoneShape.depth,
-    position: stoneShape.position,
-    rotation: stoneShape.rotation,
-    bevelRatio: stoneShape.bevelRatio,
-    skew: stoneShape.skew,
-    detail: stoneShape.detail,
-  });
+
+  const geometry = stoneShape.lattice
+    ? beveledQuadPrism({
+      corners: stoneShape.corners,
+      depth: stoneShape.depth,
+      position: stoneShape.position,
+      rotation: stoneShape.rotation,
+      bevelRatio: stoneShape.bevelRatio,
+      detail: stoneShape.detail,
+    })
+    : beveledBox({
+      width: stoneShape.width,
+      height: stoneShape.height,
+      depth: stoneShape.depth,
+      position: stoneShape.position,
+      rotation: stoneShape.rotation,
+      bevelRatio: stoneShape.bevelRatio,
+      skew: stoneShape.skew,
+      detail: stoneShape.detail,
+    });
+
+  return {
+    geometry,
+    reliefApplied: false,
+    reliefFallback: false,
+  };
 }
 
 function emptyStats() {
   return {
     stones: 0,
     stoneTriangles: 0,
+    reliefStones: 0,
+    reliefFallbacks: 0,
+    reliefClamped: 0,
+    reliefTriangles: 0,
+    reliefBuildMs: 0,
     mortarPrisms: 0,
     mortarTriangles: 0,
     totalTriangles: 0,
@@ -244,6 +274,58 @@ function emptyStats() {
     mortarBuildMs: 0,
     // Legacy alias used by older call sites / counters.
     triangles: 0,
+  };
+}
+
+function resolveStoneRelief({
+  reliefProfile,
+  coarse,
+  placement,
+  shaped,
+  bevelRadius,
+  mortarFaceRecess,
+  seed,
+}) {
+  // Category gating lives in the sampler (`profile.categories`); keep the
+  // builder gate to near-LOD lattice stones with a solved face ring only.
+  const reliefAllowed = (
+    !coarse
+    && reliefProfile.enabled
+    && placement.corners
+    && shaped.width >= reliefProfile.minimumStone.width
+    && shaped.height >= reliefProfile.minimumStone.height
+  );
+  if (!reliefAllowed) return null;
+
+  const front = sampleStoneFaceRelief({
+    profile: reliefProfile,
+    seed,
+    stableIndex: placement.stableIndex,
+    category: placement.category ?? 'field',
+    side: 'front',
+    width: shaped.width,
+    height: shaped.height,
+    bevelRadius,
+    mortarFaceRecess,
+  });
+  const back = sampleStoneFaceRelief({
+    profile: reliefProfile,
+    seed,
+    stableIndex: placement.stableIndex,
+    category: placement.category ?? 'field',
+    side: 'back',
+    width: shaped.width,
+    height: shaped.height,
+    bevelRadius,
+    mortarFaceRecess,
+  });
+  if (!front.enabled || !back.enabled) return null;
+  return {
+    enabled: true,
+    front,
+    back,
+    clamped: Boolean(front.clampedByBevel || front.clampedByMortar
+      || back.clampedByBevel || back.clampedByMortar),
   };
 }
 
@@ -262,11 +344,18 @@ export function buildModuleMasonry(placements, {
   groundHeightAt,
   lodBand = 'near',
   mortarConfig = CONSTRUCTION_MORTAR_CONFIG,
+  disableRelief = false,
 }) {
   const stats = emptyStats();
   if (!placements || placements.length === 0) return { meshes: [], stats };
 
   const style = constructionStyle(record.style.key);
+  const reliefProfile = disableRelief
+    ? Object.freeze({
+      ...constructionStoneReliefProfile(record.style.key),
+      enabled: false,
+    })
+    : constructionStoneReliefProfile(record.style.key);
   const coarse = lodBand === 'coarse';
   // Coarse: detail 1, halved jitter. Dressings stay in the placement list; the
   // caller thins field courses before we get here.
@@ -280,6 +369,8 @@ export function buildModuleMasonry(placements, {
   const stoneGeometries = [];
   const mortarDescriptors = [];
   const stoneStarted = performance.now();
+  let reliefBuildMs = 0;
+  let reliefFallbackCount = 0;
 
   for (const placement of placements) {
     const frame = arcTable.frameAt(placement.s);
@@ -302,9 +393,47 @@ export function buildModuleMasonry(placements, {
       rotation: [0, frame.yaw, placement.roll],
     };
     const shaped = stoneJitter(recipe, params, placement.stableIndex, placement.category);
-    const stoneShape = resolveStoneShape({ placement, params, shaped, detail });
+    // Resolve once without relief to obtain the damped lattice ring, then attach
+    // the sampled relief descriptor. Bevel radius must come from the final ring.
+    const provisional = resolveStoneShape({ placement, params, shaped, detail });
+    const bevelRadius = provisional.lattice
+      ? createBeveledQuadProfile({
+        corners: provisional.corners,
+        depth: provisional.depth,
+        bevelRatio: provisional.bevelRatio,
+      }).radius
+      : 0;
+    const relief = resolveStoneRelief({
+      reliefProfile,
+      coarse,
+      placement,
+      shaped,
+      bevelRadius,
+      mortarFaceRecess: mortarConfig.faceRecess,
+      seed: record.seed,
+    });
+    const stoneShape = relief
+      ? { ...provisional, relief }
+      : provisional;
+    const reliefStarted = relief?.enabled ? performance.now() : 0;
+    const builtStone = createStoneGeometry(stoneShape);
+    if (relief?.enabled) {
+      reliefBuildMs += performance.now() - reliefStarted;
+      if (builtStone.reliefApplied) {
+        stats.reliefStones += 1;
+        stats.reliefTriangles += (
+          builtStone.geometry.index?.count
+          ?? builtStone.geometry.attributes.position.count
+        ) / 3;
+        if (relief.clamped) stats.reliefClamped += 1;
+      }
+      if (builtStone.reliefFallback) {
+        stats.reliefFallbacks += 1;
+        reliefFallbackCount += 1;
+      }
+    }
     stoneGeometries.push(applyUnitShading(
-      createStoneGeometry(stoneShape),
+      builtStone.geometry,
       recipe,
       {
         stableIndex: placement.stableIndex,
@@ -321,6 +450,14 @@ export function buildModuleMasonry(placements, {
     if (mortarDescriptor) mortarDescriptors.push(mortarDescriptor);
   }
   stats.stoneBuildMs = performance.now() - stoneStarted;
+  stats.reliefBuildMs = reliefBuildMs;
+
+  if (reliefFallbackCount > 0) {
+    // One aggregated line per module — never one warning per stone.
+    console.warn(
+      `Module ${record.id} used flat-face fallback for ${reliefFallbackCount} of ${placements.length} stones.`,
+    );
+  }
 
   // The stone material declares `vertexColors`, and a material that reads
   // vertex colours from a geometry that has none renders black. `required`

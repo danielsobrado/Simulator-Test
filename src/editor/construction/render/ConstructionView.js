@@ -96,6 +96,11 @@ export class ConstructionView {
       mortarPrisms: 0,
       stoneTriangles: 0,
       mortarTriangles: 0,
+      reliefStones: 0,
+      reliefFallbacks: 0,
+      reliefClamped: 0,
+      reliefTriangles: 0,
+      reliefBuildMs: 0,
       buildMs: 0,
       stoneBuildMs: 0,
       mortarBuildMs: 0,
@@ -546,6 +551,11 @@ export class ConstructionView {
     let mortarPrisms = 0;
     let stoneTriangles = 0;
     let mortarTriangles = 0;
+    let reliefStones = 0;
+    let reliefFallbacks = 0;
+    let reliefClamped = 0;
+    let reliefTriangles = 0;
+    let reliefBuildMs = 0;
     let stoneBuildMs = 0;
     let mortarBuildMs = 0;
     for (const entry of this.entries.values()) {
@@ -554,6 +564,11 @@ export class ConstructionView {
         mortarPrisms += other.stats?.mortarPrisms ?? 0;
         stoneTriangles += other.stats?.stoneTriangles ?? 0;
         mortarTriangles += other.stats?.mortarTriangles ?? 0;
+        reliefStones += other.stats?.reliefStones ?? 0;
+        reliefFallbacks += other.stats?.reliefFallbacks ?? 0;
+        reliefClamped += other.stats?.reliefClamped ?? 0;
+        reliefTriangles += other.stats?.reliefTriangles ?? 0;
+        reliefBuildMs += other.stats?.reliefBuildMs ?? 0;
         stoneBuildMs += other.stats?.stoneBuildMs ?? 0;
         mortarBuildMs += other.stats?.mortarBuildMs ?? 0;
       }
@@ -562,6 +577,11 @@ export class ConstructionView {
     this.stats.mortarPrisms = mortarPrisms;
     this.stats.stoneTriangles = stoneTriangles;
     this.stats.mortarTriangles = mortarTriangles;
+    this.stats.reliefStones = reliefStones;
+    this.stats.reliefFallbacks = reliefFallbacks;
+    this.stats.reliefClamped = reliefClamped;
+    this.stats.reliefTriangles = reliefTriangles;
+    this.stats.reliefBuildMs = reliefBuildMs;
     this.stats.stoneBuildMs = stoneBuildMs;
     this.stats.mortarBuildMs = mortarBuildMs;
   }
