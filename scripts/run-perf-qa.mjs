@@ -28,6 +28,14 @@ function hasFlag(name) {
   return process.argv.includes(`--${name}`);
 }
 
+function positiveNumber(name, fallback, { integer = false } = {}) {
+  const value = Number(readArg(name, String(fallback)));
+  if (!Number.isFinite(value) || value <= 0 || (integer && !Number.isSafeInteger(value))) {
+    throw new Error(`--${name} must be a positive ${integer ? 'safe integer' : 'number'}.`);
+  }
+  return value;
+}
+
 function setOptionalQuery(query, key, value) {
   if (value !== null) query.set(key, value);
 }
@@ -43,10 +51,20 @@ const spawnX = readArg('x');
 const spawnZ = readArg('z');
 const yaw = readArg('yaw');
 const pitch = readArg('pitch');
-const timeoutMs = Number(
-  readArg('timeoutMs', String((Number(warmup) + Number(duration) + 90) * 1000)),
+const viewportWidth = positiveNumber('viewportWidth', 1280, { integer: true });
+const viewportHeight = positiveNumber('viewportHeight', 720, { integer: true });
+const deviceScaleFactor = positiveNumber('deviceScaleFactor', 1);
+const timeoutMs = positiveNumber(
+  'timeoutMs',
+  (Number(warmup) + Number(duration) + 90) * 1000,
+  { integer: true },
 );
 const outPath = path.resolve(readArg('out', path.join(outDir, 'perf-qa-latest.json')));
+const screenshotArg = readArg('screenshot');
+const screenshotPath = screenshotArg === null ? null : path.resolve(screenshotArg);
+const screenshotReportPath = screenshotPath === null
+  ? null
+  : path.relative(root, screenshotPath).replaceAll('\\', '/');
 const runnerPath = path.join(outDir, 'perf-qa-playwright-runner.cjs');
 
 const query = new URLSearchParams({
@@ -67,6 +85,7 @@ const targetUrl = `${baseUrl.replace(/\/$/, '')}/?${query.toString()}`;
 
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
+if (screenshotPath !== null) fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
 
 fs.writeFileSync(
   runnerPath,
@@ -91,7 +110,10 @@ const fs = require('fs');
       '--disable-frame-rate-limit',
     ],
   });
-  const page = await browser.newPage();
+  const page = await browser.newPage({
+    viewport: { width: ${viewportWidth}, height: ${viewportHeight} },
+    deviceScaleFactor: ${deviceScaleFactor},
+  });
   page.setDefaultTimeout(${timeoutMs});
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
 
@@ -130,10 +152,21 @@ const fs = require('fs');
   });
   const report = await page.evaluate(() => window.__perfQa.getReport());
   report.adapter = adapter;
+  report.capture = {
+    viewport: {
+      width: ${viewportWidth},
+      height: ${viewportHeight},
+      deviceScaleFactor: ${deviceScaleFactor},
+    },
+    screenshot: ${JSON.stringify(screenshotReportPath)},
+  };
+  ${screenshotPath === null ? '' : `await page.screenshot({ path: ${JSON.stringify(screenshotPath.replace(/\\/g, '/'))} });`}
   fs.writeFileSync(${JSON.stringify(outPath.replace(/\\/g, '/'))}, JSON.stringify(report, null, 2) + '\\n');
   console.log(JSON.stringify({
     outPath: ${JSON.stringify(outPath.replace(/\\/g, '/'))},
+    screenshotPath: ${JSON.stringify(screenshotPath?.replace(/\\/g, '/') ?? null)},
     adapter,
+    capture: report.capture,
     scenario: report.scenario?.id,
     avgFps: report.summary.avgFps,
     hitchCount: report.summary.hitchCount,
