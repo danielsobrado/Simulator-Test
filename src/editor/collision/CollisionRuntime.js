@@ -8,6 +8,7 @@ import {
   findMeshTopSupport,
 } from './mesh/MeshCapsuleQuery.js';
 import { createCollisionP1QaProvider } from './providers/CollisionP1QaProvider.js';
+import { ConstructionCollisionProvider } from './providers/ConstructionCollisionProvider.js';
 import { NaturalCollisionProvider } from './providers/NaturalCollisionProvider.js';
 import { ObjectCollisionProvider } from './providers/ObjectCollisionProvider.js';
 import { RockCollisionProvider } from './providers/RockCollisionProvider.js';
@@ -23,6 +24,7 @@ const COLLISION_QA_SCENARIOS = new Set([
   'collision-p4',
   'collision-p5',
   'collision-p6',
+  'collision-p7',
 ]);
 
 function hasDebugEnabled(debug) {
@@ -36,7 +38,9 @@ function qaScenario(search) {
 }
 
 function residencyConfig(streaming, activeQaScenario) {
-  if (!['collision-p4', 'collision-p5', 'collision-p6'].includes(activeQaScenario)) return streaming;
+  if (!['collision-p4', 'collision-p5', 'collision-p6', 'collision-p7'].includes(activeQaScenario)) {
+    return streaming;
+  }
   return Object.freeze({
     ...streaming,
     residentRadius: Math.max(streaming.residentRadius, 2),
@@ -52,7 +56,13 @@ function createEmptyProvider() {
   });
 }
 
-function createNaturalComponents({ treeSource, objectSource, collisionConfig, terrainView }) {
+function createNaturalComponents({
+  treeSource,
+  objectSource,
+  constructionSource,
+  collisionConfig,
+  terrainView,
+}) {
   const components = [];
   if (collisionConfig.trees.enabled && treeSource?.treeView) {
     const provider = new TreeCollisionProvider({
@@ -83,6 +93,18 @@ function createNaturalComponents({ treeSource, objectSource, collisionConfig, te
     });
     components.push(Object.freeze({ id: 'objects', counterName: 'Object', provider }));
   }
+  if (collisionConfig.constructions.enabled && constructionSource) {
+    const provider = new ConstructionCollisionProvider({
+      source: constructionSource,
+      terrainView,
+      chunkWorldSize: terrainView.chunkWorldSize,
+    });
+    components.push(Object.freeze({
+      id: 'constructions',
+      counterName: 'Construction',
+      provider,
+    }));
+  }
   return components;
 }
 
@@ -93,6 +115,7 @@ function createProvider({
   collisionConfig,
   treeSource,
   objectSource,
+  constructionSource,
 }) {
   if (FIXTURE_QA_SCENARIOS.has(activeQaScenario)) {
     return createCollisionP1QaProvider({
@@ -104,6 +127,7 @@ function createProvider({
   const components = createNaturalComponents({
     treeSource,
     objectSource,
+    constructionSource,
     collisionConfig,
     terrainView,
   });
@@ -140,6 +164,7 @@ export function createCollisionRuntime({
   editorConfig,
   treeSource = null,
   objectSource = null,
+  constructionSource = null,
   search = '',
 }) {
   const collisionConfig = editorConfig.collision;
@@ -156,6 +181,7 @@ export function createCollisionRuntime({
     collisionConfig,
     treeSource,
     objectSource,
+    constructionSource,
   });
 
   const world = new CollisionWorld({
