@@ -31,8 +31,8 @@ cases:
     scenario: move
     collisionRequired: false
     compareFrameToBaseline: false
-    warmupSeconds: 5
-    durationSeconds: 12
+    warmupSeconds: 12
+    durationSeconds: 60
     speed: run
     minimumCounts: {}
     coverage:
