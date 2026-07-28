@@ -15,7 +15,7 @@ const PATH_TYPES = new Set(['polyline', 'cubicBezier']);
 // omits one it accepts, is a bug that only shows up when someone clicks it.
 export const FEATURE_KINDS = new Set(['door', 'window', 'arch', 'gate', 'tower', 'breach']);
 export const OPENING_PROFILES = new Set(['round', 'segmental', 'pointed', 'flat']);
-export const TOP_STYLES = new Set(['flat', 'irregular', 'crenellated', 'ruined']);
+const TOP_STYLES = new Set(['flat', 'irregular', 'crenellated', 'ruined']);
 const MATERIAL_FAMILIES = Object.freeze(['stone', 'mortar', 'roof']);
 
 function requireObject(value, label) {

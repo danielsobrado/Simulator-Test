@@ -81,11 +81,6 @@
   color: #f6e8b8;
 }
 
-/* Optional per-tile tint, for grids whose items carry a material colour. */
-.icon-grid__tile[style*="--tile-color"] {
-  background: color-mix(in srgb, var(--tile-color) 26%, transparent);
-}
-
 /* --- Gizmo cluster ------------------------------------------------------- */
 
 /*
@@ -149,19 +144,3 @@
 .icon-gizmo__button--top-right { --gizmo-x: 31px; --gizmo-y: -31px; }
 .icon-gizmo__button--bottom-left { --gizmo-x: -31px; --gizmo-y: 31px; }
 .icon-gizmo__button--bottom-right { --gizmo-x: 31px; --gizmo-y: 31px; }
-
-/* --- Workshop gizmo toolbar --------------------------------------------- */
-
-/*
- * The workshop's toolbar keeps its existing strip layout and its
- * `data-workshop-action` contract; only its buttons become icons. Sized to match
- * the cluster so the two toolbars read as one system.
- */
-.workshop-gizmo-tools button {
-  display: grid;
-  width: 30px;
-  min-height: 30px;
-  height: 30px;
-  padding: 0;
-  place-items: center;
-}
