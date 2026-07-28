@@ -5,7 +5,13 @@ import {
 } from '../../src/editor/construction/ConstructionSchema.js';
 import { DEFAULT_CONSTRUCTION_STYLE_KEY } from '../../src/editor/construction/masonry/ConstructionStyleCatalog.js';
 
-function baseRecord({ id, revision, path, features }) {
+const DEFAULT_TOP = Object.freeze({
+  style: 'flat',
+  base: 3.5,
+  profile: Object.freeze([]),
+});
+
+function baseRecord({ id, revision, path, features, top = DEFAULT_TOP }) {
   return normalizeConstructionRecord({
     version: CONSTRUCTION_RECORD_VERSION,
     id,
@@ -22,11 +28,7 @@ function baseRecord({ id, revision, path, features }) {
       height: 3.5,
       thickness: 0.8,
     },
-    top: {
-      style: 'flat',
-      base: 3.5,
-      profile: [],
-    },
+    top,
     path: {
       version: CUBIC_BEZIER_PATH_VERSION,
       type: 'cubicBezier',
@@ -44,6 +46,7 @@ export function straightConstruction({
   start = [-8, 0],
   end = [8, 0],
   features = [],
+  top = DEFAULT_TOP,
 } = {}) {
   const dx = end[0] - start[0];
   const dz = end[1] - start[1];
@@ -51,6 +54,7 @@ export function straightConstruction({
     id,
     revision,
     features,
+    top,
     path: {
       anchors: [
         { id: 'anchor-start', position: start },
