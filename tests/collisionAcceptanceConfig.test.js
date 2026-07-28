@@ -37,6 +37,7 @@ function validConfig() {
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
+        minimumCounts: {},
         coverage: ['open-ground-run'],
       },
     ],
@@ -54,6 +55,7 @@ test('repository collision acceptance config is valid and keeps baseline collisi
   assert.equal(config.baselineCase, 'open-ground-baseline');
   assert.equal(baseline.collisionRequired, false);
   assert.equal(baseline.compareFrameToBaseline, false);
+  assert.deepEqual(baseline.minimumCounts, {});
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
 });
 
@@ -63,6 +65,16 @@ test('config validation rejects duplicate case IDs', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /case IDs must be unique/,
+  );
+});
+
+test('config validation rejects path-like case IDs', () => {
+  const config = validConfig();
+  config.cases[0].id = '../escape';
+  config.baselineCase = '../escape';
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(config),
+    /lowercase letters, digits, and hyphens/,
   );
 });
 
@@ -90,5 +102,14 @@ test('config validation rejects unsupported movement speeds', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /must be walk or run/,
+  );
+});
+
+test('config validation rejects unknown minimum-count fields', () => {
+  const config = validConfig();
+  config.cases[0].minimumCounts = { mysteryQueries: 1 };
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(config),
+    /not a supported collision count/,
   );
 });
