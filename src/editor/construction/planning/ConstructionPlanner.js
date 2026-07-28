@@ -15,12 +15,6 @@ import { createRuinEnvelope } from '../masonry/RuinEnvelope.js';
 const DEFAULT_MAX_MODULE_LENGTH = 12;
 const HASH_QUANTUM = 1e4;
 
-/**
- * FNV-1a over the canonical inputs of one module, so the view can skip
- * rebuilding a module that a dirty-segment edit did not actually change.
- * Floats are quantised to 0.1 mm first — otherwise re-sampling noise below the
- * visible threshold would defeat the whole point of the hash.
- */
 function createHasher() {
   let hash = 0x811c9dc5;
   const write = (text) => {
@@ -32,11 +26,11 @@ function createHasher() {
   return {
     text(value) {
       write(String(value));
-      write('');
+      write('\u0001');
     },
     number(value) {
       write(String(Math.round(value * HASH_QUANTUM)));
-      write('');
+      write('\u0001');
     },
     digest() {
       return (hash >>> 0).toString(16).padStart(8, '0');
@@ -53,6 +47,11 @@ function ruinSurvivorSignature(placements) {
     hasher.number(placement.stableIndex ?? 0);
     hasher.number(placement.support?.courseIndex ?? -1);
     hasher.text(placement.support?.role ?? '-');
+    hasher.text(placement.ruin?.damageVoid ? 'void' : '-');
+    hasher.text(placement.ruin?.clusterId ?? '-');
+    hasher.text(placement.ruin?.exposedTop ? 'top' : '-');
+    hasher.text(placement.ruin?.debugState ?? '-');
+    hasher.number(placement.ruin?.supportRatio ?? 0);
   }
   return hasher.digest();
 }
@@ -119,10 +118,6 @@ export function planConstruction(input, {
   if (!(maxModuleLength >= 1)) throw new Error('Maximum construction module length is invalid.');
   const sampled = sampleCubicBezierPath(record.path);
 
-  // Contiguous arc range per segment, so per-segment anchored top points and
-  // features resolve to the same absolute arc coordinate the modules use.
-  // Ranges are chained rather than taken from sample membership because the
-  // sampler drops each segment's duplicated first point (see `CurveArcTable`).
   const segmentEnds = new Map();
   const segmentOrder = [];
   for (const entry of sampled.points) {
@@ -158,26 +153,18 @@ export function planConstruction(input, {
     hasher.text(moduleId);
     hasher.text(record.style.key);
     hasher.number(record.style.version);
-    // Material assignments change renderer state only. Including them here made
-    // a paint operation invalidate every module on the next geometric edit,
-    // despite `set_material` correctly taking the material-only fast path.
     hasher.number(record.seed);
     hasher.number(record.dimensions.height);
     hasher.number(record.dimensions.thickness);
     hasher.text(record.top.style);
     hasher.number(record.top.base);
-    // The course grid deliberately does not appear here. It is a function of
-    // `record.style.key` alone (see below), which is already hashed, so no top
-    // edit can leave one module on a stale grid while its neighbour moves to a
-    // new one.
     for (const point of modulePoints) {
       hasher.number(point.x);
       hasher.number(point.z);
       hasher.number(point.tangentX);
       hasher.number(point.tangentZ);
     }
-    // The interpolated top height inside a module also depends on the nearest
-    // control point on each side, so bracket the slice rather than clipping it.
+
     let first = topPoints.findIndex((entry) => entry.distance >= from);
     if (first < 0) first = topPoints.length;
     let last = -1;
@@ -209,22 +196,9 @@ export function planConstruction(input, {
     return hasher.digest();
   }
 
-  // The masonry solve needs the same arc-length view of the path the renderer
-  // will use, so both come from one table rather than two approximations.
   const style = constructionStyle(record.style.key);
   const arcTable = masonry ? createCurveArcTable(sampled) : null;
   const topProfile = masonry ? createWallTopProfile(record, arcTable, { style }) : null;
-  // One course grid for the whole wall. Derived per module it would drift
-  // wherever the top height differs, and courses would step at the boundary.
-  //
-  // It is the style's course height flat, *not* the wall body divided into a
-  // whole number of courses. Normalising it that way made the grid a function of
-  // the wall's tallest point, which meant every module had to be rebuilt
-  // whenever a top edit moved that point — and if they were not, the ones that
-  // were rebuilt stepped against the ones that were not. The packer now trims
-  // its top course against the wall profile instead (`resolveCellCorners`'s
-  // ceiling clamp), so a wall that is not a whole number of courses tall simply
-  // finishes on a short course, the way a real one does.
   const wallCourseHeight = masonry ? style.courseHeight : null;
   let wallTopHeight = null;
   if (masonry) {
@@ -233,9 +207,6 @@ export function planConstruction(input, {
     for (let index = 0; index <= samples; index += 1) {
       wallTop = Math.max(wallTop, topProfile.heightAt((sampled.totalDistance * index) / samples));
     }
-    // Only the weathering normaliser. It is not hashed: a stale one shifts a
-    // shading gradient by a fraction of a percent and self-corrects on the next
-    // rebuild, which is not worth dirtying the whole wall for.
     wallTopHeight = wallTop;
   }
   let stoneTotal = 0;
@@ -245,12 +216,6 @@ export function planConstruction(input, {
   for (const segment of record.path.segments) {
     const segmentPoints = sampled.points.filter(({ segmentId }) => segmentId === segment.id);
     if (segmentPoints.length < 2) continue;
-    // Take the segment's span from the **contiguous** ranges, not from its own
-    // sampled points. The sampler drops each segment's duplicated first point,
-    // so `segmentPoints[0].distance` sits strictly *after* the previous
-    // segment's last point — and modules built from it leave an unwalled sliver
-    // at every segment joint. That is the visible gap in a finished wall, and
-    // no amount of care inside the packer can close it.
     const range = segmentRanges.get(segment.id);
     const startDistance = range.start;
     const endDistance = range.end;
@@ -264,9 +229,6 @@ export function planConstruction(input, {
       const endpoints = [pointAtDistance(sampled.points, from), pointAtDistance(sampled.points, to)];
       const modulePoints = [...endpoints.slice(0, 1), ...relevant, ...endpoints.slice(1)];
       const moduleId = `${segment.id}-span-${index + 1}`;
-      // Each module forks the random stream from its own index, so two modules
-      // never lay down the same course divisions and stack a full-height joint
-      // at their shared boundary.
       const seedOffset = modules.length;
       let packed = null;
       if (masonry) {
@@ -287,9 +249,6 @@ export function planConstruction(input, {
           crenellationsOver: topProfile.crenellationsOver,
           topStyle: record.top.style,
           deferRuinRemoval: record.top.style === 'ruined',
-          // Openings whose void or dressings reach into this module. A wide
-          // gate near a boundary has to be visible to both modules or the
-          // course splits on one side and not the other.
           openings: featureArcs
             .filter(({ feature, distance }) => {
               const reach = feature.width / 2 + 0.6;
@@ -302,8 +261,6 @@ export function planConstruction(input, {
           )),
         });
         stoneTotal += packed.stats.stones;
-        // Over budget leaves the remaining modules unstoned; their shell stays
-        // visible rather than the whole wall failing.
         overBudget = overBudget || packed.stats.overBudget;
       }
       modules.push(Object.freeze({
@@ -334,10 +291,8 @@ export function planConstruction(input, {
   let ruinDiagnostics = null;
   let finalModules = modules;
   if (masonry && record.top.style === 'ruined') {
-    const resolved = resolveRuinSupport({
-      modules,
-      profile: constructionRuinProfile(record.style.key),
-    });
+    const ruinProfile = constructionRuinProfile(record.style.key);
+    const resolved = resolveRuinSupport({ modules, profile: ruinProfile });
     ruinStats = resolved.stats;
     ruinDiagnostics = resolved.diagnostics;
     finalModules = resolved.modules.map((module) => {
@@ -355,9 +310,11 @@ export function planConstruction(input, {
     const survivors = finalModules.flatMap((module) => module.placements ?? []);
     ruinEnvelope = createRuinEnvelope({
       survivors,
+      removed: resolved.removed,
       totalLength: sampled.totalDistance,
-      sampleSpacing: constructionRuinProfile(record.style.key).lod.shellSampleSpacing,
+      sampleSpacing: ruinProfile.lod.shellSampleSpacing,
       fallbackHeightAt: topProfile.heightAt,
+      minimumHeight: ruinProfile.macro.minimumHeight,
     });
     stoneTotal = survivors.length;
   }
