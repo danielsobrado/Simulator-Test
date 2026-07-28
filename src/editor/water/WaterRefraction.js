@@ -43,7 +43,12 @@ export function validateWaterRefractionConfig(config) {
   assertFiniteRange(config.fineSpeed, 'stylizedSurface.water.refraction.fineSpeed', 0, 4);
   assertFiniteRange(config.depthFadeStart, 'stylizedSurface.water.refraction.depthFadeStart', 0, 100);
   assertFiniteRange(config.depthFadeEnd, 'stylizedSurface.water.refraction.depthFadeEnd', 0, 100);
-  assertFiniteRange(config.depthBias, 'stylizedSurface.water.refraction.depthBias', 0, 0.1);
+  assertFiniteRange(
+    config.depthBiasMeters,
+    'stylizedSurface.water.refraction.depthBiasMeters',
+    0,
+    10,
+  );
   assertFiniteRange(config.mipLevel, 'stylizedSurface.water.refraction.mipLevel', 0, 8);
   assertFiniteRange(
     config.sceneColorStrength,
@@ -79,13 +84,13 @@ export function computeRefractionOffset({
 }
 
 export function isRefractionDepthValid({
-  waterLinearDepth,
-  sampleLinearDepth,
-  depthBias,
+  waterViewDistance,
+  sampleViewDistance,
+  depthBiasMeters,
 }) {
-  if (!Number.isFinite(waterLinearDepth) || !Number.isFinite(sampleLinearDepth)) return false;
-  const bias = Math.max(0, Number.isFinite(depthBias) ? depthBias : 0);
-  return sampleLinearDepth >= waterLinearDepth + bias;
+  if (!Number.isFinite(waterViewDistance) || !Number.isFinite(sampleViewDistance)) return false;
+  const bias = Math.max(0, Number.isFinite(depthBiasMeters) ? depthBiasMeters : 0);
+  return sampleViewDistance >= waterViewDistance + bias;
 }
 
 export function filterRefractedSceneColor({
