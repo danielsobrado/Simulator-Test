@@ -64,8 +64,18 @@ function runChecks(config, caseConfig, run) {
 
   if (caseConfig.collisionRequired) {
     checks.push(
-      check('collision-gate', collision?.gate?.passed === true, collision?.gate?.passed ?? null, true),
-      check('readiness', collision?.readiness?.ready === true, collision?.readiness?.ready ?? null, true),
+      check(
+        'collision-gate',
+        collision?.gate?.passed === true,
+        collision?.gate?.passed ?? null,
+        true,
+      ),
+      check(
+        'readiness',
+        collision?.readiness?.ready === true,
+        collision?.readiness?.ready ?? null,
+        true,
+      ),
       check(
         'failure-free',
         collision?.readiness?.failure == null,
@@ -104,7 +114,8 @@ function runChecks(config, caseConfig, run) {
     if (config.gates.requireCanonicalSignature) {
       checks.push(check(
         'canonical-signature',
-        typeof collision?.canonicalSignature === 'string' && collision.canonicalSignature.length > 0,
+        typeof collision?.canonicalSignature === 'string'
+          && collision.canonicalSignature.length > 0,
         collision?.canonicalSignature ?? null,
         'non-empty',
       ));
@@ -159,6 +170,27 @@ function aggregateAdapters(caseSummaries) {
   });
 }
 
+function caseChecks(config, caseConfig, caseRuns, regressionMs) {
+  const checks = [
+    check('repeat-count', caseRuns.length === config.repeats, caseRuns.length, config.repeats),
+    check(
+      'all-runs',
+      caseRuns.length > 0 && caseRuns.every((run) => run.passed),
+      caseRuns.filter((run) => run.passed).length,
+      caseRuns.length,
+    ),
+  ];
+  if (caseConfig.compareFrameToBaseline) {
+    checks.push(check(
+      'frame-p95-regression',
+      regressionMs !== null && regressionMs <= config.gates.frameP95RegressionMs,
+      round(regressionMs),
+      config.gates.frameP95RegressionMs,
+    ));
+  }
+  return Object.freeze(checks);
+}
+
 export function buildCollisionAcceptanceReport({
   config,
   runs,
@@ -181,27 +213,18 @@ export function buildCollisionAcceptanceReport({
       .sort((left, right) => left.repeat - right.repeat)
       .map((run) => summariseRun(config, caseConfig, run));
     const frameP95Ms = median(caseRuns.map((run) => run.frameP95Ms));
-    const regressionMs = frameP95Ms === null || baselineFrameP95Ms === null
-      ? null
-      : frameP95Ms - baselineFrameP95Ms;
-    const regressionPassed = caseConfig.id === config.baselineCase
-      || (regressionMs !== null && regressionMs <= config.gates.frameP95RegressionMs);
-    const checks = Object.freeze([
-      check('repeat-count', caseRuns.length === config.repeats, caseRuns.length, config.repeats),
-      check('all-runs', caseRuns.length > 0 && caseRuns.every((run) => run.passed),
-        caseRuns.filter((run) => run.passed).length, caseRuns.length),
-      check(
-        'frame-p95-regression',
-        regressionPassed,
-        round(regressionMs),
-        config.gates.frameP95RegressionMs,
-      ),
-    ]);
+    const regressionMs = caseConfig.compareFrameToBaseline
+      && frameP95Ms !== null
+      && baselineFrameP95Ms !== null
+      ? frameP95Ms - baselineFrameP95Ms
+      : null;
+    const checks = caseChecks(config, caseConfig, caseRuns, regressionMs);
     return Object.freeze({
       id: caseConfig.id,
       label: caseConfig.label,
       scenario: caseConfig.scenario,
       collisionRequired: caseConfig.collisionRequired,
+      compareFrameToBaseline: caseConfig.compareFrameToBaseline,
       coverage: caseConfig.coverage,
       passed: checks.every((entry) => entry.passed),
       checks,
