@@ -96,6 +96,23 @@ test('config validation rejects a baseline compared to itself', () => {
   );
 });
 
+test('comparable cases must match the baseline movement route', () => {
+  const config = validConfig();
+  config.cases.push({
+    ...config.cases[0],
+    id: 'collision-route',
+    label: 'Collision route',
+    scenario: 'collision-p8',
+    collisionRequired: true,
+    compareFrameToBaseline: true,
+    durationSeconds: 3,
+  });
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(config),
+    /must match the baseline movement route and duration/,
+  );
+});
+
 test('config validation rejects unsupported movement speeds', () => {
   const config = validConfig();
   config.cases[0].speed = 'sprint';
