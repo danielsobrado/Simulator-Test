@@ -34,6 +34,11 @@ function count(report, name) {
   return Number.isFinite(value) ? value : null;
 }
 
+function providerMetric(report, component, metric) {
+  const value = report?.collision?.readiness?.provider?.components?.[component]?.[metric];
+  return Number.isFinite(value) ? value : null;
+}
+
 function hardwareAdapterCheck(report) {
   const adapter = report?.adapter ?? null;
   return check(
@@ -91,6 +96,22 @@ function minimumCountChecks(caseConfig, report) {
       minimum,
     );
   });
+}
+
+function minimumProviderComponentChecks(caseConfig, report) {
+  const checks = [];
+  for (const [component, metrics] of Object.entries(caseConfig.minimumProviderComponents)) {
+    for (const [metric, minimum] of Object.entries(metrics)) {
+      const actual = providerMetric(report, component, metric);
+      checks.push(check(
+        `minimum-provider:${component}.${metric}`,
+        actual !== null && actual >= minimum,
+        actual,
+        minimum,
+      ));
+    }
+  }
+  return checks;
 }
 
 function runChecks(config, caseConfig, run) {
@@ -189,6 +210,7 @@ function runChecks(config, caseConfig, run) {
   }
 
   checks.push(...minimumCountChecks(caseConfig, report));
+  checks.push(...minimumProviderComponentChecks(caseConfig, report));
   if (run.error) checks.push(check('runner-error', false, run.error, null));
   return Object.freeze(checks);
 }
@@ -312,6 +334,7 @@ export function buildCollisionAcceptanceReport({
       collisionRequired: caseConfig.collisionRequired,
       compareFrameToBaseline: caseConfig.compareFrameToBaseline,
       minimumCounts: caseConfig.minimumCounts,
+      minimumProviderComponents: caseConfig.minimumProviderComponents,
       coverage: caseConfig.coverage,
       passed: checks.every((entry) => entry.passed),
       checks,
