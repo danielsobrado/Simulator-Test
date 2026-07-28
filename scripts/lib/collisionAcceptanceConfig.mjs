@@ -20,6 +20,17 @@ const COUNT_FIELDS = new Set([
   'failedChunks',
   'finalQueueDepth',
 ]);
+const PROVIDER_COMPONENTS = new Set(['trees', 'rocks', 'objects', 'constructions']);
+const PROVIDER_METRICS = new Set([
+  'chunks',
+  'colliders',
+  'profileCount',
+  'decorative',
+  'blocking',
+  'walkable',
+  'walkablePending',
+  'generatedProxies',
+]);
 
 function assertObject(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -93,6 +104,28 @@ function freezeMinimumCounts(rawCounts, name) {
   return Object.freeze(Object.fromEntries(entries));
 }
 
+function freezeProviderMetrics(rawMetrics, name) {
+  const metrics = assertObject(rawMetrics, name);
+  const entries = Object.entries(metrics).map(([metric, value]) => {
+    if (!PROVIDER_METRICS.has(metric)) {
+      throw new Error(`${name}.${metric} is not a supported provider metric.`);
+    }
+    return [metric, assertNumber(value, `${name}.${metric}`, { integer: true })];
+  });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+function freezeMinimumProviderComponents(rawComponents, name) {
+  const components = assertObject(rawComponents ?? {}, name);
+  const entries = Object.entries(components).map(([component, metrics]) => {
+    if (!PROVIDER_COMPONENTS.has(component)) {
+      throw new Error(`${name}.${component} is not a supported collision provider component.`);
+    }
+    return [component, freezeProviderMetrics(metrics, `${name}.${component}`)];
+  });
+  return Object.freeze(Object.fromEntries(entries));
+}
+
 function freezeCase(rawCase, index) {
   const source = assertObject(rawCase, `cases[${index}]`);
   const speed = assertString(source.speed, `cases[${index}].speed`);
@@ -131,6 +164,10 @@ function freezeCase(rawCase, index) {
     minimumCounts: freezeMinimumCounts(
       source.minimumCounts,
       `cases[${index}].minimumCounts`,
+    ),
+    minimumProviderComponents: freezeMinimumProviderComponents(
+      source.minimumProviderComponents,
+      `cases[${index}].minimumProviderComponents`,
     ),
     coverage: stringList(source.coverage ?? [], `cases[${index}].coverage`),
     spawn,
