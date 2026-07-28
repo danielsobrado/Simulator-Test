@@ -1,6 +1,6 @@
 # Collision acceptance battery
 
-The collision acceptance battery turns the P8 performance and readiness requirements into repeatable hardware-WebGPU evidence.
+The collision acceptance battery turns the executable P8 collision checks into repeatable hardware-WebGPU evidence.
 
 It does not enable collision by default. Default-on remains a separate release decision after the complete release gate passes.
 
@@ -11,7 +11,12 @@ npm install
 npm run qa:collision:install
 ```
 
-The runner uses the Playwright version pinned in the repository. It refuses software adapters such as SwiftShader, WARP, llvmpipe, and lavapipe.
+The runner uses the Playwright version pinned in the repository. It rejects:
+
+- WebGL renderer fallback;
+- software WebGPU implementations such as SwiftShader, WARP, llvmpipe, and lavapipe;
+- fallback adapters;
+- adapters without a stable vendor, architecture, or description identity.
 
 ## Run current executable coverage
 
@@ -19,13 +24,27 @@ The runner uses the Playwright version pinned in the repository. It refuses soft
 npm run qa:collision
 ```
 
-This starts a strict-port Vite server, runs every configured case three times, and evaluates the execution gate.
+This starts one strict-port Vite server, runs every configured case three times, and evaluates the execution gate.
 
-Use a visible browser when driver or WebGPU behaviour differs in headless mode:
+Use a visible browser when headless driver behaviour differs:
 
 ```bash
 npm run qa:collision -- --headed
 ```
+
+Headed acceptance still uses production collision debug settings. It does not add debug geometry to a performance run.
+
+For a visual collider inspection, run a single scenario explicitly with debug enabled:
+
+```bash
+npm run qa:perf -- \
+  --qa collision-p5 \
+  --headed \
+  --collisionDebug colliders,broadphase \
+  --screenshot tmp/collision-p5-debug.png
+```
+
+Debug-enabled captures are intentionally rejected by the production acceptance gate.
 
 Use an existing server:
 
@@ -39,7 +58,7 @@ Use one repeat while debugging the harness:
 npm run qa:collision -- --repeats 1
 ```
 
-Generated output is restricted to a child of the repository `tmp` directory. Relative output paths are resolved from the repository root. The default output is:
+Generated output is restricted to a child of the repository `tmp` directory. Relative paths are resolved from the repository root.
 
 ```text
 tmp/collision-acceptance/
@@ -56,7 +75,7 @@ tmp/collision-acceptance/
       run-03.png
 ```
 
-Every raw JSON report records the hardware adapter, configured viewport, and matching screenshot path. The aggregate report rejects missing or mismatched capture evidence.
+Every raw report records the measured renderer backend, hardware adapter, viewport, matching screenshot path, frame distribution, collision timings, readiness, provider status, canonical signature, and operational counters.
 
 ## Run the release gate
 
@@ -64,67 +83,83 @@ Every raw JSON report records the hardware adapter, configured viewport, and mat
 npm run qa:collision:release
 ```
 
-The release command applies the same runtime checks and additionally requires coverage for every P8 scenario and definition-of-done item listed in the implementation plan.
+The release command applies the execution checks and additionally requires every P8 scenario and definition-of-done item declared in `requiredCoverage`.
 
-The two gates are intentionally different:
+The gates are intentionally different:
 
-- **Execution gate:** all scenarios currently configured in `config/collision-acceptance.yaml` execute successfully.
-- **Release gate:** the execution gate passes and every required P8 acceptance scenario is represented.
+- **Execution gate:** all cases currently configured in `config/collision-acceptance.yaml` pass.
+- **Release gate:** the execution gate passes and every required release scenario has deterministic evidence.
 
-The release gate must remain red while required scenarios are missing. Do not remove required coverage entries merely to make it green.
+The release gate must remain red while required scenarios are missing. Do not remove coverage requirements merely to make it green.
 
 ## Current executable scenarios
 
 The current matrix reuses deterministic P3-P8 fixtures:
 
-- open-ground no-collision baseline;
+- open-ground collision-disabled reference;
 - production tree trunk;
 - production blocking rock;
 - walkable rock BVH;
 - placed-object doorway;
 - construction wall;
-- full-stack repeated chunk crossing.
+- full-stack repeated collision chunk crossing.
 
-Targeted fixture scenes enforce collision timing, readiness, query counts, hardware evidence, and hitches. They are not compared against the open-ground frame baseline because their rendered scenes differ.
+The open-ground frame result is an absolute reference only. It is not compared to the collision-enabled route because collision can change the travelled path, streaming focus, visible geometry, and workload.
 
-The full-stack route is marked comparable and must stay within the configured frame-p95 regression allowance against the open-ground baseline. The baseline and collision-enabled case use the same spawn, direction, speed, warm-up, 60-second measurement window, 1600×900 viewport, and device scale. Configuration validation rejects future comparable cases that do not match their baseline route.
+A controlled frame A/B remains a release requirement. It needs a path-locked or collision-neutral route that proves both variants traverse equivalent world positions and workloads.
 
-`collision-p8` preserves production debug settings. It does not force collider or broadphase debug rendering, so the performance capture excludes QA visualisation cost. P1-P7 visual fixtures still force their debug views for headed inspection.
+## Per-run gates
+
+Every run requires:
+
+- an identifiable non-fallback hardware WebGPU adapter;
+- proof that the measured renderer canvas uses WebGPU rather than WebGL;
+- the configured viewport and matching screenshot evidence;
+- all collision debug flags disabled;
+- the expected scenario and collision mode;
+- no more than the configured hitch allowance;
+- collision timing samples for collision-enabled cases;
+- collision total p95 at or below the YAML threshold;
+- ready collision with no provider failure;
+- readiness misses, failed chunks, and final queue depth within limits;
+- a non-empty canonical collision signature;
+- scenario-specific minimum collision work;
+- provider-specific evidence for named fixtures.
+
+Provider-specific evidence prevents false positives. For example, the tree scenario requires loaded tree colliders, the blocking-rock scenario requires blocking rocks, and the walkable-rock scenario requires walkable rock instances.
+
+## Cross-repeat gates
+
+Each collision-enabled case must reproduce one identical canonical signature across every repeat. A non-empty but changing signature fails execution.
+
+All reports must also use one consistent hardware-adapter identity.
+
+## Threshold ownership
+
+`config/collision-acceptance.yaml` is the acceptance policy. Its collision p95 threshold is authoritative.
+
+The in-app report still includes its provisional built-in gate for diagnostics, but the aggregate battery does not use that hard-coded value as release policy.
 
 ## Required release coverage still missing
 
-The plan currently requires additional deterministic scenarios for:
+The plan currently requires deterministic evidence for:
 
 - dense forest running;
 - scree-field traversal;
 - a repeated walkable-rock climb loop;
 - dense object-town traversal;
 - a long curved-wall route;
+- controlled collision-on versus collision-off frame A/B;
 - floating-origin rebase during movement;
 - nearby construction edit and collision rebuild;
-- a collision-chunk unload and reload cycle proving colliders and prototype resources do not grow;
-- a minimum 10-minute soak covering streaming, movement, and collision stability.
+- a collision-chunk unload/reload cycle proving collider and prototype-resource counts do not grow;
+- a minimum 10-minute streaming, movement, and collision soak.
 
-These remain visible in `report.json`, `report.md`, and the command exit status.
+The soak implementation must preserve full-duration aggregate and hitch accounting. The current `FrameProfiler` retains at most 20,000 frames, so a future soak must not infer ten-minute stability solely from its retained frame array.
 
-## Per-run gates
+These requirements remain visible in `report.json`, `report.md`, and the release command exit status.
 
-Each collision run requires:
-
-- a recorded non-fallback hardware WebGPU adapter;
-- the configured viewport and matching screenshot evidence;
-- the expected QA scenario and collision mode;
-- zero hitches above the configured threshold;
-- a passing in-app collision gate;
-- ready collision with no provider failure;
-- collision total p95 at or below the configured target;
-- zero readiness misses, failed chunks, and final queue backlog;
-- a canonical collision signature;
-- scenario-specific minimum query evidence.
-
-Minimum query evidence prevents a broken fixture from passing with unrealistically low timings because it performed no collision work.
-
-## Configuration
+## Configuration safety
 
 The matrix and thresholds are kept in:
 
@@ -132,7 +167,17 @@ The matrix and thresholds are kept in:
 config/collision-acceptance.yaml
 ```
 
-Case IDs are path-safe identifiers because they are used as output-directory names. Viewport, gate, and minimum-count fields are validated before any browser or server is started.
+Validation rejects:
+
+- duplicate or path-like case IDs;
+- invalid viewport or timing values;
+- unsupported counters;
+- unsupported provider components or metrics;
+- a collision-enabled baseline;
+- invalid output paths outside the repository `tmp` tree;
+- non-HTTP external server URLs.
+
+The orchestrator bounds browser-child execution time, handles Vite spawn failures, limits captured server-log size, and uses unique temporary runner files so concurrent standalone runs cannot overwrite each other.
 
 ## Release decision
 
@@ -140,7 +185,7 @@ Collision may be considered for default-on only after all of the following are t
 
 1. `npm test`, production asset validation, and `npm run build` pass.
 2. `npm run qa:collision:release` passes on representative hardware.
-3. Repeated reports use a consistent hardware adapter.
-4. The P8 scenario coverage list is complete, including unload/reload and soak evidence.
-5. The measured p95 target is accepted or revised with documented A/B evidence.
+3. Repeated reports use one identifiable hardware adapter.
+4. The complete P8 coverage list passes, including controlled A/B, unload/reload, and soak evidence.
+5. The measured p95 target is accepted or revised with documented evidence.
 6. The architecture document reflects the final implementation.
