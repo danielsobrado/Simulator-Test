@@ -43,6 +43,7 @@ cases:
     durationSeconds: 60
     speed: run
     minimumCounts: {}
+    minimumProviderComponents: {}
     coverage:
       - open-ground-run
 
@@ -57,6 +58,9 @@ cases:
     minimumCounts:
       candidates: 1
       primitiveTests: 1
+    minimumProviderComponents:
+      trees:
+        colliders: 1
     coverage:
       - tree-trunk-production
 
@@ -71,6 +75,9 @@ cases:
     minimumCounts:
       candidates: 1
       primitiveTests: 1
+    minimumProviderComponents:
+      rocks:
+        blocking: 1
     coverage:
       - blocking-rock-production
 
@@ -86,6 +93,9 @@ cases:
       candidates: 1
       bvhQueries: 1
       triangleTests: 1
+    minimumProviderComponents:
+      rocks:
+        walkable: 1
     coverage:
       - walkable-rock-contact
 
@@ -100,6 +110,9 @@ cases:
     minimumCounts:
       candidates: 1
       primitiveTests: 1
+    minimumProviderComponents:
+      objects:
+        colliders: 1
     coverage:
       - placed-object-doorway
 
@@ -114,6 +127,9 @@ cases:
     minimumCounts:
       candidates: 1
       primitiveTests: 1
+    minimumProviderComponents:
+      constructions:
+        colliders: 1
     coverage:
       - construction-wall
 
@@ -128,5 +144,6 @@ cases:
     minimumCounts:
       broadphaseQueries: 1
       activeChunks: 1
+    minimumProviderComponents: {}
     coverage:
       - repeated-collision-chunk-crossing
