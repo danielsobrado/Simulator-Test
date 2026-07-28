@@ -69,6 +69,19 @@ function optionalNumber(value, name, options = {}) {
   return value == null ? null : assertNumber(value, name, options);
 }
 
+function freezeViewport(rawViewport) {
+  const viewport = assertObject(rawViewport, 'viewport');
+  return Object.freeze({
+    width: assertNumber(viewport.width, 'viewport.width', { minimum: 320, integer: true }),
+    height: assertNumber(viewport.height, 'viewport.height', { minimum: 200, integer: true }),
+    deviceScaleFactor: assertNumber(
+      viewport.deviceScaleFactor,
+      'viewport.deviceScaleFactor',
+      { minimum: 0.5 },
+    ),
+  });
+}
+
 function freezeMinimumCounts(rawCounts, name) {
   const counts = assertObject(rawCounts ?? {}, name);
   const entries = Object.entries(counts).map(([field, value]) => {
@@ -219,6 +232,7 @@ export function validateCollisionAcceptanceConfig(rawConfig) {
       source.timeoutPaddingSeconds,
       'timeoutPaddingSeconds',
     ),
+    viewport: freezeViewport(source.viewport),
     gates: freezeGates(source.gates),
     requiredCoverage: stringList(source.requiredCoverage ?? [], 'requiredCoverage'),
     cases,
