@@ -6,6 +6,11 @@ import {
   renderCollisionAcceptanceMarkdown,
 } from '../scripts/lib/collisionAcceptanceReport.mjs';
 
+const VIEWPORT = Object.freeze({
+  width: 1600,
+  height: 900,
+  deviceScaleFactor: 1,
+});
 const ADAPTER = Object.freeze({
   ok: true,
   vendor: 'test-vendor',
@@ -24,11 +29,7 @@ function config({
     baselineCase: 'baseline',
     hitchMs: 33.3,
     timeoutPaddingSeconds: 30,
-    viewport: {
-      width: 1600,
-      height: 900,
-      deviceScaleFactor: 1,
-    },
+    viewport: VIEWPORT,
     gates: {
       collisionP95Ms: 0.83,
       frameP95RegressionMs: 0.83,
@@ -76,8 +77,10 @@ function perfReport({
   scenario,
   collisionEnabled,
   frameP95Ms,
+  screenshotPath,
   collisionP95Ms = 0,
   adapter = ADAPTER,
+  viewport = VIEWPORT,
   debugEnabled = false,
   hitches = 0,
   broadphaseQueries = 10,
@@ -95,6 +98,10 @@ function perfReport({
       dt: { p95Ms: frameP95Ms, p99Ms: frameP95Ms },
     },
     adapter,
+    capture: {
+      viewport,
+      screenshot: screenshotPath,
+    },
     config: {
       collision: {
         debug: {
@@ -128,54 +135,46 @@ function perfReport({
   };
 }
 
+function runEntry(caseId, repeat, reportOptions) {
+  const reportPath = `${caseId}-${repeat}.json`;
+  const screenshotPath = `${caseId}-${repeat}.png`;
+  return {
+    caseId,
+    repeat,
+    reportPath,
+    screenshotPath,
+    report: perfReport({ ...reportOptions, screenshotPath }),
+  };
+}
+
 function passingRuns(options = {}) {
   return [
-    {
-      caseId: 'baseline',
-      repeat: 1,
-      reportPath: 'baseline-1.json',
-      report: perfReport({
-        scenario: 'move',
-        collisionEnabled: false,
-        frameP95Ms: 5,
-        ...options.baseline,
-      }),
-    },
-    {
-      caseId: 'baseline',
-      repeat: 2,
-      reportPath: 'baseline-2.json',
-      report: perfReport({
-        scenario: 'move',
-        collisionEnabled: false,
-        frameP95Ms: 5.2,
-        ...options.baseline,
-      }),
-    },
-    {
-      caseId: 'collision',
-      repeat: 1,
-      reportPath: 'collision-1.json',
-      report: perfReport({
-        scenario: 'collision-p8',
-        collisionEnabled: true,
-        frameP95Ms: 5.4,
-        collisionP95Ms: 0.5,
-        ...options.collision,
-      }),
-    },
-    {
-      caseId: 'collision',
-      repeat: 2,
-      reportPath: 'collision-2.json',
-      report: perfReport({
-        scenario: 'collision-p8',
-        collisionEnabled: true,
-        frameP95Ms: 5.5,
-        collisionP95Ms: 0.6,
-        ...options.collision,
-      }),
-    },
+    runEntry('baseline', 1, {
+      scenario: 'move',
+      collisionEnabled: false,
+      frameP95Ms: 5,
+      ...options.baseline,
+    }),
+    runEntry('baseline', 2, {
+      scenario: 'move',
+      collisionEnabled: false,
+      frameP95Ms: 5.2,
+      ...options.baseline,
+    }),
+    runEntry('collision', 1, {
+      scenario: 'collision-p8',
+      collisionEnabled: true,
+      frameP95Ms: 5.4,
+      collisionP95Ms: 0.5,
+      ...options.collision,
+    }),
+    runEntry('collision', 2, {
+      scenario: 'collision-p8',
+      collisionEnabled: true,
+      frameP95Ms: 5.5,
+      collisionP95Ms: 0.6,
+      ...options.collision,
+    }),
   ];
 }
 
@@ -190,9 +189,11 @@ test('aggregate passes execution and release gates with complete evidence', () =
   assert.equal(report.gates.release.passed, true);
   assert.equal(report.coverage.complete, true);
   assert.equal(report.adapters.consistent, true);
+  assert.deepEqual(report.config.viewport, VIEWPORT);
   assert.equal(report.baseline.frameP95MedianMs, 5.1);
   assert.equal(report.cases.find((entry) => entry.id === 'collision').collisionP95MaxMs, 0.6);
   assert.match(renderCollisionAcceptanceMarkdown(report), /Release gate: \*\*PASS\*\*/);
+  assert.match(renderCollisionAcceptanceMarkdown(report), /collision-1\.png/);
 });
 
 test('missing plan coverage blocks release but not executable case evidence', () => {
@@ -261,28 +262,28 @@ test('non-comparable fixtures do not use the open-ground frame or debug gate', (
   assert.equal(report.gates.execution.passed, true);
 });
 
-test('missing hardware evidence and zero query work fail the run', () => {
-  const report = buildCollisionAcceptanceReport({
-    config: config(),
-    runs: passingRuns({
-      collision: {
-        adapter: null,
-        broadphaseQueries: 0,
-        candidates: 0,
-      },
-    }),
+test('missing hardware, viewport, screenshot, and query work fail the run', () => {
+  const runs = passingRuns({
+    collision: {
+      adapter: null,
+      viewport: { width: 800, height: 600, deviceScaleFactor: 1 },
+      broadphaseQueries: 0,
+      candidates: 0,
+    },
   });
+  runs[2].report.capture.screenshot = null;
+  const report = buildCollisionAcceptanceReport({ config: config(), runs });
   const run = report.cases.find((entry) => entry.id === 'collision').runs[0];
 
   assert.equal(run.passed, false);
-  assert.equal(
-    run.checks.find((entry) => entry.id === 'hardware-adapter').passed,
-    false,
-  );
-  assert.equal(
-    run.checks.find((entry) => entry.id === 'minimum-count:candidates').passed,
-    false,
-  );
+  for (const id of [
+    'hardware-adapter',
+    'capture-viewport',
+    'capture-screenshot',
+    'minimum-count:candidates',
+  ]) {
+    assert.equal(run.checks.find((entry) => entry.id === id).passed, false);
+  }
   assert.equal(report.gates.execution.passed, false);
 });
 
