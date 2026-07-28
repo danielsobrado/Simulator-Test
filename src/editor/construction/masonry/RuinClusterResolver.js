@@ -24,6 +24,10 @@ function touches(a, b, epsilon = 0.04) {
   return spanEnd(a) + epsilon >= spanStart(b) && spanEnd(b) + epsilon >= spanStart(a);
 }
 
+function runWidth(ordered, start, end) {
+  return spanEnd(ordered[end]) - spanStart(ordered[start]);
+}
+
 /**
  * Resolve clustered damage on field stones. Dressings pass through unchanged.
  */
@@ -58,7 +62,8 @@ export function resolveRuinClusters({
   const clusterIds = new Map();
   let nextClusterId = 1;
 
-  for (const coursePlacements of byCourse.values()) {
+  const orderedCourses = [...byCourse.entries()].sort(([left], [right]) => left - right);
+  for (const [, coursePlacements] of orderedCourses) {
     const ordered = [...coursePlacements].sort(compareBySpan);
     const removeFlags = ordered.map((placement) => Boolean(placement.ruin?.candidate));
     for (const flag of removeFlags) {
@@ -71,6 +76,7 @@ export function resolveRuinClusters({
         index += 1;
         continue;
       }
+
       let end = index;
       while (
         end + 1 < ordered.length
@@ -80,8 +86,8 @@ export function resolveRuinClusters({
         end += 1;
       }
 
+      const initialWidth = runWidth(ordered, index, end);
       const run = ordered.slice(index, end + 1);
-      const width = spanEnd(run[run.length - 1]) - spanStart(run[0]);
       const maxScore = Math.max(...run.map((placement) => placement.ruin?.score ?? 0));
       const leftNeighbour = index > 0 ? ordered[index - 1] : null;
       const rightNeighbour = end + 1 < ordered.length ? ordered[end + 1] : null;
@@ -93,39 +99,52 @@ export function resolveRuinClusters({
 
       if (
         isolated
-        && width < profile.damage.cluster.minimumWidth
+        && initialWidth < profile.damage.cluster.minimumWidth
         && maxScore < profile.damage.cluster.isolatedHoleThreshold
       ) {
         stats.isolatedHolesRestored += 1;
         removeFlags[index] = false;
-      } else {
-        stats.damageClusters += 1;
-        stats.maximumClusterWidth = Math.max(stats.maximumClusterWidth, width);
-        const clusterId = nextClusterId;
-        nextClusterId += 1;
-
-        if (maxScore >= profile.damage.cluster.severeThreshold) {
-          const threshold = profile.damage.probability.removeThreshold;
-          const tryExpand = (neighbourIndex) => {
-            if (neighbourIndex < 0 || neighbourIndex >= ordered.length) return;
-            if (removeFlags[neighbourIndex]) return;
-            const score = ordered[neighbourIndex].ruin?.score ?? 0;
-            if (score >= threshold * 0.92) {
-              removeFlags[neighbourIndex] = true;
-              stats.clustersExpanded += 1;
-              clusterIds.set(ordered[neighbourIndex]._ruinId ?? ordered[neighbourIndex].stableIndex, clusterId);
-            }
-          };
-          tryExpand(index - 1);
-          tryExpand(end + 1);
-        }
-
-        for (let runIndex = index; runIndex <= end; runIndex += 1) {
-          const key = ordered[runIndex]._ruinId ?? ordered[runIndex].stableIndex;
-          clusterIds.set(key, clusterId);
-        }
+        index += 1;
+        continue;
       }
-      index = end + 1;
+
+      const clusterId = nextClusterId;
+      nextClusterId += 1;
+      stats.damageClusters += 1;
+
+      let expandedStart = index;
+      let expandedEnd = end;
+      const severe = maxScore >= profile.damage.cluster.severeThreshold;
+      const belowPreferredWidth = initialWidth < profile.damage.cluster.preferredWidth;
+      if (severe && belowPreferredWidth) {
+        const threshold = profile.damage.probability.removeThreshold * 0.92;
+        const tryExpand = (neighbourIndex, boundaryIndex) => {
+          if (neighbourIndex < 0 || neighbourIndex >= ordered.length) return false;
+          if (removeFlags[neighbourIndex]) return false;
+          if (!touches(ordered[neighbourIndex], ordered[boundaryIndex])) return false;
+          const score = ordered[neighbourIndex].ruin?.score ?? 0;
+          if (score < threshold) return false;
+          removeFlags[neighbourIndex] = true;
+          stats.clustersExpanded += 1;
+          return true;
+        };
+
+        if (tryExpand(index - 1, index)) expandedStart = index - 1;
+        if (tryExpand(end + 1, end)) expandedEnd = end + 1;
+      }
+
+      stats.maximumClusterWidth = Math.max(
+        stats.maximumClusterWidth,
+        runWidth(ordered, expandedStart, expandedEnd),
+      );
+      for (let runIndex = expandedStart; runIndex <= expandedEnd; runIndex += 1) {
+        const key = ordered[runIndex]._ruinId ?? ordered[runIndex].stableIndex;
+        clusterIds.set(key, clusterId);
+      }
+
+      // A right-side expansion belongs to this cluster. Skip it so it cannot be
+      // reprocessed as a new cluster and recursively expand only to the right.
+      index = expandedEnd + 1;
     }
 
     for (let stoneIndex = 0; stoneIndex < ordered.length; stoneIndex += 1) {
