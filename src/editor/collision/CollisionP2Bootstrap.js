@@ -125,8 +125,10 @@ function attach({
   constructionSource,
 }) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
-  const naturalQa = ['collision-p3', 'collision-p4', 'collision-p5', 'collision-p8']
-    .includes(qaScenario);
+  const p8NeedsNatural = qaScenario === 'collision-p8'
+    && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled);
+  const naturalQa = ['collision-p3', 'collision-p4', 'collision-p5'].includes(qaScenario)
+    || p8NeedsNatural;
   const requiresNaturalSource = naturalQa
     || (!fixtureQa && collisionConfig.enabled
       && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled));
