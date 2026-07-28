@@ -22,7 +22,6 @@ const ADAPTER = Object.freeze({
 
 function config({
   requiredCoverage = ['baseline', 'collision'],
-  compareCollisionToBaseline = true,
   collisionP95Ms = 0.83,
 } = {}) {
   return validateCollisionAcceptanceConfig({
@@ -34,7 +33,6 @@ function config({
     viewport: VIEWPORT,
     gates: {
       collisionP95Ms,
-      frameP95RegressionMs: 0.83,
       maxHitches: 0,
       maxReadinessMisses: 0,
       maxFailedChunks: 0,
@@ -49,7 +47,6 @@ function config({
         label: 'Baseline',
         scenario: 'move',
         collisionRequired: false,
-        compareFrameToBaseline: false,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -62,7 +59,6 @@ function config({
         label: 'Collision',
         scenario: 'collision-p8',
         collisionRequired: true,
-        compareFrameToBaseline: compareCollisionToBaseline,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -232,12 +228,11 @@ test('missing plan coverage blocks release but not executable case evidence', ()
   assert.deepEqual(report.coverage.missing, ['rebase']);
 });
 
-test('frame regression and inconsistent hardware fail execution', () => {
+test('inconsistent hardware fails execution', () => {
   const report = buildCollisionAcceptanceReport({
     config: config(),
     runs: passingRuns({
       collision: {
-        frameP95Ms: 7,
         adapter: { ...ADAPTER, architecture: 'other-gpu' },
       },
     }),
@@ -246,14 +241,9 @@ test('frame regression and inconsistent hardware fail execution', () => {
   assert.equal(report.adapters.consistent, false);
   assert.equal(report.gates.execution.passed, false);
   assert.equal(report.gates.release.passed, false);
-  assert.equal(
-    report.cases.find((entry) => entry.id === 'collision').checks
-      .find((entry) => entry.id === 'frame-p95-regression').passed,
-    false,
-  );
 });
 
-test('comparable captures fail when collision debug rendering is enabled', () => {
+test('debug rendering fails production acceptance', () => {
   const report = buildCollisionAcceptanceReport({
     config: config(),
     runs: passingRuns({ collision: { debugEnabled: true } }),
@@ -266,25 +256,6 @@ test('comparable captures fail when collision debug rendering is enabled', () =>
     false,
   );
   assert.equal(report.gates.execution.passed, false);
-});
-
-test('non-comparable fixtures do not use the open-ground frame or debug gate', () => {
-  const report = buildCollisionAcceptanceReport({
-    config: config({ compareCollisionToBaseline: false }),
-    runs: passingRuns({ collision: { frameP95Ms: 20, debugEnabled: true } }),
-  });
-  const collisionCase = report.cases.find((entry) => entry.id === 'collision');
-
-  assert.equal(collisionCase.frameP95RegressionMs, null);
-  assert.equal(
-    collisionCase.checks.some((entry) => entry.id === 'frame-p95-regression'),
-    false,
-  );
-  assert.equal(
-    collisionCase.runs[0].checks.some((entry) => entry.id === 'production-debug-disabled'),
-    false,
-  );
-  assert.equal(report.gates.execution.passed, true);
 });
 
 test('YAML threshold is authoritative over the in-app provisional gate', () => {
