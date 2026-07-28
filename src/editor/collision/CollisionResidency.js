@@ -386,7 +386,7 @@ export class CollisionResidency {
       this.lastFailure = null;
     }
     PerfCounters.inc('collisionBuilds', built);
-    PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
+    if (attempted > 0) PerfCounters.inc('collisionBuildMs', this.now() - startedAt);
     this.updateCounters();
     return Object.freeze({ attempted, built, remaining: this.queue.length });
   }
