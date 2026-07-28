@@ -227,6 +227,7 @@ export function createCollisionRuntime({
     onOwnerChunkUnloaded: provider.unloadOwnerChunk?.bind(provider) ?? null,
     now,
     logger,
+    providerId: provider.descriptor?.id ?? 'empty',
   });
   const debugView = debug.colliders || debug.broadphase
     ? new CollisionDebugView({
