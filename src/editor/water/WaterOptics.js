@@ -66,9 +66,20 @@ export function validateWaterOpticsConfig(config) {
   return config;
 }
 
-export function computeWaterOpticsSample({ depth, viewCosine = 1, config }) {
+export function computeWaterOpticsSample({
+  depth,
+  viewCosine = 1,
+  underwater = false,
+  cameraSubmersionDepth = 0,
+  config,
+}) {
   validateWaterOpticsConfig(config);
   const safeDepth = Math.max(0, Number.isFinite(depth) ? depth : 0);
+  const safeSubmersionDepth = Math.max(
+    0,
+    Number.isFinite(cameraSubmersionDepth) ? cameraSubmersionDepth : 0,
+  );
+  const verticalDistance = underwater ? safeSubmersionDepth : safeDepth;
   const safeCosine = clamp(
     Math.abs(Number.isFinite(viewCosine) ? viewCosine : 1),
     config.minimumViewCosine,
@@ -76,13 +87,14 @@ export function computeWaterOpticsSample({ depth, viewCosine = 1, config }) {
   );
   const opticalDistance = Math.min(
     config.maximumOpticalDistance,
-    safeDepth / safeCosine,
+    verticalDistance / safeCosine,
   );
   const transmission = Math.exp(-config.absorptionDensity * opticalDistance);
   const opacity = config.minimumOpacity
     + (config.maximumOpacity - config.minimumOpacity) * (1 - transmission);
   return Object.freeze({
     depth: safeDepth,
+    verticalDistance,
     opticalDistance,
     transmission,
     opacity: clamp(opacity, config.minimumOpacity, config.maximumOpacity),
