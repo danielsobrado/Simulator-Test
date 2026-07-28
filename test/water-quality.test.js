@@ -33,7 +33,7 @@ const base = Object.freeze({
     fineSpeed: 0.13,
     depthFadeStart: 0.08,
     depthFadeEnd: 1.8,
-    depthBias: 0.00012,
+    depthBiasMeters: 0.15,
     mipLevel: 0,
     sceneColorStrength: 0.94,
     absorptionCoefficients: Object.freeze([0.72, 0.28, 0.12]),
@@ -93,6 +93,13 @@ test('visual config rejects invalid tiers, optics, refraction, and caustic range
       refraction: { ...base.refraction, depthFadeEnd: 0.01 },
     }),
     /depthFadeEnd/,
+  );
+  assert.throws(
+    () => validateWaterVisualConfig({
+      ...structuredClone(base),
+      refraction: { ...base.refraction, depthBiasMeters: -1 },
+    }),
+    /depthBiasMeters/,
   );
   assert.throws(
     () => validateWaterVisualConfig({
