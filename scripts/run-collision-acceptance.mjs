@@ -28,6 +28,8 @@ import {
 } from './lib/qaRuntimeConfig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const CHILD_TIMEOUT_PADDING_MS = 30_000;
+const MAX_SERVER_LOG_CHARACTERS = 5_000_000;
 
 function readArgument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -44,6 +46,25 @@ function positiveInteger(value, name) {
     throw new Error(`${name} must be a positive safe integer.`);
   }
   return parsed;
+}
+
+function resolveFromRepository(requestedPath, fallback) {
+  const value = requestedPath ?? fallback;
+  return path.isAbsolute(value) ? path.normalize(value) : path.resolve(root, value);
+}
+
+function caseTimeoutMs(config, caseConfig) {
+  return Math.ceil(
+    (caseConfig.warmupSeconds
+      + caseConfig.durationSeconds
+      + config.timeoutPaddingSeconds) * 1000,
+  );
+}
+
+function appendServerLog(current, chunk) {
+  const next = current + chunk.toString();
+  if (next.length <= MAX_SERVER_LOG_CHARACTERS) return next;
+  return `[earlier Vite output truncated]\n${next.slice(-MAX_SERVER_LOG_CHARACTERS)}`;
 }
 
 async function preflightPort(preferredPort = 0) {
@@ -73,35 +94,52 @@ function startServer(port) {
 async function waitForServer(server, baseUrl, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
-  while (Date.now() < deadline) {
-    if (server.exitCode !== null) {
-      throw new Error(`Collision QA Vite server exited with code ${server.exitCode}.`);
+  let spawnError = null;
+  const recordSpawnError = (error) => { spawnError = error; };
+  server.once('error', recordSpawnError);
+  try {
+    while (Date.now() < deadline) {
+      if (spawnError) {
+        throw new Error(`Collision QA Vite server failed to start: ${spawnError.message}`);
+      }
+      if (server.exitCode !== null) {
+        throw new Error(`Collision QA Vite server exited with code ${server.exitCode}.`);
+      }
+      try {
+        const response = await fetch(baseUrl);
+        if (response.ok) return;
+        lastError = new Error(`Vite returned HTTP ${response.status}.`);
+      } catch (error) {
+        lastError = error;
+      }
+      await delay(100);
     }
-    try {
-      const response = await fetch(baseUrl);
-      if (response.ok) return;
-      lastError = new Error(`Vite returned HTTP ${response.status}.`);
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(100);
+  } finally {
+    server.off('error', recordSpawnError);
   }
   throw new Error(`Timed out waiting for ${baseUrl}: ${lastError?.message ?? 'unknown error'}`);
 }
 
-async function runChild(command, args) {
-  await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: root,
-      stdio: 'inherit',
-      windowsHide: true,
-    });
+async function runChild(command, args, timeoutMs) {
+  const child = spawn(command, args, {
+    cwd: root,
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  const exit = new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', (code) => {
-      if (code === 0) resolve();
+      if (code === 0) resolve('exited');
       else reject(new Error(`${path.basename(command)} exited with code ${code}.`));
     });
   });
+  const outcome = await Promise.race([
+    exit,
+    delay(timeoutMs).then(() => 'timeout'),
+  ]);
+  if (outcome !== 'timeout') return;
+  await terminateChildProcess(child);
+  throw new Error(`${path.basename(command)} timed out after ${timeoutMs} ms.`);
 }
 
 function appendOptional(args, name, value) {
@@ -117,11 +155,7 @@ function runnerArguments({
   screenshotPath,
   headed,
 }) {
-  const timeoutMs = Math.ceil(
-    (caseConfig.warmupSeconds
-      + caseConfig.durationSeconds
-      + config.timeoutPaddingSeconds) * 1000,
-  );
+  const timeoutMs = caseTimeoutMs(config, caseConfig);
   const args = [
     path.join(root, 'scripts', 'run-perf-qa.mjs'),
     '--url', baseUrl,
@@ -156,8 +190,9 @@ function relativeArtifact(filePath) {
 }
 
 async function runBattery() {
-  const configPath = path.resolve(
-    readArgument('config', path.join(root, 'config', 'collision-acceptance.yaml')),
+  const configPath = resolveFromRepository(
+    readArgument('config'),
+    path.join('config', 'collision-acceptance.yaml'),
   );
   const baseConfig = loadCollisionAcceptanceConfig(configPath);
   const repeatOverride = readArgument('repeats');
@@ -196,8 +231,8 @@ async function runBattery() {
       );
       baseUrl = `http://127.0.0.1:${port}`;
       server = startServer(port);
-      server.stdout.on('data', (chunk) => { serverOutput += chunk.toString(); });
-      server.stderr.on('data', (chunk) => { serverOutput += chunk.toString(); });
+      server.stdout.on('data', (chunk) => { serverOutput = appendServerLog(serverOutput, chunk); });
+      server.stderr.on('data', (chunk) => { serverOutput = appendServerLog(serverOutput, chunk); });
       await waitForServer(server, baseUrl, serverTimeoutMs);
     }
 
@@ -214,6 +249,7 @@ async function runBattery() {
         ]);
         console.log(`\n=== ${caseConfig.id} · run ${repeat}/${config.repeats} ===`);
         try {
+          const timeoutMs = caseTimeoutMs(config, caseConfig) + CHILD_TIMEOUT_PADDING_MS;
           await runChild(process.execPath, runnerArguments({
             config,
             caseConfig,
@@ -221,7 +257,7 @@ async function runBattery() {
             reportPath,
             screenshotPath,
             headed,
-          }));
+          }), timeoutMs);
           runs.push({
             caseId: caseConfig.id,
             repeat,
