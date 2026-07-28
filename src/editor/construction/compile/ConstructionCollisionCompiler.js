@@ -1,9 +1,15 @@
+import { createCurveArcTable } from '../masonry/CurveArcTable.js';
+import { createWallTopProfile } from '../masonry/WallTopProfile.js';
+
 const COLLISION_PLAN_VERSION = 1;
 const FOUNDATION_OVERLAP = 0.08;
 const EPSILON = 1e-6;
 const HASH_QUANTUM = 1e4;
 const MAX_STRAIGHT_BOX_LENGTH = 48;
+const TOP_SAMPLE_SPACING = 0.2;
+const MAX_TOP_SAMPLES = 256;
 const OPENING_KINDS = new Set(['door', 'window', 'arch', 'gate', 'breach']);
+const VARIABLE_TOP_STYLES = new Set(['irregular', 'ruined']);
 
 function createHasher() {
   let hash = 0x811c9dc5;
@@ -23,81 +29,19 @@ function createHasher() {
   };
 }
 
-function interpolate(left, right, targetDistance) {
-  const span = right.distance - left.distance;
-  const t = span > EPSILON ? (targetDistance - left.distance) / span : 0;
-  const tangentX = left.tangentX + (right.tangentX - left.tangentX) * t;
-  const tangentZ = left.tangentZ + (right.tangentZ - left.tangentZ) * t;
-  const magnitude = Math.hypot(tangentX, tangentZ) || 1;
-  return Object.freeze({
-    x: left.x + (right.x - left.x) * t,
-    z: left.z + (right.z - left.z) * t,
-    tangentX: tangentX / magnitude,
-    tangentZ: tangentZ / magnitude,
-    distance: targetDistance,
-  });
-}
-
-function pointAtDistance(points, distance) {
-  if (distance <= points[0].distance) return points[0];
-  if (distance >= points.at(-1).distance) return points.at(-1);
-  let low = 0;
-  let high = points.length - 1;
-  while (low + 1 < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (points[middle].distance <= distance) low = middle;
-    else high = middle;
-  }
-  return interpolate(points[low], points[high], distance);
-}
-
-function segmentRanges(sampled, path) {
-  const ends = new Map();
-  for (const point of sampled.points) {
-    ends.set(point.segmentId, Math.max(ends.get(point.segmentId) ?? 0, point.distance));
-  }
-  const ranges = new Map();
-  let start = 0;
-  for (let index = 0; index < path.segments.length; index += 1) {
-    const segment = path.segments[index];
-    const end = index === path.segments.length - 1
-      ? sampled.totalDistance
-      : ends.get(segment.id);
-    ranges.set(segment.id, Object.freeze({ start, end }));
-    start = end;
-  }
-  return ranges;
-}
-
-function featureArcs(record, ranges) {
-  return record.features
-    .filter((feature) => OPENING_KINDS.has(feature.kind))
-    .map((feature) => {
-      const range = ranges.get(feature.segmentId);
-      const center = range.start + (range.end - range.start) * feature.arcFraction;
-      return Object.freeze({
-        id: feature.id,
-        segmentId: feature.segmentId,
-        start: Math.max(range.start, center - feature.width / 2),
-        end: Math.min(range.end, center + feature.width / 2),
-        bottom: feature.sill,
-        top: feature.sill + feature.height,
-      });
-    });
-}
-
 function uniqueSorted(values) {
   return [...new Set(values.map((value) => Math.round(value / EPSILON) * EPSILON))]
     .sort((left, right) => left - right);
 }
 
-function segmentIsStraight(points, range) {
-  const relevant = points.filter(
-    (point) => point.distance >= range.start - EPSILON && point.distance <= range.end + EPSILON,
+function segmentIsStraight(sampled, range) {
+  const [start, end] = range;
+  const relevant = sampled.points.filter(
+    (point) => point.distance >= start - EPSILON && point.distance <= end + EPSILON,
   );
   if (relevant.length < 2) return true;
-  const first = pointAtDistance(points, range.start);
-  const last = pointAtDistance(points, range.end);
+  const first = relevant[0];
+  const last = relevant.at(-1);
   const dx = last.x - first.x;
   const dz = last.z - first.z;
   const length = Math.hypot(dx, dz);
@@ -109,18 +53,54 @@ function segmentIsStraight(points, range) {
   return true;
 }
 
-function boundariesForSegment(sampled, range, openings, curveSegmentLength) {
-  const boundaries = [range.start, range.end];
-  const straight = segmentIsStraight(sampled.points, range);
-  const length = range.end - range.start;
-  const maximumLength = straight ? MAX_STRAIGHT_BOX_LENGTH : curveSegmentLength;
+function featureArcs(record, arcTable) {
+  return record.features
+    .filter((feature) => OPENING_KINDS.has(feature.kind))
+    .map((feature) => {
+      const [segmentStart, segmentEnd] = arcTable.segmentRange(feature.segmentId);
+      const center = arcTable.toArc(feature.segmentId, feature.arcFraction);
+      return Object.freeze({
+        id: feature.id,
+        segmentId: feature.segmentId,
+        start: Math.max(segmentStart, center - feature.width / 2),
+        end: Math.min(segmentEnd, center + feature.width / 2),
+        bottom: feature.sill,
+        top: feature.sill + feature.height,
+      });
+    });
+}
+
+function topControlArcs(record, arcTable) {
+  return record.top.profile.map(
+    (entry) => arcTable.toArc(entry.segmentId, entry.arcFraction),
+  );
+}
+
+function boundariesForSegment({
+  sampled,
+  range,
+  openings,
+  topControls,
+  curveSegmentLength,
+  variableTop,
+}) {
+  const [start, end] = range;
+  const boundaries = [start, end];
+  const straight = segmentIsStraight(sampled, range);
+  const length = end - start;
+  const maximumLength = !straight || variableTop
+    ? curveSegmentLength
+    : MAX_STRAIGHT_BOX_LENGTH;
   if (length > maximumLength) {
     const count = Math.max(1, Math.ceil(length / maximumLength));
     for (let index = 1; index < count; index += 1) {
-      boundaries.push(range.start + length * index / count);
+      boundaries.push(start + length * index / count);
     }
   }
   for (const opening of openings) boundaries.push(opening.start, opening.end);
+  for (const control of topControls) {
+    if (control > start + EPSILON && control < end - EPSILON) boundaries.push(control);
+  }
   return uniqueSorted(boundaries);
 }
 
@@ -154,6 +134,19 @@ function solidBands(openings, wallHeight) {
   }
   if (wallHeight - cursor > EPSILON) solids.push([cursor, wallHeight]);
   return solids;
+}
+
+function maximumTopHeight(topProfile, from, to) {
+  const length = Math.max(0, to - from);
+  const samples = Math.max(
+    2,
+    Math.min(MAX_TOP_SAMPLES, Math.ceil(length / TOP_SAMPLE_SPACING)),
+  );
+  let maximum = 0;
+  for (let index = 0; index <= samples; index += 1) {
+    maximum = Math.max(maximum, topProfile.heightAt(from + length * index / samples));
+  }
+  return maximum;
 }
 
 function bandSignature(bands) {
@@ -214,14 +207,27 @@ export function compileConstructionCollision(record, sampled, {
     throw new Error('Construction collision curve segment length must be positive.');
   }
 
-  const ranges = segmentRanges(sampled, record.path);
-  const openings = featureArcs(record, ranges);
+  const arcTable = createCurveArcTable(sampled);
+  const topProfile = createWallTopProfile(record, arcTable);
+  const openings = featureArcs(record, arcTable);
+  const topControls = topControlArcs(record, arcTable);
+  const variableTop = topControls.length > 0 || VARIABLE_TOP_STYLES.has(record.top.style);
   const intervals = [];
 
   for (const segment of record.path.segments) {
-    const range = ranges.get(segment.id);
+    const range = arcTable.segmentRange(segment.id);
     const segmentOpenings = openings.filter(({ segmentId }) => segmentId === segment.id);
-    const boundaries = boundariesForSegment(sampled, range, segmentOpenings, curveSegmentLength);
+    const segmentTopControls = topControls.filter(
+      (distance) => distance >= range[0] - EPSILON && distance <= range[1] + EPSILON,
+    );
+    const boundaries = boundariesForSegment({
+      sampled,
+      range,
+      openings: segmentOpenings,
+      topControls: segmentTopControls,
+      curveSegmentLength,
+      variableTop,
+    });
     for (let index = 0; index < boundaries.length - 1; index += 1) {
       const from = boundaries[index];
       const to = boundaries[index + 1];
@@ -230,7 +236,8 @@ export function compileConstructionCollision(record, sampled, {
       const activeOpenings = segmentOpenings.filter(
         (opening) => midpoint > opening.start - EPSILON && midpoint < opening.end + EPSILON,
       );
-      const bands = solidBands(activeOpenings, record.dimensions.height);
+      const wallHeight = maximumTopHeight(topProfile, from, to);
+      const bands = solidBands(activeOpenings, wallHeight);
       intervals.push({
         segmentId: segment.id,
         from,
@@ -243,7 +250,10 @@ export function compileConstructionCollision(record, sampled, {
     }
   }
 
-  const overlap = Math.max(0.05, Math.min(curveSegmentLength * 0.2, record.dimensions.thickness * 0.25));
+  const overlap = Math.max(
+    0.05,
+    Math.min(curveSegmentLength * 0.2, record.dimensions.thickness * 0.25),
+  );
   const boxes = [];
   const bounds = { minX: Infinity, minZ: Infinity, maxX: -Infinity, maxZ: -Infinity };
 
@@ -255,10 +265,10 @@ export function compileConstructionCollision(record, sampled, {
       ?? (record.path.closed ? intervals[0] : null);
     const overlapLeft = previous && previous.signature === interval.signature ? overlap : 0;
     const overlapRight = next && next.signature === interval.signature ? overlap : 0;
-    const point = pointAtDistance(sampled.points, interval.midpoint);
+    const frame = arcTable.frameAt(interval.midpoint);
     const shift = (overlapRight - overlapLeft) / 2;
-    const centerX = point.x + point.tangentX * shift;
-    const centerZ = point.z + point.tangentZ * shift;
+    const centerX = frame.x + frame.tangentX * shift;
+    const centerZ = frame.z + frame.tangentZ * shift;
     const length = interval.to - interval.from + overlapLeft + overlapRight;
 
     for (let bandIndex = 0; bandIndex < interval.bands.length; bandIndex += 1) {
@@ -269,36 +279,38 @@ export function compileConstructionCollision(record, sampled, {
         Math.round(interval.to * 1000),
         `band-${bandIndex + 1}`,
       ].join(':');
+      const boundsForBox = boxBounds(
+        centerX,
+        centerZ,
+        frame.tangentX,
+        frame.tangentZ,
+        length,
+        record.dimensions.thickness,
+      );
       const box = Object.freeze({
         id,
         segmentId: interval.segmentId,
         center: Object.freeze([centerX, centerZ]),
-        tangent: Object.freeze([point.tangentX, point.tangentZ]),
+        tangent: Object.freeze([frame.tangentX, frame.tangentZ]),
         length,
         thickness: record.dimensions.thickness,
         bottom,
         top,
         foundationOverlap: bottom <= EPSILON ? FOUNDATION_OVERLAP : 0,
         openingIds: Object.freeze(interval.openingIds),
-        bounds: boxBounds(
-          centerX,
-          centerZ,
-          point.tangentX,
-          point.tangentZ,
-          length,
-          record.dimensions.thickness,
-        ),
+        bounds: boundsForBox,
       });
       boxes.push(box);
-      unionBounds(bounds, box.bounds);
+      unionBounds(bounds, boundsForBox);
     }
   }
 
   if (boxes.length === 0) {
-    bounds.minX = sampled.points[0].x;
-    bounds.maxX = sampled.points[0].x;
-    bounds.minZ = sampled.points[0].z;
-    bounds.maxZ = sampled.points[0].z;
+    const frame = arcTable.frameAt(0);
+    bounds.minX = frame.x;
+    bounds.maxX = frame.x;
+    bounds.minZ = frame.z;
+    bounds.maxZ = frame.z;
   }
 
   return Object.freeze({
