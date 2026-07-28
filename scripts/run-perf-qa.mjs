@@ -48,6 +48,7 @@ const warmup = readArg('warmup', '2');
 const speed = readArg('speed', 'run');
 const hitchMs = readArg('hitchMs', '33.3');
 const buildings = readArg('buildings');
+const collisionDebug = readArg('collisionDebug');
 const spawnX = readArg('x');
 const spawnZ = readArg('z');
 const yaw = readArg('yaw');
@@ -80,6 +81,7 @@ const query = new URLSearchParams({
   autostart: '1',
 });
 setOptionalQuery(query, 'buildings', buildings);
+setOptionalQuery(query, 'collisionDebug', collisionDebug);
 setOptionalQuery(query, 'x', spawnX);
 setOptionalQuery(query, 'z', spawnZ);
 setOptionalQuery(query, 'yaw', yaw);
