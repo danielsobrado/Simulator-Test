@@ -7,14 +7,15 @@
  * workshop generator so both systems produce the same kind of stonework.
  *
  * `bedAmplitude`, `jointTilt` and `splitChance` drive `CourseLattice`. Note what
- * `splitChance` does to the grid: a base cell yields `1 + c + c^2` leaves on
- * average, so `courseHeight` and `targetWidth` are deliberately *larger* than the
- * finished stone size and the recursive split brings it back down. That is the
- * order the reference builds in, and it is what widens the size distribution —
- * one big block beside two stacked small ones — without moving the stone count.
+ * `splitChance` does to the grid: with `splitMaxDepth` 2 a base cell yields
+ * `1 + c + c²` leaves on average; with depth 1 it yields `1 + c`. So
+ * `courseHeight` and `targetWidth` are deliberately *larger* than the finished
+ * stone size and the recursive split brings it back down. That is the order the
+ * reference builds in, and it is what widens the size distribution — one big
+ * block beside two stacked small ones — without moving the stone count.
  *
  * These are tuned against measurement, not against the analytic leaf count. Two
- * things pull away from `1 + c + c^2`: rejecting a split that would fall under
+ * things pull away from the leaf formula: rejecting a split that would fall under
  * `minWidth` or `MIN_SPLIT_HEIGHT` costs a few percent, more of it the busier the
  * style; and `courseHeight` is only a target, since the packer divides the wall
  * body into a whole number of courses. Tune `targetWidth` against the density
@@ -28,8 +29,121 @@
  * | dry-stone      | 1.987       | 6.604     | 6.614       | -0.2% |
  */
 
+/** Shared defaults that reproduce the former hard-coded packer behaviour. */
+const DEFAULT_STYLE_TUNING = Object.freeze({
+  splitMaxDepth: 2,
+
+  jointInsetMin: 0.012,
+  jointInsetMax: 0.03,
+  jointInsetVerticalRatio: 0.7,
+
+  depthScaleMin: 0.95,
+  depthScaleMax: 0.985,
+  faceOffsetAmplitude: 0.009,
+});
+
+/**
+ * Local whitelist so the catalogue can validate palette keys without importing
+ * workshop materials (and creating a circular dependency).
+ */
+const STONE_PALETTE_KEYS = new Set([
+  'granite',
+  'limestone',
+  'sandstone',
+]);
+
+function finiteInRange(value, label, minimum, maximum) {
+  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${label} must be between ${minimum} and ${maximum}.`);
+  }
+  return value;
+}
+
+function positive(value, label) {
+  return finiteInRange(value, label, Number.EPSILON, Infinity);
+}
+
+/**
+ * Freeze a complete masonry style descriptor after filling defaults and
+ * validating every tuning field.
+ *
+ * Exported for unit tests that assert invalid input fails immediately.
+ */
+export function defineConstructionStyle(input) {
+  const style = {
+    ...DEFAULT_STYLE_TUNING,
+    ...input,
+  };
+
+  if (!style.key || typeof style.key !== 'string') {
+    throw new Error('Construction style key is required.');
+  }
+
+  if (!style.label || typeof style.label !== 'string') {
+    throw new Error(`Construction style ${style.key} needs a label.`);
+  }
+
+  positive(style.courseHeight, `${style.key} courseHeight`);
+  positive(style.targetWidth, `${style.key} targetWidth`);
+  positive(style.minWidth, `${style.key} minWidth`);
+  positive(style.merlonSpacing, `${style.key} merlonSpacing`);
+
+  finiteInRange(style.irregularity, `${style.key} irregularity`, 0, 1);
+  finiteInRange(style.detail, `${style.key} detail`, 1, 3);
+  finiteInRange(style.bedAmplitude, `${style.key} bedAmplitude`, 0, 0.2);
+  finiteInRange(style.jointTilt, `${style.key} jointTilt`, 0, 0.5);
+  finiteInRange(style.splitChance, `${style.key} splitChance`, 0, 1);
+  finiteInRange(style.splitMaxDepth, `${style.key} splitMaxDepth`, 0, 2);
+
+  finiteInRange(style.jointInsetMin, `${style.key} jointInsetMin`, 0, 0.1);
+  finiteInRange(style.jointInsetMax, `${style.key} jointInsetMax`, 0, 0.1);
+  finiteInRange(
+    style.jointInsetVerticalRatio,
+    `${style.key} jointInsetVerticalRatio`,
+    0.1,
+    1,
+  );
+
+  finiteInRange(style.depthScaleMin, `${style.key} depthScaleMin`, 0.5, 1.2);
+  finiteInRange(style.depthScaleMax, `${style.key} depthScaleMax`, 0.5, 1.2);
+  finiteInRange(
+    style.faceOffsetAmplitude,
+    `${style.key} faceOffsetAmplitude`,
+    0,
+    0.1,
+  );
+
+  if (!Number.isInteger(style.detail)) {
+    throw new Error(`${style.key} detail must be an integer.`);
+  }
+
+  if (!Number.isInteger(style.splitMaxDepth)) {
+    throw new Error(`${style.key} splitMaxDepth must be an integer.`);
+  }
+
+  if (style.minWidth >= style.targetWidth) {
+    throw new Error(`${style.key} minWidth must be below targetWidth.`);
+  }
+
+  if (style.jointInsetMin > style.jointInsetMax) {
+    throw new Error(`${style.key} joint inset range is reversed.`);
+  }
+
+  if (style.depthScaleMin > style.depthScaleMax) {
+    throw new Error(`${style.key} depth scale range is reversed.`);
+  }
+
+  if (!STONE_PALETTE_KEYS.has(style.stonePalette)) {
+    throw new Error(
+      `${style.key} references unknown stone palette ${style.stonePalette}.`,
+    );
+  }
+
+  return Object.freeze(style);
+}
+
 export const CONSTRUCTION_STYLES = Object.freeze({
-  'coursed-rubble': Object.freeze({
+  'coursed-rubble': defineConstructionStyle({
     key: 'coursed-rubble',
     label: 'Coursed rubble',
     courseHeight: 0.56,
@@ -43,7 +157,7 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     jointTilt: 0.16,
     splitChance: 0.42,
   }),
-  ashlar: Object.freeze({
+  ashlar: defineConstructionStyle({
     key: 'ashlar',
     label: 'Ashlar',
     courseHeight: 0.44,
@@ -58,7 +172,7 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     jointTilt: 0.05,
     splitChance: 0.2,
   }),
-  'random-rubble': Object.freeze({
+  'random-rubble': defineConstructionStyle({
     key: 'random-rubble',
     label: 'Random rubble',
     courseHeight: 0.46,
@@ -72,7 +186,7 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     jointTilt: 0.22,
     splitChance: 0.6,
   }),
-  'dry-stone': Object.freeze({
+  'dry-stone': defineConstructionStyle({
     key: 'dry-stone',
     label: 'Dry stone',
     courseHeight: 0.4,
