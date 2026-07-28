@@ -135,9 +135,9 @@ export function planConstruction(input, {
     hasher.text(moduleId);
     hasher.text(record.style.key);
     hasher.number(record.style.version);
-    for (const family of ['stone', 'mortar', 'roof']) {
-      hasher.text(record.style.materials[family] ?? '-');
-    }
+    // Material assignments change renderer state only. Including them here made
+    // a paint operation invalidate every module on the next geometric edit,
+    // despite `set_material` correctly taking the material-only fast path.
     hasher.number(record.seed);
     hasher.number(record.dimensions.height);
     hasher.number(record.dimensions.thickness);
@@ -329,4 +329,3 @@ export function planConstruction(input, {
     }),
   });
 }
-
