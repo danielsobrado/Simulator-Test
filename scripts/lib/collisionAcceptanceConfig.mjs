@@ -167,6 +167,26 @@ function freezeGates(rawGates) {
   });
 }
 
+function sameSpawn(left, right) {
+  if (left === null || right === null) return left === right;
+  return left.x === right.x && left.z === right.z;
+}
+
+function assertComparableRoute(caseConfig, baseline) {
+  const matches = caseConfig.speed === baseline.speed
+    && caseConfig.warmupSeconds === baseline.warmupSeconds
+    && caseConfig.durationSeconds === baseline.durationSeconds
+    && sameSpawn(caseConfig.spawn, baseline.spawn)
+    && caseConfig.yawDegrees === baseline.yawDegrees
+    && caseConfig.pitchDegrees === baseline.pitchDegrees
+    && caseConfig.buildings === baseline.buildings;
+  if (!matches) {
+    throw new Error(
+      `Comparable case ${caseConfig.id} must match the baseline movement route and duration.`,
+    );
+  }
+}
+
 export function validateCollisionAcceptanceConfig(rawConfig) {
   const source = assertObject(rawConfig, 'collision acceptance config');
   const cases = Object.freeze((source.cases ?? []).map(freezeCase));
@@ -185,6 +205,9 @@ export function validateCollisionAcceptanceConfig(rawConfig) {
   if (baseline.collisionRequired) throw new Error('baselineCase must not require collision.');
   if (baseline.compareFrameToBaseline) {
     throw new Error('baselineCase cannot compare its frame time to itself.');
+  }
+  for (const caseConfig of cases) {
+    if (caseConfig.compareFrameToBaseline) assertComparableRoute(caseConfig, baseline);
   }
 
   return Object.freeze({
