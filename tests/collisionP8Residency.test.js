@@ -100,6 +100,9 @@ test('failed chunks expose structured context and stay unsafe', () => {
   });
   assert.equal(readiness.ready, false);
   assert.deepEqual(readiness.failed, [status.failure]);
+
+  residency.update({ focus: { x: 1025, z: 1 }, velocity: { x: 0, z: 0 } });
+  assert.equal(residency.getStatus().failure, null);
 });
 
 test('residency disposal unloads committed owner chunks and clears failure state', () => {
