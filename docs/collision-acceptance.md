@@ -39,7 +39,7 @@ Use one repeat while debugging the harness:
 npm run qa:collision -- --repeats 1
 ```
 
-Generated output is restricted to a child of the repository `tmp` directory. The default output is:
+Generated output is restricted to a child of the repository `tmp` directory. Relative output paths are resolved from the repository root. The default output is:
 
 ```text
 tmp/collision-acceptance/
@@ -82,7 +82,9 @@ The current matrix reuses deterministic P3-P8 fixtures:
 
 Targeted fixture scenes enforce collision timing, readiness, query counts, hardware evidence, and hitches. They are not compared against the open-ground frame baseline because their rendered scenes differ.
 
-The full-stack route is marked comparable and must stay within the configured frame-p95 regression allowance against the open-ground baseline.
+The full-stack route is marked comparable and must stay within the configured frame-p95 regression allowance against the open-ground baseline. The baseline and collision-enabled case use the same spawn, direction, speed, warm-up, and 60-second measurement window. Configuration validation rejects future comparable cases that do not match their baseline route.
+
+`collision-p8` preserves production debug settings. It does not force collider or broadphase debug rendering, so the performance capture excludes QA visualisation cost. P1-P7 visual fixtures still force their debug views for headed inspection.
 
 ## Required release coverage still missing
 
