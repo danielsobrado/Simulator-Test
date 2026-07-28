@@ -2,6 +2,20 @@ water:
   qualityTier: high
   currentAnimationSpeed: 0.22
   currentInfluence: 0.85
+  optics:
+    shallowColor: '#72d8e8'
+    deepColor: '#0b4a68'
+    underwaterColor: '#15596d'
+    absorptionDensity: 0.42
+    minimumOpacity: 0.08
+    maximumOpacity: 0.94
+    shallowDepth: 0.2
+    deepDepth: 6
+    maximumOpticalDistance: 14
+    minimumViewCosine: 0.22
+    surfaceTransitionDepth: 0.75
+    surfaceDetailStrength: 0.28
+    underwaterTintStrength: 0.35
   caustics:
     intensity: 0.18
     scale: 0.45
