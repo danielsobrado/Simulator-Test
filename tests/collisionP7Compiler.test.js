@@ -3,6 +3,7 @@ import test from 'node:test';
 import { compileConstructionCollision } from '../src/editor/construction/compile/ConstructionCollisionCompiler.js';
 import { sampleCubicBezierPath } from '../src/editor/construction/curve/CubicBezierPath.js';
 import {
+  closedConstruction,
   curvedConstruction,
   doorFeature,
   straightConstruction,
@@ -14,6 +15,13 @@ function compile(record, curveSegmentLength = 1.25) {
     sampleCubicBezierPath(record.path),
     { curveSegmentLength },
   );
+}
+
+function boundsIntersect(left, right) {
+  return left.minX <= right.maxX
+    && left.maxX >= right.minX
+    && left.minZ <= right.maxZ
+    && left.maxZ >= right.minZ;
 }
 
 test('a straight construction wall compiles to one oriented box', () => {
@@ -64,6 +72,16 @@ test('curved construction boxes overlap through the source-segment join', () => 
   const join = fullHeight.findIndex((box) => box.segmentId === 'segment-north-east');
   assert.ok(join > 0);
   assert.notEqual(fullHeight[join - 1].segmentId, fullHeight[join].segmentId);
+});
+
+test('closed construction loops overlap the final and first boxes', () => {
+  const plan = compile(closedConstruction());
+  const first = plan.boxes[0];
+  const last = plan.boxes.at(-1);
+
+  assert.equal(plan.boxes.length, 4);
+  assert.notEqual(first.segmentId, last.segmentId);
+  assert.equal(boundsIntersect(first.bounds, last.bounds), true);
 });
 
 test('door openings remove the player-height band but retain a lintel', () => {
