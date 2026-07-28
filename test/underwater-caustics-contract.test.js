@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const postSource = await readFile(
+  new URL('../src/editor/water/UnderwaterCausticsPostProcess.js', import.meta.url),
+  'utf8',
+);
+const controllerSource = await readFile(
+  new URL('../src/editor/water/UnderwaterViewController.js', import.meta.url),
+  'utf8',
+);
+
+test('projected caustics reconstruct world position from scene depth', () => {
+  assert.match(postSource, /getViewPosition\(/);
+  assert.match(postSource, /const worldPosition = cameraMatrixWorld\.mul\(viewPosition\)\.xyz;/);
+  assert.match(postSource, /const belowSurfaceDepth = max\(surfaceHeight\.sub\(worldPosition\.y\), 0\);/);
+  assert.match(postSource, /const geometry = oneMinus\(step\(SKY_DEPTH_THRESHOLD, depth\)\);/);
+});
+
+test('projected caustics are depth, distance, and transition bounded', () => {
+  assert.match(postSource, /const shallow = oneMinus\(smoothstep\(/);
+  assert.match(postSource, /const distanceFade = oneMinus\(smoothstep\(/);
+  assert.match(postSource, /\.mul\(blend\)/);
+  assert.match(postSource, /PerfCounters\.inc\('waterProjectedCausticFrames'\)/);
+});
+
+test('underwater controller intercepts and restores render hooks', () => {
+  assert.match(controllerSource, /terrainView\.render = \(camera\) => \{/);
+  assert.match(controllerSource, /this\.causticsPostProcess\.render\(camera\)/);
+  assert.match(controllerSource, /terrainView\.prewarmPostProcessing = \(camera\) => \{/);
+  assert.match(controllerSource, /this\.terrainView\.render = this\.originalTerrainRender;/);
+  assert.match(controllerSource, /this\.terrainView\.prewarmPostProcessing = this\.originalTerrainPrewarm;/);
+});
