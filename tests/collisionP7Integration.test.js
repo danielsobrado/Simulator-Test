@@ -7,23 +7,61 @@ import { ConstructionCompilerClient } from '../src/editor/construction/compile/C
 import { parseQaParams } from '../src/editor/performance/qa/parseQaParams.js';
 import { straightConstruction } from './helpers/constructionCollisionFixtures.js';
 
+function colliderIds(plan) {
+  return plan.collision.boxes.map((box) => `construction:${plan.constructionId}:${box.id}`);
+}
+
 test('construction compiler publishes the matching collision plan independently', async () => {
   constructionCollisionSource.clear();
   constructionCollisionSource.setConfig({ curveSegmentLength: 0.75 });
   const record = straightConstruction({ id: 'construction-compile' });
   const store = new ConstructionStore([record]);
   const compiler = new ConstructionCompilerClient();
+  try {
+    const plan = await compiler.compile(store.get(record.id), { masonry: false });
+    assert.equal(plan.constructionRevision, record.revision);
+    assert.equal(plan.collision.constructionRevision, record.revision);
+    assert.equal(
+      constructionCollisionSource.getPlan(record.id).signature,
+      plan.collision.signature,
+    );
+    assert.deepEqual(constructionCollisionSource.getConfig(), { curveSegmentLength: 0.75 });
+  } finally {
+    compiler.dispose();
+    constructionCollisionSource.clear();
+  }
+});
 
-  const plan = await compiler.compile(store.get(record.id), { masonry: false });
-  assert.equal(plan.constructionRevision, record.revision);
-  assert.equal(plan.collision.constructionRevision, record.revision);
-  assert.equal(
-    constructionCollisionSource.getPlan(record.id).signature,
-    plan.collision.signature,
-  );
-  assert.deepEqual(constructionCollisionSource.getConfig(), { curveSegmentLength: 0.75 });
-  compiler.dispose();
+test('construction undo and save/load restore collider geometry and IDs', async () => {
   constructionCollisionSource.clear();
+  constructionCollisionSource.setConfig({ curveSegmentLength: 1.25 });
+  const record = straightConstruction({ id: 'construction-persistence' });
+  const store = new ConstructionStore([record]);
+  const compiler = new ConstructionCompilerClient();
+  try {
+    const initial = await compiler.compile(store.get(record.id), { masonry: false });
+    const before = store.get(record.id);
+    const after = store.update(record.id, {
+      ...before,
+      dimensions: { ...before.dimensions, thickness: 1.2 },
+    });
+    const edited = await compiler.compile(after, { masonry: false });
+    assert.notEqual(edited.collision.signature, initial.collision.signature);
+
+    store.applyChange({ before, after }, 'undo');
+    const undone = await compiler.compile(store.get(record.id), { masonry: false });
+    assert.equal(undone.collision.signature, initial.collision.signature);
+    assert.deepEqual(colliderIds(undone), colliderIds(initial));
+
+    const document = store.toDocument();
+    const loadedStore = new ConstructionStore(document);
+    const loaded = await compiler.compile(loadedStore.get(record.id), { masonry: false });
+    assert.equal(loaded.collision.signature, initial.collision.signature);
+    assert.deepEqual(colliderIds(loaded), colliderIds(initial));
+  } finally {
+    compiler.dispose();
+    constructionCollisionSource.clear();
+  }
 });
 
 test('P7 QA fixture is deterministic and survives repeated enforcement', () => {
