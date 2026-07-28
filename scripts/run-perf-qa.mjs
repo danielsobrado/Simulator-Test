@@ -10,6 +10,7 @@
  *   npm run qa:perf -- --qa collision-p8 --out tmp/collision-p8.json
  */
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,7 +65,10 @@ const screenshotPath = screenshotArg === null ? null : path.resolve(screenshotAr
 const screenshotReportPath = screenshotPath === null
   ? null
   : path.relative(root, screenshotPath).replaceAll('\\', '/');
-const runnerPath = path.join(outDir, 'perf-qa-playwright-runner.cjs');
+const runnerPath = path.join(
+  outDir,
+  `perf-qa-playwright-runner-${process.pid}-${randomUUID()}.cjs`,
+);
 
 const query = new URLSearchParams({
   qa: scenario,
@@ -93,113 +97,121 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 
 (async () => {
-  const browser = await chromium.launch({
-    headless: ${hasFlag('headed') ? 'false' : 'true'},
-    // Without the blocklist bypass Chromium quietly hands WebGPU a software
-    // adapter, and every number below then describes a CPU rasterizer rather
-    // than the GPU path players use. Frame rates come out ~100x too low.
-    // vsync is also disabled: a 60 Hz cap hides all headroom above the refresh
-    // rate, so a regression is invisible until it drops under the cap.
-    args: [
-      '--enable-unsafe-webgpu',
-      '--ignore-gpu-blocklist',
-      '--use-angle=default',
-      '--enable-gpu-rasterization',
-      '--disable-gpu-vsync',
-      '--disable-frame-rate-limit',
-    ],
-  });
-  const page = await browser.newPage({
-    viewport: { width: ${viewportWidth}, height: ${viewportHeight} },
-    deviceScaleFactor: ${deviceScaleFactor},
-  });
-  page.setDefaultTimeout(${timeoutMs});
-  await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
-
-  // Refuse to report timings from a software or unidentified adapter.
-  const adapter = await page.evaluate(async () => {
-    if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
-    const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!found) return { ok: false, reason: 'no WebGPU adapter' };
-    const flags = found.info ?? {};
-    return {
-      ok: true,
-      vendor: flags.vendor ?? null,
-      architecture: flags.architecture ?? null,
-      description: flags.description ?? null,
-      fallback: Boolean(found.isFallbackAdapter),
-    };
-  });
-  const softwareHint = [adapter.vendor, adapter.architecture, adapter.description]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  const isSoftware = !adapter.ok
-    || adapter.fallback
-    || softwareHint.length === 0
-    || /swiftshader|lavapipe|basic render|microsoft basic|llvmpipe|warp/.test(softwareHint);
-  if (isSoftware) {
-    console.error('Perf QA aborted: WebGPU is using software or unidentified hardware.');
-    console.error(JSON.stringify(adapter, null, 2));
-    console.error('These timings are not valid hardware-GPU evidence.');
-    await browser.close();
-    process.exit(2);
-  }
-  console.log('WebGPU adapter: ' + JSON.stringify(adapter));
-
-  await page.waitForFunction(() => window.__perfQa && window.__perfQa.status === 'done', null, {
-    timeout: ${timeoutMs},
-  });
-  const report = await page.evaluate(() => window.__perfQa.getReport());
-  report.adapter = adapter;
-  report.capture = {
-    viewport: {
-      width: ${viewportWidth},
-      height: ${viewportHeight},
+  let browser = null;
+  try {
+    browser = await chromium.launch({
+      headless: ${hasFlag('headed') ? 'false' : 'true'},
+      // Without the blocklist bypass Chromium quietly hands WebGPU a software
+      // adapter, and every number below then describes a CPU rasterizer rather
+      // than the GPU path players use. Frame rates come out ~100x too low.
+      // vsync is also disabled: a 60 Hz cap hides all headroom above the refresh
+      // rate, so a regression is invisible until it drops under the cap.
+      args: [
+        '--enable-unsafe-webgpu',
+        '--ignore-gpu-blocklist',
+        '--use-angle=default',
+        '--enable-gpu-rasterization',
+        '--disable-gpu-vsync',
+        '--disable-frame-rate-limit',
+      ],
+    });
+    const page = await browser.newPage({
+      viewport: { width: ${viewportWidth}, height: ${viewportHeight} },
       deviceScaleFactor: ${deviceScaleFactor},
-    },
-    screenshot: ${JSON.stringify(screenshotReportPath)},
-  };
-  ${screenshotPath === null ? '' : `await page.screenshot({ path: ${JSON.stringify(screenshotPath.replace(/\\/g, '/'))} });`}
-  fs.writeFileSync(${JSON.stringify(outPath.replace(/\\/g, '/'))}, JSON.stringify(report, null, 2) + '\\n');
-  console.log(JSON.stringify({
-    outPath: ${JSON.stringify(outPath.replace(/\\/g, '/'))},
-    screenshotPath: ${JSON.stringify(screenshotPath?.replace(/\\/g, '/') ?? null)},
-    adapter,
-    capture: report.capture,
-    scenario: report.scenario?.id,
-    avgFps: report.summary.avgFps,
-    hitchCount: report.summary.hitchCount,
-    dt: report.summary.dt,
-    counters: report.counters,
-    collision: report.collision
-      ? {
-        enabled: report.collision.enabled,
-        p95Ms: report.collision.timingsMs?.total?.p95Ms,
-        gatePassed: report.collision.gate?.passed,
-        readiness: report.collision.readiness,
-      }
-      : null,
-  }, null, 2));
-  await browser.close();
+    });
+    page.setDefaultTimeout(${timeoutMs});
+    await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
+
+    // Refuse to report timings from a software or unidentified adapter.
+    const adapter = await page.evaluate(async () => {
+      if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
+      const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+      if (!found) return { ok: false, reason: 'no WebGPU adapter' };
+      const flags = found.info ?? {};
+      return {
+        ok: true,
+        vendor: flags.vendor ?? null,
+        architecture: flags.architecture ?? null,
+        description: flags.description ?? null,
+        fallback: Boolean(found.isFallbackAdapter),
+      };
+    });
+    const softwareHint = [adapter.vendor, adapter.architecture, adapter.description]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    const isSoftware = !adapter.ok
+      || adapter.fallback
+      || softwareHint.length === 0
+      || /swiftshader|lavapipe|basic render|microsoft basic|llvmpipe|warp/.test(softwareHint);
+    if (isSoftware) {
+      console.error('Perf QA aborted: WebGPU is using software or unidentified hardware.');
+      console.error(JSON.stringify(adapter, null, 2));
+      console.error('These timings are not valid hardware-GPU evidence.');
+      process.exitCode = 2;
+      return;
+    }
+    console.log('WebGPU adapter: ' + JSON.stringify(adapter));
+
+    await page.waitForFunction(() => window.__perfQa && window.__perfQa.status === 'done', null, {
+      timeout: ${timeoutMs},
+    });
+    const report = await page.evaluate(() => window.__perfQa.getReport());
+    report.adapter = adapter;
+    report.capture = {
+      viewport: {
+        width: ${viewportWidth},
+        height: ${viewportHeight},
+        deviceScaleFactor: ${deviceScaleFactor},
+      },
+      screenshot: ${JSON.stringify(screenshotReportPath)},
+    };
+    ${screenshotPath === null ? '' : `await page.screenshot({ path: ${JSON.stringify(screenshotPath.replace(/\\/g, '/'))} });`}
+    fs.writeFileSync(${JSON.stringify(outPath.replace(/\\/g, '/'))}, JSON.stringify(report, null, 2) + '\\n');
+    console.log(JSON.stringify({
+      outPath: ${JSON.stringify(outPath.replace(/\\/g, '/'))},
+      screenshotPath: ${JSON.stringify(screenshotPath?.replace(/\\/g, '/') ?? null)},
+      adapter,
+      capture: report.capture,
+      scenario: report.scenario?.id,
+      avgFps: report.summary.avgFps,
+      hitchCount: report.summary.hitchCount,
+      dt: report.summary.dt,
+      counters: report.counters,
+      collision: report.collision
+        ? {
+          enabled: report.collision.enabled,
+          p95Ms: report.collision.timingsMs?.total?.p95Ms,
+          gatePassed: report.collision.gate?.passed,
+          readiness: report.collision.readiness,
+        }
+        : null,
+    }, null, 2));
+  } finally {
+    await browser?.close();
+  }
 })().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });
 `,
 );
 
 console.log(`Running Perf QA: ${targetUrl}`);
 
-await new Promise((resolve, reject) => {
-  const child = spawn(
-    process.execPath,
-    [runnerPath],
-    { cwd: root, stdio: 'inherit', windowsHide: true },
-  );
-  child.once('error', reject);
-  child.once('exit', (code) => {
-    if (code === 0) resolve();
-    else reject(new Error(`Perf QA runner exited with code ${code}`));
+try {
+  await new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [runnerPath],
+      { cwd: root, stdio: 'inherit', windowsHide: true },
+    );
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Perf QA runner exited with code ${code}`));
+    });
   });
-});
+} finally {
+  fs.rmSync(runnerPath, { force: true });
+}
