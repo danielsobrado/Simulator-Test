@@ -33,7 +33,9 @@ function assertBoolean(value, name) {
 function stringList(value, name) {
   if (!Array.isArray(value)) throw new Error(`${name} must be an array.`);
   const entries = value.map((entry, index) => assertString(entry, `${name}[${index}]`));
-  if (new Set(entries).size !== entries.length) throw new Error(`${name} must not contain duplicates.`);
+  if (new Set(entries).size !== entries.length) {
+    throw new Error(`${name} must not contain duplicates.`);
+  }
   return Object.freeze(entries);
 }
 
@@ -49,17 +51,32 @@ function freezeCase(rawCase, index) {
   const spawn = source.spawn == null
     ? null
     : Object.freeze({
-      x: assertNumber(source.spawn.x, `cases[${index}].spawn.x`, { minimum: -Number.MAX_VALUE }),
-      z: assertNumber(source.spawn.z, `cases[${index}].spawn.z`, { minimum: -Number.MAX_VALUE }),
+      x: assertNumber(source.spawn.x, `cases[${index}].spawn.x`, {
+        minimum: -Number.MAX_VALUE,
+      }),
+      z: assertNumber(source.spawn.z, `cases[${index}].spawn.z`, {
+        minimum: -Number.MAX_VALUE,
+      }),
     });
 
   return Object.freeze({
     id: assertString(source.id, `cases[${index}].id`),
     label: assertString(source.label, `cases[${index}].label`),
     scenario: assertString(source.scenario, `cases[${index}].scenario`),
-    collisionRequired: assertBoolean(source.collisionRequired, `cases[${index}].collisionRequired`),
+    collisionRequired: assertBoolean(
+      source.collisionRequired,
+      `cases[${index}].collisionRequired`,
+    ),
+    compareFrameToBaseline: assertBoolean(
+      source.compareFrameToBaseline,
+      `cases[${index}].compareFrameToBaseline`,
+    ),
     warmupSeconds: assertNumber(source.warmupSeconds, `cases[${index}].warmupSeconds`),
-    durationSeconds: assertNumber(source.durationSeconds, `cases[${index}].durationSeconds`, { minimum: 0.5 }),
+    durationSeconds: assertNumber(
+      source.durationSeconds,
+      `cases[${index}].durationSeconds`,
+      { minimum: 0.5 },
+    ),
     speed,
     coverage: stringList(source.coverage ?? [], `cases[${index}].coverage`),
     spawn,
@@ -112,15 +129,22 @@ function freezeGates(rawGates) {
 export function validateCollisionAcceptanceConfig(rawConfig) {
   const source = assertObject(rawConfig, 'collision acceptance config');
   const cases = Object.freeze((source.cases ?? []).map(freezeCase));
-  if (cases.length === 0) throw new Error('collision acceptance config requires at least one case.');
+  if (cases.length === 0) {
+    throw new Error('collision acceptance config requires at least one case.');
+  }
 
   const caseIds = cases.map((entry) => entry.id);
-  if (new Set(caseIds).size !== caseIds.length) throw new Error('collision acceptance case IDs must be unique.');
+  if (new Set(caseIds).size !== caseIds.length) {
+    throw new Error('collision acceptance case IDs must be unique.');
+  }
 
   const baselineCase = assertString(source.baselineCase, 'baselineCase');
   const baseline = cases.find((entry) => entry.id === baselineCase);
   if (!baseline) throw new Error(`baselineCase ${baselineCase} does not exist.`);
   if (baseline.collisionRequired) throw new Error('baselineCase must not require collision.');
+  if (baseline.compareFrameToBaseline) {
+    throw new Error('baselineCase cannot compare its frame time to itself.');
+  }
 
   return Object.freeze({
     version: assertNumber(source.version, 'version', { minimum: 1, integer: true }),
