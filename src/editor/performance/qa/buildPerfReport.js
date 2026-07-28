@@ -31,10 +31,14 @@ function compactStreaming(streaming) {
   };
 }
 
-function timingSummary(frames, counter) {
+function timingSummary(frames, counters) {
+  const names = Array.isArray(counters) ? counters : [counters];
   const values = frames
     .filter((frame) => frame.dt > 0)
-    .map((frame) => Math.max(0, frame.countersDelta?.[counter] ?? 0))
+    .map((frame) => Math.max(
+      0,
+      names.reduce((sum, name) => sum + (frame.countersDelta?.[name] ?? 0), 0),
+    ))
     .sort((left, right) => left - right);
   const totalMs = values.reduce((sum, value) => sum + value, 0);
   return Object.freeze({
@@ -54,10 +58,16 @@ function count(counters, name) {
 }
 
 function buildCollisionReport({ frames, counters, collisionConfig, collisionStatus }) {
-  const timingsMs = Object.freeze(Object.fromEntries(
-    Object.entries(COLLISION_TIMING_COUNTERS)
-      .map(([name, counter]) => [name, timingSummary(frames, counter)]),
-  ));
+  const timingsMs = Object.freeze({
+    total: timingSummary(frames, [
+      COLLISION_TIMING_COUNTERS.total,
+      COLLISION_TIMING_COUNTERS.chunkBuild,
+    ]),
+    broadphase: timingSummary(frames, COLLISION_TIMING_COUNTERS.broadphase),
+    narrowPhase: timingSummary(frames, COLLISION_TIMING_COUNTERS.narrowPhase),
+    support: timingSummary(frames, COLLISION_TIMING_COUNTERS.support),
+    chunkBuild: timingSummary(frames, COLLISION_TIMING_COUNTERS.chunkBuild),
+  });
   const enabled = collisionStatus?.active === true || collisionConfig?.enabled === true;
   return Object.freeze({
     enabled,
