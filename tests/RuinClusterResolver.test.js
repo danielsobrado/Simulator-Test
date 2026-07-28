@@ -83,7 +83,7 @@ test('severe expansion is one bounded cluster rather than a rightward chain', ()
   assert.equal(new Set(resolved.removed.map((entry) => entry.clusterId)).size, 1);
 });
 
-test('course ordering and input ordering do not alter survivors', () => {
+test('course and input ordering do not alter survivors or cluster ids', () => {
   const placements = [
     stone(1, 0, 0.5, 0.1, false, 3),
     stone(2, 0.5, 1.0, 0.85, true, 3),
@@ -98,7 +98,26 @@ test('course ordering and input ordering do not alter survivors', () => {
     b.removed.map((entry) => entry.placement.stableIndex).sort((x, y) => x - y),
   );
   assert.deepEqual(
-    a.removed.map((entry) => entry.clusterId).sort((x, y) => x - y),
-    b.removed.map((entry) => entry.clusterId).sort((x, y) => x - y),
+    a.removed.map((entry) => entry.clusterId).sort(),
+    b.removed.map((entry) => entry.clusterId).sort(),
   );
+});
+
+test('adding an earlier unrelated cluster does not renumber a later cluster', () => {
+  const later = [
+    stone(10, 10, 10.5, 0.1, false, 3),
+    stone(11, 10.5, 11, 0.95, true, 3),
+    stone(12, 11, 11.5, 0.1, false, 3),
+  ];
+  const before = resolveRuinClusters({ placements: later, profile });
+  const after = resolveRuinClusters({
+    placements: [
+      stone(1, 0, 0.5, 0.95, true, 1),
+      ...later,
+    ],
+    profile,
+  });
+  const beforeId = before.removed.find((entry) => entry.placement.stableIndex === 11)?.clusterId;
+  const afterId = after.removed.find((entry) => entry.placement.stableIndex === 11)?.clusterId;
+  assert.equal(afterId, beforeId);
 });
