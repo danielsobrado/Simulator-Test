@@ -133,11 +133,14 @@ export function createMeshInstanceCollider({
   });
 }
 
-export function createColliderPrototype({ id, kind, bounds, metadata = {} }) {
+export function createColliderPrototype({ id, kind, bounds, metadata = {}, resource = null }) {
   if (!id) throw new Error('Collider prototype id is required.');
   if (!kind) throw new Error('Collider prototype kind is required.');
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new Error('Collider prototype metadata must be a plain object.');
+  }
+  if (resource !== null && (typeof resource !== 'object' || Array.isArray(resource))) {
+    throw new Error('Collider prototype resource must be an object or null.');
   }
   return Object.freeze({
     [COLLIDER_PROTOTYPE_BRAND]: true,
@@ -145,5 +148,6 @@ export function createColliderPrototype({ id, kind, bounds, metadata = {} }) {
     kind: String(kind),
     bounds: createCanonicalAabb(bounds),
     metadata: cloneMetadata(metadata),
+    resource,
   });
 }

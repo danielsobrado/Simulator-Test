@@ -50,6 +50,10 @@ export const COLLISION_CONFIG_DEFAULTS = deepFreeze({
     minimumWalkableHeight: 0.7,
     minimumWalkableWidth: 1.2,
     maximumProxyTriangles: 96,
+    bvhMaxLeafTriangles: 4,
+    minimumProxyOverlapRatio: 0.35,
+    allowGeneratedProxyFallback: true,
+    requireAuthoredProxy: false,
     prototypeOverrides: {},
   },
   objects: {
@@ -238,6 +242,23 @@ export function validateCollisionConfig(config) {
     );
   }
   assertPositiveInteger(config.rocks.maximumProxyTriangles, 'collision.rocks.maximumProxyTriangles');
+  assertPositiveInteger(config.rocks.bvhMaxLeafTriangles, 'collision.rocks.bvhMaxLeafTriangles');
+  assertPositive(config.rocks.minimumProxyOverlapRatio, 'collision.rocks.minimumProxyOverlapRatio');
+  if (config.rocks.minimumProxyOverlapRatio > 1) {
+    throw new Error(
+      'Invalid collision configuration: collision.rocks.minimumProxyOverlapRatio must not exceed 1.',
+    );
+  }
+  assertBoolean(
+    config.rocks.allowGeneratedProxyFallback,
+    'collision.rocks.allowGeneratedProxyFallback',
+  );
+  assertBoolean(config.rocks.requireAuthoredProxy, 'collision.rocks.requireAuthoredProxy');
+  if (config.rocks.requireAuthoredProxy && config.rocks.allowGeneratedProxyFallback) {
+    throw new Error(
+      'Invalid collision configuration: authored rock proxies cannot be required while generated fallback is enabled.',
+    );
+  }
   validateRockOverrides(config.rocks.prototypeOverrides);
   assertPositive(config.constructions.curveSegmentLength, 'collision.constructions.curveSegmentLength');
 

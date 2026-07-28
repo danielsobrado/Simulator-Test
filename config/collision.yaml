@@ -1,7 +1,8 @@
 # Static player-collision configuration.
 #
-# P4 adds canonical primitive rock collision. Large rocks are classified as
-# walkable-pending and use a visible primitive fallback until P5 installs BVHs.
+# P5 replaces large-rock primitive fallbacks with reusable walkable mesh proxies
+# and one BVH per prototype. Generated convex proxies remain visibly reported so
+# authored COLLIDER_WALKABLE nodes can replace them asset by asset.
 enabled: true
 schemaVersion: 1
 
@@ -37,6 +38,10 @@ rocks:
   minimumWalkableHeight: 0.7
   minimumWalkableWidth: 1.2
   maximumProxyTriangles: 96
+  bvhMaxLeafTriangles: 4
+  minimumProxyOverlapRatio: 0.35
+  allowGeneratedProxyFallback: true
+  requireAuthoredProxy: false
   # Keys use the configured asset id/scene path. Multi-prototype assets use #0,
   # #1, and so on. Supported fields: tier, shape, collisionScale.
   # tier: auto | decorative | blocking | walkable

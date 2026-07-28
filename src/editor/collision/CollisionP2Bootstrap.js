@@ -6,7 +6,9 @@ import { TerrainCollisionProvider } from './providers/TerrainCollisionProvider.j
 const params = new URLSearchParams(window.location.search);
 const qaScenario = params.get('qa');
 const fixtureQa = qaScenario === 'collision-p1' || qaScenario === 'collision-p2';
-const productionQa = qaScenario === 'collision-p3' || qaScenario === 'collision-p4';
+const productionQa = qaScenario === 'collision-p3'
+  || qaScenario === 'collision-p4'
+  || qaScenario === 'collision-p5';
 const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
@@ -32,6 +34,7 @@ function publish(status) {
   if (qaScenario === 'collision-p2') window.__collisionP2Qa = payload;
   if (qaScenario === 'collision-p3') window.__collisionP3Qa = payload;
   if (qaScenario === 'collision-p4') window.__collisionP4Qa = payload;
+  if (qaScenario === 'collision-p5') window.__collisionP5Qa = payload;
 }
 
 function sampleCandidates() {
@@ -49,7 +52,9 @@ function sampleCandidates() {
 
 function productionSample(status) {
   if (qaScenario === 'collision-p3') return status.provider?.sample ?? null;
-  if (qaScenario === 'collision-p4') return status.provider?.rockSample ?? null;
+  if (qaScenario === 'collision-p4' || qaScenario === 'collision-p5') {
+    return status.provider?.rockSample ?? null;
+  }
   return null;
 }
 
@@ -57,6 +62,7 @@ function positionProductionPlayer(status) {
   if (!productionQa || targetPositioned) return false;
   const sample = productionSample(status);
   if (!sample) return false;
+  if (qaScenario === 'collision-p5' && sample.tier !== 'walkable') return false;
   const distance = sample.radius + motor.config.radius + 1.5;
   const render = player.terrainView.floatingOrigin.toRender(sample.x, sample.z + distance);
   qaTarget = Object.freeze({ ...sample });
@@ -75,7 +81,9 @@ function updateQa() {
   if (status?.residency.ready) {
     if (productionQa && !qaTarget) {
       if (positionProductionPlayer(status)) publish('positioning');
-      else publish(qaScenario === 'collision-p4' ? 'waiting-rocks' : 'waiting-trees');
+      else if (qaScenario === 'collision-p3') publish('waiting-trees');
+      else if (qaScenario === 'collision-p5') publish('waiting-walkable-rocks');
+      else publish('waiting-rocks');
     } else {
       sampleCandidates();
       publish('ready');

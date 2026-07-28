@@ -5,8 +5,14 @@ import { createCanonicalAabb } from '../colliders/ColliderBounds.js';
 import {
   COLLIDER_TYPE_CAPSULE,
   COLLIDER_TYPE_SPHERE,
+  createMeshInstanceCollider,
   createPrimitiveCollider,
 } from '../colliders/ColliderRecords.js';
+import {
+  composeUniformTransform,
+  createMeshInstanceTransform,
+  transformPrototypeBounds,
+} from '../mesh/MeshInstanceTransform.js';
 import {
   ROCK_COLLISION_SHAPE_CAPSULE,
   ROCK_COLLISION_TIER_BLOCKING,
@@ -42,8 +48,7 @@ function rotatedEllipseExtents(radiusX, radiusZ, rotationY) {
 }
 
 function colliderPrototypeId(profile, tier) {
-  const fallback = tier === ROCK_COLLISION_TIER_WALKABLE ? ':p4-fallback' : '';
-  return `rock-tier-${tier}:${profile.id}:${profile.shape}${fallback}`;
+  return `rock-tier-${tier}:${profile.id}:${profile.shape}`;
 }
 
 function sphereCollider({ placement, profile, part, partIndex, tier, translationY, scale }) {
@@ -112,7 +117,27 @@ function colliderForPart(context) {
     : sphereCollider(context);
 }
 
-function sampleFrom({ placement, profile, tier, colliders }) {
+function walkableCollider({ placement, prototype, translationY, scale }) {
+  const transform = composeUniformTransform({
+    x: placement.x,
+    y: translationY,
+    z: placement.z,
+    rotationY: Number.isFinite(placement.rotationY) ? placement.rotationY : 0,
+    scale,
+  });
+  const instance = createMeshInstanceTransform(transform);
+  return createMeshInstanceCollider({
+    sourceId: createCollisionSourceId('rock', placement.stableId, 'walkable-mesh'),
+    layers: COLLISION_LAYERS.solid,
+    ownerChunkX: placement.ownerChunkX,
+    ownerChunkZ: placement.ownerChunkZ,
+    aabb: transformPrototypeBounds(prototype.bounds, instance.matrix),
+    prototypeId: prototype.id,
+    transform,
+  });
+}
+
+function sampleFrom({ placement, profile, tier, colliders, prototype = null }) {
   const collider = colliders[0];
   if (!collider) return null;
   return Object.freeze({
@@ -124,6 +149,7 @@ function sampleFrom({ placement, profile, tier, colliders }) {
     z: placement.z,
     radius: Math.max(profile.width, profile.depth) * placement.scale * 0.5,
     height: profile.height * placement.scale,
+    generatedProxy: prototype?.metadata.generated ?? false,
   });
 }
 
@@ -133,6 +159,11 @@ function policySignature(config) {
     config.minimumCollidableWidth,
     config.minimumWalkableHeight,
     config.minimumWalkableWidth,
+    config.maximumProxyTriangles,
+    config.bvhMaxLeafTriangles,
+    config.minimumProxyOverlapRatio,
+    config.allowGeneratedProxyFallback,
+    config.requireAuthoredProxy,
   ].join(':');
 }
 
@@ -145,6 +176,15 @@ export class RockCollisionProvider {
     this.config = config;
     this.descriptor = source.descriptor;
     this.policySignature = policySignature(config);
+    this.world = null;
+  }
+
+  attachWorld(world) {
+    if (!world?.registerPrototype) throw new Error('Rock collision provider requires a collision world.');
+    if (this.world && this.world !== world) {
+      throw new Error('Rock collision provider cannot attach to multiple collision worlds.');
+    }
+    this.world = world;
   }
 
   getEpoch() {
@@ -166,7 +206,9 @@ export class RockCollisionProvider {
     const stats = {
       decorative: 0,
       blocking: 0,
+      walkable: 0,
       walkablePending: 0,
+      generatedProxies: 0,
       colliders: 0,
     };
     let sample = null;
@@ -188,26 +230,55 @@ export class RockCollisionProvider {
         stats.decorative += 1;
         continue;
       }
-      if (tier === ROCK_COLLISION_TIER_WALKABLE) stats.walkablePending += 1;
-      else if (tier === ROCK_COLLISION_TIER_BLOCKING) stats.blocking += 1;
 
       const translationY = placement.height - this.source.burialFor(placement, profile);
-      const placementColliders = profile.parts.map((part, partIndex) => colliderForPart({
-        placement,
-        profile,
-        part,
-        partIndex,
-        tier,
-        translationY,
-        scale,
-      }));
+      let placementColliders;
+      let meshPrototype = null;
+      if (tier === ROCK_COLLISION_TIER_WALKABLE) {
+        meshPrototype = this.source.getMeshPrototype(prototypeIndex, this.world);
+        placementColliders = [walkableCollider({
+          placement,
+          prototype: meshPrototype,
+          translationY,
+          scale,
+        })];
+        stats.walkable += 1;
+        if (meshPrototype.metadata.generated) stats.generatedProxies += 1;
+      } else {
+        placementColliders = profile.parts.map((part, partIndex) => colliderForPart({
+          placement,
+          profile,
+          part,
+          partIndex,
+          tier,
+          translationY,
+          scale,
+        }));
+        stats.blocking += 1;
+      }
+
       colliders.push(...placementColliders);
       stats.colliders += placementColliders.length;
-      sample ??= sampleFrom({ placement, profile, tier, colliders: placementColliders });
+      const candidateSample = sampleFrom({
+        placement,
+        profile,
+        tier,
+        colliders: placementColliders,
+        prototype: meshPrototype,
+      });
+      if (!sample || (tier === ROCK_COLLISION_TIER_WALKABLE
+          && sample.tier !== ROCK_COLLISION_TIER_WALKABLE)) {
+        sample = candidateSample;
+      }
     }
 
     colliders.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+    const meshStatus = this.source.getMeshPrototypeStatus?.()
+      ?? { count: 0, triangles: 0, generated: 0 };
     PerfCounters.set('collisionRockProfiles', profiles.length);
+    PerfCounters.set('collisionRockMeshPrototypes', meshStatus.count);
+    PerfCounters.set('collisionRockMeshTriangles', meshStatus.triangles);
+    PerfCounters.set('collisionRockGeneratedPrototypes', meshStatus.generated);
     return Object.freeze({
       signature: `${snapshot.signature}|${this.source.getProfileSignature()}|${this.policySignature}`,
       colliders: Object.freeze(colliders),
@@ -220,6 +291,12 @@ export class RockCollisionProvider {
     return Object.freeze({
       id: this.descriptor.id,
       profileCount: this.getCachedProfileCount(),
+      meshPrototypes: this.source.getMeshPrototypeStatus?.() ?? null,
     });
+  }
+
+  dispose() {
+    this.source.dispose?.();
+    this.world = null;
   }
 }
