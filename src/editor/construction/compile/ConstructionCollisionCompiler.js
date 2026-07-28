@@ -249,14 +249,8 @@ export function compileConstructionCollision(record, sampled, {
     const interval = intervals[index];
     const previous = intervals[index - 1];
     const next = intervals[index + 1];
-    const overlapLeft = previous
-      && previous.segmentId === interval.segmentId
-      && previous.signature === interval.signature
-      ? overlap : 0;
-    const overlapRight = next
-      && next.segmentId === interval.segmentId
-      && next.signature === interval.signature
-      ? overlap : 0;
+    const overlapLeft = previous && previous.signature === interval.signature ? overlap : 0;
+    const overlapRight = next && next.signature === interval.signature ? overlap : 0;
     const point = pointAtDistance(sampled.points, interval.midpoint);
     const shift = (overlapRight - overlapLeft) / 2;
     const centerX = point.x + point.tangentX * shift;
