@@ -8,21 +8,17 @@ const DEBUG_DISABLED = Object.freeze({
   contacts: false,
   support: false,
 });
-
-test('P8 performance QA preserves production debug settings', () => {
-  assert.equal(collisionQaDebugConfig(DEBUG_DISABLED, 'collision-p8'), DEBUG_DISABLED);
+const DEBUG_VISUAL = Object.freeze({
+  colliders: true,
+  broadphase: true,
+  contacts: false,
+  support: false,
 });
 
-test('headed collision fixtures force collider and broadphase debug views', () => {
-  const debug = collisionQaDebugConfig(DEBUG_DISABLED, 'collision-p5');
-
-  assert.notEqual(debug, DEBUG_DISABLED);
-  assert.equal(debug.colliders, true);
-  assert.equal(debug.broadphase, true);
-  assert.equal(debug.contacts, false);
-  assert.equal(debug.support, false);
+test('headless collision QA preserves production debug settings', () => {
+  assert.equal(collisionQaDebugConfig(DEBUG_DISABLED), DEBUG_DISABLED);
 });
 
-test('normal gameplay preserves configured debug settings', () => {
-  assert.equal(collisionQaDebugConfig(DEBUG_DISABLED, null), DEBUG_DISABLED);
+test('headed collision QA preserves explicit visual debug settings', () => {
+  assert.equal(collisionQaDebugConfig(DEBUG_VISUAL), DEBUG_VISUAL);
 });
