@@ -4,6 +4,7 @@ import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';
 import './editor/map/worldMap.css';
 import './editor/ui/radialPalette.css';
+import './editor/ui/compactMenus.css';
 import './editor/inventory/inventory.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
 import './editor/audio/index.js';
@@ -60,6 +61,7 @@ import {
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
 import { ConstructionStore } from './editor/construction/ConstructionStore.js';
 import { ConstructionMaterialStore } from './editor/construction/ConstructionMaterialStore.js';
+import { ConstructionGizmoController } from './editor/construction/ui/ConstructionGizmoController.js';
 import { ConstructionPaletteController } from './editor/construction/ui/ConstructionPaletteController.js';
 import { ConstructionSpatialIndex } from './editor/construction/ConstructionSpatialIndex.js';
 import { ConstructionCompilerClient } from './editor/construction/compile/ConstructionCompilerClient.js';
@@ -454,16 +456,37 @@ async function startEditor() {
     materialStore: constructionMaterialStore,
     onStatus: (message) => controller.emitNotice(message),
   });
+  // The palette covers how a wall looks; the gizmo covers what you do to it.
+  // It borrows the palette's inspector rather than opening a second one.
+  controller.constructionGizmo = new ConstructionGizmoController({
+    host: ui.viewport,
+    controller,
+    palette: controller.constructionPalette,
+    onStatus: (message) => controller.emitNotice(message),
+  });
 
   // One owner for Escape. Each handler backs out exactly one level and the
   // first to claim the press consumes it, so the layers compose instead of
   // four independent listeners racing on the capture phase.
   const escapeStack = new EscapeStack();
+  // The grid opens from the cluster, so it must back out first. Registering it
+  // ahead of the cluster at the same level is what makes one press close one
+  // layer rather than both.
+  escapeStack.register(ESCAPE_PRIORITY.palette, () => {
+    if (!controller.constructionGizmo?.isGridOpen) return false;
+    controller.constructionGizmo.closeGrid();
+    return true;
+  }, { label: 'openings grid' });
   escapeStack.register(ESCAPE_PRIORITY.palette, () => {
     if (!controller.constructionPalette?.isOpen) return false;
     controller.constructionPalette.close();
     return true;
   }, { label: 'construction palette' });
+  escapeStack.register(ESCAPE_PRIORITY.palette, () => {
+    if (!controller.constructionGizmo?.isOpen) return false;
+    controller.constructionGizmo.close();
+    return true;
+  }, { label: 'construction gizmo' });
   escapeStack.register(ESCAPE_PRIORITY.inspector, () => {
     if (!controller.constructionPalette?.isInspectorOpen) return false;
     controller.constructionPalette.closeInspector();

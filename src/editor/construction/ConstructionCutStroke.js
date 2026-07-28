@@ -18,6 +18,12 @@ import {
 
 export const CUT_ARCH_WIDTH = 2.2;
 export const CUT_DOOR_WIDTH = 1.3;
+/** Where a window's sill sits above grade, in metres. */
+export const WINDOW_SILL = 1.1;
+/** Smallest opening the schema accepts, so a clamp cannot produce an invalid one. */
+const MIN_OPENING_HEIGHT = 0.2;
+/** Cut shapes that stop against a wall rather than passing through it. */
+const SPAN_KINDS = new Set(['door', 'window']);
 /** How close a stroke's end must come to a centreline to count as abutting. */
 const ABUT_MARGIN = 0.3;
 /** Headroom left between an opening's crown and the wall top above it. */
@@ -119,6 +125,47 @@ function buildCut(record, arcTable, hit, kind, width, heightAt) {
     kind,
     width: Math.min(width, Math.max(0.4, crown * 0.9)),
     height,
+  };
+}
+
+/**
+ * Which kind a cut records, given what the stroke drew and what the user asked
+ * for in the openings grid.
+ *
+ * The geometry is authoritative about *shape*: a stroke that crossed the wall
+ * left a hole through it, and one that stopped against it left a recess. The
+ * preference only chooses between kinds that share that shape — gate and arch
+ * both pass through, door and window both stop — so picking "window" cannot
+ * turn a crossing into something the masonry solver would have to close up.
+ */
+export function resolveCutKind(geometricKind, preferredKind = null) {
+  if (!preferredKind) return geometricKind;
+  if (geometricKind === 'arch') return preferredKind === 'gate' ? 'gate' : 'arch';
+  return SPAN_KINDS.has(preferredKind) ? preferredKind : geometricKind;
+}
+
+/**
+ * The feature properties a cut carries beyond its position and width.
+ *
+ * These used to be hardcoded at the call site — every cut came out a round,
+ * dressed opening silled at grade, which meant a window could not be carved at
+ * all. Raising the sill keeps the **crown** where the geometry put it and takes
+ * the height off the bottom, so a window lands under the same arch a door
+ * would have.
+ *
+ * @param cut one entry from `resolveCutStroke`.
+ * @param preference `{ kind, profile, dressed }` from the openings grid.
+ */
+export function cutFeatureStyle(cut, { kind = null, profile = 'round', dressed = true } = {}) {
+  const resolvedKind = resolveCutKind(cut.kind, kind);
+  const available = Math.max(0, (cut.height ?? 0) - MIN_OPENING_HEIGHT);
+  const sill = resolvedKind === 'window' ? Math.min(WINDOW_SILL, available) : 0;
+  return {
+    kind: resolvedKind,
+    height: Math.max(MIN_OPENING_HEIGHT, (cut.height ?? MIN_OPENING_HEIGHT) - sill),
+    sill,
+    profile,
+    dressed,
   };
 }
 

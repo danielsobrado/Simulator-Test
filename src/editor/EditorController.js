@@ -28,7 +28,7 @@ import {
   flattenTop,
 } from './construction/masonry/WallTopEdit.js';
 import { createWallTopProfile } from './construction/masonry/WallTopProfile.js';
-import { resolveCutStroke } from './construction/ConstructionCutStroke.js';
+import { cutFeatureStyle, resolveCutStroke } from './construction/ConstructionCutStroke.js';
 
 /** Commit a raise/lower burst as one history entry once the keys settle. */
 const TOP_EDIT_COMMIT_MS = 250;
@@ -94,6 +94,7 @@ export class EditorController {
     this.cameraProvider = null;
     /** Set by the composition root; the right button falls back to orbit only. */
     this.constructionPalette = null;
+    this.constructionGizmo = null;
     /** `() => boolean` — true while paused for editing inside player mode. */
     this.playerEditingProvider = null;
     this.rightPointerStart = null;
@@ -114,6 +115,18 @@ export class EditorController {
     this.selectedAnchorId = null;
     /** True while an Alt-drag is carving rather than drawing. */
     this.constructionCutStroke = false;
+    /**
+     * What the next cut carves, set from the openings grid.
+     *
+     * `resolveCutStroke` decides *where* openings land and whether a stroke made
+     * an arch or a span — that is geometry and stays its job. These are the
+     * properties it has no way to infer, and which used to be hardcoded at the
+     * call site: every cut came out a round, dressed opening silled at grade, so
+     * a window was not carvable at all.
+     */
+    this.constructionOpening = { kind: null, profile: 'round', dressed: true };
+    /** Lets a menu arm a cut for pointers that cannot hold Alt. */
+    this.constructionCutArmed = false;
     /** `{ constructionId, s }` under the pointer, for the raise/lower gesture. */
     this.hoveredArc = null;
     this.constructionTopRadius = TOP_RADIUS_DEFAULT;
@@ -285,6 +298,7 @@ export class EditorController {
       return;
     }
     this.cancelConstructionGesture();
+    this.constructionGizmo?.close();
     this.constructionMode = mode;
     this.tool = 'construction';
     if (mode === 'draw') this.setSelectedConstruction(null);
@@ -321,6 +335,28 @@ export class EditorController {
       this.emitNotice(error.message, true);
       return null;
     }
+  }
+
+  /**
+   * Choose what the next cut carves. Partial updates only touch what they name,
+   * so the grid can set a profile without resetting the chosen kind.
+   */
+  setConstructionOpening({ kind, profile, dressed } = {}) {
+    if (kind !== undefined) this.constructionOpening.kind = kind;
+    if (profile !== undefined) this.constructionOpening.profile = profile;
+    if (dressed !== undefined) this.constructionOpening.dressed = Boolean(dressed);
+    this.emitState();
+  }
+
+  /** Arm the next drag to carve rather than draw, as holding Alt would. */
+  armConstructionCut(armed = true) {
+    this.constructionCutArmed = Boolean(armed);
+    this.emitState();
+  }
+
+  /** The style the next carved opening takes; see `cutFeatureStyle`. */
+  cutFeatureStyle(cut) {
+    return cutFeatureStyle(cut, this.constructionOpening);
   }
 
   deleteSelectedConstruction() {
@@ -675,14 +711,10 @@ export class EditorController {
         constructionId: cut.constructionId,
         feature: {
           id: featureId,
-          kind: cut.kind,
+          ...this.cutFeatureStyle(cut),
           segmentId: cut.segmentId,
           arcFraction: cut.arcFraction,
           width: cut.width,
-          height: cut.height,
-          sill: 0,
-          profile: 'round',
-          dressed: true,
         },
       });
       if (change) added += 1;
@@ -768,6 +800,11 @@ export class EditorController {
         this.activeCamera,
       );
       this.setSelectedConstruction(constructionId);
+      // Selecting a wall raises its action cluster; clicking away dismisses it.
+      // Opened here rather than from `setSelectedConstruction`, which also runs
+      // for programmatic selection where there is no pointer to anchor to.
+      if (constructionId) this.constructionGizmo?.open(constructionId, event);
+      else this.constructionGizmo?.close();
       this.emitState();
       return;
     }
@@ -778,8 +815,9 @@ export class EditorController {
     this.constructionStroke = [point];
     this.constructionDrawing = true;
     // Alt turns the freehand gesture into a cut: the stroke carves openings in
-    // the walls it crosses instead of becoming a wall itself.
-    this.constructionCutStroke = event.altKey;
+    // the walls it crosses instead of becoming a wall itself. The gizmo's cut
+    // button arms the same thing for a pointer that cannot hold a modifier.
+    this.constructionCutStroke = event.altKey || this.constructionCutArmed;
     this.canvas.setPointerCapture(event.pointerId);
     this.emitState();
   }
@@ -865,6 +903,9 @@ export class EditorController {
       this.constructionDrawing = false;
       this.constructionStroke = null;
       this.constructionCutStroke = false;
+      // Arming is one-shot. A cut mode that stayed on would turn the next
+      // ordinary drag into a carve, which looks like the wall tool breaking.
+      this.constructionCutArmed = false;
       this.constructionView.clearDraft();
       if (cutting) {
         this.commitCutStroke(stroke);
@@ -1305,6 +1346,9 @@ export class EditorController {
     );
     if (!constructionId) return;
     this.setSelectedConstruction(constructionId);
+    // One menu on a wall at a time: the cluster and the palette both anchor to
+    // the pointer, so leaving both up would overlap them on the same spot.
+    this.constructionGizmo?.close();
     this.constructionPalette.open(constructionId, event);
     this.emitState();
   }

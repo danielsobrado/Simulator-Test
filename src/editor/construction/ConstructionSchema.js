@@ -10,9 +10,12 @@ export const MAX_CONSTRUCTION_TOP_POINTS = 64;
 
 const ID_PATTERN = /^[a-z][a-z0-9-]{0,95}$/;
 const PATH_TYPES = new Set(['polyline', 'cubicBezier']);
-const FEATURE_KINDS = new Set(['door', 'window', 'arch', 'gate', 'tower', 'breach']);
-const OPENING_PROFILES = new Set(['round', 'segmental', 'pointed', 'flat']);
-const TOP_STYLES = new Set(['flat', 'irregular', 'crenellated', 'ruined']);
+// Exported because the opening menus are built from these rather than from a
+// second hand-written list: a menu that offers a kind the validator rejects, or
+// omits one it accepts, is a bug that only shows up when someone clicks it.
+export const FEATURE_KINDS = new Set(['door', 'window', 'arch', 'gate', 'tower', 'breach']);
+export const OPENING_PROFILES = new Set(['round', 'segmental', 'pointed', 'flat']);
+export const TOP_STYLES = new Set(['flat', 'irregular', 'crenellated', 'ruined']);
 const MATERIAL_FAMILIES = Object.freeze(['stone', 'mortar', 'roof']);
 
 function requireObject(value, label) {

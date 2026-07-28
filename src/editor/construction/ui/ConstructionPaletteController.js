@@ -4,6 +4,7 @@ import {
   getWorkshopMaterialPreset,
 } from '../../workshop/ProceduralWorkshopMaterialConfig.js';
 import { CONSTRUCTION_STYLES } from '../masonry/ConstructionStyleCatalog.js';
+import { icon } from '../../ui/icons.js';
 import { ConstructionInspector } from './ConstructionInspector.js';
 
 /**
@@ -29,10 +30,20 @@ import { ConstructionInspector } from './ConstructionInspector.js';
 const WALL_PRESET_FAMILIES = new Set(['walls', 'stone']);
 
 const TOP_ACTIONS = Object.freeze([
-  { id: 'top:flat', label: 'Flat top', color: '#cfd6e4', glyph: '▬' },
-  { id: 'top:crenellated', label: 'Crenellate', color: '#b9c6dd', glyph: '⊓' },
-  { id: 'top:ruined', label: 'Ruin', color: '#a89684', glyph: '⋰' },
-  { id: 'top:irregular', label: 'Irregular top', color: '#c2b9a4', glyph: '∿' },
+  { id: 'top:flat', label: 'Flat top', color: '#cfd6e4', glyph: icon('top-flat', { size: 16 }) },
+  {
+    id: 'top:crenellated',
+    label: 'Crenellate',
+    color: '#b9c6dd',
+    glyph: icon('top-crenellated', { size: 16 }),
+  },
+  { id: 'top:ruined', label: 'Ruin', color: '#a89684', glyph: icon('top-ruined', { size: 16 }) },
+  {
+    id: 'top:irregular',
+    label: 'Irregular top',
+    color: '#c2b9a4',
+    glyph: icon('top-irregular', { size: 16 }),
+  },
 ]);
 
 /**
@@ -47,12 +58,15 @@ const TOP_ACTIONS = Object.freeze([
  * solver input and gets loaded into the compiler worker.
  */
 const STYLE_PETALS = Object.freeze({
-  'coursed-rubble': { color: '#d8d2c6', glyph: '▤' },
-  ashlar: { color: '#c9c3b6', glyph: '▦' },
-  'random-rubble': { color: '#b3aca0', glyph: '▨' },
-  'dry-stone': { color: '#9d968b', glyph: '▩' },
+  'coursed-rubble': { color: '#d8d2c6', glyph: icon('bond-coursed-rubble', { size: 16 }) },
+  ashlar: { color: '#c9c3b6', glyph: icon('bond-ashlar', { size: 16 }) },
+  'random-rubble': { color: '#b3aca0', glyph: icon('bond-random-rubble', { size: 16 }) },
+  'dry-stone': { color: '#9d968b', glyph: icon('bond-dry-stone', { size: 16 }) },
 });
-const STYLE_PETAL_FALLBACK = Object.freeze({ color: '#b3aca0', glyph: '▩' });
+const STYLE_PETAL_FALLBACK = Object.freeze({
+  color: '#b3aca0',
+  glyph: icon('bond-random-rubble', { size: 16 }),
+});
 
 export class ConstructionPaletteController {
   constructor({ host, controller, materialStore, onStatus = null }) {
@@ -120,7 +134,11 @@ export class ConstructionPaletteController {
         { radius: 79, items: this.stylePetals() },
         { radius: 46, items: TOP_ACTIONS },
       ],
-      center: { action: 'reset-material', glyph: '↺', label: 'Reset material' },
+      center: {
+        action: 'reset-material',
+        glyph: icon('reset', { size: 18 }),
+        label: 'Reset material',
+      },
       footer: { action: 'more', label: 'More…' },
     });
   }
@@ -135,6 +153,18 @@ export class ConstructionPaletteController {
 
   closeInspector() {
     this.inspector.close();
+  }
+
+  /**
+   * Open the inspector without going through the palette.
+   *
+   * The gizmo cluster's properties button needs the same panel the palette's
+   * "More…" opens, and the inspector belongs to one owner — handing out the
+   * instance instead would give two controllers the power to close each other's
+   * panel out from under them.
+   */
+  openInspector(constructionId) {
+    this.inspector.open(constructionId);
   }
 
   select(id) {

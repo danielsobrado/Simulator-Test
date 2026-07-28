@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { disposeModelParts } from '../assets/modelParts.js';
+import { icon } from '../ui/icons.js';
 import './ProceduralWorkshopComponentController.css';
 import { ProceduralWorkshopComponentController } from './ProceduralWorkshopComponentController.js';
 import { ProceduralWorkshopMaterialController } from './ProceduralWorkshopMaterialController.js';
@@ -18,6 +19,37 @@ function randomSeed() {
 
 function actionForTransformMode(mode) {
   return mode === 'rotate' ? 'rotate' : mode === 'scale' ? 'scale' : 'move';
+}
+
+/**
+ * The preview's transform toolbar.
+ *
+ * Icons rather than words, so it matches the construction tool's gizmo cluster
+ * and stops costing a third of the preview's top edge. The `data-workshop-action`
+ * values are unchanged — every existing handler and the `is-active` sync in
+ * `actionForTransformMode` key off those, not off the label.
+ */
+const WORKSHOP_GIZMO_TOOLS = Object.freeze([
+  { action: 'move', label: 'Move', iconName: 'move', active: true },
+  { action: 'rotate', label: 'Rotate', iconName: 'rotate' },
+  { action: 'scale', label: 'Scale', iconName: 'scale' },
+  { action: 'material', label: 'Material', iconName: 'material' },
+  { action: 'reset-component', label: 'Reset part', iconName: 'reset' },
+  { action: 'reset-all-components', label: 'Reset all', iconName: 'reset-all' },
+  { action: 'center', label: 'Center scene', iconName: 'center' },
+  { action: 'frame', label: 'Frame', iconName: 'frame' },
+]);
+
+function workshopGizmoToolsMarkup() {
+  return WORKSHOP_GIZMO_TOOLS
+    .map(({ action, label, iconName, active }) => (
+      `<button type="button"${active ? ' class="is-active"' : ''}`
+      + ` data-workshop-action="${action}"`
+      // The label moves to the accessible name; losing it entirely would leave
+      // eight unlabelled buttons.
+      + ` aria-label="${label}" title="${label}">${icon(iconName, { size: 17 })}</button>`
+    ))
+    .join('');
 }
 
 export class ProceduralWorkshopUi {
@@ -184,14 +216,7 @@ export class ProceduralWorkshopUi {
             <div class="workshop-preview">
               <div class="workshop-preview__badge">16 × 16 m sunlit work garden</div>
               <div class="workshop-gizmo-tools" role="toolbar" aria-label="Selected component transform tools">
-                <button type="button" class="is-active" data-workshop-action="move">Move</button>
-                <button type="button" data-workshop-action="rotate">Rotate</button>
-                <button type="button" data-workshop-action="scale">Scale</button>
-                <button type="button" data-workshop-action="material">Material</button>
-                <button type="button" data-workshop-action="reset-component">Reset part</button>
-                <button type="button" data-workshop-action="reset-all-components">Reset all</button>
-                <button type="button" data-workshop-action="center">Center scene</button>
-                <button type="button" data-workshop-action="frame">Frame</button>
+                ${workshopGizmoToolsMarkup()}
               </div>
               <div class="workshop-canvas" data-role="workshop-canvas"></div>
               <div class="workshop-material-ui" data-role="workshop-material-ui"></div>

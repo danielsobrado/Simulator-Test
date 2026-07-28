@@ -12,6 +12,8 @@
  * knows nothing about materials, presets or walls.
  */
 
+import { escapeAttribute } from './markup.js';
+
 // The stylesheet is imported by the composition root rather than here: this
 // module's layout maths is unit-tested, and Node's loader cannot resolve a CSS
 // import. See `radialPalette.css`, imported from `src/main.js`.
@@ -25,14 +27,6 @@ export function paletteRadius(rings = []) {
     DEFAULT_RING_RADIUS,
     ...rings.map((ring) => ring.radius ?? DEFAULT_RING_RADIUS),
   ) + RING_MARGIN;
-}
-
-function escapeAttribute(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
 }
 
 /** Angle of petal `index` of `count`: first at the top, then evenly around. */

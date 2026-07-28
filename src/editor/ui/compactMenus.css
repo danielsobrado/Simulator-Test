@@ -1,0 +1,167 @@
+/*
+ * Compact glass menus: the icon grid popup and the selection gizmo cluster.
+ *
+ * Sizing is deliberately tight — 32px tiles, 18px icons, 4px gaps — because
+ * these open *over* the scene the user is editing and every pixel of panel is a
+ * pixel of wall they cannot see. Colour comes from the app's dark chrome rather
+ * than the light reference art, so a popup reads as part of the same editor as
+ * the radial palette it opens beside.
+ *
+ * Geometry lives here and nowhere else. `GizmoCluster` emits a slot *class*; the
+ * offsets that turn `--top-left` into a position are below, so rearranging the
+ * cluster never touches JavaScript.
+ */
+
+.icon-grid,
+.icon-gizmo {
+  position: absolute;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.icon-grid[hidden],
+.icon-gizmo[hidden] {
+  display: none;
+}
+
+/* --- Icon grid popup ----------------------------------------------------- */
+
+.icon-grid {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 10px;
+  background: rgb(20 22 30 / 88%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 34%);
+  backdrop-filter: blur(10px);
+}
+
+.icon-grid__group {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns, 6), 32px);
+  gap: 4px;
+}
+
+/* A rule between stacked groups reads as grouping without spending a text row
+   on a heading, which is what keeps the panel as small as the reference's. */
+.icon-grid__group + .icon-grid__group {
+  padding-top: 5px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+}
+
+.icon-grid__tile {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 5%);
+  color: #e8ecf4;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.icon-grid__tile:hover {
+  border-color: rgb(255 255 255 / 22%);
+  background: rgb(255 255 255 / 12%);
+}
+
+.icon-grid__tile:focus-visible {
+  outline: 2px solid var(--accent, #d9bd66);
+  outline-offset: 1px;
+}
+
+.icon-grid__tile.is-active {
+  border-color: var(--accent, #d9bd66);
+  box-shadow: inset 0 0 0 1px var(--accent, #d9bd66);
+  background: var(--accent-soft, rgb(217 189 102 / 14%));
+  color: #f6e8b8;
+}
+
+/* Optional per-tile tint, for grids whose items carry a material colour. */
+.icon-grid__tile[style*="--tile-color"] {
+  background: color-mix(in srgb, var(--tile-color) 26%, transparent);
+}
+
+/* --- Gizmo cluster ------------------------------------------------------- */
+
+/*
+ * The cluster is a transparent positioning frame, not a panel: in the reference
+ * each action is its own floating chip, so glass lives on the buttons. The frame
+ * must not eat pointer events for the scene behind it.
+ */
+.icon-gizmo {
+  width: 132px;
+  height: 132px;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.icon-gizmo__button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  translate: calc(-50% + var(--gizmo-x, 0px)) calc(-50% + var(--gizmo-y, 0px));
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 9px;
+  background: rgb(20 22 30 / 88%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 34%);
+  backdrop-filter: blur(10px);
+  color: #e8ecf4;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 120ms ease, border-color 120ms ease, scale 120ms ease;
+}
+
+.icon-gizmo__button:hover {
+  border-color: rgb(255 255 255 / 40%);
+  background: rgb(32 36 48 / 92%);
+  scale: 1.08;
+}
+
+.icon-gizmo__button:focus-visible {
+  outline: 2px solid var(--accent, #d9bd66);
+  outline-offset: 1px;
+}
+
+.icon-gizmo__button.is-active {
+  border-color: var(--accent, #d9bd66);
+  background: var(--accent-soft, rgb(217 189 102 / 14%));
+  color: #f6e8b8;
+}
+
+/* Slot offsets. The straight arms sit a touch further out than the diagonals so
+   the eight positions read as a ring rather than a square. */
+.icon-gizmo__button--center { --gizmo-x: 0px; --gizmo-y: 0px; }
+.icon-gizmo__button--top { --gizmo-x: 0px; --gizmo-y: -44px; }
+.icon-gizmo__button--bottom { --gizmo-x: 0px; --gizmo-y: 44px; }
+.icon-gizmo__button--left { --gizmo-x: -44px; --gizmo-y: 0px; }
+.icon-gizmo__button--right { --gizmo-x: 44px; --gizmo-y: 0px; }
+.icon-gizmo__button--top-left { --gizmo-x: -31px; --gizmo-y: -31px; }
+.icon-gizmo__button--top-right { --gizmo-x: 31px; --gizmo-y: -31px; }
+.icon-gizmo__button--bottom-left { --gizmo-x: -31px; --gizmo-y: 31px; }
+.icon-gizmo__button--bottom-right { --gizmo-x: 31px; --gizmo-y: 31px; }
+
+/* --- Workshop gizmo toolbar --------------------------------------------- */
+
+/*
+ * The workshop's toolbar keeps its existing strip layout and its
+ * `data-workshop-action` contract; only its buttons become icons. Sized to match
+ * the cluster so the two toolbars read as one system.
+ */
+.workshop-gizmo-tools button {
+  display: grid;
+  width: 30px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+}
