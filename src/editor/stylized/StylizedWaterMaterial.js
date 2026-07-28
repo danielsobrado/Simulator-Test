@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import {
   abs,
+  cameraFar,
+  cameraNear,
   cameraPosition,
   clamp,
   dot,
@@ -89,11 +91,13 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
   return result;
 }
 
-function refractionNoise(point) {
+function refractionWarp(coarsePoint, finePoint) {
+  const coarse = stylizedFbm(coarsePoint).sub(0.5).mul(2);
+  const fine = stylizedFbm(finePoint).sub(0.5).mul(2);
   return vec2(
-    stylizedFbm(point),
-    stylizedFbm(point.add(vec2(19.17, 7.31))),
-  ).sub(0.5).mul(2);
+    coarse.mul(0.7).add(fine.mul(0.3)),
+    coarse.mul(-0.35).add(fine.mul(0.65)),
+  );
 }
 
 export function createStylizedWaterMaterial({
@@ -227,24 +231,24 @@ export function createStylizedWaterMaterial({
       .mul(refraction.fineScale)
       .sub(currentFlow.mul(time.mul(refraction.fineSpeed)))
       .add(vec2(31.73, 11.29));
-    const coarseWarp = refractionNoise(coarsePoint);
-    const fineWarp = refractionNoise(finePoint);
     const depthFactor = smoothstep(
       refraction.depthFadeStart,
       refraction.depthFadeEnd,
       waterDepth,
     );
-    const distortionUv = coarseWarp.mul(0.65)
-      .add(fineWarp.mul(0.35))
+    const distortionUv = refractionWarp(coarsePoint, finePoint)
       .mul(refraction.strength * quality.refractionStrength)
       .mul(depthFactor);
     const baseViewportUv = viewportSafeUV(screenUV);
     const distortedViewportUv = viewportSafeUV(baseViewportUv.add(distortionUv));
-    const waterLinearDepth = linearDepth();
-    const distortedLinearDepth = linearDepth(viewportDepthTexture(distortedViewportUv));
+    const depthRange = cameraFar.sub(cameraNear);
+    const waterViewDistance = linearDepth().mul(depthRange).add(cameraNear);
+    const distortedViewDistance = linearDepth(
+      viewportDepthTexture(distortedViewportUv),
+    ).mul(depthRange).add(cameraNear);
     const validDepth = step(
-      waterLinearDepth.add(refraction.depthBias),
-      distortedLinearDepth,
+      waterViewDistance.add(refraction.depthBiasMeters),
+      distortedViewDistance,
     );
     const acceptedViewportUv = mix(
       baseViewportUv,
