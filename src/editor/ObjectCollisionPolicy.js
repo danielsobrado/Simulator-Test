@@ -16,15 +16,25 @@ const MODEL_DEFAULTS = Object.freeze({
   campfire: OBJECT_COLLISION_POLICY_TRIGGER,
 });
 
+const PROFILE_DEFAULTS = Object.freeze({
+  campfire: 'rock',
+  workshop: 'wall',
+});
+
 const CATEGORY_DEFAULTS = Object.freeze({
   building: OBJECT_COLLISION_POLICY_SOLID,
   defense: OBJECT_COLLISION_POLICY_SOLID,
   civic: OBJECT_COLLISION_POLICY_SOLID,
   nature: OBJECT_COLLISION_POLICY_SOLID,
+  workshop: OBJECT_COLLISION_POLICY_SOLID,
 });
 
 export function defaultObjectCollisionPolicy(rawDefinition) {
   return MODEL_DEFAULTS[rawDefinition.model]
     ?? CATEGORY_DEFAULTS[rawDefinition.category]
     ?? OBJECT_COLLISION_POLICY_NONE;
+}
+
+export function defaultObjectCollisionProfile(rawDefinition) {
+  return PROFILE_DEFAULTS[rawDefinition.model] ?? rawDefinition.model;
 }
