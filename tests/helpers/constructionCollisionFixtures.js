@@ -1,0 +1,118 @@
+import {
+  CONSTRUCTION_RECORD_VERSION,
+  CUBIC_BEZIER_PATH_VERSION,
+  normalizeConstructionRecord,
+} from '../../src/editor/construction/ConstructionSchema.js';
+import { DEFAULT_CONSTRUCTION_STYLE_KEY } from '../../src/editor/construction/masonry/ConstructionStyleCatalog.js';
+
+function baseRecord({ id, revision, path, features }) {
+  return normalizeConstructionRecord({
+    version: CONSTRUCTION_RECORD_VERSION,
+    id,
+    revision,
+    seed: 1701,
+    kind: 'wall',
+    label: id,
+    style: {
+      key: DEFAULT_CONSTRUCTION_STYLE_KEY,
+      version: 1,
+      materials: {},
+    },
+    dimensions: {
+      height: 3.5,
+      thickness: 0.8,
+    },
+    top: {
+      style: 'flat',
+      base: 3.5,
+      profile: [],
+    },
+    path: {
+      version: CUBIC_BEZIER_PATH_VERSION,
+      type: 'cubicBezier',
+      closed: false,
+      ...path,
+      features,
+    },
+    features,
+  });
+}
+
+export function straightConstruction({
+  id = 'construction-test',
+  revision = 1,
+  start = [-8, 0],
+  end = [8, 0],
+  features = [],
+} = {}) {
+  const dx = end[0] - start[0];
+  const dz = end[1] - start[1];
+  return baseRecord({
+    id,
+    revision,
+    features,
+    path: {
+      anchors: [
+        { id: 'anchor-start', position: start },
+        { id: 'anchor-end', position: end },
+      ],
+      segments: [{
+        id: 'segment-main',
+        startAnchorId: 'anchor-start',
+        endAnchorId: 'anchor-end',
+        startHandle: [dx / 3, dz / 3],
+        endHandle: [-dx / 3, -dz / 3],
+      }],
+    },
+  });
+}
+
+export function curvedConstruction({
+  id = 'construction-curve',
+  revision = 1,
+} = {}) {
+  return baseRecord({
+    id,
+    revision,
+    features: [],
+    path: {
+      anchors: [
+        { id: 'anchor-west', position: [-6, 0] },
+        { id: 'anchor-north', position: [0, 4] },
+        { id: 'anchor-east', position: [6, 0] },
+      ],
+      segments: [
+        {
+          id: 'segment-west-north',
+          startAnchorId: 'anchor-west',
+          endAnchorId: 'anchor-north',
+          startHandle: [2.5, 0],
+          endHandle: [-2.5, 0],
+        },
+        {
+          id: 'segment-north-east',
+          startAnchorId: 'anchor-north',
+          endAnchorId: 'anchor-east',
+          startHandle: [2.5, 0],
+          endHandle: [-2.5, 0],
+        },
+      ],
+    },
+  });
+}
+
+export function doorFeature(overrides = {}) {
+  return {
+    id: 'door-main',
+    kind: 'door',
+    segmentId: 'segment-main',
+    arcFraction: 0.5,
+    width: 2,
+    height: 2.2,
+    sill: 0,
+    profile: 'round',
+    dressed: true,
+    group: null,
+    ...overrides,
+  };
+}
