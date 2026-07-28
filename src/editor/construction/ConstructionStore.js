@@ -1,3 +1,4 @@
+import { ensureCollisionP7QaFixture } from '../collision/CollisionP7QaFixture.js';
 import { constructionCollisionSource } from '../collision/providers/ConstructionCollisionSource.js';
 import { normalizeConstructionRecord } from './ConstructionSchema.js';
 
@@ -10,12 +11,17 @@ function numericSuffix(id) {
   return match ? Number(match[1]) : 0;
 }
 
+function browserSearch() {
+  return typeof window === 'undefined' ? '' : window.location.search;
+}
+
 export class ConstructionStore {
   constructor(records = []) {
     this.records = new Map();
     this.listeners = new Set();
     this.nextId = 1;
     this.replaceAll(records);
+    ensureCollisionP7QaFixture(this, browserSearch());
   }
 
   get size() {
