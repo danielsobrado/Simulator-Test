@@ -10,9 +10,11 @@ import {
   createPrimitiveCollider,
 } from '../colliders/ColliderRecords.js';
 
+const TILT_EPSILON = 1e-6;
 const UNIT_SCALE = new THREE.Vector3(1, 1, 1);
 const LOCAL_BOX = new THREE.Box3();
 const WORLD_BOX = new THREE.Box3();
+const CONSERVATIVE_BOX = new THREE.Box3();
 const POSITION = new THREE.Vector3();
 const QUATERNION = new THREE.Quaternion();
 const SCALE = new THREE.Vector3();
@@ -22,6 +24,7 @@ const LOCAL_POINT = new THREE.Vector3();
 const WORLD_POINT = new THREE.Vector3();
 const LOCAL_X = new THREE.Vector3(1, 0, 0);
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const TRANSFORMED_UP = new THREE.Vector3();
 const BOX_CENTER = new THREE.Vector3();
 const BOX_SIZE = new THREE.Vector3();
 
@@ -54,6 +57,22 @@ function yawFromQuaternion(quaternion) {
   return Math.atan2(-LOCAL_X.z, LOCAL_X.x);
 }
 
+function isTilted(quaternion) {
+  TRANSFORMED_UP.copy(WORLD_UP).applyQuaternion(quaternion);
+  return Math.abs(TRANSFORMED_UP.y) < 1 - TILT_EPSILON;
+}
+
+function uprightBoxFromBounds(box) {
+  box.getCenter(BOX_CENTER);
+  box.getSize(BOX_SIZE);
+  return {
+    position: [BOX_CENTER.x, BOX_CENTER.y, BOX_CENTER.z],
+    rotationY: 0,
+    dimensions: [BOX_SIZE.x, BOX_SIZE.y, BOX_SIZE.z],
+    aabb: canonicalAabbFromBox(box),
+  };
+}
+
 function transformedBox(description, rootMatrix) {
   LOCAL_MATRIX.compose(
     POSITION.set(...description.position),
@@ -67,6 +86,7 @@ function transformedBox(description, rootMatrix) {
     BOX_SIZE.set(...description.dimensions),
   );
   WORLD_BOX.copy(LOCAL_BOX).applyMatrix4(WORLD_MATRIX);
+  if (isTilted(QUATERNION)) return uprightBoxFromBounds(WORLD_BOX);
   return {
     position: [POSITION.x, POSITION.y, POSITION.z],
     rotationY: yawFromQuaternion(QUATERNION),
@@ -91,6 +111,27 @@ function transformedCapsule(description, rootMatrix) {
   );
   WORLD_BOX.copy(LOCAL_BOX).applyMatrix4(rootMatrix);
   rootMatrix.decompose(POSITION, QUATERNION, SCALE);
+  if (isTilted(QUATERNION)) {
+    WORLD_BOX.getCenter(BOX_CENTER);
+    WORLD_BOX.getSize(BOX_SIZE);
+    const conservativeRadius = Math.max(BOX_SIZE.x, BOX_SIZE.z) / 2;
+    CONSERVATIVE_BOX.min.set(
+      BOX_CENTER.x - conservativeRadius,
+      WORLD_BOX.min.y,
+      BOX_CENTER.z - conservativeRadius,
+    );
+    CONSERVATIVE_BOX.max.set(
+      BOX_CENTER.x + conservativeRadius,
+      WORLD_BOX.max.y,
+      BOX_CENTER.z + conservativeRadius,
+    );
+    return {
+      position: [BOX_CENTER.x, WORLD_BOX.min.y, BOX_CENTER.z],
+      rotationY: 0,
+      dimensions: [conservativeRadius, BOX_SIZE.y, conservativeRadius],
+      aabb: canonicalAabbFromBox(CONSERVATIVE_BOX),
+    };
+  }
   return {
     position: [WORLD_POINT.x, WORLD_POINT.y, WORLD_POINT.z],
     rotationY: yawFromQuaternion(QUATERNION),
@@ -115,6 +156,16 @@ function transformedSphere(description, rootMatrix) {
   );
   WORLD_BOX.copy(LOCAL_BOX).applyMatrix4(rootMatrix);
   rootMatrix.decompose(POSITION, QUATERNION, SCALE);
+  if (isTilted(QUATERNION)) {
+    WORLD_BOX.getCenter(BOX_CENTER);
+    WORLD_BOX.getSize(BOX_SIZE);
+    return {
+      position: [BOX_CENTER.x, BOX_CENTER.y, BOX_CENTER.z],
+      rotationY: 0,
+      dimensions: [BOX_SIZE.x / 2, BOX_SIZE.y / 2, BOX_SIZE.z / 2],
+      aabb: canonicalAabbFromBox(WORLD_BOX),
+    };
+  }
   return {
     position: [WORLD_POINT.x, WORLD_POINT.y, WORLD_POINT.z],
     rotationY: yawFromQuaternion(QUATERNION),
