@@ -32,15 +32,68 @@ import { mortarProfile } from './ConstructionMortarConfig.js';
 const cache = new Map();
 const PRESET_TEXTURE_CACHE = new Map();
 const MAX_PRESET_TEXTURE_CACHE = 64;
+let sourceSignatureCache = new WeakMap();
 
-function materialKey(record) {
+function hashText(value) {
+  let hash = 0x811c9dc5;
+  const text = String(value ?? '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function sourceSignature(source) {
+  if (!source || typeof source !== 'object') return '-';
+  const cached = sourceSignatureCache.get(source);
+  if (cached) return cached;
+  const signature = hashText([
+    source.kind ?? '-',
+    source.colorSpace ?? '-',
+    source.dataUrl ?? '-',
+  ].join('|'));
+  sourceSignatureCache.set(source, signature);
+  return signature;
+}
+
+function presetSignature(document, presetId) {
+  if (!presetId) return '-';
+  const preset = getWorkshopMaterialPreset(document, presetId);
+  if (!preset) return `${presetId}:missing`;
+
+  const parts = [
+    preset.id,
+    preset.family,
+    preset.baseColor,
+    preset.tint,
+    preset.roughness,
+    preset.metalness,
+    preset.normalStrength,
+    preset.heightStrength,
+    preset.weathering,
+    preset.mapping,
+    preset.repeat,
+    preset.rotation,
+    preset.alignment,
+  ];
+  for (const [kind, sourceId] of Object.entries(preset.sources ?? {}).sort(([a], [b]) => (
+    a.localeCompare(b)
+  ))) {
+    const source = document?.materialLibrary?.sources?.[sourceId] ?? null;
+    parts.push(kind, sourceId, sourceSignature(source));
+  }
+  return `${presetId}:${hashText(parts.join('|'))}`;
+}
+
+function materialKey(record, materialDocument) {
   const { key, version, materials } = record.style;
   return [
     key,
     version,
-    materials.stone ?? '-',
-    materials.mortar ?? '-',
-    materials.roof ?? '-',
+    presetSignature(materialDocument, materials.stone),
+    presetSignature(materialDocument, materials.mortar),
+    presetSignature(materialDocument, materials.roof),
     record.seed,
   ].join('|');
 }
@@ -130,7 +183,14 @@ function presetTexture(document, preset, kind) {
   const sourceId = preset.sources?.[kind];
   const source = document?.materialLibrary?.sources?.[sourceId];
   if (!source) return null;
-  const key = `${kind}|${sourceId}|${preset.mapping}|${preset.repeat}|${preset.rotation}`;
+  const key = [
+    kind,
+    sourceId,
+    sourceSignature(source),
+    preset.mapping,
+    preset.repeat,
+    preset.rotation,
+  ].join('|');
   if (!PRESET_TEXTURE_CACHE.has(key)) {
     if (PRESET_TEXTURE_CACHE.size >= MAX_PRESET_TEXTURE_CACHE) return null;
     const image = new Image();
@@ -180,7 +240,7 @@ export function applyConstructionMaterialPreset(material, preset, materialDocume
 }
 
 export function createConstructionMaterials(record, materialDocument = null) {
-  const key = materialKey(record);
+  const key = materialKey(record, materialDocument);
   const found = cache.get(key);
   if (found) {
     found.users += 1;
@@ -227,4 +287,5 @@ export function disposeConstructionMaterials() {
   cache.clear();
   for (const texture of PRESET_TEXTURE_CACHE.values()) texture.dispose?.();
   PRESET_TEXTURE_CACHE.clear();
+  sourceSignatureCache = new WeakMap();
 }
