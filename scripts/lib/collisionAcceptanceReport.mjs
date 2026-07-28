@@ -34,11 +34,34 @@ function count(report, name) {
   return Number.isFinite(value) ? value : null;
 }
 
+function hardwareAdapterCheck(report) {
+  const adapter = report?.adapter ?? null;
+  return check(
+    'hardware-adapter',
+    adapter?.ok === true && adapter?.fallback !== true,
+    adapter,
+    'hardware WebGPU adapter',
+  );
+}
+
+function minimumCountChecks(caseConfig, report) {
+  return Object.entries(caseConfig.minimumCounts).map(([name, minimum]) => {
+    const actual = count(report, name);
+    return check(
+      `minimum-count:${name}`,
+      actual !== null && actual >= minimum,
+      actual,
+      minimum,
+    );
+  });
+}
+
 function runChecks(config, caseConfig, run) {
   const report = run.report ?? null;
   const collision = report?.collision ?? null;
   const checks = [
     check('report-present', report !== null, report !== null, true),
+    hardwareAdapterCheck(report),
     check(
       'scenario-match',
       report?.scenario?.id === caseConfig.scenario,
@@ -122,6 +145,7 @@ function runChecks(config, caseConfig, run) {
     }
   }
 
+  checks.push(...minimumCountChecks(caseConfig, report));
   if (run.error) checks.push(check('runner-error', false, run.error, null));
   return Object.freeze(checks);
 }
@@ -225,6 +249,7 @@ export function buildCollisionAcceptanceReport({
       scenario: caseConfig.scenario,
       collisionRequired: caseConfig.collisionRequired,
       compareFrameToBaseline: caseConfig.compareFrameToBaseline,
+      minimumCounts: caseConfig.minimumCounts,
       coverage: caseConfig.coverage,
       passed: checks.every((entry) => entry.passed),
       checks,
