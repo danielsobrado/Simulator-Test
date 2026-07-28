@@ -55,13 +55,13 @@ function createRecord(constructionId, box, terrainView, chunkWorldSize) {
 
 export class ConstructionCollisionProvider {
   constructor({ source, terrainView, chunkWorldSize }) {
-    if (!source?.list || !source?.getPlan || !source?.signature) {
-      throw new Error('Construction collision provider requires a compiled-plan source.');
+    if (!source?.configure || !source?.list || !source?.getPlan || !source?.signature) {
+      throw new Error('Construction collision provider requires a configurable compiled-plan source.');
     }
     if (!terrainView?.getCanonicalHeight || !(chunkWorldSize > 0)) {
       throw new Error('Construction collision provider requires terrain and chunk dimensions.');
     }
-    this.source = source;
+    this.source = source.configure(chunkWorldSize);
     this.terrainView = terrainView;
     this.chunkWorldSize = chunkWorldSize;
     this.observedSpatialSignatures = new Map();
@@ -73,7 +73,7 @@ export class ConstructionCollisionProvider {
   }
 
   getProfileCount() {
-    return this.source.plans?.size ?? 0;
+    return this.source.getPlanCount();
   }
 
   consumeDirtyOwnerChunks(activeKeys) {
@@ -140,7 +140,7 @@ export class ConstructionCollisionProvider {
     return Object.freeze({
       id: this.descriptor.id,
       plans: this.getProfileCount(),
-      source: this.source.getStatus?.() ?? null,
+      source: this.source.getStatus(),
     });
   }
 
