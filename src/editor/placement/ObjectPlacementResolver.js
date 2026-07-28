@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { QUARTER_TURN_RADIANS } from '../constants.js';
+import { registerCollisionObjectSource } from '../collision/CollisionPlayerBridge.js';
 import { evaluateObjectSurface } from '../TerrainPlacement.js';
 import {
   canonicalWorldToRenderLocal,
@@ -41,6 +42,19 @@ export class ObjectPlacementResolver {
     this.heightField = heightField;
     this.tileSize = tileSize;
     this.floatingOrigin = floatingOrigin;
+    this.releaseCollisionObjectSource = null;
+    if (typeof window !== 'undefined') {
+      this.releaseCollisionObjectSource = registerCollisionObjectSource({
+        objectMap,
+        placementResolver: this,
+        objectCatalog: [...definitionByKey.values()],
+        tileSize,
+      });
+      window.addEventListener('pagehide', () => {
+        this.releaseCollisionObjectSource?.();
+        this.releaseCollisionObjectSource = null;
+      }, { once: true });
+    }
   }
 
   resolve(object) {
