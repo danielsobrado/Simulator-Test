@@ -26,6 +26,7 @@ function publish() {
 
 export function registerCollisionConfig(config) {
   if (!config) throw new Error('Collision config registration requires a config.');
+  constructionCollisionSource.setConfig(config.constructions);
   currentConfig = config;
   publish();
 }
