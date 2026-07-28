@@ -1,10 +1,5 @@
 /**
  * Compression-aware support for ruined opening arches.
- *
- * Group presence of any jamb is not enough: springs must bear on a jamb crown
- * or strong field masonry, and voussoirs survive only along a continuous
- * compression path from the abutments (both sides for a closed ring / keystone,
- * one side plus field rest for a short partial stub).
  */
 
 import {
@@ -12,12 +7,6 @@ import {
   RUIN_REMOVAL_REASON,
 } from './ConstructionSupportRoles.js';
 import { coverageWithinSpan, intervalOverlap } from './RuinSupportIntervals.js';
-
-function compareArchOrder(a, b) {
-  const ordinal = (a.support?.archOrdinal ?? 0) - (b.support?.archOrdinal ?? 0);
-  if (ordinal !== 0) return ordinal;
-  return (a.stableIndex ?? 0) - (b.stableIndex ?? 0);
-}
 
 function compareJambOrder(a, b) {
   const ordinal = (a.support?.jambOrdinal ?? 0) - (b.support?.jambOrdinal ?? 0);
@@ -27,8 +16,20 @@ function compareJambOrder(a, b) {
 
 function unitCentre(stone) {
   const span = stone.support?.span;
-  if (span) return (span[0] + span[1]) * 0.5;
-  return stone.s ?? 0;
+  return span ? (span[0] + span[1]) * 0.5 : stone.s ?? 0;
+}
+
+function compareAlongWall(a, b) {
+  const centre = unitCentre(a) - unitCentre(b);
+  if (Math.abs(centre) > 1e-9) return centre;
+  return (a.stableIndex ?? 0) - (b.stableIndex ?? 0);
+}
+
+function faceKey(stone) {
+  const explicit = stone.support?.face;
+  if (Number.isFinite(explicit) && explicit !== 0) return Math.sign(explicit);
+  const offset = stone.offsetNormal ?? 0;
+  return offset === 0 ? 0 : Math.sign(offset);
 }
 
 function verticalContact(upper, lower, tolerance) {
@@ -48,9 +49,6 @@ function spanContact(a, b, pad) {
 function ringContact(a, b, profile) {
   const pad = Math.max(0.04, profile.openings.voussoirContactRatio * 0.5);
   if (!spanContact(a, b, pad)) return false;
-  // Voussoirs along a ring touch laterally more than stacked beds. Near the
-  // spring they can be nearly vertical — allow near-touch in Y as well as
-  // true overlap so compression does not die on a zero-overlap abut.
   const verticalOverlap = intervalOverlap(
     a.support.bottom,
     a.support.top,
@@ -70,41 +68,22 @@ function topJamb(jambs, survivors) {
   const ordered = [...jambs]
     .filter((stone) => survivors.has(stone._ruinId))
     .sort(compareJambOrder);
-  return ordered.length > 0 ? ordered[ordered.length - 1] : null;
+  return ordered.at(-1) ?? null;
 }
 
 function springHasJambBearing(spring, jamb, profile) {
   if (!spring || !jamb) return false;
   if (!verticalContact(spring, jamb, profile.support.verticalTolerance)) return false;
-  // Springs often abut the jamb crown edge-to-edge; allow a small touch pad.
   const pad = Math.max(0.08, profile.support.minimumAbsoluteOverlap);
   return spanContact(spring, jamb, pad);
 }
 
-function springHasFieldBearing(spring, fieldPool, survivors, profile) {
-  if (!spring) return false;
-  const supports = [];
-  for (const lower of fieldPool) {
-    if (!survivors.has(lower._ruinId)) continue;
-    if (!verticalContact(spring, lower, profile.support.verticalTolerance)) continue;
-    if (!spanContact(spring, lower, profile.support.maximumCantilever)) continue;
-    supports.push(lower.support.span);
-  }
-  const coverage = coverageWithinSpan(
-    spring.support.span[0],
-    spring.support.span[1],
-    supports,
-  );
-  return coverage.ratio >= profile.openings.springFieldSupportRatio
-    && coverage.leftOverhang <= profile.support.maximumCantilever
-    && coverage.rightOverhang <= profile.support.maximumCantilever;
-}
-
-function fieldRestRatio(stone, fieldPool, survivors, profile) {
+function fieldCoverage(stone, fieldPool, survivors, profile) {
   const supports = [];
   for (const lower of fieldPool) {
     if (!survivors.has(lower._ruinId)) continue;
     if (!verticalContact(stone, lower, profile.support.verticalTolerance)) continue;
+    if (!spanContact(stone, lower, profile.support.maximumCantilever)) continue;
     supports.push(lower.support.span);
   }
   return coverageWithinSpan(
@@ -114,9 +93,120 @@ function fieldRestRatio(stone, fieldPool, survivors, profile) {
   );
 }
 
-/**
- * Identify left/right springs and resolve which arch units remain in compression.
- */
+function springHasFieldBearing(spring, fieldPool, survivors, profile) {
+  if (!spring) return false;
+  const coverage = fieldCoverage(spring, fieldPool, survivors, profile);
+  return coverage.ratio >= profile.openings.springFieldSupportRatio
+    && coverage.leftOverhang <= profile.support.maximumCantilever
+    && coverage.rightOverhang <= profile.support.maximumCantilever;
+}
+
+function canRemainAsStub(unit, reachable, fieldPool, survivors, profile) {
+  if (!reachable) return false;
+  const rest = fieldCoverage(unit, fieldPool, survivors, profile);
+  return rest.ratio >= profile.openings.springFieldSupportRatio
+    && rest.leftOverhang <= profile.openings.partialArchMaxCantilever
+    && rest.rightOverhang <= profile.openings.partialArchMaxCantilever;
+}
+
+function resolveFaceChain({
+  units,
+  keystones,
+  leftJamb,
+  rightJamb,
+  fieldPool,
+  survivors,
+  profile,
+}) {
+  const ring = [...units].sort(compareAlongWall);
+  const leftSpring = ring[0] ?? null;
+  const rightSpring = ring.at(-1) ?? null;
+  const leftSpringSupported = Boolean(leftSpring) && survivors.has(leftSpring._ruinId) && (
+    springHasJambBearing(leftSpring, leftJamb, profile)
+    || springHasFieldBearing(leftSpring, fieldPool, survivors, profile)
+  );
+  const rightSpringSupported = Boolean(rightSpring) && survivors.has(rightSpring._ruinId) && (
+    springHasJambBearing(rightSpring, rightJamb, profile)
+    || springHasFieldBearing(rightSpring, fieldPool, survivors, profile)
+  );
+
+  const chain = [...ring, ...keystones].sort(compareAlongWall);
+  const reachLeft = new Set();
+  const reachRight = new Set();
+  if (leftSpringSupported) {
+    const start = chain.indexOf(leftSpring);
+    reachLeft.add(leftSpring._ruinId);
+    for (let index = start + 1; index < chain.length; index += 1) {
+      const previous = chain[index - 1];
+      const unit = chain[index];
+      if (!reachLeft.has(previous._ruinId) || !survivors.has(unit._ruinId)) break;
+      if (!ringContact(previous, unit, profile)) break;
+      reachLeft.add(unit._ruinId);
+    }
+  }
+  if (rightSpringSupported) {
+    const start = chain.indexOf(rightSpring);
+    reachRight.add(rightSpring._ruinId);
+    for (let index = start - 1; index >= 0; index -= 1) {
+      const next = chain[index + 1];
+      const unit = chain[index];
+      if (!reachRight.has(next._ruinId) || !survivors.has(unit._ruinId)) break;
+      if (!ringContact(unit, next, profile)) break;
+      reachRight.add(unit._ruinId);
+    }
+  }
+
+  const remove = new Map();
+  const keystoneSupport = new Map();
+  for (const unit of chain) {
+    if (!survivors.has(unit._ruinId)) continue;
+    const fromLeft = reachLeft.has(unit._ruinId);
+    const fromRight = reachRight.has(unit._ruinId);
+    const isKeystone = unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE;
+    if (isKeystone) {
+      keystoneSupport.set(unit._ruinId, fromLeft && fromRight);
+      continue;
+    }
+    if (fromLeft && fromRight) continue;
+
+    const stub = canRemainAsStub(
+      unit,
+      fromLeft || fromRight,
+      fieldPool,
+      survivors,
+      profile,
+    );
+    if (profile.openings.archRequiresBothSprings
+      && !(leftSpringSupported && rightSpringSupported)
+      && !stub) {
+      remove.set(unit._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
+    } else if (!stub) {
+      remove.set(unit._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
+    }
+  }
+
+  return {
+    remove,
+    keystoneSupport,
+    leftSpringSupported,
+    rightSpringSupported,
+    leftSpringId: leftSpring?._ruinId ?? null,
+    rightSpringId: rightSpring?._ruinId ?? null,
+  };
+}
+
+function lintelSupported(lintel, leftJamb, rightJamb, fieldPool, survivors, profile) {
+  if (!lintel || !survivors.has(lintel._ruinId)) return false;
+  const onJambs = springHasJambBearing(lintel, leftJamb, profile)
+    && springHasJambBearing(lintel, rightJamb, profile);
+  if (onJambs) return true;
+  const field = fieldCoverage(lintel, fieldPool, survivors, profile);
+  return field.ratio >= profile.support.strongOverlapRatio
+    && field.leftOverhang <= profile.support.maximumCantilever
+    && field.rightOverhang <= profile.support.maximumCantilever;
+}
+
+/** Resolve each rendered arch face independently, then require shared keystones to be supported by all faces. */
 export function resolveArchCompression({
   arches,
   leftJambs = [],
@@ -125,9 +215,9 @@ export function resolveArchCompression({
   survivors,
   profile,
 }) {
-  const ordered = [...arches].sort(compareArchOrder);
   const remove = new Map();
-  if (ordered.length === 0) {
+  const available = arches.filter((unit) => survivors.has(unit._ruinId));
+  if (available.length === 0) {
     return {
       remove,
       leftSpringSupported: false,
@@ -136,105 +226,72 @@ export function resolveArchCompression({
     };
   }
 
-  const nonKey = ordered.filter(
-    (unit) => unit.support?.role !== CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
-  );
-  const centres = (nonKey.length > 0 ? nonKey : ordered).map(unitCentre);
-  const openingCentre = centres.reduce((sum, value) => sum + value, 0) / centres.length;
-
-  const leftHalf = nonKey.filter((unit) => unitCentre(unit) <= openingCentre);
-  const rightHalf = nonKey.filter((unit) => unitCentre(unit) >= openingCentre);
-  let leftSpring = leftHalf[0] ?? nonKey[0] ?? ordered[0];
-  let rightSpring = rightHalf[rightHalf.length - 1]
-    ?? nonKey[nonKey.length - 1]
-    ?? ordered[ordered.length - 1];
-  if (leftSpring === rightSpring && ordered.length > 1) {
-    leftSpring = ordered[0];
-    rightSpring = ordered[ordered.length - 1];
-  }
-
   const leftJamb = topJamb(leftJambs, survivors);
   const rightJamb = topJamb(rightJambs, survivors);
-  const leftSpringSupported = survivors.has(leftSpring._ruinId) && (
-    springHasJambBearing(leftSpring, leftJamb, profile)
-    || springHasFieldBearing(leftSpring, fieldPool, survivors, profile)
+  const keystones = available.filter(
+    (unit) => unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
   );
-  const rightSpringSupported = survivors.has(rightSpring._ruinId) && (
-    springHasJambBearing(rightSpring, rightJamb, profile)
-    || springHasFieldBearing(rightSpring, fieldPool, survivors, profile)
+  const ringUnits = available.filter(
+    (unit) => unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.ARCH,
   );
 
-  const reachLeft = new Set();
-  const reachRight = new Set();
-  const leftIndex = ordered.indexOf(leftSpring);
-  const rightIndex = ordered.indexOf(rightSpring);
-
-  if (leftSpringSupported && leftIndex >= 0) {
-    reachLeft.add(leftSpring._ruinId);
-    for (let index = leftIndex + 1; index < ordered.length; index += 1) {
-      const prev = ordered[index - 1];
-      const unit = ordered[index];
-      if (!reachLeft.has(prev._ruinId)) break;
-      if (!survivors.has(unit._ruinId)) break;
-      if (!ringContact(prev, unit, profile)) break;
-      reachLeft.add(unit._ruinId);
-    }
-  }
-
-  if (rightSpringSupported && rightIndex >= 0) {
-    reachRight.add(rightSpring._ruinId);
-    for (let index = rightIndex - 1; index >= 0; index -= 1) {
-      const next = ordered[index + 1];
-      const unit = ordered[index];
-      if (!reachRight.has(next._ruinId)) break;
-      if (!survivors.has(unit._ruinId)) break;
-      if (!ringContact(unit, next, profile)) break;
-      reachRight.add(unit._ruinId);
-    }
-  }
-
-  for (const unit of ordered) {
-    if (!survivors.has(unit._ruinId)) continue;
-    const fromLeft = reachLeft.has(unit._ruinId);
-    const fromRight = reachRight.has(unit._ruinId);
-    const isKeystone = unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE;
-
-    if (fromLeft && fromRight) continue;
-
-    if (isKeystone && profile.openings.removeFloatingKeystone) {
-      remove.set(unit._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
-      continue;
-    }
-
-    const rest = fieldRestRatio(unit, fieldPool, survivors, profile);
-    const okStub = (fromLeft || fromRight)
-      && rest.ratio >= profile.openings.springFieldSupportRatio
-      && rest.leftOverhang <= profile.openings.partialArchMaxCantilever
-      && rest.rightOverhang <= profile.openings.partialArchMaxCantilever;
-
-    if (profile.openings.archRequiresBothSprings && !(leftSpringSupported && rightSpringSupported)) {
-      if (!okStub) {
-        remove.set(unit._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
+  if (ringUnits.length === 0) {
+    for (const lintel of keystones) {
+      if (!lintelSupported(lintel, leftJamb, rightJamb, fieldPool, survivors, profile)) {
+        remove.set(lintel._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
       }
-      continue;
     }
+    return {
+      remove,
+      leftSpringSupported: keystones.length > 0 && remove.size === 0,
+      rightSpringSupported: keystones.length > 0 && remove.size === 0,
+      kept: keystones.length - remove.size,
+    };
+  }
 
-    if (!okStub) {
-      remove.set(unit._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
+  const byFace = new Map();
+  for (const unit of ringUnits) {
+    const face = faceKey(unit);
+    if (!byFace.has(face)) byFace.set(face, []);
+    byFace.get(face).push(unit);
+  }
+
+  const keySupportCounts = new Map(keystones.map((unit) => [unit._ruinId, 0]));
+  const faceResults = [];
+  for (const units of byFace.values()) {
+    const result = resolveFaceChain({
+      units,
+      keystones,
+      leftJamb,
+      rightJamb,
+      fieldPool,
+      survivors,
+      profile,
+    });
+    faceResults.push(result);
+    for (const [id, reason] of result.remove) remove.set(id, reason);
+    for (const [id, supported] of result.keystoneSupport) {
+      if (supported) keySupportCounts.set(id, (keySupportCounts.get(id) ?? 0) + 1);
+    }
+  }
+
+  for (const keystone of keystones) {
+    const supportedFaces = keySupportCounts.get(keystone._ruinId) ?? 0;
+    if (profile.openings.removeFloatingKeystone && supportedFaces !== faceResults.length) {
+      remove.set(keystone._ruinId, RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED);
     }
   }
 
   let kept = 0;
-  for (const unit of ordered) {
-    if (survivors.has(unit._ruinId) && !remove.has(unit._ruinId)) kept += 1;
+  for (const unit of available) {
+    if (!remove.has(unit._ruinId)) kept += 1;
   }
-
   return {
     remove,
-    leftSpringSupported,
-    rightSpringSupported,
-    leftSpringId: leftSpring?._ruinId ?? null,
-    rightSpringId: rightSpring?._ruinId ?? null,
+    leftSpringSupported: faceResults.every((result) => result.leftSpringSupported),
+    rightSpringSupported: faceResults.every((result) => result.rightSpringSupported),
+    leftSpringId: faceResults[0]?.leftSpringId ?? null,
+    rightSpringId: faceResults[0]?.rightSpringId ?? null,
     kept,
   };
 }
