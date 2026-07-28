@@ -38,7 +38,6 @@ const COLLISION_QA_SCENARIOS = new Set([
   'collision-p7',
   'collision-p8',
 ]);
-const PERFORMANCE_QA_SCENARIOS = new Set(['collision-p8']);
 
 function hasDebugEnabled(debug) {
   return Object.values(debug).some(Boolean);
@@ -50,9 +49,8 @@ function qaScenario(search) {
   return COLLISION_QA_SCENARIOS.has(scenario) ? scenario : null;
 }
 
-export function collisionQaDebugConfig(debug, activeQaScenario) {
-  if (!activeQaScenario || PERFORMANCE_QA_SCENARIOS.has(activeQaScenario)) return debug;
-  return Object.freeze({ ...debug, colliders: true, broadphase: true });
+export function collisionQaDebugConfig(debug) {
+  return debug;
 }
 
 function residencyConfig(streaming, activeQaScenario) {
@@ -216,7 +214,7 @@ export function createCollisionRuntime({
   if (!shouldCreateCollisionRuntime(collisionConfig, search)) return null;
   const activeQaScenario = qaScenario(search);
   const qaMode = activeQaScenario !== null;
-  const debug = collisionQaDebugConfig(collisionConfig.debug, activeQaScenario);
+  const debug = collisionQaDebugConfig(collisionConfig.debug);
   const provider = createProvider({
     activeQaScenario,
     terrainView,
