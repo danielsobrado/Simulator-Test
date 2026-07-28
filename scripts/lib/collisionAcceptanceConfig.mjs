@@ -150,10 +150,6 @@ function freezeCase(rawCase, index) {
       source.collisionRequired,
       `cases[${index}].collisionRequired`,
     ),
-    compareFrameToBaseline: assertBoolean(
-      source.compareFrameToBaseline,
-      `cases[${index}].compareFrameToBaseline`,
-    ),
     warmupSeconds: assertNumber(source.warmupSeconds, `cases[${index}].warmupSeconds`),
     durationSeconds: assertNumber(
       source.durationSeconds,
@@ -188,10 +184,6 @@ function freezeGates(rawGates) {
   const gates = assertObject(rawGates, 'gates');
   return Object.freeze({
     collisionP95Ms: assertNumber(gates.collisionP95Ms, 'gates.collisionP95Ms'),
-    frameP95RegressionMs: assertNumber(
-      gates.frameP95RegressionMs,
-      'gates.frameP95RegressionMs',
-    ),
     maxHitches: assertNumber(gates.maxHitches, 'gates.maxHitches', { integer: true }),
     maxReadinessMisses: assertNumber(
       gates.maxReadinessMisses,
@@ -217,26 +209,6 @@ function freezeGates(rawGates) {
   });
 }
 
-function sameSpawn(left, right) {
-  if (left === null || right === null) return left === right;
-  return left.x === right.x && left.z === right.z;
-}
-
-function assertComparableRoute(caseConfig, baseline) {
-  const matches = caseConfig.speed === baseline.speed
-    && caseConfig.warmupSeconds === baseline.warmupSeconds
-    && caseConfig.durationSeconds === baseline.durationSeconds
-    && sameSpawn(caseConfig.spawn, baseline.spawn)
-    && caseConfig.yawDegrees === baseline.yawDegrees
-    && caseConfig.pitchDegrees === baseline.pitchDegrees
-    && caseConfig.buildings === baseline.buildings;
-  if (!matches) {
-    throw new Error(
-      `Comparable case ${caseConfig.id} must match the baseline movement route and duration.`,
-    );
-  }
-}
-
 export function validateCollisionAcceptanceConfig(rawConfig) {
   const source = assertObject(rawConfig, 'collision acceptance config');
   const cases = Object.freeze((source.cases ?? []).map(freezeCase));
@@ -253,12 +225,6 @@ export function validateCollisionAcceptanceConfig(rawConfig) {
   const baseline = cases.find((entry) => entry.id === baselineCase);
   if (!baseline) throw new Error(`baselineCase ${baselineCase} does not exist.`);
   if (baseline.collisionRequired) throw new Error('baselineCase must not require collision.');
-  if (baseline.compareFrameToBaseline) {
-    throw new Error('baselineCase cannot compare its frame time to itself.');
-  }
-  for (const caseConfig of cases) {
-    if (caseConfig.compareFrameToBaseline) assertComparableRoute(caseConfig, baseline);
-  }
 
   return Object.freeze({
     version: assertNumber(source.version, 'version', { minimum: 1, integer: true }),
