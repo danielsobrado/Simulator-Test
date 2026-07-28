@@ -23,6 +23,8 @@
     "test": "node --test",
     "qa:perf": "node scripts/run-perf-qa.mjs",
     "qa:perf:parse": "node scripts/parse-perf-qa.mjs tmp/perf-qa-latest.json",
+    "qa:collision": "node scripts/run-collision-acceptance.mjs",
+    "qa:collision:release": "node scripts/run-collision-acceptance.mjs --release",
     "qa:assets:startup": "node scripts/run-asset-startup-qa.mjs",
     "verify:asset-serving": "node scripts/verify-asset-serving.mjs",
     "qa:workshop:install": "playwright install chromium",
