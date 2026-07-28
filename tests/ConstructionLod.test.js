@@ -248,6 +248,55 @@ test('soft limestone coarse joints amplify once from near placements', () => {
   assert.ok(visible.height + 1e-9 >= 0.08);
 });
 
+test('coarse LOD does not stretch across a multi-course ruin gap', () => {
+  const make = (courseIndex, y) => ({
+    category: 'field',
+    s: 0.5,
+    y,
+    width: 0.8,
+    height: 0.35,
+    packedWidth: 0.8,
+    courseIndex,
+    stableIndex: courseIndex,
+    corners: [[0.1, y - 0.175], [0.9, y - 0.175], [0.9, y + 0.175], [0.1, y + 0.175]],
+    mortarCorners: [[0.05, y - 0.2], [0.95, y - 0.2], [0.95, y + 0.2], [0.05, y + 0.2]],
+    jointWidths: { head: 0.1, bed: 0.05 },
+  });
+  // Survivors at courses 0 and 3: normal thin would keep 0+2, so a jump of 3
+  // is a ruin void and must not be filled by stretching.
+  const near = [make(0, 0.2), make(3, 1.4)];
+  const coarse = coarsePlacements(near, { styleKey: 'coursed-rubble' });
+  const field = coarse.filter((stone) => stone.category === 'field');
+  assert.equal(field.length, 1);
+  assert.ok(
+    field[0].height < 0.55,
+    `expected no ruin-gap stretch, got height ${field[0].height}`,
+  );
+});
+
+test('coarse LOD still stretches across a normal every-other-course thin', () => {
+  const make = (courseIndex, y) => ({
+    category: 'field',
+    s: 0.5,
+    y,
+    width: 0.8,
+    height: 0.35,
+    packedWidth: 0.8,
+    courseIndex,
+    stableIndex: courseIndex,
+    corners: [[0.1, y - 0.175], [0.9, y - 0.175], [0.9, y + 0.175], [0.1, y + 0.175]],
+    mortarCorners: [[0.05, y - 0.2], [0.95, y - 0.2], [0.95, y + 0.2], [0.05, y + 0.2]],
+    jointWidths: { head: 0.1, bed: 0.05 },
+  });
+  const near = [make(0, 0.2), make(1, 0.6), make(2, 1.0)];
+  const coarse = coarsePlacements(near, { styleKey: 'coursed-rubble' });
+  const field = coarse.filter((stone) => stone.category === 'field');
+  // Keeps courses 0 and 2 in ordered y; stretches 0 toward 2.
+  assert.equal(field.length, 2);
+  const bottom = field.find((stone) => stone.courseIndex === 0);
+  assert.ok(bottom.height > 0.35 + 0.2, `expected thin stretch, got ${bottom.height}`);
+});
+
 function scaleCornersForTest(corners, scaleX, scaleY) {
   let minX = Infinity;
   let maxX = -Infinity;

@@ -16,12 +16,12 @@ Deterministic soft-limestone wall (seed 3141, ~48 m path with curve + openings).
 
 | Band | p50 ms | p95 ms |
 | --- | ---: | ---: |
-| Near | 15.48 | 18.19 |
-| Coarse | 5.54 | 6.72 |
+| Near | 16.10 | 17.75 |
+| Coarse | 5.60 | 7.10 |
 
 Soft triangle ratio (coarse/near): **21.5%** (gate ≤ 55%)
 
-Build p95 ratio (coarse/near): **37.0%** (gate ≤ 60%)
+Build p95 ratio (coarse/near): **40.0%** (gate ≤ 60%)
 
 ## Gates
 

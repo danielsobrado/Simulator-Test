@@ -334,13 +334,11 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
   }
   if (field.length === 0) return placements;
 
+  const jointProfile = constructionJointProfile(styleKey);
+  // Preserve intentional ruin notches: never stretch across a gap larger than the
+  // normal every-other-course thin (one omitted lattice course).
   const courses = new Map();
   for (const placement of mergeSplitCells(field)) {
-    // Never merge/stretch across an explicit damage void.
-    if (placement.ruin?.damageVoid) {
-      rest.push(amplifyCoarseJoints(placement, constructionJointProfile(styleKey)));
-      continue;
-    }
     const key = placement.courseIndex != null
       ? `course:${placement.courseIndex}`
       : `y:${Math.round(placement.y * 50) / 50}`;
@@ -351,24 +349,44 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
   const meanY = (course) => (
     course.reduce((total, placement) => total + placement.y, 0) / course.length
   );
+  const courseIndexSpan = (course) => {
+    let minimum = Infinity;
+    let maximum = -Infinity;
+    for (const placement of course) {
+      const index = placement.courseIndex ?? placement.support?.courseIndex;
+      if (index == null) continue;
+      minimum = Math.min(minimum, index);
+      maximum = Math.max(maximum, index);
+    }
+    return { minimum, maximum };
+  };
   const ordered = [...courses.values()].sort((a, b) => meanY(a) - meanY(b));
 
-  const jointProfile = constructionJointProfile(styleKey);
   const merged = [];
   for (let index = 0; index < ordered.length; index += 2) {
     const course = ordered[index];
     const above = ordered[index + 1];
-    // Do not stretch through a missing ruin course when the upper band was a
-    // damage void island rather than a thinned field course.
-    const aboveHasVoid = above?.some((placement) => placement.ruin?.damageVoid);
-    const step = above && !aboveHasVoid
-      ? Math.max(0, meanY(above) - meanY(course))
-      : 0;
-    for (const placement of course) {
-      if (placement.ruin?.clusterId != null && aboveHasVoid) {
-        merged.push(amplifyCoarseJoints(placement, jointProfile));
-        continue;
+    let step = 0;
+    if (above) {
+      const belowSpan = courseIndexSpan(course);
+      const aboveSpan = courseIndexSpan(above);
+      // Normal coarse thin keeps N and N+2. Anything wider implies a missing
+      // ruin course between survivors — do not grow stones through that notch.
+      let ruinGap = false;
+      if (
+        Number.isFinite(belowSpan.maximum)
+        && Number.isFinite(aboveSpan.minimum)
+        && aboveSpan.minimum - belowSpan.maximum > 2
+      ) {
+        // Normal coarse thin keeps N and N+2. A wider jump means at least one
+        // additional lattice course was removed by ruin support — do not fill it.
+        ruinGap = true;
       }
+      if (!ruinGap) {
+        step = Math.max(0, meanY(above) - meanY(course));
+      }
+    }
+    for (const placement of course) {
       const stretched = stretchOverGap(placement, step);
       merged.push(amplifyCoarseJoints(stretched, jointProfile));
     }

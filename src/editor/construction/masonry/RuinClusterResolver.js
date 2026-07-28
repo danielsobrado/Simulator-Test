@@ -24,12 +24,6 @@ function touches(a, b, epsilon = 0.04) {
   return spanEnd(a) + epsilon >= spanStart(b) && spanEnd(b) + epsilon >= spanStart(a);
 }
 
-function isField(placement) {
-  const role = placement.support?.role;
-  if (role) return role === 'field' || role === 'foundation';
-  return placement.category === 'field';
-}
-
 /**
  * Resolve clustered damage on field stones. Dressings pass through unchanged.
  */
@@ -47,20 +41,6 @@ export function resolveRuinClusters({
 
   const field = [];
   const rest = [];
-  for (const placement of placements) {
-    if (isField(placement) && (placement.support?.role ?? 'field') !== 'foundation'
-      && placement.category === 'field') {
-      field.push(placement);
-    } else if (placement.category === 'field' || placement.support?.role === 'foundation') {
-      field.push(placement);
-    } else {
-      rest.push(placement);
-    }
-  }
-
-  // Simpler: field category goes to field processing; rest pass through.
-  field.length = 0;
-  rest.length = 0;
   for (const placement of placements) {
     if (placement.category === 'field') field.push(placement);
     else rest.push(placement);

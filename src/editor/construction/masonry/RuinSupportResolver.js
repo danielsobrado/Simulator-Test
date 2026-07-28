@@ -35,6 +35,13 @@ function emptyStats() {
   };
 }
 
+function isLatticeRole(role) {
+  return (
+    role === CONSTRUCTION_SUPPORT_ROLE.FIELD
+    || role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION
+  );
+}
+
 function compareSupportOrder(a, b) {
   const course = (a.support?.courseIndex ?? 0) - (b.support?.courseIndex ?? 0);
   if (course !== 0) return course;
@@ -43,19 +50,28 @@ function compareSupportOrder(a, b) {
   return (a.stableIndex ?? 0) - (b.stableIndex ?? 0);
 }
 
+function compareJambOrder(a, b) {
+  const ordinal = (a.support?.jambOrdinal ?? 0) - (b.support?.jambOrdinal ?? 0);
+  if (ordinal !== 0) return ordinal;
+  return (a.stableIndex ?? 0) - (b.stableIndex ?? 0);
+}
+
+function verticalToleranceFor(lower, profile) {
+  if (lower.support?.role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION) {
+    return profile.support.foundationTolerance;
+  }
+  return profile.support.verticalTolerance;
+}
+
 function evaluateSupport(stone, lowerCourse, profile, survivors) {
   const [s0, s1] = stone.support.span;
   const candidates = findOverlapCandidates(lowerCourse, s0, s1, profile.support.maximumCantilever);
   const supports = [];
   for (const lower of candidates) {
     if (!survivors.has(lower._ruinId)) continue;
+    const tolerance = verticalToleranceFor(lower, profile);
     const gap = stone.support.bottom - lower.support.top;
-    if (
-      gap < -profile.support.verticalTolerance
-      || gap > profile.support.verticalTolerance
-    ) {
-      continue;
-    }
+    if (gap < -tolerance || gap > tolerance) continue;
     supports.push(lower.support.span);
   }
   return coverageWithinSpan(s0, s1, supports);
@@ -64,7 +80,6 @@ function evaluateSupport(stone, lowerCourse, profile, survivors) {
 function isDirectlySupported(coverage, profile, role) {
   if (role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION) return true;
   if (role === CONSTRUCTION_SUPPORT_ROLE.ARCH || role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE) {
-    // Handled separately.
     return coverage.ratio >= profile.support.minimumOverlapRatio;
   }
   if (coverage.covered < profile.support.minimumAbsoluteOverlap) return false;
@@ -89,10 +104,55 @@ function markRemoved(removed, placement, reason, stats) {
   }
 }
 
+function openingPrefixFromGroupId(groupId) {
+  if (typeof groupId !== 'string') return null;
+  const match = groupId.match(/^(opening:[^:]+):/);
+  return match ? match[1] : null;
+}
+
+function isLaterallyIsolated(stone, courseList, survivors) {
+  return !courseList.some((candidate) => (
+    candidate._ruinId !== stone._ruinId
+    && survivors.has(candidate._ruinId)
+    && (
+      Math.abs(candidate.support.span[0] - stone.support.span[1]) < 0.08
+      || Math.abs(candidate.support.span[1] - stone.support.span[0]) < 0.08
+    )
+  ));
+}
+
+/**
+ * Height of an isolated tooth ending at `topStone`, walking downward.
+ * Returns both the course count and the stack so tall pinnacles can be cleared
+ * in one pass (the previous hardcoded `1` never tripped the YAML max).
+ */
+function isolatedToothFromTop(topStone, byCourseNow, survivors) {
+  const stack = [topStone];
+  let stone = topStone;
+  let course = stone.support.courseIndex;
+  while (true) {
+    const below = byCourseNow.get(course - 1) ?? [];
+    const stacked = below.filter((candidate) => (
+      survivors.has(candidate._ruinId)
+      && candidate.support?.role === CONSTRUCTION_SUPPORT_ROLE.FIELD
+      && coverageWithinSpan(
+        stone.support.span[0],
+        stone.support.span[1],
+        [candidate.support.span],
+      ).ratio >= 0.55
+    ));
+    if (stacked.length !== 1) break;
+    const next = stacked[0];
+    if (!isLaterallyIsolated(next, below, survivors)) break;
+    stack.push(next);
+    stone = next;
+    course -= 1;
+  }
+  return { toothCourses: stack.length, stack };
+}
+
 /**
  * Resolve clustered damage then structural support across all wall modules.
- *
- * @param {{ modules: Array<{ id: string, placements: object[] }>, profile: object }} args
  */
 export function resolveRuinSupport({
   modules,
@@ -116,7 +176,6 @@ export function resolveRuinSupport({
     }
   }
 
-  // Clip dressings above collapse envelope.
   const clipped = [];
   const preRemoved = [];
   for (const placement of flattened) {
@@ -153,10 +212,12 @@ export function resolveRuinSupport({
   }
   const removed = [...preRemoved, ...clustered.removed];
 
-  // Group by course for lower-support lookup.
+  // Lattice masonry only — dressings use jambOrdinal / opening groups.
   const byCourse = new Map();
   for (const placement of survivors.values()) {
-    const course = placement.support?.courseIndex ?? 0;
+    const role = placement.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD;
+    if (!isLatticeRole(role)) continue;
+    const course = placement.support?.courseIndex ?? placement.courseIndex ?? 0;
     if (!byCourse.has(course)) byCourse.set(course, []);
     byCourse.get(course).push(placement);
   }
@@ -166,27 +227,23 @@ export function resolveRuinSupport({
 
   const courseKeys = [...byCourse.keys()].sort((a, b) => a - b);
   const reverseDeps = new Map();
-
   const queue = [];
+
   for (const course of courseKeys) {
     const stones = byCourse.get(course);
-    const lower = byCourse.get(course - 1) ?? [];
-    const lower2 = byCourse.get(course - 2) ?? [];
-    const lowerPool = [...lower, ...lower2].sort(compareSupportOrder);
+    const lowerPool = [
+      ...(byCourse.get(course - 1) ?? []),
+      ...(byCourse.get(course - 2) ?? []),
+    ].sort(compareSupportOrder);
 
     for (const stone of stones) {
       const role = stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD;
       stats.supportChecks += 1;
-
       if (role === CONSTRUCTION_SUPPORT_ROLE.FOUNDATION) continue;
-      if (role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE || role === CONSTRUCTION_SUPPORT_ROLE.ARCH) {
-        continue; // openings pass later
-      }
 
       const coverage = evaluateSupport(stone, lowerPool, profile, survivors);
       stats.supportEdges += coverage.merged.length;
 
-      // Record reverse edges for propagation (approximate: all overlapping lower).
       for (const lowerStone of findOverlapCandidates(
         lowerPool,
         stone.support.span[0],
@@ -211,38 +268,103 @@ export function resolveRuinSupport({
     }
   }
 
-  // Opening / arch groups.
+  // Jamb stacks: bottom-up within each jamb group, using jambOrdinal.
+  const jambGroups = new Map();
+  for (const stone of survivors.values()) {
+    if (stone.support?.role !== CONSTRUCTION_SUPPORT_ROLE.JAMB) continue;
+    const groupId = stone.support.groupId;
+    if (!groupId) continue;
+    if (!jambGroups.has(groupId)) jambGroups.set(groupId, []);
+    jambGroups.get(groupId).push(stone);
+  }
+  for (const units of jambGroups.values()) {
+    units.sort(compareJambOrder);
+    for (let index = 0; index < units.length; index += 1) {
+      const stone = units[index];
+      if (!survivors.has(stone._ruinId)) continue;
+      stats.supportChecks += 1;
+      if (index === 0) {
+        // Bottom jamb: needs foundation / field under its footprint.
+        const course = Math.max(0, Math.floor(stone.support.bottom / 0.5));
+        const lowerPool = [
+          ...(byCourse.get(0) ?? []),
+          ...(byCourse.get(1) ?? []),
+          ...(byCourse.get(course) ?? []),
+          ...(byCourse.get(course - 1) ?? []),
+        ].sort(compareSupportOrder);
+        if (profile.openings.protectLowerJambs) continue;
+        const coverage = evaluateSupport(stone, lowerPool, profile, survivors);
+        const ok = coverage.ratio >= profile.openings.jambMinimumSupport
+          || isDirectlySupported(coverage, profile, CONSTRUCTION_SUPPORT_ROLE.JAMB);
+        if (!ok) {
+          queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.UNSUPPORTED });
+        }
+        continue;
+      }
+      const below = units[index - 1];
+      if (!survivors.has(below._ruinId)) {
+        queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.UNSUPPORTED });
+        continue;
+      }
+      const gap = stone.support.bottom - below.support.top;
+      const tolerance = profile.support.verticalTolerance;
+      if (gap < -tolerance || gap > tolerance) {
+        queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.UNSUPPORTED });
+        continue;
+      }
+      if (!reverseDeps.has(below._ruinId)) reverseDeps.set(below._ruinId, []);
+      reverseDeps.get(below._ruinId).push(stone._ruinId);
+    }
+  }
+
+  // Arch rings require surviving left + right jamb groups for the same opening.
   const archGroups = new Map();
+  const jambsByOpening = new Map();
   for (const stone of survivors.values()) {
     const groupId = stone.support?.groupId;
     if (!groupId) continue;
-    if (!archGroups.has(groupId)) archGroups.set(groupId, []);
-    archGroups.get(groupId).push(stone);
+    const prefix = openingPrefixFromGroupId(groupId);
+    if (!prefix) continue;
+    if (stone.support.role === CONSTRUCTION_SUPPORT_ROLE.JAMB) {
+      if (!jambsByOpening.has(prefix)) jambsByOpening.set(prefix, { left: [], right: [] });
+      const bucket = jambsByOpening.get(prefix);
+      if ((stone.support.side ?? 0) < 0) bucket.left.push(stone);
+      else bucket.right.push(stone);
+      continue;
+    }
+    if (
+      stone.support.role === CONSTRUCTION_SUPPORT_ROLE.ARCH
+      || stone.support.role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE
+    ) {
+      if (!archGroups.has(groupId)) archGroups.set(groupId, []);
+      archGroups.get(groupId).push(stone);
+    }
   }
-  for (const [groupId, units] of archGroups) {
-    void groupId;
-    const springs = units.filter((unit) => unit.support?.archOrdinal === 0
-      || unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.JAMB);
-    const arches = units.filter((unit) => (
-      unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.ARCH
-      || unit.support?.role === CONSTRUCTION_SUPPORT_ROLE.KEYSTONE
-    ));
-    if (arches.length === 0) continue;
 
-    const left = springs.find((unit) => (unit.support?.side ?? 0) < 0)
-      ?? springs[0];
-    const right = springs.find((unit) => (unit.support?.side ?? 0) > 0)
-      ?? springs[springs.length - 1];
-    const springsOk = Boolean(
-      left && right
-      && survivors.has(left._ruinId)
-      && survivors.has(right._ruinId),
-    );
+  for (const [groupId, arches] of archGroups) {
+    const prefix = openingPrefixFromGroupId(groupId);
+    const jambs = prefix ? jambsByOpening.get(prefix) : null;
+    const leftOk = Boolean(jambs?.left.some((stone) => survivors.has(stone._ruinId)));
+    const rightOk = Boolean(jambs?.right.some((stone) => survivors.has(stone._ruinId)));
+    const springsOk = leftOk && rightOk;
 
     if (profile.openings.archRequiresBothSprings && !springsOk) {
       for (const unit of arches) {
         if (survivors.has(unit._ruinId)) {
           queue.push({ id: unit._ruinId, reason: RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED });
+        }
+      }
+      // Upper jambs without an arch also collapse when their spring side is gone.
+      if (jambs) {
+        for (const side of [jambs.left, jambs.right]) {
+          const ordered = [...side].sort(compareJambOrder);
+          for (let index = 1; index < ordered.length; index += 1) {
+            const stone = ordered[index];
+            if (!survivors.has(stone._ruinId)) continue;
+            if (!survivors.has(ordered[index - 1]._ruinId)) {
+              queue.push({ id: stone._ruinId, reason: RUIN_REMOVAL_REASON.ARCH_UNSUPPORTED });
+            }
+          }
         }
       }
     } else {
@@ -253,13 +375,13 @@ export function resolveRuinSupport({
   queue.sort((a, b) => {
     const left = survivors.get(a.id);
     const right = survivors.get(b.id);
-    if (!left || !right) return (a.id - b.id);
+    if (!left || !right) return a.id - b.id;
     return compareSupportOrder(left, right);
   });
 
   let steps = 0;
   const seen = new Set();
-  while (queue.length > 0 && steps < profile.support.maximumPropagationSteps * survivors.size) {
+  while (queue.length > 0 && steps < profile.support.maximumPropagationSteps * Math.max(1, survivors.size)) {
     steps += 1;
     stats.supportIterations += 1;
     const { id, reason } = queue.shift();
@@ -273,21 +395,29 @@ export function resolveRuinSupport({
     for (const dependantId of reverseDeps.get(id) ?? []) {
       if (!survivors.has(dependantId) || seen.has(dependantId)) continue;
       const dependant = survivors.get(dependantId);
+      const role = dependant.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD;
+      if (role === CONSTRUCTION_SUPPORT_ROLE.JAMB) {
+        queue.push({ id: dependantId, reason: RUIN_REMOVAL_REASON.UNSUPPORTED });
+        continue;
+      }
+      if (!isLatticeRole(role)) continue;
       const course = dependant.support?.courseIndex ?? 0;
       const lowerPool = [
         ...(byCourse.get(course - 1) ?? []),
         ...(byCourse.get(course - 2) ?? []),
       ].filter((candidate) => survivors.has(candidate._ruinId));
       const coverage = evaluateSupport(dependant, lowerPool, profile, survivors);
-      if (!isDirectlySupported(coverage, profile, dependant.support?.role)) {
+      if (!isDirectlySupported(coverage, profile, role)) {
         queue.push({ id: dependantId, reason: RUIN_REMOVAL_REASON.UNSUPPORTED });
       }
     }
   }
 
-  // Crown pinnacle cleanup.
+  // Crown pinnacle cleanup on lattice field only.
   if (profile.crown.removeUnsupportedPinnacles) {
-    const remaining = [...survivors.values()].sort(compareSupportOrder);
+    const remaining = [...survivors.values()]
+      .filter((stone) => isLatticeRole(stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD))
+      .sort(compareSupportOrder);
     const byCourseNow = new Map();
     for (const stone of remaining) {
       const course = stone.support?.courseIndex ?? 0;
@@ -298,8 +428,9 @@ export function resolveRuinSupport({
 
     for (const stone of remaining) {
       if (!survivors.has(stone._ruinId)) continue;
-      const role = stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD;
-      if (role !== CONSTRUCTION_SUPPORT_ROLE.FIELD) continue;
+      if ((stone.support?.role ?? CONSTRUCTION_SUPPORT_ROLE.FIELD) !== CONSTRUCTION_SUPPORT_ROLE.FIELD) {
+        continue;
+      }
       const course = stone.support.courseIndex;
       const above = byCourseNow.get(course + 1) ?? [];
       const hasAbove = above.some((candidate) => (
@@ -313,15 +444,7 @@ export function resolveRuinSupport({
       if (hasAbove) continue;
 
       const same = byCourseNow.get(course) ?? [];
-      const neighbours = same.filter((candidate) => (
-        candidate._ruinId !== stone._ruinId
-        && survivors.has(candidate._ruinId)
-        && (
-          Math.abs(candidate.support.span[0] - stone.support.span[1]) < 0.08
-          || Math.abs(candidate.support.span[1] - stone.support.span[0]) < 0.08
-        )
-      ));
-      if (neighbours.length > 0) continue;
+      if (!isLaterallyIsolated(stone, same, survivors)) continue;
 
       const width = stone.support.span[1] - stone.support.span[0];
       const lowerPool = [
@@ -329,14 +452,17 @@ export function resolveRuinSupport({
         ...(byCourseNow.get(course - 2) ?? []),
       ].filter((candidate) => survivors.has(candidate._ruinId));
       const coverage = evaluateSupport(stone, lowerPool, profile, survivors);
-      const toothCourses = 1;
+      const { toothCourses, stack } = isolatedToothFromTop(stone, byCourseNow, survivors);
       if (
         width < profile.crown.minimumToothWidth
         || coverage.ratio < profile.crown.isolatedToothStrongSupport
         || toothCourses > profile.crown.maximumSupportedToothCourses
       ) {
-        survivors.delete(stone._ruinId);
-        markRemoved(removed, stone, RUIN_REMOVAL_REASON.PINNACLE, stats);
+        for (const unit of stack) {
+          if (!survivors.has(unit._ruinId)) continue;
+          survivors.delete(unit._ruinId);
+          markRemoved(removed, unit, RUIN_REMOVAL_REASON.PINNACLE, stats);
+        }
       }
     }
   }
@@ -345,7 +471,6 @@ export function resolveRuinSupport({
   stats.finalSurvivors = survivors.size;
   stats.finalRemoved = removed.length;
 
-  // Mark damage voids on survivors that neighbour removals (for coarse LOD).
   const removedSpansByCourse = new Map();
   for (const entry of removed) {
     const placement = entry.placement;

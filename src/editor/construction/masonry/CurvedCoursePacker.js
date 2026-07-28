@@ -572,6 +572,7 @@ export function packCurvedWall({
         bottom,
         top,
         courseIndex: supportMeta?.courseIndex ?? -1,
+        jambOrdinal: supportMeta?.jambOrdinal ?? null,
         groupId: supportMeta?.groupId ?? null,
         archOrdinal: supportMeta?.archOrdinal ?? null,
         side: supportMeta?.side ?? null,
@@ -691,7 +692,8 @@ export function packCurvedWall({
       }, {
         role: CONSTRUCTION_SUPPORT_ROLE.JAMB,
         groupId: `opening:${openingId}:${side < 0 ? 'left' : 'right'}-jamb`,
-        courseIndex: jambOrdinal,
+        courseIndex: -1,
+        jambOrdinal,
         side,
         archOrdinal: 0,
       });
@@ -712,6 +714,7 @@ export function packCurvedWall({
         role: CONSTRUCTION_SUPPORT_ROLE.ARCH,
         groupId: `opening:${openingId}:arch`,
         courseIndex: -1,
+        jambOrdinal: null,
         archOrdinal,
       });
       archOrdinal += 1;
@@ -730,6 +733,7 @@ export function packCurvedWall({
           role: CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
           groupId: `opening:${openingId}:arch`,
           courseIndex: -1,
+          jambOrdinal: null,
           archOrdinal: 999,
         });
       }
