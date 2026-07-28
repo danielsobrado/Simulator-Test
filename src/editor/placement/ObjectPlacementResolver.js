@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { QUARTER_TURN_RADIANS } from '../constants.js';
+import { registerCollisionObjectSource } from '../collision/CollisionPlayerBridge.js';
+import { ensureCollisionP6QaFixture } from '../collision/CollisionP6QaFixture.js';
 import { evaluateObjectSurface } from '../TerrainPlacement.js';
 import {
   canonicalWorldToRenderLocal,
@@ -9,6 +11,7 @@ import {
 const FOUNDATION_OVERLAP = 0.04;
 const FOUNDATION_FOOTPRINT_SCALE = 0.96;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const UNIT_SCALE = new THREE.Vector3(1, 1, 1);
 
 function requireDefinition(definitionByKey, definitionKey) {
   const definition = definitionByKey.get(definitionKey);
@@ -40,6 +43,20 @@ export class ObjectPlacementResolver {
     this.heightField = heightField;
     this.tileSize = tileSize;
     this.floatingOrigin = floatingOrigin;
+    this.releaseCollisionObjectSource = null;
+    if (typeof window !== 'undefined') {
+      ensureCollisionP6QaFixture(objectMap, window.location.search);
+      this.releaseCollisionObjectSource = registerCollisionObjectSource({
+        objectMap,
+        placementResolver: this,
+        objectCatalog: [...definitionByKey.values()],
+        tileSize,
+      });
+      window.addEventListener('pagehide', () => {
+        this.releaseCollisionObjectSource?.();
+        this.releaseCollisionObjectSource = null;
+      }, { once: true });
+    }
   }
 
   resolve(object) {
@@ -68,40 +85,47 @@ export class ObjectPlacementResolver {
     return canonicalWorldToRenderLocal(canonical.x, canonical.z, this.floatingOrigin);
   }
 
-  createObjectMatrix(object, surfaceOverride = null) {
-    const placement = surfaceOverride
-      ? {
-        bounds: this.objectMap.getBounds(
-          object.x,
-          object.z,
-          object.definitionKey,
-          object.rotation,
-        ),
-        definition: requireDefinition(this.definitionByKey, object.definitionKey),
-        surface: surfaceOverride,
-      }
-      : this.resolve(object);
-    const center = this.renderCenter(placement.bounds);
+  createPlacementQuaternion(object, definition, surface) {
     const yaw = new THREE.Quaternion().setFromAxisAngle(
       WORLD_UP,
       -object.rotation * QUARTER_TURN_RADIANS,
     );
-    let quaternion = yaw;
+    if (!definition.foundation.alignToNormal) return yaw;
+    const normal = new THREE.Vector3(surface.normal.x, surface.normal.y, surface.normal.z);
+    return new THREE.Quaternion().setFromUnitVectors(WORLD_UP, normal).multiply(yaw);
+  }
 
-    if (placement.definition.foundation.alignToNormal) {
-      const normal = new THREE.Vector3(
-        placement.surface.normal.x,
-        placement.surface.normal.y,
-        placement.surface.normal.z,
-      );
-      const alignment = new THREE.Quaternion().setFromUnitVectors(WORLD_UP, normal);
-      quaternion = alignment.multiply(yaw);
-    }
+  placementFor(object, surfaceOverride = null) {
+    if (!surfaceOverride) return this.resolve(object);
+    return {
+      bounds: this.objectMap.getBounds(
+        object.x,
+        object.z,
+        object.definitionKey,
+        object.rotation,
+      ),
+      definition: requireDefinition(this.definitionByKey, object.definitionKey),
+      surface: surfaceOverride,
+    };
+  }
 
+  createCanonicalObjectMatrix(object, surfaceOverride = null) {
+    const placement = this.placementFor(object, surfaceOverride);
+    const center = this.canonicalCenter(placement.bounds);
     return new THREE.Matrix4().compose(
       new THREE.Vector3(center.x, placement.surface.baseHeight, center.z),
-      quaternion,
-      new THREE.Vector3(1, 1, 1),
+      this.createPlacementQuaternion(object, placement.definition, placement.surface),
+      UNIT_SCALE,
+    );
+  }
+
+  createObjectMatrix(object, surfaceOverride = null) {
+    const placement = this.placementFor(object, surfaceOverride);
+    const center = this.renderCenter(placement.bounds);
+    return new THREE.Matrix4().compose(
+      new THREE.Vector3(center.x, placement.surface.baseHeight, center.z),
+      this.createPlacementQuaternion(object, placement.definition, placement.surface),
+      UNIT_SCALE,
     );
   }
 

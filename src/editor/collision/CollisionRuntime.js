@@ -9,6 +9,7 @@ import {
 } from './mesh/MeshCapsuleQuery.js';
 import { createCollisionP1QaProvider } from './providers/CollisionP1QaProvider.js';
 import { NaturalCollisionProvider } from './providers/NaturalCollisionProvider.js';
+import { ObjectCollisionProvider } from './providers/ObjectCollisionProvider.js';
 import { RockCollisionProvider } from './providers/RockCollisionProvider.js';
 import { createRockCollisionSource } from './providers/RockCollisionSource.js';
 import { TreeCollisionProvider } from './providers/TreeCollisionProvider.js';
@@ -21,6 +22,7 @@ const COLLISION_QA_SCENARIOS = new Set([
   'collision-p3',
   'collision-p4',
   'collision-p5',
+  'collision-p6',
 ]);
 
 function hasDebugEnabled(debug) {
@@ -34,7 +36,7 @@ function qaScenario(search) {
 }
 
 function residencyConfig(streaming, activeQaScenario) {
-  if (activeQaScenario !== 'collision-p4' && activeQaScenario !== 'collision-p5') return streaming;
+  if (!['collision-p4', 'collision-p5', 'collision-p6'].includes(activeQaScenario)) return streaming;
   return Object.freeze({
     ...streaming,
     residentRadius: Math.max(streaming.residentRadius, 2),
@@ -50,7 +52,7 @@ function createEmptyProvider() {
   });
 }
 
-function createNaturalComponents({ treeSource, collisionConfig }) {
+function createNaturalComponents({ treeSource, objectSource, collisionConfig, terrainView }) {
   const components = [];
   if (collisionConfig.trees.enabled && treeSource?.treeView) {
     const provider = new TreeCollisionProvider({
@@ -74,6 +76,13 @@ function createNaturalComponents({ treeSource, collisionConfig }) {
     });
     components.push(Object.freeze({ id: 'rocks', counterName: 'Rock', provider }));
   }
+  if (collisionConfig.objects.enabled && objectSource) {
+    const provider = new ObjectCollisionProvider({
+      ...objectSource,
+      chunkWorldSize: terrainView.chunkWorldSize,
+    });
+    components.push(Object.freeze({ id: 'objects', counterName: 'Object', provider }));
+  }
   return components;
 }
 
@@ -83,6 +92,7 @@ function createProvider({
   editorConfig,
   collisionConfig,
   treeSource,
+  objectSource,
 }) {
   if (FIXTURE_QA_SCENARIOS.has(activeQaScenario)) {
     return createCollisionP1QaProvider({
@@ -91,7 +101,12 @@ function createProvider({
       collisionConfig,
     });
   }
-  const components = createNaturalComponents({ treeSource, collisionConfig });
+  const components = createNaturalComponents({
+    treeSource,
+    objectSource,
+    collisionConfig,
+    terrainView,
+  });
   if (components.length === 0) return createEmptyProvider();
   return new NaturalCollisionProvider({
     components,
@@ -105,13 +120,28 @@ function attachProviderWorld(provider, world) {
   for (const component of provider.components ?? []) component.provider.attachWorld?.(world);
 }
 
+function enqueueTargetedRefreshes(provider) {
+  if (!provider?.enqueueRefreshKey || !provider?.chunkStates) return;
+  const activeKeys = [...provider.chunkStates.keys()];
+  for (const component of provider.components ?? []) {
+    const dirty = component.provider.consumeDirtyOwnerChunks?.(activeKeys) ?? [];
+    for (const key of dirty) provider.enqueueRefreshKey(key);
+  }
+}
+
 export function shouldCreateCollisionRuntime(collisionConfig, search = '') {
   return collisionConfig.enabled
     || qaScenario(search) !== null
     || hasDebugEnabled(collisionConfig.debug);
 }
 
-export function createCollisionRuntime({ terrainView, editorConfig, treeSource = null, search = '' }) {
+export function createCollisionRuntime({
+  terrainView,
+  editorConfig,
+  treeSource = null,
+  objectSource = null,
+  search = '',
+}) {
   const collisionConfig = editorConfig.collision;
   if (!shouldCreateCollisionRuntime(collisionConfig, search)) return null;
   const activeQaScenario = qaScenario(search);
@@ -125,6 +155,7 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
     editorConfig,
     collisionConfig,
     treeSource,
+    objectSource,
   });
 
   const world = new CollisionWorld({
@@ -166,6 +197,7 @@ export function createCollisionRuntime({ terrainView, editorConfig, treeSource =
           z: (focus.z - lastFocus.z) / seconds,
         };
       }
+      enqueueTargetedRefreshes(provider);
       provider.refresh?.(world);
       residency.update({ focus, velocity });
       residency.flush();

@@ -86,6 +86,18 @@ const SCENARIOS = Object.freeze({
       yawDegrees: 0,
     },
   },
+  'collision-p6': {
+    id: 'collision-p6',
+    label: 'Collision P6 placed object doorway',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 6,
+      speed: 'run',
+      warmup: 8,
+      spawn: { x: 0, z: 0 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {
