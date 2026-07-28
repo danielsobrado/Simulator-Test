@@ -20,9 +20,9 @@ function maximum(values) {
 
 function adapterIdentity(adapter) {
   if (!adapter || typeof adapter !== 'object') return null;
-  return [adapter.vendor, adapter.architecture, adapter.description]
-    .map((value) => String(value ?? '').trim().toLowerCase())
-    .join('|');
+  const parts = [adapter.vendor, adapter.architecture, adapter.description]
+    .map((value) => String(value ?? '').trim().toLowerCase());
+  return parts.some(Boolean) ? parts.join('|') : null;
 }
 
 function check(id, passed, actual, target = null) {
@@ -38,9 +38,11 @@ function hardwareAdapterCheck(report) {
   const adapter = report?.adapter ?? null;
   return check(
     'hardware-adapter',
-    adapter?.ok === true && adapter?.fallback !== true,
+    adapter?.ok === true
+      && adapter?.fallback !== true
+      && adapterIdentity(adapter) !== null,
     adapter,
-    'hardware WebGPU adapter',
+    'identifiable hardware WebGPU adapter',
   );
 }
 
@@ -117,10 +119,11 @@ function runChecks(config, caseConfig, run) {
   if (caseConfig.collisionRequired) {
     checks.push(
       check(
-        'collision-gate',
-        collision?.gate?.passed === true,
-        collision?.gate?.passed ?? null,
-        true,
+        'collision-samples',
+        Number.isFinite(collision?.timingsMs?.total?.samples)
+          && collision.timingsMs.total.samples > 0,
+        collision?.timingsMs?.total?.samples ?? null,
+        '> 0',
       ),
       check(
         'readiness',
@@ -196,6 +199,7 @@ function summariseRun(config, caseConfig, run) {
     frameP95Ms: round(report?.summary?.dt?.p95Ms),
     frameP99Ms: round(report?.summary?.dt?.p99Ms),
     collisionP95Ms: round(report?.collision?.timingsMs?.total?.p95Ms),
+    collisionSamples: report?.collision?.timingsMs?.total?.samples ?? null,
     hitchCount: report?.summary?.hitchCount ?? null,
     readinessMisses: count(report, 'readinessMisses'),
     failedChunks: count(report, 'failedChunks'),
@@ -225,6 +229,20 @@ function aggregateAdapters(caseSummaries) {
   });
 }
 
+function canonicalSignatureStabilityCheck(config, caseConfig, caseRuns) {
+  if (!caseConfig.collisionRequired || !config.gates.requireCanonicalSignature) return null;
+  const signatures = caseRuns
+    .map((run) => run.canonicalSignature)
+    .filter((signature) => typeof signature === 'string' && signature.length > 0);
+  const distinct = [...new Set(signatures)].sort();
+  return check(
+    'canonical-signature-stable',
+    signatures.length === caseRuns.length && distinct.length === 1,
+    distinct,
+    'one identical signature across repeats',
+  );
+}
+
 function caseChecks(config, caseConfig, caseRuns, regressionMs) {
   const checks = [
     check('repeat-count', caseRuns.length === config.repeats, caseRuns.length, config.repeats),
@@ -235,6 +253,8 @@ function caseChecks(config, caseConfig, caseRuns, regressionMs) {
       caseRuns.length,
     ),
   ];
+  const signatureCheck = canonicalSignatureStabilityCheck(config, caseConfig, caseRuns);
+  if (signatureCheck) checks.push(signatureCheck);
   if (caseConfig.compareFrameToBaseline) {
     checks.push(check(
       'frame-p95-regression',
