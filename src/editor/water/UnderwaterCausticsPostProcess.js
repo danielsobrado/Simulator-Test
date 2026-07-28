@@ -82,8 +82,7 @@ function buildProjectedCaustics({
       .mul(geometry)
       .mul(blend)
       .mul(config.intensity);
-    const source = beauty.sample(screenUV);
-    return vec4(source.rgb.add(color.mul(amount)), source.a);
+    return vec4(beauty.rgb.add(color.mul(amount)), beauty.a);
   })();
 }
 
@@ -105,7 +104,7 @@ export class UnderwaterCausticsPostProcess {
     this.pipeline = null;
   }
 
-  update({ blend = 0, surfaceHeight = 0 } = {}) {
+  update({ blend = 0, surfaceHeight } = {}) {
     this.blend.value = THREE.MathUtils.clamp(Number(blend) || 0, 0, 1);
     if (Number.isFinite(surfaceHeight)) this.surfaceHeight.value = surfaceHeight;
   }
