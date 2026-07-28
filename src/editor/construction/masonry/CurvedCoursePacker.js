@@ -101,6 +101,10 @@ function hashLane(seed, index, lane) {
   return ((mixSeed(seed, index) >>> (lane * 8)) & 255) / 255;
 }
 
+function lerp(from, to, amount) {
+  return from + (to - from) * amount;
+}
+
 /**
  * Largest stone whose chord stays within the mortar joint on this curve.
  *
@@ -336,6 +340,7 @@ export function packCurvedWall({
         {
           seed,
           chance: splitChance,
+          maxDepth: style.splitMaxDepth ?? 2,
           minWidth: style.minWidth,
           courseHeight,
         },
@@ -380,16 +385,29 @@ export function packCurvedWall({
 
         // The lattice tiles exactly by construction, so unlike a packed box the
         // mortar gap has to be cut out of the face rather than left over from a
-        // width that fell short.
-        const inset = 0.012 + hashLane(shapeSeed, index, 0) * 0.018;
+        // width that fell short. Inset is style-driven; subtract once across the
+        // whole face (not per side) so a 24 mm inset on a 1 m stone leaves 976 mm.
+        const insetMinimum = style.jointInsetMin ?? 0.012;
+        const insetMaximum = style.jointInsetMax ?? 0.03;
+        const verticalRatio = style.jointInsetVerticalRatio ?? 0.7;
+        const inset = lerp(insetMinimum, insetMaximum, hashLane(shapeSeed, index, 0));
         const scaleX = Math.max(0.4, 1 - inset / face.width);
-        const scaleY = Math.max(0.4, 1 - (inset * 0.7) / face.height);
+        const scaleY = Math.max(0.4, 1 - (inset * verticalRatio) / face.height);
+
+        const depthScale = lerp(
+          style.depthScaleMin ?? 0.95,
+          style.depthScaleMax ?? 0.985,
+          hashLane(shapeSeed, index, 3),
+        );
+        const faceOffset = (hashLane(shapeSeed, index, 2) - 0.5)
+          * 2
+          * (style.faceOffsetAmplitude ?? 0.009);
 
         stones.push(Object.freeze({
           category: 'field',
           s: leafCenter,
           y: face.anchorY,
-          offsetNormal: straddle + (hashLane(shapeSeed, index, 2) - 0.5) * 0.018,
+          offsetNormal: straddle + faceOffset,
           // The leaf's solved arc footprint, before the mortar inset. The
           // geometry uses `corners`; this is what tiles the course exactly, so
           // coverage stays checkable.
@@ -400,7 +418,7 @@ export function packCurvedWall({
           corners: scaleCorners(face.corners, scaleX, scaleY),
           width: face.width * scaleX,
           height: face.height * scaleY,
-          depth: thickness * (0.95 + hashLane(shapeSeed, index, 3) * 0.035),
+          depth: thickness * depthScale,
           yaw: frame.yaw,
           roll: 0,
           stableIndex: index,

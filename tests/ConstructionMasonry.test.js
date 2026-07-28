@@ -14,6 +14,7 @@ import {
   createCubicBezierPathFromStroke,
   sampleCubicBezierPath,
 } from '../src/editor/construction/curve/CubicBezierPath.js';
+import { mixSeed } from '../src/editor/workshop/ProceduralRandom.js';
 
 const STYLE = constructionStyle('coursed-rubble');
 
@@ -50,18 +51,19 @@ function record(path, overrides = {}) {
 
 function setup(path, overrides = {}) {
   const built = record(path, overrides);
+  const style = constructionStyle(built.style.key);
   const arcTable = createCurveArcTable(sampleCubicBezierPath(built.path));
-  const profile = createWallTopProfile(built, arcTable, { style: STYLE });
-  return { record: built, arcTable, profile };
+  const profile = createWallTopProfile(built, arcTable, { style });
+  return { record: built, arcTable, profile, style };
 }
 
 function pack(context, {
-  arcRange, seedOffset = 0, budget, wallRange, courseHeight,
+  arcRange, seedOffset = 0, budget, wallRange, courseHeight, style,
 } = {}) {
   return packCurvedWall({
     arcTable: context.arcTable,
     arcRange: arcRange ?? [0, context.arcTable.totalLength],
-    style: STYLE,
+    style: style ?? context.style ?? STYLE,
     thickness: context.record.dimensions.thickness,
     seed: context.record.seed,
     seedOffset,
@@ -445,4 +447,171 @@ test('a zero-length or zero-height range yields nothing rather than throwing', (
     topHeightAt: () => 0,
   });
   assert.deepEqual(flattened.stones, []);
+});
+
+function fieldCellGroups(result) {
+  const groups = new Map();
+  for (const stone of result.stones) {
+    if (stone.category !== 'field' || stone.cellIndex == null) continue;
+    if (!groups.has(stone.cellIndex)) groups.set(stone.cellIndex, []);
+    groups.get(stone.cellIndex).push(stone);
+  }
+  return groups;
+}
+
+function softContext(path = straightPath(24), overrides = {}) {
+  return setup(path, {
+    style: { key: 'soft-limestone-rubble', version: 1 },
+    ...overrides,
+  });
+}
+
+test('soft-limestone-rubble packing is deterministic', () => {
+  const context = softContext();
+  assert.deepEqual(pack(context), pack(context));
+});
+
+test('soft-limestone-rubble never splits a cell past one level', () => {
+  const result = pack(softContext(straightPath(36)));
+  const groups = fieldCellGroups(result);
+  assert.ok(groups.size > 20);
+  for (const leaves of groups.values()) {
+    assert.ok(leaves.length <= 2, `cell produced ${leaves.length} leaves`);
+  }
+  assert.ok(
+    [...groups.values()].some((leaves) => leaves.length === 2),
+    'some cells must still split into paired blocks',
+  );
+});
+
+test('soft-limestone-rubble splits fewer cells than coursed rubble', () => {
+  const soft = pack(softContext(straightPath(36)));
+  const coursed = pack(setup(straightPath(36)));
+  const splitCount = (result) => (
+    [...fieldCellGroups(result).values()].filter((leaves) => leaves.length > 1).length
+  );
+  assert.ok(splitCount(soft) < splitCount(coursed));
+});
+
+test('soft-limestone-rubble keeps a comparable stone-density budget', () => {
+  const soft = pack(softContext(straightPath(24)));
+  const coursed = pack(setup(straightPath(24)));
+  const ratio = soft.stones.length / coursed.stones.length;
+  assert.ok(
+    ratio > 0.85 && ratio < 1.15,
+    `soft/coursed stone ratio ${ratio.toFixed(3)} outside ±15%`,
+  );
+});
+
+test('soft-limestone-rubble stays under the module stone budget', () => {
+  const context = softContext(straightPath(12));
+  const result = pack(context);
+  assert.equal(result.stats.overBudget, false);
+  assert.ok(result.stones.length < MAX_MODULE_STONES);
+});
+
+test('soft-limestone-rubble joint insets follow the style range', () => {
+  const style = constructionStyle('soft-limestone-rubble');
+  const context = softContext(straightPath(24));
+  const result = pack(context);
+  const field = result.stones.filter((stone) => stone.category === 'field');
+  assert.ok(field.length > 40);
+
+  // Reproduce the packer's inset hash so we can assert the style range without
+  // confusing arc-leaf width with the tilted face bounding box.
+  const SHAPE_HASH = 0x27d4eb2d;
+  const shapeSeed = mixSeed(context.record.seed ^ SHAPE_HASH, 0);
+  const hashLane = (seed, index, lane) => (
+    ((mixSeed(seed, index) >>> (lane * 8)) & 255) / 255
+  );
+  const lerp = (from, to, amount) => from + (to - from) * amount;
+
+  for (const stone of field) {
+    assert.ok(stone.width > 0);
+    assert.ok(stone.height > 0.1);
+    const inset = lerp(
+      style.jointInsetMin,
+      style.jointInsetMax,
+      hashLane(shapeSeed, stone.stableIndex, 0),
+    );
+    assert.ok(
+      inset >= style.jointInsetMin - 1e-12
+      && inset <= style.jointInsetMax + 1e-12,
+      `inset ${inset}`,
+    );
+    assert.ok(stone.width < stone.packedWidth + 0.05);
+    assert.ok(stone.height < stone.bandHeight * style.courseHeight + 0.08);
+  }
+});
+
+test('soft-limestone-rubble depth and face offset stay in style range', () => {
+  const style = constructionStyle('soft-limestone-rubble');
+  const thickness = 0.8;
+  const result = pack(softContext(straightPath(36)));
+  const field = result.stones.filter((stone) => stone.category === 'field');
+  let forward = 0;
+  let recessed = 0;
+  let offsetSum = 0;
+  for (const stone of field) {
+    const depthScale = stone.depth / thickness;
+    assert.ok(
+      depthScale >= style.depthScaleMin - 1e-9
+      && depthScale <= style.depthScaleMax + 1e-9,
+      `depth scale ${depthScale}`,
+    );
+    // Straight wall: no curvature straddle, so offsetNormal is pure face offset.
+    assert.ok(Math.abs(stone.offsetNormal) <= style.faceOffsetAmplitude + 1e-9);
+    if (stone.offsetNormal > 1e-6) forward += 1;
+    if (stone.offsetNormal < -1e-6) recessed += 1;
+    offsetSum += stone.offsetNormal;
+  }
+  assert.ok(forward > 0 && recessed > 0);
+  assert.ok(Math.abs(offsetSum / field.length) < 0.003);
+});
+
+test('soft-limestone-rubble adjacent modules stay seamless', () => {
+  const context = softContext(straightPath(36));
+  const total = context.arcTable.totalLength;
+  const middle = total / 2;
+  const wall = { wallRange: [0, total] };
+  const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
+  const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
+
+  const leftEdges = fieldCells(left).map((cells) => cells.at(-1).to);
+  const rightEdges = fieldCells(right).map((cells) => cells[0].from);
+  assert.equal(leftEdges.length, rightEdges.length);
+  for (let index = 0; index < leftEdges.length; index += 1) {
+    assert.ok(Math.abs(leftEdges[index] - rightEdges[index]) < 1e-9);
+  }
+  const distinct = new Set(leftEdges.map((edge) => edge.toFixed(4)));
+  assert.ok(distinct.size >= leftEdges.length - 1);
+  for (const leaves of fieldCellGroups(left).values()) {
+    assert.ok(leaves.length <= 2);
+  }
+  for (const leaves of fieldCellGroups(right).values()) {
+    assert.ok(leaves.length <= 2);
+  }
+});
+
+test('soft-limestone-rubble respects curvature limits on tight arcs', () => {
+  for (const radius of [2.5, 4, 6, 9]) {
+    for (const seed of [1, 7, 42]) {
+      const context = softContext(tightArcPath(radius), { seed });
+      const result = pack(context);
+      assert.equal(result.stats.overBudget, false);
+      assert.ok(result.stones.length < MAX_MODULE_STONES);
+      for (const stone of result.stones) {
+        assert.ok(stone.width > 0);
+        assert.ok(stone.height > 0);
+        const sagitta = chordSagitta(stone.packedWidth ?? stone.width, context.arcTable.curvatureAt(stone.s));
+        assert.ok(sagitta <= 0.02 + 1e-6, `sagitta ${sagitta} at r=${radius}`);
+      }
+      if (radius <= 4) {
+        assert.ok(
+          result.stats.targetWidth < context.style.targetWidth,
+          `tight r=${radius} should narrow stones`,
+        );
+      }
+    }
+  }
 });
