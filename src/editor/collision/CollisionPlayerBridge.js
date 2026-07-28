@@ -1,6 +1,7 @@
 let currentPlayer = null;
 let currentConfig = null;
 let currentNaturalSource = null;
+let currentObjectSource = null;
 const listeners = new Set();
 
 function composition() {
@@ -9,6 +10,7 @@ function composition() {
     player: currentPlayer,
     collisionConfig: currentConfig,
     treeSource: currentNaturalSource,
+    objectSource: currentObjectSource,
   });
 }
 
@@ -46,6 +48,25 @@ export function registerCollisionNaturalSource(source) {
   return () => {
     if (currentNaturalSource !== registered) return;
     currentNaturalSource = null;
+    publish();
+  };
+}
+
+export function registerCollisionObjectSource(source) {
+  if (!source?.objectMap || !source?.placementResolver || !Array.isArray(source?.objectCatalog)) {
+    throw new Error('Collision object-source registration requires map, resolver, and catalog.');
+  }
+  const registered = Object.freeze({
+    objectMap: source.objectMap,
+    placementResolver: source.placementResolver,
+    objectCatalog: source.objectCatalog,
+    tileSize: source.tileSize,
+  });
+  currentObjectSource = registered;
+  publish();
+  return () => {
+    if (currentObjectSource !== registered) return;
+    currentObjectSource = null;
     publish();
   };
 }
