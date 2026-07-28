@@ -33,6 +33,24 @@ test.afterEach(() => {
   disposeConstructionMaterials();
 });
 
+test('createConstructionMaterials includes a mortar slot', () => {
+  const materials = createConstructionMaterials(wall());
+  assert.ok(materials.mortar);
+  assert.equal(materials.mortar.userData.constructionSlot, 'mortar');
+  assert.ok(materials.mortar.color.equals(new THREE.Color('#77766b')));
+  assert.equal(materials.mortar.roughness, 1);
+});
+
+test('dry-stone mortar reads darker than coursed rubble', () => {
+  const rubble = createConstructionMaterials(wall());
+  const dry = createConstructionMaterials(normalizeConstructionRecord({
+    ...wall(),
+    id: 'construction-dry',
+    style: { key: 'dry-stone', version: 1, materials: {} },
+  }));
+  assert.ok(dry.mortar.color.getHex() < rubble.mortar.color.getHex());
+});
+
 test('painting a builtin preset changes the stone colour and roughness', () => {
   const plain = createConstructionMaterials(wall());
   const painted = createConstructionMaterials(wall({ stone: 'sandstone-masonry' }));

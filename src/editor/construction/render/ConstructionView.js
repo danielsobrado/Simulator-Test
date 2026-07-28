@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { cubicBezierPathBounds, sampleCubicBezierPath } from '../curve/CubicBezierPath.js';
 import { createCurveArcTable } from '../masonry/CurveArcTable.js';
 import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
+import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { createConstructionMaterials } from './ConstructionMaterials.js';
 import { coarsePlacements, moduleProjectedPixels, selectConstructionLod } from './ConstructionLod.js';
 
@@ -29,6 +30,22 @@ const MODULE_BUILD_COUNT = 1;
 
 function quantizeOrigin(value) {
   return Math.round(value / ORIGIN_QUANTUM) * ORIGIN_QUANTUM;
+}
+
+/**
+ * Resolve the material for one resident mesh from its explicit slot.
+ * Selection tints stone only — mortar stays dark so joints keep contrast.
+ */
+export function residentMaterial(mesh, materials, selected) {
+  const slot = mesh.userData.constructionMaterialSlot;
+  if (slot === CONSTRUCTION_MATERIAL_SLOT.MORTAR) {
+    return materials.mortar;
+  }
+  if (slot === CONSTRUCTION_MATERIAL_SLOT.STONE || slot == null) {
+    return selected ? materials.stoneSelected : materials.stone;
+  }
+  console.warn(`Unknown construction material slot "${slot}"; using stone.`);
+  return selected ? materials.stoneSelected : materials.stone;
 }
 
 function originForRecord(record) {
@@ -137,7 +154,12 @@ export class ConstructionView {
       modulesShell: 0,
       lodTransitions: 0,
       stones: 0,
+      mortarPrisms: 0,
+      stoneTriangles: 0,
+      mortarTriangles: 0,
       buildMs: 0,
+      stoneBuildMs: 0,
+      mortarBuildMs: 0,
     };
     this.wallMaterial = new THREE.MeshStandardNodeMaterial({
       color: '#8d8879',
@@ -243,10 +265,7 @@ export class ConstructionView {
     if (hint?.materialOnly && entry.shellMesh) {
       // Geometry is unchanged; only the material assignment can differ.
       entry.materials = this.createMaterials(record);
-      for (const resident of entry.modules.values()) {
-        for (const mesh of resident.meshes) mesh.material = entry.materials.stone;
-      }
-      this.applySelectionMaterial(record.id, entry);
+      this.applyEntryMaterials(entry);
       return;
     }
 
@@ -273,16 +292,25 @@ export class ConstructionView {
     this.scheduleCompile(record, hint);
   }
 
+  applyResidentMaterials(entry, selected) {
+    if (!entry.materials) return;
+    for (const resident of entry.modules.values()) {
+      for (const mesh of resident.meshes) {
+        mesh.material = residentMaterial(mesh, entry.materials, selected);
+      }
+    }
+  }
+
+  applyEntryMaterials(entry) {
+    this.applySelectionMaterial(entry.record.id, entry);
+  }
+
   applySelectionMaterial(constructionId, entry) {
     const selected = constructionId === this.selectedId;
     if (entry.shellMesh) {
       entry.shellMesh.material = selected ? this.selectedMaterial : this.wallMaterial;
     }
-    if (!entry.materials) return;
-    const stone = selected ? entry.materials.stoneSelected : entry.materials.stone;
-    for (const resident of entry.modules.values()) {
-      for (const mesh of resident.meshes) mesh.material = stone;
-    }
+    this.applyResidentMaterials(entry, selected);
   }
 
   onStoreChange(change) {
@@ -488,17 +516,48 @@ export class ConstructionView {
       stale.geometry.dispose();
     }
     for (const mesh of built.meshes) {
-      mesh.name = `construction-masonry:${entry.record.id}:${module.id}`;
+      const slot = mesh.userData.constructionMaterialSlot
+        ?? CONSTRUCTION_MATERIAL_SLOT.STONE;
+      mesh.name = [
+        'construction-masonry',
+        entry.record.id,
+        module.id,
+        slot,
+      ].join(':');
       mesh.userData.constructionId = entry.record.id;
       entry.group.add(mesh);
     }
     resident.meshes = built.meshes;
     resident.stats = built.stats;
-    let stones = 0;
-    for (const other of entry.modules.values()) stones += other.stats?.stones ?? 0;
-    this.stats.stones = stones;
+    this.refreshModuleStats();
     this.applySelectionMaterial(entry.record.id, entry);
     this.updateShellVisibility(entry);
+  }
+
+  /** Recompute stone/mortar counters from resident module stats (avoids drift). */
+  refreshModuleStats() {
+    let stones = 0;
+    let mortarPrisms = 0;
+    let stoneTriangles = 0;
+    let mortarTriangles = 0;
+    let stoneBuildMs = 0;
+    let mortarBuildMs = 0;
+    for (const entry of this.entries.values()) {
+      for (const other of entry.modules.values()) {
+        stones += other.stats?.stones ?? 0;
+        mortarPrisms += other.stats?.mortarPrisms ?? 0;
+        stoneTriangles += other.stats?.stoneTriangles ?? 0;
+        mortarTriangles += other.stats?.mortarTriangles ?? 0;
+        stoneBuildMs += other.stats?.stoneBuildMs ?? 0;
+        mortarBuildMs += other.stats?.mortarBuildMs ?? 0;
+      }
+    }
+    this.stats.stones = stones;
+    this.stats.mortarPrisms = mortarPrisms;
+    this.stats.stoneTriangles = stoneTriangles;
+    this.stats.mortarTriangles = mortarTriangles;
+    this.stats.stoneBuildMs = stoneBuildMs;
+    this.stats.mortarBuildMs = mortarBuildMs;
   }
 
   /**
@@ -693,15 +752,22 @@ export class ConstructionView {
       return;
     }
     this.previewedMaterialId = constructionId;
-    const material = this.createMaterials({
+    const materials = this.createMaterials({
       ...entry.record,
       style: {
         ...entry.record.style,
         materials: { ...entry.record.style.materials, stone: presetId },
       },
-    }).stone;
+    });
     for (const resident of entry.modules.values()) {
-      for (const mesh of resident.meshes) mesh.material = material;
+      for (const mesh of resident.meshes) {
+        // Palette hover only previews the stone slot; mortar stays put.
+        if (mesh.userData.constructionMaterialSlot === CONSTRUCTION_MATERIAL_SLOT.MORTAR) {
+          mesh.material = materials.mortar;
+          continue;
+        }
+        mesh.material = materials.stone;
+      }
     }
   }
 

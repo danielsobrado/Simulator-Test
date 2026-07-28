@@ -8,6 +8,8 @@ import {
   surfaceRoughnessTexture,
 } from '../../workshop/ProceduralWorkshopMaterials.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
+import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
+import { mortarProfile } from './ConstructionMortarConfig.js';
 
 /**
  * Stone materials for live constructions.
@@ -63,7 +65,22 @@ function createStoneMaterial(record, style) {
       seed + 503,
     );
   }
-  material.userData.constructionSlot = 'stone';
+  material.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.STONE;
+  return material;
+}
+
+/**
+ * Recessed joint / core material. Kept deliberately flat: mortar is seen through
+ * narrow gaps, so maps and vertex colours add cost with little readable value.
+ */
+function createMortarMaterial(record, style) {
+  const profile = mortarProfile(style.key);
+  const material = new THREE.MeshStandardNodeMaterial({
+    color: profile.color,
+    roughness: profile.roughness,
+    metalness: profile.metalness,
+  });
+  material.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.MORTAR;
   return material;
 }
 
@@ -143,12 +160,12 @@ export function createConstructionMaterials(record, materialDocument = null) {
   }
   const style = constructionStyle(record.style.key);
   let stone = createStoneMaterial(record, style);
-  const presetId = record.style?.materials?.stone ?? null;
-  const preset = presetId
-    ? getWorkshopMaterialPreset(materialDocument, presetId)
+  const stonePresetId = record.style?.materials?.stone ?? null;
+  const stonePreset = stonePresetId
+    ? getWorkshopMaterialPreset(materialDocument, stonePresetId)
     : null;
-  if (preset) {
-    stone = applyConstructionMaterialPreset(stone, preset, materialDocument);
+  if (stonePreset) {
+    stone = applyConstructionMaterialPreset(stone, stonePreset, materialDocument);
   }
   // Selection tints rather than replaces. Swapping to a flat gold material
   // would drop `vertexColors` and take every baked joint line with it, so a
@@ -156,8 +173,20 @@ export function createConstructionMaterials(record, materialDocument = null) {
   const stoneSelected = stone.clone();
   stoneSelected.emissive = new THREE.Color('#6a4f12');
   stoneSelected.emissiveIntensity = 0.55;
-  stoneSelected.userData.constructionSlot = 'stone';
-  const materials = Object.freeze({ stone, stoneSelected });
+  stoneSelected.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.STONE;
+
+  // Mortar stays dark when selected — gold would erase joint contrast.
+  let mortar = createMortarMaterial(record, style);
+  const mortarPresetId = record.style?.materials?.mortar ?? null;
+  const mortarPreset = mortarPresetId
+    ? getWorkshopMaterialPreset(materialDocument, mortarPresetId)
+    : null;
+  if (mortarPreset) {
+    mortar = applyConstructionMaterialPreset(mortar, mortarPreset, materialDocument);
+    mortar.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.MORTAR;
+  }
+
+  const materials = Object.freeze({ stone, stoneSelected, mortar });
   cache.set(key, { materials, users: 1 });
   return materials;
 }

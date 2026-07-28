@@ -9,6 +9,16 @@ import { stoneJitter } from '../../workshop/ProceduralWorkshopIrregularity.js';
 import { applyUnitShading } from '../../workshop/ProceduralWorkshopMaterials.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
 import { scaleCorners } from '../masonry/CourseLattice.js';
+import { CONSTRUCTION_MATERIAL_SLOT } from '../render/ConstructionMaterialSlots.js';
+import {
+  CONSTRUCTION_MORTAR_CONFIG,
+  overlapForCategory,
+} from '../render/ConstructionMortarConfig.js';
+import {
+  buildMortarCoreGeometry,
+  expandCorners,
+  mortarCoreDepth,
+} from './ConstructionMortarCoreBuilder.js';
 
 /**
  * Turn module-local stone placements into merged geometry.
@@ -18,13 +28,11 @@ import { scaleCorners } from '../masonry/CourseLattice.js';
  * **module-origin-local** space so a floating-origin rebase stays a transform
  * update, and so bevels and mortar insets sit in a well-conditioned float32
  * range instead of being quantised away 3 km from the origin.
+ *
+ * Each module returns a mortar mesh (recessed core) then a stone mesh. The
+ * authoritative construction record is unchanged; mortar is derived geometry.
  */
 
-/**
- * `stoneJitter` and `applyUnitShading` both expect a workshop recipe. Rather
- * than drag that schema across, adapt the construction record to the fields
- * they actually read.
- */
 /**
  * How much of `stoneJitter`'s in-plane shaping a lattice stone keeps.
  *
@@ -88,6 +96,128 @@ function dampedRotation(nominal, jittered) {
   ];
 }
 
+/** Axis-aligned face ring for ordinary (non-lattice) box stones. */
+export function rectangleCorners(width, height) {
+  return [
+    [-width / 2, -height / 2],
+    [width / 2, -height / 2],
+    [width / 2, height / 2],
+    [-width / 2, height / 2],
+  ];
+}
+
+/**
+ * Resolve the final stone shape once, after jitter, so visible stone and mortar
+ * backing cannot disagree.
+ */
+export function resolveStoneShape({ placement, params, shaped, detail }) {
+  const lattice = Boolean(placement.corners);
+  const corners = lattice
+    ? dampedCorners(placement, shaped)
+    : rectangleCorners(shaped.width, shaped.height);
+  const rotation = lattice
+    ? dampedRotation(params.rotation, shaped.rotation)
+    : shaped.rotation;
+  return {
+    corners,
+    width: shaped.width,
+    height: shaped.height,
+    depth: shaped.depth,
+    position: shaped.position,
+    rotation,
+    category: placement.category ?? 'field',
+    bevelRatio: lattice
+      ? Math.min(LATTICE_BEVEL_MAX, shaped.bevelRatio * LATTICE_BEVEL_GAIN)
+      : shaped.bevelRatio,
+    skew: shaped.skew,
+    protrusion: shaped.protrusion,
+    lattice,
+    detail,
+  };
+}
+
+export function shouldBuildMortarBacking(placement) {
+  return placement?.category !== 'recess';
+}
+
+/**
+ * Plain-data mortar prism for one resolved stone.
+ *
+ * @returns {object | null}
+ */
+export function createMortarDescriptor({
+  placement,
+  stoneShape,
+  config = CONSTRUCTION_MORTAR_CONFIG,
+}) {
+  if (!shouldBuildMortarBacking(placement)) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of stoneShape.corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  const stoneWidth = maxX - minX;
+  const stoneHeight = maxY - minY;
+  if (!(stoneWidth > 0) || !(stoneHeight > 0)) return null;
+
+  const overlap = overlapForCategory(placement.category ?? stoneShape.category, config);
+  const mortarCorners = expandCorners(stoneShape.corners, overlap, {
+    maxScale: config.maxCornerScale,
+  });
+  const depth = mortarCoreDepth(stoneShape.depth, config);
+
+  return {
+    corners: mortarCorners,
+    depth,
+    position: stoneShape.position,
+    rotation: stoneShape.rotation,
+    uvDensity: config.uvDensity,
+  };
+}
+
+function createStoneGeometry(stoneShape) {
+  if (stoneShape.lattice) {
+    return beveledQuadPrism({
+      corners: stoneShape.corners,
+      depth: stoneShape.depth,
+      position: stoneShape.position,
+      rotation: stoneShape.rotation,
+      bevelRatio: stoneShape.bevelRatio,
+      detail: stoneShape.detail,
+    });
+  }
+  return beveledBox({
+    width: stoneShape.width,
+    height: stoneShape.height,
+    depth: stoneShape.depth,
+    position: stoneShape.position,
+    rotation: stoneShape.rotation,
+    bevelRatio: stoneShape.bevelRatio,
+    skew: stoneShape.skew,
+    detail: stoneShape.detail,
+  });
+}
+
+function emptyStats() {
+  return {
+    stones: 0,
+    stoneTriangles: 0,
+    mortarPrisms: 0,
+    mortarTriangles: 0,
+    totalTriangles: 0,
+    stoneBuildMs: 0,
+    mortarBuildMs: 0,
+    // Legacy alias used by older call sites / counters.
+    triangles: 0,
+  };
+}
+
 /**
  * @param placements from `packCurvedWall`, module-local.
  * @param options.moduleOrigin canonical XZ the emitted vertices are relative to.
@@ -102,8 +232,9 @@ export function buildModuleMasonry(placements, {
   moduleOrigin,
   groundHeightAt,
   lodBand = 'near',
+  mortarConfig = CONSTRUCTION_MORTAR_CONFIG,
 }) {
-  const stats = { stones: 0, triangles: 0 };
+  const stats = emptyStats();
   if (!placements || placements.length === 0) return { meshes: [], stats };
 
   const style = constructionStyle(record.style.key);
@@ -116,7 +247,10 @@ export function buildModuleMasonry(placements, {
     detail,
     irregularity: coarse ? style.irregularity * 0.5 : style.irregularity,
   });
-  const geometries = [];
+
+  const stoneGeometries = [];
+  const mortarDescriptors = [];
+  const stoneStarted = performance.now();
 
   for (const placement of placements) {
     const frame = arcTable.frameAt(placement.s);
@@ -139,42 +273,85 @@ export function buildModuleMasonry(placements, {
       rotation: [0, frame.yaw, placement.roll],
     };
     const shaped = stoneJitter(recipe, params, placement.stableIndex, placement.category);
-    geometries.push(applyUnitShading(
-      placement.corners
-        ? beveledQuadPrism({
-          ...params,
-          ...shaped,
-          corners: dampedCorners(placement, shaped),
-          rotation: dampedRotation(params.rotation, shaped.rotation),
-          bevelRatio: Math.min(LATTICE_BEVEL_MAX, shaped.bevelRatio * LATTICE_BEVEL_GAIN),
-          detail,
-        })
-        : beveledBox({ ...params, ...shaped, detail }),
+    const stoneShape = resolveStoneShape({ placement, params, shaped, detail });
+    stoneGeometries.push(applyUnitShading(
+      createStoneGeometry(stoneShape),
       recipe,
       {
         stableIndex: placement.stableIndex,
         heightRatio: placement.heightRatio,
-        protrusion: shaped.protrusion,
-        depth: shaped.depth,
+        protrusion: stoneShape.protrusion,
+        depth: stoneShape.depth,
       },
     ));
+    const mortarDescriptor = createMortarDescriptor({
+      placement,
+      stoneShape,
+      config: mortarConfig,
+    });
+    if (mortarDescriptor) mortarDescriptors.push(mortarDescriptor);
   }
+  stats.stoneBuildMs = performance.now() - stoneStarted;
 
   // The stone material declares `vertexColors`, and a material that reads
   // vertex colours from a geometry that has none renders black. `required`
   // covers the case where nothing in this module happened to be shaded.
-  harmonizeVertexColors(geometries, { required: true });
-  const merged = mergeGeometries(geometries);
-  for (const geometry of geometries) geometry.dispose();
-  if (!merged) return { meshes: [], stats };
+  harmonizeVertexColors(stoneGeometries, { required: true });
 
-  merged.computeBoundingBox();
-  merged.computeBoundingSphere();
-  stats.stones = placements.length;
-  stats.triangles = (merged.index?.count ?? merged.attributes.position.count) / 3;
+  let mergedStone = null;
+  let mortarCore = null;
+  let mortarMesh = null;
+  let stoneMesh = null;
+  try {
+    mergedStone = mergeGeometries(stoneGeometries);
+    if (!mergedStone) {
+      return { meshes: [], stats };
+    }
+    mergedStone.computeBoundingBox();
+    mergedStone.computeBoundingSphere();
 
-  const mesh = new THREE.Mesh(merged, materials.stone);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return { meshes: [mesh], stats };
+    const mortarStarted = performance.now();
+    mortarCore = buildMortarCoreGeometry(mortarDescriptors);
+    stats.mortarBuildMs = performance.now() - mortarStarted;
+
+    stats.stones = placements.length;
+    stats.stoneTriangles = (mergedStone.index?.count ?? mergedStone.attributes.position.count) / 3;
+    stats.mortarPrisms = mortarDescriptors.length;
+    stats.mortarTriangles = mortarCore
+      ? (mortarCore.index?.count ?? mortarCore.attributes.position.count) / 3
+      : 0;
+    stats.totalTriangles = stats.stoneTriangles + stats.mortarTriangles;
+    stats.triangles = stats.totalTriangles;
+
+    const meshes = [];
+    if (mortarCore) {
+      mortarMesh = new THREE.Mesh(mortarCore, materials.mortar);
+      mortarMesh.userData.constructionMaterialSlot = CONSTRUCTION_MATERIAL_SLOT.MORTAR;
+      mortarMesh.castShadow = false;
+      mortarMesh.receiveShadow = true;
+      meshes.push(mortarMesh);
+      mortarCore = null;
+    }
+
+    stoneMesh = new THREE.Mesh(mergedStone, materials.stone);
+    stoneMesh.userData.constructionMaterialSlot = CONSTRUCTION_MATERIAL_SLOT.STONE;
+    stoneMesh.castShadow = true;
+    stoneMesh.receiveShadow = true;
+    meshes.push(stoneMesh);
+    mergedStone = null;
+    mortarMesh = null;
+    stoneMesh = null;
+
+    return { meshes, stats };
+  } catch (error) {
+    mergedStone?.dispose();
+    mortarCore?.dispose();
+    mortarMesh?.geometry?.dispose();
+    stoneMesh?.geometry?.dispose();
+    throw error;
+  } finally {
+    for (const geometry of stoneGeometries) {
+      geometry.dispose();
+    }
+  }
 }

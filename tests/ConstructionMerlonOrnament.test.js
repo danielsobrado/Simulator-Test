@@ -52,7 +52,32 @@ test('the corbel cantilevers clear of the merlon and stays modest', () => {
     }
   }
   // "A random border edge is extruded" — some merlons, not most and not none.
-  assert.ok(corbels > 15 && corbels < 70, `${corbels} corbels in 128 merlons`);
+  // Corbels ride on the tall variant only, which is itself the minority, so this
+  // is a small fraction by design and not an accident of the seed.
+  assert.ok(corbels > 6 && corbels < 50, `${corbels} corbels in 128 merlons`);
+});
+
+test('a crown of tall ornamented merlons stays a minority', () => {
+  // The reference only sends *some* of the top row through the ornament pass,
+  // and a four-row merlon costs about twice a two-row one. On a long wall in a
+  // fine-grained style, a crown of them eats enough of the wall-wide stone
+  // budget to leave the far end unbuilt.
+  const tall = crown(256).filter(({ bridge }) => bridge === 3);
+  assert.ok(tall.length > 20, `only ${tall.length} of 256 tall`);
+  assert.ok(tall.length < 100, `${tall.length} of 256 tall — the crown is too busy`);
+});
+
+test('a merlon narrower than its stones courses fewer columns', () => {
+  // A fine-grained style crenellates on a tighter spacing. Three columns across
+  // a half-metre merlon would be splinters rather than masonry, and the crown of
+  // a long wall would cost several times what the wall body does.
+  const columnsAt = (width) => layoutMerlon(
+    { s: 4, width, base: 3.5, height: 0.72 },
+    OPTIONS,
+  ).columns;
+  assert.equal(columnsAt(0.65), 3);
+  assert.equal(columnsAt(0.5), 2);
+  assert.equal(columnsAt(0.3), 1);
 });
 
 test('some merlons are pierced and the slit is a clean void', () => {
@@ -82,7 +107,9 @@ test('some merlons are pierced and the slit is a clean void', () => {
 });
 
 test('a solid merlon breaks bond between its rows', () => {
-  const solid = crown(128).filter(({ pierced }) => !pierced);
+  // Only merlons wide enough to carry more than one stone per row; a single
+  // column has no joints to break.
+  const solid = crown(128).filter(({ pierced, columns }) => !pierced && columns > 1);
   assert.ok(solid.length > 20);
   for (const ornament of solid) {
     const rows = new Map();
