@@ -3,7 +3,6 @@ import {
   Fn,
   abs,
   clamp,
-  float,
   getViewPosition,
   length,
   max,
@@ -16,11 +15,13 @@ import {
   step,
   time,
   uniform,
-  vec2,
-  vec3,
   vec4,
 } from 'three/tsl';
-import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import {
+  PERF_COUNTER_WATER_PROJECTED_CAUSTIC_CPU_MS,
+  PERF_COUNTER_WATER_PROJECTED_CAUSTIC_FRAMES,
+  PerfCounters,
+} from '../performance/qa/PerfCounters.js';
 import { validateProjectedWaterCausticsConfig } from './ProjectedWaterCaustics.js';
 
 const SKY_DEPTH_THRESHOLD = 0.9999;
@@ -102,7 +103,6 @@ export class UnderwaterCausticsPostProcess {
     this.cameraPosition = uniform(new THREE.Vector3());
     this.scenePass = null;
     this.pipeline = null;
-    this.camera = null;
   }
 
   update({ blend = 0, surfaceHeight = 0 } = {}) {
@@ -135,7 +135,6 @@ export class UnderwaterCausticsPostProcess {
         },
       });
     }
-    this.camera = camera;
   }
 
   updateCamera(camera) {
@@ -151,8 +150,11 @@ export class UnderwaterCausticsPostProcess {
     this.updateCamera(camera);
     const startedAt = performance.now();
     this.pipeline.render();
-    PerfCounters.inc('waterProjectedCausticFrames');
-    PerfCounters.set('waterProjectedCausticCpuMs', performance.now() - startedAt);
+    PerfCounters.inc(PERF_COUNTER_WATER_PROJECTED_CAUSTIC_FRAMES);
+    PerfCounters.set(
+      PERF_COUNTER_WATER_PROJECTED_CAUSTIC_CPU_MS,
+      performance.now() - startedAt,
+    );
     return true;
   }
 
@@ -185,6 +187,5 @@ export class UnderwaterCausticsPostProcess {
     this.scenePass = null;
     this.renderer = null;
     this.scene = null;
-    this.camera = null;
   }
 }
