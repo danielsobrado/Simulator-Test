@@ -37,7 +37,6 @@ function validConfig() {
     },
     gates: {
       collisionP95Ms: 0.83,
-      frameP95RegressionMs: 0.83,
       maxHitches: 0,
       maxReadinessMisses: 0,
       maxFailedChunks: 0,
@@ -52,7 +51,6 @@ function validConfig() {
         label: 'Baseline',
         scenario: 'move',
         collisionRequired: false,
-        compareFrameToBaseline: false,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -74,14 +72,12 @@ test('repository collision acceptance config is valid and keeps release coverage
   const walkableRock = config.cases.find((entry) => entry.id === 'walkable-rock-bvh');
   const object = config.cases.find((entry) => entry.id === 'placed-object-doorway');
   const construction = config.cases.find((entry) => entry.id === 'construction-wall');
-  const fullStack = config.cases.find((entry) => entry.id === 'full-stack-chunk-crossing');
 
   assert.equal(config.version, 1);
   assert.equal(config.repeats, 3);
   assert.equal(config.baselineCase, 'open-ground-baseline');
   assert.deepEqual(config.viewport, { width: 1600, height: 900, deviceScaleFactor: 1 });
   assert.equal(baseline.collisionRequired, false);
-  assert.equal(baseline.compareFrameToBaseline, false);
   assert.deepEqual(baseline.minimumCounts, {});
   assert.deepEqual(baseline.minimumProviderComponents, {});
   assert.deepEqual(tree.minimumProviderComponents, { trees: { colliders: 1 } });
@@ -89,7 +85,6 @@ test('repository collision acceptance config is valid and keeps release coverage
   assert.deepEqual(walkableRock.minimumProviderComponents, { rocks: { walkable: 1 } });
   assert.deepEqual(object.minimumProviderComponents, { objects: { colliders: 1 } });
   assert.deepEqual(construction.minimumProviderComponents, { constructions: { colliders: 1 } });
-  assert.equal(fullStack.compareFrameToBaseline, false);
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
   assert.deepEqual(config.requiredCoverage, REQUIRED_RELEASE_COVERAGE);
 });
@@ -119,32 +114,6 @@ test('config validation rejects a collision-enabled baseline', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /baselineCase must not require collision/,
-  );
-});
-
-test('config validation rejects a baseline compared to itself', () => {
-  const config = validConfig();
-  config.cases[0].compareFrameToBaseline = true;
-  assert.throws(
-    () => validateCollisionAcceptanceConfig(config),
-    /cannot compare its frame time to itself/,
-  );
-});
-
-test('comparable cases must match the baseline movement route', () => {
-  const config = validConfig();
-  config.cases.push({
-    ...config.cases[0],
-    id: 'collision-route',
-    label: 'Collision route',
-    scenario: 'collision-p8',
-    collisionRequired: true,
-    compareFrameToBaseline: true,
-    durationSeconds: 3,
-  });
-  assert.throws(
-    () => validateCollisionAcceptanceConfig(config),
-    /must match the baseline movement route and duration/,
   );
 });
 
