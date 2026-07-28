@@ -73,6 +73,7 @@ function perfReport({
   frameP95Ms,
   collisionP95Ms = 0,
   adapter = ADAPTER,
+  debugEnabled = false,
   hitches = 0,
   broadphaseQueries = 10,
   candidates = 20,
@@ -89,6 +90,16 @@ function perfReport({
       dt: { p95Ms: frameP95Ms, p99Ms: frameP95Ms },
     },
     adapter,
+    config: {
+      collision: {
+        debug: {
+          colliders: debugEnabled,
+          broadphase: debugEnabled,
+          contacts: false,
+          support: false,
+        },
+      },
+    },
     collision: {
       enabled: collisionEnabled,
       timingsMs: { total: { p95Ms: collisionP95Ms } },
@@ -211,16 +222,35 @@ test('frame regression and inconsistent hardware fail execution', () => {
   );
 });
 
-test('non-comparable fixtures do not use the open-ground frame gate', () => {
+test('comparable captures fail when collision debug rendering is enabled', () => {
+  const report = buildCollisionAcceptanceReport({
+    config: config(),
+    runs: passingRuns({ collision: { debugEnabled: true } }),
+  });
+  const run = report.cases.find((entry) => entry.id === 'collision').runs[0];
+
+  assert.equal(run.passed, false);
+  assert.equal(
+    run.checks.find((entry) => entry.id === 'production-debug-disabled').passed,
+    false,
+  );
+  assert.equal(report.gates.execution.passed, false);
+});
+
+test('non-comparable fixtures do not use the open-ground frame or debug gate', () => {
   const report = buildCollisionAcceptanceReport({
     config: config({ compareCollisionToBaseline: false }),
-    runs: passingRuns({ collision: { frameP95Ms: 20 } }),
+    runs: passingRuns({ collision: { frameP95Ms: 20, debugEnabled: true } }),
   });
   const collisionCase = report.cases.find((entry) => entry.id === 'collision');
 
   assert.equal(collisionCase.frameP95RegressionMs, null);
   assert.equal(
     collisionCase.checks.some((entry) => entry.id === 'frame-p95-regression'),
+    false,
+  );
+  assert.equal(
+    collisionCase.runs[0].checks.some((entry) => entry.id === 'production-debug-disabled'),
     false,
   );
   assert.equal(report.gates.execution.passed, true);
