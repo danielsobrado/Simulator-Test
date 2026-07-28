@@ -3,11 +3,13 @@ import './editor/performance/frameRateDisplay.css';
 import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';
 import './editor/map/worldMap.css';
+import './editor/ui/radialPalette.css';
 import './editor/inventory/inventory.css';
 import { loadEditorConfig } from './config/loadEditorConfig.js';
 import './editor/audio/index.js';
 import { LoadingOverlay } from './editor/ui/LoadingOverlay.js';
 import { LoadingTracker } from './editor/ui/LoadingTracker.js';
+import { ESCAPE_PRIORITY, EscapeStack } from './editor/ui/EscapeStack.js';
 import { assetFileName, bindAssetProgress, watchWalkModeEntry } from './editor/ui/loadingSources.js';
 import { EditorCamera } from './editor/EditorCamera.js';
 import { EditorUi } from './editor/EditorUi.js';
@@ -36,7 +38,7 @@ import { parseQaParams } from './editor/performance/qa/parseQaParams.js';
 import { PlayerController } from './editor/player/PlayerController.js';
 import { ViewModeController } from './editor/player/ViewModeController.js';
 import { ViewModeUi } from './editor/player/ViewModeUi.js';
-import { PLAYER_MODE_WALK } from './editor/player/playerConstants.js';
+import { PLAYER_MODE_EDIT, PLAYER_MODE_WALK } from './editor/player/playerConstants.js';
 import { isTreeImpostorBakeMode } from './editor/stylized/impostorBakeMode.js';
 import { StylizedSurfaceView } from './editor/stylized/StylizedSurfaceView.js';
 import { BiomeAssetPalette } from './editor/stylized/BiomeAssetPalette.js';
@@ -57,9 +59,12 @@ import {
 } from './editor/settings/SceneSettingsRuntime.js';
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
 import { ConstructionStore } from './editor/construction/ConstructionStore.js';
+import { ConstructionMaterialStore } from './editor/construction/ConstructionMaterialStore.js';
+import { ConstructionPaletteController } from './editor/construction/ui/ConstructionPaletteController.js';
 import { ConstructionSpatialIndex } from './editor/construction/ConstructionSpatialIndex.js';
 import { ConstructionCompilerClient } from './editor/construction/compile/ConstructionCompilerClient.js';
 import { ConstructionView } from './editor/construction/render/ConstructionView.js';
+import { ConstructionGroundProvider } from './editor/construction/simulation/ConstructionGroundProvider.js';
 import { TILE_BY_KEY, TILE_CATALOG } from './editor/tileCatalog.js';
 import { GpuVoxelWorld } from './editor/voxel/GpuVoxelWorld.js';
 import { VoxelPrototypeUi } from './editor/voxel/VoxelPrototypeUi.js';
@@ -280,10 +285,12 @@ async function startEditor() {
     else if (change.id) constructionSpatialIndex.remove(change.id);
   });
   const constructionCompiler = new ConstructionCompilerClient();
+  const constructionMaterialStore = new ConstructionMaterialStore();
   const constructionView = new ConstructionView({
     terrainView,
     store: constructionStore,
     compilerClient: constructionCompiler,
+    materialStore: constructionMaterialStore,
   });
   const proceduralAssetManager = new ProceduralAssetManager({
     tileSize: tileMap.tileSize,
@@ -418,6 +425,7 @@ async function startEditor() {
     voxelStampStore,
     proceduralAssetManager,
     constructionStore,
+    constructionMaterialStore,
     constructionView,
     biomeAssetPalette,
     inventoryStore,
@@ -430,6 +438,59 @@ async function startEditor() {
   // Pickers follow whichever camera is actually rendering, so construction
   // editing works from the player's first-person view as well as the orbit one.
   controller.cameraProvider = () => viewModeController.camera;
+  controller.playerEditingProvider = () => viewModeController.paused;
+  viewModeController.onPausedEditing = () => controller.selectTool('construction');
+  // Flat wall tops become walkable: the provider composes into the same ground
+  // height function the player physics already samples.
+  playerController.constructionGround = new ConstructionGroundProvider({
+    store: constructionStore,
+    spatialIndex: constructionSpatialIndex,
+    terrainView,
+  });
+  // Right-tapping a wall opens the same circular palette the workshop uses.
+  controller.constructionPalette = new ConstructionPaletteController({
+    host: ui.viewport,
+    controller,
+    materialStore: constructionMaterialStore,
+    onStatus: (message) => controller.emitNotice(message),
+  });
+
+  // One owner for Escape. Each handler backs out exactly one level and the
+  // first to claim the press consumes it, so the layers compose instead of
+  // four independent listeners racing on the capture phase.
+  const escapeStack = new EscapeStack();
+  escapeStack.register(ESCAPE_PRIORITY.palette, () => {
+    if (!controller.constructionPalette?.isOpen) return false;
+    controller.constructionPalette.close();
+    return true;
+  }, { label: 'construction palette' });
+  escapeStack.register(ESCAPE_PRIORITY.inspector, () => {
+    if (!controller.constructionPalette?.isInspectorOpen) return false;
+    controller.constructionPalette.closeInspector();
+    return true;
+  }, { label: 'construction inspector' });
+  escapeStack.register(ESCAPE_PRIORITY.gesture, () => {
+    if (!controller.constructionDrawing && !controller.constructionAnchorDrag) return false;
+    controller.cancelConstructionGesture();
+    controller.emitState();
+    return true;
+  }, { label: 'construction gesture' });
+  escapeStack.register(ESCAPE_PRIORITY.selection, () => {
+    if (!controller.selectedConstructionId && !controller.selectedObjectId) return false;
+    controller.setSelectedConstruction(null);
+    controller.setSelectedObject(null);
+    controller.selectedAnchorId = null;
+    controller.emitState();
+    return true;
+  }, { label: 'selection' });
+  escapeStack.register(ESCAPE_PRIORITY.playerPaused, () => {
+    if (!viewModeController.paused) return false;
+    viewModeController.setMode(PLAYER_MODE_EDIT);
+    return true;
+  }, { label: 'leave paused editing' });
+  escapeStack.register(ESCAPE_PRIORITY.playerWalking, () => viewModeController.pause(), {
+    label: 'pause into editing',
+  });
   gameplayOverlayController.subscribe((state) => {
     if (state.activeOverlay != null) {
       controller.cancelBlockedWorldInteraction();
@@ -696,6 +757,17 @@ async function startEditor() {
     // Drains the construction module build queue under its own frame budget,
     // so committing a long wall cannot stall a frame.
     constructionView.update(frameTimestamp);
+    constructionView.updateLod(viewModeController.camera, terrainView.renderer.domElement.clientHeight);
+    PerfCounters.set('constructionModulesResident', constructionView.stats.modulesResident);
+    PerfCounters.set('constructionModulesRebuilt', constructionView.stats.modulesRebuilt);
+    PerfCounters.set('constructionModulesSkippedByHash', constructionView.stats.modulesSkippedByHash);
+    PerfCounters.set('constructionQueueDepth', constructionView.stats.queueDepth);
+    PerfCounters.set('constructionStones', constructionView.stats.stones);
+    PerfCounters.set('constructionBuildMs', Math.round(constructionView.stats.buildMs));
+    PerfCounters.set('constructionModulesNear', constructionView.stats.modulesNear);
+    PerfCounters.set('constructionModulesCoarse', constructionView.stats.modulesCoarse);
+    PerfCounters.set('constructionModulesShell', constructionView.stats.modulesShell);
+    PerfCounters.set('constructionLodTransitions', constructionView.stats.lodTransitions);
     if (profiling) perfQa.mark('terrainCommit');
 
     viewModeController.update(frameTimestamp);

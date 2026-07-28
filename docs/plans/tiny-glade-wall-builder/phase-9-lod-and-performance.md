@@ -1,6 +1,29 @@
 # Phase 9 — LOD, budgets, and performance gates
 
-Status: **planned**. Depends on Phase 2 (there must be masonry to simplify).
+Status: **landed 2026-07-28**. Depends on Phase 2.
+
+## What shipped, where it differs from this plan
+
+1. **A coordinate-space bug the plan did not anticipate.** `module.bounds` are
+   **canonical** world coordinates and `camera.position` is **render** space, so
+   comparing them directly made every module read as its distance from the
+   floating origin — the entire wall landed in one band regardless of where the
+   camera was. `moduleProjectedPixels` now takes a `toRender` converter, and a
+   test pins it by placing a module 5 km from the origin and asserting the
+   converted and unconverted results select different bands.
+2. **`coarse` is a build-time detail reduction, not a second mesh set**, so
+   switching between `near` and `coarse` never waits on geometry. Only `shell`
+   swaps what is drawn, and it reuses the ribbon that already exists.
+
+**Verified live** on a 40 m wall of 8 modules and 382 stones:
+
+| Camera distance | near | coarse | shell | ribbon shown |
+| --- | --- | --- | --- | --- |
+| 12 m | 7 | 1 | 0 | no |
+| 60 m | 0 | 8 | 0 | no |
+| 400 m | 0 | 0 | 8 | yes |
+
+A selected wall stays pinned at 8 near even from 400 m.
 
 ## Goal
 

@@ -170,10 +170,24 @@
 
 .inventory-set-tab:hover { background: var(--surface-3); }
 
+/*
+ * The active tab overlaps the slot's top border by a pixel and paints above it, so the two
+ * merge into one shape. Without this the slot's own top edge draws straight through and the
+ * strip reads as a separate floating control.
+ */
 .inventory-set-tab.is-active {
+  position: relative;
+  z-index: 1;
+  margin-bottom: -1px;
+  padding-bottom: 1px;
   background: color-mix(in srgb, var(--accent) 20%, var(--surface-3));
   border-color: var(--accent);
   color: var(--text);
+}
+
+/* Square off the top so the slot continues the tab strip instead of curving away from it. */
+.inventory-weapon-slots .inventory-slot {
+  border-radius: 0 0 7px 7px;
 }
 
 .inventory-doll {

@@ -108,7 +108,20 @@ export class ConstructionStore {
       1,
       ...[...this.records.keys()].map((id) => numericSuffix(id) + 1),
     );
-    this.emit({ kind: 'history', id: target?.id ?? source?.id, before: source, after: target });
+    // Forward the command hint so undo of a palette paint stays material-only
+    // and does not re-pack every stone on a long wall.
+    const hint = change.materialOnly
+      ? { dirtySegmentIds: [...(change.dirtySegmentIds ?? [])], materialOnly: true }
+      : Array.isArray(change.dirtySegmentIds)
+        ? { dirtySegmentIds: [...change.dirtySegmentIds] }
+        : undefined;
+    this.emit({
+      kind: 'history',
+      id: target?.id ?? source?.id,
+      before: source,
+      after: target,
+      hint,
+    });
   }
 
   clear() {

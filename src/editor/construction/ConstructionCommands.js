@@ -133,6 +133,80 @@ export function executeConstructionCommand(store, command) {
     const after = store.update(before.id, next, {});
     return change(before, after, { dirtySegmentIds: allSegments(path), dropped });
   }
+  if (
+    command.type === 'add_feature'
+    || command.type === 'move_feature'
+    || command.type === 'resize_feature'
+    || command.type === 'delete_feature'
+  ) {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const existing = before.features.find(({ id }) => id === command.featureId) ?? null;
+    let features;
+    if (command.type === 'add_feature') {
+      features = [...before.features, command.feature];
+    } else if (command.type === 'delete_feature') {
+      if (!existing) throw new Error(`Unknown feature ${command.featureId}.`);
+      features = before.features.filter(({ id }) => id !== command.featureId);
+    } else {
+      if (!existing) throw new Error(`Unknown feature ${command.featureId}.`);
+      features = before.features.map((feature) => (
+        feature.id === command.featureId ? { ...feature, ...command.changes } : feature
+      ));
+    }
+    // A feature can move between segments, so both host segments are dirty.
+    const segments = new Set();
+    if (existing) segments.add(existing.segmentId);
+    if (command.feature?.segmentId) segments.add(command.feature.segmentId);
+    if (command.changes?.segmentId) segments.add(command.changes.segmentId);
+    const hint = { dirtySegmentIds: [...segments] };
+    const after = store.update(before.id, {
+      ...before,
+      features,
+      path: { ...before.path, features },
+    }, hint);
+    return change(before, after, hint);
+  }
+  if (command.type === 'set_material') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    const hint = { dirtySegmentIds: [], materialOnly: true };
+    const after = store.update(before.id, {
+      ...before,
+      style: {
+        ...before.style,
+        materials: { ...before.style.materials, ...command.materials },
+      },
+    }, hint);
+    // Geometry is untouched — the renderer only swaps the material, so painting
+    // a 200 m wall must not re-pack a single stone.
+    return change(before, after, hint);
+  }
+  if (command.type === 'set_style' || command.type === 'set_dimensions') {
+    const before = store.get(command.constructionId);
+    if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
+    let next;
+    if (command.type === 'set_style') {
+      next = { ...before, style: { ...before.style, key: command.styleKey } };
+    } else {
+      const dimensions = { ...before.dimensions, ...command.dimensions };
+      // `top.base` defaults to the wall height and is authoritative once set,
+      // so changing the height would otherwise leave the top where it was.
+      // Carry it along only while the user has not authored a top of their
+      // own — an explicit base or any profile point means they have.
+      const tracksHeight = before.top.profile.length === 0
+        && Math.abs(before.top.base - before.dimensions.height) < 1e-9;
+      next = {
+        ...before,
+        dimensions,
+        top: tracksHeight ? { ...before.top, base: dimensions.height } : before.top,
+      };
+    }
+    // Course height and stone width both come from the style, and thickness
+    // changes every stone's depth, so the whole wall is dirty either way.
+    const after = store.update(before.id, next, {});
+    return change(before, after, { dirtySegmentIds: allSegments(after.path) });
+  }
   if (command.type === 'set_top_profile') {
     const before = store.get(command.constructionId);
     if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);

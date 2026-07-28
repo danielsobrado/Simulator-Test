@@ -3,6 +3,7 @@ import { cubicBezierPathBounds, sampleCubicBezierPath } from '../curve/CubicBezi
 import { createCurveArcTable } from '../masonry/CurveArcTable.js';
 import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
 import { createConstructionMaterials } from './ConstructionMaterials.js';
+import { coarsePlacements, moduleProjectedPixels, selectConstructionLod } from './ConstructionLod.js';
 
 const FOUNDATION_OVERLAP = 0.08;
 const HANDLE_RADIUS = 0.16;
@@ -105,12 +106,14 @@ function buildWallGeometry(record, terrainView, origin) {
 }
 
 export class ConstructionView {
-  constructor({ terrainView, store, compilerClient = null }) {
+  constructor({ terrainView, store, compilerClient = null, materialStore = null }) {
     this.terrainView = terrainView;
     this.floatingOrigin = terrainView.floatingOrigin;
     this.scene = terrainView.scene;
     this.store = store;
     this.compilerClient = compilerClient;
+    /** Optional; custom imported presets live here, built-ins resolve without it. */
+    this.materialStore = materialStore;
     this.root = new THREE.Group();
     this.root.name = 'live-constructions';
     this.scene.add(this.root);
@@ -129,6 +132,12 @@ export class ConstructionView {
       modulesRebuilt: 0,
       modulesSkippedByHash: 0,
       queueDepth: 0,
+      modulesNear: 0,
+      modulesCoarse: 0,
+      modulesShell: 0,
+      lodTransitions: 0,
+      stones: 0,
+      buildMs: 0,
     };
     this.wallMaterial = new THREE.MeshStandardNodeMaterial({
       color: '#8d8879',
@@ -233,7 +242,7 @@ export class ConstructionView {
 
     if (hint?.materialOnly && entry.shellMesh) {
       // Geometry is unchanged; only the material assignment can differ.
-      entry.materials = createConstructionMaterials(record);
+      entry.materials = this.createMaterials(record);
       for (const resident of entry.modules.values()) {
         for (const mesh of resident.meshes) mesh.material = entry.materials.stone;
       }
@@ -244,7 +253,7 @@ export class ConstructionView {
     // Rebuilt per revision: the arc table is the shared arc-length view the
     // masonry builder places against, and must match the path the plan solved.
     entry.arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
-    entry.materials = createConstructionMaterials(record);
+    entry.materials = this.createMaterials(record);
 
     if (entry.shellMesh) {
       entry.group.remove(entry.shellMesh);
@@ -372,6 +381,65 @@ export class ConstructionView {
    * empty. Phase 1 has no per-module geometry to emit yet; the queue and its
    * budget exist so masonry can slot in without re-plumbing the frame loop.
    */
+  /**
+   * Choose an LOD band per module and show the matching geometry.
+   *
+   * `shell` reuses the record's existing ribbon, so the far band costs nothing
+   * to build. `near` and `coarse` both draw the module's masonry; the coarse
+   * tier is a build-time detail reduction rather than a separate mesh set, so
+   * switching between them never waits on geometry.
+   */
+  updateLod(camera, viewportHeight) {
+    if (!camera || !(viewportHeight > 0)) return;
+    let nearCount = 0;
+    let coarseCount = 0;
+    let shellCount = 0;
+    for (const entry of this.entries.values()) {
+      if (!entry.plan) continue;
+      const pinned = entry.record.id === this.selectedId;
+      let anyShell = false;
+      for (const module of entry.plan.modules) {
+        const resident = entry.modules.get(module.id);
+        if (!resident) continue;
+        const pixels = moduleProjectedPixels({
+          camera,
+          module,
+          height: entry.record.dimensions.height,
+          viewportHeight,
+          // Module bounds are canonical; the camera is in render space.
+          toRender: (x, z) => this.floatingOrigin.toRender(x, z),
+          cameraY: camera.position.y,
+        });
+        const band = selectConstructionLod({ pixels, previous: resident.band ?? null, pinned });
+        if (band !== resident.band) {
+          resident.band = band;
+          this.stats.lodTransitions += 1;
+          // near↔coarse is a build-time detail change. Rebuild when the resident
+          // mesh was built for a different band; keep the old mesh visible until
+          // the queue drains so the swap never flashes empty.
+          if (
+            (band === 'near' || band === 'coarse')
+            && resident.builtBand
+            && resident.builtBand !== band
+          ) {
+            this.enqueueModuleBuild(entry.record.id, module);
+          }
+        }
+        const visible = band !== 'shell' && resident.meshes.length > 0;
+        for (const mesh of resident.meshes) mesh.visible = visible;
+        if (!visible) anyShell = true;
+        if (band === 'near') nearCount += 1;
+        else if (band === 'coarse') coarseCount += 1;
+        else shellCount += 1;
+      }
+      // The shell covers whatever the module meshes are not drawing.
+      if (entry.shellMesh) entry.shellMesh.visible = anyShell;
+    }
+    this.stats.modulesNear = nearCount;
+    this.stats.modulesCoarse = coarseCount;
+    this.stats.modulesShell = shellCount;
+  }
+
   update() {
     if (this.buildQueue.length === 0) return;
     const started = performance.now();
@@ -384,7 +452,9 @@ export class ConstructionView {
       const job = this.buildQueue.shift();
       const entry = this.entries.get(job.constructionId);
       if (!entry || !entry.modules.has(job.module.id)) continue;
+      const moduleStarted = performance.now();
       this.buildModule(entry, job.module);
+      this.stats.buildMs += performance.now() - moduleStarted;
       this.stats.modulesRebuilt += 1;
       built += 1;
     }
@@ -394,15 +464,22 @@ export class ConstructionView {
   buildModule(entry, module) {
     const resident = entry.modules.get(module.id);
     if (!resident) return;
-    const built = module.placements?.length
-      ? buildModuleMasonry(module.placements, {
+    // Prefer the LOD band updateLod already chose; default to near so the first
+    // build is full detail until the camera has had a frame to classify it.
+    const lodBand = resident.band === 'coarse' ? 'coarse' : 'near';
+    const source = module.placements ?? [];
+    const placements = lodBand === 'coarse' ? coarsePlacements(source) : source;
+    const built = placements.length
+      ? buildModuleMasonry(placements, {
         record: entry.record,
         materials: entry.materials,
         arcTable: entry.arcTable,
         moduleOrigin: entry.origin,
         groundHeightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z) ?? 0,
+        lodBand,
       })
       : { meshes: [], stats: null };
+    resident.builtBand = lodBand;
 
     // Remove the old meshes in the same tick the new ones go in, so a module
     // never flickers to empty mid-swap (doc 18 §6).
@@ -417,6 +494,9 @@ export class ConstructionView {
     }
     resident.meshes = built.meshes;
     resident.stats = built.stats;
+    let stones = 0;
+    for (const other of entry.modules.values()) stones += other.stats?.stones ?? 0;
+    this.stats.stones = stones;
     this.applySelectionMaterial(entry.record.id, entry);
     this.updateShellVisibility(entry);
   }
@@ -583,6 +663,52 @@ export class ConstructionView {
   /** The arc table the masonry was placed against, for hover and edit maths. */
   arcTableFor(constructionId) {
     return this.entries.get(constructionId)?.arcTable ?? null;
+  }
+
+  createMaterials(record) {
+    return createConstructionMaterials(record, this.materialStore?.document ?? null);
+  }
+
+  /**
+   * Swap a record's stone material without touching geometry, so hovering a
+   * palette petal previews instantly. Passing `null` restores the committed
+   * material.
+   */
+  setMaterialPreview(constructionId, presetId) {
+    // Restore any wall that still carries a hover preview before applying the
+    // next one (or clearing). Closing the palette passes null ids; without this
+    // the last preview material stays on the meshes.
+    const previousId = this.previewedMaterialId;
+    if (previousId && previousId !== constructionId) {
+      this.restoreMaterialAssignment(previousId);
+    }
+    if (!constructionId || !presetId) {
+      if (constructionId) this.restoreMaterialAssignment(constructionId);
+      this.previewedMaterialId = null;
+      return;
+    }
+    const entry = this.entries.get(constructionId);
+    if (!entry) {
+      this.previewedMaterialId = null;
+      return;
+    }
+    this.previewedMaterialId = constructionId;
+    const material = this.createMaterials({
+      ...entry.record,
+      style: {
+        ...entry.record.style,
+        materials: { ...entry.record.style.materials, stone: presetId },
+      },
+    }).stone;
+    for (const resident of entry.modules.values()) {
+      for (const mesh of resident.meshes) mesh.material = material;
+    }
+  }
+
+  restoreMaterialAssignment(constructionId) {
+    const entry = this.entries.get(constructionId);
+    if (!entry?.materials) return;
+    this.applySelectionMaterial(constructionId, entry);
   }
 
   pickHandle(clientX, clientY, camera) {

@@ -1,7 +1,22 @@
 # Phase 8 — Walkable wall tops
 
-Status: **planned**. Depends on Phase 3 (`WallTopProfile.heightAt` is the
-collision surface).
+Status: **landed 2026-07-28**. Depends on Phase 3.
+
+## What shipped, where it differs from this plan
+
+1. **Changing "Wall height" has to carry `top.base` with it.** `top.base`
+   defaults to the wall height but is authoritative once set, so raising the
+   height moved the stones and left the walkable surface behind. `set_dimensions`
+   now brings the base along **only while the user has not authored a top** — an
+   explicit base or any profile point means they have, and it is left alone.
+2. **The provider carries query counters.** The grid rejection rate is what
+   makes this affordable at physics-step frequency, so it is measured rather
+   than assumed.
+
+**Verified live.** On the centreline of a 3.5 m wall the surface reads 10.52
+against a terrain height of 7.02 — exactly `terrain + 3.5`. Off the wall it
+returns `null`. 500 off-wall queries produced **0** closest-point searches: the
+occupancy grid rejected every one.
 
 ## Goal
 

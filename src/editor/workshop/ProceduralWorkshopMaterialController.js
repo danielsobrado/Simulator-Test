@@ -7,6 +7,7 @@ import {
   serializeWorkshopMaterialDocument,
 } from './ProceduralWorkshopMaterialConfig.js';
 import { prepareWorkshopAlbedo } from './ProceduralWorkshopTextureUpload.js';
+import { RadialPalette } from '../ui/RadialPalette.js';
 
 const POINTER_SELECT_DISTANCE = 6;
 
@@ -75,8 +76,6 @@ export class ProceduralWorkshopMaterialController {
     (previewRoot.parent ?? previewRoot).add(this.highlight);
 
     root.innerHTML = `
-      <div class="workshop-material-palette" data-role="material-palette" hidden
-        role="menu" aria-label="Material favorites"></div>
       <aside class="workshop-material-inspector" data-role="material-inspector" hidden>
         <header>
           <div><small>Selected material area</small><strong data-role="material-region-name"></strong></div>
@@ -121,7 +120,18 @@ export class ProceduralWorkshopMaterialController {
       </aside>
       <div class="workshop-material-region-label" data-role="material-region-label" hidden></div>
     `;
-    this.palette = root.querySelector('[data-role="material-palette"]');
+    // The palette itself is the shared `RadialPalette`; only its colours and
+    // its contents are workshop-specific. Preview/commit, the local undo stack
+    // and the layered Escape all stay exactly as they were.
+    this.palette = new RadialPalette({
+      host: root,
+      modifier: 'radial-palette--workshop',
+      onSelect: (presetId) => this.commitPreset(presetId),
+      onHover: (presetId) => this.previewPreset(presetId),
+      onHoverEnd: () => this.clearMaterialPreview(),
+      onAction: (action) => this.paletteAction(action),
+      onClose: () => this.clearMaterialPreview(),
+    });
     this.inspector = root.querySelector('[data-role="material-inspector"]');
     this.regionLabel = root.querySelector('[data-role="material-region-label"]');
     this.regionName = root.querySelector('[data-role="material-region-name"]');
@@ -133,8 +143,6 @@ export class ProceduralWorkshopMaterialController {
     this.onPointerUp = (event) => this.pointerUp(event);
     this.onRootClick = (event) => this.rootClick(event);
     this.onRootChange = (event) => this.rootChange(event);
-    this.onRootPointerOver = (event) => this.palettePointerOver(event);
-    this.onRootPointerOut = (event) => this.palettePointerOut(event);
     this.onKeyDown = (event) => this.keyDown(event);
     this.onSourceFileChange = (event) => this.sourceFileChange(event);
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
@@ -142,8 +150,6 @@ export class ProceduralWorkshopMaterialController {
     renderer.domElement.addEventListener('pointerup', this.onPointerUp);
     root.addEventListener('click', this.onRootClick);
     root.addEventListener('change', this.onRootChange);
-    root.addEventListener('pointerover', this.onRootPointerOver);
-    root.addEventListener('pointerout', this.onRootPointerOut);
     root.addEventListener('change', this.onSourceFileChange);
     window.addEventListener('keydown', this.onKeyDown);
   }
@@ -214,7 +220,7 @@ export class ProceduralWorkshopMaterialController {
   }
 
   pointerMove(event) {
-    if (!this.active || !this.palette.hidden) return;
+    if (!this.active || this.palette.isOpen) return;
     const region = this.hitRegion(event);
     this.hoverRegionId = region?.id ?? null;
     this.updateHighlight(this.hoverRegionId ?? this.selectedRegionId);
@@ -269,33 +275,34 @@ export class ProceduralWorkshopMaterialController {
 
   openPalette(clientX, clientY) {
     this.clearMaterialPreview();
-    const presets = this.favoritePresets();
-    const buttons = presets.map((preset, index) => {
-      const angle = -90 + index * (360 / Math.max(1, presets.length));
-      return `<button type="button" role="menuitem" data-preset-id="${preset.id}"
-        style="--material-angle:${angle}deg;--material-color:${preset.baseColor}"
-        aria-label="${preset.label}" title="${preset.label}"><span></span></button>`;
-    }).join('');
-    this.palette.innerHTML = `
-      ${buttons}
-      <button type="button" class="workshop-material-reset" data-material-action="reset"
-        aria-label="Reset to inherited material" title="Reset to inherited">↺</button>
-      <button type="button" class="workshop-material-more" data-material-action="more">More…</button>
-    `;
-    this.palette.hidden = false;
-    const hostBounds = this.canvasHost.getBoundingClientRect();
-    const radius = 116;
-    const x = Math.min(hostBounds.width - radius, Math.max(radius, clientX - hostBounds.left));
-    const y = Math.min(hostBounds.height - radius, Math.max(radius, clientY - hostBounds.top));
-    this.palette.style.left = `${x}px`;
-    this.palette.style.top = `${y}px`;
-    this.palette.querySelector('button')?.focus();
+    this.palette.open({
+      clientX,
+      clientY,
+      rings: [{
+        items: this.favoritePresets().map((preset) => ({
+          id: preset.id,
+          label: preset.label,
+          color: preset.baseColor,
+        })),
+      }],
+      center: { action: 'reset', glyph: '↺', label: 'Reset to inherited' },
+      footer: { action: 'more', label: 'More…' },
+    });
     this.refreshInspector();
   }
 
   closePalette() {
     this.clearMaterialPreview();
-    this.palette.hidden = true;
+    this.palette.close({ notify: false });
+  }
+
+  paletteAction(action) {
+    if (action === 'reset') this.resetSelected();
+    if (action === 'more') {
+      this.closePalette();
+      this.inspector.hidden = false;
+      this.refreshInspector();
+    }
   }
 
   previewPreset(presetId) {
@@ -356,18 +363,10 @@ export class ProceduralWorkshopMaterialController {
   }
 
   rootClick(event) {
-    const presetId = event.target.closest('[data-preset-id]')?.dataset.presetId;
-    if (presetId) {
-      this.commitPreset(presetId);
-      return;
-    }
+    // Palette petals and the reset/more buttons are the palette's own events
+    // now; everything here belongs to the inspector.
     const action = event.target.closest('[data-material-action]')?.dataset.materialAction;
     if (action === 'reset') this.resetSelected();
-    if (action === 'more') {
-      this.closePalette();
-      this.inspector.hidden = false;
-      this.refreshInspector();
-    }
     if (action === 'close-inspector') this.inspector.hidden = true;
     if (action === 'copy') this.copySelected();
     if (action === 'paste') this.pasteSelected();
@@ -380,15 +379,6 @@ export class ProceduralWorkshopMaterialController {
     }
     if (action === 'undo') this.undo();
     if (action === 'redo') this.redo();
-  }
-
-  palettePointerOver(event) {
-    const presetId = event.target.closest('[data-preset-id]')?.dataset.presetId;
-    if (presetId) this.previewPreset(presetId);
-  }
-
-  palettePointerOut(event) {
-    if (event.target.closest('[data-preset-id]')) this.clearMaterialPreview();
   }
 
   rootChange(event) {
@@ -539,17 +529,14 @@ export class ProceduralWorkshopMaterialController {
 
   keyDown(event) {
     if (!this.active) return;
-    if (!this.palette.hidden && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    if (this.palette.isOpen && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
       event.preventDefault();
-      const buttons = [...this.palette.querySelectorAll('button')];
-      const current = Math.max(0, buttons.indexOf(document.activeElement));
-      const delta = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
-      buttons[(current + delta + buttons.length) % buttons.length]?.focus();
+      this.palette.focusStep(event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1);
       return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (!this.palette.hidden) this.closePalette();
+      if (this.palette.isOpen) this.closePalette();
       else if (!this.inspector.hidden) this.inspector.hidden = true;
       else this.setActive(false);
       return;
@@ -610,10 +597,9 @@ export class ProceduralWorkshopMaterialController {
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
     this.root.removeEventListener('click', this.onRootClick);
     this.root.removeEventListener('change', this.onRootChange);
-    this.root.removeEventListener('pointerover', this.onRootPointerOver);
-    this.root.removeEventListener('pointerout', this.onRootPointerOut);
     this.root.removeEventListener('change', this.onSourceFileChange);
     window.removeEventListener('keydown', this.onKeyDown);
+    this.palette.dispose();
     this.highlight.removeFromParent();
     this.highlight.geometry.dispose();
     this.highlight.material.dispose();

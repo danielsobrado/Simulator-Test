@@ -55,6 +55,9 @@ export class ViewModeUi {
       ? 'player-spawn'
       : state.mode;
     this.root.toggleAttribute('data-awaiting-spawn', state.awaitingSpawn);
+    // Drives the paused-editing CSS. Kept as a dataset flag rather than a third
+    // view mode so every existing `[data-view-mode='player']` rule still applies.
+    this.root.dataset.playerPaused = state.paused ? 'true' : 'false';
 
     for (const button of this.switcher.querySelectorAll('[data-view-mode]')) {
       const isPlayerButton = button.dataset.viewMode === PLAYER_MODE_WALK;

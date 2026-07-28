@@ -45,6 +45,10 @@ export class PlayerController {
     this.pitch = 0;
     this.enabled = false;
     this.harnessActive = false;
+    /** Walking is suspended for in-world editing; the pose is preserved. */
+    this.paused = false;
+    /** Set by the composition root; makes wall tops walkable. */
+    this.constructionGround = null;
     this.uiBlocked = false;
     this.keys = new Set();
     this.jumpQueued = false;
@@ -254,6 +258,26 @@ export class PlayerController {
     return () => this.waterEventListeners.delete(listener);
   }
 
+  /**
+   * Pause walking without unloading the player.
+   *
+   * `setEnabled(false)` would discard the pose; pausing keeps it so resuming
+   * puts the player exactly back where they stopped.
+   */
+  setPaused(paused) {
+    const next = Boolean(paused);
+    if (this.paused === next) return;
+    this.paused = next;
+    this.lastTimestamp = null;
+    if (next) {
+      this.resetInput();
+      if (typeof document !== 'undefined' && document.pointerLockElement) {
+        document.exitPointerLock?.();
+      }
+    }
+    this.emit();
+  }
+
   setEnabled(enabled, spawn = null) {
     this.enabled = Boolean(enabled);
     this.lastTimestamp = null;
@@ -287,6 +311,13 @@ export class PlayerController {
 
   update(timestamp) {
     if (!this.enabled) {
+      this.lastTimestamp = null;
+      return;
+    }
+    // Freeze the physics step while paused for editing. Left running, gravity
+    // and ground-following would drift or settle the camera under the user
+    // while they work, and the view has to hold still to edit against.
+    if (this.paused) {
       this.lastTimestamp = null;
       return;
     }
@@ -331,7 +362,16 @@ export class PlayerController {
       config: this.config,
       forward: this.forward,
       right: this.right,
-      getGroundHeight: (x, z) => this.terrainView.getWorldHeight(x, z),
+      // Walls are part of the ground, not obstacles: a flat-topped wall is a
+      // height field over a narrow ribbon, so it composes into the same
+      // function rather than needing collision response.
+      getGroundHeight: (x, z) => {
+        const terrain = this.terrainView.getWorldHeight(x, z);
+        if (!this.constructionGround) return terrain;
+        const canonical = this.terrainView.floatingOrigin.toCanonical(x, z);
+        const wall = this.constructionGround.heightAt(canonical.x, canonical.z);
+        return wall === null ? terrain : Math.max(terrain, wall);
+      },
       getWaterSample: typeof this.terrainView.getWorldWater === 'function'
         ? (x, z) => this.terrainView.getWorldWater(x, z)
         : null,
@@ -379,14 +419,14 @@ export class PlayerController {
   }
 
   onCanvasPointer(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
+    if (!this.enabled || this.harnessActive || this.uiBlocked || this.paused) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.type === 'pointerdown' && event.button === 0) this.requestPointerLock();
   }
 
   onContextMenu(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
+    if (!this.enabled || this.harnessActive || this.uiBlocked || this.paused) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   }
@@ -395,10 +435,13 @@ export class PlayerController {
     if (!this.enabled
         || this.harnessActive
         || this.uiBlocked
+        || this.paused
         || event.target instanceof HTMLInputElement
         || event.target instanceof HTMLTextAreaElement) {
       return;
     }
+    // Escape is owned by `EscapeStack`, which listens on the capture phase at a
+    // higher priority; everything else belongs to the player while walking.
     if (event.code !== 'Escape') event.stopImmediatePropagation();
     if (!MOVEMENT_CODES.has(event.code)) return;
     event.preventDefault();
@@ -412,7 +455,7 @@ export class PlayerController {
   }
 
   onKeyUp(event) {
-    if (!this.enabled || this.harnessActive || this.uiBlocked) return;
+    if (!this.enabled || this.harnessActive || this.uiBlocked || this.paused) return;
     if (event.code !== 'Escape') event.stopImmediatePropagation();
     if (MOVEMENT_CODES.has(event.code)) {
       event.preventDefault();

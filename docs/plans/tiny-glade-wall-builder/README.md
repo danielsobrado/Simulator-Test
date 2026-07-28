@@ -1,6 +1,6 @@
 # Tiny Glade-style wall builder
 
-Status: **active** — Phases 1–4 landed 2026-07-27; Phase 5 next.
+Status: **complete** — all nine phases landed 2026-07-27/28.
 
 This folder is the execution plan for turning the live construction tool into a
 Tiny Glade-style procedural wall builder. It extends

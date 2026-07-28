@@ -55,7 +55,9 @@ function setup(path, overrides = {}) {
   return { record: built, arcTable, profile };
 }
 
-function pack(context, { arcRange, seedOffset = 0, budget } = {}) {
+function pack(context, {
+  arcRange, seedOffset = 0, budget, wallRange, courseHeight,
+} = {}) {
   return packCurvedWall({
     arcTable: context.arcTable,
     arcRange: arcRange ?? [0, context.arcTable.totalLength],
@@ -65,6 +67,8 @@ function pack(context, { arcRange, seedOffset = 0, budget } = {}) {
     seedOffset,
     topHeightAt: context.profile.heightAt,
     ruinFactorAt: context.profile.ruinFactorAt,
+    ...(wallRange ? { wallRange } : {}),
+    ...(courseHeight ? { courseHeight } : {}),
     ...(budget === undefined ? {} : { budget }),
   });
 }
@@ -253,22 +257,114 @@ test('a ruined wall drops from the top and keeps a footing', () => {
   }
 });
 
-test('adjacent modules meet flush at their shared boundary', () => {
-  const context = setup(straightPath(24));
-  const middle = context.arcTable.totalLength / 2;
-  const left = pack(context, { arcRange: [0, middle], seedOffset: 0 });
-  const right = pack(context, { arcRange: [middle, context.arcTable.totalLength], seedOffset: 1 });
+/** Field-stone courses, ordered bottom-up, each sorted along the wall. */
+function fieldCourses(result) {
+  const courses = new Map();
+  for (const stone of result.stones.filter(({ category }) => category === 'field')) {
+    const key = stone.heightRatio.toFixed(6);
+    if (!courses.has(key)) courses.set(key, []);
+    courses.get(key).push(stone);
+  }
+  return [...courses.entries()]
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([, course]) => [...course].sort((a, b) => a.s - b.s));
+}
 
-  const leftEdge = Math.max(...left.stones.map((stone) => stone.s + stone.packedWidth / 2));
-  const rightEdge = Math.min(...right.stones.map((stone) => stone.s - stone.packedWidth / 2));
-  assert.ok(Math.abs(leftEdge - middle) < 1e-9, 'left module must end on the boundary');
-  assert.ok(Math.abs(rightEdge - middle) < 1e-9, 'right module must start on the boundary');
+test('adjacent modules meet without leaving a full-height joint', () => {
+  const context = setup(straightPath(36));
+  const total = context.arcTable.totalLength;
+  const middle = total / 2;
+  const wall = { wallRange: [0, total], courseHeight: null };
+  const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
+  const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
 
-  // Different seed offsets, so the two modules must not produce identical
-  // course divisions and stack a full-height joint at the seam.
-  const leftCourse = left.stones.filter((stone) => stone.heightRatio < 0.1).length;
-  const rightCourse = right.stones.filter((stone) => stone.heightRatio < 0.1).length;
-  assert.ok(leftCourse > 0 && rightCourse > 0);
+  const leftEdges = fieldCourses(left).map((course) => {
+    const last = course.at(-1);
+    return last.s + last.packedWidth / 2;
+  });
+  const rightEdges = fieldCourses(right).map((course) => {
+    const first = course[0];
+    return first.s - first.packedWidth / 2;
+  });
+  assert.ok(leftEdges.length >= 6, 'the fixture should have several courses');
+
+  // The two modules still meet exactly — no gap, no overlap.
+  for (let index = 0; index < leftEdges.length; index += 1) {
+    assert.ok(
+      Math.abs(leftEdges[index] - rightEdges[index]) < 1e-9,
+      `course ${index} leaves a gap of ${leftEdges[index] - rightEdges[index]}`,
+    );
+  }
+
+  // But the meeting point moves course to course, so the seam cannot stack
+  // into the continuous vertical line that a partitioned wall otherwise shows.
+  const distinct = new Set(leftEdges.map((edge) => edge.toFixed(4)));
+  assert.ok(
+    distinct.size >= leftEdges.length - 1,
+    `the boundary joint stacked: only ${distinct.size} distinct positions`,
+  );
+  const spread = Math.max(...leftEdges) - Math.min(...leftEdges);
+  assert.ok(spread > 0.2, `the boundary barely moves: ${spread} m`);
+  assert.ok(spread < STYLE.targetWidth, 'the boundary must not wander a whole stone');
+});
+
+test('boundaries still meet where curvature differs across the seam', () => {
+  // The wander offset must depend only on seed and course index. Scaling it by
+  // the local `targetWidth` looks harmless but that value is curvature-limited
+  // *per module*, so two modules either side of a bend shift by different
+  // amounts and tear open a gap most of a stone wide.
+  const context = setup(tightArcPath(5));
+  const total = context.arcTable.totalLength;
+  const middle = total / 2;
+  const wall = { wallRange: [0, total] };
+  const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
+  const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
+
+  // The two halves of a tight arc really do get different stone widths.
+  assert.notEqual(left.stats.targetWidth, undefined);
+  const leftCourses = fieldCourses(left);
+  const rightCourses = fieldCourses(right);
+  assert.ok(leftCourses.length > 1 && leftCourses.length === rightCourses.length);
+
+  for (let index = 0; index < leftCourses.length; index += 1) {
+    const last = leftCourses[index].at(-1);
+    const first = rightCourses[index][0];
+    const gap = (first.s - first.packedWidth / 2) - (last.s + last.packedWidth / 2);
+    assert.ok(Math.abs(gap) < 1e-9, `course ${index} tore open a ${gap.toFixed(4)} m gap`);
+  }
+});
+
+test('the wall ends stay hard edges even as boundaries wander', () => {
+  const context = setup(straightPath(36));
+  const total = context.arcTable.totalLength;
+  const middle = total / 2;
+  const wall = { wallRange: [0, total] };
+  const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
+  const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
+
+  for (const course of fieldCourses(left)) {
+    assert.ok(Math.abs((course[0].s - course[0].packedWidth / 2) - 0) < 1e-9);
+  }
+  for (const course of fieldCourses(right)) {
+    const last = course.at(-1);
+    assert.ok(Math.abs((last.s + last.packedWidth / 2) - total) < 1e-9);
+  }
+});
+
+test('adjacent modules share a course grid so courses do not step', () => {
+  const context = setup(straightPath(36));
+  const total = context.arcTable.totalLength;
+  const middle = total / 2;
+  const courseHeight = 0.44;
+  const wall = { wallRange: [0, total], courseHeight };
+  const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
+  const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
+
+  const heights = (result) => [...new Set(
+    result.stones.filter(({ category }) => category === 'field')
+      .map(({ heightRatio }) => heightRatio.toFixed(6)),
+  )].sort();
+  assert.deepEqual(heights(left), heights(right), 'courses must line up across the seam');
 });
 
 test('a zero-length or zero-height range yields nothing rather than throwing', () => {

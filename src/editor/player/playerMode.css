@@ -153,3 +153,28 @@
 [data-view-mode='player-spawn'] .toast {
   display: none;
 }
+
+/*
+ * Paused for in-world editing.
+ *
+ * The sidebar is laid out for the orthographic editor and reads badly over a
+ * first-person view, so it stays out of the way behind an explicit toggle. The
+ * statusbar comes back unconditionally — it carries the selection readout that
+ * editing depends on.
+ */
+[data-view-mode='player'][data-player-paused='true'] .statusbar {
+  display: flex;
+}
+
+[data-view-mode='player'][data-player-paused='true'][data-player-panels='true'] .sidebar {
+  pointer-events: auto;
+}
+
+[data-view-mode='player'][data-player-paused='true'][data-player-panels='true']
+  .sidebar > *:not(.panel--minimap) {
+  opacity: 1;
+}
+
+[data-view-mode='player'][data-player-paused='true'] .player-hud__hint::after {
+  content: ' — paused for editing';
+}

@@ -1,6 +1,33 @@
 # Phase 5 — Radial palette, right-click, materials, albedo import
 
-Status: **planned**. Depends on Phase 2 (materials need stones to sit on).
+Status: **landed 2026-07-28**. Depends on Phase 2.
+
+## What shipped, where it differs from this plan
+
+1. **`materialLibrary.presets` holds only *custom* presets.** The built-ins are
+   a separate constant that `availablePreset` consults alongside the library, so
+   reading the library alone gives an **empty palette on a fresh world** — which
+   is exactly what happened first time. `materialPresets()` merges both.
+2. **Built-in masonry presets are family `walls`, not `stone`.** The filter is
+   `{walls, stone}`; `stone` is kept for custom presets authored against the
+   construction stone slot.
+3. **The markup builder is a pure exported function.** This repo has no DOM test
+   harness (no jsdom, no happy-dom), and Node's loader cannot resolve a CSS
+   import, so `buildRadialMarkup` and `petalAngle` are separated out and tested
+   as strings. `radialPalette.css` is imported from `src/main.js` rather than
+   from the module, for the same reason — `LoadingOverlay` gets away with a
+   self-import only because nothing unit-tests it.
+4. **Albedo import is deferred to the inspector**, which is not built yet. The
+   store, its caps, the GC projection and the budget readout are all in place
+   and tested; only the file-picker UI is outstanding.
+
+**Verified live.** Construction palette: 9 petals — 5 material on the 79 px ring,
+4 wall-top actions on the 46 px ring — 220 px disc, hover preview swaps the
+material and restores on leave, and **both preview and commit do zero geometry
+rebuilds**. Workshop palette after the extraction: 8 petals at exactly the
+original angles (−90°, −45°, 0°, 45°, 90°, 135°, 180°, 225°), single 79 px ring,
+reset and More… present, 220 px disc, keyboard `focusStep` and close working —
+no regression.
 
 ## Goal
 

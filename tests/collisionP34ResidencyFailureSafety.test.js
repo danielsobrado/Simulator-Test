@@ -46,7 +46,8 @@ test('commit callback failure rolls the world back and retries after backoff', (
   residency.update({ focus: { x: 1, z: 1 } });
   const failed = residency.flush();
   assert.equal(failed.built, 0);
-  assert.equal(world.isOwnerChunkReady(0, 0), false);
+  const ownerChunk = residency.getStatus().currentChunk;
+  assert.equal(world.isOwnerChunkReady(ownerChunk.chunkX, ownerChunk.chunkZ), false);
   assert.equal(residency.getStatus().deferredRetries, 1);
   assert.equal(unloadNotifications, 1);
   assert.match(residency.getStatus().lastBuildError, /commit callback failed/);
@@ -58,7 +59,7 @@ test('commit callback failure rolls the world back and retries after backoff', (
   residency.update({ focus: { x: 1, z: 1 } });
   const recovered = residency.flush();
   assert.equal(recovered.built, 1);
-  assert.equal(world.isOwnerChunkReady(0, 0), true);
+  assert.equal(world.isOwnerChunkReady(ownerChunk.chunkX, ownerChunk.chunkZ), true);
   assert.equal(residency.getStatus().deferredRetries, 0);
 });
 

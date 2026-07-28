@@ -40,7 +40,12 @@ test('explicit planted species controls prototype and species morphology', () =>
 
   assert.equal(selected.speciesId, 'conifer_narrow');
   assert.equal(selected.prototypeIndex, 1);
-  assert.equal(selected.crownAspect, FOREST_SPECIES_DEFAULTS.conifer_narrow.crownAspect);
+  assert.ok(selected.instanceMorphology);
+  assert.equal(
+    selected.crownAspect,
+    FOREST_SPECIES_DEFAULTS.conifer_narrow.crownAspect
+      * selected.instanceMorphology.crownFlattening,
+  );
   assert.equal(selected.speciesColor, FOREST_SPECIES_DEFAULTS.conifer_narrow.color);
 });
 

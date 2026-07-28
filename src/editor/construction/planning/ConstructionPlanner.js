@@ -143,6 +143,14 @@ export function planConstruction(input, {
     hasher.number(record.dimensions.thickness);
     hasher.text(record.top.style);
     hasher.number(record.top.base);
+    // The course grid is solved for the whole wall (see below), so a top edit
+    // anywhere can re-space the courses everywhere. Without it in the hash the
+    // edited module rebuilds onto the new grid while its neighbour keeps the old
+    // one, and the courses step at the seam — the exact failure the wall-wide
+    // grid exists to prevent. Locality still holds for the common case, because
+    // the grid only moves when the wall's tallest point crosses a course.
+    hasher.number(wallCourseHeight ?? 0);
+    hasher.number(wallTopHeight ?? 0);
     for (const point of modulePoints) {
       hasher.number(point.x);
       hasher.number(point.z);
@@ -187,6 +195,22 @@ export function planConstruction(input, {
   const style = constructionStyle(record.style.key);
   const arcTable = masonry ? createCurveArcTable(sampled) : null;
   const topProfile = masonry ? createWallTopProfile(record, arcTable, { style }) : null;
+  // One course grid for the whole wall. Derived per module it would drift
+  // wherever the top height differs, and courses would step at the boundary.
+  let wallCourseHeight = null;
+  let wallTopHeight = null;
+  if (masonry) {
+    let wallTop = 0;
+    const samples = Math.max(8, Math.ceil(sampled.totalDistance / 0.5));
+    for (let index = 0; index <= samples; index += 1) {
+      wallTop = Math.max(wallTop, topProfile.heightAt((sampled.totalDistance * index) / samples));
+    }
+    const body = Math.max(0.12, wallTop - (
+      record.top.style === 'flat' || record.top.style === 'irregular' ? 0.16 : 0
+    ));
+    wallCourseHeight = body / Math.max(1, Math.ceil(body / style.courseHeight));
+    wallTopHeight = wallTop;
+  }
   let stoneTotal = 0;
   let overBudget = false;
 
@@ -194,8 +218,15 @@ export function planConstruction(input, {
   for (const segment of record.path.segments) {
     const segmentPoints = sampled.points.filter(({ segmentId }) => segmentId === segment.id);
     if (segmentPoints.length < 2) continue;
-    const startDistance = segmentPoints[0].distance;
-    const endDistance = segmentPoints.at(-1).distance;
+    // Take the segment's span from the **contiguous** ranges, not from its own
+    // sampled points. The sampler drops each segment's duplicated first point,
+    // so `segmentPoints[0].distance` sits strictly *after* the previous
+    // segment's last point — and modules built from it leave an unwalled sliver
+    // at every segment joint. That is the visible gap in a finished wall, and
+    // no amount of care inside the packer can close it.
+    const range = segmentRanges.get(segment.id);
+    const startDistance = range.start;
+    const endDistance = range.end;
     const length = endDistance - startDistance;
     const count = Math.max(1, Math.ceil(length / maxModuleLength));
     for (let index = 0; index < count; index += 1) {
@@ -219,11 +250,23 @@ export function planConstruction(input, {
           thickness: record.dimensions.thickness,
           seed: record.seed,
           seedOffset,
+          wallRange: [0, sampled.totalDistance],
+          courseHeight: wallCourseHeight,
+          heightReference: wallTopHeight,
           topHeightAt: topProfile.heightAt,
           ruinFactorAt: topProfile.ruinFactorAt,
           slopeAt: topProfile.slopeAt,
           crenellationsOver: topProfile.crenellationsOver,
           topStyle: record.top.style,
+          // Openings whose void or dressings reach into this module. A wide
+          // gate near a boundary has to be visible to both modules or the
+          // course splits on one side and not the other.
+          openings: featureArcs
+            .filter(({ feature, distance }) => {
+              const reach = feature.width / 2 + 0.6;
+              return distance + reach > from && distance - reach < to;
+            })
+            .map(({ feature, distance }) => ({ ...feature, s: distance })),
           budget: Math.max(0, Math.min(
             MAX_MODULE_STONES,
             MAX_CONSTRUCTION_STONES - stoneTotal,

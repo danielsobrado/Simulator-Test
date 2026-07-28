@@ -1,7 +1,22 @@
 # Phase 7 — Player-mode editing after ESC
 
-Status: **planned**. Depends on Phase 1 only — **can be pulled forward at any
-time**, and is the cheapest phase in the plan relative to what it delivers.
+Status: **landed 2026-07-28**. Depends on Phase 1 only.
+
+## What shipped, where it differs from this plan
+
+1. **`PlayerController` already had the guard shape.** Every input handler
+   checks `uiBlocked` for the gameplay overlay, so pausing is a second flag
+   alongside it rather than a new mechanism — `setPaused` gates the same
+   handlers plus the physics step, and `setEnabled` stays true so the pose
+   survives.
+2. **`setMode` resumes rather than respawning.** Re-entering player mode while
+   paused would otherwise walk back into spawn selection.
+3. **`playerEditingProvider`** is how `selectTool` learns it is paused, keeping
+   `EditorController` free of a direct dependency on the view-mode controller.
+
+Escape ordering is verified as a unit: with a palette open, a gesture active, a
+selection present and the player paused, four presses back out one level each —
+palette, gesture, selection, then paused-editing — and never resume walking.
 
 ## Goal
 

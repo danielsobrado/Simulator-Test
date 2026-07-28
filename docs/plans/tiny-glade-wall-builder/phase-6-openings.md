@@ -1,7 +1,27 @@
 # Phase 6 — Openings: arches, gates, doors, windows
 
-Status: **planned**. Depends on Phase 2 (omission needs stones), Phase 3
-(standalone arches need a lowered top), Phase 4 (`intersectCubicBezierPaths`).
+Status: **landed 2026-07-28**. Depends on Phases 2, 3 and 4.
+
+## What shipped, where it differs from this plan
+
+1. **Coping had to learn about voids.** An opening tall enough to break the
+   crown otherwise leaves the cap floating over thin air — very visible on a
+   standalone arcade, where every stone below is gone. Coping is now suppressed
+   wherever the void reaches coping height, and runs unbroken where it does not.
+2. **`previousJoints` moved to absolute arc coordinates**, because a pierced
+   course packs several spans that all need to break bond against the same
+   course below. `packCourse` works in its own span-local frame, so every call
+   site converts on the way in. Missing that conversion for the coping course
+   silently stopped it staggering — caught by the existing joint-staggering
+   test, which is the whole reason that test exists.
+3. **Jamb lines become forbidden joints for the course above**, so a vertical
+   joint never stacks directly on the edge of an opening.
+
+**Verified live.** A 28 m wall went from 232 field stones to 220 field + 14
+ashlar jambs + 32 voussoirs after one Alt-drag across it (`kind: 'arch'`,
+2.2 m x 2.73 m, sized under the wall top). A second stroke stopping short of the
+wall produced a `door`. The standalone-arcade test lowers the top below the
+springing and cuts until `field === 0` with the rings and jambs intact.
 
 ## Goal
 

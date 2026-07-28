@@ -1,5 +1,14 @@
 import { packCourse } from '../../workshop/ProceduralWorkshopCoursePacker.js';
 import { createRandom, mixSeed } from '../../workshop/ProceduralRandom.js';
+import { layoutOpening, openingHalfWidthAt, survivingIntervals } from './OpeningLayout.js';
+import {
+  createBedField,
+  jointTilt,
+  resolveCellCorners,
+  scaleCorners,
+  splitCell,
+} from './CourseLattice.js';
+import { layoutMerlon } from './MerlonOrnament.js';
 
 /**
  * Course-solve a curved wall in arc length.
@@ -44,6 +53,22 @@ const COPING_OVERSAIL = 1.14;
 
 const RUIN_HASH = 0x6ec1b5f3;
 const SHAPE_HASH = 0x27d4eb2d;
+const BOUNDARY_HASH = 0x1b873593;
+
+/**
+ * How far a module boundary wanders per course, as a fraction of stone width.
+ *
+ * Modules partition the wall, so without this **every course has to terminate
+ * on the same arc position** and the shared joint stacks into a continuous
+ * vertical line up the full height of the wall — the one thing coursed masonry
+ * never does. Offsetting the boundary per course makes the seam zigzag like any
+ * other joint.
+ *
+ * The offset depends only on `(seed, course)`, never on the module, so the two
+ * modules either side of a boundary compute the *same* shift and still meet
+ * flush. It is clamped away at the wall's real ends, which genuinely are edges.
+ */
+const BOUNDARY_WANDER = 0.42;
 
 /**
  * `stableIndex` ranges per unit kind within a module.
@@ -51,10 +76,21 @@ const SHAPE_HASH = 0x27d4eb2d;
  * Field, coping and merlon stones must not collide in the index space or they
  * would share `stoneJitter` hashes and shape identically. Separating them also
  * means adding a coping course cannot re-roll the field masonry beneath it.
+ *
+ * A base cell now reserves `LEAVES_PER_CELL` indices rather than one, because
+ * `splitCell` can turn it into up to four stones and each needs its own shaping
+ * hash. The lanes are scaled by the same factor so the headroom is unchanged.
  */
-const INDEX_STRIDE = 10000;
-const INDEX_COPING = 5000;
-const INDEX_MERLON = 7000;
+const LEAVES_PER_CELL = 4;
+const INDEX_STRIDE = 40000;
+const INDEX_COPING = 20000;
+const INDEX_MERLON = 28000;
+const INDEX_DRESSING = 34000;
+/** Indices reserved per merlon: 4 rows x 3 cells, plus a corbel, plus slack. */
+const MERLON_UNIT_STRIDE = 16;
+
+/** A leaf this short reads as a chip wedged in the joint, not as a stone. */
+const MIN_LEAF_HEIGHT = 0.09;
 
 function hashUnit(seed, index) {
   return mixSeed(seed, index) / 0x100000000;
@@ -124,6 +160,26 @@ export function packCurvedWall({
   slopeAt = () => 0,
   crenellationsOver = () => [],
   topStyle = 'flat',
+  openings = [],
+  /**
+   * The whole wall's arc range. Only its real ends are hard edges; every
+   * interior module boundary is free to wander per course.
+   */
+  wallRange = null,
+  /**
+   * Course height for the whole wall, so adjacent modules lay their courses at
+   * the same heights. Derived per module it would drift wherever the wall top
+   * differs, and the courses would step at the boundary.
+   */
+  courseHeight: courseHeightOverride = null,
+  /**
+   * Wall-wide top height that `heightRatio` is normalised against.
+   *
+   * Normalised per module it would mean the same physical course weathers
+   * differently either side of a boundary, because `applyUnitShading` drives
+   * weathering from this ratio.
+   */
+  heightReference = null,
   budget = MAX_MODULE_STONES,
 }) {
   const [s0, s1] = arcRange;
@@ -165,72 +221,192 @@ export function packCurvedWall({
   const bodyHeightAt = (s) => Math.max(0.12, topHeightAt(s) - copingHeight);
 
   const bodyMax = Math.max(0.12, maxTop - copingHeight);
-  const courses = Math.max(1, Math.ceil(bodyMax / style.courseHeight));
-  const courseHeight = bodyMax / courses;
+  const courseHeight = courseHeightOverride
+    ?? bodyMax / Math.max(1, Math.ceil(bodyMax / style.courseHeight));
+  const courses = Math.max(1, Math.round(bodyMax / courseHeight));
+  const heightScale = heightReference ?? maxTop;
   const random = createRandom(mixSeed(seed, seedOffset));
   const shapeSeed = mixSeed(seed ^ SHAPE_HASH, seedOffset);
   const baseIndex = seedOffset * INDEX_STRIDE;
-  let stableIndex = baseIndex;
+  let cellCounter = 0;
   let previousJoints = [];
 
   stats.courses = courses;
 
+  // Bed lines, joint lean and cell splitting. The first two must agree across a
+  // module boundary, so they are driven by the wall-wide `seed`, `courseHeight`
+  // and `style` values and never by anything curvature-limited per module — the
+  // same rule `boundaryOffset` below follows, for the same reason.
+  const bedOffset = createBedField(seed, courseHeight, {
+    amplitude: style.bedAmplitude ?? 0,
+  });
+  const tiltAmount = style.jointTilt ?? 0;
+  // Splitting is safe to scale per module: a base cell never straddles a
+  // boundary, so no two modules have to agree about how one is cut. A course the
+  // curvature has already narrowed has small cells, and cutting those again would
+  // only make splinters.
+  const splitChance = (style.splitChance ?? 0) * Math.min(1, targetWidth / style.targetWidth);
+
+  const [wallStart, wallEnd] = wallRange ?? [s0, s1];
+  // Shared by both modules at a boundary, so it may depend only on `seed` and
+  // the course index. Scaling by the local `targetWidth` would break that:
+  // that value is curvature-limited per module, so two modules either side of a
+  // bend would shift by different amounts and stop meeting at all.
+  const boundaryOffset = (course) => (
+    (hashUnit(seed ^ BOUNDARY_HASH, course) - 0.5) * 2 * BOUNDARY_WANDER * style.targetWidth
+  );
+  const courseRange = (course) => {
+    const shift = boundaryOffset(course);
+    return [
+      s0 <= wallStart + 1e-6 ? wallStart : s0 + shift,
+      s1 >= wallEnd - 1e-6 ? wallEnd : s1 + shift,
+    ];
+  };
+
   for (let course = 0; course < courses; course += 1) {
     const y = (course + 0.5) * courseHeight;
-    const packed = packCourse({
-      span,
-      targetWidth,
-      minWidth: style.minWidth,
-      random,
-      forbiddenJoints: previousJoints,
-    });
+    const [courseStart, courseEnd] = courseRange(course);
+    // Split the course around the openings and pack each surviving span
+    // separately, so stone edges land flush on the jamb line rather than
+    // wherever the omitted stone happened to end.
+    const spans = openings.length > 0
+      ? survivingIntervals([courseStart, courseEnd], openings, y)
+      : [[courseStart, courseEnd]];
+
+    const packedStones = [];
+    const courseJoints = [];
+    // Joints that have to stay plumb: the wall's real ends, and every jamb line
+    // an opening cut into this course. Leaning those would put the stone either
+    // proud of the wall end or into the void.
+    const plumbJoints = [wallStart, wallEnd];
+    for (const [from, to] of spans) {
+      const spanWidth = to - from;
+      const midpoint = from + spanWidth / 2;
+      const packed = packCourse({
+        span: spanWidth,
+        targetWidth,
+        minWidth: style.minWidth,
+        random,
+        // Translate the course below's joints into this span's local frame so
+        // staggering survives the split; an opening must not unbond the wall.
+        forbiddenJoints: previousJoints.map((joint) => joint - midpoint),
+      });
+      for (const stone of packed.stones) {
+        packedStones.push({ ...stone, center: midpoint + stone.center });
+      }
+      for (const joint of packed.joints) courseJoints.push(midpoint + joint);
+      // A jamb is a vertical line the course above must not stack a joint on.
+      if (from > courseStart) {
+        courseJoints.push(from);
+        plumbJoints.push(from);
+      }
+      if (to < courseEnd) {
+        courseJoints.push(to);
+        plumbJoints.push(to);
+      }
+    }
     // Assigned from the solve, not from what survived, so staggering is a
     // property of the course and an opening or a ruin cannot unbond the wall.
-    previousJoints = packed.joints;
+    previousJoints = courseJoints;
 
-    for (const stone of packed.stones) {
-      // `packCourse` centres its stones on zero, in [-span/2, +span/2].
-      const s = s0 + span / 2 + stone.center;
-      const index = stableIndex;
-      stableIndex += 1;
+    const tiltAt = (jointS) => (
+      plumbJoints.some((plumb) => Math.abs(plumb - jointS) < 1e-6)
+        ? 0
+        : jointTilt(seed, course, jointS, courseHeight, tiltAmount)
+    );
+
+    for (const stone of packedStones) {
+      // Spans report their stones already in absolute arc coordinates.
+      const s = stone.center;
+      // Counted per base cell, and incremented even for a cell the wall top or a
+      // ruin removes, so a change at one end of the wall cannot shift the shaping
+      // hash of every stone after it.
+      const cell = cellCounter;
+      cellCounter += 1;
 
       const localTop = bodyHeightAt(s);
       if (y > localTop) continue;
-      if (shouldDropRuinStone(ruinFactorAt(s), y, localTop, seed, index)) {
-        stats.dropped += 1;
-        continue;
-      }
-      if (stones.length >= budget) {
-        stats.overBudget = true;
-        continue;
-      }
 
-      const frame = arcTable.frameAt(s);
-      const curvature = arcTable.curvatureAt(s);
-      // Straddle the arc so the chord's error is split between the inner and
-      // outer faces instead of landing entirely on one. Positive curvature
-      // turns toward +normal, so the chord bulges that way and the block shifts
-      // against it.
-      const sagitta = chordSagitta(stone.width, curvature);
-      const straddle = -Math.sign(curvature) * sagitta * 0.5;
+      // Coarse grid first, then split — the order the reference builds in, and
+      // what puts one big block beside two stacked small ones.
+      const leaves = splitCell(
+        { courseIndex: course, s0: s - stone.width / 2, s1: s + stone.width / 2 },
+        {
+          seed,
+          chance: splitChance,
+          minWidth: style.minWidth,
+          courseHeight,
+        },
+      );
 
-      const inset = 0.012 + hashLane(shapeSeed, index, 0) * 0.018;
-      stones.push(Object.freeze({
-        category: 'field',
-        s,
-        y: y + (hashLane(shapeSeed, index, 1) - 0.5) * 0.025,
-        offsetNormal: straddle + (hashLane(shapeSeed, index, 2) - 0.5) * 0.018,
-        // The solved width before the mortar inset. The geometry uses `width`;
-        // this is what tiles the course exactly, so coverage is checkable.
-        packedWidth: stone.width,
-        width: Math.max(0.12, stone.width - inset),
-        height: Math.max(0.12, courseHeight - inset * 0.7),
-        depth: thickness * (0.95 + hashLane(shapeSeed, index, 3) * 0.035),
-        yaw: frame.yaw,
-        roll: 0,
-        stableIndex: index,
-        heightRatio: y / maxTop,
-      }));
+      for (let ordinal = 0; ordinal < leaves.length; ordinal += 1) {
+        const leaf = leaves[ordinal];
+        const index = baseIndex + cell * LEAVES_PER_CELL + ordinal;
+        const leafWidth = leaf.s1 - leaf.s0;
+        const leafCenter = (leaf.s0 + leaf.s1) / 2;
+
+        // Both tilts come from the joint's own arc position, so the neighbour
+        // sharing that joint — in this cell, the next cell, or the next module —
+        // resolves the identical corner and the two stones meet exactly.
+        const face = resolveCellCorners(leaf, {
+          bedOffset,
+          courseHeight,
+          tiltLeft: tiltAt(leaf.s0),
+          tiltRight: tiltAt(leaf.s1),
+          ceilingAt: bodyHeightAt,
+          minHeight: MIN_LEAF_HEIGHT,
+        });
+        if (!face) continue;
+
+        if (shouldDropRuinStone(ruinFactorAt(leafCenter), face.anchorY, localTop, seed, index)) {
+          stats.dropped += 1;
+          continue;
+        }
+        if (stones.length >= budget) {
+          stats.overBudget = true;
+          continue;
+        }
+
+        const frame = arcTable.frameAt(leafCenter);
+        const curvature = arcTable.curvatureAt(leafCenter);
+        // Straddle the arc so the chord's error is split between the inner and
+        // outer faces instead of landing entirely on one. Positive curvature
+        // turns toward +normal, so the chord bulges that way and the block shifts
+        // against it.
+        const sagitta = chordSagitta(leafWidth, curvature);
+        const straddle = -Math.sign(curvature) * sagitta * 0.5;
+
+        // The lattice tiles exactly by construction, so unlike a packed box the
+        // mortar gap has to be cut out of the face rather than left over from a
+        // width that fell short.
+        const inset = 0.012 + hashLane(shapeSeed, index, 0) * 0.018;
+        const scaleX = Math.max(0.4, 1 - inset / face.width);
+        const scaleY = Math.max(0.4, 1 - (inset * 0.7) / face.height);
+
+        stones.push(Object.freeze({
+          category: 'field',
+          s: leafCenter,
+          y: face.anchorY,
+          offsetNormal: straddle + (hashLane(shapeSeed, index, 2) - 0.5) * 0.018,
+          // The leaf's solved arc footprint, before the mortar inset. The
+          // geometry uses `corners`; this is what tiles the course exactly, so
+          // coverage stays checkable.
+          packedWidth: leafWidth,
+          // Fraction of the course the leaf occupies, so a cell's leaves can be
+          // shown to partition it rather than merely to span it.
+          bandHeight: leaf.v1 - leaf.v0,
+          corners: scaleCorners(face.corners, scaleX, scaleY),
+          width: face.width * scaleX,
+          height: face.height * scaleY,
+          depth: thickness * (0.95 + hashLane(shapeSeed, index, 3) * 0.035),
+          yaw: frame.yaw,
+          roll: 0,
+          stableIndex: index,
+          courseIndex: course,
+          cellIndex: baseIndex + cell,
+          heightRatio: face.anchorY / heightScale,
+        }));
+      }
     }
   }
 
@@ -247,7 +423,9 @@ export function packCurvedWall({
       category,
       s,
       y,
-      offsetNormal: straddle,
+      // Dressings sit at an explicit offset from the centreline (a voussoir
+      // ring stands proud of each face); field units only straddle the chord.
+      offsetNormal: straddle + (size.offsetNormal ?? 0),
       packedWidth: size.packedWidth ?? size.width,
       width: size.width,
       height: size.height,
@@ -255,7 +433,7 @@ export function packCurvedWall({
       yaw: frame.yaw,
       roll: size.roll ?? 0,
       stableIndex: index,
-      heightRatio: Math.min(1, y / maxTop),
+      heightRatio: Math.min(1, y / heightScale),
     }));
   };
 
@@ -263,19 +441,37 @@ export function packCurvedWall({
     // One course finishing the wall, rolled to follow the top's own slope so a
     // ramped or irregular wall reads as capped rather than stepped.
     let copingIndex = baseIndex + INDEX_COPING;
+    // The cap is a course too, so it takes the next course index's offset —
+    // otherwise the coping joint would be the one seam still stacking on the
+    // module boundary, right along the most visible edge of the wall.
+    const [copingStart, copingEnd] = courseRange(courses);
+    const copingSpan = copingEnd - copingStart;
+    const copingMidpoint = copingStart + copingSpan / 2;
     const packed = packCourse({
-      span,
+      span: copingSpan,
       targetWidth: Math.min(targetWidth * 1.15, curvatureLimit / WIDTH_SAFETY),
       minWidth: style.minWidth,
       random,
-      forbiddenJoints: previousJoints,
+      // `previousJoints` is kept in absolute arc coordinates so it can be
+      // shared across the split spans of a pierced course; `packCourse` works
+      // in its own span-local frame, so convert on the way in or the coping
+      // silently stops breaking bond with the course beneath it.
+      forbiddenJoints: previousJoints.map((joint) => joint - copingMidpoint),
     });
     for (const stone of packed.stones) {
-      const s = s0 + span / 2 + stone.center;
+      const s = copingMidpoint + stone.center;
       const index = copingIndex;
       copingIndex += 1;
       // A ruined stretch has no crown to cap.
       if (ruinFactorAt(s) > 0.55) continue;
+      // Nor does a stretch the void reaches all the way through — an opening
+      // tall enough to break the crown would otherwise leave coping floating
+      // over thin air, which is exactly what a standalone arcade produces.
+      const crownY = topHeightAt(s) - copingHeight / 2;
+      const pierced = openings.some((opening) => (
+        Math.abs(opening.s - s) <= openingHalfWidthAt(opening, crownY)
+      ));
+      if (pierced) continue;
       const inset = 0.01 + hashLane(shapeSeed, index, 0) * 0.012;
       emitUnit('coping', s, topHeightAt(s) - copingHeight / 2, index, {
         packedWidth: stone.width,
@@ -292,39 +488,57 @@ export function packCurvedWall({
   }
 
   if (topStyle === 'crenellated') {
-    let merlonIndex = baseIndex + INDEX_MERLON;
+    let merlonOrdinal = 0;
     for (const merlon of crenellationsOver(s0, s1)) {
       if (merlon.s < s0 || merlon.s > s1) continue;
-      // Merlons are bonded masonry, not single blocks: short packed courses so
-      // they carry the same joints and jitter as the wall below.
-      const merlonCourses = Math.max(1, Math.round(merlon.height / courseHeight));
-      const merlonCourseHeight = merlon.height / merlonCourses;
-      let merlonJoints = [];
-      for (let course = 0; course < merlonCourses; course += 1) {
-        const y = merlon.base + (course + 0.5) * merlonCourseHeight;
-        const packed = packCourse({
-          span: merlon.width,
-          targetWidth,
-          minWidth: Math.min(style.minWidth, merlon.width * 0.45),
-          random,
-          forbiddenJoints: merlonJoints,
+      // A fixed stride per merlon rather than a running counter: the ornament
+      // emits a variable number of units, so counting them would make every
+      // merlon's shape depend on how the ones before it happened to come out.
+      const merlonIndex = baseIndex + INDEX_MERLON + merlonOrdinal * MERLON_UNIT_STRIDE;
+      merlonOrdinal += 1;
+      // Shaped stones rather than a plain packed block: tapered, bridged back to
+      // the crown, sometimes pierced by an arrow loop, sometimes carrying a
+      // corbel.
+      const ornament = layoutMerlon(merlon, {
+        minWidth: style.minWidth,
+        thickness,
+        seed,
+        index: merlonIndex,
+      });
+      for (let unitIndex = 0; unitIndex < ornament.units.length; unitIndex += 1) {
+        const unit = ornament.units[unitIndex];
+        const index = merlonIndex + unitIndex;
+        const inset = 0.01 + hashLane(shapeSeed, index, 0) * 0.014;
+        emitUnit(unit.category, unit.s, unit.y, index, {
+          packedWidth: unit.width,
+          width: Math.max(0.1, unit.width - inset),
+          height: Math.max(0.1, unit.height - inset * 0.7),
+          depth: unit.depth,
         });
-        merlonJoints = packed.joints;
-        for (const stone of packed.stones) {
-          const index = merlonIndex;
-          merlonIndex += 1;
-          const inset = 0.01 + hashLane(shapeSeed, index, 0) * 0.014;
-          emitUnit('field', merlon.s + stone.center, y, index, {
-            packedWidth: stone.width,
-            width: Math.max(0.1, stone.width - inset),
-            height: Math.max(0.1, merlonCourseHeight - inset * 0.7),
-            depth: thickness * 0.92,
-          });
-        }
       }
     }
   }
 
+  // Dressings last: they are placed against the void, not packed into a course,
+  // and their categories scale the jitter down so they read as worked stone.
+  let dressingIndex = baseIndex + INDEX_DRESSING;
+  for (const opening of openings) {
+    const { jambs, voussoirs, keystone } = layoutOpening(opening, { thickness, minWidth: style.minWidth });
+    for (const unit of [...jambs, ...voussoirs, ...(keystone ? [keystone] : [])]) {
+      if (unit.s < s0 - 0.5 || unit.s > s1 + 0.5) continue;
+      const index = dressingIndex;
+      dressingIndex += 1;
+      emitUnit(unit.category, unit.s, unit.y, index, {
+        width: unit.width,
+        height: unit.height,
+        depth: unit.depth,
+        roll: unit.roll,
+        offsetNormal: unit.offsetNormal,
+      });
+    }
+  }
+
   stats.stones = stones.length;
+  stats.openings = openings.length;
   return { stones: Object.freeze(stones), stats: Object.freeze(stats) };
 }

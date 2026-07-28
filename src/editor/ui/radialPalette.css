@@ -1,0 +1,181 @@
+/*
+ * Radial palette geometry, extracted from the workshop material palette.
+ *
+ * Callers supply colours through a modifier class; the layout lives here so a
+ * second circular menu cannot drift from the first. The one generalisation over
+ * the workshop original is `--ring-radius`, which lets a palette carry more
+ * than one ring.
+ */
+
+.radial-palette {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  translate: -50% -50%;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgb(18 30 24 / 96%) 0 24%,
+    rgb(15 27 21 / 88%) 25% 68%,
+    transparent 69%
+  );
+  box-shadow: 0 14px 40px rgb(0 0 0 / 36%);
+  pointer-events: auto;
+}
+
+.radial-palette__petal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  padding: 4px;
+  translate: -50% -50%;
+  /* Rotate out to the ring, then counter-rotate so the face stays upright. */
+  transform:
+    rotate(var(--angle))
+    translateY(calc(-1 * var(--ring-radius, 79px)))
+    rotate(calc(-1 * var(--angle)));
+  border: 2px solid rgb(255 255 255 / 72%);
+  border-radius: 50%;
+  background: #17251d;
+  box-shadow: 0 3px 8px rgb(0 0 0 / 35%);
+}
+
+.radial-palette__petal span {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgb(255 255 255 / 30%), transparent 28%),
+    var(--petal-color, #38513f);
+  color: #0f1a13;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.radial-palette__petal:hover,
+.radial-palette__petal:focus-visible {
+  scale: 1.14;
+  border-color: #8ff2c8;
+  outline: none;
+}
+
+.radial-palette__center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 45px;
+  height: 45px;
+  translate: -50% -50%;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 50%;
+  color: #eff7ef;
+  background: #263b2f;
+}
+
+.radial-palette__center:hover,
+.radial-palette__center:focus-visible {
+  border-color: #8ff2c8;
+  outline: none;
+}
+
+.radial-palette__footer {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  translate: -50%;
+  padding: 3px 8px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 10px;
+  color: #e8eee7;
+  background: #213329;
+  font-size: 0.65rem;
+}
+
+.radial-palette__footer:hover,
+.radial-palette__footer:focus-visible {
+  border-color: #8ff2c8;
+  outline: none;
+}
+
+/* The construction palette sits over terrain rather than the workshop glade. */
+.radial-palette--construction {
+  border-color: rgb(255 255 255 / 28%);
+  background: radial-gradient(
+    circle,
+    rgb(24 26 34 / 96%) 0 24%,
+    rgb(20 22 30 / 88%) 25% 68%,
+    transparent 69%
+  );
+}
+
+.radial-palette--construction .radial-palette__petal {
+  background: #1d2029;
+}
+
+.radial-palette--construction .radial-palette__center {
+  background: #2c3040;
+}
+
+.radial-palette--construction .radial-palette__footer {
+  background: #262a36;
+}
+
+/* Compact wall inspector opened from the palette's More… footer. */
+.construction-inspector {
+  position: absolute;
+  top: 72px;
+  right: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  width: min(240px, calc(100% - 36px));
+  padding: 14px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  background: rgb(22 24 32 / 94%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 34%);
+  color: #e8ecf4;
+  font: 13px/1.35 "Segoe UI", sans-serif;
+}
+
+.construction-inspector[hidden] {
+  display: none;
+}
+
+.construction-inspector header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.construction-inspector header button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 10%);
+  color: inherit;
+  cursor: pointer;
+}
+
+.construction-inspector label {
+  display: grid;
+  gap: 4px;
+}
+
+.construction-inspector input,
+.construction-inspector select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 8px;
+  background: rgb(12 14 20 / 88%);
+  color: inherit;
+}

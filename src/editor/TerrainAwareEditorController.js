@@ -225,6 +225,19 @@ export class TerrainAwareEditorController extends EditorController {
       ...(this.constructionStore
         ? { constructions: this.constructionStore.toDocument() }
         : {}),
+      ...(this.constructionMaterialStore
+        ? {
+          // GC before serializing: the material document's own normalizer
+          // collects presets nothing in *that document* references, and a
+          // preset used only by a wall record is invisible to it. Projecting
+          // each record's choice into the overrides makes the reference visible
+          // so an imported image survives the round trip.
+          constructionMaterials: (() => {
+            this.constructionMaterialStore.gc(this.constructionStore?.list() ?? []);
+            return this.constructionMaterialStore.toDocument();
+          })(),
+        }
+        : {}),
       ...(this.biomeAssetPalette
         ? {
           visualConfig: {
@@ -244,6 +257,7 @@ export class TerrainAwareEditorController extends EditorController {
   loadDocument(document, { preserveInventory = false } = {}) {
     const previousProceduralAssets = this.proceduralAssetManager?.toDocument() ?? null;
     const previousConstructions = this.constructionStore?.toDocument() ?? null;
+    const previousConstructionMaterials = this.constructionMaterialStore?.toDocument() ?? null;
     const previousBiomeAssets = this.biomeAssetPalette?.toDocument() ?? null;
     const previousSceneSettings = this.sceneSettingsProvider?.() ?? null;
     const previousInventory = this.inventoryStore?.toDocument() ?? null;
@@ -262,6 +276,9 @@ export class TerrainAwareEditorController extends EditorController {
         }
       }
       this.proceduralAssetManager?.replaceAll(document.proceduralAssets ?? []);
+      // Materials load before the records that reference them, so a record's
+      // preset id resolves the moment its geometry is built.
+      this.constructionMaterialStore?.loadDocument(document.constructionMaterials ?? null);
       this.constructionStore?.replaceAll(document.constructions ?? []);
       if (document.visualConfig?.sceneSettings && this.sceneSettingsConsumer) {
         this.sceneSettingsConsumer(document.visualConfig.sceneSettings);
@@ -291,6 +308,9 @@ export class TerrainAwareEditorController extends EditorController {
       }
       if (previousConstructions) {
         this.constructionStore.replaceAll(previousConstructions);
+      }
+      if (previousConstructionMaterials) {
+        this.constructionMaterialStore.loadDocument(previousConstructionMaterials);
       }
       if (previousBiomeAssets) {
         this.biomeAssetPalette.replaceDocument(previousBiomeAssets);

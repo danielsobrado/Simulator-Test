@@ -2,11 +2,13 @@ import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   beveledBox,
+  beveledQuadPrism,
   harmonizeVertexColors,
 } from '../../workshop/ProceduralWorkshopGeometry.js';
 import { stoneJitter } from '../../workshop/ProceduralWorkshopIrregularity.js';
 import { applyUnitShading } from '../../workshop/ProceduralWorkshopMaterials.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
+import { scaleCorners } from '../masonry/CourseLattice.js';
 
 /**
  * Turn module-local stone placements into merged geometry.
@@ -23,6 +25,35 @@ import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
  * than drag that schema across, adapt the construction record to the fields
  * they actually read.
  */
+/**
+ * How much of `stoneJitter`'s in-plane shaping a lattice stone keeps.
+ *
+ * A packed box is an island: resizing it ±10% or rolling it a couple of degrees
+ * just varies the stone, because the mortar gap around it was never meant to
+ * close. A lattice stone is the opposite — it is cut to *share* its corners with
+ * its neighbours, and the same ±10% would open holes several times the width of
+ * the joint. Damped to roughly the size of the mortar inset, the jitter still
+ * reads as hand-laid without unpicking the bond.
+ *
+ * Out-of-plane shaping (rotation X/Y, protrusion, depth) is left at full
+ * strength: it is the strongest silhouette cue in the wall and it cannot open an
+ * in-plane joint.
+ */
+const LATTICE_SHAPE_DAMPING = 0.25;
+const LATTICE_ROLL_DAMPING = 0.3;
+
+/**
+ * Construction stones carry a wider bevel than the workshop default.
+ *
+ * The reference gets its pillowy read from subdividing every extruded polygon.
+ * The equivalent here is the bevel ring, which `05-…md` §5 explicitly allows to
+ * be exaggerated for readability at game scale. Applied as a gain rather than a
+ * fixed value so `stoneJitter`'s per-stone bevel variation survives, and capped
+ * so a stone never rounds off into a pebble.
+ */
+const LATTICE_BEVEL_GAIN = 1.4;
+const LATTICE_BEVEL_MAX = 0.16;
+
 export function constructionRecipe(record) {
   const style = constructionStyle(record.style.key);
   return Object.freeze({
@@ -34,6 +65,27 @@ export function constructionRecipe(record) {
     weathering: 0.25,
     albedo: null,
   });
+}
+
+/** `stoneJitter`'s width and height scaling, damped and applied to the face ring. */
+function dampedCorners(placement, shaped) {
+  const damp = (jittered, nominal) => (
+    1 + ((jittered / nominal) - 1) * LATTICE_SHAPE_DAMPING
+  );
+  return scaleCorners(
+    placement.corners,
+    damp(shaped.width, placement.width),
+    damp(shaped.height, placement.height),
+  );
+}
+
+/** Roll turns in the face plane and can open a joint; the other two cannot. */
+function dampedRotation(nominal, jittered) {
+  return [
+    jittered[0],
+    jittered[1],
+    nominal[2] + (jittered[2] - nominal[2]) * LATTICE_ROLL_DAMPING,
+  ];
 }
 
 /**
@@ -49,12 +101,21 @@ export function buildModuleMasonry(placements, {
   arcTable,
   moduleOrigin,
   groundHeightAt,
+  lodBand = 'near',
 }) {
   const stats = { stones: 0, triangles: 0 };
   if (!placements || placements.length === 0) return { meshes: [], stats };
 
   const style = constructionStyle(record.style.key);
-  const recipe = constructionRecipe(record);
+  const coarse = lodBand === 'coarse';
+  // Coarse: detail 1, halved jitter. Dressings stay in the placement list; the
+  // caller thins field courses before we get here.
+  const detail = coarse ? 1 : style.detail;
+  const recipe = Object.freeze({
+    ...constructionRecipe(record),
+    detail,
+    irregularity: coarse ? style.irregularity * 0.5 : style.irregularity,
+  });
   const geometries = [];
 
   for (const placement of placements) {
@@ -79,7 +140,16 @@ export function buildModuleMasonry(placements, {
     };
     const shaped = stoneJitter(recipe, params, placement.stableIndex, placement.category);
     geometries.push(applyUnitShading(
-      beveledBox({ ...params, ...shaped, detail: style.detail }),
+      placement.corners
+        ? beveledQuadPrism({
+          ...params,
+          ...shaped,
+          corners: dampedCorners(placement, shaped),
+          rotation: dampedRotation(params.rotation, shaped.rotation),
+          bevelRatio: Math.min(LATTICE_BEVEL_MAX, shaped.bevelRatio * LATTICE_BEVEL_GAIN),
+          detail,
+        })
+        : beveledBox({ ...params, ...shaped, detail }),
       recipe,
       {
         stableIndex: placement.stableIndex,

@@ -123,6 +123,159 @@ export function beveledBox({
   );
 }
 
+function polygonArea(ring) {
+  let total = 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const [x0, y0] = ring[index];
+    const [x1, y1] = ring[(index + 1) % ring.length];
+    total += x0 * y1 - x1 * y0;
+  }
+  return total / 2;
+}
+
+function shortestEdgeLength(ring) {
+  let shortest = Infinity;
+  for (let index = 0; index < ring.length; index += 1) {
+    const [x0, y0] = ring[index];
+    const [x1, y1] = ring[(index + 1) % ring.length];
+    shortest = Math.min(shortest, Math.hypot(x1 - x0, y1 - y0));
+  }
+  return shortest;
+}
+
+/**
+ * Offset every edge inward by `radius` and re-intersect the neighbours.
+ *
+ * This is the general form of the per-axis inset `beveledBox` does: the bevel
+ * ring is grown back out by the same radius afterwards, so the finished prism
+ * still measures its nominal size. Returns null on a degenerate ring so the
+ * caller can fall back.
+ */
+function insetRing(ring, radius) {
+  const count = ring.length;
+  const lines = [];
+  for (let index = 0; index < count; index += 1) {
+    const [x0, y0] = ring[index];
+    const [x1, y1] = ring[(index + 1) % count];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const length = Math.hypot(dx, dy);
+    if (!(length > 1e-9)) return null;
+    // The interior lies to the left of travel on a counter-clockwise ring.
+    lines.push({
+      x: x0 + (-dy / length) * radius,
+      y: y0 + (dx / length) * radius,
+      dx: dx / length,
+      dy: dy / length,
+    });
+  }
+  const inset = [];
+  for (let index = 0; index < count; index += 1) {
+    const a = lines[(index + count - 1) % count];
+    const b = lines[index];
+    const cross = a.dx * b.dy - a.dy * b.dx;
+    if (Math.abs(cross) < 1e-6) return null;
+    const t = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / cross;
+    inset.push([a.x + a.dx * t, a.y + a.dy * t]);
+  }
+  return inset;
+}
+
+/** An inset that swallowed the ring flips an edge or collapses the area. */
+function insetSurvived(ring, inset) {
+  if (!(polygonArea(inset) > 1e-8)) return false;
+  for (let index = 0; index < inset.length; index += 1) {
+    const next = (index + 1) % inset.length;
+    const originalX = ring[next][0] - ring[index][0];
+    const originalY = ring[next][1] - ring[index][1];
+    const insetX = inset[next][0] - inset[index][0];
+    const insetY = inset[next][1] - inset[index][1];
+    if (originalX * insetX + originalY * insetY <= 0) return false;
+  }
+  return true;
+}
+
+function scaleAboutCentroid(ring, factor) {
+  let centroidX = 0;
+  let centroidY = 0;
+  for (const [x, y] of ring) {
+    centroidX += x;
+    centroidY += y;
+  }
+  centroidX /= ring.length;
+  centroidY /= ring.length;
+  return ring.map(([x, y]) => [
+    centroidX + (x - centroidX) * factor,
+    centroidY + (y - centroidY) * factor,
+  ]);
+}
+
+/**
+ * A bevelled prism over an arbitrary planar quad.
+ *
+ * `beveledBox`'s profile is a rectangle whose top and bottom edges may shear in
+ * local X. That cannot express a bed joint rising across the stone, nor two head
+ * joints leaning by different amounts — the two things that make laid masonry
+ * read as laid rather than tiled. Four free corners can, which is the
+ * `cornerOffsets` descriptor `04-masonry-and-stone-generation.md` §8 asks for and
+ * `05-…md` §5 sanctions ("8-corner prism; controlled corner offsets; one bevel
+ * ring").
+ *
+ * Callers are expected to hand *the same* corner positions to the two units that
+ * share a joint, so neighbours meet exactly instead of relying on a mortar gap to
+ * hide the mismatch.
+ *
+ * `beveledBox` is deliberately left alone rather than reimplemented on top of
+ * this. Its per-axis inset is not the offset polygon of a sheared rectangle, so
+ * routing it through here would shift every workshop building very slightly for
+ * no gain.
+ *
+ * @param options.corners four `[x, y]` pairs in the unit's own face plane,
+ *   already centred on the unit origin. Winding is fixed up here.
+ */
+export function beveledQuadPrism({
+  corners,
+  depth,
+  position = [0, 0, 0],
+  rotation = [0, 0, 0],
+  detail = 2,
+  bevelRatio = 0.055,
+}) {
+  const ring = corners.map(([x, y]) => [x, y]);
+  if (polygonArea(ring) < 0) ring.reverse();
+
+  const edge = shortestEdgeLength(ring);
+  const radius = Math.max(1e-4, Math.min(edge, depth) * bevelRatio);
+  const offset = insetRing(ring, radius);
+  // A sliver whose inset swallowed itself would hand `ExtrudeGeometry` a
+  // self-intersecting shape, which triangulates into inverted faces. Shrinking
+  // about the centroid instead is always simple and keeps the winding.
+  const profile = offset && insetSurvived(ring, offset)
+    ? offset
+    : scaleAboutCentroid(ring, Math.max(0.3, 1 - (2 * radius) / Math.max(edge, 1e-4)));
+
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0][0], profile[0][1]);
+  for (let index = 1; index < profile.length; index += 1) {
+    shape.lineTo(profile[index][0], profile[index][1]);
+  }
+  shape.closePath();
+
+  const extrusionDepth = Math.max(0.02, depth - radius * 2);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: extrusionDepth,
+    steps: 1,
+    bevelEnabled: true,
+    bevelThickness: radius,
+    bevelSize: radius,
+    bevelSegments: detail >= 3 ? 2 : 1,
+  });
+  geometry.translate(0, 0, -extrusionDepth / 2);
+  return applyWorkshopProjectedUv(
+    transformGeometry(normalizeGeometry(geometry), { position, rotation }),
+  );
+}
+
 export function archedPanel({
   width,
   springHeight,

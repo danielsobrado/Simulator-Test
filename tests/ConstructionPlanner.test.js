@@ -38,6 +38,61 @@ test('construction planning emits stable bounded semantic modules', () => {
   }
 });
 
+test('modules tile the whole wall with no gap between them', () => {
+  // Module intervals used to come from each segment's own sampled points, but
+  // the sampler drops every segment's duplicated first point — so segment n+1
+  // started strictly after segment n ended, and each joint left an unwalled
+  // sliver. It is visible in a finished wall as a vertical gap at every
+  // segment boundary, and nothing inside the masonry packer can close it.
+  const plan = planConstruction(record(), { maxModuleLength: 8 });
+  const intervals = plan.modules.map(({ pathInterval }) => pathInterval);
+  assert.ok(intervals.length > 3);
+
+  assert.ok(Math.abs(intervals[0][0]) < 1e-9, 'the first module must start at the wall start');
+  assert.ok(
+    Math.abs(intervals.at(-1)[1] - plan.totalLength) < 1e-9,
+    'the last module must end at the wall end',
+  );
+  for (let index = 1; index < intervals.length; index += 1) {
+    const gap = intervals[index][0] - intervals[index - 1][1];
+    assert.ok(
+      Math.abs(gap) < 1e-9,
+      `modules ${index - 1} and ${index} leave a ${gap.toFixed(4)} m gap`,
+    );
+  }
+});
+
+test('masonry covers every course from wall start to wall end', () => {
+  const plan = planConstruction(record(), { maxModuleLength: 8 });
+  const courses = new Map();
+  for (const module of plan.modules) {
+    for (const placement of module.placements ?? []) {
+      if (placement.category !== 'field') continue;
+      const key = Math.round(placement.heightRatio * 1e5);
+      if (!courses.has(key)) courses.set(key, []);
+      courses.get(key).push(placement);
+    }
+  }
+  assert.ok(courses.size >= 4, 'the fixture should have several courses');
+  for (const [key, course] of courses) {
+    course.sort((a, b) => a.s - b.s);
+    assert.ok(
+      Math.abs((course[0].s - course[0].packedWidth / 2)) < 1e-6,
+      `course ${key} does not reach the wall start`,
+    );
+    const last = course.at(-1);
+    assert.ok(
+      Math.abs((last.s + last.packedWidth / 2) - plan.totalLength) < 1e-6,
+      `course ${key} does not reach the wall end`,
+    );
+    for (let index = 1; index < course.length; index += 1) {
+      const gap = (course[index].s - course[index].packedWidth / 2)
+        - (course[index - 1].s + course[index - 1].packedWidth / 2);
+      assert.ok(Math.abs(gap) < 1e-6, `course ${key} has a ${gap.toFixed(4)} m hole`);
+    }
+  }
+});
+
 test('module content hashes only change where an anchor edit reaches', () => {
   const source = record();
   const before = planConstruction(source, { maxModuleLength: 8 });

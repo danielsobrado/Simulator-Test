@@ -27,9 +27,31 @@ import {
   applyTopEdit,
   flattenTop,
 } from './construction/masonry/WallTopEdit.js';
+import { createWallTopProfile } from './construction/masonry/WallTopProfile.js';
+import { resolveCutStroke } from './construction/ConstructionCutStroke.js';
 
 /** Commit a raise/lower burst as one history entry once the keys settle. */
 const TOP_EDIT_COMMIT_MS = 250;
+
+const SECONDARY_POINTER_BUTTON = 2;
+/**
+ * Tap-versus-drag thresholds for the right button, mirroring
+ * `POINTER_SELECT_DISTANCE` in the workshop material controller.
+ */
+const POINTER_TAP_DISTANCE = 6;
+const POINTER_TAP_MS = 400;
+
+/** Allocate an opening id that cannot collide with holes left by deletions. */
+function nextOpeningFeatureId(record) {
+  const used = new Set(record.features.map(({ id }) => id));
+  let index = record.features.length + 1;
+  let id = `opening-${record.id}-${index}`;
+  while (used.has(id)) {
+    index += 1;
+    id = `opening-${record.id}-${index}`;
+  }
+  return id;
+}
 
 export class EditorController {
   constructor({
@@ -44,6 +66,7 @@ export class EditorController {
     defaultBrushSize,
     terrainConfig,
     constructionStore = null,
+    constructionMaterialStore = null,
     constructionView = null,
     worldInputBlockedProvider = null,
   }) {
@@ -57,6 +80,7 @@ export class EditorController {
     this.brushSizes = brushSizes;
     this.terrainConfig = terrainConfig;
     this.constructionStore = constructionStore;
+    this.constructionMaterialStore = constructionMaterialStore;
     this.constructionView = constructionView;
     this.worldInputBlockedProvider = worldInputBlockedProvider;
     /**
@@ -68,6 +92,11 @@ export class EditorController {
      * was nothing else to point at.
      */
     this.cameraProvider = null;
+    /** Set by the composition root; the right button falls back to orbit only. */
+    this.constructionPalette = null;
+    /** `() => boolean` — true while paused for editing inside player mode. */
+    this.playerEditingProvider = null;
+    this.rightPointerStart = null;
     this.tool = 'terrain';
     this.terrainMode = 'paint';
     this.selectedTileId = 4;
@@ -83,6 +112,8 @@ export class EditorController {
     this.constructionAnchorDrag = null;
     /** The node under edit, so Delete removes a node rather than the wall. */
     this.selectedAnchorId = null;
+    /** True while an Alt-drag is carving rather than drawing. */
+    this.constructionCutStroke = false;
     /** `{ constructionId, s }` under the pointer, for the raise/lower gesture. */
     this.hoveredArc = null;
     this.constructionTopRadius = TOP_RADIUS_DEFAULT;
@@ -184,6 +215,14 @@ export class EditorController {
 
   selectTool(tool) {
     if (!VALID_EDITOR_TOOLS.includes(tool)) {
+      return;
+    }
+    // While paused inside player mode only construction editing is offered.
+    // Terrain sculpting needs a rethought brush preview from a grazing
+    // first-person view, and object placement needs an elevated-placement
+    // story; neither is what in-world wall editing was asked for.
+    if (this.playerEditingProvider?.() && tool !== 'construction') {
+      this.emitNotice('Only wall building is available while paused in player mode.', true);
       return;
     }
     this.tool = tool;
@@ -477,6 +516,19 @@ export class EditorController {
     if (this.isWorldInputBlocked()) {
       return;
     }
+    // Right-drag is the only orbit control (EditorCamera binds RIGHT to
+    // ROTATE and leaves LEFT null), so a right-click menu has to share the
+    // button rather than take it. Record the press and decide on release:
+    // a tap opens the palette, a drag orbits. Deliberately no preventDefault —
+    // MapControls still needs the event to begin its orbit, and a tap therefore
+    // leaks a few pixels of rotation, which is imperceptible and cheaper than
+    // snapshotting camera state that would desync with damping.
+    if (event.button === SECONDARY_POINTER_BUTTON) {
+      this.rightPointerStart = this.tool === 'construction'
+        ? { x: event.clientX, y: event.clientY, time: event.timeStamp }
+        : null;
+      return;
+    }
     if (event.button !== PRIMARY_POINTER_BUTTON || this.spacePressed) {
       return;
     }
@@ -548,6 +600,17 @@ export class EditorController {
   }
 
   onPointerUp(event) {
+    if (event.button === SECONDARY_POINTER_BUTTON) {
+      const start = this.rightPointerStart;
+      this.rightPointerStart = null;
+      if (!start) return;
+      const travel = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      const elapsed = event.timeStamp - start.time;
+      if (travel <= POINTER_TAP_DISTANCE && elapsed <= POINTER_TAP_MS) {
+        this.openConstructionPalette(event);
+      }
+      return;
+    }
     if (
       event.button === PRIMARY_POINTER_BUTTON
       && (this.constructionDrawing || this.constructionAnchorDrag)
@@ -578,6 +641,56 @@ export class EditorController {
       ? this.terrainView.floatingOrigin.toCanonical(render.x, render.z)
       : render;
     return { x: canonical.x, z: canonical.z };
+  }
+
+  /**
+   * Turn a finished Alt-drag into openings on the walls it touched.
+   *
+   * Each crossing becomes an arch; a stroke that stops against a wall becomes a
+   * door. Repeated strokes stack arches until the field masonry between them is
+   * consumed, which is how a standalone arcade gets built.
+   */
+  commitCutStroke(stroke) {
+    if (!this.constructionStore || stroke.length < 2) return;
+    const records = this.constructionStore.list();
+    const cuts = resolveCutStroke(stroke, records, {
+      arcTableFor: (id) => this.constructionView?.arcTableFor(id) ?? null,
+      heightAt: (record, s) => {
+        const arcTable = this.constructionView?.arcTableFor(record.id);
+        if (!arcTable) return record.dimensions.height;
+        return createWallTopProfile(record, arcTable).heightAt(s);
+      },
+    });
+    if (cuts.length === 0) {
+      this.emitNotice('Draw across a wall to carve an arch, or up to one for a door.', true);
+      return;
+    }
+    let added = 0;
+    for (const cut of cuts) {
+      const record = this.constructionStore.get(cut.constructionId);
+      if (!record) continue;
+      const featureId = nextOpeningFeatureId(record);
+      const change = this.runConstructionCommand({
+        type: 'add_feature',
+        constructionId: cut.constructionId,
+        feature: {
+          id: featureId,
+          kind: cut.kind,
+          segmentId: cut.segmentId,
+          arcFraction: cut.arcFraction,
+          width: cut.width,
+          height: cut.height,
+          sill: 0,
+          profile: 'round',
+          dressed: true,
+        },
+      });
+      if (change) added += 1;
+    }
+    if (added > 0) {
+      this.emitNotice(`Carved ${added} opening${added === 1 ? '' : 's'}.`);
+      this.emitMap();
+    }
   }
 
   /** Insert a node where the pointer meets a wall. Returns true if it landed. */
@@ -664,6 +777,9 @@ export class EditorController {
     this.setSelectedConstruction(null);
     this.constructionStroke = [point];
     this.constructionDrawing = true;
+    // Alt turns the freehand gesture into a cut: the stroke carves openings in
+    // the walls it crosses instead of becoming a wall itself.
+    this.constructionCutStroke = event.altKey;
     this.canvas.setPointerCapture(event.pointerId);
     this.emitState();
   }
@@ -675,6 +791,11 @@ export class EditorController {
       const previous = this.constructionStroke.at(-1);
       if (Math.hypot(point.x - previous.x, point.z - previous.z) >= 0.12) {
         this.constructionStroke.push(point);
+      }
+      if (this.constructionCutStroke) {
+        // A cut is not a wall, so it gets no wall preview. Masonry is never
+        // touched during the drag either — the openings land on commit.
+        return;
       }
       if (this.constructionStroke.length >= 2) {
         try {
@@ -740,9 +861,16 @@ export class EditorController {
     }
     if (this.constructionDrawing) {
       const stroke = this.constructionStroke ?? [];
+      const cutting = this.constructionCutStroke;
       this.constructionDrawing = false;
       this.constructionStroke = null;
+      this.constructionCutStroke = false;
       this.constructionView.clearDraft();
+      if (cutting) {
+        this.commitCutStroke(stroke);
+        this.emitState();
+        return;
+      }
       if (
         stroke.length < 2
         || Math.hypot(stroke.at(-1).x - stroke[0].x, stroke.at(-1).z - stroke[0].z) < 0.5
@@ -1160,6 +1288,30 @@ export class EditorController {
       dirtySegmentIds: Object.freeze([...segments]),
       materialOnly: false,
     }));
+  }
+
+  /**
+   * Open the radial palette on the wall under the cursor.
+   *
+   * Set by the composition root; without one the right button is left entirely
+   * to the camera, which is the correct fallback rather than a broken menu.
+   */
+  openConstructionPalette(event) {
+    if (!this.constructionPalette || !this.constructionView) return;
+    const constructionId = this.constructionView.pickConstruction(
+      event.clientX,
+      event.clientY,
+      this.activeCamera,
+    );
+    if (!constructionId) return;
+    this.setSelectedConstruction(constructionId);
+    this.constructionPalette.open(constructionId, event);
+    this.emitState();
+  }
+
+  /** Live material preview while a palette petal is hovered. */
+  previewConstructionMaterial(constructionId, presetId) {
+    this.constructionView?.setMaterialPreview(constructionId, presetId);
   }
 
   /** Palette action: discard the profile and keep the wall's mean height. */

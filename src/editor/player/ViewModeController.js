@@ -13,6 +13,14 @@ export class ViewModeController {
     this.terrainView = terrainView;
     this.canvas = terrainView.renderer.domElement;
     this.mode = PLAYER_MODE_EDIT;
+    /**
+     * Walking suspended for in-world editing.
+     *
+     * Deliberately a flag rather than a third entry in `PLAYER_MODES`: keeping
+     * the mode set at two means `ViewModeUi`, every `playerMode.css` selector,
+     * the perf harness and every `setMode` caller keep working untouched.
+     */
+    this.paused = false;
     this.awaitingSpawn = false;
     this.spacePressed = false;
     this.listeners = new Set();
@@ -39,9 +47,31 @@ export class ViewModeController {
   getState() {
     return Object.freeze({
       mode: this.mode,
+      paused: this.paused,
       awaitingSpawn: this.awaitingSpawn,
       player: this.playerController.getStatus(),
     });
+  }
+
+  /** Suspend walking so the world can be edited from the player's viewpoint. */
+  pause() {
+    if (this.mode !== PLAYER_MODE_WALK || this.paused) return false;
+    this.paused = true;
+    this.playerController.setPaused(true);
+    // Only wall building is offered while paused; force the construction tool
+    // so a leftover terrain/object tool cannot still paint from first person.
+    this.onPausedEditing?.();
+    this.emit();
+    return true;
+  }
+
+  /** Resume walking. Clicking the viewport re-locks the pointer as before. */
+  resume() {
+    if (!this.paused) return false;
+    this.paused = false;
+    this.playerController.setPaused(false);
+    this.emit();
+    return true;
   }
 
   subscribe(listener) {
@@ -57,6 +87,9 @@ export class ViewModeController {
 
     if (mode === PLAYER_MODE_WALK) {
       if (this.mode === PLAYER_MODE_WALK) {
+        // Already walking, or paused mid-walk: re-entering resumes rather than
+        // respawning, so clicking the viewport puts the player straight back.
+        this.resume();
         if (requestPointerLock) {
           this.playerController.requestPointerLock();
         }
@@ -77,6 +110,7 @@ export class ViewModeController {
     }
 
     this.cancelSpawnSelection();
+    this.resume();
     if (this.mode === PLAYER_MODE_EDIT) {
       return;
     }

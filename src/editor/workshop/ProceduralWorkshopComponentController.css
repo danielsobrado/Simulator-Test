@@ -210,74 +210,10 @@
   pointer-events: none;
 }
 
-.workshop-material-palette {
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  translate: -50% -50%;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(18 30 24 / 96%) 0 24%, rgb(15 27 21 / 88%) 25% 68%, transparent 69%);
-  box-shadow: 0 14px 40px rgb(0 0 0 / 36%);
-  pointer-events: auto;
-}
-
-.workshop-material-palette > [data-preset-id] {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 38px;
-  height: 38px;
-  padding: 4px;
-  translate: -50% -50%;
-  transform: rotate(var(--material-angle)) translateY(-79px) rotate(calc(-1 * var(--material-angle)));
-  border: 2px solid rgb(255 255 255 / 72%);
-  border-radius: 50%;
-  background: #17251d;
-  box-shadow: 0 3px 8px rgb(0 0 0 / 35%);
-}
-
-.workshop-material-palette > [data-preset-id] span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 34% 28%, rgb(255 255 255 / 30%), transparent 28%),
-    var(--material-color);
-}
-
-.workshop-material-palette > [data-preset-id]:hover,
-.workshop-material-palette > [data-preset-id]:focus-visible {
-  scale: 1.14;
-  border-color: #8ff2c8;
-  outline: none;
-}
-
-.workshop-material-reset {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 45px;
-  height: 45px;
-  translate: -50% -50%;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 50%;
-  color: #eff7ef;
-  background: #263b2f;
-}
-
-.workshop-material-more {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  translate: -50%;
-  padding: 3px 8px;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 10px;
-  color: #e8eee7;
-  background: #213329;
-  font-size: 0.65rem;
+/* Palette geometry now lives in src/editor/ui/radialPalette.css; only the
+   workshop's own colours remain here as a modifier. */
+.radial-palette--workshop {
+  border-color: rgb(255 255 255 / 24%);
 }
 
 .workshop-material-inspector {

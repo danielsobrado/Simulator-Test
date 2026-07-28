@@ -63,6 +63,30 @@ test('construction commands provide reversible snapshots and local dirty segment
   assert.equal(store.size, 0);
 });
 
+test('undo of set_material forwards the materialOnly hint', () => {
+  const store = new ConstructionStore();
+  executeConstructionCommand(store, { type: 'create', record: record() });
+  const painted = executeConstructionCommand(store, {
+    type: 'set_material',
+    constructionId: 'construction-1',
+    materials: { stone: 'sandstone-masonry' },
+  });
+  assert.equal(painted.materialOnly, true);
+
+  let emitted = null;
+  store.subscribe((change) => {
+    emitted = change;
+  });
+  store.applyChange(painted, 'undo');
+  assert.equal(emitted.kind, 'history');
+  assert.equal(emitted.hint?.materialOnly, true);
+  assert.equal(store.get('construction-1').style.materials.stone, null);
+
+  store.applyChange(painted, 'redo');
+  assert.equal(emitted.hint?.materialOnly, true);
+  assert.equal(store.get('construction-1').style.materials.stone, 'sandstone-masonry');
+});
+
 test('construction spatial index covers every touched chunk and updates locally', () => {
   const index = new ConstructionSpatialIndex({ chunkWorldSize: 8 });
   const wall = record();

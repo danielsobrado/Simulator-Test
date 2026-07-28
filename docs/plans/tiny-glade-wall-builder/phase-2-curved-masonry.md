@@ -29,6 +29,25 @@ below; this is the summary.
    `ProceduralWorkshopMaterials.js` instead. The preset-texture extraction moves
    to Phase 5, where presets are actually applied.
 
+6. **Modules did not tile the wall** (fixed 2026-07-28, from a screenshot).
+   Module intervals were taken from each segment's own sampled points, but
+   `sampleCubicBezierPath` drops every segment's duplicated first point — so
+   segment *n+1* started strictly after segment *n* ended and **every segment
+   joint left an unwalled sliver**, visible as a vertical gap up the whole wall.
+   This is the same sampler quirk Phase 1 fixed for arc ranges; the module
+   interval computation was simply missed. Intervals now come from the
+   contiguous `segmentRanges`.
+7. **Module boundaries wander per course** (added with the above). Even with the
+   gap closed, modules partition the wall, so every course had to terminate on
+   the same arc position and the shared joint stacked into a continuous vertical
+   line — the one thing coursed masonry never does. The boundary now shifts per
+   course by up to 0.42 stone widths, derived from `(seed, course)` **only** so
+   both modules at a seam compute the same shift and still meet flush. Scaling
+   it by the local `targetWidth` is the trap: that value is curvature-limited
+   per module, so two modules either side of a bend would tear open a gap.
+   Wall ends stay hard edges, and course height plus `heightRatio` are now
+   wall-wide so courses neither step nor weather differently across a seam.
+
 Measured on a 251 m serpentine wall: 45 modules, 2216 stones, 62 048 triangles,
 no budget overflow, shell correctly hidden once every module had geometry.
 
