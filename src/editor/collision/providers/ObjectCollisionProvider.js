@@ -5,6 +5,7 @@ import {
   defaultObjectCollisionProfile,
 } from '../../ObjectCollisionPolicy.js';
 import { collisionChunkKey, parseCollisionChunkKey } from '../CollisionIds.js';
+import { collisionChunkForCanonical } from '../colliders/ColliderBounds.js';
 import { createObjectColliderRecords } from './ObjectColliderTransforms.js';
 
 const OBJECT_COLLISION_SCHEMA = 'objects:v1';
@@ -129,7 +130,13 @@ export class ObjectCollisionProvider {
 
   cellBounds(chunkX, chunkZ) {
     const minX = chunkX * this.cellsPerChunk;
-    const minZ = -(chunkZ + 1) * this.cellsPerChunk;
+    // Cell Z and chunk Z run the same way, because canonical Z already runs
+    // opposite to cell Z (`canonical = -cell * tileSize`) and chunk Z is
+    // mirrored against canonical Z in `collisionChunkCanonicalBounds`. The two
+    // mirrorings cancel. Mirroring again here pointed the cell window at the
+    // opposite half of the world from the chunk's own canonical bounds, so an
+    // object was collected for a chunk whose bounds it could never overlap.
+    const minZ = chunkZ * this.cellsPerChunk;
     return Object.freeze({
       minX,
       minZ,
@@ -165,8 +172,16 @@ export class ObjectCollisionProvider {
       const profile = this.ensureProfile(object.definitionKey);
       const placement = this.placementResolver.resolve(object);
       const center = this.placementResolver.canonicalCenter(placement.bounds);
-      const ownerChunkX = Math.floor(center.x / this.chunkWorldSize);
-      const ownerChunkZ = Math.floor(center.z / this.chunkWorldSize);
+      // The shared helper rather than a local `Math.floor`: this is the same
+      // mapping `CollisionResidency` uses to decide which chunks to load around
+      // the player. Hand-rolling it here got the Z mirroring wrong, so objects
+      // were filed under a chunk that is never resident where the player stands
+      // — colliders present, never loaded, and the player walked through walls.
+      const { chunkX: ownerChunkX, chunkZ: ownerChunkZ } = collisionChunkForCanonical(
+        center.x,
+        center.z,
+        this.chunkWorldSize,
+      );
       if (ownerChunkX !== chunkX || ownerChunkZ !== chunkZ) continue;
 
       ownedSignatures.push(objectProfileSignature(object, profile));
@@ -178,6 +193,10 @@ export class ObjectCollisionProvider {
         placement,
         descriptions: profile.descriptions,
         chunkWorldSize: this.chunkWorldSize,
+        // This chunk is the owner by construction — the filter above is what
+        // let the object through — so hand that decision down rather than let
+        // the records derive a second, possibly different one.
+        ownerChunk: { chunkX: ownerChunkX, chunkZ: ownerChunkZ },
       });
       colliders.push(...records);
       if (!sample && records[0]) {

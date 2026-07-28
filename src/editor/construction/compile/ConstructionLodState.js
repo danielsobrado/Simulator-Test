@@ -113,6 +113,13 @@ export function resolveRequestedLodBand({
     previousVisible
     && candidate !== previousVisible
     && !force
+    // `visibleSince` is 0 when no residence has been recorded yet. Treating that
+    // as "visible since time zero" made the dwell `now - 0`, which against a
+    // `performance.now()` clock that starts at process load meant *every*
+    // transition was suppressed for the first `minimumResidenceMs` of the
+    // process — LOD frozen at whatever it initialised to for the first half
+    // second, and a band flip before then silently ignored.
+    && visibleSince > 0
     && now - visibleSince < transition.minimumResidenceMs
   ) {
     return previousVisible;

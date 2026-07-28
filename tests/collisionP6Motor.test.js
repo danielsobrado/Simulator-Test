@@ -63,11 +63,11 @@ function fixture() {
     tileSize: TILE_SIZE,
     chunkWorldSize: CHUNK_WORLD_SIZE,
   });
-  const built = provider.buildChunkData(0, -1);
+  const built = provider.buildChunkData(0, 0);
   const world = new CollisionWorld({ chunkWorldSize: CHUNK_WORLD_SIZE, binSize: 16 });
   world.replaceOwnerChunk({
     chunkX: 0,
-    chunkZ: -1,
+    chunkZ: 0,
     revision: 1,
     colliders: built.colliders,
   });
@@ -131,5 +131,7 @@ test('the same cottage front remains solid beside the doorway', () => {
 
   assert.equal(result.blocked, true);
   assert.ok(result.position.z > -0.5, `front wall was crossed at z=${result.position.z}`);
-  assert.ok(result.contacts.some((contact) => contact.sourceId.includes('wall-front-left')));
+  // `contacts` is a list of source-id strings — `addUnique(contactIds,
+  // deepest.sourceId)` — not of contact objects.
+  assert.ok(result.contacts.some((sourceId) => sourceId.includes('wall-front-left')));
 });

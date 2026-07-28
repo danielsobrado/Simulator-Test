@@ -6,6 +6,7 @@ import { createObjectCatalog } from '../src/editor/objectCatalogSchema.js';
 import { ObjectPlacementResolver } from '../src/editor/placement/ObjectPlacementResolver.js';
 import { ObjectCollisionProvider } from '../src/editor/collision/providers/ObjectCollisionProvider.js';
 import { FloatingOrigin } from '../src/editor/world/FloatingOrigin.js';
+import { collisionChunkForCanonical } from '../src/editor/collision/colliders/ColliderBounds.js';
 
 const TILE_SIZE = 2;
 const CHUNK_WORLD_SIZE = 128;
@@ -72,65 +73,76 @@ function close(actual, expected) {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 }
 
-test('object provider maps positive cell Z into negative canonical collision chunks', () => {
+test('object chunk ownership matches the window residency loads', () => {
   const { objectMap, provider } = fixture();
   const placed = objectMap.place({ definitionKey: 'wall', x: 0, z: 0, rotation: 0 });
 
-  assert.deepEqual(provider.cellBounds(0, -1), {
+  // Cell Z and chunk Z run together: canonical Z is already mirrored against
+  // cell Z, and `collisionChunkForCanonical` mirrors chunk Z against canonical
+  // Z, so the two cancel. Chunk 0 is cells 0..63, which are canonical -126..0.
+  assert.deepEqual(provider.cellBounds(0, 0), {
     minX: 0,
     maxX: 63,
     minZ: 0,
     maxZ: 63,
   });
-  const built = provider.buildChunkData(0, -1);
+  const built = provider.buildChunkData(0, 0);
   assert.equal(built.colliders.length, 1);
   assert.equal(built.colliders[0].sourceId, `object:${placed.id}:wall`);
   assert.equal(built.colliders[0].ownerChunkX, 0);
-  assert.equal(built.colliders[0].ownerChunkZ, -1);
+  // A wall at canonical z -1 belongs to chunk 0 — the same chunk
+  // `CollisionResidency` loads for a player standing there. Filing it under -1
+  // put its colliders in a chunk that is never resident where the wall is, so
+  // the wall existed but never blocked.
+  assert.equal(built.colliders[0].ownerChunkZ, 0);
   assert.deepEqual(built.colliders[0].position, [1, 6.15, -1]);
-  assert.equal(provider.buildChunkData(0, 0).colliders.length, 0);
+  assert.deepEqual(
+    collisionChunkForCanonical(1, -1, CHUNK_WORLD_SIZE),
+    { chunkX: 0, chunkZ: 0 },
+  );
+  assert.equal(provider.buildChunkData(0, -1).colliders.length, 0);
 });
 
 test('quarter-turn transforms preserve stable IDs and rotate the collider', () => {
   const { objectMap, provider } = fixture();
   const placed = objectMap.place({ definitionKey: 'wall', x: 0, z: 0, rotation: 0 });
-  provider.buildChunkData(0, -1);
-  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:-1']), []);
+  provider.buildChunkData(0, 0);
+  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:0']), []);
 
   const rotated = objectMap.transform(placed.id, { x: 0, z: 0, rotation: 1 });
-  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:-1']), ['0:-1']);
-  const built = provider.buildChunkData(0, -1);
+  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:0']), ['0:0']);
+  const built = provider.buildChunkData(0, 0);
   assert.equal(built.colliders[0].sourceId, `object:${placed.id}:wall`);
   close(built.colliders[0].rotationY, -Math.PI / 2);
   assert.equal(rotated.rotation, 1);
-  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:-1']), []);
+  assert.deepEqual(provider.consumeDirtyOwnerChunks(['0:0']), []);
 });
 
 test('remove, undo, redo, and save/load rebuild only content signatures', () => {
   const { objectMap, provider } = fixture();
   const before = objectMap.place({ definitionKey: 'wall', x: 0, z: 0, rotation: 0 });
-  const initial = provider.buildChunkData(0, -1);
+  const initial = provider.buildChunkData(0, 0);
   const initialIds = initial.colliders.map((collider) => collider.sourceId);
 
   const after = objectMap.transform(before.id, { x: 2, z: 0, rotation: 1 });
-  const transformed = provider.buildChunkData(0, -1);
+  const transformed = provider.buildChunkData(0, 0);
   assert.notEqual(transformed.signature, initial.signature);
 
   const change = Object.freeze({ before, after });
   objectMap.applyChange(change, 'undo');
-  const undone = provider.buildChunkData(0, -1);
+  const undone = provider.buildChunkData(0, 0);
   assert.equal(undone.signature, initial.signature);
   assert.deepEqual(undone.colliders.map((collider) => collider.sourceId), initialIds);
 
   objectMap.applyChange(change, 'redo');
-  assert.equal(provider.buildChunkData(0, -1).signature, transformed.signature);
+  assert.equal(provider.buildChunkData(0, 0).signature, transformed.signature);
 
   const document = objectMap.toDocument();
-  const saved = provider.buildChunkData(0, -1);
+  const saved = provider.buildChunkData(0, 0);
   objectMap.clear();
-  assert.equal(provider.buildChunkData(0, -1).colliders.length, 0);
+  assert.equal(provider.buildChunkData(0, 0).colliders.length, 0);
   objectMap.loadDocument(document);
-  const loaded = provider.buildChunkData(0, -1);
+  const loaded = provider.buildChunkData(0, 0);
   assert.equal(loaded.signature, saved.signature);
   assert.deepEqual(
     loaded.colliders.map((collider) => collider.sourceId),

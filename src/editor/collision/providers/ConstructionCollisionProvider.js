@@ -1,6 +1,7 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import { createCollisionSourceId, collisionChunkKey, parseCollisionChunkKey } from '../CollisionIds.js';
 import { COLLISION_LAYERS } from '../CollisionLayers.js';
+import { collisionChunkForCanonical } from '../colliders/ColliderBounds.js';
 import { COLLIDER_TYPE_BOX, createPrimitiveCollider } from '../colliders/ColliderRecords.js';
 
 const CONSTRUCTION_COLLISION_SCHEMA = 'constructions:v1';
@@ -11,11 +12,16 @@ function heightAt(terrainView, x, z) {
   return Number.isFinite(value) ? value : 0;
 }
 
+/**
+ * Owner chunk for a canonical point.
+ *
+ * Delegates to the shared helper rather than repeating the arithmetic: canonical
+ * Z is mirrored against chunk Z, and the local copy this replaced omitted the
+ * mirroring. It agreed with the residency window only for walls sitting exactly
+ * on z 0, which is why the fixtures never caught it.
+ */
 function ownerFor(x, z, chunkWorldSize) {
-  return {
-    chunkX: Math.floor(x / chunkWorldSize),
-    chunkZ: Math.floor(z / chunkWorldSize),
-  };
+  return collisionChunkForCanonical(x, z, chunkWorldSize);
 }
 
 function createRecord(constructionId, box, terrainView, chunkWorldSize) {
@@ -51,7 +57,11 @@ function createRecord(constructionId, box, terrainView, chunkWorldSize) {
       maxZ: box.bounds.maxZ,
     },
     position: [box.center[0], bottom + colliderHeight / 2, box.center[1]],
-    rotationY: Math.atan2(-box.tangent[1], box.tangent[0]),
+    // `+ 0` normalises the negative zero. A wall running along +X has
+    // `tangent[1] === 0`, so the negation hands `atan2` a -0 and it returns -0 —
+    // arithmetically identical to 0 but not `Object.is` equal to it, which makes
+    // an axis-aligned wall's rotation compare unequal to the 0 it should be.
+    rotationY: Math.atan2(-box.tangent[1], box.tangent[0]) + 0,
     dimensions: [box.length, colliderHeight, box.thickness],
     prototypeId: `construction:${constructionId}:${box.segmentId}`,
   });

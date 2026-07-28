@@ -61,6 +61,33 @@ test('residence time delays band change', () => {
   }), true);
 });
 
+test('a module with no recorded residence may change band immediately', () => {
+  // `visibleSince` is 0 until a transition records one. Reading that as
+  // "visible since time zero" made the dwell `now - 0`, and against
+  // `performance.now()` — which starts at process load — that suppressed every
+  // band change for the first `minimumResidenceMs` of the process.
+  assert.equal(resolveRequestedLodBand({
+    pixels: 4000,
+    previousVisible: 'shell',
+    now: 185,
+    visibleSince: 0,
+    styleKey: 'coursed-rubble',
+  }), 'near', 'a first transition has nothing to thrash against');
+});
+
+test('residence still holds a band once one has been recorded', () => {
+  const args = {
+    pixels: 4000,
+    previousVisible: 'shell',
+    visibleSince: 1000,
+    styleKey: 'coursed-rubble',
+  };
+  // Within the dwell the previous band wins; past it the candidate does. This
+  // is the anti-thrash the zero check must not disable.
+  assert.equal(resolveRequestedLodBand({ ...args, now: 1100 }), 'shell');
+  assert.equal(resolveRequestedLodBand({ ...args, now: 9000 }), 'near');
+});
+
 test('selection forces near via resolveRequestedLodBand', () => {
   assert.equal(resolveRequestedLodBand({
     pixels: 10,

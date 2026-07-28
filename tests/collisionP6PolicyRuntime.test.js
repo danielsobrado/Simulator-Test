@@ -60,14 +60,14 @@ test('triggers remain queryable but do not block, and decorative objects emit no
     chunkWorldSize: 128,
   });
 
-  const built = provider.buildChunkData(0, -1);
+  const built = provider.buildChunkData(0, 0);
   assert.equal(built.stats.trigger, 1);
   assert.equal(built.stats.none, 1);
   assert.equal(built.colliders.length, 1);
   assert.equal(built.colliders[0].layers, COLLISION_LAYERS.trigger);
 
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
-  world.replaceOwnerChunk({ chunkX: 0, chunkZ: -1, revision: 1, colliders: built.colliders });
+  world.replaceOwnerChunk({ chunkX: 0, chunkZ: 0, revision: 1, colliders: built.colliders });
   assert.equal(world.collectCandidates(built.colliders[0].aabb, COLLISION_LAYERS.solid, []).length, 0);
   assert.equal(world.collectCandidates(built.colliders[0].aabb, COLLISION_LAYERS.trigger, []).length, 1);
 });
