@@ -177,7 +177,7 @@ function faceHeight(corners) {
 
 test('coarse placements remain covered by matching backing', () => {
   const { placements } = packStraight();
-  const coarse = coarsePlacements(placements);
+  const coarse = coarsePlacements(placements, { styleKey: 'coursed-rubble' });
   assert.ok(coarse.length > 0);
   assert.ok(coarse.length < placements.length);
 
@@ -210,22 +210,12 @@ test('coarse placements remain covered by matching backing', () => {
       config: CONSTRUCTION_MORTAR_CONFIG,
     });
     assert.ok(descriptor, 'every coarse stone gets backing');
-    // Prefer covering the resolved stone. When near mortarCorners are still
-    // present (pre–coarse amplification), they may be shorter than a stretched
-    // coarse face — still require the backing to cover that footprint.
-    const mortarHeight = faceHeight(descriptor.corners);
-    const stoneHeight = faceHeight(stoneShape.corners);
-    if (placement.mortarCorners && mortarHeight + 1e-6 < stoneHeight) {
-      assert.ok(
-        mortarHeight + 1e-6 >= faceHeight(placement.mortarCorners),
-        'backing must cover the authoritative mortar footprint',
-      );
-    } else {
-      assert.ok(
-        mortarHeight + 1e-6 >= stoneHeight,
-        'backing must be at least as tall as the resolved stone face',
-      );
-    }
+    // Stretched + amplified coarse stones keep a taller face ring; backing must
+    // cover the resolved stone when mortarCorners were merged/stretched too.
+    assert.ok(
+      faceHeight(descriptor.corners) + 1e-6 >= faceHeight(stoneShape.corners),
+      'backing must be at least as tall as the resolved stone face',
+    );
     descriptors.push(descriptor);
   }
   assert.equal(descriptors.length, coarse.length);

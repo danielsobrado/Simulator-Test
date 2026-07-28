@@ -126,3 +126,130 @@ test('an orthographic camera still yields a usable size', () => {
   });
   assert.equal(selectConstructionLod({ pixels: zoomed }), 'near');
 });
+
+function rect(halfW, halfH) {
+  return [
+    [-halfW, -halfH],
+    [halfW, -halfH],
+    [halfW, halfH],
+    [-halfW, halfH],
+  ];
+}
+
+function bounds(corners) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  return { width: maxX - minX, height: maxY - minY };
+}
+
+test('split leaves merge into one coarse block with outer mortar footprint', () => {
+  // Leaf-local mortar rings: at s=±0.25 they cover world [-0.5,0] and [0,0.5].
+  const leafMortar = rect(0.25, 0.25);
+  const leafStone = rect(0.23, 0.23);
+  const near = [
+    {
+      category: 'field',
+      cellIndex: 7,
+      courseIndex: 0,
+      s: -0.25,
+      y: 0.5,
+      width: 0.46,
+      height: 0.46,
+      corners: leafStone,
+      mortarCorners: leafMortar,
+      jointWidths: { head: 0.04, bed: 0.04 },
+      packedWidth: 0.5,
+    },
+    {
+      category: 'field',
+      cellIndex: 7,
+      courseIndex: 0,
+      s: 0.25,
+      y: 0.5,
+      width: 0.46,
+      height: 0.46,
+      corners: leafStone,
+      mortarCorners: leafMortar,
+      jointWidths: { head: 0.04, bed: 0.04 },
+      packedWidth: 0.5,
+    },
+  ];
+
+  const coarse = coarsePlacements(near, { styleKey: 'coursed-rubble' });
+  const field = coarse.filter((stone) => stone.category === 'field');
+  assert.equal(field.length, 1);
+  const stone = field[0];
+  assert.ok(stone.mortarCorners);
+  const mortarW = bounds(stone.mortarCorners).width;
+  assert.ok(Math.abs(mortarW - 1) < 1e-6, `merged mortar width ${mortarW}`);
+  assert.ok(bounds(stone.corners).width < mortarW - 0.01);
+});
+
+test('soft limestone coarse joints amplify once from near placements', () => {
+  const mortarCorners = rect(0.55, 0.28);
+  const nearHead = 0.032;
+  const nearBed = 0.024;
+  const placement = {
+    category: 'field',
+    cellIndex: 1,
+    courseIndex: 0,
+    s: 1,
+    y: 0.5,
+    width: 1.1 - nearHead,
+    height: 0.56 - nearBed,
+    corners: scaleCornersForTest(mortarCorners, 1 - nearHead / 1.1, 1 - nearBed / 0.56),
+    mortarCorners,
+    jointWidths: { head: nearHead, bed: nearBed },
+    packedWidth: 1.1,
+  };
+  // Second course so stretch runs; use identical horizontal footprint.
+  const above = {
+    ...placement,
+    courseIndex: 1,
+    y: 1.1,
+    cellIndex: 2,
+  };
+  const near = [placement, above];
+  const snapshot = structuredClone(near);
+  const coarse = coarsePlacements(near, { styleKey: 'soft-limestone-rubble' });
+  assert.deepEqual(near, snapshot, 'near placements stay immutable');
+
+  const field = coarse.filter((stone) => stone.category === 'field');
+  assert.equal(field.length, 1);
+  const stone = field[0];
+  assert.ok(Math.abs(stone.jointWidths.head - nearHead * 1.2) < 1e-9);
+  assert.ok(Math.abs(stone.jointWidths.bed - nearBed * 1.2) < 1e-9);
+
+  const again = coarsePlacements(near, { styleKey: 'soft-limestone-rubble' });
+  assert.deepEqual(again, coarse);
+
+  const mortar = bounds(stone.mortarCorners);
+  const visible = bounds(stone.corners);
+  assert.ok(Math.abs((mortar.width - visible.width) - stone.jointWidths.head) < 0.02);
+  assert.ok(visible.width + 1e-9 >= 0.12);
+  assert.ok(visible.height + 1e-9 >= 0.08);
+});
+
+function scaleCornersForTest(corners, scaleX, scaleY) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  return corners.map(([x, y]) => [cx + (x - cx) * scaleX, cy + (y - cy) * scaleY]);
+}

@@ -496,7 +496,9 @@ export class ConstructionView {
     // build is full detail until the camera has had a frame to classify it.
     const lodBand = resident.band === 'coarse' ? 'coarse' : 'near';
     const source = module.placements ?? [];
-    const placements = lodBand === 'coarse' ? coarsePlacements(source) : source;
+    const placements = lodBand === 'coarse'
+      ? coarsePlacements(source, { styleKey: entry.record.style?.key })
+      : source;
     const built = placements.length
       ? buildModuleMasonry(placements, {
         record: entry.record,

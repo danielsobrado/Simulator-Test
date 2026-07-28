@@ -1,4 +1,5 @@
 import { projectedPixelHeight, selectProjectedLod } from '../../stylized/lod/projectedLod.js';
+import { constructionJointProfile } from '../config/ConstructionJointProfiles.generated.js';
 import { scaleCorners } from '../masonry/CourseLattice.js';
 
 /**
@@ -86,6 +87,44 @@ const CORNER_DIRECTIONS = [
   [-1, 1], // top-left
 ];
 
+function cornerBounds(corners) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function mergeCornerRing(group, key, s, y) {
+  if (!group.every((leaf) => Array.isArray(leaf[key]))) return null;
+  const world = CORNER_DIRECTIONS.map(([alongS, alongY], slot) => {
+    let best = null;
+    for (const leaf of group) {
+      const point = [leaf.s + leaf[key][slot][0], leaf.y + leaf[key][slot][1]];
+      if (!best
+        || point[0] * alongS > best[0] * alongS + 1e-12
+        || (Math.abs(point[0] - best[0]) <= 1e-12 && point[1] * alongY > best[1] * alongY)) {
+        best = point;
+      }
+    }
+    return best;
+  });
+  return world.map(([cornerS, cornerY]) => [cornerS - s, cornerY - y]);
+}
+
 /**
  * Put the leaves of one split cell back into the single stone they were cut from.
  *
@@ -127,11 +166,23 @@ function mergeCellLeaves(group) {
     (best, leaf) => (leaf.width * leaf.height > best.width * best.height ? leaf : best),
     group[0],
   );
+
+  const mergedStoneCorners = corners.map(([cornerS, cornerY]) => [cornerS - s, cornerY - y]);
+  const mergedMortarCorners = mergeCornerRing(group, 'mortarCorners', s, y);
+
+  // Joint widths on the merged cell: keep the dominant leaf's near widths so
+  // coarse amplification has a stable base (internal split joints disappear).
+  const jointWidths = dominant.jointWidths
+    ? { ...dominant.jointWidths }
+    : undefined;
+
   return {
     ...dominant,
     s,
     y,
-    corners: corners.map(([cornerS, cornerY]) => [cornerS - s, cornerY - y]),
+    corners: mergedStoneCorners,
+    ...(mergedMortarCorners ? { mortarCorners: mergedMortarCorners } : {}),
+    ...(jointWidths ? { jointWidths } : {}),
     width: maxS - minS,
     height: maxY - minY,
     packedWidth: maxS - minS,
@@ -161,13 +212,62 @@ function mergeSplitCells(field) {
 function stretchOverGap(placement, step) {
   if (!(step > 0)) return placement;
   const height = placement.height + step;
+  const scaleY = height / placement.height;
   return {
     ...placement,
     y: placement.y + step / 2,
     height,
     ...(placement.corners
-      ? { corners: scaleCorners(placement.corners, 1, height / placement.height) }
+      ? { corners: scaleCorners(placement.corners, 1, scaleY) }
       : {}),
+    ...(placement.mortarCorners
+      ? { mortarCorners: scaleCorners(placement.mortarCorners, 1, scaleY) }
+      : {}),
+  };
+}
+
+/**
+ * Widen coarse joints from the authoritative mortar footprint.
+ *
+ * Always derived from near placements + multiplier once — never mutates the
+ * near source, so near → coarse → near returns identical near geometry.
+ */
+export function amplifyCoarseJoints(placement, profile) {
+  if (!placement.corners || !placement.jointWidths || !placement.mortarCorners) {
+    return placement;
+  }
+
+  const multiplier = profile.coarseLodMultiplier;
+  if (!(multiplier > 1)) {
+    return placement;
+  }
+
+  const mortarBounds = cornerBounds(placement.mortarCorners);
+  if (!(mortarBounds.width > 0) || !(mortarBounds.height > 0)) {
+    return placement;
+  }
+
+  const extraHead = placement.jointWidths.head * (multiplier - 1);
+  const extraBed = placement.jointWidths.bed * (multiplier - 1);
+
+  const maximumHead = Math.max(0, mortarBounds.width - profile.minimumRenderedWidth);
+  const maximumBed = Math.max(0, mortarBounds.height - profile.minimumRenderedHeight);
+
+  const finalHead = Math.min(placement.jointWidths.head + extraHead, maximumHead);
+  const finalBed = Math.min(placement.jointWidths.bed + extraBed, maximumBed);
+
+  const scaleX = Math.max(0.01, 1 - finalHead / mortarBounds.width);
+  const scaleY = Math.max(0.01, 1 - finalBed / mortarBounds.height);
+
+  return {
+    ...placement,
+    corners: scaleCorners(placement.mortarCorners, scaleX, scaleY),
+    width: mortarBounds.width * scaleX,
+    height: mortarBounds.height * scaleY,
+    jointWidths: {
+      head: finalHead,
+      bed: finalBed,
+    },
   };
 }
 
@@ -180,8 +280,11 @@ function stretchOverGap(placement, step) {
  * Courses are keyed on `courseIndex` where the lattice supplies one. Bucketing on
  * `y` stopped being sound once bed joints ramp: two stones in the same course sit
  * at different heights, and near a wall top they can be a whole bucket apart.
+ *
+ * @param placements near-authoritative placements (never mutated)
+ * @param options.styleKey masonry style for joint amplification
  */
-export function coarsePlacements(placements) {
+export function coarsePlacements(placements, { styleKey = null } = {}) {
   if (!Array.isArray(placements) || placements.length === 0) return placements ?? [];
   const field = [];
   const rest = [];
@@ -205,12 +308,16 @@ export function coarsePlacements(placements) {
   );
   const ordered = [...courses.values()].sort((a, b) => meanY(a) - meanY(b));
 
+  const jointProfile = constructionJointProfile(styleKey);
   const merged = [];
   for (let index = 0; index < ordered.length; index += 2) {
     const course = ordered[index];
     const above = ordered[index + 1];
     const step = above ? Math.max(0, meanY(above) - meanY(course)) : 0;
-    for (const placement of course) merged.push(stretchOverGap(placement, step));
+    for (const placement of course) {
+      const stretched = stretchOverGap(placement, step);
+      merged.push(amplifyCoarseJoints(stretched, jointProfile));
+    }
   }
   return [...rest, ...merged];
 }

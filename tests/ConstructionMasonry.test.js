@@ -14,7 +14,6 @@ import {
   createCubicBezierPathFromStroke,
   sampleCubicBezierPath,
 } from '../src/editor/construction/curve/CubicBezierPath.js';
-import { mixSeed } from '../src/editor/workshop/ProceduralRandom.js';
 import { constructionJointProfile } from '../src/editor/construction/config/ConstructionJointProfiles.generated.js';
 
 const STYLE = constructionStyle('coursed-rubble');
