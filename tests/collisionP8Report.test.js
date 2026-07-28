@@ -104,7 +104,8 @@ test('collision QA report uses per-frame deltas and exposes required counts', ()
   assert.equal(report.version, 2);
   assert.equal(report.collision.enabled, true);
   assert.equal(report.collision.timingsMs.total.samples, 3);
-  assert.equal(report.collision.timingsMs.total.p95Ms, 0.58);
+  assert.equal(report.collision.timingsMs.total.p95Ms, 0.6);
+  assert.equal(report.collision.timingsMs.chunkBuild.p95Ms, 0.36);
   assert.equal(report.collision.counts.candidates, 42);
   assert.equal(report.collision.counts.activePrimitiveColliders, 30);
   assert.equal(report.collision.counts.prototypeBvhs, 1);
