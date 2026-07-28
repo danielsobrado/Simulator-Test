@@ -57,6 +57,7 @@ function validConfig() {
         durationSeconds: 2,
         speed: 'run',
         minimumCounts: {},
+        minimumProviderComponents: {},
         coverage: ['open-ground-run'],
       },
     ],
@@ -68,6 +69,11 @@ test('repository collision acceptance config is valid and keeps release coverage
     path.join(root, 'config', 'collision-acceptance.yaml'),
   );
   const baseline = config.cases.find((entry) => entry.id === config.baselineCase);
+  const tree = config.cases.find((entry) => entry.id === 'production-tree-trunk');
+  const blockingRock = config.cases.find((entry) => entry.id === 'production-blocking-rock');
+  const walkableRock = config.cases.find((entry) => entry.id === 'walkable-rock-bvh');
+  const object = config.cases.find((entry) => entry.id === 'placed-object-doorway');
+  const construction = config.cases.find((entry) => entry.id === 'construction-wall');
   const fullStack = config.cases.find((entry) => entry.id === 'full-stack-chunk-crossing');
 
   assert.equal(config.version, 1);
@@ -77,6 +83,12 @@ test('repository collision acceptance config is valid and keeps release coverage
   assert.equal(baseline.collisionRequired, false);
   assert.equal(baseline.compareFrameToBaseline, false);
   assert.deepEqual(baseline.minimumCounts, {});
+  assert.deepEqual(baseline.minimumProviderComponents, {});
+  assert.deepEqual(tree.minimumProviderComponents, { trees: { colliders: 1 } });
+  assert.deepEqual(blockingRock.minimumProviderComponents, { rocks: { blocking: 1 } });
+  assert.deepEqual(walkableRock.minimumProviderComponents, { rocks: { walkable: 1 } });
+  assert.deepEqual(object.minimumProviderComponents, { objects: { colliders: 1 } });
+  assert.deepEqual(construction.minimumProviderComponents, { constructions: { colliders: 1 } });
   assert.equal(fullStack.compareFrameToBaseline, false);
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
   assert.deepEqual(config.requiredCoverage, REQUIRED_RELEASE_COVERAGE);
@@ -151,6 +163,22 @@ test('config validation rejects unknown minimum-count fields', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /not a supported collision count/,
+  );
+});
+
+test('config validation rejects unknown provider components and metrics', () => {
+  const unknownComponent = validConfig();
+  unknownComponent.cases[0].minimumProviderComponents = { wildlife: { colliders: 1 } };
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(unknownComponent),
+    /not a supported collision provider component/,
+  );
+
+  const unknownMetric = validConfig();
+  unknownMetric.cases[0].minimumProviderComponents = { trees: { leaves: 1 } };
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(unknownMetric),
+    /not a supported provider metric/,
   );
 });
 
