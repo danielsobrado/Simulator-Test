@@ -1,8 +1,10 @@
+import { constructionCollisionSource } from './providers/ConstructionCollisionSource.js';
+
 let currentPlayer = null;
 let currentConfig = null;
 let currentNaturalSource = null;
 let currentObjectSource = null;
-let currentConstructionSource = null;
+let currentConstructionSource = constructionCollisionSource;
 const listeners = new Set();
 
 function composition() {
@@ -81,7 +83,7 @@ export function registerCollisionConstructionSource(source) {
   publish();
   return () => {
     if (currentConstructionSource !== source) return;
-    currentConstructionSource = null;
+    currentConstructionSource = constructionCollisionSource;
     publish();
   };
 }
