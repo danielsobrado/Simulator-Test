@@ -10,7 +10,10 @@ const source = await readFile(
 test('medium and higher tiers derive opacity from semantic water depth', () => {
   assert.match(source, /const waterDepth = max\(waterField\.b, 0\);/);
   assert.match(source, /if \(quality\.depthOptics\)/);
-  assert.match(source, /const opticalDistance = min\(/);
+  // Assignment, not declaration: `opticalDistance` is declared `let` outside the
+  // `depthOptics` branch so the legacy path can still read it, and only assigned
+  // in here.
+  assert.match(source, /\n\s*opticalDistance = min\(/);
   assert.match(
     source,
     /const transmission = exp\(opticalDistance\.mul\(-optics\.absorptionDensity\)\);/,

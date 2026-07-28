@@ -9,7 +9,10 @@ const source = await readFile(
 
 test('water acceptance runner requires hardware WebGPU by default', () => {
   assert.match(source, /Hardware WebGPU adapter required/);
-  assert.match(source, /--allow-software/);
+  // The flag name without its dashes: `hasFlag` prepends them, so the literal
+  // `--allow-software` never appears in the source even though that is the
+  // switch the runner accepts.
+  assert.match(source, /hasFlag\('allow-software'\)/);
   assert.match(source, /performanceAuthoritative/);
 });
 
