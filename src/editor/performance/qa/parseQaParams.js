@@ -110,6 +110,18 @@ const SCENARIOS = Object.freeze({
       yawDegrees: 0,
     },
   },
+  'collision-p8': {
+    id: 'collision-p8',
+    label: 'Collision P8 streaming and performance gate',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 12,
+      speed: 'run',
+      warmup: 10,
+      spawn: { x: 0, z: 0 },
+      yawDegrees: 0,
+    },
+  },
 });
 
 function readNumber(params, key, fallback) {
