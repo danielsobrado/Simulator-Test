@@ -64,7 +64,7 @@ Every raw JSON report records the hardware adapter, configured viewport, and mat
 npm run qa:collision:release
 ```
 
-The release command applies the same runtime checks and additionally requires coverage for every P8 scenario listed in the implementation plan.
+The release command applies the same runtime checks and additionally requires coverage for every P8 scenario and definition-of-done item listed in the implementation plan.
 
 The two gates are intentionally different:
 
@@ -101,7 +101,9 @@ The plan currently requires additional deterministic scenarios for:
 - dense object-town traversal;
 - a long curved-wall route;
 - floating-origin rebase during movement;
-- nearby construction edit and collision rebuild.
+- nearby construction edit and collision rebuild;
+- a collision-chunk unload and reload cycle proving colliders and prototype resources do not grow;
+- a minimum 10-minute soak covering streaming, movement, and collision stability.
 
 These remain visible in `report.json`, `report.md`, and the command exit status.
 
@@ -139,6 +141,6 @@ Collision may be considered for default-on only after all of the following are t
 1. `npm test`, production asset validation, and `npm run build` pass.
 2. `npm run qa:collision:release` passes on representative hardware.
 3. Repeated reports use a consistent hardware adapter.
-4. The P8 scenario coverage list is complete.
+4. The P8 scenario coverage list is complete, including unload/reload and soak evidence.
 5. The measured p95 target is accepted or revised with documented A/B evidence.
 6. The architecture document reflects the final implementation.
