@@ -1,10 +1,11 @@
 import path from 'node:path';
 
 export function resolveQaOutputDirectory(root, requestedPath, defaultName) {
-  const temporaryRoot = path.resolve(root, 'tmp');
-  const outputDirectory = path.resolve(
-    requestedPath ?? path.join(temporaryRoot, defaultName),
-  );
+  const repositoryRoot = path.resolve(root);
+  const temporaryRoot = path.join(repositoryRoot, 'tmp');
+  const outputDirectory = requestedPath == null
+    ? path.join(temporaryRoot, defaultName)
+    : path.resolve(repositoryRoot, requestedPath);
   const relative = path.relative(temporaryRoot, outputDirectory);
   const outsideTemporaryRoot = relative === '..'
     || relative.startsWith(`..${path.sep}`)
