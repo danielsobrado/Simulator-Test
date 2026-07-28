@@ -43,7 +43,7 @@ function field({
     },
     ruin: {
       damageVoid,
-      clusterId: damageVoid ? 7 : null,
+      clusterId: damageVoid ? 'cluster:test' : null,
     },
   };
 }
@@ -93,4 +93,13 @@ test('coarse stretching is local and does not fill a horizontal ruin void', () =
   const right = coarse.find(({ stableIndex }) => stableIndex === lowerRight.stableIndex);
   assert.ok(left.height > lowerLeft.height, 'covered left stone should stretch');
   assert.equal(right.height, lowerRight.height, 'uncovered right stone must preserve the void');
+});
+
+test('partial upper-course coverage does not stretch over the uncovered portion', () => {
+  const lower = field({ id: 1, courseIndex: 0, s: 0.5, y: 0.2, width: 1 });
+  const upper = field({ id: 2, courseIndex: 1, s: 0.4, y: 0.6, width: 0.8 });
+  const coarse = coarsePlacements([lower, upper], { styleKey: 'coursed-rubble' });
+  const kept = coarse.find(({ stableIndex }) => stableIndex === lower.stableIndex);
+  assert.equal(kept.height, lower.height);
+  assert.equal(kept.y, lower.y);
 });
