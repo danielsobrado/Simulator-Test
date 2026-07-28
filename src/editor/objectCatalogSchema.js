@@ -1,3 +1,8 @@
+import {
+  OBJECT_COLLISION_POLICIES,
+  defaultObjectCollisionPolicy,
+} from './ObjectCollisionPolicy.js';
+
 const REQUIRED_STRING_FIELDS = Object.freeze(['key', 'label', 'icon', 'category', 'color', 'model']);
 const FOUNDATION_MODES = new Set(['conform', 'terrace']);
 
@@ -35,6 +40,49 @@ function createFoundation(rawFoundation, rawDefinition) {
     maxDepth: rawFoundation.maxDepth,
     alignToNormal: rawFoundation.alignToNormal,
     color: rawFoundation.color,
+  });
+}
+
+function createVector(raw, fallback, key, field, positive) {
+  const source = raw ?? fallback;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    throw new Error(`Object ${key} has an invalid collision ${field}.`);
+  }
+  const vector = {};
+  for (const axis of ['x', 'y', 'z']) {
+    const value = source[axis];
+    if (!Number.isFinite(value) || (positive && value <= 0)) {
+      throw new Error(`Object ${key} has an invalid collision ${field}.${axis}.`);
+    }
+    vector[axis] = value;
+  }
+  return Object.freeze(vector);
+}
+
+function createCollision(rawCollision, rawDefinition) {
+  const key = rawDefinition.key;
+  const raw = rawCollision ?? {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`Object ${key} has an invalid collision configuration.`);
+  }
+  const policy = raw.policy ?? defaultObjectCollisionPolicy(rawDefinition);
+  if (!OBJECT_COLLISION_POLICIES.has(policy)) {
+    throw new Error(`Object ${key} has an invalid collision policy.`);
+  }
+  if (raw.profile !== undefined
+      && (typeof raw.profile !== 'string' || raw.profile.trim() === '')) {
+    throw new Error(`Object ${key} has an invalid collision profile.`);
+  }
+  if (raw.allowFootprintOverflow !== undefined
+      && typeof raw.allowFootprintOverflow !== 'boolean') {
+    throw new Error(`Object ${key} has an invalid collision footprint-overflow flag.`);
+  }
+  return Object.freeze({
+    policy,
+    profile: raw.profile ?? rawDefinition.model,
+    allowFootprintOverflow: raw.allowFootprintOverflow ?? false,
+    scale: createVector(raw.scale, { x: 1, y: 1, z: 1 }, key, 'scale', true),
+    offset: createVector(raw.offset, { x: 0, y: 0, z: 0 }, key, 'offset', false),
   });
 }
 
@@ -86,6 +134,7 @@ export function createObjectCatalog(rawDefinitions, tileByKey) {
         depth: rawDefinition.footprint.depth,
       }),
       foundation: createFoundation(rawDefinition.foundation, rawDefinition),
+      collision: createCollision(rawDefinition.collision, rawDefinition),
       allowedTileIds: Object.freeze(allowedTileIds),
       allowedTerrainClasses: Object.freeze([...new Set(allowedTerrainClasses)]),
     });
