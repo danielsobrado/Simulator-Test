@@ -2,6 +2,8 @@ const counts = Object.create(null);
 
 export const PERF_COUNTER_WATER_GENERATION_MS = 'waterGenerationMs';
 export const PERF_COUNTER_WATER_UPLOAD_BYTES = 'waterUploadBytes';
+export const PERF_COUNTER_WATER_PROJECTED_CAUSTIC_FRAMES = 'waterProjectedCausticFrames';
+export const PERF_COUNTER_WATER_PROJECTED_CAUSTIC_CPU_MS = 'waterProjectedCausticCpuMs';
 
 export const PerfCounters = {
   inc(name, amount = 1) {

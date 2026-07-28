@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { validateUnderwaterConfig } from './UnderwaterConfig.js';
 import { advanceUnderwaterBlend, mixNumber } from './UnderwaterTransition.js';
+import { resolveWaterQualityFeatures } from './WaterQuality.js';
+import { UnderwaterCausticsPostProcess } from './UnderwaterCausticsPostProcess.js';
 
 const MAX_DELTA_SECONDS = 0.1;
 const SKY_HIDE_THRESHOLD = 0.98;
@@ -48,6 +50,34 @@ export class UnderwaterViewController {
     this.appliedBackground = new THREE.Color();
     this.appliedFogColor = new THREE.Color();
     this.appliedFogDensity = this.surfaceFogDensity;
+
+    const waterVisual = terrainView.stylizedConfig?.water ?? {};
+    const quality = resolveWaterQualityFeatures(waterVisual);
+    this.causticsPostProcess = quality.projectedCaustics && waterVisual.projectedCaustics
+      ? new UnderwaterCausticsPostProcess({
+        renderer: terrainView.renderer,
+        scene: terrainView.scene,
+        config: waterVisual.projectedCaustics,
+        qualityStrength: quality.projectedCausticStrength,
+      })
+      : null;
+    this.originalTerrainRender = terrainView.render;
+    this.originalTerrainPrewarm = terrainView.prewarmPostProcessing;
+    this.causticsRenderHook = null;
+    this.causticsPrewarmHook = null;
+    if (this.causticsPostProcess) {
+      this.causticsRenderHook = (camera) => {
+        if (this.causticsPostProcess.render(camera)) return undefined;
+        return this.originalTerrainRender.call(terrainView, camera);
+      };
+      this.causticsPrewarmHook = (camera) => {
+        const original = this.originalTerrainPrewarm?.call(terrainView, camera) ?? false;
+        const projected = this.causticsPostProcess.prewarm(camera);
+        return Boolean(original || projected);
+      };
+      terrainView.render = this.causticsRenderHook;
+      terrainView.prewarmPostProcessing = this.causticsPrewarmHook;
+    }
   }
 
   captureSurfaceEnvironment() {
@@ -118,6 +148,11 @@ export class UnderwaterViewController {
       deltaSeconds,
       this.config.transitionSeconds,
     );
+    const causticsState = { blend: this.blend };
+    if (status.headSubmerged || status.waterDepth > 0) {
+      causticsState.surfaceHeight = status.waterSurfaceHeight;
+    }
+    this.causticsPostProcess?.update(causticsState);
     this.applyEnvironment();
     return this.blend;
   }
@@ -127,11 +162,13 @@ export class UnderwaterViewController {
       blend: this.blend,
       active: this.blend > 0,
       submerged: this.playerController.getStatus().headSubmerged,
+      projectedCaustics: this.causticsPostProcess?.getStatus() ?? null,
     });
   }
 
   restoreSurfaceEnvironment() {
     this.blend = 0;
+    this.causticsPostProcess?.update({ blend: 0 });
     this.scene.background = this.surfaceBackground;
     if (this.originalFogExists) {
       if (!this.scene.fog?.isFogExp2) {
@@ -156,6 +193,18 @@ export class UnderwaterViewController {
     this.restoreSurfaceEnvironment();
     if (this.godRays && this.originalGodRaysRender) {
       this.godRays.render = this.originalGodRaysRender;
+    }
+    if (this.causticsPostProcess) {
+      if (this.terrainView.render === this.causticsRenderHook) {
+        this.terrainView.render = this.originalTerrainRender;
+      }
+      if (this.terrainView.prewarmPostProcessing === this.causticsPrewarmHook) {
+        this.terrainView.prewarmPostProcessing = this.originalTerrainPrewarm;
+      }
+      this.causticsPostProcess.dispose();
+      this.causticsPostProcess = null;
+      this.causticsRenderHook = null;
+      this.causticsPrewarmHook = null;
     }
     this.lastTimestamp = null;
   }
