@@ -1,6 +1,7 @@
 import {
   OBJECT_COLLISION_POLICIES,
   defaultObjectCollisionPolicy,
+  defaultObjectCollisionProfile,
 } from './ObjectCollisionPolicy.js';
 
 const REQUIRED_STRING_FIELDS = Object.freeze(['key', 'label', 'icon', 'category', 'color', 'model']);
@@ -79,7 +80,7 @@ function createCollision(rawCollision, rawDefinition) {
   }
   return Object.freeze({
     policy,
-    profile: raw.profile ?? rawDefinition.model,
+    profile: raw.profile ?? defaultObjectCollisionProfile(rawDefinition),
     allowFootprintOverflow: raw.allowFootprintOverflow ?? false,
     scale: createVector(raw.scale, { x: 1, y: 1, z: 1 }, key, 'scale', true),
     offset: createVector(raw.offset, { x: 0, y: 0, z: 0 }, key, 'offset', false),
