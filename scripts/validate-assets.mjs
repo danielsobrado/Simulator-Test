@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
+import { createObjectColliderDescriptions } from '../src/editor/ObjectColliderLibrary.js';
 import { OBJECT_MODEL_NAMES } from '../src/editor/ObjectModelLibrary.js';
 import { createObjectCatalog } from '../src/editor/objectCatalogSchema.js';
 import { TILE_BY_KEY } from '../src/editor/tileCatalog.js';
@@ -158,9 +159,13 @@ async function main() {
     throw new Error('config/objects.yaml must contain object definitions.');
   }
 
+  const editorConfig = yaml.load(await readFile(EDITOR_CONFIG_PATH, 'utf8'));
+  const collisionConfig = yaml.load(await readFile(COLLISION_CONFIG_PATH, 'utf8'));
   const catalog = createObjectCatalog(parsed.objects, TILE_BY_KEY);
   const modelNames = new Set(OBJECT_MODEL_NAMES);
   const usedModels = new Set();
+  let collidableDefinitions = 0;
+  let colliderParts = 0;
 
   for (const definition of catalog) {
     if (!modelNames.has(definition.model)) {
@@ -169,8 +174,12 @@ async function main() {
       );
     }
     usedModels.add(definition.model);
+    const descriptions = createObjectColliderDescriptions(definition, editorConfig.map.tileSize);
+    if (descriptions.length > 0) collidableDefinitions += 1;
+    colliderParts += descriptions.length;
     console.log(`validated ${definition.key}: ${definition.model} `
-      + `(${definition.footprint.width}×${definition.footprint.depth}, ${definition.category})`);
+      + `(${definition.footprint.width}×${definition.footprint.depth}, ${definition.category}, `
+      + `${definition.collision.policy}, ${descriptions.length} collider parts)`);
   }
 
   const unused = OBJECT_MODEL_NAMES.filter((model) => !usedModels.has(model));
@@ -180,12 +189,11 @@ async function main() {
 
   const categories = new Set(catalog.map((definition) => definition.category));
   console.log(
-    `validated ${catalog.length} object definitions across ${categories.size} categories `
-    + `and ${usedModels.size} procedural models`,
+    `validated ${catalog.length} object definitions across ${categories.size} categories, `
+    + `${usedModels.size} procedural models, ${collidableDefinitions} collidable definitions, `
+    + `and ${colliderParts} object collider parts`,
   );
 
-  const editorConfig = yaml.load(await readFile(EDITOR_CONFIG_PATH, 'utf8'));
-  const collisionConfig = yaml.load(await readFile(COLLISION_CONFIG_PATH, 'utf8'));
   await validateStylizedAssets(editorConfig, collisionConfig);
 }
 
