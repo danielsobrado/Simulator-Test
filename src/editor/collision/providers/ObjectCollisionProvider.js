@@ -167,7 +167,7 @@ export class ObjectCollisionProvider {
     PerfCounters.set('collisionObjectProfiles', this.profiles.size);
     PerfCounters.inc('collisionObjectChunkBuilds');
     return Object.freeze({
-      signature: `${this.catalogSignature}|${spatialSignature}|${objectSignature(ownedObjects)}`,
+      signature: `${this.catalogSignature}|${objectSignature(ownedObjects)}`,
       colliders: Object.freeze(colliders),
       stats: Object.freeze(stats),
       sample,
