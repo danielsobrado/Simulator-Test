@@ -18,14 +18,15 @@ test('medium and higher tiers derive opacity from semantic water depth', () => {
   assert.match(source, /float\(optics\.maximumOpacity\)/);
 });
 
-test('underwater optical distance follows camera submersion', () => {
+test('underwater optical distance blends to camera submersion', () => {
   assert.match(
     source,
     /const cameraSubmersionDepth = max\(positionWorld\.y\.sub\(cameraPosition\.y\), 0\);/,
   );
+  assert.match(source, /const underwaterBlend = smoothstep\(/);
   assert.match(
     source,
-    /const verticalDistance = mix\(waterDepth, cameraSubmersionDepth, underwaterMask\);/,
+    /const verticalDistance = mix\(waterDepth, cameraSubmersionDepth, underwaterBlend\);/,
   );
 });
 
