@@ -170,9 +170,13 @@ export function createStylizedWaterMaterial({
       optics.minimumViewCosine,
       1,
     );
-    const underwaterMask = step(cameraPosition.y, positionWorld.y);
     const cameraSubmersionDepth = max(positionWorld.y.sub(cameraPosition.y), 0);
-    const verticalDistance = mix(waterDepth, cameraSubmersionDepth, underwaterMask);
+    const underwaterBlend = smoothstep(
+      0,
+      optics.surfaceTransitionDepth,
+      cameraSubmersionDepth,
+    );
+    const verticalDistance = mix(waterDepth, cameraSubmersionDepth, underwaterBlend);
     const opticalDistance = min(
       verticalDistance.div(viewCosine),
       optics.maximumOpticalDistance,
@@ -188,7 +192,7 @@ export function createStylizedWaterMaterial({
     const bodyColor = mix(
       depthColor,
       colorNode(optics.underwaterColor),
-      underwaterMask.mul(optics.underwaterTintStrength),
+      underwaterBlend.mul(optics.underwaterTintStrength),
     );
     color = mix(
       bodyColor,
