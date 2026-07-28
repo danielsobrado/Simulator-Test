@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import yaml from 'js-yaml';
 
 const SPEEDS = new Set(['walk', 'run']);
+const SAFE_ID = /^[a-z0-9][a-z0-9-]*$/;
 const COUNT_FIELDS = new Set([
   'broadphaseQueries',
   'candidates',
@@ -32,6 +33,14 @@ function assertString(value, name) {
     throw new Error(`${name} must be a non-empty string.`);
   }
   return value.trim();
+}
+
+function assertId(value, name) {
+  const id = assertString(value, name);
+  if (!SAFE_ID.test(id)) {
+    throw new Error(`${name} must contain only lowercase letters, digits, and hyphens.`);
+  }
+  return id;
 }
 
 function assertNumber(value, name, { minimum = 0, integer = false } = {}) {
@@ -88,7 +97,7 @@ function freezeCase(rawCase, index) {
     });
 
   return Object.freeze({
-    id: assertString(source.id, `cases[${index}].id`),
+    id: assertId(source.id, `cases[${index}].id`),
     label: assertString(source.label, `cases[${index}].label`),
     scenario: assertString(source.scenario, `cases[${index}].scenario`),
     collisionRequired: assertBoolean(
@@ -170,7 +179,7 @@ export function validateCollisionAcceptanceConfig(rawConfig) {
     throw new Error('collision acceptance case IDs must be unique.');
   }
 
-  const baselineCase = assertString(source.baselineCase, 'baselineCase');
+  const baselineCase = assertId(source.baselineCase, 'baselineCase');
   const baseline = cases.find((entry) => entry.id === baselineCase);
   if (!baseline) throw new Error(`baselineCase ${baselineCase} does not exist.`);
   if (baseline.collisionRequired) throw new Error('baselineCase must not require collision.');
