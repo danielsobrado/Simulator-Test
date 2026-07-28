@@ -37,6 +37,22 @@ test('construction edits keep old collision until the matching revision is ready
   assert.equal(source.getStatus().stalePlans, 0);
 });
 
+test('revision-only construction changes do not dirty collision chunks', () => {
+  const source = new ConstructionCollisionSource().configure(128);
+  const first = straightConstruction({ id: 'construction-material', revision: 1 });
+  const second = straightConstruction({ id: first.id, revision: 2 });
+  source.setActive(first);
+  source.applyPlan(first, collisionPlan(first));
+  const spatialRevision = source.signature(0, 0);
+
+  source.setActive(second);
+  source.applyPlan(second, collisionPlan(second));
+
+  assert.equal(source.signature(0, 0), spatialRevision);
+  assert.equal(source.getPlan(first.id).constructionRevision, 2);
+  assert.equal(source.getStatus().unchangedPlans, 1);
+});
+
 test('construction deletion removes collision and rejects a late worker plan', () => {
   const source = new ConstructionCollisionSource().configure(128);
   const record = straightConstruction({ id: 'construction-delete' });
