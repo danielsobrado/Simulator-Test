@@ -87,6 +87,40 @@ test('undo of set_material forwards the materialOnly hint', () => {
   assert.equal(store.get('construction-1').style.materials.stone, 'sandstone-masonry');
 });
 
+test('set_style switches to soft limestone, preserves materials, and rebuilds', () => {
+  const store = new ConstructionStore();
+  executeConstructionCommand(store, { type: 'create', record: record() });
+  executeConstructionCommand(store, {
+    type: 'set_material',
+    constructionId: 'construction-1',
+    materials: { stone: 'granite-masonry' },
+  });
+
+  const switched = executeConstructionCommand(store, {
+    type: 'set_style',
+    constructionId: 'construction-1',
+    styleKey: 'soft-limestone-rubble',
+  });
+
+  assert.equal(switched.after.style.key, 'soft-limestone-rubble');
+  assert.equal(switched.after.style.materials.stone, 'granite-masonry');
+  assert.equal(switched.materialOnly, false);
+  assert.ok(switched.dirtySegmentIds.length >= 1);
+  assert.deepEqual(
+    switched.dirtySegmentIds,
+    switched.after.path.segments.map(({ id }) => id),
+  );
+
+  store.applyChange(switched, 'undo');
+  assert.equal(store.get('construction-1').style.key, 'coursed-rubble');
+  assert.equal(store.get('construction-1').style.materials.stone, 'granite-masonry');
+
+  store.applyChange(switched, 'redo');
+  assert.equal(store.get('construction-1').style.key, 'soft-limestone-rubble');
+  assert.equal(store.get('construction-1').style.materials.stone, 'granite-masonry');
+  assert.deepEqual(store.get('construction-1').style, switched.after.style);
+});
+
 test('construction spatial index covers every touched chunk and updates locally', () => {
   const index = new ConstructionSpatialIndex({ chunkWorldSize: 8 });
   const wall = record();

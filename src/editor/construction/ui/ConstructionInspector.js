@@ -8,6 +8,21 @@ import { CONSTRUCTION_STYLES } from '../masonry/ConstructionStyleCatalog.js';
  * ready; the file picker belongs with a fuller inspector later.
  */
 
+/** Pure markup for the masonry-style `<select>` options. */
+export function constructionStyleOptionsMarkup(selectedKey) {
+  return Object.values(CONSTRUCTION_STYLES)
+    .map(({ key, label }) => (
+      `<option value="${key}"${selectedKey === key ? ' selected' : ''}>${label}</option>`
+    ))
+    .join('');
+}
+
+/** Human-readable status line for a masonry style change. */
+export function masonryStyleStatusMessage(styleKey) {
+  const selected = CONSTRUCTION_STYLES[styleKey];
+  return `Masonry style set to ${selected?.label ?? styleKey}.`;
+}
+
 export class ConstructionInspector {
   constructor({ host, controller, onStatus = null }) {
     if (!host) throw new Error('ConstructionInspector needs a host element.');
@@ -38,11 +53,7 @@ export class ConstructionInspector {
     if (!record) return;
     this.constructionId = constructionId;
     this.controller.setSelectedConstruction?.(constructionId);
-    const styles = Object.values(CONSTRUCTION_STYLES)
-      .map(({ key, label }) => (
-        `<option value="${key}"${record.style.key === key ? ' selected' : ''}>${label}</option>`
-      ))
-      .join('');
+    const styles = constructionStyleOptionsMarkup(record.style.key);
     this.element.innerHTML = `
       <header>
         <strong>${escapeText(record.label ?? 'Wall')}</strong>
@@ -84,7 +95,7 @@ export class ConstructionInspector {
         constructionId: this.constructionId,
         styleKey: event.target.value,
       });
-      this.onStatus?.(`Masonry style set to ${event.target.value}.`);
+      this.onStatus?.(masonryStyleStatusMessage(event.target.value));
       return;
     }
     const value = Number(event.target.value);
