@@ -211,6 +211,45 @@ function scaleAboutCentroid(ring, factor) {
 }
 
 /**
+ * Shared bevel-profile solve for an arbitrary planar quad.
+ *
+ * Normalises winding, picks a safe bevel radius from the shortest edge, insets
+ * the ring, and falls back to centroid scaling when the inset collapses. Used by
+ * both the flat `beveledQuadPrism` extrusion and the pillowed relief builder so
+ * the two stay in lockstep on footprint and depth.
+ *
+ * @param options.corners four `[x, y]` pairs in the unit's own face plane,
+ *   already centred on the unit origin. Winding is fixed up here.
+ */
+export function createBeveledQuadProfile({
+  corners,
+  depth,
+  bevelRatio = 0.055,
+}) {
+  const ring = corners.map(([x, y]) => [x, y]);
+  if (polygonArea(ring) < 0) ring.reverse();
+
+  const edge = shortestEdgeLength(ring);
+  const radius = Math.max(1e-4, Math.min(edge, depth) * bevelRatio);
+  const offset = insetRing(ring, radius);
+  // A sliver whose inset swallowed itself would hand `ExtrudeGeometry` a
+  // self-intersecting shape, which triangulates into inverted faces. Shrinking
+  // about the centroid instead is always simple and keeps the winding.
+  const profile = offset && insetSurvived(ring, offset)
+    ? offset
+    : scaleAboutCentroid(ring, Math.max(0.3, 1 - (2 * radius) / Math.max(edge, 1e-4)));
+  const extrusionDepth = Math.max(0.02, depth - radius * 2);
+
+  return {
+    ring,
+    profile,
+    radius,
+    extrusionDepth,
+    insetSucceeded: Boolean(offset && insetSurvived(ring, offset)),
+  };
+}
+
+/**
  * A bevelled prism over an arbitrary planar quad.
  *
  * `beveledBox`'s profile is a rectangle whose top and bottom edges may shear in
@@ -241,18 +280,11 @@ export function beveledQuadPrism({
   detail = 2,
   bevelRatio = 0.055,
 }) {
-  const ring = corners.map(([x, y]) => [x, y]);
-  if (polygonArea(ring) < 0) ring.reverse();
-
-  const edge = shortestEdgeLength(ring);
-  const radius = Math.max(1e-4, Math.min(edge, depth) * bevelRatio);
-  const offset = insetRing(ring, radius);
-  // A sliver whose inset swallowed itself would hand `ExtrudeGeometry` a
-  // self-intersecting shape, which triangulates into inverted faces. Shrinking
-  // about the centroid instead is always simple and keeps the winding.
-  const profile = offset && insetSurvived(ring, offset)
-    ? offset
-    : scaleAboutCentroid(ring, Math.max(0.3, 1 - (2 * radius) / Math.max(edge, 1e-4)));
+  const { profile, radius, extrusionDepth } = createBeveledQuadProfile({
+    corners,
+    depth,
+    bevelRatio,
+  });
 
   const shape = new THREE.Shape();
   shape.moveTo(profile[0][0], profile[0][1]);
@@ -261,7 +293,6 @@ export function beveledQuadPrism({
   }
   shape.closePath();
 
-  const extrusionDepth = Math.max(0.02, depth - radius * 2);
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: extrusionDepth,
     steps: 1,

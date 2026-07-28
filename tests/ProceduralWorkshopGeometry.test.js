@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   beveledBox,
   beveledQuadPrism,
+  createBeveledQuadProfile,
 } from '../src/editor/workshop/ProceduralWorkshopGeometry.js';
 
 /** `[minX, minY, minZ, maxX, maxY, maxZ]` of a geometry's positions. */
@@ -113,4 +114,47 @@ test('bevel radius follows the shortest edge, not the longest', () => {
   const wide = beveledQuadPrism({ corners: rectangle(2.4, 0.2), depth: 0.8, bevelRatio: 0.12 });
   const [, minY, , , maxY] = bounds(wide);
   assert.ok(Math.abs((maxY - minY) - 0.2) < 1e-6);
+});
+
+test('createBeveledQuadProfile matches beveledQuadPrism footprint and depth', () => {
+  // Strict parity: extracting the profile must not change the extruded prism.
+  const corners = rectangle(1.2, 0.56);
+  const depth = 0.8;
+  const bevelRatio = 0.085;
+  const before = beveledQuadPrism({ corners, depth, bevelRatio, detail: 2 });
+  const profile = createBeveledQuadProfile({ corners, depth, bevelRatio });
+  const after = beveledQuadPrism({ corners, depth, bevelRatio, detail: 2 });
+
+  assert.equal(profile.ring.length, 4);
+  assert.equal(profile.profile.length, 4);
+  assert.ok(profile.radius > 0);
+  assert.ok(profile.extrusionDepth > 0);
+  assert.equal(triangles(before), triangles(after));
+  assert.deepEqual(bounds(before), bounds(after));
+
+  const beforePos = before.getAttribute('position');
+  const afterPos = after.getAttribute('position');
+  assert.equal(beforePos.count, afterPos.count);
+  for (let index = 0; index < beforePos.count; index += 1) {
+    assert.ok(Math.abs(beforePos.getX(index) - afterPos.getX(index)) < 1e-9);
+    assert.ok(Math.abs(beforePos.getY(index) - afterPos.getY(index)) < 1e-9);
+    assert.ok(Math.abs(beforePos.getZ(index) - afterPos.getZ(index)) < 1e-9);
+  }
+
+  const beforeUv = before.getAttribute('uv');
+  const afterUv = after.getAttribute('uv');
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+  for (let index = 0; index < beforeUv.count; index += 1) {
+    minU = Math.min(minU, beforeUv.getX(index), afterUv.getX(index));
+    maxU = Math.max(maxU, beforeUv.getX(index), afterUv.getX(index));
+    minV = Math.min(minV, beforeUv.getY(index), afterUv.getY(index));
+    maxV = Math.max(maxV, beforeUv.getY(index), afterUv.getY(index));
+  }
+  assert.ok(Number.isFinite(minU) && Number.isFinite(maxU));
+  assert.ok(Number.isFinite(minV) && Number.isFinite(maxV));
+  before.dispose();
+  after.dispose();
 });
