@@ -1,3 +1,4 @@
+import { constructionJointProfile } from '../config/ConstructionJointProfiles.generated.js';
 import { packCourse } from '../../workshop/ProceduralWorkshopCoursePacker.js';
 import { createRandom, mixSeed } from '../../workshop/ProceduralRandom.js';
 import { layoutOpening, openingHalfWidthAt, survivingIntervals } from './OpeningLayout.js';
@@ -8,6 +9,7 @@ import {
   scaleCorners,
   splitCell,
 } from './CourseLattice.js';
+import { clampJointWidths, sampleJointWidths } from './JointWidthField.js';
 import { layoutMerlon } from './MerlonOrnament.js';
 
 /**
@@ -189,12 +191,24 @@ export function packCurvedWall({
   const [s0, s1] = arcRange;
   const span = s1 - s0;
   const stones = [];
+  const jointProfile = constructionJointProfile(style.key);
   const stats = {
     courses: 0,
     stones: 0,
     dropped: 0,
     overBudget: false,
     targetWidth: style.targetWidth,
+    jointSamples: 0,
+    headJointTotal: 0,
+    bedJointTotal: 0,
+    headJointMin: Infinity,
+    headJointMax: 0,
+    bedJointMin: Infinity,
+    bedJointMax: 0,
+    headJointsClamped: 0,
+    bedJointsClamped: 0,
+    meanHeadJoint: 0,
+    meanBedJoint: 0,
   };
   if (!(span > 1e-6)) return { stones, stats: Object.freeze(stats) };
 
@@ -383,16 +397,30 @@ export function packCurvedWall({
         const sagitta = chordSagitta(leafWidth, curvature);
         const straddle = -Math.sign(curvature) * sagitta * 0.5;
 
-        // The lattice tiles exactly by construction, so unlike a packed box the
-        // mortar gap has to be cut out of the face rather than left over from a
-        // width that fell short. Inset is style-driven; subtract once across the
-        // whole face (not per side) so a 24 mm inset on a 1 m stone leaves 976 mm.
-        const insetMinimum = style.jointInsetMin ?? 0.012;
-        const insetMaximum = style.jointInsetMax ?? 0.03;
-        const verticalRatio = style.jointInsetVerticalRatio ?? 0.7;
-        const inset = lerp(insetMinimum, insetMaximum, hashLane(shapeSeed, index, 0));
-        const scaleX = Math.max(0.4, 1 - inset / face.width);
-        const scaleY = Math.max(0.4, 1 - (inset * verticalRatio) / face.height);
+        // The lattice tiles exactly by construction, so the mortar gap is cut
+        // out of the face. jointWidth is the total visible gap; scaleCorners
+        // retracts once across the face (half per side when neighbours match).
+        const sampledJointWidths = sampleJointWidths({
+          profile: jointProfile,
+          seed: shapeSeed,
+          stableIndex: index,
+          lodBand: 'near',
+        });
+        const jointWidths = clampJointWidths(face, sampledJointWidths, jointProfile);
+        const scaleX = 1 - jointWidths.head / face.width;
+        const scaleY = 1 - jointWidths.bed / face.height;
+        const safeScaleX = Math.max(0.01, scaleX);
+        const safeScaleY = Math.max(0.01, scaleY);
+
+        stats.jointSamples += 1;
+        stats.headJointTotal += jointWidths.head;
+        stats.bedJointTotal += jointWidths.bed;
+        stats.headJointMin = Math.min(stats.headJointMin, jointWidths.head);
+        stats.headJointMax = Math.max(stats.headJointMax, jointWidths.head);
+        stats.bedJointMin = Math.min(stats.bedJointMin, jointWidths.bed);
+        stats.bedJointMax = Math.max(stats.bedJointMax, jointWidths.bed);
+        if (jointWidths.headClamped) stats.headJointsClamped += 1;
+        if (jointWidths.bedClamped) stats.bedJointsClamped += 1;
 
         const depthScale = lerp(
           style.depthScaleMin ?? 0.95,
@@ -408,16 +436,22 @@ export function packCurvedWall({
           s: leafCenter,
           y: face.anchorY,
           offsetNormal: straddle + faceOffset,
-          // The leaf's solved arc footprint, before the mortar inset. The
-          // geometry uses `corners`; this is what tiles the course exactly, so
-          // coverage stays checkable.
+          // Arc span of the solved leaf (before joint retraction).
           packedWidth: leafWidth,
           // Fraction of the course the leaf occupies, so a cell's leaves can be
           // shown to partition it rather than merely to span it.
           bandHeight: leaf.v1 - leaf.v0,
-          corners: scaleCorners(face.corners, scaleX, scaleY),
-          width: face.width * scaleX,
-          height: face.height * scaleY,
+          corners: scaleCorners(face.corners, safeScaleX, safeScaleY),
+          // Authoritative solved cell footprint for the recessed mortar core.
+          mortarCorners: Object.freeze(
+            face.corners.map((corner) => Object.freeze([...corner])),
+          ),
+          jointWidths: Object.freeze({
+            head: jointWidths.head,
+            bed: jointWidths.bed,
+          }),
+          width: face.width * safeScaleX,
+          height: face.height * safeScaleY,
           depth: thickness * depthScale,
           yaw: frame.yaw,
           roll: 0,
@@ -560,5 +594,15 @@ export function packCurvedWall({
 
   stats.stones = stones.length;
   stats.openings = openings.length;
+  stats.meanHeadJoint = stats.jointSamples > 0
+    ? stats.headJointTotal / stats.jointSamples
+    : 0;
+  stats.meanBedJoint = stats.jointSamples > 0
+    ? stats.bedJointTotal / stats.jointSamples
+    : 0;
+  if (stats.jointSamples === 0) {
+    stats.headJointMin = 0;
+    stats.bedJointMin = 0;
+  }
   return { stones: Object.freeze(stones), stats: Object.freeze(stats) };
 }

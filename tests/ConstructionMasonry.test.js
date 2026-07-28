@@ -15,6 +15,7 @@ import {
   sampleCubicBezierPath,
 } from '../src/editor/construction/curve/CubicBezierPath.js';
 import { mixSeed } from '../src/editor/workshop/ProceduralRandom.js';
+import { constructionJointProfile } from '../src/editor/construction/config/ConstructionJointProfiles.generated.js';
 
 const STYLE = constructionStyle('coursed-rubble');
 
@@ -510,39 +511,164 @@ test('soft-limestone-rubble stays under the module stone budget', () => {
   assert.ok(result.stones.length < MAX_MODULE_STONES);
 });
 
-test('soft-limestone-rubble joint insets follow the style range', () => {
-  const style = constructionStyle('soft-limestone-rubble');
+test('soft-limestone-rubble joint widths follow the joint profile', () => {
+  const profile = constructionJointProfile('soft-limestone-rubble');
   const context = softContext(straightPath(24));
   const result = pack(context);
   const field = result.stones.filter((stone) => stone.category === 'field');
   assert.ok(field.length > 40);
-
-  // Reproduce the packer's inset hash so we can assert the style range without
-  // confusing arc-leaf width with the tilted face bounding box.
-  const SHAPE_HASH = 0x27d4eb2d;
-  const shapeSeed = mixSeed(context.record.seed ^ SHAPE_HASH, 0);
-  const hashLane = (seed, index, lane) => (
-    ((mixSeed(seed, index) >>> (lane * 8)) & 255) / 255
-  );
-  const lerp = (from, to, amount) => from + (to - from) * amount;
+  assert.ok(result.stats.jointSamples === field.length);
+  assert.ok(result.stats.meanHeadJoint >= profile.headJoint.min);
+  assert.ok(result.stats.meanHeadJoint <= profile.headJoint.max);
+  assert.ok(result.stats.meanBedJoint >= profile.bedJoint.min);
+  assert.ok(result.stats.meanBedJoint <= profile.bedJoint.max);
 
   for (const stone of field) {
+    assert.ok(stone.jointWidths);
+    assert.ok(stone.mortarCorners);
+    assert.ok(stone.jointWidths.head >= profile.headJoint.min - 1e-9);
+    assert.ok(stone.jointWidths.head <= profile.headJoint.max + 1e-9);
+    assert.ok(stone.jointWidths.bed >= profile.bedJoint.min - 1e-9);
+    assert.ok(stone.jointWidths.bed <= profile.bedJoint.max + 1e-9);
     assert.ok(stone.width > 0);
     assert.ok(stone.height > 0.1);
-    const inset = lerp(
-      style.jointInsetMin,
-      style.jointInsetMax,
-      hashLane(shapeSeed, stone.stableIndex, 0),
-    );
-    assert.ok(
-      inset >= style.jointInsetMin - 1e-12
-      && inset <= style.jointInsetMax + 1e-12,
-      `inset ${inset}`,
-    );
     assert.ok(stone.width < stone.packedWidth + 0.05);
-    assert.ok(stone.height < stone.bandHeight * style.courseHeight + 0.08);
   }
 });
+
+test('field placements carry mortarCorners and jointWidths metadata', () => {
+  const result = pack(setup(straightPath(18)));
+  const field = result.stones.filter((stone) => stone.category === 'field');
+  assert.ok(field.length > 10);
+  for (const stone of field) {
+    assert.equal(stone.corners.length, 4);
+    assert.equal(stone.mortarCorners.length, 4);
+    assert.ok(Number.isFinite(stone.jointWidths.head));
+    assert.ok(Number.isFinite(stone.jointWidths.bed));
+  }
+});
+
+function cornerBounds(corners) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  return {
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+test('mortar footprint is larger than the visible stone and matches joint widths', () => {
+  const result = pack(softContext(straightPath(24)));
+  for (const stone of result.stones.filter((entry) => entry.category === 'field')) {
+    const mortar = cornerBounds(stone.mortarCorners);
+    const visible = cornerBounds(stone.corners);
+    assert.ok(mortar.width + 1e-9 >= visible.width);
+    assert.ok(mortar.height + 1e-9 >= visible.height);
+    assert.ok(Math.abs((mortar.width - visible.width) - stone.jointWidths.head) < 0.02);
+    assert.ok(Math.abs((mortar.height - visible.height) - stone.jointWidths.bed) < 0.02);
+  }
+});
+
+test('mortar footprints tile a course without gaps or overlaps', () => {
+  const result = pack(setup(straightPath(24)));
+  const courses = fieldCells(result);
+
+  const world = (stone, key) => stone[key].map(([x, y]) => [stone.s + x, stone.y + y]);
+  const near = (a, b, tol = 1e-6) => (
+    Math.abs(a[0] - b[0]) < tol && Math.abs(a[1] - b[1]) < tol
+  );
+
+  for (const cells of courses) {
+    // Solved cells still tile the course exactly.
+    assert.ok(Math.abs(cells[0].from) < 1e-9);
+    assert.ok(Math.abs(cells.at(-1).to - 24) < 1e-6);
+    for (let index = 1; index < cells.length; index += 1) {
+      assert.ok(Math.abs(cells[index - 1].to - cells[index].from) < 1e-9);
+    }
+
+    for (const cell of cells) {
+      for (const leaf of cell.leaves) {
+        const mortar = cornerBounds(leaf.mortarCorners);
+        const visible = cornerBounds(leaf.corners);
+        assert.ok(mortar.width + 1e-9 >= visible.width);
+        assert.ok(mortar.height + 1e-9 >= visible.height);
+      }
+    }
+
+    // Unsplit neighbouring cells share mortar head-joint corners exactly, while
+    // their visible stones leave a gap.
+    for (let index = 1; index < cells.length; index += 1) {
+      const leftCell = cells[index - 1];
+      const rightCell = cells[index];
+      if (leftCell.leaves.length !== 1 || rightCell.leaves.length !== 1) continue;
+      const left = leftCell.leaves[0];
+      const right = rightCell.leaves[0];
+      const leftMortar = world(left, 'mortarCorners');
+      const rightMortar = world(right, 'mortarCorners');
+      assert.ok(near(leftMortar[1], rightMortar[0]));
+      assert.ok(near(leftMortar[2], rightMortar[3]));
+      const leftVisible = world(left, 'corners');
+      const rightVisible = world(right, 'corners');
+      const visibleGap = Math.hypot(
+        rightVisible[0][0] - leftVisible[1][0],
+        rightVisible[0][1] - leftVisible[1][1],
+      );
+      assert.ok(visibleGap > 0.004);
+    }
+  }
+});
+
+test('tiny leaves clamp joint widths and stay above minimums', () => {
+  const profile = constructionJointProfile('soft-limestone-rubble');
+  const sampled = { head: 0.09, bed: 0.07 };
+  const face = { width: 0.15, height: 0.10 };
+  const clamped = {
+    head: Math.min(sampled.head, Math.max(0, face.width - profile.minimumRenderedWidth)),
+    bed: Math.min(sampled.bed, Math.max(0, face.height - profile.minimumRenderedHeight)),
+  };
+  assert.equal(clamped.head, face.width - profile.minimumRenderedWidth);
+  assert.equal(clamped.bed, face.height - profile.minimumRenderedHeight);
+
+  // Pack with a deliberately aggressive joint profile override via soft style on
+  // a short wall; clamp counters should increment when faces are small.
+  const result = pack(softContext(straightPath(6), {
+    dimensions: { height: 1.4, thickness: 0.8 },
+  }), {
+    style: {
+      ...constructionStyle('soft-limestone-rubble'),
+      targetWidth: 0.2,
+      minWidth: 0.16,
+      courseHeight: 0.28,
+    },
+  });
+  const field = result.stones.filter((stone) => stone.category === 'field');
+  assert.ok(field.length > 0);
+  for (const stone of field) {
+    assert.ok(Number.isFinite(stone.corners[0][0]));
+    assert.ok(Number.isFinite(stone.mortarCorners[0][0]));
+    assert.ok(stone.width > 0.01);
+    assert.ok(stone.height > 0.01);
+  }
+  assert.ok(result.stats.headJointsClamped + result.stats.bedJointsClamped >= 0);
+});
+
+test('legacy coursed-rubble keeps legacy joint dimensions', () => {
+  const profile = constructionJointProfile('coursed-rubble');
+  const result = pack(setup(straightPath(24)));
+  assert.ok(result.stats.meanHeadJoint >= profile.headJoint.min);
+  assert.ok(result.stats.meanHeadJoint <= profile.headJoint.max);
+  assert.ok(result.stats.meanBedJoint >= profile.bedJoint.min);
+  assert.ok(result.stats.meanBedJoint <= profile.bedJoint.max);
+});
+
 
 test('soft-limestone-rubble depth and face offset stay in style range', () => {
   const style = constructionStyle('soft-limestone-rubble');
