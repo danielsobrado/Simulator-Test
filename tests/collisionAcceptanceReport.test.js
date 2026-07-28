@@ -24,6 +24,11 @@ function config({
     baselineCase: 'baseline',
     hitchMs: 33.3,
     timeoutPaddingSeconds: 30,
+    viewport: {
+      width: 1600,
+      height: 900,
+      deviceScaleFactor: 1,
+    },
     gates: {
       collisionP95Ms: 0.83,
       frameP95RegressionMs: 0.83,
