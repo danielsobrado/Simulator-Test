@@ -34,6 +34,7 @@ cases:
     warmupSeconds: 5
     durationSeconds: 12
     speed: run
+    minimumCounts: {}
     coverage:
       - open-ground-run
 
@@ -45,6 +46,9 @@ cases:
     warmupSeconds: 8
     durationSeconds: 6
     speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
     coverage:
       - tree-trunk-production
 
@@ -56,6 +60,9 @@ cases:
     warmupSeconds: 10
     durationSeconds: 7
     speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
     coverage:
       - blocking-rock-production
 
@@ -67,6 +74,10 @@ cases:
     warmupSeconds: 12
     durationSeconds: 10
     speed: run
+    minimumCounts:
+      candidates: 1
+      bvhQueries: 1
+      triangleTests: 1
     coverage:
       - walkable-rock-contact
 
@@ -78,6 +89,9 @@ cases:
     warmupSeconds: 10
     durationSeconds: 9
     speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
     coverage:
       - placed-object-doorway
 
@@ -89,6 +103,9 @@ cases:
     warmupSeconds: 10
     durationSeconds: 5
     speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
     coverage:
       - construction-wall
 
@@ -100,5 +117,8 @@ cases:
     warmupSeconds: 12
     durationSeconds: 60
     speed: run
+    minimumCounts:
+      broadphaseQueries: 1
+      activeChunks: 1
     coverage:
       - repeated-collision-chunk-crossing
