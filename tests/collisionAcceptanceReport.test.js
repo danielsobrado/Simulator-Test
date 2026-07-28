@@ -54,6 +54,7 @@ function config({
         durationSeconds: 2,
         speed: 'run',
         minimumCounts: {},
+        minimumProviderComponents: {},
         coverage: ['baseline'],
       },
       {
@@ -68,6 +69,9 @@ function config({
         minimumCounts: {
           broadphaseQueries: 1,
           candidates: 1,
+        },
+        minimumProviderComponents: {
+          trees: { colliders: 1 },
         },
         coverage: ['collision'],
       },
@@ -90,6 +94,7 @@ function perfReport({
   hitches = 0,
   broadphaseQueries = 10,
   candidates = 20,
+  treeColliders = 3,
   readinessMisses = 0,
   failedChunks = 0,
   finalQueueDepth = 0,
@@ -133,7 +138,15 @@ function perfReport({
         failedChunks,
         finalQueueDepth,
       },
-      readiness: { ready, failure },
+      readiness: {
+        ready,
+        failure,
+        provider: {
+          components: {
+            trees: { colliders: treeColliders },
+          },
+        },
+      },
       canonicalSignature,
       gate: {
         passed: !collisionEnabled || (
@@ -318,7 +331,7 @@ test('canonical signatures must be stable across repeats', () => {
   assert.equal(report.gates.execution.passed, false);
 });
 
-test('missing renderer, hardware identity, viewport, screenshot, and query work fail the run', () => {
+test('missing renderer, hardware, capture, query, and provider evidence fail the run', () => {
   const runs = passingRuns({
     collision: {
       adapter: { ok: true, vendor: '', architecture: '', description: '', fallback: false },
@@ -326,6 +339,7 @@ test('missing renderer, hardware identity, viewport, screenshot, and query work 
       viewport: { width: 800, height: 600, deviceScaleFactor: 1 },
       broadphaseQueries: 0,
       candidates: 0,
+      treeColliders: 0,
     },
   });
   runs[2].report.capture.screenshot = null;
@@ -339,6 +353,7 @@ test('missing renderer, hardware identity, viewport, screenshot, and query work 
     'capture-viewport',
     'capture-screenshot',
     'minimum-count:candidates',
+    'minimum-provider:trees.colliders',
   ]) {
     assert.equal(run.checks.find((entry) => entry.id === id).passed, false);
   }
