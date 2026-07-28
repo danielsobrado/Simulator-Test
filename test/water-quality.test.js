@@ -24,6 +24,20 @@ const base = Object.freeze({
     surfaceDetailStrength: 0.28,
     underwaterTintStrength: 0.35,
   }),
+  refraction: Object.freeze({
+    enabled: true,
+    strength: 0.012,
+    coarseScale: 0.045,
+    fineScale: 0.16,
+    coarseSpeed: 0.05,
+    fineSpeed: 0.13,
+    depthFadeStart: 0.08,
+    depthFadeEnd: 1.8,
+    depthBias: 0.00012,
+    mipLevel: 0,
+    sceneColorStrength: 0.94,
+    absorptionCoefficients: Object.freeze([0.72, 0.28, 0.12]),
+  }),
   caustics: Object.freeze({
     intensity: 0.2,
     scale: 0.4,
@@ -38,17 +52,22 @@ test('quality tiers preserve geography while selecting bounded visual features',
   assert.deepEqual(resolveWaterQualityFeatures({ qualityTier: 'low' }), {
     flow: false,
     depthOptics: false,
+    refraction: false,
+    refractionStrength: 0,
     caustics: false,
     causticStrength: 0,
   });
-  assert.equal(resolveWaterQualityFeatures({ qualityTier: 'medium' }).flow, true);
-  assert.equal(resolveWaterQualityFeatures({ qualityTier: 'medium' }).depthOptics, true);
-  assert.equal(resolveWaterQualityFeatures({ qualityTier: 'medium' }).caustics, false);
-  assert.equal(resolveWaterQualityFeatures({ qualityTier: 'high' }).caustics, true);
+  const medium = resolveWaterQualityFeatures({ qualityTier: 'medium' });
+  assert.equal(medium.flow, true);
+  assert.equal(medium.depthOptics, true);
+  assert.equal(medium.refraction, false);
+  assert.equal(medium.caustics, false);
+  assert.equal(resolveWaterQualityFeatures({ qualityTier: 'high' }).refraction, true);
+  assert.ok(resolveWaterQualityFeatures({ qualityTier: 'ultra' }).refractionStrength > 1);
   assert.ok(resolveWaterQualityFeatures({ qualityTier: 'ultra' }).causticStrength > 1);
 });
 
-test('visual config rejects invalid tiers, optics, and caustic ranges', () => {
+test('visual config rejects invalid tiers, optics, refraction, and caustic ranges', () => {
   assert.equal(validateWaterVisualConfig(structuredClone(base)).qualityTier, 'high');
   assert.throws(
     () => validateWaterVisualConfig({ ...structuredClone(base), qualityTier: 'cinematic' }),
@@ -67,6 +86,20 @@ test('visual config rejects invalid tiers, optics, and caustic ranges', () => {
       optics: { ...base.optics, surfaceTransitionDepth: 0 },
     }),
     /surfaceTransitionDepth/,
+  );
+  assert.throws(
+    () => validateWaterVisualConfig({
+      ...structuredClone(base),
+      refraction: { ...base.refraction, depthFadeEnd: 0.01 },
+    }),
+    /depthFadeEnd/,
+  );
+  assert.throws(
+    () => validateWaterVisualConfig({
+      ...structuredClone(base),
+      refraction: { ...base.refraction, absorptionCoefficients: [0.2, 0.1] },
+    }),
+    /absorptionCoefficients/,
   );
   assert.throws(
     () => validateWaterVisualConfig({
