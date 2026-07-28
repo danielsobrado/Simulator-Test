@@ -35,7 +35,7 @@ function count(report, name) {
 }
 
 function providerMetric(report, component, metric) {
-  const value = report?.collision?.readiness?.provider?.components?.[component]?.[metric];
+  const value = report?.collision?.provider?.components?.[component]?.[metric];
   return Number.isFinite(value) ? value : null;
 }
 
