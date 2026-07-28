@@ -572,13 +572,16 @@ export function createWorkshopMaterials(recipe) {
   const stoneAlbedo = explicitStoneAlbedo ?? (wallsAreStone ? importedAlbedo('walls') : null);
   const roofAlbedo = importedAlbedo('roof');
   const woodAlbedo = importedAlbedo('wood');
+  const stoneSurface = stoneSurfaceProfile(recipe.style);
+  const stoneConfig = stoneSurface.material;
 
-  const stoneBump = surfaceBumpTexture(recipe.seed, 1);
+  const stoneBump = surfaceBumpTexture(recipe.seed, stoneConfig.bumpTextureScale);
   const roofBump = roofBumpTexture(recipe.seed);
   const plasterBump = surfaceBumpTexture(recipe.seed + 913, 0.72);
   const stoneRoughness = surfaceRoughnessTexture(recipe.seed + 101, {
-    base: 226,
-    variation: 26,
+    base: stoneConfig.roughnessBase,
+    variation: stoneConfig.roughnessVariation,
+    broadScale: stoneConfig.roughnessBroadScale,
   });
   const mortarRoughness = surfaceRoughnessTexture(recipe.seed + 211, {
     base: 242,
@@ -596,11 +599,10 @@ export function createWorkshopMaterials(recipe) {
     broadScale: 10,
   });
   const highQuality = recipe.detail >= 2;
+  const stoneNormalKind = stoneConfig.normalKind
+    ?? (recipe.style === 'granite' ? 'granite' : 'stoneBlock');
   const stoneNormal = highQuality
-    ? proceduralNormalTexture(
-      recipe.style === 'granite' ? 'granite' : 'stoneBlock',
-      recipe.seed + 503,
-    )
+    ? proceduralNormalTexture(stoneNormalKind, recipe.seed + 503)
     : null;
   const plasterNormal = highQuality
     ? proceduralNormalTexture(
@@ -621,9 +623,12 @@ export function createWorkshopMaterials(recipe) {
     color: stoneAlbedo?.tint ?? (recipe.albedo ? '#ffffff' : STONE_PALETTES[recipe.style].color),
     map: stoneAlbedo?.texture ?? (recipe.albedo ? stoneTexture(recipe) : null),
     bumpMap: stoneBump,
-    bumpScale: 0.055,
+    bumpScale: stoneConfig.bumpScale,
     normalMap: stoneNormal,
-    normalScale: new THREE.Vector2(0.55, 0.55),
+    normalScale: new THREE.Vector2(
+      stoneConfig.workshopNormalScale,
+      stoneConfig.workshopNormalScale,
+    ),
     roughnessMap: stoneRoughness,
     // Always on. Before 2026-07-25 an imported albedo disabled vertex colours
     // entirely, which contradicted 15-…md line 89 and threw away the baked
@@ -633,8 +638,20 @@ export function createWorkshopMaterials(recipe) {
     vertexColors: true,
     roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.72,
+    envMapIntensity: stoneConfig.workshopEnvMapIntensity,
   }), 'stone');
+  stone.userData.stoneSurfaceProfile = recipe.style;
+  stone.userData.stoneSurface = Object.freeze({
+    palette: recipe.style,
+    bumpScale: stoneConfig.bumpScale,
+    bumpTextureScale: stoneConfig.bumpTextureScale,
+    normalKind: stoneNormalKind,
+    normalScale: stoneConfig.workshopNormalScale,
+    roughnessBase: stoneConfig.roughnessBase,
+    roughnessVariation: stoneConfig.roughnessVariation,
+    roughnessBroadScale: stoneConfig.roughnessBroadScale,
+    envMapIntensity: stoneConfig.workshopEnvMapIntensity,
+  });
   const roof = tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
     color: roofAlbedo?.tint ?? '#ffffff',
     map: roofAlbedo?.texture ?? roofTexture(recipe.topStyle, recipe.seed),
@@ -652,11 +669,11 @@ export function createWorkshopMaterials(recipe) {
     stone,
     mortar: tagWorkshopMaterial(new THREE.MeshStandardNodeMaterial({
       color: wallAlbedo?.tint ?? (recipe.finish === 'masonry'
-        ? new THREE.Color(
+        ? (stoneConfig.mortarColor ?? new THREE.Color(
           STONE_PALETTES[recipe.style].base[0] / 255 * 0.66,
           STONE_PALETTES[recipe.style].base[1] / 255 * 0.66,
           STONE_PALETTES[recipe.style].base[2] / 255 * 0.66,
-        )
+        ))
         : '#ffffff'),
       map: wallAlbedo?.texture ?? (recipe.finish === 'masonry' ? null : plasterTexture(recipe)),
       bumpMap: plasterBump,
