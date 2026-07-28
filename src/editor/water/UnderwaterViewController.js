@@ -63,16 +63,20 @@ export class UnderwaterViewController {
       : null;
     this.originalTerrainRender = terrainView.render;
     this.originalTerrainPrewarm = terrainView.prewarmPostProcessing;
+    this.causticsRenderHook = null;
+    this.causticsPrewarmHook = null;
     if (this.causticsPostProcess) {
-      terrainView.render = (camera) => {
+      this.causticsRenderHook = (camera) => {
         if (this.causticsPostProcess.render(camera)) return undefined;
         return this.originalTerrainRender.call(terrainView, camera);
       };
-      terrainView.prewarmPostProcessing = (camera) => {
+      this.causticsPrewarmHook = (camera) => {
         const original = this.originalTerrainPrewarm?.call(terrainView, camera) ?? false;
         const projected = this.causticsPostProcess.prewarm(camera);
         return Boolean(original || projected);
       };
+      terrainView.render = this.causticsRenderHook;
+      terrainView.prewarmPostProcessing = this.causticsPrewarmHook;
     }
   }
 
@@ -144,10 +148,11 @@ export class UnderwaterViewController {
       deltaSeconds,
       this.config.transitionSeconds,
     );
-    this.causticsPostProcess?.update({
-      blend: this.blend,
-      surfaceHeight: status.waterSurfaceHeight,
-    });
+    const causticsState = { blend: this.blend };
+    if (status.headSubmerged || status.waterDepth > 0) {
+      causticsState.surfaceHeight = status.waterSurfaceHeight;
+    }
+    this.causticsPostProcess?.update(causticsState);
     this.applyEnvironment();
     return this.blend;
   }
@@ -190,10 +195,16 @@ export class UnderwaterViewController {
       this.godRays.render = this.originalGodRaysRender;
     }
     if (this.causticsPostProcess) {
-      this.terrainView.render = this.originalTerrainRender;
-      this.terrainView.prewarmPostProcessing = this.originalTerrainPrewarm;
+      if (this.terrainView.render === this.causticsRenderHook) {
+        this.terrainView.render = this.originalTerrainRender;
+      }
+      if (this.terrainView.prewarmPostProcessing === this.causticsPrewarmHook) {
+        this.terrainView.prewarmPostProcessing = this.originalTerrainPrewarm;
+      }
       this.causticsPostProcess.dispose();
       this.causticsPostProcess = null;
+      this.causticsRenderHook = null;
+      this.causticsPrewarmHook = null;
     }
     this.lastTimestamp = null;
   }
