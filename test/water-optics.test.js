@@ -16,11 +16,12 @@ const optics = Object.freeze({
   deepDepth: 6,
   maximumOpticalDistance: 14,
   minimumViewCosine: 0.22,
+  surfaceTransitionDepth: 0.75,
   surfaceDetailStrength: 0.28,
   underwaterTintStrength: 0.35,
 });
 
-test('depth optics are monotonic and bounded', () => {
+test('depth optics are monotonic and bounded above the surface', () => {
   const shallow = computeWaterOpticsSample({ depth: 0.1, config: optics });
   const medium = computeWaterOpticsSample({ depth: 2, config: optics });
   const deep = computeWaterOpticsSample({ depth: 8, config: optics });
@@ -41,22 +42,29 @@ test('grazing views increase optical distance without exceeding the cap', () => 
   assert.ok(grazing.opticalDistance <= optics.maximumOpticalDistance);
 });
 
-test('underwater optics use camera submersion instead of seabed depth', () => {
+test('the waterline blends from bed depth to camera submersion depth', () => {
+  const surface = computeWaterOpticsSample({ depth: 20, config: optics });
   const justBelow = computeWaterOpticsSample({
     depth: 20,
-    underwater: true,
-    cameraSubmersionDepth: 0.2,
+    cameraSubmersionDepth: 0.001,
+    config: optics,
+  });
+  const transitioned = computeWaterOpticsSample({
+    depth: 20,
+    cameraSubmersionDepth: optics.surfaceTransitionDepth,
     config: optics,
   });
   const deepBelow = computeWaterOpticsSample({
     depth: 20,
-    underwater: true,
     cameraSubmersionDepth: 5,
     config: optics,
   });
-  assert.equal(justBelow.verticalDistance, 0.2);
-  assert.ok(justBelow.opacity < deepBelow.opacity);
-  assert.equal(justBelow.depthMix, 1);
+  assert.ok(Math.abs(surface.opacity - justBelow.opacity) < 1e-6);
+  assert.equal(surface.underwaterBlend, 0);
+  assert.equal(transitioned.underwaterBlend, 1);
+  assert.equal(transitioned.verticalDistance, optics.surfaceTransitionDepth);
+  assert.ok(transitioned.opacity < deepBelow.opacity);
+  assert.equal(transitioned.depthMix, 1);
 });
 
 test('optics validation rejects malformed colours and inverted ranges', () => {
