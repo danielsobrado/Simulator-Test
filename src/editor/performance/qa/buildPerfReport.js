@@ -69,6 +69,16 @@ function buildCollisionReport({ frames, counters, collisionConfig, collisionStat
     chunkBuild: timingSummary(frames, COLLISION_TIMING_COUNTERS.chunkBuild),
   });
   const enabled = collisionStatus?.active === true || collisionConfig?.enabled === true;
+  const readiness = Object.freeze({
+    ready: collisionStatus?.ready ?? !enabled,
+    policy: collisionStatus?.residency?.notReadyPolicy ?? null,
+    desiredChunks: collisionStatus?.residency?.desiredChunks ?? 0,
+    readyDesiredChunks: collisionStatus?.residency?.readyDesiredChunks ?? 0,
+    failure: collisionStatus?.failure ?? null,
+  });
+  const samplePassed = timingsMs.total.samples > 0;
+  const timingPassed = timingsMs.total.p95Ms <= COLLISION_P95_TARGET_MS;
+  const readinessPassed = readiness.ready && readiness.failure === null;
   return Object.freeze({
     enabled,
     timingsMs,
@@ -92,19 +102,17 @@ function buildCollisionReport({ frames, counters, collisionConfig, collisionStat
       failedChunks: count(counters, COLLISION_GAUGE_COUNTERS.failedChunks),
       finalQueueDepth: count(counters, COLLISION_GAUGE_COUNTERS.queueDepth),
     }),
-    readiness: Object.freeze({
-      ready: collisionStatus?.ready ?? !enabled,
-      policy: collisionStatus?.residency?.notReadyPolicy ?? null,
-      desiredChunks: collisionStatus?.residency?.desiredChunks ?? 0,
-      readyDesiredChunks: collisionStatus?.residency?.readyDesiredChunks ?? 0,
-      failure: collisionStatus?.failure ?? null,
-    }),
+    readiness,
     canonicalSignature: collisionStatus?.canonicalSignature ?? null,
     provider: collisionStatus?.provider ?? null,
     gate: Object.freeze({
       provisionalP95TargetMs: COLLISION_P95_TARGET_MS,
       measuredP95Ms: timingsMs.total.p95Ms,
-      passed: !enabled || timingsMs.total.p95Ms <= COLLISION_P95_TARGET_MS,
+      sampleCount: timingsMs.total.samples,
+      samplePassed,
+      timingPassed,
+      readinessPassed,
+      passed: !enabled || (samplePassed && timingPassed && readinessPassed),
     }),
   });
 }
