@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CollisionResidency } from '../src/editor/collision/CollisionResidency.js';
 import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
+import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
 
 const CONFIG = Object.freeze({
   residentRadius: 0,
@@ -25,6 +26,24 @@ function chunkAabb(chunkX, chunkZ) {
     maxZ: chunkZ * 128 + 2,
   };
 }
+
+test('idle residency flushes do not add chunk-build timing', () => {
+  PerfCounters.reset();
+  let timestamp = 0;
+  const residency = new CollisionResidency({
+    world: createWorld(),
+    config: CONFIG,
+    buildOwnerChunk: () => ({ revision: 1, colliders: [] }),
+    now: () => {
+      timestamp += 1;
+      return timestamp;
+    },
+  });
+
+  assert.deepEqual(residency.flush(), { attempted: 0, built: 0, remaining: 0 });
+  assert.equal(PerfCounters.get('collisionBuildMs'), 0);
+  PerfCounters.reset();
+});
 
 test('velocity prefetch reverses route priority without retaining stale queued chunks', () => {
   const world = createWorld();
