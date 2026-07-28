@@ -9,10 +9,16 @@ import { ConstructionInspector } from './ConstructionInspector.js';
 /**
  * The right-click palette for live constructions.
  *
- * Two rings, which is why the shared `RadialPalette` takes `rings` rather than
- * a flat list: materials on the outside, wall-top actions on the inside. The
- * reference game puts "Flat Top" on its colour tool, and grouping it with the
- * materials here is what makes one right-click cover both.
+ * Three rings, which is why the shared `RadialPalette` takes `rings` rather than
+ * a flat list: material presets on the outside, masonry bond in the middle,
+ * wall-top actions on the inside. The reference game puts "Flat Top" on its
+ * colour tool, and grouping all three here is what makes one right-click cover
+ * the whole look of a wall.
+ *
+ * Colour and bond are deliberately separate rings rather than a combined list of
+ * finished looks. They are independent — any bond in any stone — and a merged
+ * ring would be the product of the two, which is more petals than a radial menu
+ * can carry and more choices than the difference warrants.
  */
 
 /**
@@ -28,6 +34,25 @@ const TOP_ACTIONS = Object.freeze([
   { id: 'top:ruined', label: 'Ruin', color: '#a89684', glyph: '⋰' },
   { id: 'top:irregular', label: 'Irregular top', color: '#c2b9a4', glyph: '∿' },
 ]);
+
+/**
+ * How each masonry style shows up on the ring.
+ *
+ * Deliberately a warm neutral ramp rather than each style's own stone colour:
+ * the ring outside this one is *already* the colour choice, and painting a bond
+ * in limestone here would read as a second, conflicting way to set the same
+ * thing. The glyph carries the meaning, the ramp just groups the ring.
+ *
+ * Presentation lives here rather than in `ConstructionStyleCatalog`, which is
+ * solver input and gets loaded into the compiler worker.
+ */
+const STYLE_PETALS = Object.freeze({
+  'coursed-rubble': { color: '#d8d2c6', glyph: '▤' },
+  ashlar: { color: '#c9c3b6', glyph: '▦' },
+  'random-rubble': { color: '#b3aca0', glyph: '▨' },
+  'dry-stone': { color: '#9d968b', glyph: '▩' },
+});
+const STYLE_PETAL_FALLBACK = Object.freeze({ color: '#b3aca0', glyph: '▩' });
 
 export class ConstructionPaletteController {
   constructor({ host, controller, materialStore, onStatus = null }) {
@@ -68,6 +93,15 @@ export class ConstructionPaletteController {
       .slice(0, 8);
   }
 
+  /** One petal per masonry bond, in catalog order. */
+  stylePetals() {
+    return this.styleOptions().map(({ key, label }) => ({
+      id: `style:${key}`,
+      label,
+      ...(STYLE_PETALS[key] ?? STYLE_PETAL_FALLBACK),
+    }));
+  }
+
   open(constructionId, { clientX, clientY }) {
     this.inspector.close();
     this.constructionId = constructionId;
@@ -76,13 +110,14 @@ export class ConstructionPaletteController {
       clientY,
       rings: [
         {
-          radius: 79,
+          radius: 112,
           items: this.materialPresets().map((preset) => ({
             id: `material:${preset.id}`,
             label: preset.label,
             color: preset.baseColor,
           })),
         },
+        { radius: 79, items: this.stylePetals() },
         { radius: 46, items: TOP_ACTIONS },
       ],
       center: { action: 'reset-material', glyph: '↺', label: 'Reset material' },
@@ -116,6 +151,14 @@ export class ConstructionPaletteController {
         value,
       )?.label ?? value}.`);
     }
+    if (kind === 'style') {
+      this.controller.runConstructionCommand({
+        type: 'set_style',
+        constructionId: this.constructionId,
+        styleKey: value,
+      });
+      this.onStatus?.(`Masonry set to ${CONSTRUCTION_STYLES[value]?.label ?? value}.`);
+    }
     if (kind === 'top') {
       this.controller.setConstructionTopStyle(value);
       this.onStatus?.(`Wall top set to ${value}.`);
@@ -124,9 +167,10 @@ export class ConstructionPaletteController {
   }
 
   /**
-   * Hover preview is material-only: previewing a top style would re-pack the
-   * masonry on every pointer move, which is exactly what the "preview never
-   * waits for masonry" invariant forbids.
+   * Hover preview is material-only: previewing a bond or a top style would
+   * re-pack the masonry on every pointer move — `set_style` dirties every
+   * segment — which is exactly what the "preview never waits for masonry"
+   * invariant forbids.
    */
   preview(id) {
     if (!this.constructionId || !id.startsWith('material:')) return;

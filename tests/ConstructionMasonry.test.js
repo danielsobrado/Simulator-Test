@@ -78,34 +78,81 @@ test('packing is deterministic', () => {
   assert.deepEqual(pack(context), pack(context));
 });
 
+/**
+ * Field masonry grouped course by course, and within a course cell by cell.
+ *
+ * `CourseLattice` can cut a base cell into up to four stones, so the exact-fill
+ * contract now sits one level up: the *cells* tile the course, and the leaves
+ * partition their own cell. Grouping on `courseIndex` rather than on
+ * `heightRatio` is what makes that visible — a bed joint ramps along the wall, so
+ * two stones in one course legitimately sit at different heights.
+ *
+ * @returns courses bottom-up, each an array of cells ordered along the wall,
+ *   each cell `{ from, to, leaves }`.
+ */
+function fieldCells(result) {
+  const courses = new Map();
+  for (const stone of result.stones) {
+    if (stone.category !== 'field' || stone.courseIndex == null) continue;
+    if (!courses.has(stone.courseIndex)) courses.set(stone.courseIndex, new Map());
+    const cells = courses.get(stone.courseIndex);
+    const leaves = cells.get(stone.cellIndex);
+    if (leaves) leaves.push(stone);
+    else cells.set(stone.cellIndex, [stone]);
+  }
+  return [...courses.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, cells]) => [...cells.values()]
+      .map((leaves) => ({
+        from: Math.min(...leaves.map((leaf) => leaf.s - leaf.packedWidth / 2)),
+        to: Math.max(...leaves.map((leaf) => leaf.s + leaf.packedWidth / 2)),
+        leaves,
+      }))
+      .sort((a, b) => a.from - b.from));
+}
+
 test('each course tiles its arc range exactly', () => {
   const context = setup(straightPath());
-  const { stones } = pack(context);
-  assert.ok(stones.length > 20);
+  const result = pack(context);
+  assert.ok(result.stones.length > 20);
 
-  const byCourse = new Map();
-  for (const stone of stones) {
-    const key = stone.heightRatio.toFixed(6);
-    if (!byCourse.has(key)) byCourse.set(key, []);
-    byCourse.get(key).push(stone);
-  }
-  assert.ok(byCourse.size >= 6, 'a 3.5 m wall should have several courses');
+  const courses = fieldCells(result);
+  assert.ok(courses.length >= 6, 'a 3.5 m wall should have several courses');
 
-  for (const course of byCourse.values()) {
-    const ordered = [...course].sort((a, b) => a.s - b.s);
-    // Every stone survives on a flat, unruined wall, so the packed widths must
-    // tile the whole range with no gap and no overlap.
-    assert.ok(Math.abs((ordered[0].s - ordered[0].packedWidth / 2) - 0) < 1e-9);
-    const last = ordered.at(-1);
-    assert.ok(
-      Math.abs((last.s + last.packedWidth / 2) - context.arcTable.totalLength) < 1e-9,
-    );
-    for (let index = 1; index < ordered.length; index += 1) {
-      const previousEdge = ordered[index - 1].s + ordered[index - 1].packedWidth / 2;
-      const nextEdge = ordered[index].s - ordered[index].packedWidth / 2;
-      assert.ok(Math.abs(previousEdge - nextEdge) < 1e-9, 'gap or overlap between stones');
+  for (const cells of courses) {
+    // Every stone survives on a flat, unruined wall, so the cells must tile the
+    // whole range with no gap and no overlap.
+    assert.ok(Math.abs(cells[0].from) < 1e-9);
+    assert.ok(Math.abs(cells.at(-1).to - context.arcTable.totalLength) < 1e-9);
+    for (let index = 1; index < cells.length; index += 1) {
+      assert.ok(
+        Math.abs(cells[index].from - cells[index - 1].to) < 1e-9,
+        'gap or overlap between cells',
+      );
     }
   }
+});
+
+test('the leaves of a split cell partition it', () => {
+  // A split has to be a partition, not a cover: overlapping leaves would z-fight
+  // along the cut, and leaves that fall short would open a hole no mortar gap
+  // was sized for.
+  const context = setup(straightPath());
+  let split = 0;
+  for (const cells of fieldCells(context && pack(context))) {
+    for (const { from, to, leaves } of cells) {
+      if (leaves.length > 1) split += 1;
+      const covered = leaves.reduce(
+        (total, leaf) => total + leaf.packedWidth * leaf.bandHeight,
+        0,
+      );
+      assert.ok(
+        Math.abs(covered - (to - from)) < 1e-9,
+        `cell covers ${covered} of ${to - from}`,
+      );
+    }
+  }
+  assert.ok(split > 20, `the fixture should split many cells, split ${split}`);
 });
 
 test('stone width is capped so the chord hides inside the mortar joint', () => {
@@ -157,20 +204,12 @@ test('stones straddle the arc rather than chording to one side', () => {
 
 test('joints stagger against the course below', () => {
   const context = setup(straightPath());
-  const { stones } = pack(context);
-  const byCourse = new Map();
-  for (const stone of stones) {
-    const key = stone.heightRatio.toFixed(6);
-    if (!byCourse.has(key)) byCourse.set(key, []);
-    byCourse.get(key).push(stone);
-  }
-  const courses = [...byCourse.entries()]
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([, course]) => [...course].sort((a, b) => a.s - b.s));
+  const courses = fieldCells(pack(context));
 
-  const jointsOf = (course) => course
-    .slice(0, -1)
-    .map((stone) => stone.s + stone.packedWidth / 2);
+  // Cell joints only. A vertical split cuts a *new* joint inside a cell, and
+  // that one is deliberately not staggered against anything — it is a stone
+  // being broken in two, not a course being bonded.
+  const jointsOf = (cells) => cells.slice(0, -1).map((cell) => cell.to);
 
   const band = STYLE.targetWidth * 0.25;
   let checked = 0;
@@ -208,6 +247,15 @@ test('raising one end does not re-roll the masonry at the other', () => {
   // The whole point of hashing per-stone shaping on `stableIndex` rather than
   // pulling from the sequential stream: a dropped or added stone must not shift
   // every stone after it.
+  //
+  // The course grid is pinned across both fixtures, which is what the planner
+  // does in practice — it solves one `courseHeight` for the whole wall. Letting
+  // it float here would compare two different grids, and since a head joint's
+  // lean scales with course height, every stone in the wall would differ by a
+  // fraction of a millimetre for reasons that have nothing to do with seed
+  // locality. `ConstructionPlanner` hashes the wall-wide grid into every module
+  // precisely so a change to it rebuilds the whole wall rather than half of it.
+  const courseHeight = 0.42;
   const flat = setup(straightPath(30));
   const segmentId = flat.record.path.segments.at(-1).id;
   const raised = setup(straightPath(30), {
@@ -222,16 +270,20 @@ test('raising one end does not re-roll the masonry at the other', () => {
     },
   });
 
-  const before = new Map(pack(flat).stones.map((stone) => [stone.stableIndex, stone]));
-  const after = pack(raised).stones;
+  const before = new Map(
+    pack(flat, { courseHeight }).stones.map((stone) => [stone.stableIndex, stone]),
+  );
+  const after = pack(raised, { courseHeight }).stones;
   let compared = 0;
   for (const stone of after) {
     const original = before.get(stone.stableIndex);
     if (!original) continue;             // a course the flat wall never reached
     if (stone.s > 14) continue;          // inside the raise, heights legitimately differ
     assert.equal(stone.width, original.width);
+    assert.equal(stone.height, original.height);
     assert.equal(stone.depth, original.depth);
     assert.equal(stone.offsetNormal, original.offsetNormal);
+    assert.deepEqual(stone.corners, original.corners);
     compared += 1;
   }
   assert.ok(compared > 100, 'expected many shared stones to compare');
@@ -257,19 +309,6 @@ test('a ruined wall drops from the top and keeps a footing', () => {
   }
 });
 
-/** Field-stone courses, ordered bottom-up, each sorted along the wall. */
-function fieldCourses(result) {
-  const courses = new Map();
-  for (const stone of result.stones.filter(({ category }) => category === 'field')) {
-    const key = stone.heightRatio.toFixed(6);
-    if (!courses.has(key)) courses.set(key, []);
-    courses.get(key).push(stone);
-  }
-  return [...courses.entries()]
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([, course]) => [...course].sort((a, b) => a.s - b.s));
-}
-
 test('adjacent modules meet without leaving a full-height joint', () => {
   const context = setup(straightPath(36));
   const total = context.arcTable.totalLength;
@@ -278,14 +317,8 @@ test('adjacent modules meet without leaving a full-height joint', () => {
   const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
   const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
 
-  const leftEdges = fieldCourses(left).map((course) => {
-    const last = course.at(-1);
-    return last.s + last.packedWidth / 2;
-  });
-  const rightEdges = fieldCourses(right).map((course) => {
-    const first = course[0];
-    return first.s - first.packedWidth / 2;
-  });
+  const leftEdges = fieldCells(left).map((cells) => cells.at(-1).to);
+  const rightEdges = fieldCells(right).map((cells) => cells[0].from);
   assert.ok(leftEdges.length >= 6, 'the fixture should have several courses');
 
   // The two modules still meet exactly — no gap, no overlap.
@@ -322,14 +355,12 @@ test('boundaries still meet where curvature differs across the seam', () => {
 
   // The two halves of a tight arc really do get different stone widths.
   assert.notEqual(left.stats.targetWidth, undefined);
-  const leftCourses = fieldCourses(left);
-  const rightCourses = fieldCourses(right);
+  const leftCourses = fieldCells(left);
+  const rightCourses = fieldCells(right);
   assert.ok(leftCourses.length > 1 && leftCourses.length === rightCourses.length);
 
   for (let index = 0; index < leftCourses.length; index += 1) {
-    const last = leftCourses[index].at(-1);
-    const first = rightCourses[index][0];
-    const gap = (first.s - first.packedWidth / 2) - (last.s + last.packedWidth / 2);
+    const gap = rightCourses[index][0].from - leftCourses[index].at(-1).to;
     assert.ok(Math.abs(gap) < 1e-9, `course ${index} tore open a ${gap.toFixed(4)} m gap`);
   }
 });
@@ -342,12 +373,26 @@ test('the wall ends stay hard edges even as boundaries wander', () => {
   const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
   const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
 
-  for (const course of fieldCourses(left)) {
-    assert.ok(Math.abs((course[0].s - course[0].packedWidth / 2) - 0) < 1e-9);
+  for (const cells of fieldCells(left)) {
+    assert.ok(Math.abs(cells[0].from) < 1e-9);
+    // A hard edge is plumb as well as exact: the lean every other head joint
+    // gets would throw the end stone out past the end of the wall. Only the
+    // leaves actually touching the wall start — a vertical split puts its right
+    // child on an interior joint, which is free to lean. Corners 0 and 3 are the
+    // bottom-left and top-left of the face.
+    const touching = cells[0].leaves.filter(
+      (leaf) => Math.abs((leaf.s - leaf.packedWidth / 2) - cells[0].from) < 1e-9,
+    );
+    assert.ok(touching.length > 0);
+    for (const leaf of touching) {
+      assert.ok(
+        Math.abs(leaf.corners[0][0] - leaf.corners[3][0]) < 1e-9,
+        'the wall-start joint leaned',
+      );
+    }
   }
-  for (const course of fieldCourses(right)) {
-    const last = course.at(-1);
-    assert.ok(Math.abs((last.s + last.packedWidth / 2) - total) < 1e-9);
+  for (const cells of fieldCells(right)) {
+    assert.ok(Math.abs(cells.at(-1).to - total) < 1e-9);
   }
 });
 
@@ -355,16 +400,37 @@ test('adjacent modules share a course grid so courses do not step', () => {
   const context = setup(straightPath(36));
   const total = context.arcTable.totalLength;
   const middle = total / 2;
-  const courseHeight = 0.44;
-  const wall = { wallRange: [0, total], courseHeight };
+  const wall = { wallRange: [0, total], courseHeight: 0.44 };
   const left = pack(context, { arcRange: [0, middle], seedOffset: 0, ...wall });
   const right = pack(context, { arcRange: [middle, total], seedOffset: 1, ...wall });
 
-  const heights = (result) => [...new Set(
+  const courseIndices = (result) => [...new Set(
     result.stones.filter(({ category }) => category === 'field')
-      .map(({ heightRatio }) => heightRatio.toFixed(6)),
-  )].sort();
-  assert.deepEqual(heights(left), heights(right), 'courses must line up across the seam');
+      .map(({ courseIndex }) => courseIndex),
+  )].sort((a, b) => a - b);
+  assert.deepEqual(
+    courseIndices(left),
+    courseIndices(right),
+    'courses must line up across the seam',
+  );
+
+  // And the bed line itself has to agree, not just the course numbering: the
+  // two modules meet along one continuous ramp or the seam shows as a step of a
+  // whole course. Checked to the width of the mortar joint rather than to 1e-9,
+  // because each stone's own hashed inset has already shrunk its face by then —
+  // `tests/ConstructionCourseLattice.test.js` pins the exact continuity upstream
+  // of that, where it is a property of the lattice rather than of the packer.
+  const seamBed = (result, atEnd) => fieldCells(result).map((course) => {
+    const cell = atEnd ? course.at(-1) : course[0];
+    const leaf = [...cell.leaves].sort((a, b) => a.y - b.y)[0];
+    return leaf.y + leaf.corners[atEnd ? 1 : 0][1];
+  });
+  const leftSeam = seamBed(left, true);
+  const rightSeam = seamBed(right, false);
+  for (let index = 0; index < leftSeam.length; index += 1) {
+    const step = leftSeam[index] - rightSeam[index];
+    assert.ok(Math.abs(step) < 0.02, `bed line steps by ${step} at course ${index}`);
+  }
 });
 
 test('a zero-length or zero-height range yields nothing rather than throwing', () => {

@@ -127,16 +127,17 @@ test('stone edges land flush on the jamb line', () => {
   // must sit on the reserved boundary, not wherever a dropped stone ended.
   const courses = new Map();
   for (const stone of field) {
-    const key = stone.heightRatio.toFixed(6);
-    if (!courses.has(key)) courses.set(key, []);
-    courses.get(key).push(stone);
+    if (!courses.has(stone.courseIndex)) courses.set(stone.courseIndex, []);
+    courses.get(stone.courseIndex).push(stone);
   }
+  // The grid the packer solved on: the style's course height flat, from grade up.
+  const courseHeight = STYLE.courseHeight;
   let checked = 0;
-  for (const course of courses.values()) {
-    // Reconstruct the *course* height. `stone.y` carries a per-stone jitter of
-    // up to +-12 mm, which is enough to move the reserved half-width and make
-    // the comparison miss by a fraction of a millimetre.
-    const y = course[0].heightRatio * 3.5;
+  for (const [courseIndex, course] of courses) {
+    // Reconstruct the *course* centre, the height the opening was reserved
+    // against. A stone's own `y` is the centre of its face, which the bed ramp
+    // and a horizontal split both move by more than enough to miss the jamb.
+    const y = (courseIndex + 0.5) * courseHeight;
     const half = openingHalfWidthAt(arch, y);
     if (half <= 0) continue;
     const spans = survivingIntervals([0, context.arcTable.totalLength], [arch], y);

@@ -13,15 +13,19 @@
  * order the reference builds in, and it is what widens the size distribution —
  * one big block beside two stacked small ones — without moving the stone count.
  *
- * The calibration each row holds to is
- * `courseHeight * targetWidth / (1 + c + c^2) ~= the pre-lattice cell area`, so
- * stones per square metre and therefore the triangle budget are unchanged:
+ * These are tuned against measurement, not against the analytic leaf count. Two
+ * things pull away from `1 + c + c^2`: rejecting a split that would fall under
+ * `minWidth` or `MIN_SPLIT_HEIGHT` costs a few percent, more of it the busier the
+ * style; and `courseHeight` is only a target, since the packer divides the wall
+ * body into a whole number of courses. Tune `targetWidth` against the density
+ * table below — over 60 m x 3.34 m, five seeds — rather than against the cell
+ * arithmetic, and expect a couple of percent of drift at other wall heights.
  *
- * | style          | pre-lattice | 1+c+c^2 | area / leaf |
- * | coursed-rubble | 0.46 x 0.92 = 0.423 | 1.596 | 0.672 / 1.596 = 0.421 |
- * | ashlar         | 0.38 x 1.10 = 0.418 | 1.240 | 0.519 / 1.240 = 0.419 |
- * | random-rubble  | 0.34 x 0.62 = 0.211 | 1.960 | 0.414 / 1.960 = 0.211 |
- * | dry-stone      | 0.28 x 0.54 = 0.151 | 2.142 | 0.324 / 2.142 = 0.151 |
+ * | style          | leaves/cell | stones/m2 | pre-lattice | delta |
+ * | coursed-rubble | 1.535       | 2.298     | 2.363       | -2.7% |
+ * | ashlar         | 1.194       | 2.431     | 2.392       | +1.6% |
+ * | random-rubble  | 1.842       | 4.706     | 4.744       | -0.8% |
+ * | dry-stone      | 1.987       | 6.604     | 6.614       | -0.2% |
  */
 
 export const CONSTRUCTION_STYLES = Object.freeze({
@@ -58,7 +62,7 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     key: 'random-rubble',
     label: 'Random rubble',
     courseHeight: 0.46,
-    targetWidth: 0.9,
+    targetWidth: 0.94,
     minWidth: 0.2,
     irregularity: 0.72,
     detail: 2,

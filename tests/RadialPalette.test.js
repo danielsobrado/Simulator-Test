@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildRadialMarkup, petalAngle } from '../src/editor/ui/RadialPalette.js';
+import { buildRadialMarkup, paletteRadius, petalAngle } from '../src/editor/ui/RadialPalette.js';
 
 function petals(markup) {
   return [...markup.matchAll(/data-radial-item="([^"]*)"[^>]*style="([^"]*)"/g)]
@@ -46,6 +46,19 @@ test('each ring carries its own radius', () => {
     styleVar(found[0].style, 'ring-radius'),
     styleVar(found[1].style, 'ring-radius'),
   );
+});
+
+test('the palette reserves room for its outermost ring', () => {
+  // The disc used to be a fixed 220px, which a third ring's petals fell outside
+  // of — both the backdrop and the box the viewport clamp reasons about.
+  const twoRings = paletteRadius([{ radius: 79 }, { radius: 46 }]);
+  const threeRings = paletteRadius([{ radius: 112 }, { radius: 79 }, { radius: 46 }]);
+  assert.ok(threeRings > twoRings);
+  assert.ok(threeRings > 112, 'the outermost petals must sit inside the disc');
+  // A ring without an explicit radius still gets the default reserved.
+  assert.equal(paletteRadius([{}]), twoRings);
+  assert.equal(paletteRadius([]), twoRings);
+  assert.equal(paletteRadius(), twoRings);
 });
 
 test('petals without a colour fall back to the stylesheet default', () => {

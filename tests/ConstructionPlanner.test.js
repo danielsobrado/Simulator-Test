@@ -64,31 +64,42 @@ test('modules tile the whole wall with no gap between them', () => {
 
 test('masonry covers every course from wall start to wall end', () => {
   const plan = planConstruction(record(), { maxModuleLength: 8 });
+  // Grouped by course and then by base cell: `CourseLattice` can cut a cell into
+  // several stones, so it is the cells that tile the course. Keyed on
+  // `courseIndex` rather than on `heightRatio`, which a ramped bed joint no
+  // longer holds constant along a course.
   const courses = new Map();
   for (const module of plan.modules) {
     for (const placement of module.placements ?? []) {
       if (placement.category !== 'field') continue;
-      const key = Math.round(placement.heightRatio * 1e5);
-      if (!courses.has(key)) courses.set(key, []);
-      courses.get(key).push(placement);
+      if (!courses.has(placement.courseIndex)) courses.set(placement.courseIndex, new Map());
+      const cells = courses.get(placement.courseIndex);
+      // `cellIndex` is module-local, so qualify it before pooling modules.
+      const key = `${module.id}:${placement.cellIndex}`;
+      const leaves = cells.get(key);
+      if (leaves) leaves.push(placement);
+      else cells.set(key, [placement]);
     }
   }
   assert.ok(courses.size >= 4, 'the fixture should have several courses');
-  for (const [key, course] of courses) {
-    course.sort((a, b) => a.s - b.s);
+  for (const [courseIndex, cells] of courses) {
+    const spans = [...cells.values()]
+      .map((leaves) => [
+        Math.min(...leaves.map((leaf) => leaf.s - leaf.packedWidth / 2)),
+        Math.max(...leaves.map((leaf) => leaf.s + leaf.packedWidth / 2)),
+      ])
+      .sort((a, b) => a[0] - b[0]);
     assert.ok(
-      Math.abs((course[0].s - course[0].packedWidth / 2)) < 1e-6,
-      `course ${key} does not reach the wall start`,
+      Math.abs(spans[0][0]) < 1e-6,
+      `course ${courseIndex} does not reach the wall start`,
     );
-    const last = course.at(-1);
     assert.ok(
-      Math.abs((last.s + last.packedWidth / 2) - plan.totalLength) < 1e-6,
-      `course ${key} does not reach the wall end`,
+      Math.abs(spans.at(-1)[1] - plan.totalLength) < 1e-6,
+      `course ${courseIndex} does not reach the wall end`,
     );
-    for (let index = 1; index < course.length; index += 1) {
-      const gap = (course[index].s - course[index].packedWidth / 2)
-        - (course[index - 1].s + course[index - 1].packedWidth / 2);
-      assert.ok(Math.abs(gap) < 1e-6, `course ${key} has a ${gap.toFixed(4)} m hole`);
+    for (let index = 1; index < spans.length; index += 1) {
+      const gap = spans[index][0] - spans[index - 1][1];
+      assert.ok(Math.abs(gap) < 1e-6, `course ${courseIndex} has a ${gap.toFixed(4)} m hole`);
     }
   }
 });
@@ -140,32 +151,43 @@ test('a top profile edit only reaches the modules it interpolates across', () =>
   // control point sets the whole wall, because the profile clamps outside its
   // outermost point — so this test uses the shape the gesture actually emits.
   const lastSegmentId = record().path.segments.at(-1).id;
-  const withPeak = (height) => {
+  const hashesOf = (shoulder, peak) => {
     const source = record();
     source.top = {
       style: 'flat',
       base: 4,
       profile: [
-        { segmentId: lastSegmentId, arcFraction: 0.55, height: 4 },
-        { segmentId: lastSegmentId, arcFraction: 0.8, height },
-        { segmentId: lastSegmentId, arcFraction: 0.98, height: 4 },
+        { segmentId: lastSegmentId, arcFraction: 0.5, height: 4 },
+        { segmentId: lastSegmentId, arcFraction: 0.65, height: shoulder },
+        { segmentId: lastSegmentId, arcFraction: 0.8, height: peak },
+        { segmentId: lastSegmentId, arcFraction: 0.95, height: 4 },
       ],
     };
-    return source;
+    return new Map(
+      planConstruction(source, { maxModuleLength: 8 })
+        .modules.map(({ id, contentHash }) => [id, contentHash]),
+    );
   };
-  const before = planConstruction(withPeak(5), { maxModuleLength: 8 });
-  const after = planConstruction(withPeak(7), { maxModuleLength: 8 });
-  const beforeHashes = new Map(before.modules.map(({ id, contentHash }) => [id, contentHash]));
-  const firstModule = after.modules[0];
-  assert.equal(
-    firstModule.contentHash,
-    beforeHashes.get(firstModule.id),
-    'a raise at the far end must not dirty the near end',
-  );
-  assert.notEqual(
-    after.modules.at(-1).contentHash,
-    beforeHashes.get(after.modules.at(-1).id),
-  );
+
+  const base = hashesOf(4, 5);
+  const ids = [...base.keys()];
+
+  // A shoulder moved under the peak, and a raise that lifts the peak itself.
+  // Both stay local, including the second: the course grid is the style's course
+  // height flat, so no top edit can re-space the courses on a module the edit
+  // never reached. Deriving the grid from the wall's tallest point instead made
+  // every raise a whole-wall rebuild.
+  for (const [label, changed] of [
+    ['shoulder', hashesOf(4.6, 5)],
+    ['peak', hashesOf(4, 7)],
+  ]) {
+    assert.equal(
+      changed.get(ids[0]),
+      base.get(ids[0]),
+      `a ${label} edit at the far end reached the near end`,
+    );
+    assert.notEqual(changed.get(ids.at(-1)), base.get(ids.at(-1)));
+  }
 });
 
 test('editing one segment leaves other segment module IDs stable', () => {

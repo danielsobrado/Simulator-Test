@@ -221,9 +221,11 @@ export function packCurvedWall({
   const bodyHeightAt = (s) => Math.max(0.12, topHeightAt(s) - copingHeight);
 
   const bodyMax = Math.max(0.12, maxTop - copingHeight);
-  const courseHeight = courseHeightOverride
-    ?? bodyMax / Math.max(1, Math.ceil(bodyMax / style.courseHeight));
-  const courses = Math.max(1, Math.round(bodyMax / courseHeight));
+  const courseHeight = courseHeightOverride ?? style.courseHeight;
+  // Ceil, not round: the top course is trimmed to the wall profile by
+  // `resolveCellCorners`, so overshooting costs nothing and rounding down would
+  // leave up to half a course of bare wall under the coping.
+  const courses = Math.max(1, Math.ceil(bodyMax / courseHeight));
   const heightScale = heightReference ?? maxTop;
   const random = createRandom(mixSeed(seed, seedOffset));
   const shapeSeed = mixSeed(seed ^ SHAPE_HASH, seedOffset);

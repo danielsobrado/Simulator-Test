@@ -9,8 +9,10 @@
 
 .radial-palette {
   position: absolute;
-  width: 220px;
-  height: 220px;
+  /* Sized by `RadialPalette.open` from the rings it was given, so a palette can
+     carry a third ring without its petals falling outside the backdrop. */
+  width: var(--palette-size, 220px);
+  height: var(--palette-size, 220px);
   translate: -50% -50%;
   border: 1px solid rgb(255 255 255 / 24%);
   border-radius: 50%;

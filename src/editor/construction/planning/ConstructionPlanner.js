@@ -143,14 +143,10 @@ export function planConstruction(input, {
     hasher.number(record.dimensions.thickness);
     hasher.text(record.top.style);
     hasher.number(record.top.base);
-    // The course grid is solved for the whole wall (see below), so a top edit
-    // anywhere can re-space the courses everywhere. Without it in the hash the
-    // edited module rebuilds onto the new grid while its neighbour keeps the old
-    // one, and the courses step at the seam — the exact failure the wall-wide
-    // grid exists to prevent. Locality still holds for the common case, because
-    // the grid only moves when the wall's tallest point crosses a course.
-    hasher.number(wallCourseHeight ?? 0);
-    hasher.number(wallTopHeight ?? 0);
+    // The course grid deliberately does not appear here. It is a function of
+    // `record.style.key` alone (see below), which is already hashed, so no top
+    // edit can leave one module on a stale grid while its neighbour moves to a
+    // new one.
     for (const point of modulePoints) {
       hasher.number(point.x);
       hasher.number(point.z);
@@ -197,7 +193,16 @@ export function planConstruction(input, {
   const topProfile = masonry ? createWallTopProfile(record, arcTable, { style }) : null;
   // One course grid for the whole wall. Derived per module it would drift
   // wherever the top height differs, and courses would step at the boundary.
-  let wallCourseHeight = null;
+  //
+  // It is the style's course height flat, *not* the wall body divided into a
+  // whole number of courses. Normalising it that way made the grid a function of
+  // the wall's tallest point, which meant every module had to be rebuilt
+  // whenever a top edit moved that point — and if they were not, the ones that
+  // were rebuilt stepped against the ones that were not. The packer now trims
+  // its top course against the wall profile instead (`resolveCellCorners`'s
+  // ceiling clamp), so a wall that is not a whole number of courses tall simply
+  // finishes on a short course, the way a real one does.
+  const wallCourseHeight = masonry ? style.courseHeight : null;
   let wallTopHeight = null;
   if (masonry) {
     let wallTop = 0;
@@ -205,10 +210,9 @@ export function planConstruction(input, {
     for (let index = 0; index <= samples; index += 1) {
       wallTop = Math.max(wallTop, topProfile.heightAt((sampled.totalDistance * index) / samples));
     }
-    const body = Math.max(0.12, wallTop - (
-      record.top.style === 'flat' || record.top.style === 'irregular' ? 0.16 : 0
-    ));
-    wallCourseHeight = body / Math.max(1, Math.ceil(body / style.courseHeight));
+    // Only the weathering normaliser. It is not hashed: a stale one shifts a
+    // shading gradient by a fraction of a percent and self-corrects on the next
+    // rebuild, which is not worth dirtying the whole wall for.
     wallTopHeight = wallTop;
   }
   let stoneTotal = 0;

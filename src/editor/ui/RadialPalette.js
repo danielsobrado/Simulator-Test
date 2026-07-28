@@ -16,6 +16,16 @@
 // module's layout maths is unit-tested, and Node's loader cannot resolve a CSS
 // import. See `radialPalette.css`, imported from `src/main.js`.
 const DEFAULT_RING_RADIUS = 79;
+/** Clearance from the outermost ring to the palette's own edge, in pixels. */
+const RING_MARGIN = 40;
+
+/** The radius the palette has to reserve for the rings it was given. */
+export function paletteRadius(rings = []) {
+  return Math.max(
+    DEFAULT_RING_RADIUS,
+    ...rings.map((ring) => ring.radius ?? DEFAULT_RING_RADIUS),
+  ) + RING_MARGIN;
+}
 
 function escapeAttribute(value) {
   return String(value ?? '')
@@ -122,12 +132,14 @@ export class RadialPalette {
     this.element.innerHTML = buildRadialMarkup({ rings, center, footer });
     this.element.hidden = false;
 
+    // Grow the disc to the rings it was given. Fixed at two rings' worth, a
+    // third ring's petals would sit outside the backdrop and outside the box the
+    // clamp below reasons about.
+    const radius = paletteRadius(rings);
+    this.element.style.setProperty('--palette-size', `${radius * 2}px`);
+
     // Clamp inside the host so a palette opened near an edge stays reachable.
     const bounds = this.host.getBoundingClientRect();
-    const radius = Math.max(
-      DEFAULT_RING_RADIUS,
-      ...rings.map((ring) => ring.radius ?? DEFAULT_RING_RADIUS),
-    ) + 37;
     const x = Math.min(bounds.width - radius, Math.max(radius, clientX - bounds.left));
     const y = Math.min(bounds.height - radius, Math.max(radius, clientY - bounds.top));
     this.element.style.left = `${x}px`;
