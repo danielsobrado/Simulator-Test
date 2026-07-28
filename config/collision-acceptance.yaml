@@ -1,0 +1,97 @@
+version: 1
+repeats: 3
+baselineCase: open-ground-baseline
+hitchMs: 33.3
+timeoutPaddingSeconds: 90
+
+gates:
+  collisionP95Ms: 0.83
+  frameP95RegressionMs: 0.83
+  maxHitches: 0
+  maxReadinessMisses: 0
+  maxFailedChunks: 0
+  maxFinalQueueDepth: 0
+  requireCanonicalSignature: true
+  requireConsistentAdapter: true
+
+requiredCoverage:
+  - open-ground-run
+  - dense-forest-run
+  - scree-field-traversal
+  - walkable-rock-climb-loop
+  - dense-object-town
+  - long-curved-wall-traversal
+  - repeated-collision-chunk-crossing
+  - floating-origin-rebase-during-movement
+  - construction-edit-rebuild-nearby
+
+cases:
+  - id: open-ground-baseline
+    label: Open-ground no-collision baseline
+    scenario: move
+    collisionRequired: false
+    warmupSeconds: 5
+    durationSeconds: 12
+    speed: run
+    coverage:
+      - open-ground-run
+
+  - id: production-tree-trunk
+    label: Production tree trunk
+    scenario: collision-p3
+    collisionRequired: true
+    warmupSeconds: 8
+    durationSeconds: 6
+    speed: run
+    coverage:
+      - tree-trunk-production
+
+  - id: production-blocking-rock
+    label: Production blocking rock
+    scenario: collision-p4
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 7
+    speed: run
+    coverage:
+      - blocking-rock-production
+
+  - id: walkable-rock-bvh
+    label: Walkable rock BVH
+    scenario: collision-p5
+    collisionRequired: true
+    warmupSeconds: 12
+    durationSeconds: 10
+    speed: run
+    coverage:
+      - walkable-rock-contact
+
+  - id: placed-object-doorway
+    label: Placed-object doorway
+    scenario: collision-p6
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 9
+    speed: run
+    coverage:
+      - placed-object-doorway
+
+  - id: construction-wall
+    label: Construction wall
+    scenario: collision-p7
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 5
+    speed: run
+    coverage:
+      - construction-wall
+
+  - id: full-stack-chunk-crossing
+    label: Full-stack repeated collision chunk crossing
+    scenario: collision-p8
+    collisionRequired: true
+    warmupSeconds: 12
+    durationSeconds: 60
+    speed: run
+    coverage:
+      - repeated-collision-chunk-crossing
