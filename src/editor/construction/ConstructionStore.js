@@ -1,3 +1,4 @@
+import { constructionCollisionSource } from '../collision/providers/ConstructionCollisionSource.js';
 import { normalizeConstructionRecord } from './ConstructionSchema.js';
 
 function clone(value) {
@@ -51,6 +52,7 @@ export class ConstructionStore {
     const record = normalizeConstructionRecord(input);
     if (this.records.has(record.id)) throw new Error(`Construction ${record.id} already exists.`);
     this.records.set(record.id, record);
+    constructionCollisionSource.setActive(record);
     this.nextId = Math.max(this.nextId, numericSuffix(record.id) + 1);
     const snapshot = clone(record);
     this.emit({ kind: 'add', id: record.id, before: null, after: snapshot });
@@ -73,6 +75,7 @@ export class ConstructionStore {
       revision: current.revision + 1,
     });
     this.records.set(key, record);
+    constructionCollisionSource.setActive(record);
     const before = clone(current);
     const after = clone(record);
     this.emit({ kind: 'update', id: key, before, after, hint });
@@ -84,6 +87,7 @@ export class ConstructionStore {
     const current = this.records.get(key);
     if (!current) return null;
     this.records.delete(key);
+    constructionCollisionSource.remove(key);
     const snapshot = clone(current);
     this.emit({ kind: 'remove', id: key, before: snapshot, after: null });
     return snapshot;
@@ -93,6 +97,7 @@ export class ConstructionStore {
     const record = normalizeConstructionRecord(input);
     if (this.records.has(record.id)) throw new Error(`Construction ${record.id} already exists.`);
     this.records.set(record.id, record);
+    constructionCollisionSource.setActive(record);
     this.nextId = Math.max(this.nextId, numericSuffix(record.id) + 1);
     const snapshot = clone(record);
     this.emit({ kind: 'restore', id: record.id, before: null, after: snapshot });
@@ -103,7 +108,13 @@ export class ConstructionStore {
     const source = direction === 'undo' ? change.after : change.before;
     const target = direction === 'undo' ? change.before : change.after;
     if (source) this.records.delete(source.id);
-    if (target) this.records.set(target.id, normalizeConstructionRecord(target));
+    if (target) {
+      const record = normalizeConstructionRecord(target);
+      this.records.set(target.id, record);
+      constructionCollisionSource.setActive(record);
+    } else if (source) {
+      constructionCollisionSource.remove(source.id);
+    }
     this.nextId = Math.max(
       1,
       ...[...this.records.keys()].map((id) => numericSuffix(id) + 1),
@@ -127,6 +138,7 @@ export class ConstructionStore {
   clear() {
     const previous = this.list();
     this.records.clear();
+    constructionCollisionSource.clear();
     this.nextId = 1;
     if (previous.length > 0) this.emit({ kind: 'clear', before: previous, after: [] });
     return previous;
@@ -141,6 +153,7 @@ export class ConstructionStore {
       next.set(record.id, record);
     }
     this.records = next;
+    constructionCollisionSource.replaceActive(normalized);
     this.nextId = Math.max(1, ...normalized.map(({ id }) => numericSuffix(id) + 1));
     this.emit({ kind: 'replace', before: null, after: this.list() });
   }
@@ -153,4 +166,3 @@ export class ConstructionStore {
     this.replaceAll(records ?? []);
   }
 }
-
