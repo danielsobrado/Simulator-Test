@@ -198,7 +198,9 @@ function courseCoversPlacement(placement, above) {
   if (!above || above.length === 0 || placement.ruin?.damageVoid) return false;
   const [s0, s1] = placementSpan(placement);
   const width = Math.max(0, s1 - s0);
-  if (!(width > 0)) return false;
+  // Legacy fixtures and non-lattice callers may omit horizontal dimensions. The
+  // old reducer stretched those inputs unconditionally, so retain that contract.
+  if (!(width > 0)) return true;
   const coverage = coverageWithinSpan(s0, s1, above.map(placementSpan));
   return coverage.ratio >= 0.75 && coverage.largestGap <= width * 0.25;
 }
