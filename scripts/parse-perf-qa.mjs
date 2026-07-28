@@ -94,3 +94,7 @@ console.log(`textureBytesUploaded=${counters.textureBytesUploaded ?? 0}`);
 
 console.log(`source: ${inputPath}`);
 console.log(`report: ${outPath} (${fs.statSync(outPath).size} bytes)`);
+
+if (scenario.id === 'collision-p8' && collision?.gate?.passed !== true) {
+  process.exitCode = 1;
+}
