@@ -4,7 +4,10 @@ import { ConstructionCollisionProvider } from '../src/editor/collision/providers
 import { ConstructionCollisionSource } from '../src/editor/collision/providers/ConstructionCollisionSource.js';
 import { compileConstructionCollision } from '../src/editor/construction/compile/ConstructionCollisionCompiler.js';
 import { sampleCubicBezierPath } from '../src/editor/construction/curve/CubicBezierPath.js';
-import { straightConstruction } from './helpers/constructionCollisionFixtures.js';
+import {
+  doorFeature,
+  straightConstruction,
+} from './helpers/constructionCollisionFixtures.js';
 
 function compile(record) {
   return compileConstructionCollision(record, sampleCubicBezierPath(record.path));
@@ -41,6 +44,32 @@ test('construction provider emits stable canonical wall colliders', () => {
   assert.ok(Math.abs(collider.aabb.maxY - 4.3) < 1e-9);
   assert.ok(Math.abs(collider.position[1] - 1.71) < 1e-9);
   assert.equal(built.signature, provider.buildChunkData(0, 0).signature);
+});
+
+test('elevated doorway bands preserve clearance above the highest grade', () => {
+  const source = new ConstructionCollisionSource();
+  const record = straightConstruction({
+    id: 'construction-slope-door',
+    features: [doorFeature()],
+  });
+  const plan = compile(record);
+  const lintelBox = plan.boxes.find(
+    (box) => box.openingIds.includes('door-main') && box.bottom === 2.2,
+  );
+  source.setActive(record);
+  source.applyPlan(record, plan);
+  const provider = createProvider(source, (x) => x * 0.1);
+  const colliders = [
+    ...provider.buildChunkData(-1, 0).colliders,
+    ...provider.buildChunkData(0, 0).colliders,
+  ];
+  const lintel = colliders.find(
+    (collider) => collider.sourceId === `construction:${record.id}:${lintelBox.id}`,
+  );
+
+  assert.ok(lintel);
+  assert.ok(Math.abs(lintel.aabb.minY - 2.3) < 1e-9);
+  assert.ok(Math.abs(lintel.aabb.maxY - 3.6) < 1e-9);
 });
 
 test('construction plan replacement dirties only old and new owner chunks', () => {
