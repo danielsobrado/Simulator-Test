@@ -1,6 +1,7 @@
 import { Box3, Line3, Vector3 } from 'three';
 import { INTERSECTED } from 'three-mesh-bvh';
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
+import { COLLISION_COUNT_COUNTERS } from '../CollisionPerfCounters.js';
 import { createMeshInstanceTransform } from './MeshInstanceTransform.js';
 
 const EPSILON = 1e-8;
@@ -96,6 +97,8 @@ export function findMeshSideContact({ capsule, collider, prototype, skinWidth = 
 
   PerfCounters.inc('collisionMeshQueries');
   PerfCounters.inc('collisionMeshTriangleTests', triangleTests);
+  PerfCounters.inc(COLLISION_COUNT_COUNTERS.bvhQueries);
+  PerfCounters.inc(COLLISION_COUNT_COUNTERS.triangleTests, triangleTests);
   if (!best) return null;
   PerfCounters.inc('collisionMeshContacts');
   out.sourceId = collider.sourceId;
@@ -214,6 +217,8 @@ export function findMeshTopSupport({
 
   PerfCounters.inc('collisionMeshSupportQueries');
   PerfCounters.inc('collisionMeshSupportTriangleTests', triangleTests);
+  PerfCounters.inc(COLLISION_COUNT_COUNTERS.bvhQueries);
+  PerfCounters.inc(COLLISION_COUNT_COUNTERS.triangleTests, triangleTests);
   if (!best) return null;
   PerfCounters.inc('collisionMeshSupportHits');
   return Object.freeze({
