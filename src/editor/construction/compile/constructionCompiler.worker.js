@@ -1,11 +1,11 @@
-import { planConstruction } from '../planning/ConstructionPlanner.js';
+import { compileConstructionPlan } from './compileConstructionPlan.js';
 
 self.addEventListener('message', ({ data }) => {
   const { requestId, record, options } = data;
   try {
     self.postMessage({
       requestId,
-      plan: planConstruction(record, options),
+      plan: compileConstructionPlan(record, options),
     });
   } catch (error) {
     self.postMessage({
@@ -14,4 +14,3 @@ self.addEventListener('message', ({ data }) => {
     });
   }
 });
-
