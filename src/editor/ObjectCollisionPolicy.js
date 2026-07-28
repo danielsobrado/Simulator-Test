@@ -1,0 +1,30 @@
+export const OBJECT_COLLISION_POLICY_NONE = 'none';
+export const OBJECT_COLLISION_POLICY_SOLID = 'solid';
+export const OBJECT_COLLISION_POLICY_TRIGGER = 'trigger';
+export const OBJECT_COLLISION_POLICY_WALKABLE = 'walkable';
+
+export const OBJECT_COLLISION_POLICIES = Object.freeze(new Set([
+  OBJECT_COLLISION_POLICY_NONE,
+  OBJECT_COLLISION_POLICY_SOLID,
+  OBJECT_COLLISION_POLICY_TRIGGER,
+  OBJECT_COLLISION_POLICY_WALKABLE,
+]));
+
+const MODEL_DEFAULTS = Object.freeze({
+  bush: OBJECT_COLLISION_POLICY_NONE,
+  cropField: OBJECT_COLLISION_POLICY_NONE,
+  campfire: OBJECT_COLLISION_POLICY_TRIGGER,
+});
+
+const CATEGORY_DEFAULTS = Object.freeze({
+  building: OBJECT_COLLISION_POLICY_SOLID,
+  defense: OBJECT_COLLISION_POLICY_SOLID,
+  civic: OBJECT_COLLISION_POLICY_SOLID,
+  nature: OBJECT_COLLISION_POLICY_SOLID,
+});
+
+export function defaultObjectCollisionPolicy(rawDefinition) {
+  return MODEL_DEFAULTS[rawDefinition.model]
+    ?? CATEGORY_DEFAULTS[rawDefinition.category]
+    ?? OBJECT_COLLISION_POLICY_NONE;
+}
