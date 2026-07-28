@@ -11,6 +11,7 @@ import { createCubicBezierPathFromStroke } from '../src/editor/construction/curv
 
 function survivor(s0, s1, top) {
   return {
+    category: 'field',
     support: {
       role: CONSTRUCTION_SUPPORT_ROLE.FIELD,
       span: [s0, s1],
@@ -18,6 +19,13 @@ function survivor(s0, s1, top) {
       top,
       courseIndex: 0,
     },
+  };
+}
+
+function removed(s0, s1, top = 2) {
+  return {
+    reason: 'cluster-damage',
+    placement: survivor(s0, s1, top),
   };
 }
 
@@ -33,8 +41,21 @@ test('ruin envelope follows survivor crown and never exceeds it', () => {
   });
   assert.ok(sampleRuinEnvelopeHeight(envelope, 1) <= 1.2 + 1e-9);
   assert.ok(sampleRuinEnvelopeHeight(envelope, 5) <= 2.4 + 1e-9);
-  // Empty stretch falls back to macro, not inventing taller stone.
+  // Empty space without resolved ruin damage may still be an authored opening.
   assert.equal(sampleRuinEnvelopeHeight(envelope, 3), 3.5);
+});
+
+test('resolved removed spans stay open in the shell envelope', () => {
+  const envelope = createRuinEnvelope({
+    survivors: [survivor(0, 2, 1.2), survivor(4, 6, 2.4)],
+    removed: [removed(2, 4)],
+    totalLength: 6,
+    sampleSpacing: 0.5,
+    minimumHeight: 0.2,
+    fallbackHeightAt: () => 3.5,
+  });
+  assert.equal(sampleRuinEnvelopeHeight(envelope, 3), 0.2);
+  assert.equal(envelope.samples.find((sample) => sample.s === 3)?.damageVoid, true);
 });
 
 test('sampleRuinEnvelopeHeight works after structured-clone drops heightAt', () => {
@@ -44,9 +65,7 @@ test('sampleRuinEnvelopeHeight works after structured-clone drops heightAt', () 
     sampleSpacing: 1,
     fallbackHeightAt: () => 0,
   });
-  const cloned = structuredClone({
-    samples: envelope.samples,
-  });
+  const cloned = structuredClone({ samples: envelope.samples });
   assert.ok(sampleRuinEnvelopeHeight(cloned, 2) > 1.5);
 });
 
