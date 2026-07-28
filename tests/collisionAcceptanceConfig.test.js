@@ -49,7 +49,7 @@ function validConfig() {
   };
 }
 
-test('repository collision acceptance config is valid and keeps baseline collision disabled', () => {
+test('repository collision acceptance config is valid and keeps release coverage explicit', () => {
   const config = loadCollisionAcceptanceConfig(
     path.join(root, 'config', 'collision-acceptance.yaml'),
   );
@@ -63,6 +63,8 @@ test('repository collision acceptance config is valid and keeps baseline collisi
   assert.equal(baseline.compareFrameToBaseline, false);
   assert.deepEqual(baseline.minimumCounts, {});
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
+  assert.equal(config.requiredCoverage.includes('collision-unload-reload-cycle'), true);
+  assert.equal(config.requiredCoverage.includes('long-soak-10m'), true);
 });
 
 test('config validation rejects duplicate case IDs', () => {
