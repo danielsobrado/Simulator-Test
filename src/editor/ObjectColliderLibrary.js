@@ -9,6 +9,7 @@ const BOX = 'box';
 const CAPSULE = 'capsule';
 const SPHERE = 'sphere';
 const FOOTPRINT_EPSILON = 1e-6;
+const MINIMUM_DOOR_CLEARANCE = 1.82;
 
 function freezeDescription(description) {
   return Object.freeze({
@@ -62,23 +63,27 @@ function doorwayShell({
   const frontZ = centerZ + depth / 2 - thickness / 2;
   const backZ = centerZ - depth / 2 + thickness / 2;
   const sideOffset = doorWidth / 2 + sideWidth / 2;
-  const lintelHeight = Math.max(thickness, height - doorHeight);
-  return [
+  const clearance = Math.min(height, Math.max(doorHeight, MINIMUM_DOOR_CLEARANCE));
+  const descriptions = [
     box('wall-left', thickness, height, depth, centerX - width / 2 + thickness / 2, height / 2, centerZ),
     box('wall-right', thickness, height, depth, centerX + width / 2 - thickness / 2, height / 2, centerZ),
     box('wall-back', width - thickness * 2, height, thickness, centerX, height / 2, backZ),
     box('wall-front-left', sideWidth, height, thickness, centerX - sideOffset, height / 2, frontZ),
     box('wall-front-right', sideWidth, height, thickness, centerX + sideOffset, height / 2, frontZ),
-    box(
+  ];
+  const lintelHeight = height - clearance;
+  if (lintelHeight > FOOTPRINT_EPSILON) {
+    descriptions.push(box(
       'wall-front-lintel',
       doorWidth,
       lintelHeight,
       thickness,
       centerX,
-      doorHeight + lintelHeight / 2,
+      clearance + lintelHeight / 2,
       frontZ,
-    ),
-  ];
+    ));
+  }
+  return descriptions;
 }
 
 function postRectangle({ spreadX, spreadZ, width, height, baseY = 0, prefix = 'post' }) {
