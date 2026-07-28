@@ -178,6 +178,18 @@ function updateWorldCompositionCounters(world) {
   return composition;
 }
 
+function providerRefreshFailure(status) {
+  if (!status?.lastError) return null;
+  return Object.freeze({
+    providerId: status.id ?? 'unknown',
+    phase: 'provider-refresh',
+    chunkKey: null,
+    sourceId: null,
+    prototypeId: null,
+    message: status.lastError,
+  });
+}
+
 export function shouldCreateCollisionRuntime(collisionConfig, search = '') {
   return collisionConfig.enabled
     || qaScenario(search) !== null
@@ -251,7 +263,13 @@ export function createCollisionRuntime({
       };
     }
     enqueueTargetedRefreshes(provider);
-    provider.refresh?.(world);
+    if (typeof provider.refresh === 'function') {
+      const refreshStartedAt = now();
+      const refresh = provider.refresh(world);
+      if (refresh?.attempted > 0) {
+        recordCollisionTiming(COLLISION_TIMING_COUNTERS.chunkBuild, refreshStartedAt, now);
+      }
+    }
     residency.update({ focus, velocity });
     residency.flush();
     debugView?.update();
@@ -306,16 +324,17 @@ export function createCollisionRuntime({
     getStatus() {
       const composition = updateWorldCompositionCounters(world);
       const residencyStatus = residency.getStatus();
+      const providerStatus = provider.getStatus?.() ?? null;
       return Object.freeze({
         active: true,
         qaMode,
         qaScenario: activeQaScenario,
         canonicalSignature: canonicalCollisionSignature(world),
-        provider: provider.getStatus?.() ?? null,
+        provider: providerStatus,
         world: Object.freeze({ ...world.getStatus(), ...composition }),
         residency: residencyStatus,
         ready: residencyStatus.ready,
-        failure: residencyStatus.failure,
+        failure: residencyStatus.failure ?? providerRefreshFailure(providerStatus),
       });
     },
     dispose() {
