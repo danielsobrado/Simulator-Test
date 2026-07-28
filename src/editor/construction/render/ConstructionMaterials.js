@@ -7,6 +7,7 @@ import {
   surfaceBumpTexture,
   surfaceRoughnessTexture,
 } from '../../workshop/ProceduralWorkshopMaterials.js';
+import { stoneSurfaceProfile } from '../../workshop/ProceduralWorkshopStoneSurfaceConfig.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { mortarProfile } from './ConstructionMortarConfig.js';
@@ -46,6 +47,11 @@ function materialKey(record) {
 
 function createStoneMaterial(record, style) {
   const seed = record.seed >>> 0;
+  const surface = stoneSurfaceProfile(style.stonePalette);
+  const config = surface.material;
+  const normalKind = config.normalKind
+    ?? (style.irregularity > 0.5 ? 'granite' : 'stoneBlock');
+
   const material = new THREE.MeshStandardNodeMaterial({
     color: '#ffffff',
     roughness: 1,
@@ -56,16 +62,38 @@ function createStoneMaterial(record, style) {
     // `harmonizeVertexColors(..., { required: true })` in the masonry builder.
     vertexColors: true,
   });
-  material.bumpMap = surfaceBumpTexture(seed);
-  material.bumpScale = 0.055;
-  material.roughnessMap = surfaceRoughnessTexture(seed + 101, { base: 226, variation: 26 });
+  material.bumpMap = surfaceBumpTexture(seed, config.bumpTextureScale);
+  material.bumpScale = config.bumpScale;
+  material.roughnessMap = surfaceRoughnessTexture(seed + 101, {
+    base: config.roughnessBase,
+    variation: config.roughnessVariation,
+    broadScale: config.roughnessBroadScale,
+  });
   if (style.detail >= 2) {
-    material.normalMap = proceduralNormalTexture(
-      style.irregularity > 0.5 ? 'granite' : 'stoneBlock',
-      seed + 503,
-    );
+    material.normalMap = proceduralNormalTexture(normalKind, seed + 503);
+  }
+  if (
+    Number.isFinite(config.constructionNormalScale)
+    && material.normalScale?.setScalar
+  ) {
+    material.normalScale.setScalar(config.constructionNormalScale);
+  }
+  if (Number.isFinite(config.constructionEnvMapIntensity)) {
+    material.envMapIntensity = config.constructionEnvMapIntensity;
   }
   material.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.STONE;
+  material.userData.stoneSurfaceProfile = style.stonePalette;
+  material.userData.stoneSurface = Object.freeze({
+    palette: style.stonePalette,
+    bumpScale: config.bumpScale,
+    bumpTextureScale: config.bumpTextureScale,
+    normalKind,
+    normalScale: config.constructionNormalScale,
+    roughnessBase: config.roughnessBase,
+    roughnessVariation: config.roughnessVariation,
+    roughnessBroadScale: config.roughnessBroadScale,
+    envMapIntensity: config.constructionEnvMapIntensity,
+  });
   return material;
 }
 

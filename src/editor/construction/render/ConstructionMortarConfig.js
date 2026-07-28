@@ -37,7 +37,7 @@ export const CONSTRUCTION_MORTAR_PROFILES = Object.freeze({
     metalness: 0,
   }),
   'soft-limestone-rubble': Object.freeze({
-    color: '#74756d',
+    color: '#74746d',
     roughness: 1,
     metalness: 0,
   }),

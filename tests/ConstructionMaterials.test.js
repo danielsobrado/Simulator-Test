@@ -47,8 +47,49 @@ test('soft-limestone-rubble mortar profile is desaturated medium-dark', () => {
     id: 'construction-soft',
     style: { key: 'soft-limestone-rubble', version: 1, materials: {} },
   }));
-  assert.ok(materials.mortar.color.equals(new THREE.Color('#74756d')));
+  assert.ok(materials.mortar.color.equals(new THREE.Color('#74746d')));
   assert.equal(materials.mortar.roughness, 1);
+});
+
+test('soft-limestone-rubble stone material uses the calm surface profile', () => {
+  const materials = createConstructionMaterials(normalizeConstructionRecord({
+    ...wall(),
+    id: 'construction-soft-stone',
+    style: { key: 'soft-limestone-rubble', version: 1, materials: {} },
+  }));
+  const stone = materials.stone;
+  assert.equal(stone.vertexColors, true);
+  assert.equal(stone.roughness, 1);
+  assert.equal(stone.metalness, 0);
+  assert.equal(stone.bumpScale, 0.028);
+  assert.equal(stone.normalScale.x, 0.28);
+  assert.equal(stone.normalScale.y, 0.28);
+  assert.equal(stone.envMapIntensity, 0.58);
+  assert.equal(stone.userData.constructionSlot, 'stone');
+  assert.equal(stone.userData.stoneSurfaceProfile, 'soft-limestone');
+  assert.equal(stone.userData.stoneSurface.bumpScale, 0.028);
+  assert.equal(stone.userData.stoneSurface.roughnessBase, 238);
+  assert.equal(stone.userData.stoneSurface.roughnessVariation, 10);
+  assert.equal(stone.userData.stoneSurface.normalKind, 'stoneBlock');
+});
+
+test('user presets override soft-limestone surface defaults', () => {
+  const materials = createConstructionMaterials(normalizeConstructionRecord({
+    ...wall(),
+    id: 'construction-soft-preset',
+    style: {
+      key: 'soft-limestone-rubble',
+      version: 1,
+      materials: { stone: 'sandstone-masonry' },
+    },
+  }));
+  const preset = BUILTIN_WORKSHOP_MATERIAL_PRESETS['sandstone-masonry'];
+  assert.equal(materials.stone.roughness, preset.roughness);
+  assert.equal(materials.stone.normalScale.x, preset.normalStrength);
+  assert.equal(materials.stone.bumpScale, preset.heightStrength);
+  assert.equal(materials.stone.vertexColors, true);
+  assert.equal(materials.stone.userData.constructionSlot, 'stone');
+  assert.equal(materials.stone.userData.stoneSurfaceProfile, 'soft-limestone');
 });
 
 test('painting a builtin preset changes the stone colour and roughness', () => {
