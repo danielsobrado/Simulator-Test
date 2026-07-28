@@ -10,7 +10,8 @@ const productionQa = qaScenario === 'collision-p3'
   || qaScenario === 'collision-p4'
   || qaScenario === 'collision-p5'
   || qaScenario === 'collision-p6'
-  || qaScenario === 'collision-p7';
+  || qaScenario === 'collision-p7'
+  || qaScenario === 'collision-p8';
 const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
@@ -39,6 +40,7 @@ function publish(status) {
   if (qaScenario === 'collision-p5') window.__collisionP5Qa = payload;
   if (qaScenario === 'collision-p6') window.__collisionP6Qa = payload;
   if (qaScenario === 'collision-p7') window.__collisionP7Qa = payload;
+  if (qaScenario === 'collision-p8') window.__collisionP8Qa = payload;
 }
 
 function sampleCandidates() {
@@ -69,7 +71,7 @@ function productionSample(status) {
 }
 
 function positionProductionPlayer(status) {
-  if (!productionQa || targetPositioned) return false;
+  if (!productionQa || targetPositioned || qaScenario === 'collision-p8') return false;
   const sample = productionSample(status);
   if (!sample) return false;
   if (qaScenario === 'collision-p5' && sample.tier !== 'walkable') return false;
@@ -88,8 +90,17 @@ function updateQa() {
     window.__editor.characterMotor = motor;
   }
   const status = runtime?.getStatus();
-  if (status?.residency.ready) {
-    if (productionQa && !qaTarget) {
+  if (status?.failure) {
+    publish('failed');
+  } else if (status?.residency.ready) {
+    if (qaScenario === 'collision-p8') {
+      qaTarget ??= Object.freeze({
+        kind: 'release-hardening',
+        canonicalSignature: status.canonicalSignature,
+      });
+      sampleCandidates();
+      publish('ready');
+    } else if (productionQa && !qaTarget) {
       if (positionProductionPlayer(status)) publish('positioning');
       else if (qaScenario === 'collision-p3') publish('waiting-trees');
       else if (qaScenario === 'collision-p5') publish('waiting-walkable-rocks');
@@ -114,7 +125,8 @@ function attach({
   constructionSource,
 }) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
-  const naturalQa = ['collision-p3', 'collision-p4', 'collision-p5'].includes(qaScenario);
+  const naturalQa = ['collision-p3', 'collision-p4', 'collision-p5', 'collision-p8']
+    .includes(qaScenario);
   const requiresNaturalSource = naturalQa
     || (!fixtureQa && collisionConfig.enabled
       && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled));
@@ -123,12 +135,14 @@ function attach({
     return;
   }
   const requiresObjectSource = qaScenario === 'collision-p6'
+    || (qaScenario === 'collision-p8' && collisionConfig.objects.enabled)
     || (!fixtureQa && collisionConfig.enabled && collisionConfig.objects.enabled);
   if (requiresObjectSource && !objectSource) {
     publish('waiting-placed-objects');
     return;
   }
   const requiresConstructionSource = qaScenario === 'collision-p7'
+    || (qaScenario === 'collision-p8' && collisionConfig.constructions.enabled)
     || (!fixtureQa && collisionConfig.enabled && collisionConfig.constructions.enabled);
   if (requiresConstructionSource && !constructionSource) {
     publish('waiting-constructions');
