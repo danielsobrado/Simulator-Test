@@ -122,17 +122,20 @@ export function createStylizedWaterMaterial({
   const waterField = texture(waterFieldTexture, fieldUv);
   const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
   const waterDepth = max(waterField.b, 0);
+  const shoreDistance = max(waterField.a, 0);
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
   );
   const fallbackFlow = vec2(water.flowX, water.flowZ);
   let currentFlow = fallbackFlow;
+  let currentStrength = float(0);
   if (quality.flow) {
     const encodedFlow = texture(waterFlowTexture, fieldUv).rg;
     const decodedCellFlow = encodedFlow.mul(2).sub(1);
     const decodedFlow = vec2(decodedCellFlow.x, decodedCellFlow.y.negate());
-    const currentMask = step(0.05, length(decodedFlow));
+    currentStrength = clamp(length(decodedFlow), 0, 1);
+    const currentMask = step(0.05, currentStrength);
     currentFlow = mix(
       fallbackFlow,
       decodedFlow.mul(water.currentInfluence),
@@ -180,6 +183,7 @@ export function createStylizedWaterMaterial({
   let opticalDistance = float(0);
   let bodyColor = legacyColor;
   let surfaceDetailMix = float(0);
+  let foamAmount = float(0);
 
   if (quality.depthOptics) {
     const optics = water.optics;
@@ -222,6 +226,27 @@ export function createStylizedWaterMaterial({
     ).mul(waterCoverage);
   }
 
+  if (quality.foam && water.foam.enabled) {
+    const foam = water.foam;
+    const shoreBand = oneMinus(smoothstep(0, foam.shoreWidth, shoreDistance));
+    const flowPhase = dot(worldXZ, currentFlow)
+      .mul(foam.flowBandScale)
+      .sub(time.mul(foam.flowBandSpeed));
+    const flowBand = pow(
+      sin(flowPhase).mul(0.5).add(0.5),
+      foam.flowBandContrast,
+    ).mul(currentStrength).mul(foam.flowStrength);
+    const noiseBreakup = mix(
+      float(1),
+      smoothstep(0.18, 0.82, noiseFac),
+      foam.noiseStrength,
+    );
+    foamAmount = max(shoreBand, flowBand)
+      .mul(noiseBreakup)
+      .mul(foam.intensity * quality.foamStrength)
+      .mul(waterCoverage);
+  }
+
   if (quality.refraction && water.refraction.enabled) {
     const refraction = water.refraction;
     const coarsePoint = worldXZ
@@ -243,6 +268,9 @@ export function createStylizedWaterMaterial({
     const distortedViewportUv = viewportSafeUV(baseViewportUv.add(distortionUv));
     const depthRange = cameraFar.sub(cameraNear);
     const waterViewDistance = linearDepth().mul(depthRange).add(cameraNear);
+    const baseViewDistance = linearDepth(
+      viewportDepthTexture(baseViewportUv),
+    ).mul(depthRange).add(cameraNear);
     const distortedViewDistance = linearDepth(
       viewportDepthTexture(distortedViewportUv),
     ).mul(depthRange).add(cameraNear);
@@ -253,6 +281,11 @@ export function createStylizedWaterMaterial({
     const acceptedViewportUv = mix(
       baseViewportUv,
       distortedViewportUv,
+      validDepth,
+    );
+    const acceptedViewDistance = mix(
+      baseViewDistance,
+      distortedViewDistance,
       validDepth,
     );
     const sceneColor = viewportOpaqueMipTexture(
@@ -274,6 +307,20 @@ export function createStylizedWaterMaterial({
     );
     color = mix(physicalColor, legacyColor, surfaceDetailMix);
     alpha = waterCoverage;
+
+    if (quality.intersectionFoam && water.foam.enabled) {
+      const foam = water.foam;
+      const sceneGap = max(acceptedViewDistance.sub(waterViewDistance), 0);
+      const contact = oneMinus(smoothstep(
+        foam.intersectionDepth,
+        foam.intersectionDepth + foam.intersectionSoftness,
+        sceneGap,
+      ));
+      const intersectionFoam = contact
+        .mul(foam.intersectionStrength * quality.intersectionFoamStrength)
+        .mul(waterCoverage);
+      foamAmount = max(foamAmount, intersectionFoam);
+    }
   }
 
   if (quality.caustics) {
@@ -290,6 +337,14 @@ export function createStylizedWaterMaterial({
       .mul(caustics.intensity * quality.causticStrength)
       .mul(shallow);
     color = color.add(colorNode(water.highlightColor).mul(causticAmount));
+  }
+
+  if (quality.foam && water.foam.enabled) {
+    color = mix(
+      color,
+      colorNode(water.foam.color),
+      clamp(foamAmount, 0, 1),
+    );
   }
 
   const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
