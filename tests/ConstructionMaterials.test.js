@@ -41,14 +41,14 @@ test('createConstructionMaterials includes a mortar slot', () => {
   assert.equal(materials.mortar.roughness, 1);
 });
 
-test('dry-stone mortar reads darker than coursed rubble', () => {
-  const rubble = createConstructionMaterials(wall());
-  const dry = createConstructionMaterials(normalizeConstructionRecord({
+test('soft-limestone-rubble mortar profile is desaturated medium-dark', () => {
+  const materials = createConstructionMaterials(normalizeConstructionRecord({
     ...wall(),
-    id: 'construction-dry',
-    style: { key: 'dry-stone', version: 1, materials: {} },
+    id: 'construction-soft',
+    style: { key: 'soft-limestone-rubble', version: 1, materials: {} },
   }));
-  assert.ok(dry.mortar.color.getHex() < rubble.mortar.color.getHex());
+  assert.ok(materials.mortar.color.equals(new THREE.Color('#74756d')));
+  assert.equal(materials.mortar.roughness, 1);
 });
 
 test('painting a builtin preset changes the stone colour and roughness', () => {

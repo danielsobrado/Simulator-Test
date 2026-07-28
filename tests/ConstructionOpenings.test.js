@@ -315,3 +315,99 @@ test('crown height accounts for the arch ring', () => {
   assert.ok(openingCrownHeight(opening()) > opening().height);
   assert.ok(openingCrownHeight(opening({ profile: 'flat', height: 2 })) > 2);
 });
+
+test('soft-limestone-rubble openings stay clear and keep plumb jambs', () => {
+  const soft = constructionStyle('soft-limestone-rubble');
+  const path = straight(30);
+  const segmentId = path.segments[1].id;
+  const context = setup({
+    style: { key: 'soft-limestone-rubble', version: 1 },
+    features: [
+      {
+        id: 'opening-arch',
+        kind: 'arch',
+        segmentId,
+        arcFraction: 0.25,
+        width: 2.2,
+        height: 2.5,
+        sill: 0,
+        profile: 'round',
+        dressed: true,
+      },
+      {
+        id: 'opening-door',
+        kind: 'door',
+        segmentId,
+        arcFraction: 0.55,
+        width: 1.2,
+        height: 2.2,
+        sill: 0,
+        profile: 'flat',
+        dressed: true,
+      },
+      {
+        id: 'opening-window',
+        kind: 'window',
+        segmentId,
+        arcFraction: 0.8,
+        width: 0.9,
+        height: 1.1,
+        sill: 1.2,
+        profile: 'flat',
+        dressed: true,
+      },
+    ],
+  }, path);
+  const profile = createWallTopProfile(context.record, context.arcTable, { style: soft });
+  const openings = context.record.features.map((feature) => {
+    const [from, to] = context.arcTable.segmentRange(feature.segmentId);
+    return {
+      ...feature,
+      s: from + (to - from) * feature.arcFraction,
+    };
+  });
+  const { stones } = packCurvedWall({
+    arcTable: context.arcTable,
+    arcRange: [0, context.arcTable.totalLength],
+    style: soft,
+    thickness: context.record.dimensions.thickness,
+    seed: context.record.seed,
+    topHeightAt: profile.heightAt,
+    ruinFactorAt: profile.ruinFactorAt,
+    slopeAt: profile.slopeAt,
+    openings,
+    budget: 4000,
+  });
+
+  const field = stones.filter(({ category }) => category === 'field');
+  assert.ok(field.length > 40);
+  const courseHeight = soft.courseHeight;
+  for (const stone of field) {
+    if (stone.courseIndex == null) continue;
+    // Openings are reserved against the course centre, not the leaf face centre.
+    const courseY = (stone.courseIndex + 0.5) * courseHeight;
+    for (const voidOpening of openings) {
+      const half = openingHalfWidthAt(voidOpening, courseY);
+      if (!(half > 0)) continue;
+      const left = voidOpening.s - half;
+      const right = voidOpening.s + half;
+      const stoneLeft = stone.s - stone.packedWidth / 2;
+      const stoneRight = stone.s + stone.packedWidth / 2;
+      assert.ok(
+        stoneRight <= left + 1e-6 || stoneLeft >= right - 1e-6,
+        `field stone crosses ${voidOpening.id} at course ${stone.courseIndex}`,
+      );
+    }
+  }
+
+  // Jamb-adjacent soft stones still respect one-level split depth.
+  const byCell = new Map();
+  for (const stone of field) {
+    if (stone.cellIndex == null) continue;
+    if (!byCell.has(stone.cellIndex)) byCell.set(stone.cellIndex, []);
+    byCell.get(stone.cellIndex).push(stone);
+  }
+  for (const leaves of byCell.values()) {
+    assert.ok(leaves.length <= 2);
+  }
+});
