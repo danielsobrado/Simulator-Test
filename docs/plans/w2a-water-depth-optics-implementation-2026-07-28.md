@@ -19,6 +19,7 @@ Delivered in W2A:
 - Depth-driven shallow-to-deep colour.
 - Beer-Lambert-style scalar transmission.
 - View-angle-aware optical distance.
+- Camera-submersion-aware underside transmission.
 - Bounded minimum and maximum opacity.
 - Matching surface tint when viewed from below.
 - Quality-tier gating.
@@ -40,20 +41,23 @@ Explicitly deferred to W2C:
 
 ## Optical model
 
-The authoritative vertical depth comes from `waterField.b`.
+The authoritative vertical bed-to-surface depth comes from `waterField.b`.
 
 The approximate path through the water is:
 
 ```text
+verticalDistance = cameraBelowSurface
+  ? cameraSubmersionDepth
+  : waterColumnDepth
 viewCosine = clamp(abs(viewDirection.y), minimumViewCosine, 1)
-opticalDistance = min(depth / viewCosine, maximumOpticalDistance)
+opticalDistance = min(verticalDistance / viewCosine, maximumOpticalDistance)
 transmission = exp(-absorptionDensity * opticalDistance)
 opacity = mix(minimumOpacity, maximumOpacity, 1 - transmission)
 ```
 
-This makes grazing views less transparent than vertical views through the same water column while keeping the result bounded.
+This makes grazing views less transparent than vertical views while keeping the result bounded. Above the surface, the bed-to-surface column controls transmission. Below the surface, actual camera submersion controls the path, preventing a deep seabed from making the underside opaque when the camera is only just underwater.
 
-The surface colour uses a smooth depth blend:
+The surface colour uses a smooth geographic depth blend:
 
 ```text
 shallowColor -> deepColor
@@ -99,7 +103,7 @@ These settings do not change terrain generation, water-body identity, swimming, 
 
 ## CPU reference
 
-`WaterOptics.js` mirrors the shader's scalar depth, view-angle, transmission, opacity, and depth-mix calculations.
+`WaterOptics.js` mirrors the shader's scalar depth, submersion, view-angle, transmission, opacity, and depth-mix calculations.
 
 It exists for:
 
@@ -117,12 +121,14 @@ Focused coverage includes:
 - monotonic opacity with increasing depth;
 - decreasing transmission with increasing depth;
 - increased optical distance at grazing angles;
+- underwater camera-depth authority;
 - maximum optical-distance clamping;
 - opacity bounds;
 - shallow and deep colour-mix boundaries;
 - colour-format validation;
 - opacity and depth-range validation;
-- quality-tier feature selection.
+- quality-tier feature selection;
+- shader source contract for semantic depth and the low-tier fallback.
 
 ## Headed acceptance still required
 
@@ -132,7 +138,7 @@ Focused coverage includes:
 - Cross ocean and river chunk borders without optical seams.
 - Inspect high-elevation imported rivers.
 - Enter and leave the water repeatedly without a colour or alpha pop.
-- View the surface from below and confirm the underside tint remains coherent.
+- View the surface from just below and at greater submersion depths.
 - Compare low, medium, high, and ultra tiers.
 - Measure first-use shader compilation and steady water-pass GPU time.
 
