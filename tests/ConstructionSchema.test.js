@@ -106,6 +106,32 @@ test('unknown top styles and unknown masonry styles are rejected', () => {
   );
 });
 
+test('soft-limestone-rubble is accepted and typos are rejected', () => {
+  const record = normalizeConstructionRecord(legacyRecord({
+    style: {
+      key: 'soft-limestone-rubble',
+      version: 1,
+      materials: { stone: 'granite-masonry', mortar: null, roof: null },
+    },
+  }));
+  assert.equal(record.style.key, 'soft-limestone-rubble');
+  assert.equal(record.version, 1);
+  assert.equal(record.style.materials.stone, 'granite-masonry');
+
+  const again = normalizeConstructionRecord(structuredClone(record));
+  assert.deepEqual(again.style, record.style);
+  assert.deepEqual(again.dimensions, record.dimensions);
+  assert.deepEqual(again.top, record.top);
+  assert.equal(again.version, 1);
+
+  assert.throws(
+    () => normalizeConstructionRecord(legacyRecord({
+      style: { key: 'soft-limeston-rubble', version: 1 },
+    })),
+    /Unknown construction style soft-limeston-rubble/,
+  );
+});
+
 test('opening fields default and validate', () => {
   const built = path();
   const segmentId = built.segments[0].id;

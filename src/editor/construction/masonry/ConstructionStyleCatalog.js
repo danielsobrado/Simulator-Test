@@ -22,11 +22,16 @@
  * table below — over 60 m x 3.34 m, five seeds — rather than against the cell
  * arithmetic, and expect a couple of percent of drift at other wall heights.
  *
- * | style          | leaves/cell | stones/m2 | pre-lattice | delta |
- * | coursed-rubble | 1.535       | 2.298     | 2.363       | -2.7% |
- * | ashlar         | 1.194       | 2.431     | 2.392       | +1.6% |
- * | random-rubble  | 1.842       | 4.706     | 4.744       | -0.8% |
- * | dry-stone      | 1.987       | 6.604     | 6.614       | -0.2% |
+ * | style                 | leaves/cell | stones/m2 | pre-lattice | delta |
+ * | coursed-rubble        | 1.535       | 2.298     | 2.363       | -2.7% |
+ * | soft-limestone-rubble | ~1.34†      | (opt-in)  |             |       |
+ * | ashlar                | 1.194       | 2.431     | 2.392       | +1.6% |
+ * | random-rubble         | 1.842       | 4.706     | 4.744       | -0.8% |
+ * | dry-stone             | 1.987       | 6.604     | 6.614       | -0.2% |
+ *
+ * † `splitMaxDepth` 1: expected leaves ≈ 1 + c. Depth 2: ≈ 1 + c + c².
+ * soft-limestone-rubble base cell 0.52 × 1.09 = 0.567 m² → ≈ 0.423 m² / leaf,
+ * matching coursed-rubble's finished density budget.
  */
 
 /** Shared defaults that reproduce the former hard-coded packer behaviour. */
@@ -50,6 +55,7 @@ const STONE_PALETTE_KEYS = new Set([
   'granite',
   'limestone',
   'sandstone',
+  'soft-limestone',
 ]);
 
 function finiteInRange(value, label, minimum, maximum) {
@@ -156,6 +162,27 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     bedAmplitude: 0.14,
     jointTilt: 0.16,
     splitChance: 0.42,
+  }),
+  'soft-limestone-rubble': defineConstructionStyle({
+    key: 'soft-limestone-rubble',
+    label: 'Soft limestone rubble',
+    courseHeight: 0.52,
+    targetWidth: 1.09,
+    minWidth: 0.28,
+    irregularity: 0.36,
+    detail: 2,
+    merlonSpacing: 1.22,
+    stonePalette: 'soft-limestone',
+    bedAmplitude: 0.08,
+    jointTilt: 0.10,
+    splitChance: 0.34,
+    splitMaxDepth: 1,
+    jointInsetMin: 0.018,
+    jointInsetMax: 0.032,
+    jointInsetVerticalRatio: 0.72,
+    depthScaleMin: 0.965,
+    depthScaleMax: 0.995,
+    faceOffsetAmplitude: 0.012,
   }),
   ashlar: defineConstructionStyle({
     key: 'ashlar',

@@ -2,9 +2,41 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   CONSTRUCTION_STYLES,
+  DEFAULT_CONSTRUCTION_STYLE_KEY,
   constructionStyle,
   defineConstructionStyle,
 } from '../src/editor/construction/masonry/ConstructionStyleCatalog.js';
+
+test('soft-limestone-rubble exists with required tuning', () => {
+  const style = constructionStyle('soft-limestone-rubble');
+  assert.equal(style.key, 'soft-limestone-rubble');
+  assert.equal(style.label, 'Soft limestone rubble');
+  assert.equal(style.courseHeight, 0.52);
+  assert.equal(style.targetWidth, 1.09);
+  assert.equal(style.minWidth, 0.28);
+  assert.equal(style.irregularity, 0.36);
+  assert.equal(style.bedAmplitude, 0.08);
+  assert.equal(style.jointTilt, 0.10);
+  assert.equal(style.splitChance, 0.34);
+  assert.equal(style.splitMaxDepth, 1);
+  assert.equal(style.jointInsetMin, 0.018);
+  assert.equal(style.jointInsetMax, 0.032);
+  assert.equal(style.jointInsetVerticalRatio, 0.72);
+  assert.equal(style.depthScaleMin, 0.965);
+  assert.equal(style.depthScaleMax, 0.995);
+  assert.equal(style.faceOffsetAmplitude, 0.012);
+  assert.equal(style.stonePalette, 'soft-limestone');
+  assert.equal(Object.isFrozen(style), true);
+});
+
+test('default masonry style remains coursed rubble', () => {
+  assert.equal(DEFAULT_CONSTRUCTION_STYLE_KEY, 'coursed-rubble');
+  assert.equal(
+    Object.keys(CONSTRUCTION_STYLES)[0],
+    'coursed-rubble',
+  );
+  assert.equal(Object.keys(CONSTRUCTION_STYLES)[1], 'soft-limestone-rubble');
+});
 
 test('existing styles keep their authored values and packer defaults', () => {
   const coursed = constructionStyle('coursed-rubble');

@@ -33,6 +33,23 @@ export const STONE_PALETTES = Object.freeze({
     outlier: [162, 158, 132],
     outlierChance: 0.1,
   }),
+  /**
+   * Pale, low-saturation limestone for `soft-limestone-rubble`. Kept separate
+   * from `limestone` so existing workshop assets and walls stay warm yellow.
+   */
+  'soft-limestone': Object.freeze({
+    base: [188, 185, 170],
+    warm: [201, 195, 174],
+    color: '#bcb9aa',
+    ramp: Object.freeze([
+      [188, 185, 170],
+      [198, 194, 178],
+      [177, 176, 165],
+      [191, 188, 174],
+    ]),
+    outlier: [160, 161, 153],
+    outlierChance: 0.06,
+  }),
   sandstone: Object.freeze({
     base: [187, 122, 78],
     warm: [220, 159, 98],
