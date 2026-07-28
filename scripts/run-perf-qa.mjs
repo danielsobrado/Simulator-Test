@@ -121,6 +121,7 @@ const fs = require('fs');
     });
     page.setDefaultTimeout(${timeoutMs});
     await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__perfQa != null, null, { timeout: ${timeoutMs} });
 
     const rendererBackend = await page.evaluate(() => {
       const canvas = document.querySelector(
@@ -181,7 +182,7 @@ const fs = require('fs');
     }
     console.log('WebGPU adapter: ' + JSON.stringify(adapter));
 
-    await page.waitForFunction(() => window.__perfQa && window.__perfQa.status === 'done', null, {
+    await page.waitForFunction(() => window.__perfQa.status === 'done', null, {
       timeout: ${timeoutMs},
     });
     const report = await page.evaluate(() => window.__perfQa.getReport());
