@@ -104,6 +104,7 @@ export class CharacterMotor {
     this.lastResult = null;
     this.primitiveTests = 0;
     this.primitiveColliderTests = 0;
+    this.collisionRuntime.prime?.({ x: position.x, z: position.z });
   }
 
   contact(capsule, collider, out = this.contactScratch) {
