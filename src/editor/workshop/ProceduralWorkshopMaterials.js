@@ -12,24 +12,91 @@ import { getSurfaceTexture } from './ProceduralWorkshopTextureConfig.js';
  * per-stone tint" layer of 05-…md §8, deliberately narrow: the section warns
  * that strong uncoordinated variation makes a wall unreadable.
  */
+
+function hexToRgb(hex) {
+  const match = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 16);
+  return [
+    (value >> 16) & 255,
+    (value >> 8) & 255,
+    value & 255,
+  ];
+}
+
+function assertRgbTriple(channels, label) {
+  if (!Array.isArray(channels) || channels.length !== 3) {
+    throw new Error(`${label} must contain exactly three channels.`);
+  }
+  for (let index = 0; index < 3; index += 1) {
+    const channel = channels[index];
+    if (!Number.isInteger(channel) || channel < 0 || channel > 255) {
+      throw new Error(`${label}[${index}] must be an integer 0–255, got ${channel}.`);
+    }
+  }
+}
+
+/**
+ * Freeze a complete stone palette after validating nested colour data.
+ * Exported for unit tests that assert invalid descriptors fail.
+ */
+export function defineStonePalette(input) {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Stone palette descriptor is required.');
+  }
+  assertRgbTriple(input.base, 'base');
+  assertRgbTriple(input.warm, 'warm');
+  if (!Array.isArray(input.ramp) || input.ramp.length < 2 || input.ramp.length > 8) {
+    throw new Error('ramp must contain between 2 and 8 colour stops.');
+  }
+  for (let index = 0; index < input.ramp.length; index += 1) {
+    assertRgbTriple(input.ramp[index], `ramp[${index}]`);
+  }
+  if (input.outlier != null) assertRgbTriple(input.outlier, 'outlier');
+  if (typeof input.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input.color)) {
+    throw new Error('color must be a six-digit hex colour.');
+  }
+  const chance = input.outlierChance ?? 0;
+  if (!Number.isFinite(chance) || chance < 0 || chance > 1) {
+    throw new Error(`outlierChance must be between 0 and 1, got ${chance}.`);
+  }
+  const declared = hexToRgb(input.color);
+  for (let index = 0; index < 3; index += 1) {
+    if (Math.abs(declared[index] - input.base[index]) > 1) {
+      throw new Error(
+        `color ${input.color} does not match base [${input.base.join(', ')}].`,
+      );
+    }
+  }
+
+  return Object.freeze({
+    base: Object.freeze([...input.base]),
+    warm: Object.freeze([...input.warm]),
+    color: input.color,
+    ramp: Object.freeze(input.ramp.map((stop) => Object.freeze([...stop]))),
+    outlier: input.outlier ? Object.freeze([...input.outlier]) : null,
+    outlierChance: chance,
+  });
+}
+
 export const STONE_PALETTES = Object.freeze({
-  granite: Object.freeze({
+  granite: defineStonePalette({
     base: [137, 143, 146],
     warm: [165, 154, 136],
     color: '#91979a',
-    ramp: Object.freeze([
+    ramp: [
       [137, 143, 146], [152, 150, 141], [124, 130, 134], [143, 148, 138],
-    ]),
+    ],
     outlier: [110, 116, 112],
     outlierChance: 0.1,
   }),
-  limestone: Object.freeze({
+  limestone: defineStonePalette({
     base: [194, 180, 148],
     warm: [220, 202, 154],
     color: '#c4b794',
-    ramp: Object.freeze([
+    ramp: [
       [194, 180, 148], [214, 198, 156], [178, 166, 140], [196, 188, 160],
-    ]),
+    ],
     outlier: [162, 158, 132],
     outlierChance: 0.1,
   }),
@@ -37,26 +104,26 @@ export const STONE_PALETTES = Object.freeze({
    * Pale, low-saturation limestone for `soft-limestone-rubble`. Kept separate
    * from `limestone` so existing workshop assets and walls stay warm yellow.
    */
-  'soft-limestone': Object.freeze({
-    base: [188, 185, 170],
-    warm: [201, 195, 174],
-    color: '#bcb9aa',
-    ramp: Object.freeze([
-      [188, 185, 170],
-      [198, 194, 178],
-      [177, 176, 165],
-      [191, 188, 174],
-    ]),
-    outlier: [160, 161, 153],
-    outlierChance: 0.06,
+  'soft-limestone': defineStonePalette({
+    base: [188, 186, 176],
+    warm: [198, 194, 181],
+    color: '#bcbab0',
+    ramp: [
+      [188, 186, 176],
+      [196, 193, 181],
+      [180, 181, 175],
+      [191, 189, 180],
+    ],
+    outlier: [166, 168, 164],
+    outlierChance: 0.045,
   }),
-  sandstone: Object.freeze({
+  sandstone: defineStonePalette({
     base: [187, 122, 78],
     warm: [220, 159, 98],
     color: '#bd8056',
-    ramp: Object.freeze([
+    ramp: [
       [187, 122, 78], [214, 155, 96], [170, 110, 72], [192, 140, 96],
-    ]),
+    ],
     outlier: [150, 132, 96],
     outlierChance: 0.12,
   }),
