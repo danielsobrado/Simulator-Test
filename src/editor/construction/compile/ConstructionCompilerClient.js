@@ -1,15 +1,16 @@
-import { planConstruction } from '../planning/ConstructionPlanner.js';
+import { compileConstructionPlan } from './compileConstructionPlan.js';
 
 function staleError() {
   return new DOMException('A newer construction compile replaced this result.', 'AbortError');
 }
 
 export class ConstructionCompilerClient {
-  constructor({ workerFactory } = {}) {
+  constructor({ workerFactory, collisionConfig = {} } = {}) {
     this.revisions = new Map();
     this.pending = new Map();
     this.nextRequestId = 1;
     this.worker = null;
+    this.collisionConfig = Object.freeze({ ...collisionConfig });
     if (typeof Worker !== 'undefined') {
       this.worker = workerFactory
         ? workerFactory()
@@ -35,7 +36,14 @@ export class ConstructionCompilerClient {
         this.pending.delete(id);
       }
     }
-    if (!this.worker) return Promise.resolve(planConstruction(record, options));
+    const compileOptions = Object.freeze({
+      ...options,
+      collision: Object.freeze({
+        ...this.collisionConfig,
+        ...(options.collision ?? {}),
+      }),
+    });
+    if (!this.worker) return Promise.resolve(compileConstructionPlan(record, compileOptions));
     return new Promise((resolve, reject) => {
       this.pending.set(requestId, {
         constructionId: record.id,
@@ -43,7 +51,7 @@ export class ConstructionCompilerClient {
         resolve,
         reject,
       });
-      this.worker.postMessage({ requestId, record, options, previousRevision });
+      this.worker.postMessage({ requestId, record, options: compileOptions, previousRevision });
     });
   }
 
@@ -71,4 +79,3 @@ export class ConstructionCompilerClient {
     this.worker = null;
   }
 }
-
