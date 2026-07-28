@@ -30,6 +30,20 @@ test('a straight construction wall compiles to one oriented box', () => {
   assert.deepEqual([plan.boxes[0].bottom, plan.boxes[0].top], [0, 3.5]);
 });
 
+test('long straight walls are partitioned into bounded overlapping boxes', () => {
+  const plan = compile(straightConstruction({ start: [0, 0], end: [200, 0] }));
+
+  assert.ok(plan.boxes.length > 1);
+  assert.ok(plan.boxes.every((box) => box.length <= 48.4));
+  for (let index = 1; index < plan.boxes.length; index += 1) {
+    const previous = plan.boxes[index - 1];
+    const current = plan.boxes[index];
+    assert.ok(
+      current.center[0] - previous.center[0] <= (current.length + previous.length) / 2,
+    );
+  }
+});
+
 test('curved construction boxes overlap through the source-segment join', () => {
   const plan = compile(curvedConstruction(), 1);
 
