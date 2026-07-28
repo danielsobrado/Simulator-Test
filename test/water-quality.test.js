@@ -20,6 +20,7 @@ const base = Object.freeze({
     deepDepth: 6,
     maximumOpticalDistance: 14,
     minimumViewCosine: 0.22,
+    surfaceTransitionDepth: 0.75,
     surfaceDetailStrength: 0.28,
     underwaterTintStrength: 0.35,
   }),
@@ -59,6 +60,13 @@ test('visual config rejects invalid tiers, optics, and caustic ranges', () => {
       optics: { ...base.optics, minimumViewCosine: 0 },
     }),
     /minimumViewCosine/,
+  );
+  assert.throws(
+    () => validateWaterVisualConfig({
+      ...structuredClone(base),
+      optics: { ...base.optics, surfaceTransitionDepth: 0 },
+    }),
+    /surfaceTransitionDepth/,
   );
   assert.throws(
     () => validateWaterVisualConfig({
