@@ -8,7 +8,8 @@ const qaScenario = params.get('qa');
 const fixtureQa = qaScenario === 'collision-p1' || qaScenario === 'collision-p2';
 const productionQa = qaScenario === 'collision-p3'
   || qaScenario === 'collision-p4'
-  || qaScenario === 'collision-p5';
+  || qaScenario === 'collision-p5'
+  || qaScenario === 'collision-p6';
 const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
@@ -35,6 +36,7 @@ function publish(status) {
   if (qaScenario === 'collision-p3') window.__collisionP3Qa = payload;
   if (qaScenario === 'collision-p4') window.__collisionP4Qa = payload;
   if (qaScenario === 'collision-p5') window.__collisionP5Qa = payload;
+  if (qaScenario === 'collision-p6') window.__collisionP6Qa = payload;
 }
 
 function sampleCandidates() {
@@ -54,6 +56,9 @@ function productionSample(status) {
   if (qaScenario === 'collision-p3') return status.provider?.sample ?? null;
   if (qaScenario === 'collision-p4' || qaScenario === 'collision-p5') {
     return status.provider?.rockSample ?? null;
+  }
+  if (qaScenario === 'collision-p6') {
+    return status.provider?.components?.objects?.sample ?? null;
   }
   return null;
 }
@@ -83,6 +88,7 @@ function updateQa() {
       if (positionProductionPlayer(status)) publish('positioning');
       else if (qaScenario === 'collision-p3') publish('waiting-trees');
       else if (qaScenario === 'collision-p5') publish('waiting-walkable-rocks');
+      else if (qaScenario === 'collision-p6') publish('waiting-objects');
       else publish('waiting-rocks');
     } else {
       sampleCandidates();
@@ -94,13 +100,21 @@ function updateQa() {
   frameId = requestAnimationFrame(updateQa);
 }
 
-function attach({ player: nextPlayer, collisionConfig, treeSource }) {
+function attach({ player: nextPlayer, collisionConfig, treeSource, objectSource }) {
   if (disposed || runtime || !nextPlayer?.terrainView || !nextPlayer.config) return;
-  const requiresNaturalSource = productionQa
+  const requiresNaturalSource = qaScenario !== 'collision-p6' && (
+    productionQa
     || (!fixtureQa && collisionConfig.enabled
-      && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled));
+      && (collisionConfig.trees.enabled || collisionConfig.rocks.enabled))
+  );
   if (requiresNaturalSource && !treeSource) {
     publish('waiting-natural-props');
+    return;
+  }
+  const requiresObjectSource = qaScenario === 'collision-p6'
+    || (!fixtureQa && collisionConfig.enabled && collisionConfig.objects.enabled);
+  if (requiresObjectSource && !objectSource) {
+    publish('waiting-placed-objects');
     return;
   }
 
@@ -109,6 +123,7 @@ function attach({ player: nextPlayer, collisionConfig, treeSource }) {
     terrainView: player.terrainView,
     editorConfig: { collision: collisionConfig, player: player.config },
     treeSource,
+    objectSource,
     search: window.location.search,
   });
   if (!runtime) {
