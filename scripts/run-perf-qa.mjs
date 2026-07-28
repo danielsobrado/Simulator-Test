@@ -1,7 +1,8 @@
 /**
  * Headless runner for the in-app Perf QA harness.
  *
- * Prerequisites: `npm run dev` already serving the app.
+ * Prerequisites: `npm run dev` already serving the app and the repository's
+ * Playwright Chromium installed.
  *
  * Usage:
  *   npm run qa:perf
@@ -158,11 +159,12 @@ console.log(`Running Perf QA: ${targetUrl}`);
 
 await new Promise((resolve, reject) => {
   const child = spawn(
-    'npx',
-    ['--yes', '-p', 'playwright', 'node', runnerPath],
-    { cwd: root, stdio: 'inherit', shell: true },
+    process.execPath,
+    [runnerPath],
+    { cwd: root, stdio: 'inherit', windowsHide: true },
   );
-  child.on('exit', (code) => {
+  child.once('error', reject);
+  child.once('exit', (code) => {
     if (code === 0) resolve();
     else reject(new Error(`Perf QA runner exited with code ${code}`));
   });
