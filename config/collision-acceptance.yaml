@@ -11,7 +11,6 @@ viewport:
 
 gates:
   collisionP95Ms: 0.83
-  frameP95RegressionMs: 0.83
   maxHitches: 0
   maxReadinessMisses: 0
   maxFailedChunks: 0
@@ -38,7 +37,6 @@ cases:
     label: Open-ground no-collision baseline
     scenario: move
     collisionRequired: false
-    compareFrameToBaseline: false
     warmupSeconds: 12
     durationSeconds: 60
     speed: run
@@ -51,7 +49,6 @@ cases:
     label: Production tree trunk
     scenario: collision-p3
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 8
     durationSeconds: 6
     speed: run
@@ -68,7 +65,6 @@ cases:
     label: Production blocking rock
     scenario: collision-p4
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 10
     durationSeconds: 7
     speed: run
@@ -85,7 +81,6 @@ cases:
     label: Walkable rock BVH
     scenario: collision-p5
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 12
     durationSeconds: 10
     speed: run
@@ -103,7 +98,6 @@ cases:
     label: Placed-object doorway
     scenario: collision-p6
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 10
     durationSeconds: 9
     speed: run
@@ -120,7 +114,6 @@ cases:
     label: Construction wall
     scenario: collision-p7
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 10
     durationSeconds: 5
     speed: run
@@ -137,7 +130,6 @@ cases:
     label: Full-stack repeated collision chunk crossing
     scenario: collision-p8
     collisionRequired: true
-    compareFrameToBaseline: false
     warmupSeconds: 12
     durationSeconds: 60
     speed: run
