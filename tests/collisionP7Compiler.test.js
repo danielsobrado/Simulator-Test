@@ -38,6 +38,26 @@ test('a straight construction wall compiles to one oriented box', () => {
   assert.deepEqual([plan.boxes[0].bottom, plan.boxes[0].top], [0, 3.5]);
 });
 
+test('raised and lowered wall tops use the rendered top profile', () => {
+  const plan = compile(straightConstruction({
+    top: {
+      style: 'flat',
+      base: 3.5,
+      profile: [
+        { segmentId: 'segment-main', arcFraction: 0, height: 2.5 },
+        { segmentId: 'segment-main', arcFraction: 0.5, height: 5 },
+        { segmentId: 'segment-main', arcFraction: 1, height: 2.5 },
+      ],
+    },
+  }));
+  const tops = plan.boxes.map((box) => box.top);
+
+  assert.ok(plan.boxes.length > 4);
+  assert.ok(Math.abs(Math.max(...tops) - 5) < 1e-9);
+  assert.ok(Math.min(...tops) < 3.2);
+  assert.ok(tops.some((height) => height > 4.5));
+});
+
 test('long straight walls are partitioned into bounded overlapping boxes', () => {
   const plan = compile(straightConstruction({ start: [0, 0], end: [200, 0] }));
 
