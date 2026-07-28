@@ -49,9 +49,14 @@ tmp/collision-acceptance/
   cases/
     <case-id>/
       run-01.json
+      run-01.png
       run-02.json
+      run-02.png
       run-03.json
+      run-03.png
 ```
+
+Every raw JSON report records the hardware adapter, configured viewport, and matching screenshot path. The aggregate report rejects missing or mismatched capture evidence.
 
 ## Run the release gate
 
@@ -82,7 +87,7 @@ The current matrix reuses deterministic P3-P8 fixtures:
 
 Targeted fixture scenes enforce collision timing, readiness, query counts, hardware evidence, and hitches. They are not compared against the open-ground frame baseline because their rendered scenes differ.
 
-The full-stack route is marked comparable and must stay within the configured frame-p95 regression allowance against the open-ground baseline. The baseline and collision-enabled case use the same spawn, direction, speed, warm-up, and 60-second measurement window. Configuration validation rejects future comparable cases that do not match their baseline route.
+The full-stack route is marked comparable and must stay within the configured frame-p95 regression allowance against the open-ground baseline. The baseline and collision-enabled case use the same spawn, direction, speed, warm-up, 60-second measurement window, 1600×900 viewport, and device scale. Configuration validation rejects future comparable cases that do not match their baseline route.
 
 `collision-p8` preserves production debug settings. It does not force collider or broadphase debug rendering, so the performance capture excludes QA visualisation cost. P1-P7 visual fixtures still force their debug views for headed inspection.
 
@@ -105,6 +110,7 @@ These remain visible in `report.json`, `report.md`, and the command exit status.
 Each collision run requires:
 
 - a recorded non-fallback hardware WebGPU adapter;
+- the configured viewport and matching screenshot evidence;
 - the expected QA scenario and collision mode;
 - zero hitches above the configured threshold;
 - a passing in-app collision gate;
@@ -124,7 +130,7 @@ The matrix and thresholds are kept in:
 config/collision-acceptance.yaml
 ```
 
-Case IDs are path-safe identifiers because they are used as output-directory names. Gate and minimum-count fields are validated before any browser or server is started.
+Case IDs are path-safe identifiers because they are used as output-directory names. Viewport, gate, and minimum-count fields are validated before any browser or server is started.
 
 ## Release decision
 
