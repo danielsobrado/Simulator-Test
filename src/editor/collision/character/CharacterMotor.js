@@ -1,4 +1,9 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
+import {
+  COLLISION_COUNT_COUNTERS,
+  COLLISION_TIMING_COUNTERS,
+  recordCollisionTiming,
+} from '../CollisionPerfCounters.js';
 import { COLLISION_LAYERS } from '../CollisionLayers.js';
 import { COLLIDER_TYPE_MESH_INSTANCE } from '../colliders/ColliderRecords.js';
 import {
@@ -55,6 +60,7 @@ export class CharacterMotor {
     config,
     stepHeight,
     groundSnapDistance,
+    now = () => performance.now(),
   }) {
     if (!collisionRuntime
         || typeof collisionRuntime.querySweptCapsule !== 'function'
@@ -75,6 +81,7 @@ export class CharacterMotor {
     if (!(stepHeight > 0) || !(groundSnapDistance >= 0)) {
       throw new Error('Character motor support configuration is invalid.');
     }
+    if (typeof now !== 'function') throw new Error('Character motor now must be a function.');
 
     this.collisionRuntime = collisionRuntime;
     this.terrainProvider = terrainProvider;
@@ -82,11 +89,13 @@ export class CharacterMotor {
     this.stepHeight = stepHeight;
     this.groundSnapDistance = groundSnapDistance;
     this.maximumSlopeCosine = Math.cos(config.maxSlopeDegrees * Math.PI / 180);
+    this.now = now;
     this.candidateBuffer = [];
     this.contactScratch = {};
     this.previousValidPosition = null;
     this.lastResult = null;
     this.primitiveTests = 0;
+    this.primitiveColliderTests = 0;
   }
 
   reset(position) {
@@ -94,18 +103,22 @@ export class CharacterMotor {
     this.previousValidPosition = copyPosition(position);
     this.lastResult = null;
     this.primitiveTests = 0;
+    this.primitiveColliderTests = 0;
   }
 
   contact(capsule, collider, out = this.contactScratch) {
     this.primitiveTests += 1;
-    return collider.type === COLLIDER_TYPE_MESH_INSTANCE
-      ? this.collisionRuntime.findMeshSideContact?.(
+    if (collider.type === COLLIDER_TYPE_MESH_INSTANCE) {
+      return this.collisionRuntime.findMeshSideContact?.(
         capsule,
         collider,
         this.config.skinWidth,
         out,
-      ) ?? null
-      : findPrimitiveSideContact(capsule, collider, this.config.skinWidth, out);
+      ) ?? null;
+    }
+    this.primitiveColliderTests += 1;
+    PerfCounters.inc(COLLISION_COUNT_COUNTERS.primitiveTests);
+    return findPrimitiveSideContact(capsule, collider, this.config.skinWidth, out);
   }
 
   overlaps(capsule, collider) {
@@ -113,6 +126,8 @@ export class CharacterMotor {
       return this.contact(capsule, collider, {}) !== null;
     }
     this.primitiveTests += 1;
+    this.primitiveColliderTests += 1;
+    PerfCounters.inc(COLLISION_COUNT_COUNTERS.primitiveTests);
     return capsuleOverlapsPrimitive(capsule, collider, this.config.skinWidth);
   }
 
@@ -175,6 +190,7 @@ export class CharacterMotor {
     allowStep = grounded,
     supportDownDistance = this.groundSnapDistance,
   }) {
+    const totalStartedAt = this.now();
     assertFinitePoint(start, 'start');
     if (!displacement || !Number.isFinite(displacement.x) || !Number.isFinite(displacement.z)) {
       throw new Error('Character motor displacement must contain finite x and z.');
@@ -184,6 +200,7 @@ export class CharacterMotor {
     }
     if (!this.previousValidPosition) this.previousValidPosition = copyPosition(start);
     this.primitiveTests = 0;
+    this.primitiveColliderTests = 0;
 
     const maximumDistance = this.config.maxSubstepDistance * MAX_CHARACTER_SUBSTEPS;
     const boundedDisplacement = safeDisplacement(displacement, maximumDistance);
@@ -222,11 +239,17 @@ export class CharacterMotor {
 
     if (!readiness.ready) {
       PerfCounters.inc('collisionNotReadyStops');
+      PerfCounters.inc(COLLISION_COUNT_COUNTERS.readinessMisses);
       PerfCounters.set('collisionPrimitiveTests', 0);
       const support = this.terrainProvider.sample(
         this.previousValidPosition.x,
         this.previousValidPosition.z,
         this.config.radius,
+      );
+      const totalMs = recordCollisionTiming(
+        COLLISION_TIMING_COUNTERS.total,
+        totalStartedAt,
+        this.now,
       );
       const result = Object.freeze({
         position: this.previousValidPosition,
@@ -243,7 +266,9 @@ export class CharacterMotor {
         iterations: 0,
         substeps: 0,
         primitiveTests: 0,
+        primitiveColliderTests: 0,
         readiness,
+        timings: Object.freeze({ totalMs, narrowPhaseMs: 0, supportMs: 0 }),
       });
       this.lastResult = result;
       return result;
@@ -274,6 +299,7 @@ export class CharacterMotor {
     let blocked = false;
     let stepped = false;
     let totalIterations = 0;
+    const narrowStartedAt = this.now();
 
     for (let index = 0; index < substeps; index += 1) {
       const targetX = capsule.x + stepX;
@@ -283,6 +309,7 @@ export class CharacterMotor {
       if (resolved.blocked) blocked = true;
 
       if (resolved.blocked && allowStep && grounded) {
+        PerfCounters.inc(COLLISION_COUNT_COUNTERS.stepAttempts);
         const step = tryCharacterStep({
           capsule,
           targetX,
@@ -298,12 +325,19 @@ export class CharacterMotor {
         if (step) {
           capsule = step.capsule;
           stepped = true;
+          PerfCounters.inc(COLLISION_COUNT_COUNTERS.stepSuccesses);
           continue;
         }
       }
       capsule = resolved.capsule;
     }
+    const narrowPhaseMs = recordCollisionTiming(
+      COLLISION_TIMING_COUNTERS.narrowPhase,
+      narrowStartedAt,
+      this.now,
+    );
 
+    const supportStartedAt = this.now();
     const support = findCharacterSupport({
       x: capsule.x,
       z: capsule.z,
@@ -316,14 +350,25 @@ export class CharacterMotor {
       maximumSlopeCosine: this.maximumSlopeCosine,
       findMeshTopSupport: (options) => this.meshSupport(options),
     }) ?? this.terrainProvider.sample(capsule.x, capsule.z, capsule.radius);
+    const supportMs = recordCollisionTiming(
+      COLLISION_TIMING_COUNTERS.support,
+      supportStartedAt,
+      this.now,
+    );
     const position = copyPosition({ x: capsule.x, y: capsule.y, z: capsule.z });
     this.previousValidPosition = position;
 
     PerfCounters.set('collisionContacts', contactIds.length);
+    PerfCounters.inc(COLLISION_COUNT_COUNTERS.contacts, contactIds.length);
     PerfCounters.set('collisionSolverIterations', totalIterations);
     PerfCounters.set('collisionSubsteps', substeps);
     PerfCounters.set('collisionPrimitiveTests', this.primitiveTests);
     if (stepped) PerfCounters.inc('collisionStepUps');
+    const totalMs = recordCollisionTiming(
+      COLLISION_TIMING_COUNTERS.total,
+      totalStartedAt,
+      this.now,
+    );
 
     const result = Object.freeze({
       position,
@@ -340,7 +385,9 @@ export class CharacterMotor {
       iterations: totalIterations,
       substeps,
       primitiveTests: this.primitiveTests,
+      primitiveColliderTests: this.primitiveColliderTests,
       readiness,
+      timings: Object.freeze({ totalMs, narrowPhaseMs, supportMs }),
     });
     this.lastResult = result;
     return result;
@@ -358,7 +405,9 @@ export class CharacterMotor {
         supportWalkable: true,
         contacts: Object.freeze([]),
         primitiveTests: 0,
+        primitiveColliderTests: 0,
         previousValidPosition: this.previousValidPosition,
+        timings: null,
       });
     }
     return Object.freeze({
@@ -374,7 +423,10 @@ export class CharacterMotor {
       iterations: this.lastResult.iterations,
       substeps: this.lastResult.substeps,
       primitiveTests: this.lastResult.primitiveTests,
+      primitiveColliderTests: this.lastResult.primitiveColliderTests,
       previousValidPosition: this.previousValidPosition,
+      readiness: this.lastResult.readiness,
+      timings: this.lastResult.timings,
     });
   }
 
@@ -383,5 +435,6 @@ export class CharacterMotor {
     this.previousValidPosition = null;
     this.lastResult = null;
     this.primitiveTests = 0;
+    this.primitiveColliderTests = 0;
   }
 }
