@@ -73,6 +73,12 @@ test('backing expands in plane by absolute overlap', () => {
   assert.ok(Math.abs(height - 0.548) < 1e-9, `height=${height}`);
 });
 
+test('safety overlap is only a few millimetres', () => {
+  assert.equal(CONSTRUCTION_MORTAR_CONFIG.safetyOverlap, 0.003);
+  assert.ok(CONSTRUCTION_MORTAR_CONFIG.safetyOverlap <= 0.003);
+  assert.ok(CONSTRUCTION_MORTAR_CONFIG.legacyOverlapByCategory.field === 0.024);
+});
+
 test('rotated prism bounds remain finite', () => {
   const geometry = buildMortarCoreGeometry([{
     ...UNIT_PRISM,

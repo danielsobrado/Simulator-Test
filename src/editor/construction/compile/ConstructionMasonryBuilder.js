@@ -141,6 +141,33 @@ export function shouldBuildMortarBacking(placement) {
 }
 
 /**
+ * Face ring for the recessed mortar core.
+ *
+ * Prefer the packer's solved `mortarCorners` (full cell footprint) with only a
+ * millimetre-scale safety overlap. Fall back to expanding the final stone face
+ * for dressings / legacy placements that omit the footprint.
+ */
+function mortarFaceCorners({ placement, stoneShape, config }) {
+  if (placement.mortarCorners) {
+    return expandCorners(
+      placement.mortarCorners,
+      config.safetyOverlap,
+      { maxScale: config.maxCornerScale },
+    );
+  }
+
+  const overlap = overlapForCategory(
+    placement.category ?? stoneShape.category,
+    config,
+  );
+  return expandCorners(
+    stoneShape.corners,
+    overlap,
+    { maxScale: config.maxCornerScale },
+  );
+}
+
+/**
  * Plain-data mortar prism for one resolved stone.
  *
  * @returns {object | null}
@@ -152,11 +179,12 @@ export function createMortarDescriptor({
 }) {
   if (!shouldBuildMortarBacking(placement)) return null;
 
+  const sourceCorners = placement.mortarCorners ?? stoneShape.corners;
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const [x, y] of stoneShape.corners) {
+  for (const [x, y] of sourceCorners) {
     minX = Math.min(minX, x);
     maxX = Math.max(maxX, x);
     minY = Math.min(minY, y);
@@ -166,9 +194,10 @@ export function createMortarDescriptor({
   const stoneHeight = maxY - minY;
   if (!(stoneWidth > 0) || !(stoneHeight > 0)) return null;
 
-  const overlap = overlapForCategory(placement.category ?? stoneShape.category, config);
-  const mortarCorners = expandCorners(stoneShape.corners, overlap, {
-    maxScale: config.maxCornerScale,
+  const mortarCorners = mortarFaceCorners({
+    placement,
+    stoneShape,
+    config,
   });
   const depth = mortarCoreDepth(stoneShape.depth, config);
 

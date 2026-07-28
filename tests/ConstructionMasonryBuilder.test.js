@@ -210,11 +210,22 @@ test('coarse placements remain covered by matching backing', () => {
       config: CONSTRUCTION_MORTAR_CONFIG,
     });
     assert.ok(descriptor, 'every coarse stone gets backing');
-    // Stretched coarse stones keep a taller face ring; backing must cover it.
-    assert.ok(
-      faceHeight(descriptor.corners) + 1e-6 >= faceHeight(stoneShape.corners),
-      'backing must be at least as tall as the resolved stone face',
-    );
+    // Prefer covering the resolved stone. When near mortarCorners are still
+    // present (pre–coarse amplification), they may be shorter than a stretched
+    // coarse face — still require the backing to cover that footprint.
+    const mortarHeight = faceHeight(descriptor.corners);
+    const stoneHeight = faceHeight(stoneShape.corners);
+    if (placement.mortarCorners && mortarHeight + 1e-6 < stoneHeight) {
+      assert.ok(
+        mortarHeight + 1e-6 >= faceHeight(placement.mortarCorners),
+        'backing must cover the authoritative mortar footprint',
+      );
+    } else {
+      assert.ok(
+        mortarHeight + 1e-6 >= stoneHeight,
+        'backing must be at least as tall as the resolved stone face',
+      );
+    }
     descriptors.push(descriptor);
   }
   assert.equal(descriptors.length, coarse.length);
@@ -222,4 +233,179 @@ test('coarse placements remain covered by matching backing', () => {
   const geometry = buildMortarCoreGeometry(descriptors);
   assert.equal(geometry.userData.mortarPrisms, coarse.length);
   geometry.dispose();
+});
+
+function faceWidth(corners) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const [x] of corners) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+  }
+  return maxX - minX;
+}
+
+function shapeStub(corners, overrides = {}) {
+  return {
+    corners,
+    depth: 0.7,
+    position: [0, 1, 0],
+    rotation: [0, 0, 0],
+    category: 'field',
+    ...overrides,
+  };
+}
+
+test('authoritative mortarCorners win over shrunken stone corners', () => {
+  const mortarCorners = [
+    [-0.5, -0.25],
+    [0.5, -0.25],
+    [0.5, 0.25],
+    [-0.5, 0.25],
+  ];
+  const tinyStone = [
+    [-0.2, -0.1],
+    [0.2, -0.1],
+    [0.2, 0.1],
+    [-0.2, 0.1],
+  ];
+  const descriptor = createMortarDescriptor({
+    placement: { category: 'field', mortarCorners },
+    stoneShape: shapeStub(tinyStone),
+    config: CONSTRUCTION_MORTAR_CONFIG,
+  });
+  const width = faceWidth(descriptor.corners);
+  // Cell footprint (1 m) plus 2 * safetyOverlap, not legacy field overlap.
+  assert.ok(Math.abs(width - (1 + CONSTRUCTION_MORTAR_CONFIG.safetyOverlap * 2)) < 1e-9);
+  assert.ok(width < 1.05);
+});
+
+test('legacy category overlap applies without mortarCorners', () => {
+  const corners = [
+    [-0.5, -0.25],
+    [0.5, -0.25],
+    [0.5, 0.25],
+    [-0.5, 0.25],
+  ];
+  const descriptor = createMortarDescriptor({
+    placement: { category: 'field' },
+    stoneShape: shapeStub(corners),
+    config: CONSTRUCTION_MORTAR_CONFIG,
+  });
+  const width = faceWidth(descriptor.corners);
+  assert.ok(Math.abs(width - 1.048) < 1e-9);
+});
+
+test('wall-end mortar does not grow past the solved endpoint', () => {
+  const { placements } = packStraight(12);
+  const field = placements.filter((stone) => stone.category === 'field');
+  const end = field.reduce((best, stone) => (
+    (stone.s + stone.packedWidth / 2) > (best.s + best.packedWidth / 2) ? stone : best
+  ));
+  assert.ok(end.mortarCorners);
+  const descriptor = createMortarDescriptor({
+    placement: end,
+    stoneShape: shapeStub(end.corners.map(([x, y]) => [x * 0.5, y * 0.5]), {
+      depth: end.depth,
+    }),
+    config: CONSTRUCTION_MORTAR_CONFIG,
+  });
+  const mortarMax = Math.max(...descriptor.corners.map(([x]) => end.s + x));
+  const solvedMax = Math.max(...end.mortarCorners.map(([x]) => end.s + x));
+  assert.ok(
+    mortarMax <= solvedMax + CONSTRUCTION_MORTAR_CONFIG.safetyOverlap + 1e-6,
+  );
+});
+
+test('opening-edge mortar stays on the surviving interval', () => {
+  const record = wallRecord(24);
+  const arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
+  const profile = createWallTopProfile(record, arcTable, { style: STYLE });
+  const arch = {
+    id: 'door',
+    kind: 'door',
+    profile: 'round',
+    s: 12,
+    width: 2.4,
+    sill: 0,
+    height: 2.6,
+    dressed: true,
+    group: null,
+  };
+  const packed = packCurvedWall({
+    arcTable,
+    arcRange: [0, arcTable.totalLength],
+    style: STYLE,
+    thickness: record.dimensions.thickness,
+    seed: record.seed,
+    seedOffset: 0,
+    topHeightAt: profile.heightAt,
+    ruinFactorAt: profile.ruinFactorAt,
+    openings: [arch],
+  });
+  const jambLeft = arch.s - arch.width / 2;
+  const jambRight = arch.s + arch.width / 2;
+  const field = packed.stones.filter((stone) => stone.category === 'field');
+  for (const stone of field) {
+    if (!stone.mortarCorners) continue;
+    const descriptor = createMortarDescriptor({
+      placement: stone,
+      stoneShape: shapeStub(stone.corners, { depth: stone.depth }),
+      config: CONSTRUCTION_MORTAR_CONFIG,
+    });
+    const xs = descriptor.corners.map(([x]) => stone.s + x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    // Backing may touch the jamb (+ safety) but must not cross the void.
+    if (maxX < jambLeft + 0.05) {
+      assert.ok(maxX <= jambLeft + CONSTRUCTION_MORTAR_CONFIG.safetyOverlap + 1e-4);
+    }
+    if (minX > jambRight - 0.05) {
+      assert.ok(minX >= jambRight - CONSTRUCTION_MORTAR_CONFIG.safetyOverlap - 1e-4);
+    }
+  }
+});
+
+test('wide soft-limestone joints still cover adjacent backing', () => {
+  const soft = constructionStyle('soft-limestone-rubble');
+  const record = normalizeConstructionRecord({
+    ...wallRecord(12),
+    style: { key: 'soft-limestone-rubble', version: 1 },
+    seed: 3141,
+  });
+  const arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
+  const profile = createWallTopProfile(record, arcTable, { style: soft });
+  const packed = packCurvedWall({
+    arcTable,
+    arcRange: [0, arcTable.totalLength],
+    style: soft,
+    thickness: record.dimensions.thickness,
+    seed: record.seed,
+    seedOffset: 0,
+    topHeightAt: profile.heightAt,
+    ruinFactorAt: profile.ruinFactorAt,
+  });
+  const field = packed.stones
+    .filter((stone) => stone.category === 'field' && stone.courseIndex === 1)
+    .sort((a, b) => a.s - b.s);
+  assert.ok(field.length >= 2);
+  for (let index = 1; index < field.length; index += 1) {
+    const left = field[index - 1];
+    const right = field[index];
+    if (Math.abs((left.s + left.packedWidth / 2) - (right.s - right.packedWidth / 2)) > 1e-5) {
+      continue;
+    }
+    const leftDesc = createMortarDescriptor({
+      placement: left,
+      stoneShape: shapeStub(left.corners, { depth: left.depth }),
+    });
+    const rightDesc = createMortarDescriptor({
+      placement: right,
+      stoneShape: shapeStub(right.corners, { depth: right.depth }),
+    });
+    const leftMax = Math.max(...leftDesc.corners.map(([x]) => left.s + x));
+    const rightMin = Math.min(...rightDesc.corners.map(([x]) => right.s + x));
+    // Safety expansion on both sides should overlap or meet, never leave a gap.
+    assert.ok(leftMax + 1e-6 >= rightMin);
+  }
 });

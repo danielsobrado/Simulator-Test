@@ -3,6 +3,11 @@
  *
  * Geometry builders read these constants; keep visual tuning here rather than
  * scattering magic numbers through the prism writer.
+ *
+ * Field placements from the course packer carry authoritative `mortarCorners`
+ * (the solved cell footprint). Those use `safetyOverlap` only — a few
+ * millimetres to hide floating-point cracks. `legacyOverlapByCategory` remains
+ * the fallback for dressings and older placement producers without footprints.
  */
 
 export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
@@ -12,8 +17,13 @@ export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
   minimumDepth: 0.08,
   /** UV scale for future imported mortar textures. */
   uvDensity: 0.8,
-  /** Absolute face-plane expansion behind joint gaps, by stone category (m). */
-  overlapByCategory: Object.freeze({
+  /**
+   * Tiny absolute expansion when backing from authoritative `mortarCorners`.
+   * Hides FP cracks between adjacent cell footprints — not a visual joint.
+   */
+  safetyOverlap: 0.003,
+  /** Fallback face-plane expansion for placements without mortarCorners (m). */
+  legacyOverlapByCategory: Object.freeze({
     field: 0.024,
     ashlar: 0.014,
     quoin: 0.012,
@@ -65,6 +75,6 @@ export function mortarProfile(styleKey) {
 }
 
 export function overlapForCategory(category, config = CONSTRUCTION_MORTAR_CONFIG) {
-  const table = config.overlapByCategory;
+  const table = config.legacyOverlapByCategory;
   return table[category] ?? table.default;
 }
