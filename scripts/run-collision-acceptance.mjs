@@ -109,7 +109,14 @@ function appendOptional(args, name, value) {
   args.push(`--${name}`, String(value));
 }
 
-function runnerArguments({ config, caseConfig, baseUrl, reportPath, headed }) {
+function runnerArguments({
+  config,
+  caseConfig,
+  baseUrl,
+  reportPath,
+  screenshotPath,
+  headed,
+}) {
   const timeoutMs = Math.ceil(
     (caseConfig.warmupSeconds
       + caseConfig.durationSeconds
@@ -123,8 +130,12 @@ function runnerArguments({ config, caseConfig, baseUrl, reportPath, headed }) {
     '--duration', String(caseConfig.durationSeconds),
     '--speed', caseConfig.speed,
     '--hitchMs', String(config.hitchMs),
+    '--viewportWidth', String(config.viewport.width),
+    '--viewportHeight', String(config.viewport.height),
+    '--deviceScaleFactor', String(config.viewport.deviceScaleFactor),
     '--timeoutMs', String(timeoutMs),
     '--out', reportPath,
+    '--screenshot', screenshotPath,
   ];
   appendOptional(args, 'x', caseConfig.spawn?.x);
   appendOptional(args, 'z', caseConfig.spawn?.z);
@@ -138,6 +149,10 @@ function runnerArguments({ config, caseConfig, baseUrl, reportPath, headed }) {
 async function loadReport(reportPath) {
   const text = await readFile(reportPath, 'utf8');
   return JSON.parse(text);
+}
+
+function relativeArtifact(filePath) {
+  return path.relative(root, filePath).replaceAll('\\', '/');
 }
 
 async function runBattery() {
@@ -190,11 +205,13 @@ async function runBattery() {
       const caseDirectory = path.join(outputDirectory, 'cases', caseConfig.id);
       await mkdir(caseDirectory, { recursive: true });
       for (let repeat = 1; repeat <= config.repeats; repeat += 1) {
-        const reportPath = path.join(
-          caseDirectory,
-          `run-${String(repeat).padStart(2, '0')}.json`,
-        );
-        await unlink(reportPath).catch(() => {});
+        const runName = `run-${String(repeat).padStart(2, '0')}`;
+        const reportPath = path.join(caseDirectory, `${runName}.json`);
+        const screenshotPath = path.join(caseDirectory, `${runName}.png`);
+        await Promise.all([
+          unlink(reportPath).catch(() => {}),
+          unlink(screenshotPath).catch(() => {}),
+        ]);
         console.log(`\n=== ${caseConfig.id} · run ${repeat}/${config.repeats} ===`);
         try {
           await runChild(process.execPath, runnerArguments({
@@ -202,12 +219,14 @@ async function runBattery() {
             caseConfig,
             baseUrl,
             reportPath,
+            screenshotPath,
             headed,
           }));
           runs.push({
             caseId: caseConfig.id,
             repeat,
-            reportPath: path.relative(root, reportPath).replaceAll('\\', '/'),
+            reportPath: relativeArtifact(reportPath),
+            screenshotPath: relativeArtifact(screenshotPath),
             report: await loadReport(reportPath),
             error: null,
           });
@@ -215,7 +234,8 @@ async function runBattery() {
           runs.push({
             caseId: caseConfig.id,
             repeat,
-            reportPath: path.relative(root, reportPath).replaceAll('\\', '/'),
+            reportPath: relativeArtifact(reportPath),
+            screenshotPath: relativeArtifact(screenshotPath),
             report: null,
             error: error instanceof Error ? error.message : String(error),
           });
@@ -233,7 +253,7 @@ async function runBattery() {
     config,
     runs,
     source: Object.freeze({
-      configPath: path.relative(root, configPath).replaceAll('\\', '/'),
+      configPath: relativeArtifact(configPath),
       baseUrl,
       releaseMode,
       branch: process.env.GITHUB_REF_NAME ?? null,
