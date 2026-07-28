@@ -6,6 +6,7 @@
  * Usage:
  *   npm run qa:perf
  *   npm run qa:perf -- --qa chunk-cross --duration 12 --warmup 2
+ *   npm run qa:perf -- --qa collision-p8 --out tmp/collision-p8.json
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,6 +27,10 @@ function hasFlag(name) {
   return process.argv.includes(`--${name}`);
 }
 
+function setOptionalQuery(query, key, value) {
+  if (value !== null) query.set(key, value);
+}
+
 const baseUrl = readArg('url', 'http://localhost:5173');
 const scenario = readArg('qa', 'chunk-cross');
 const duration = readArg('duration', '12');
@@ -33,9 +38,15 @@ const warmup = readArg('warmup', '2');
 const speed = readArg('speed', 'run');
 const hitchMs = readArg('hitchMs', '33.3');
 const buildings = readArg('buildings');
+const spawnX = readArg('x');
+const spawnZ = readArg('z');
+const yaw = readArg('yaw');
+const pitch = readArg('pitch');
 const timeoutMs = Number(
   readArg('timeoutMs', String((Number(warmup) + Number(duration) + 90) * 1000)),
 );
+const outPath = path.resolve(readArg('out', path.join(outDir, 'perf-qa-latest.json')));
+const runnerPath = path.join(outDir, 'perf-qa-playwright-runner.cjs');
 
 const query = new URLSearchParams({
   qa: scenario,
@@ -46,12 +57,15 @@ const query = new URLSearchParams({
   download: '0',
   autostart: '1',
 });
-if (buildings !== null) query.set('buildings', buildings);
+setOptionalQuery(query, 'buildings', buildings);
+setOptionalQuery(query, 'x', spawnX);
+setOptionalQuery(query, 'z', spawnZ);
+setOptionalQuery(query, 'yaw', yaw);
+setOptionalQuery(query, 'pitch', pitch);
 const targetUrl = `${baseUrl.replace(/\/$/, '')}/?${query.toString()}`;
-const outPath = path.join(outDir, 'perf-qa-latest.json');
-const runnerPath = path.join(outDir, 'perf-qa-playwright-runner.cjs');
 
 fs.mkdirSync(outDir, { recursive: true });
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
 
 fs.writeFileSync(
   runnerPath,
@@ -123,7 +137,14 @@ const fs = require('fs');
     avgFps: report.summary.avgFps,
     hitchCount: report.summary.hitchCount,
     dt: report.summary.dt,
-    counters: report.counters,
+    collision: report.collision
+      ? {
+        enabled: report.collision.enabled,
+        p95Ms: report.collision.timingsMs?.total?.p95Ms,
+        gatePassed: report.collision.gate?.passed,
+        readiness: report.collision.readiness,
+      }
+      : null,
   }, null, 2));
   await browser.close();
 })().catch((error) => {
