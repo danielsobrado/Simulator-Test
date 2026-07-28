@@ -28,13 +28,12 @@ function runWidth(ordered, start, end) {
   return spanEnd(ordered[end]) - spanStart(ordered[start]);
 }
 
-/**
- * Resolve clustered damage on field stones. Dressings pass through unchanged.
- */
-export function resolveRuinClusters({
-  placements,
-  profile,
-}) {
+function stableClusterId(courseIndex, placement) {
+  return `course:${courseIndex}:stone:${placement.stableIndex ?? placement._ruinId ?? 0}`;
+}
+
+/** Resolve clustered damage on field stones. Dressings pass through unchanged. */
+export function resolveRuinClusters({ placements, profile }) {
   const stats = {
     preliminaryDamage: 0,
     isolatedHolesRestored: 0,
@@ -60,10 +59,9 @@ export function resolveRuinClusters({
   const survivors = [...rest];
   const removed = [];
   const clusterIds = new Map();
-  let nextClusterId = 1;
 
   const orderedCourses = [...byCourse.entries()].sort(([left], [right]) => left - right);
-  for (const [, coursePlacements] of orderedCourses) {
+  for (const [courseIndex, coursePlacements] of orderedCourses) {
     const ordered = [...coursePlacements].sort(compareBySpan);
     const removeFlags = ordered.map((placement) => Boolean(placement.ruin?.candidate));
     for (const flag of removeFlags) {
@@ -108,10 +106,6 @@ export function resolveRuinClusters({
         continue;
       }
 
-      const clusterId = nextClusterId;
-      nextClusterId += 1;
-      stats.damageClusters += 1;
-
       let expandedStart = index;
       let expandedEnd = end;
       const severe = maxScore >= profile.damage.cluster.severeThreshold;
@@ -133,6 +127,8 @@ export function resolveRuinClusters({
         if (tryExpand(end + 1, end)) expandedEnd = end + 1;
       }
 
+      const clusterId = stableClusterId(courseIndex, ordered[expandedStart]);
+      stats.damageClusters += 1;
       stats.maximumClusterWidth = Math.max(
         stats.maximumClusterWidth,
         runWidth(ordered, expandedStart, expandedEnd),
