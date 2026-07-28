@@ -46,6 +46,12 @@ export function validateWaterOpticsConfig(config) {
     1,
   );
   assertFiniteRange(
+    config.surfaceTransitionDepth,
+    'stylizedSurface.water.optics.surfaceTransitionDepth',
+    0.05,
+    5,
+  );
+  assertFiniteRange(
     config.surfaceDetailStrength,
     'stylizedSurface.water.optics.surfaceDetailStrength',
     0,
@@ -69,7 +75,6 @@ export function validateWaterOpticsConfig(config) {
 export function computeWaterOpticsSample({
   depth,
   viewCosine = 1,
-  underwater = false,
   cameraSubmersionDepth = 0,
   config,
 }) {
@@ -79,7 +84,13 @@ export function computeWaterOpticsSample({
     0,
     Number.isFinite(cameraSubmersionDepth) ? cameraSubmersionDepth : 0,
   );
-  const verticalDistance = underwater ? safeSubmersionDepth : safeDepth;
+  const underwaterBlend = smoothstep(
+    0,
+    config.surfaceTransitionDepth,
+    safeSubmersionDepth,
+  );
+  const verticalDistance = safeDepth
+    + (safeSubmersionDepth - safeDepth) * underwaterBlend;
   const safeCosine = clamp(
     Math.abs(Number.isFinite(viewCosine) ? viewCosine : 1),
     config.minimumViewCosine,
@@ -94,6 +105,8 @@ export function computeWaterOpticsSample({
     + (config.maximumOpacity - config.minimumOpacity) * (1 - transmission);
   return Object.freeze({
     depth: safeDepth,
+    cameraSubmersionDepth: safeSubmersionDepth,
+    underwaterBlend,
     verticalDistance,
     opticalDistance,
     transmission,
