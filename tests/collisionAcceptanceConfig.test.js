@@ -33,6 +33,7 @@ function validConfig() {
         label: 'Baseline',
         scenario: 'move',
         collisionRequired: false,
+        compareFrameToBaseline: false,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -46,14 +47,13 @@ test('repository collision acceptance config is valid and keeps baseline collisi
   const config = loadCollisionAcceptanceConfig(
     path.join(root, 'config', 'collision-acceptance.yaml'),
   );
+  const baseline = config.cases.find((entry) => entry.id === config.baselineCase);
 
   assert.equal(config.version, 1);
   assert.equal(config.repeats, 3);
   assert.equal(config.baselineCase, 'open-ground-baseline');
-  assert.equal(
-    config.cases.find((entry) => entry.id === config.baselineCase).collisionRequired,
-    false,
-  );
+  assert.equal(baseline.collisionRequired, false);
+  assert.equal(baseline.compareFrameToBaseline, false);
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
 });
 
@@ -72,6 +72,15 @@ test('config validation rejects a collision-enabled baseline', () => {
   assert.throws(
     () => validateCollisionAcceptanceConfig(config),
     /baselineCase must not require collision/,
+  );
+});
+
+test('config validation rejects a baseline compared to itself', () => {
+  const config = validConfig();
+  config.cases[0].compareFrameToBaseline = true;
+  assert.throws(
+    () => validateCollisionAcceptanceConfig(config),
+    /cannot compare its frame time to itself/,
   );
 });
 
