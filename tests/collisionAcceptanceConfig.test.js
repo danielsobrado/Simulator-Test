@@ -8,6 +8,20 @@ import {
 } from '../scripts/lib/collisionAcceptanceConfig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REQUIRED_RELEASE_COVERAGE = Object.freeze([
+  'open-ground-run',
+  'dense-forest-run',
+  'scree-field-traversal',
+  'walkable-rock-climb-loop',
+  'dense-object-town',
+  'long-curved-wall-traversal',
+  'repeated-collision-chunk-crossing',
+  'controlled-collision-frame-ab',
+  'floating-origin-rebase-during-movement',
+  'construction-edit-rebuild-nearby',
+  'collision-unload-reload-cycle',
+  'long-soak-10m',
+]);
 
 function validConfig() {
   return {
@@ -54,6 +68,7 @@ test('repository collision acceptance config is valid and keeps release coverage
     path.join(root, 'config', 'collision-acceptance.yaml'),
   );
   const baseline = config.cases.find((entry) => entry.id === config.baselineCase);
+  const fullStack = config.cases.find((entry) => entry.id === 'full-stack-chunk-crossing');
 
   assert.equal(config.version, 1);
   assert.equal(config.repeats, 3);
@@ -62,9 +77,9 @@ test('repository collision acceptance config is valid and keeps release coverage
   assert.equal(baseline.collisionRequired, false);
   assert.equal(baseline.compareFrameToBaseline, false);
   assert.deepEqual(baseline.minimumCounts, {});
+  assert.equal(fullStack.compareFrameToBaseline, false);
   assert.equal(new Set(config.cases.map((entry) => entry.id)).size, config.cases.length);
-  assert.equal(config.requiredCoverage.includes('collision-unload-reload-cycle'), true);
-  assert.equal(config.requiredCoverage.includes('long-soak-10m'), true);
+  assert.deepEqual(config.requiredCoverage, REQUIRED_RELEASE_COVERAGE);
 });
 
 test('config validation rejects duplicate case IDs', () => {
