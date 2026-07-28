@@ -13,7 +13,10 @@ const ADAPTER = Object.freeze({
   fallback: false,
 });
 
-function config({ requiredCoverage = ['baseline', 'collision'] } = {}) {
+function config({
+  requiredCoverage = ['baseline', 'collision'],
+  compareCollisionToBaseline = true,
+} = {}) {
   return validateCollisionAcceptanceConfig({
     version: 1,
     repeats: 2,
@@ -37,6 +40,7 @@ function config({ requiredCoverage = ['baseline', 'collision'] } = {}) {
         label: 'Baseline',
         scenario: 'move',
         collisionRequired: false,
+        compareFrameToBaseline: false,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -47,6 +51,7 @@ function config({ requiredCoverage = ['baseline', 'collision'] } = {}) {
         label: 'Collision',
         scenario: 'collision-p8',
         collisionRequired: true,
+        compareFrameToBaseline: compareCollisionToBaseline,
         warmupSeconds: 1,
         durationSeconds: 2,
         speed: 'run',
@@ -194,6 +199,21 @@ test('frame regression and inconsistent hardware fail execution', () => {
       .find((entry) => entry.id === 'frame-p95-regression').passed,
     false,
   );
+});
+
+test('non-comparable fixtures do not use the open-ground frame gate', () => {
+  const report = buildCollisionAcceptanceReport({
+    config: config({ compareCollisionToBaseline: false }),
+    runs: passingRuns({ collision: { frameP95Ms: 20 } }),
+  });
+  const collisionCase = report.cases.find((entry) => entry.id === 'collision');
+
+  assert.equal(collisionCase.frameP95RegressionMs, null);
+  assert.equal(
+    collisionCase.checks.some((entry) => entry.id === 'frame-p95-regression'),
+    false,
+  );
+  assert.equal(report.gates.execution.passed, true);
 });
 
 test('readiness misses and incomplete repeats fail the collision case', () => {
