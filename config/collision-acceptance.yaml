@@ -27,6 +27,7 @@ requiredCoverage:
   - dense-object-town
   - long-curved-wall-traversal
   - repeated-collision-chunk-crossing
+  - controlled-collision-frame-ab
   - floating-origin-rebase-during-movement
   - construction-edit-rebuild-nearby
   - collision-unload-reload-cycle
@@ -120,7 +121,7 @@ cases:
     label: Full-stack repeated collision chunk crossing
     scenario: collision-p8
     collisionRequired: true
-    compareFrameToBaseline: true
+    compareFrameToBaseline: false
     warmupSeconds: 12
     durationSeconds: 60
     speed: run
