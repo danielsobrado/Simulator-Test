@@ -122,7 +122,35 @@ const fs = require('fs');
     page.setDefaultTimeout(${timeoutMs});
     await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
 
-    // Refuse to report timings from a software or unidentified adapter.
+    const rendererBackend = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        'canvas[aria-label="Drusniel World infinite world editor viewport"]',
+      );
+      if (!canvas) return { webgpu: false, webgl2: false, reason: 'renderer canvas not found' };
+      let webgpu = false;
+      let webgl2 = false;
+      try {
+        webgpu = canvas.getContext('webgpu') !== null;
+      } catch {
+        webgpu = false;
+      }
+      try {
+        webgl2 = canvas.getContext('webgl2') !== null;
+      } catch {
+        webgl2 = false;
+      }
+      return { webgpu, webgl2, reason: null };
+    });
+    if (!rendererBackend.webgpu || rendererBackend.webgl2) {
+      console.error('Perf QA aborted: the measured renderer is not using WebGPU.');
+      console.error(JSON.stringify(rendererBackend, null, 2));
+      process.exitCode = 2;
+      return;
+    }
+
+    // The canvas check above proves the measured renderer uses WebGPU. This
+    // adapter probe rejects software implementations and records stable hardware
+    // identity for comparisons across runs.
     const adapter = await page.evaluate(async () => {
       if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
       const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -164,6 +192,7 @@ const fs = require('fs');
         height: ${viewportHeight},
         deviceScaleFactor: ${deviceScaleFactor},
       },
+      rendererBackend,
       screenshot: ${JSON.stringify(screenshotReportPath)},
     };
     ${screenshotPath === null ? '' : `await page.screenshot({ path: ${JSON.stringify(screenshotPath.replace(/\\/g, '/'))} });`}
