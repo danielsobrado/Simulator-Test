@@ -5,6 +5,19 @@ import {
   PLAYER_SPAWN_PICK_MESSAGE,
 } from './playerConstants.js';
 
+function collisionHelp(player) {
+  const collision = player?.collision;
+  if (!collision?.active || collision.ready) return null;
+  const failure = collision.readiness?.failed?.[0] ?? null;
+  if (failure) {
+    return `Collision failed in ${failure.chunkKey ?? 'the destination'}: ${failure.message}`;
+  }
+  const missing = collision.readiness?.missing?.length ?? 0;
+  return missing > 0
+    ? `Loading collision safety data… ${missing} chunk${missing === 1 ? '' : 's'} remaining.`
+    : 'Loading collision safety data…';
+}
+
 export class ViewModeUi {
   constructor({ root, controller }) {
     this.root = root;
@@ -55,8 +68,6 @@ export class ViewModeUi {
       ? 'player-spawn'
       : state.mode;
     this.root.toggleAttribute('data-awaiting-spawn', state.awaitingSpawn);
-    // Drives the paused-editing CSS. Kept as a dataset flag rather than a third
-    // view mode so every existing `[data-view-mode='player']` rule still applies.
     this.root.dataset.playerPaused = state.paused ? 'true' : 'false';
 
     for (const button of this.switcher.querySelectorAll('[data-view-mode]')) {
@@ -75,6 +86,12 @@ export class ViewModeUi {
     this.crosshair.hidden = state.awaitingSpawn;
     if (state.awaitingSpawn) {
       this.help.textContent = PLAYER_SPAWN_PICK_MESSAGE;
+      return;
+    }
+
+    const readiness = collisionHelp(state.player);
+    if (readiness) {
+      this.help.textContent = readiness;
       return;
     }
 
