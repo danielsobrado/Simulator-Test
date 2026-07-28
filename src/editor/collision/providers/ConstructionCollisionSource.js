@@ -1,6 +1,7 @@
 import { ConstructionSpatialIndex } from '../../construction/ConstructionSpatialIndex.js';
 
 const DEFAULT_CONFIG = Object.freeze({ curveSegmentLength: 1.25 });
+const BOUNDS_FIELDS = Object.freeze(['minX', 'minZ', 'maxX', 'maxZ']);
 
 function normalizeConfig(config = {}) {
   const curveSegmentLength = config.curveSegmentLength ?? DEFAULT_CONFIG.curveSegmentLength;
@@ -8,6 +9,10 @@ function normalizeConfig(config = {}) {
     throw new Error('Construction collision curve segment length must be positive.');
   }
   return Object.freeze({ curveSegmentLength });
+}
+
+function sameBounds(left, right) {
+  return BOUNDS_FIELDS.every((field) => left?.[field] === right?.[field]);
 }
 
 export class ConstructionCollisionSource {
@@ -18,6 +23,7 @@ export class ConstructionCollisionSource {
     this.chunkWorldSize = null;
     this.config = DEFAULT_CONFIG;
     this.appliedPlans = 0;
+    this.unchangedPlans = 0;
     this.rejectedPlans = 0;
   }
 
@@ -74,8 +80,14 @@ export class ConstructionCollisionSource {
       this.rejectedPlans += 1;
       return false;
     }
+
+    const previous = this.plans.get(record.id);
     this.plans.set(record.id, plan);
-    this.spatialIndex?.updateBounds(record.id, plan.bounds);
+    if (previous?.signature === plan.signature && sameBounds(previous.bounds, plan.bounds)) {
+      this.unchangedPlans += 1;
+    } else {
+      this.spatialIndex?.updateBounds(record.id, plan.bounds);
+    }
     this.appliedPlans += 1;
     return true;
   }
@@ -121,6 +133,7 @@ export class ConstructionCollisionSource {
       plans: this.plans.size,
       stalePlans,
       appliedPlans: this.appliedPlans,
+      unchangedPlans: this.unchangedPlans,
       rejectedPlans: this.rejectedPlans,
       spatialRevision: this.spatialIndex?.revision ?? 0,
       config: this.config,
