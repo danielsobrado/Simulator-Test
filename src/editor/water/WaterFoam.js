@@ -48,7 +48,10 @@ export function computeGeographicFoam({
 }) {
   validateWaterFoamConfig(config);
   if (!config.enabled) return 0;
-  const shore = 1 - smoothstep(0, config.shoreWidth, Math.max(0, shoreDistance));
+  const safeShoreDistance = Number.isFinite(shoreDistance)
+    ? Math.max(0, shoreDistance)
+    : Number.POSITIVE_INFINITY;
+  const shore = 1 - smoothstep(0, config.shoreWidth, safeShoreDistance);
   const band = Math.pow(
     clamp(Math.sin(Number.isFinite(flowPhase) ? flowPhase : 0) * 0.5 + 0.5, 0, 1),
     config.flowBandContrast,
