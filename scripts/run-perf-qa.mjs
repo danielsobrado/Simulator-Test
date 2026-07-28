@@ -151,12 +151,15 @@ const fs = require('fs');
       return;
     }
 
-    // The canvas check above proves the measured renderer uses WebGPU. This
-    // adapter probe rejects software implementations and records stable hardware
-    // identity for comparisons across runs.
+    // Match Three r185 WebGPUBackend adapter selection. The canvas check above
+    // proves the measured renderer is WebGPU; this second request records the
+    // identity selected by the same compatibility-level options.
     const adapter = await page.evaluate(async () => {
       if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
-      const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+      const found = await navigator.gpu.requestAdapter({
+        featureLevel: 'compatibility',
+        xrCompatible: false,
+      });
       if (!found) return { ok: false, reason: 'no WebGPU adapter' };
       const flags = found.info ?? {};
       return {
