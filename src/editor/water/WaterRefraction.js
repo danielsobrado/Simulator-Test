@@ -64,8 +64,8 @@ export function validateWaterRefractionConfig(config) {
 }
 
 export function computeRefractionOffset({
-  coarse = { x: 0, y: 0 },
-  fine = { x: 0, y: 0 },
+  coarse = 0,
+  fine = 0,
   depth = 0,
   qualityScale = 1,
   config,
@@ -76,9 +76,11 @@ export function computeRefractionOffset({
   const scale = config.enabled
     ? config.strength * clamp(qualityScale, 0, 2) * depthFactor
     : 0;
+  const coarseValue = clamp(coarse, -1, 1);
+  const fineValue = clamp(fine, -1, 1);
   return Object.freeze({
-    x: (clamp(coarse.x, -1, 1) * 0.65 + clamp(fine.x, -1, 1) * 0.35) * scale,
-    y: (clamp(coarse.y, -1, 1) * 0.65 + clamp(fine.y, -1, 1) * 0.35) * scale,
+    x: (coarseValue * 0.7 + fineValue * 0.3) * scale,
+    y: (coarseValue * -0.35 + fineValue * 0.65) * scale,
     depthFactor,
   });
 }
