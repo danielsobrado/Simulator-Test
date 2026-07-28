@@ -44,6 +44,25 @@ function hardwareAdapterCheck(report) {
   );
 }
 
+function captureViewportCheck(config, report) {
+  const viewport = report?.capture?.viewport ?? null;
+  const matches = viewport?.width === config.viewport.width
+    && viewport?.height === config.viewport.height
+    && viewport?.deviceScaleFactor === config.viewport.deviceScaleFactor;
+  return check('capture-viewport', matches, viewport, config.viewport);
+}
+
+function screenshotCheck(run, report) {
+  const reportPath = report?.capture?.screenshot ?? null;
+  const expectedPath = run.screenshotPath ?? null;
+  return check(
+    'capture-screenshot',
+    typeof expectedPath === 'string' && expectedPath.length > 0 && reportPath === expectedPath,
+    reportPath,
+    expectedPath,
+  );
+}
+
 function productionDebugCheck(report) {
   const debug = report?.config?.collision?.debug ?? null;
   const disabled = debug !== null && Object.values(debug).every((value) => value === false);
@@ -68,6 +87,8 @@ function runChecks(config, caseConfig, run) {
   const checks = [
     check('report-present', report !== null, report !== null, true),
     hardwareAdapterCheck(report),
+    captureViewportCheck(config, report),
+    screenshotCheck(run, report),
     check(
       'scenario-match',
       report?.scenario?.id === caseConfig.scenario,
@@ -164,12 +185,14 @@ function summariseRun(config, caseConfig, run) {
   return Object.freeze({
     repeat: run.repeat,
     reportPath: run.reportPath ?? null,
+    screenshotPath: run.screenshotPath ?? null,
     error: run.error ?? null,
     passed: checks.every((entry) => entry.passed),
     checks,
     scenario: report?.scenario?.id ?? null,
     adapter: report?.adapter ?? null,
     adapterIdentity: adapterIdentity(report?.adapter),
+    capture: report?.capture ?? null,
     frameP95Ms: round(report?.summary?.dt?.p95Ms),
     frameP99Ms: round(report?.summary?.dt?.p99Ms),
     collisionP95Ms: round(report?.collision?.timingsMs?.total?.p95Ms),
@@ -289,6 +312,7 @@ export function buildCollisionAcceptanceReport({
       repeats: config.repeats,
       baselineCase: config.baselineCase,
       hitchMs: config.hitchMs,
+      viewport: config.viewport,
       gates: config.gates,
     }),
     baseline: Object.freeze({
@@ -325,6 +349,9 @@ export function renderCollisionAcceptanceMarkdown(report) {
     '',
     `Release gate: **${report.gates.release.passed ? 'PASS' : 'FAIL'}**`,
     '',
+    `Viewport: ${report.config.viewport.width}×${report.config.viewport.height}`
+      + ` @ ${report.config.viewport.deviceScaleFactor}x`,
+    '',
     `Baseline frame p95: ${markdownCell(report.baseline.frameP95MedianMs)} ms`,
     '',
     '| Case | Runs | Result | Frame p95 | Regression | Collision p95 max | Hitches max |',
@@ -349,6 +376,16 @@ export function renderCollisionAcceptanceMarkdown(report) {
   } else {
     lines.push('Missing required scenarios:');
     for (const item of report.coverage.missing) lines.push(`- ${item}`);
+  }
+
+  lines.push('', '## Evidence', '');
+  for (const caseSummary of report.cases) {
+    for (const run of caseSummary.runs) {
+      lines.push(
+        `- ${caseSummary.id} run ${run.repeat}: `
+        + `${markdownCell(run.reportPath)} · ${markdownCell(run.screenshotPath)}`,
+      );
+    }
   }
 
   lines.push('', '## Failed checks', '');
