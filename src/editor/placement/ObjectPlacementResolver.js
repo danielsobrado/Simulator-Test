@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { QUARTER_TURN_RADIANS } from '../constants.js';
 import { registerCollisionObjectSource } from '../collision/CollisionPlayerBridge.js';
+import { ensureCollisionP6QaFixture } from '../collision/CollisionP6QaFixture.js';
 import { evaluateObjectSurface } from '../TerrainPlacement.js';
 import {
   canonicalWorldToRenderLocal,
@@ -44,6 +45,7 @@ export class ObjectPlacementResolver {
     this.floatingOrigin = floatingOrigin;
     this.releaseCollisionObjectSource = null;
     if (typeof window !== 'undefined') {
+      ensureCollisionP6QaFixture(objectMap, window.location.search);
       this.releaseCollisionObjectSource = registerCollisionObjectSource({
         objectMap,
         placementResolver: this,
