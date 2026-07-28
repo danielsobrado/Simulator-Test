@@ -101,6 +101,13 @@ export class ConstructionView {
       reliefClamped: 0,
       reliefTriangles: 0,
       reliefBuildMs: 0,
+      edgeWearEligible: 0,
+      edgeWearStones: 0,
+      edgeWearClamped: 0,
+      edgeWearFallbacks: 0,
+      flattenedCorners: 0,
+      edgeWearTriangles: 0,
+      edgeWearBuildMs: 0,
       buildMs: 0,
       stoneBuildMs: 0,
       mortarBuildMs: 0,
@@ -556,6 +563,13 @@ export class ConstructionView {
     let reliefClamped = 0;
     let reliefTriangles = 0;
     let reliefBuildMs = 0;
+    let edgeWearEligible = 0;
+    let edgeWearStones = 0;
+    let edgeWearClamped = 0;
+    let edgeWearFallbacks = 0;
+    let flattenedCorners = 0;
+    let edgeWearTriangles = 0;
+    let edgeWearBuildMs = 0;
     let stoneBuildMs = 0;
     let mortarBuildMs = 0;
     for (const entry of this.entries.values()) {
@@ -569,6 +583,13 @@ export class ConstructionView {
         reliefClamped += other.stats?.reliefClamped ?? 0;
         reliefTriangles += other.stats?.reliefTriangles ?? 0;
         reliefBuildMs += other.stats?.reliefBuildMs ?? 0;
+        edgeWearEligible += other.stats?.edgeWearEligible ?? 0;
+        edgeWearStones += other.stats?.edgeWearStones ?? 0;
+        edgeWearClamped += other.stats?.edgeWearClamped ?? 0;
+        edgeWearFallbacks += other.stats?.edgeWearFallbacks ?? 0;
+        flattenedCorners += other.stats?.flattenedCorners ?? 0;
+        edgeWearTriangles += other.stats?.edgeWearTriangles ?? 0;
+        edgeWearBuildMs += other.stats?.edgeWearBuildMs ?? 0;
         stoneBuildMs += other.stats?.stoneBuildMs ?? 0;
         mortarBuildMs += other.stats?.mortarBuildMs ?? 0;
       }
@@ -582,6 +603,13 @@ export class ConstructionView {
     this.stats.reliefClamped = reliefClamped;
     this.stats.reliefTriangles = reliefTriangles;
     this.stats.reliefBuildMs = reliefBuildMs;
+    this.stats.edgeWearEligible = edgeWearEligible;
+    this.stats.edgeWearStones = edgeWearStones;
+    this.stats.edgeWearClamped = edgeWearClamped;
+    this.stats.edgeWearFallbacks = edgeWearFallbacks;
+    this.stats.flattenedCorners = flattenedCorners;
+    this.stats.edgeWearTriangles = edgeWearTriangles;
+    this.stats.edgeWearBuildMs = edgeWearBuildMs;
     this.stats.stoneBuildMs = stoneBuildMs;
     this.stats.mortarBuildMs = mortarBuildMs;
   }

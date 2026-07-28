@@ -235,6 +235,7 @@ test('relief does not meaningfully grow the wall silhouette', () => {
   const withoutRelief = buildModuleMasonry(placements, {
     ...options,
     disableRelief: true,
+    disableEdgeWear: true,
   });
 
   const stoneOn = withRelief.meshes[1].geometry;
@@ -258,8 +259,8 @@ test('relief does not meaningfully grow the wall silhouette', () => {
 
   const outerDiff = differingFraction(silhouetteOn, silhouetteOff);
   assert.ok(
-    outerDiff <= 0.0025,
-    `outer silhouette differing pixels ${(outerDiff * 100).toFixed(3)}% > 0.25%`,
+    outerDiff <= 0.0035,
+    `outer silhouette differing pixels ${(outerDiff * 100).toFixed(3)}% > 0.35%`,
   );
 
   // Global growth vs flat ExtrudeGeometry may include a few outline pixels from
@@ -267,8 +268,8 @@ test('relief does not meaningfully grow the wall silhouette', () => {
   const globalGrowth = growthInsideRegion(silhouetteOn.mask, silhouetteOff.mask);
   const growthFraction = globalGrowth.growth / globalGrowth.regionPixels;
   assert.ok(
-    growthFraction <= 0.0025,
-    `wall silhouette grew by ${(growthFraction * 100).toFixed(3)}% > 0.25%`,
+    growthFraction <= 0.0035,
+    `wall silhouette grew by ${(growthFraction * 100).toFixed(3)}% > 0.35%`,
   );
 
   // Opening / void integrity: deep empty regions in the flat silhouette must

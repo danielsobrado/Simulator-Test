@@ -658,3 +658,68 @@ test('deterministic rebuild produces identical stone positions', () => {
   assert.deepEqual(positionFingerprint(second.meshes[1].geometry), firstPositions);
   for (const mesh of second.meshes) mesh.geometry.dispose();
 });
+
+test('soft limestone near field stones receive edge wear', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const field = placements.filter((stone) => (
+    stone.category === 'field'
+    && stone.corners
+    && stone.width >= 0.32
+    && stone.height >= 0.18
+    && stone.depth >= 0.2
+  ));
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(field.slice(0, 24), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'near',
+  });
+  assert.ok(built.stats.edgeWearEligible > 0);
+  assert.ok(built.stats.edgeWearStones > 0);
+  assert.ok(built.stats.edgeWearFallbacks / Math.max(1, built.stats.edgeWearEligible) < 0.05);
+  assert.equal(built.meshes.length, 2);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('coarse lod never applies edge wear', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(placements.slice(0, 40), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+  });
+  assert.equal(built.stats.edgeWearStones, 0);
+  assert.equal(built.stats.edgeWearEligible, 0);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('mortar descriptors stay identical with edge wear enabled and disabled', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const materials = materialsFor(record);
+  const subset = placements.slice(0, 16);
+  const withWear = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+  });
+  const withoutWear = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    disableEdgeWear: true,
+  });
+  assert.equal(withWear.stats.mortarTriangles, withoutWear.stats.mortarTriangles);
+  assert.equal(withWear.stats.mortarPrisms, withoutWear.stats.mortarPrisms);
+  for (const mesh of [...withWear.meshes, ...withoutWear.meshes]) mesh.geometry.dispose();
+});

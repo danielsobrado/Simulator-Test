@@ -9,9 +9,11 @@ import {
 import { stoneJitter } from '../../workshop/ProceduralWorkshopIrregularity.js';
 import { applyUnitShading } from '../../workshop/ProceduralWorkshopMaterials.js';
 import { constructionStoneReliefProfile } from '../config/ConstructionStoneReliefProfiles.generated.js';
+import { constructionStoneEdgeWearProfile } from '../config/ConstructionStoneEdgeWearProfiles.generated.js';
 import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
 import { scaleCorners } from '../masonry/CourseLattice.js';
 import { sampleStoneFaceRelief } from '../masonry/StoneFaceReliefField.js';
+import { sampleStoneEdgeWear } from '../masonry/StoneEdgeWearField.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from '../render/ConstructionMaterialSlots.js';
 import {
   CONSTRUCTION_MORTAR_CONFIG,
@@ -23,6 +25,8 @@ import {
   mortarCoreDepth,
 } from './ConstructionMortarCoreBuilder.js';
 import { reliefQuadPrism } from './ConstructionReliefQuadPrism.js';
+import { resolveStoneTopology } from './ConstructionStoneTopologyResolver.js';
+import { buildSoftStoneGeometry } from './ConstructionSoftStoneGeometry.js';
 
 /**
  * Turn module-local stone placements into merged geometry.
@@ -114,9 +118,16 @@ export function rectangleCorners(width, height) {
  * Resolve the final stone shape once, after jitter, so visible stone and mortar
  * backing cannot disagree.
  *
- * `relief` is optional near-LOD face sculpting. It never feeds back into packing.
+ * `relief` / `edgeWear` are optional near-LOD sculpting. They never feed packing.
  */
-export function resolveStoneShape({ placement, params, shaped, detail, relief = null }) {
+export function resolveStoneShape({
+  placement,
+  params,
+  shaped,
+  detail,
+  relief = null,
+  edgeWear = null,
+}) {
   const lattice = Boolean(placement.corners);
   const corners = lattice
     ? dampedCorners(placement, shaped)
@@ -140,6 +151,7 @@ export function resolveStoneShape({ placement, params, shaped, detail, relief = 
     lattice,
     detail,
     relief,
+    edgeWear,
   };
 }
 
@@ -217,9 +229,32 @@ export function createMortarDescriptor({
   };
 }
 
-function createStoneGeometry(stoneShape) {
+function createStoneGeometry(stoneShape, { mortarConfig = CONSTRUCTION_MORTAR_CONFIG } = {}) {
+  if (
+    stoneShape.lattice
+    && stoneShape.relief?.enabled
+    && stoneShape.edgeWear?.front?.enabled
+    && stoneShape.edgeWear?.back?.enabled
+  ) {
+    const topology = resolveStoneTopology({
+      stoneShape,
+      faceRelief: stoneShape.relief,
+      edgeWear: stoneShape.edgeWear,
+      mortarConfig,
+    });
+    if (topology.valid) {
+      return buildSoftStoneGeometry({
+        topology,
+        stoneShape,
+        position: stoneShape.position,
+        rotation: stoneShape.rotation,
+      });
+    }
+    // Topology failed progressive clamp — fall through to relief-only / flat.
+  }
+
   if (stoneShape.lattice && stoneShape.relief?.enabled) {
-    return reliefQuadPrism({
+    const built = reliefQuadPrism({
       corners: stoneShape.corners,
       depth: stoneShape.depth,
       position: stoneShape.position,
@@ -229,6 +264,11 @@ function createStoneGeometry(stoneShape) {
       frontRelief: stoneShape.relief.front,
       backRelief: stoneShape.relief.back,
     });
+    return {
+      ...built,
+      edgeWearApplied: false,
+      edgeWearFallback: Boolean(stoneShape.edgeWear?.front?.enabled),
+    };
   }
 
   const geometry = stoneShape.lattice
@@ -255,6 +295,8 @@ function createStoneGeometry(stoneShape) {
     geometry,
     reliefApplied: false,
     reliefFallback: false,
+    edgeWearApplied: false,
+    edgeWearFallback: false,
   };
 }
 
@@ -267,6 +309,13 @@ function emptyStats() {
     reliefClamped: 0,
     reliefTriangles: 0,
     reliefBuildMs: 0,
+    edgeWearEligible: 0,
+    edgeWearStones: 0,
+    edgeWearClamped: 0,
+    edgeWearFallbacks: 0,
+    flattenedCorners: 0,
+    edgeWearTriangles: 0,
+    edgeWearBuildMs: 0,
     mortarPrisms: 0,
     mortarTriangles: 0,
     totalTriangles: 0,
@@ -329,6 +378,58 @@ function resolveStoneRelief({
   };
 }
 
+function resolveStoneEdgeWear({
+  edgeWearProfile,
+  coarse,
+  placement,
+  shaped,
+  mortarFaceRecess,
+  seed,
+}) {
+  // First integration: field stones only. Category scales remain in YAML for
+  // later dressing tuning once field QA passes.
+  const edgeWearAllowed = (
+    !coarse
+    && edgeWearProfile.enabled
+    && placement.corners
+    && (placement.category ?? 'field') === 'field'
+    && shaped.width >= edgeWearProfile.minimumStone.width
+    && shaped.height >= edgeWearProfile.minimumStone.height
+    && shaped.depth >= edgeWearProfile.minimumStone.depth
+  );
+  if (!edgeWearAllowed) return null;
+
+  const front = sampleStoneEdgeWear({
+    profile: edgeWearProfile,
+    seed,
+    stableIndex: placement.stableIndex,
+    category: placement.category ?? 'field',
+    side: 'front',
+    width: shaped.width,
+    height: shaped.height,
+    depth: shaped.depth,
+    mortarFaceRecess,
+  });
+  const back = sampleStoneEdgeWear({
+    profile: edgeWearProfile,
+    seed,
+    stableIndex: placement.stableIndex,
+    category: placement.category ?? 'field',
+    side: 'back',
+    width: shaped.width,
+    height: shaped.height,
+    depth: shaped.depth,
+    mortarFaceRecess,
+  });
+  if (!front.enabled || !back.enabled) return null;
+  return {
+    enabled: true,
+    front,
+    back,
+    clamped: Boolean(front.clamped || back.clamped),
+  };
+}
+
 /**
  * @param placements from `packCurvedWall`, module-local.
  * @param options.moduleOrigin canonical XZ the emitted vertices are relative to.
@@ -345,6 +446,7 @@ export function buildModuleMasonry(placements, {
   lodBand = 'near',
   mortarConfig = CONSTRUCTION_MORTAR_CONFIG,
   disableRelief = false,
+  disableEdgeWear = false,
 }) {
   const stats = emptyStats();
   if (!placements || placements.length === 0) return { meshes: [], stats };
@@ -356,6 +458,12 @@ export function buildModuleMasonry(placements, {
       enabled: false,
     })
     : constructionStoneReliefProfile(record.style.key);
+  const edgeWearProfile = disableEdgeWear
+    ? Object.freeze({
+      ...constructionStoneEdgeWearProfile(record.style.key),
+      enabled: false,
+    })
+    : constructionStoneEdgeWearProfile(record.style.key);
   const coarse = lodBand === 'coarse';
   // Coarse: detail 1, halved jitter. Dressings stay in the placement list; the
   // caller thins field courses before we get here.
@@ -370,7 +478,9 @@ export function buildModuleMasonry(placements, {
   const mortarDescriptors = [];
   const stoneStarted = performance.now();
   let reliefBuildMs = 0;
+  let edgeWearBuildMs = 0;
   let reliefFallbackCount = 0;
+  let edgeWearFallbackCount = 0;
 
   for (const placement of placements) {
     const frame = arcTable.frameAt(placement.s);
@@ -393,16 +503,29 @@ export function buildModuleMasonry(placements, {
       rotation: [0, frame.yaw, placement.roll],
     };
     const shaped = stoneJitter(recipe, params, placement.stableIndex, placement.category);
-    // Resolve once without relief to obtain the damped lattice ring, then attach
-    // the sampled relief descriptor. Bevel radius must come from the final ring.
+    // Resolve once without sculpting to obtain the damped lattice ring, then
+    // attach sampled relief / edge-wear.
     const provisional = resolveStoneShape({ placement, params, shaped, detail });
-    const bevelRadius = provisional.lattice
-      ? createBeveledQuadProfile({
-        corners: provisional.corners,
-        depth: provisional.depth,
-        bevelRatio: provisional.bevelRatio,
-      }).radius
-      : 0;
+    const edgeWear = resolveStoneEdgeWear({
+      edgeWearProfile,
+      coarse,
+      placement,
+      shaped,
+      mortarFaceRecess: mortarConfig.faceRecess,
+      seed: record.seed,
+    });
+    if (edgeWear) stats.edgeWearEligible += 1;
+    // When edge wear owns the bevel, skip ExtrudeGeometry profile solve — the
+    // topology resolver reclamps face recession against shoulder depth.
+    const bevelRadius = edgeWear
+      ? Math.max(edgeWear.front.baseWidth, edgeWear.front.baseDepth, 1e-4)
+      : provisional.lattice
+        ? createBeveledQuadProfile({
+          corners: provisional.corners,
+          depth: provisional.depth,
+          bevelRatio: provisional.bevelRatio,
+        }).radius
+        : 0;
     const relief = resolveStoneRelief({
       reliefProfile,
       coarse,
@@ -412,13 +535,19 @@ export function buildModuleMasonry(placements, {
       mortarFaceRecess: mortarConfig.faceRecess,
       seed: record.seed,
     });
-    const stoneShape = relief
-      ? { ...provisional, relief }
-      : provisional;
-    const reliefStarted = relief?.enabled ? performance.now() : 0;
-    const builtStone = createStoneGeometry(stoneShape);
+    const stoneShape = {
+      ...provisional,
+      ...(relief ? { relief } : {}),
+      ...(edgeWear ? { edgeWear } : {}),
+    };
+    const sculptStarted = (relief?.enabled || edgeWear?.enabled) ? performance.now() : 0;
+    const builtStone = createStoneGeometry(stoneShape, { mortarConfig });
+    if (relief?.enabled || edgeWear?.enabled) {
+      const elapsed = performance.now() - sculptStarted;
+      if (edgeWear?.enabled) edgeWearBuildMs += elapsed;
+      else reliefBuildMs += elapsed;
+    }
     if (relief?.enabled) {
-      reliefBuildMs += performance.now() - reliefStarted;
       if (builtStone.reliefApplied) {
         stats.reliefStones += 1;
         stats.reliefTriangles += (
@@ -430,6 +559,23 @@ export function buildModuleMasonry(placements, {
       if (builtStone.reliefFallback) {
         stats.reliefFallbacks += 1;
         reliefFallbackCount += 1;
+      }
+    }
+    if (edgeWear?.enabled) {
+      if (builtStone.edgeWearApplied) {
+        stats.edgeWearStones += 1;
+        stats.edgeWearTriangles += (
+          builtStone.geometry.index?.count
+          ?? builtStone.geometry.attributes.position.count
+        ) / 3;
+        stats.flattenedCorners += builtStone.stats?.flattenedCorners ?? 0;
+        if (builtStone.stats?.variableInsetClamped) {
+          stats.edgeWearClamped += 1;
+        }
+      }
+      if (builtStone.edgeWearFallback) {
+        stats.edgeWearFallbacks += 1;
+        edgeWearFallbackCount += 1;
       }
     }
     stoneGeometries.push(applyUnitShading(
@@ -451,11 +597,16 @@ export function buildModuleMasonry(placements, {
   }
   stats.stoneBuildMs = performance.now() - stoneStarted;
   stats.reliefBuildMs = reliefBuildMs;
+  stats.edgeWearBuildMs = edgeWearBuildMs;
 
   if (reliefFallbackCount > 0) {
-    // One aggregated line per module — never one warning per stone.
     console.warn(
       `Module ${record.id} used flat-face fallback for ${reliefFallbackCount} of ${placements.length} stones.`,
+    );
+  }
+  if (edgeWearFallbackCount > 0) {
+    console.warn(
+      `Module ${record.id} used edge-wear fallback for ${edgeWearFallbackCount} of ${placements.length} stones.`,
     );
   }
 
