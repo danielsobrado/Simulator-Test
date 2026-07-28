@@ -22,7 +22,10 @@ test('projected caustics are depth, distance, and transition bounded', () => {
   assert.match(postSource, /const shallow = oneMinus\(smoothstep\(/);
   assert.match(postSource, /const distanceFade = oneMinus\(smoothstep\(/);
   assert.match(postSource, /\.mul\(blend\)/);
-  assert.match(postSource, /PerfCounters\.inc\('waterProjectedCausticFrames'\)/);
+  assert.match(
+    postSource,
+    /PerfCounters\.inc\(PERF_COUNTER_WATER_PROJECTED_CAUSTIC_FRAMES\)/,
+  );
 });
 
 test('underwater controller intercepts and restores render hooks', () => {
