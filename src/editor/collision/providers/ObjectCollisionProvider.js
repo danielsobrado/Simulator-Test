@@ -92,7 +92,7 @@ export class ObjectCollisionProvider {
 
   cellBounds(chunkX, chunkZ) {
     const minX = chunkX * this.cellsPerChunk;
-    const minZ = chunkZ * this.cellsPerChunk;
+    const minZ = -(chunkZ + 1) * this.cellsPerChunk;
     return Object.freeze({
       minX,
       minZ,
