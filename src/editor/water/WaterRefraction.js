@@ -76,6 +76,7 @@ export function computeRefractionOffset({
   const scale = config.enabled
     ? config.strength * clamp(qualityScale, 0, 2) * depthFactor
     : 0;
+  if (scale === 0) return Object.freeze({ x: 0, y: 0, depthFactor });
   const coarseValue = clamp(coarse, -1, 1);
   const fineValue = clamp(fine, -1, 1);
   return Object.freeze({
