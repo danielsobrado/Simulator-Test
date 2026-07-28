@@ -28,10 +28,16 @@ test('projected caustics are depth, distance, and transition bounded', () => {
   );
 });
 
-test('underwater controller intercepts and restores render hooks', () => {
-  assert.match(controllerSource, /terrainView\.render = \(camera\) => \{/);
+test('underwater controller installs and ownership-safely restores render hooks', () => {
+  assert.match(controllerSource, /this\.causticsRenderHook = \(camera\) => \{/);
   assert.match(controllerSource, /this\.causticsPostProcess\.render\(camera\)/);
-  assert.match(controllerSource, /terrainView\.prewarmPostProcessing = \(camera\) => \{/);
-  assert.match(controllerSource, /this\.terrainView\.render = this\.originalTerrainRender;/);
-  assert.match(controllerSource, /this\.terrainView\.prewarmPostProcessing = this\.originalTerrainPrewarm;/);
+  assert.match(controllerSource, /this\.causticsPrewarmHook = \(camera\) => \{/);
+  assert.match(controllerSource, /this\.terrainView\.render === this\.causticsRenderHook/);
+  assert.match(controllerSource, /this\.terrainView\.prewarmPostProcessing === this\.causticsPrewarmHook/);
+});
+
+test('surface height is retained while the underwater blend fades out', () => {
+  assert.match(postSource, /update\(\{ blend = 0, surfaceHeight \} = \{\}\)/);
+  assert.match(controllerSource, /if \(status\.headSubmerged \|\| status\.waterDepth > 0\)/);
+  assert.match(controllerSource, /causticsState\.surfaceHeight = status\.waterSurfaceHeight;/);
 });
