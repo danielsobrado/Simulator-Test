@@ -32,6 +32,13 @@ function objectSignature(objects) {
     .join('|');
 }
 
+function incrementPolicy(stats, policy) {
+  if (policy === 'none') stats.none += 1;
+  else if (policy === 'trigger') stats.trigger += 1;
+  else if (policy === 'walkable') stats.walkable += 1;
+  else stats.solid += 1;
+}
+
 export class ObjectCollisionProvider {
   constructor({
     objectMap,
@@ -111,34 +118,35 @@ export class ObjectCollisionProvider {
   buildChunkData(chunkX, chunkZ) {
     const key = collisionChunkKey(chunkX, chunkZ);
     const bounds = this.cellBounds(chunkX, chunkZ);
-    const objects = this.objectMap.queryBounds(bounds);
+    const candidates = this.objectMap.queryBounds(bounds);
+    const ownedObjects = [];
     const colliders = [];
     const stats = { none: 0, solid: 0, trigger: 0, walkable: 0, colliders: 0 };
     let sample = null;
 
-    for (const object of objects) {
+    for (const object of candidates) {
       const profile = this.profiles.get(object.definitionKey);
       if (!profile) throw new Error(`Object ${object.id} references unknown collider profile.`);
+      const placement = this.placementResolver.resolve(object);
+      const center = this.placementResolver.canonicalCenter(placement.bounds);
+      const ownerChunkX = Math.floor(center.x / this.chunkWorldSize);
+      const ownerChunkZ = Math.floor(center.z / this.chunkWorldSize);
+      if (ownerChunkX !== chunkX || ownerChunkZ !== chunkZ) continue;
+
+      ownedObjects.push(object);
+      incrementPolicy(stats, profile.definition.collision.policy);
       const records = createObjectColliderRecords({
         object,
         definition: profile.definition,
         placementResolver: this.placementResolver,
+        placement,
         descriptions: profile.descriptions,
         chunkWorldSize: this.chunkWorldSize,
       });
-      const owned = records.filter(
-        (record) => record.ownerChunkX === chunkX && record.ownerChunkZ === chunkZ,
-      );
-      if (profile.definition.collision.policy === 'none') stats.none += 1;
-      else if (profile.definition.collision.policy === 'trigger') stats.trigger += 1;
-      else if (profile.definition.collision.policy === 'walkable') stats.walkable += 1;
-      else stats.solid += 1;
-      colliders.push(...owned);
-      if (!sample && owned[0]) {
-        const placement = this.placementResolver.resolve(object);
-        const center = this.placementResolver.canonicalCenter(placement.bounds);
+      colliders.push(...records);
+      if (!sample && records[0]) {
         sample = Object.freeze({
-          sourceId: owned[0].sourceId,
+          sourceId: records[0].sourceId,
           objectId: object.id,
           definitionKey: object.definitionKey,
           policy: profile.definition.collision.policy,
@@ -146,7 +154,7 @@ export class ObjectCollisionProvider {
           y: placement.surface.baseHeight,
           z: center.z,
           radius: Math.max(placement.bounds.width, placement.bounds.depth) * this.tileSize / 2,
-          height: owned.reduce((maximum, record) => Math.max(maximum, record.aabb.maxY), 0)
+          height: records.reduce((maximum, record) => Math.max(maximum, record.aabb.maxY), 0)
             - placement.surface.baseHeight,
         });
       }
@@ -159,7 +167,7 @@ export class ObjectCollisionProvider {
     PerfCounters.set('collisionObjectProfiles', this.profiles.size);
     PerfCounters.inc('collisionObjectChunkBuilds');
     return Object.freeze({
-      signature: `${this.catalogSignature}|${spatialSignature}|${objectSignature(objects)}`,
+      signature: `${this.catalogSignature}|${spatialSignature}|${objectSignature(ownedObjects)}`,
       colliders: Object.freeze(colliders),
       stats: Object.freeze(stats),
       sample,
