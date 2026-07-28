@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { validateUnderwaterConfig } from './UnderwaterConfig.js';
 import { advanceUnderwaterBlend, mixNumber } from './UnderwaterTransition.js';
+import { resolveWaterQualityFeatures } from './WaterQuality.js';
+import { UnderwaterCausticsPostProcess } from './UnderwaterCausticsPostProcess.js';
 
 const MAX_DELTA_SECONDS = 0.1;
 const SKY_HIDE_THRESHOLD = 0.98;
@@ -48,6 +50,30 @@ export class UnderwaterViewController {
     this.appliedBackground = new THREE.Color();
     this.appliedFogColor = new THREE.Color();
     this.appliedFogDensity = this.surfaceFogDensity;
+
+    const waterVisual = terrainView.stylizedConfig?.water ?? {};
+    const quality = resolveWaterQualityFeatures(waterVisual);
+    this.causticsPostProcess = quality.projectedCaustics && waterVisual.projectedCaustics
+      ? new UnderwaterCausticsPostProcess({
+        renderer: terrainView.renderer,
+        scene: terrainView.scene,
+        config: waterVisual.projectedCaustics,
+        qualityStrength: quality.projectedCausticStrength,
+      })
+      : null;
+    this.originalTerrainRender = terrainView.render;
+    this.originalTerrainPrewarm = terrainView.prewarmPostProcessing;
+    if (this.causticsPostProcess) {
+      terrainView.render = (camera) => {
+        if (this.causticsPostProcess.render(camera)) return undefined;
+        return this.originalTerrainRender.call(terrainView, camera);
+      };
+      terrainView.prewarmPostProcessing = (camera) => {
+        const original = this.originalTerrainPrewarm?.call(terrainView, camera) ?? false;
+        const projected = this.causticsPostProcess.prewarm(camera);
+        return Boolean(original || projected);
+      };
+    }
   }
 
   captureSurfaceEnvironment() {
@@ -118,6 +144,10 @@ export class UnderwaterViewController {
       deltaSeconds,
       this.config.transitionSeconds,
     );
+    this.causticsPostProcess?.update({
+      blend: this.blend,
+      surfaceHeight: status.waterSurfaceHeight,
+    });
     this.applyEnvironment();
     return this.blend;
   }
@@ -127,11 +157,13 @@ export class UnderwaterViewController {
       blend: this.blend,
       active: this.blend > 0,
       submerged: this.playerController.getStatus().headSubmerged,
+      projectedCaustics: this.causticsPostProcess?.getStatus() ?? null,
     });
   }
 
   restoreSurfaceEnvironment() {
     this.blend = 0;
+    this.causticsPostProcess?.update({ blend: 0 });
     this.scene.background = this.surfaceBackground;
     if (this.originalFogExists) {
       if (!this.scene.fog?.isFogExp2) {
@@ -156,6 +188,12 @@ export class UnderwaterViewController {
     this.restoreSurfaceEnvironment();
     if (this.godRays && this.originalGodRaysRender) {
       this.godRays.render = this.originalGodRaysRender;
+    }
+    if (this.causticsPostProcess) {
+      this.terrainView.render = this.originalTerrainRender;
+      this.terrainView.prewarmPostProcessing = this.originalTerrainPrewarm;
+      this.causticsPostProcess.dispose();
+      this.causticsPostProcess = null;
     }
     this.lastTimestamp = null;
   }
