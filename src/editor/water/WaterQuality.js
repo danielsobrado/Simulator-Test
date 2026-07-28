@@ -1,4 +1,5 @@
 import { validateWaterOpticsConfig } from './WaterOptics.js';
+import { validateWaterRefractionConfig } from './WaterRefraction.js';
 
 export const WATER_QUALITY_LOW = 'low';
 export const WATER_QUALITY_MEDIUM = 'medium';
@@ -16,24 +17,32 @@ const FEATURES_BY_TIER = Object.freeze({
   [WATER_QUALITY_LOW]: Object.freeze({
     flow: false,
     depthOptics: false,
+    refraction: false,
+    refractionStrength: 0,
     caustics: false,
     causticStrength: 0,
   }),
   [WATER_QUALITY_MEDIUM]: Object.freeze({
     flow: true,
     depthOptics: true,
+    refraction: false,
+    refractionStrength: 0,
     caustics: false,
     causticStrength: 0,
   }),
   [WATER_QUALITY_HIGH]: Object.freeze({
     flow: true,
     depthOptics: true,
+    refraction: true,
+    refractionStrength: 1,
     caustics: true,
     causticStrength: 1,
   }),
   [WATER_QUALITY_ULTRA]: Object.freeze({
     flow: true,
     depthOptics: true,
+    refraction: true,
+    refractionStrength: 1.25,
     caustics: true,
     causticStrength: 1.35,
   }),
@@ -62,6 +71,7 @@ export function validateWaterVisualConfig(waterConfig) {
   assertFiniteRange(waterConfig.currentAnimationSpeed, 'stylizedSurface.water.currentAnimationSpeed', 0, 4);
   assertFiniteRange(waterConfig.currentInfluence, 'stylizedSurface.water.currentInfluence', 0, 2);
   validateWaterOpticsConfig(waterConfig.optics);
+  validateWaterRefractionConfig(waterConfig.refraction);
 
   const caustics = waterConfig.caustics;
   if (!caustics || typeof caustics !== 'object' || Array.isArray(caustics)) {
