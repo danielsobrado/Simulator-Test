@@ -2,6 +2,15 @@ import { ConstructionSpatialIndex } from '../../construction/ConstructionSpatial
 
 const DEFAULT_CONFIG = Object.freeze({ curveSegmentLength: 1.25 });
 const BOUNDS_FIELDS = Object.freeze(['minX', 'minZ', 'maxX', 'maxZ']);
+const BOX_FIELDS = Object.freeze([
+  'id',
+  'segmentId',
+  'length',
+  'thickness',
+  'bottom',
+  'top',
+  'foundationOverlap',
+]);
 
 function normalizeConfig(config = {}) {
   const curveSegmentLength = config.curveSegmentLength ?? DEFAULT_CONFIG.curveSegmentLength;
@@ -13,6 +22,25 @@ function normalizeConfig(config = {}) {
 
 function sameBounds(left, right) {
   return BOUNDS_FIELDS.every((field) => left?.[field] === right?.[field]);
+}
+
+function sameVector(left, right) {
+  return left?.length === right?.length
+    && left.every((value, index) => value === right[index]);
+}
+
+function sameBox(left, right) {
+  return BOX_FIELDS.every((field) => left?.[field] === right?.[field])
+    && sameVector(left?.center, right?.center)
+    && sameVector(left?.tangent, right?.tangent)
+    && sameVector(left?.openingIds, right?.openingIds)
+    && sameBounds(left?.bounds, right?.bounds);
+}
+
+function sameGeometry(left, right) {
+  return sameBounds(left?.bounds, right?.bounds)
+    && left?.boxes?.length === right?.boxes?.length
+    && left.boxes.every((box, index) => sameBox(box, right.boxes[index]));
 }
 
 export class ConstructionCollisionSource {
@@ -83,7 +111,7 @@ export class ConstructionCollisionSource {
 
     const previous = this.plans.get(record.id);
     this.plans.set(record.id, plan);
-    if (previous?.signature === plan.signature && sameBounds(previous.bounds, plan.bounds)) {
+    if (sameGeometry(previous, plan)) {
       this.unchangedPlans += 1;
     } else {
       this.spatialIndex?.updateBounds(record.id, plan.bounds);
