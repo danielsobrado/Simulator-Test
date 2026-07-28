@@ -116,7 +116,7 @@ const fs = require('fs');
   page.setDefaultTimeout(${timeoutMs});
   await page.goto(${JSON.stringify(targetUrl)}, { waitUntil: 'domcontentloaded' });
 
-  // Refuse to report timings from a software adapter.
+  // Refuse to report timings from a software or unidentified adapter.
   const adapter = await page.evaluate(async () => {
     if (!navigator.gpu) return { ok: false, reason: 'navigator.gpu is unavailable' };
     const found = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -136,11 +136,12 @@ const fs = require('fs');
     .toLowerCase();
   const isSoftware = !adapter.ok
     || adapter.fallback
+    || softwareHint.length === 0
     || /swiftshader|lavapipe|basic render|microsoft basic|llvmpipe|warp/.test(softwareHint);
   if (isSoftware) {
-    console.error('Perf QA aborted: WebGPU is running on a software adapter.');
+    console.error('Perf QA aborted: WebGPU is using software or unidentified hardware.');
     console.error(JSON.stringify(adapter, null, 2));
-    console.error('Timings from a CPU rasterizer are not comparable to the GPU path.');
+    console.error('These timings are not valid hardware-GPU evidence.');
     await browser.close();
     process.exit(2);
   }
