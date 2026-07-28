@@ -177,6 +177,9 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     jointTilt: 0.10,
     splitChance: 0.34,
     splitMaxDepth: 1,
+    // Field head/bed joints are authored in masonry-joints.yml (soft limestone
+    // uses wider separate ranges). These inset fields remain for catalogue
+    // compatibility; CurvedCoursePacker no longer reads them for field stones.
     jointInsetMin: 0.018,
     jointInsetMax: 0.032,
     jointInsetVerticalRatio: 0.72,

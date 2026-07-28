@@ -208,6 +208,7 @@ test('soft limestone coarse joints amplify once from near placements', () => {
     corners: scaleCornersForTest(mortarCorners, 1 - nearHead / 1.1, 1 - nearBed / 0.56),
     mortarCorners,
     jointWidths: { head: nearHead, bed: nearBed },
+    jointWidthsNear: { head: nearHead, bed: nearBed },
     packedWidth: 1.1,
   };
   // Second course so stretch runs; use identical horizontal footprint.
@@ -227,9 +228,18 @@ test('soft limestone coarse joints amplify once from near placements', () => {
   const stone = field[0];
   assert.ok(Math.abs(stone.jointWidths.head - nearHead * 1.2) < 1e-9);
   assert.ok(Math.abs(stone.jointWidths.bed - nearBed * 1.2) < 1e-9);
+  assert.equal(stone.coarseJointsAmplified, true);
+  assert.equal(stone.jointWidthsNear.head, nearHead);
 
   const again = coarsePlacements(near, { styleKey: 'soft-limestone-rubble' });
   assert.deepEqual(again, coarse);
+
+  // Re-running amplify / coarse on already-amplified placements must not compound.
+  const double = coarsePlacements(coarse, { styleKey: 'soft-limestone-rubble' });
+  const doubleField = double.filter((entry) => entry.category === 'field');
+  assert.ok(doubleField.length >= 1);
+  assert.ok(Math.abs(doubleField[0].jointWidths.head - stone.jointWidths.head) < 1e-9);
+  assert.ok(Math.abs(doubleField[0].jointWidths.bed - stone.jointWidths.bed) < 1e-9);
 
   const mortar = bounds(stone.mortarCorners);
   const visible = bounds(stone.corners);

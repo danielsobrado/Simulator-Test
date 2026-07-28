@@ -210,7 +210,11 @@ export function packCurvedWall({
     meanHeadJoint: 0,
     meanBedJoint: 0,
   };
-  if (!(span > 1e-6)) return { stones, stats: Object.freeze(stats) };
+  if (!(span > 1e-6)) {
+    stats.headJointMin = 0;
+    stats.bedJointMin = 0;
+    return { stones, stats: Object.freeze(stats) };
+  }
 
   // Cap the stone width from the tightest curvature anywhere in the module, and
   // leave headroom for the packer's widest draw rather than for its mean.
@@ -228,7 +232,11 @@ export function packCurvedWall({
   for (let index = 0; index <= topSamples; index += 1) {
     maxTop = Math.max(maxTop, topHeightAt(s0 + (span * index) / topSamples));
   }
-  if (!(maxTop > 0)) return { stones, stats: Object.freeze(stats) };
+  if (!(maxTop > 0)) {
+    stats.headJointMin = 0;
+    stats.bedJointMin = 0;
+    return { stones, stats: Object.freeze(stats) };
+  }
 
   // A coping course finishes the wall, so the field masonry stops short of the
   // crown by exactly its depth and the finished height still matches `top.base`.
@@ -447,6 +455,11 @@ export function packCurvedWall({
             face.corners.map((corner) => Object.freeze([...corner])),
           ),
           jointWidths: Object.freeze({
+            head: jointWidths.head,
+            bed: jointWidths.bed,
+          }),
+          // Frozen near-band widths so coarse LOD can amplify idempotently.
+          jointWidthsNear: Object.freeze({
             head: jointWidths.head,
             bed: jointWidths.bed,
           }),

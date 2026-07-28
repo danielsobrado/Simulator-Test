@@ -1,3 +1,5 @@
+import { constructionJointProfile } from '../config/ConstructionJointProfiles.generated.js';
+
 /**
  * Tuning and appearance for recessed mortar / core backing meshes.
  *
@@ -8,7 +10,12 @@
  * (the solved cell footprint). Those use `safetyOverlap` only — a few
  * millimetres to hide floating-point cracks. `legacyOverlapByCategory` remains
  * the fallback for dressings and older placement producers without footprints.
+ *
+ * `safetyOverlap` is taken from the joint-profile defaults so YAML remains the
+ * editable source for the millimetre crack fill.
  */
+
+const DEFAULT_JOINT_PROFILE = constructionJointProfile('default');
 
 export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
   /** Metres between the visible stone face and the mortar core face. */
@@ -21,7 +28,7 @@ export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
    * Tiny absolute expansion when backing from authoritative `mortarCorners`.
    * Hides FP cracks between adjacent cell footprints — not a visual joint.
    */
-  safetyOverlap: 0.003,
+  safetyOverlap: DEFAULT_JOINT_PROFILE.mortarSafetyOverlap,
   /** Fallback face-plane expansion for placements without mortarCorners (m). */
   legacyOverlapByCategory: Object.freeze({
     field: 0.024,

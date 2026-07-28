@@ -151,7 +151,7 @@ function mortarFaceCorners({ placement, stoneShape, config }) {
   if (placement.mortarCorners) {
     return expandCorners(
       placement.mortarCorners,
-      config.safetyOverlap,
+      config.safetyOverlap ?? 0.003,
       { maxScale: config.maxCornerScale },
     );
   }

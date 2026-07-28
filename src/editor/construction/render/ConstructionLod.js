@@ -176,6 +176,16 @@ function mergeCellLeaves(group) {
     ? { ...dominant.jointWidths }
     : undefined;
 
+  let width = maxS - minS;
+  let height = maxY - minY;
+  let packedWidth = width;
+  if (mergedMortarCorners) {
+    const mortar = cornerBounds(mergedMortarCorners);
+    // Solved cell span — not the shrunken visible hull — so coarse amplification
+    // and footprint checks still see the authoritative course tile.
+    packedWidth = mortar.width;
+  }
+
   return {
     ...dominant,
     s,
@@ -183,9 +193,15 @@ function mergeCellLeaves(group) {
     corners: mergedStoneCorners,
     ...(mergedMortarCorners ? { mortarCorners: mergedMortarCorners } : {}),
     ...(jointWidths ? { jointWidths } : {}),
-    width: maxS - minS,
-    height: maxY - minY,
-    packedWidth: maxS - minS,
+    // Near joint widths stay authoritative across merge/stretch/amplify.
+    ...(dominant.jointWidthsNear
+      ? { jointWidthsNear: { ...dominant.jointWidthsNear } }
+      : jointWidths
+        ? { jointWidthsNear: { ...jointWidths } }
+        : {}),
+    width,
+    height,
+    packedWidth,
     bandHeight: 1,
   };
 }
@@ -229,8 +245,9 @@ function stretchOverGap(placement, step) {
 /**
  * Widen coarse joints from the authoritative mortar footprint.
  *
- * Always derived from near placements + multiplier once — never mutates the
+ * Always derived from near joint widths + multiplier once — never mutates the
  * near source, so near → coarse → near returns identical near geometry.
+ * Idempotent: re-amplifying an already-amplified placement is a no-op.
  */
 export function amplifyCoarseJoints(placement, profile) {
   if (!placement.corners || !placement.jointWidths || !placement.mortarCorners) {
@@ -242,19 +259,26 @@ export function amplifyCoarseJoints(placement, profile) {
     return placement;
   }
 
+  // Prefer the near-band widths frozen on first amplify so a second pass cannot
+  // compound the multiplier (coarsePlacements(coarsePlacements(near))).
+  const nearWidths = placement.jointWidthsNear ?? placement.jointWidths;
+  if (placement.coarseJointsAmplified) {
+    return placement;
+  }
+
   const mortarBounds = cornerBounds(placement.mortarCorners);
   if (!(mortarBounds.width > 0) || !(mortarBounds.height > 0)) {
     return placement;
   }
 
-  const extraHead = placement.jointWidths.head * (multiplier - 1);
-  const extraBed = placement.jointWidths.bed * (multiplier - 1);
+  const extraHead = nearWidths.head * (multiplier - 1);
+  const extraBed = nearWidths.bed * (multiplier - 1);
 
   const maximumHead = Math.max(0, mortarBounds.width - profile.minimumRenderedWidth);
   const maximumBed = Math.max(0, mortarBounds.height - profile.minimumRenderedHeight);
 
-  const finalHead = Math.min(placement.jointWidths.head + extraHead, maximumHead);
-  const finalBed = Math.min(placement.jointWidths.bed + extraBed, maximumBed);
+  const finalHead = Math.min(nearWidths.head + extraHead, maximumHead);
+  const finalBed = Math.min(nearWidths.bed + extraBed, maximumBed);
 
   const scaleX = Math.max(0.01, 1 - finalHead / mortarBounds.width);
   const scaleY = Math.max(0.01, 1 - finalBed / mortarBounds.height);
@@ -264,10 +288,16 @@ export function amplifyCoarseJoints(placement, profile) {
     corners: scaleCorners(placement.mortarCorners, scaleX, scaleY),
     width: mortarBounds.width * scaleX,
     height: mortarBounds.height * scaleY,
+    packedWidth: mortarBounds.width,
+    jointWidthsNear: {
+      head: nearWidths.head,
+      bed: nearWidths.bed,
+    },
     jointWidths: {
       head: finalHead,
       bed: finalBed,
     },
+    coarseJointsAmplified: true,
   };
 }
 
