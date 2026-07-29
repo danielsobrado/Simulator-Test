@@ -68,6 +68,21 @@ export function decodeWaterFlowComponent(value) {
   return Math.max(-1, Math.min(1, Number(value) / 255 * 2 - 1));
 }
 
+/**
+ * True when any vertex of an encoded field carries water coverage.
+ *
+ * Coverage is channel 0 and never negative, so a non-zero magnitude is enough
+ * and no half-float decode is needed. The sign bit is masked so an encoded -0
+ * still reads as dry.
+ */
+export function waterFieldHasCoverage(pixels) {
+  if (!pixels) return false;
+  for (let index = 0; index < pixels.length; index += WATER_FIELD_CHANNELS) {
+    if ((pixels[index] & 0x7fff) !== 0) return true;
+  }
+  return false;
+}
+
 function sampleIndex(x, z, width) {
   return z * width + x;
 }

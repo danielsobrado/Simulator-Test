@@ -1,9 +1,12 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import {
+  PERF_COUNTER_WATER_CHUNKS_DRAWN,
+  PERF_COUNTER_WATER_CHUNKS_DRY,
   PERF_COUNTER_WATER_UPLOAD_BYTES,
   PerfCounters,
 } from '../performance/qa/PerfCounters.js';
+import { waterFieldHasCoverage } from '../water/WaterField.js';
 import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
 
 const WATER_FIELD_CHANNELS = 4;
@@ -52,6 +55,7 @@ export class StylizedWaterSlot {
     this.waterFlowTexture.needsUpdate = true;
     this.uploadedPage = null;
     this.uploadedFieldRevision = -1;
+    this.hasWaterCoverage = false;
     this.material = createStylizedWaterMaterial({
       surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
       waterFieldTexture: this.waterFieldTexture,
@@ -88,6 +92,9 @@ export class StylizedWaterSlot {
     this.surfaceOrigin.value = page.waterFieldSurfaceOrigin ?? 0;
     this.uploadedPage = page;
     this.uploadedFieldRevision = page.waterFieldRevision ?? 0;
+    // Recomputed per upload rather than carried on the page, so a runtime edit
+    // that floods or drains this chunk re-decides whether it draws.
+    this.hasWaterCoverage = waterFieldHasCoverage(this.waterFieldPixels);
     const uploadedBytes = page.waterFieldPixels.byteLength + page.waterFlowPixels.byteLength;
     PerfCounters.inc(PERF_COUNTER_WATER_UPLOAD_BYTES, uploadedBytes);
     PerfCounters.inc('textureBytesUploaded', uploadedBytes);
@@ -107,12 +114,24 @@ export class StylizedWaterSlot {
       && page?.waterFieldPixels
       && page?.waterFlowPixels,
     );
-    this.mesh.visible = ready;
-    if (!ready) return;
+    if (!ready) {
+      this.mesh.visible = false;
+      return;
+    }
     if (page !== this.uploadedPage
         || (page.waterFieldRevision ?? 0) !== this.uploadedFieldRevision) {
       this.uploadField(page);
     }
+    // A chunk with no coverage anywhere must not draw. Its fragments would all
+    // discard on alpha, but the refraction branch samples the viewport colour
+    // and depth textures, and three.js copies both for the entire frame as soon
+    // as one water mesh is submitted — so a dry chunk still costs the whole
+    // scene a backbuffer copy, a depth copy and a mip chain.
+    this.mesh.visible = this.hasWaterCoverage;
+    PerfCounters.inc(
+      this.hasWaterCoverage ? PERF_COUNTER_WATER_CHUNKS_DRAWN : PERF_COUNTER_WATER_CHUNKS_DRY,
+    );
+    if (!this.hasWaterCoverage) return;
     this.mesh.position.copy(this.terrainSlot.mesh.position);
   }
 

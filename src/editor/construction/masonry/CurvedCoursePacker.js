@@ -7,6 +7,7 @@ import {
   createBedField,
   jointTilt,
   resolveCellCorners,
+  resolveLeafFaces,
   scaleCorners,
   splitCell,
 } from './CourseLattice.js';
@@ -376,23 +377,28 @@ export function packCurvedWall({
         },
       );
 
-      for (let ordinal = 0; ordinal < leaves.length; ordinal += 1) {
-        const leaf = leaves[ordinal];
+      // Both tilts come from the joint's own arc position, so the neighbour
+      // sharing that joint — in this cell, the next cell, or the next module —
+      // resolves the identical corner and the two stones meet exactly.
+      //
+      // Resolved as a set rather than one at a time: where the wall-top clamp
+      // collapses a leaf, its band goes to the leaf below instead of vanishing
+      // and leaving a notch under the coping.
+      const resolved = resolveLeafFaces(leaves, {
+        bedOffset,
+        courseHeight,
+        ceilingAt: bodyHeightAt,
+        minHeight: MIN_LEAF_HEIGHT,
+        resolveTilt: tiltAt,
+      });
+
+      for (let ordinal = 0; ordinal < resolved.leaves.length; ordinal += 1) {
+        const leaf = resolved.leaves[ordinal];
         const index = baseIndex + cell * LEAVES_PER_CELL + ordinal;
         const leafWidth = leaf.s1 - leaf.s0;
         const leafCenter = (leaf.s0 + leaf.s1) / 2;
 
-        // Both tilts come from the joint's own arc position, so the neighbour
-        // sharing that joint — in this cell, the next cell, or the next module —
-        // resolves the identical corner and the two stones meet exactly.
-        const face = resolveCellCorners(leaf, {
-          bedOffset,
-          courseHeight,
-          tiltLeft: tiltAt(leaf.s0),
-          tiltRight: tiltAt(leaf.s1),
-          ceilingAt: bodyHeightAt,
-          minHeight: MIN_LEAF_HEIGHT,
-        });
+        const face = resolved.faces[ordinal];
         if (!face) continue;
 
         const verticalValues = face.corners.map(([, yValue]) => face.anchorY + yValue);

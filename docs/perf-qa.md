@@ -6,6 +6,14 @@ Deterministic harness for reproducing and measuring player-mode stutter while mo
 > [perf-investigation-2026-07-25.md](perf-investigation-2026-07-25.md), including
 > the two harness defects that made earlier numbers untrustworthy. Read that before
 > comparing against any report captured before that date.
+>
+> The 2026-07-28 collapse to ~20 FPS is written up in
+> [perf-investigation-2026-07-28.md](perf-investigation-2026-07-28.md). Short
+> version: any material sampling `viewportDepthTexture` or
+> `viewportOpaqueMipTexture` costs a full colour copy, depth copy and mip chain
+> **per frame for the whole scene**, the moment one such mesh is submitted —
+> whether or not it covers a visible pixel. Check `waterChunksDrawn` before
+> blaming geometry for a whole-scene collapse.
 
 ## Quick start
 

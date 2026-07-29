@@ -22,6 +22,14 @@ hitch count tracks how much chunk streaming is still in flight — always compar
 runs at the same `--warmup`, and prefer an A/B against the unmodified code over
 comparing to the recorded baseline on a different machine.
 
+Treat every `viewport*Texture` TSL node as a whole-scene, per-frame cost, never a
+per-pixel one. Sampling `viewportDepthTexture` or `viewportOpaqueMipTexture` makes
+the renderer copy the colour buffer, copy the depth buffer and build a mip chain
+for the entire frame as soon as one mesh using that material is submitted — even
+if every one of its fragments discards. A mesh that draws nothing must therefore
+not be submitted at all
+(`docs/perf-investigation-2026-07-28.md`).
+
 ## Asset startup
 
 Only the trees and the shared scene may block the first frame.
