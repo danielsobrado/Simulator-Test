@@ -1071,71 +1071,79 @@ stylizedSurface:
     # only through the perspective walking camera; the editor stays unfiltered.
     godRays:
       enabled: true
-      technique: screen-space
-      intensity: 1.2
+      technique: volumetric
+      intensity: 0.85
       # Preserve enough ray-buffer detail for close silhouettes and use enough
       # radial taps that one tap cannot appear as a displaced canopy-sized slab.
       resolutionScale: 0.6
       samples: 24
       density: 0.96
-      decay: 0.92
-      weight: 0.35
-      exposure: 0.85
+      decay: 0.9
+      weight: 0.28
+      exposure: 0.32
       # A broad, smoothly advected density field breaks rigid spokes into soft
       # evolving volumes without screen-pixel shimmer.
-      dustStrength: 0.65
+      dustStrength: 0.45
       dustScale: 4.5
       dustSpeed: 0.04
       # Cloud colour remains softly translucent, but its denser transmission
       # mask can still carve strong shafts around the sun.
-      cloudOcclusion: 0.9
+      cloudOcclusion: 0.78
       # World-space samples use the sun's directional shadow map, so shafts stay
       # attached to trees and buildings while the player turns or walks. A
       # bilateral pass softens the low-resolution raymarch without smearing
       # silhouettes, and exponential height fog concentrates scattering near
       # the ground.
       volumetric:
-        intensity: 1
+        intensity: 0.7
         resolutionScale: 0.5
         raymarchSteps: 40
-        density: 0.7
-        maxDensity: 0.45
+        density: 0.55
+        maxDensity: 0.3
         distanceAttenuation: 2
         blurSoftness: 0.85
         cloudInfluence: 0.75
-        fogDensity: 0.018
+        fogDensity: 0.012
         fogBaseHeight: 2
         fogHeightFalloff: 0.035
         fogMaxDistance: 180
     radius: 5000
-    lowColor: '#4aa7e2'
-    highColor: '#8ecef2'
+    # Atmospheric perspective is pale at the horizon and deepens toward the
+    # zenith. The former values were reversed, making cloud gaps look like blue
+    # holes cut into a nearly white sky.
+    lowColor: '#9cc9e2'
+    highColor: '#3f83c2'
     horizonLine: 0.05
     horizonSpread: 0.15
     sunElevation: 10
     sunAzimuth: 258
-    sunColor: '#fbfcd6'
-    sunGlowColor: '#34a2ef'
+    sunColor: '#fff4dc'
+    sunGlowColor: '#ffd7a6'
     sunSize: 0.015
     sunEdgeSoftness: 0.04
     sunEmission: 1.4
     sunGlowFalloff: 53
     sunGlowIntensity: 0.45
-    cloudSpeed: 0.02
-    cloudScale: 8.5
-    cloudDensity: 0.36
-    cloudSharpness: 0.05
-    cloudCore: '#dcdcdc'
-    cloudEdge: '#ffffff'
-    cloudRim: '#d2d2d2'
-    cloudOpacity: 0.4
+    # The dome remains camera-following, but its noise field is sampled in
+    # canonical world space. worldScale is metres per broad noise cell, so
+    # walking changes the cloud perspective and stays continuous across
+    # floating-origin snaps. The wind rate resolves to roughly 6 m/s.
+    cloudSpeed: 0.035
+    cloudScale: 10.5
+    cloudWorldScale: 180
+    cloudDensity: 0.56
+    cloudSharpness: 0.16
+    cloudCore: '#b8c6d2'
+    cloudEdge: '#f7fbff'
+    cloudRim: '#fff3dc'
+    cloudOpacity: 0.62
     cloudFloor: -0.03
     cloudCeiling: 0.75
     cloudRimFalloff: 8
     cloudRimStrength: 0.2
     groundLightColor: '#6f784d'
     ambientIntensity: 2.0
-    directionalColor: '#ffffff'
+    directionalColor: '#fff3dc'
     directionalIntensity: 3.0
     lightDistance: 220
     shadows: true
@@ -1148,7 +1156,7 @@ stylizedSurface:
     shadowRadius: 2.4
     # Matched to the sky's horizon band so terrain fades into the sky instead of
     # meeting it at a visible colour seam.
-    fogColor: '#7fc0e8'
+    fogColor: '#91bfd9'
     fogDensity: 0.0015
     # Aerial perspective on the far-terrain backdrop. Distance hazes toward
     # horizonColor; heightFalloff lets peaks stay clearer than valley floors, so

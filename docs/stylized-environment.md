@@ -73,8 +73,11 @@ stylizedSurface:
 - Water tiles get a cel-shaded Voronoi overlay (F1 − SmoothF1) with world-anchored
   flow, matching the upstream WaterFloor look without the demo-only ripple/PDE stack.
 - The sky is a camera-following inverted dome with the source day palette, sun glow,
-  clouds, fog and lighting. `sky.fogColor` is matched to the sky's horizon band so terrain
-  fades into the sky rather than meeting it at a colour seam.
+  clouds, fog and lighting. Cloud sampling is anchored to canonical world space through
+  `sky.cloudWorldScale`, so walking produces parallax and floating-origin snaps do not
+  move the weather. The visible clouds and god-ray transmission pass share the same
+  coordinates. `sky.fogColor` is matched to the sky's horizon band so terrain fades into
+  the sky rather than meeting it at a colour seam.
 - The far-terrain backdrop (`world/MacroFarTerrainView.js`) uses a **polar grid graded
   toward the camera**. A uniform grid at a 60 km radius spends most vertices on the far rim
   and leaves ~750 m per vertex where mountains are actually read, so peaks came out as

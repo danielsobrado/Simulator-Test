@@ -22,13 +22,20 @@ function colorNode(value) {
   return vec3(color.r, color.g, color.b);
 }
 
-function cloudCoverageNode({ config, time, direction }) {
+function cloudCoverageNode({
+  config,
+  time,
+  direction,
+  cameraWorldPosition,
+}) {
   const projected = direction.xz.div(max(direction.y.add(0.55), 0.16));
   const cloudUv = cloudMotionCoordinatesNode({
     projected,
+    cameraWorldPosition,
     timeNode: time,
     scale: config.sky.cloudScale,
     speed: config.sky.cloudSpeed,
+    worldScale: config.sky.cloudWorldScale,
   });
   const cloudNoise = stylizedFbm(cloudUv);
   const cloudShape = smoothstep(
@@ -52,7 +59,12 @@ function cloudCoverageNode({ config, time, direction }) {
   };
 }
 
-function createSkyMaterial({ config, time, sunDirection }) {
+function createSkyMaterial({
+  config,
+  time,
+  sunDirection,
+  cameraWorldPosition,
+}) {
   const direction = normalize(positionLocal);
   const horizon = smoothstep(
     config.sky.horizonLine - config.sky.horizonSpread,
@@ -77,7 +89,12 @@ function createSkyMaterial({ config, time, sunDirection }) {
   const {
     coverage: cloudCoverage,
     shape: cloudShape,
-  } = cloudCoverageNode({ config, time, direction });
+  } = cloudCoverageNode({
+    config,
+    time,
+    direction,
+    cameraWorldPosition,
+  });
   const cloudMask = cloudCoverage.mul(config.sky.cloudOpacity);
   const cloudEdge = smoothstep(0.15, 0.85, cloudShape);
   const cloudColor = mix(
@@ -99,9 +116,19 @@ function createSkyMaterial({ config, time, sunDirection }) {
   return material;
 }
 
-function createCloudTransmissionMaterial({ config, time, cloudOcclusion }) {
+function createCloudTransmissionMaterial({
+  config,
+  time,
+  cloudOcclusion,
+  cameraWorldPosition,
+}) {
   const direction = normalize(positionLocal);
-  const { coverage } = cloudCoverageNode({ config, time, direction });
+  const { coverage } = cloudCoverageNode({
+    config,
+    time,
+    direction,
+    cameraWorldPosition,
+  });
   const transmission = oneMinus(
     coverage.mul(cloudOcclusion),
   );
@@ -119,6 +146,7 @@ export class StylizedSkyView {
     this.terrainView = terrainView;
     this.config = config;
     this.time = uniform(0);
+    this.cameraWorldPosition = uniform(new THREE.Vector2());
     this.cloudOcclusion = uniform(
       config.sky.godRays?.cloudOcclusion ?? config.sky.cloudOpacity,
     );
@@ -133,6 +161,7 @@ export class StylizedSkyView {
       config,
       time: this.time,
       sunDirection: this.sunDirection,
+      cameraWorldPosition: this.cameraWorldPosition,
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.scale.setScalar(config.sky.radius);
@@ -145,6 +174,7 @@ export class StylizedSkyView {
       config,
       time: this.time,
       cloudOcclusion: this.cloudOcclusion,
+      cameraWorldPosition: this.cameraWorldPosition,
     });
     this.cloudMaskMesh = new THREE.Mesh(this.geometry, this.cloudMaskMaterial);
     this.cloudMaskMesh.scale.setScalar(config.sky.radius);
@@ -207,6 +237,11 @@ export class StylizedSkyView {
     const timeSeconds = timestamp / 1000;
     this.time.value = timeSeconds;
     this.terrainView.godRays.setTime(timeSeconds);
+    const canonicalCamera = this.terrainView.floatingOrigin.toCanonical(
+      camera.position.x,
+      camera.position.z,
+    );
+    this.cameraWorldPosition.value.set(canonicalCamera.x, canonicalCamera.z);
     this.mesh.position.copy(camera.position);
     this.cloudMaskMesh.position.copy(camera.position);
     this.directional.position.copy(camera.position).addScaledVector(

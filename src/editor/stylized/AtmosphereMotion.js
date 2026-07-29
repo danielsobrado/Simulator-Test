@@ -8,46 +8,60 @@ const CLOUD_EVOLUTION_STRENGTH = 0.24;
 export function cloudMotionCoordinatesReference({
   projectedX,
   projectedY,
+  cameraWorldX = 0,
+  cameraWorldZ = 0,
   timeSeconds,
   scale,
   speed,
+  worldScale = 1,
 }) {
   const drift = timeSeconds * speed;
   const phase = drift * CLOUD_EVOLUTION_RATE;
-  const baseX = projectedY * 0.83;
-  const baseY = projectedX * 0.67;
+  const worldBaseX = projectedX * scale + cameraWorldX / worldScale;
+  const worldBaseY = projectedY * scale + cameraWorldZ / worldScale;
+  const warpBaseX = worldBaseY * 0.83;
+  const warpBaseY = worldBaseX * 0.67;
   return {
-    x: projectedX * scale
+    x: worldBaseX
       + drift
-      + (Math.sin(baseX + phase) - Math.sin(baseX)) * CLOUD_EVOLUTION_STRENGTH,
-    y: projectedY * scale
+      + (Math.sin(warpBaseX + phase) - Math.sin(warpBaseX))
+        * CLOUD_EVOLUTION_STRENGTH,
+    y: worldBaseY
       + drift * CLOUD_DRIFT_Y_RATIO
-      + (Math.sin(baseY - phase * CLOUD_EVOLUTION_Y_RATE) - Math.sin(baseY))
+      + (Math.sin(warpBaseY - phase * CLOUD_EVOLUTION_Y_RATE) - Math.sin(warpBaseY))
         * CLOUD_EVOLUTION_STRENGTH,
   };
 }
 
 /**
- * Advects the cloud field while gently bending its sampling domain. Translation
- * supplies wind drift; the zero-at-start sine offsets make cloud silhouettes
- * slowly grow and shrink instead of sliding as a rigid painted layer.
+ * Anchors the cloud field to canonical world space, then advects and gently
+ * bends its sampling domain. The camera offset creates travel parallax without
+ * making the sky dome finite; the zero-at-start sine offsets make silhouettes
+ * grow and shrink instead of sliding as a rigid painted layer.
  */
 export function cloudMotionCoordinatesNode({
   projected,
+  cameraWorldPosition,
   timeNode,
   scale,
   speed,
+  worldScale,
 }) {
   const drift = timeNode.mul(speed);
   const phase = drift.mul(CLOUD_EVOLUTION_RATE);
-  const baseX = projected.y.mul(0.83);
-  const baseY = projected.x.mul(0.67);
-  const evolution = vec2(
-    baseX.add(phase).sin().sub(baseX.sin()),
-    baseY.sub(phase.mul(CLOUD_EVOLUTION_Y_RATE)).sin().sub(baseY.sin()),
-  ).mul(CLOUD_EVOLUTION_STRENGTH);
-  return projected
+  const worldBase = projected
     .mul(scale)
+    .add(cameraWorldPosition.div(worldScale));
+  const warpBaseX = worldBase.y.mul(0.83);
+  const warpBaseY = worldBase.x.mul(0.67);
+  const evolution = vec2(
+    warpBaseX.add(phase).sin().sub(warpBaseX.sin()),
+    warpBaseY
+      .sub(phase.mul(CLOUD_EVOLUTION_Y_RATE))
+      .sin()
+      .sub(warpBaseY.sin()),
+  ).mul(CLOUD_EVOLUTION_STRENGTH);
+  return worldBase
     .add(vec2(drift, drift.mul(CLOUD_DRIFT_Y_RATIO)))
     .add(evolution);
 }

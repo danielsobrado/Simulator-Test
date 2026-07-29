@@ -275,6 +275,7 @@ function validateStylizedSurface(config) {
     ['stylizedSurface', 'sky', 'sunEmission'],
     ['stylizedSurface', 'sky', 'sunGlowFalloff'],
     ['stylizedSurface', 'sky', 'cloudScale'],
+    ['stylizedSurface', 'sky', 'cloudWorldScale'],
     ['stylizedSurface', 'sky', 'cloudSharpness'],
     ['stylizedSurface', 'sky', 'cloudRimFalloff'],
     ['stylizedSurface', 'sky', 'ambientIntensity'],

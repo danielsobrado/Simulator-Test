@@ -36,28 +36,28 @@ function frontCamera() {
 function enabledConfig() {
   return {
     enabled: true,
-    technique: 'screen-space',
-    intensity: 1.2,
+    technique: 'volumetric',
+    intensity: 0.85,
     resolutionScale: 0.6,
     samples: 24,
     density: 0.96,
-    decay: 0.92,
-    weight: 0.35,
-    exposure: 0.85,
-    dustStrength: 0.65,
+    decay: 0.9,
+    weight: 0.28,
+    exposure: 0.32,
+    dustStrength: 0.45,
     dustScale: 4.5,
     dustSpeed: 0.04,
-    cloudOcclusion: 0.9,
+    cloudOcclusion: 0.78,
     volumetric: {
-      intensity: 1,
+      intensity: 0.7,
       resolutionScale: 0.5,
       raymarchSteps: 40,
-      density: 0.7,
-      maxDensity: 0.45,
+      density: 0.55,
+      maxDensity: 0.3,
       distanceAttenuation: 2,
       blurSoftness: 0.85,
       cloudInfluence: 0.75,
-      fogDensity: 0.018,
+      fogDensity: 0.012,
       fogBaseHeight: 2,
       fogHeightFalloff: 0.035,
       fogMaxDistance: 180,
@@ -154,16 +154,22 @@ test('advected radial dust evolves continuously rather than blinking between fra
 test('clouds drift and subtly evolve without adjacent-frame popping', () => {
   const config = yaml.load(readFileSync(path.join(root, 'editor.config.yaml'), 'utf8'));
   const sky = config.stylizedSurface.sky;
-  const sample = (timeSeconds) => cloudMotionCoordinatesReference({
-    projectedX: 0.37,
-    projectedY: -0.24,
-    timeSeconds,
-    scale: sky.cloudScale,
-    speed: sky.cloudSpeed,
-  });
+  const sample = (timeSeconds, cameraWorldX = 0, cameraWorldZ = 0) => (
+    cloudMotionCoordinatesReference({
+      projectedX: 0.37,
+      projectedY: -0.24,
+      cameraWorldX,
+      cameraWorldZ,
+      timeSeconds,
+      scale: sky.cloudScale,
+      speed: sky.cloudSpeed,
+      worldScale: sky.cloudWorldScale ?? 180,
+    })
+  );
   const start = sample(0);
   const nextFrame = sample(1 / 60);
   const tenSeconds = sample(10);
+  const afterWalking = sample(0, 60, -25);
   const rigidTenSeconds = {
     x: 0.37 * sky.cloudScale + sky.cloudSpeed * 10,
     y: -0.24 * sky.cloudScale + sky.cloudSpeed * 10 * 0.37,
@@ -175,6 +181,10 @@ test('clouds drift and subtly evolve without adjacent-frame popping', () => {
   assert.ok(
     distance(tenSeconds, rigidTenSeconds) > 0.02,
     'cloud silhouettes must evolve instead of translating as a rigid texture',
+  );
+  assert.ok(
+    distance(start, afterWalking) > 0.2,
+    'walking through the canonical world must produce readable cloud parallax',
   );
 });
 
@@ -463,5 +473,12 @@ test('god rays configuration validates defaults and rejects unsafe budgets', () 
   assert.throws(
     () => validateEditorConfig(tooManyVolumetricSteps),
     /volumetric\.raymarchSteps must be an integer from 8 to 128/,
+  );
+
+  const invalidCloudWorldScale = structuredClone(config);
+  invalidCloudWorldScale.stylizedSurface.sky.cloudWorldScale = 0;
+  assert.throws(
+    () => validateEditorConfig(invalidCloudWorldScale),
+    /stylizedSurface\.sky\.cloudWorldScale must be positive/,
   );
 });
