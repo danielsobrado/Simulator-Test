@@ -69,17 +69,17 @@ public/assets/impostors/trees/prototype-<index>-albedo.png
 public/assets/impostors/trees/prototype-<index>-normal.png
 ```
 
-Manifest version 2 contains a deterministic source signature derived from the
+Manifest version 3 contains a deterministic source signature derived from the
 current prototype geometry and tree/impostor configuration. Runtime loading
 rejects stale versions, mismatched source signatures, missing prototypes,
 non-contiguous prototype indices and invalid dimensions or paths. A rejected
-manifest is disposed and runtime baking or cross-card fallback takes over.
+manifest is disposed and runtime baking or the low-poly proxy fallback takes over.
 
 Generated files are optional only for development. `npm run validate:assets`
 permits the runtime fallback. `npm run verify` and release CI use the strict
 production validator and fail when the generated assets are missing or stale.
 
-The production workflow is `.github/workflows/bake-tree-impostors.yml`. It bakes,
+The production workflow is `.github/workflows/tree-impostor-assets.yml`. It bakes,
 runs the strict validator, tests and builds, uploads the generated files as an
 Actions artifact, and commits only successfully verified atlas files. The baker
 itself never changes Git state.

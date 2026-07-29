@@ -1,7 +1,9 @@
 {
-  "version": 2,
-  "generatedAt": "2026-07-26T12:14:46.204Z",
-  "sourceSignature": "tree-impostor-v1-0a26fa6c",
+  "version": 3,
+  "generatedAt": "2026-07-29T02:00:37.389Z",
+  "sourceSignature": "tree-impostor-v2-2cce27e3",
+  "normalEncoding": "view-normal-rgb-foliage-mask-a",
+  "requiresRuntimeBake": false,
   "prototypes": [
     {
       "prototypeIndex": 0,
@@ -17,7 +19,8 @@
       "centerY": 5.115944454446435,
       "radius": 7.809238961076569,
       "albedo": "/assets/impostors/trees/prototype-0-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-0-normal.png"
+      "normal": "/assets/impostors/trees/prototype-0-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 1,
@@ -33,7 +36,8 @@
       "centerY": 5.2746627340093255,
       "radius": 6.663762796164984,
       "albedo": "/assets/impostors/trees/prototype-1-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-1-normal.png"
+      "normal": "/assets/impostors/trees/prototype-1-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 2,
@@ -49,7 +53,8 @@
       "centerY": 2.0823555001989007,
       "radius": 2.452163030829727,
       "albedo": "/assets/impostors/trees/prototype-2-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-2-normal.png"
+      "normal": "/assets/impostors/trees/prototype-2-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 3,
@@ -65,7 +70,8 @@
       "centerY": 4.586332083679736,
       "radius": 5.193342380972961,
       "albedo": "/assets/impostors/trees/prototype-3-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-3-normal.png"
+      "normal": "/assets/impostors/trees/prototype-3-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 4,
@@ -81,7 +87,8 @@
       "centerY": 5.370892807841301,
       "radius": 6.434184380994843,
       "albedo": "/assets/impostors/trees/prototype-4-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-4-normal.png"
+      "normal": "/assets/impostors/trees/prototype-4-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 5,
@@ -97,7 +104,8 @@
       "centerY": 5.771370650269091,
       "radius": 6.266360836112094,
       "albedo": "/assets/impostors/trees/prototype-5-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-5-normal.png"
+      "normal": "/assets/impostors/trees/prototype-5-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 6,
@@ -113,7 +121,8 @@
       "centerY": 3.994343996979296,
       "radius": 4.9433400367086735,
       "albedo": "/assets/impostors/trees/prototype-6-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-6-normal.png"
+      "normal": "/assets/impostors/trees/prototype-6-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 7,
@@ -123,13 +132,14 @@
       "gutter": 4,
       "lowElevationDegrees": 12,
       "highElevationDegrees": 58,
-      "width": 10.63216439858233,
-      "height": 10.63216439858233,
-      "depth": 5.245351791381836,
-      "centerY": 3.896484375,
-      "radius": 5.316082199291165,
+      "width": 10.796926608963858,
+      "height": 10.796926608963858,
+      "depth": 5.417890548706055,
+      "centerY": 3.929570198059082,
+      "radius": 5.398463304481929,
       "albedo": "/assets/impostors/trees/prototype-7-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-7-normal.png"
+      "normal": "/assets/impostors/trees/prototype-7-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 8,
@@ -145,7 +155,8 @@
       "centerY": 5.168741703033447,
       "radius": 6.551357066375358,
       "albedo": "/assets/impostors/trees/prototype-8-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-8-normal.png"
+      "normal": "/assets/impostors/trees/prototype-8-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 9,
@@ -161,7 +172,8 @@
       "centerY": 12.706242561340332,
       "radius": 13.80957070724619,
       "albedo": "/assets/impostors/trees/prototype-9-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-9-normal.png"
+      "normal": "/assets/impostors/trees/prototype-9-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 10,
@@ -177,7 +189,8 @@
       "centerY": 9.22936725616455,
       "radius": 11.655257817477198,
       "albedo": "/assets/impostors/trees/prototype-10-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-10-normal.png"
+      "normal": "/assets/impostors/trees/prototype-10-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 11,
@@ -193,7 +206,8 @@
       "centerY": 5.93296480178833,
       "radius": 7.79860182055405,
       "albedo": "/assets/impostors/trees/prototype-11-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-11-normal.png"
+      "normal": "/assets/impostors/trees/prototype-11-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 12,
@@ -209,7 +223,8 @@
       "centerY": 4.3621907234191895,
       "radius": 6.400805053803733,
       "albedo": "/assets/impostors/trees/prototype-12-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-12-normal.png"
+      "normal": "/assets/impostors/trees/prototype-12-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     },
     {
       "prototypeIndex": 13,
@@ -225,7 +240,8 @@
       "centerY": 3.7274577617645264,
       "radius": 4.888431429080574,
       "albedo": "/assets/impostors/trees/prototype-13-albedo.png",
-      "normal": "/assets/impostors/trees/prototype-13-normal.png"
+      "normal": "/assets/impostors/trees/prototype-13-normal.png",
+      "normalEncoding": "view-normal-rgb-foliage-mask-a"
     }
   ]
 }

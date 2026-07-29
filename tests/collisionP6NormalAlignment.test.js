@@ -67,7 +67,7 @@ test('normal-aligned parts use conservative upright bounds for primitive narrowp
     chunkWorldSize: 128,
   });
 
-  const built = provider.buildChunkData(0, -1);
+  const built = provider.buildChunkData(0, 0);
   const post = built.colliders.find((collider) => collider.sourceId.endsWith(':post-left'));
   assert.ok(post);
   assert.equal(post.rotationY, 0);
@@ -79,5 +79,5 @@ test('normal-aligned parts use conservative upright bounds for primitive narrowp
   close(post.position[2] - post.dimensions[2] / 2, post.aabb.minZ);
   close(post.position[2] + post.dimensions[2] / 2, post.aabb.maxZ);
   assert.equal(post.ownerChunkX, 0);
-  assert.equal(post.ownerChunkZ, -1);
+  assert.equal(post.ownerChunkZ, 0);
 });

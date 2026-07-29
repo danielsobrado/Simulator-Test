@@ -73,21 +73,21 @@ function commitInitial(provider, world, chunkX, chunkZ) {
 
 test('object mutation refreshes only the dirty resident owner chunk', () => {
   const { objectMap, placed, objectProvider, natural, world } = fixture();
-  commitInitial(natural, world, 0, -1);
-  commitInitial(natural, world, 1, -1);
-  const untouchedRevision = natural.chunkStates.get('1:-1').revision;
+  commitInitial(natural, world, 0, 0);
+  commitInitial(natural, world, 1, 0);
+  const untouchedRevision = natural.chunkStates.get('1:0').revision;
   const sourceId = `object:${placed.id}:wall`;
   assert.equal(world.getCollider(sourceId).rotationY, 0);
 
   objectMap.transform(placed.id, { x: 0, z: 0, rotation: 1 });
   const activeKeys = [...natural.chunkStates.keys()];
   const dirty = objectProvider.consumeDirtyOwnerChunks(activeKeys);
-  assert.deepEqual(dirty, ['0:-1']);
+  assert.deepEqual(dirty, ['0:0']);
   for (const key of dirty) natural.enqueueRefreshKey(key);
 
   const refreshed = natural.refresh(world);
   assert.equal(refreshed.attempted, 1);
   assert.equal(refreshed.rebuilt, 1);
-  assert.equal(natural.chunkStates.get('1:-1').revision, untouchedRevision);
+  assert.equal(natural.chunkStates.get('1:0').revision, untouchedRevision);
   assert.ok(Math.abs(world.getCollider(sourceId).rotationY + Math.PI / 2) < 1e-9);
 });

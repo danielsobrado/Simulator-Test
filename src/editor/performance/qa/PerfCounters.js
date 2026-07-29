@@ -2,6 +2,20 @@ const counts = Object.create(null);
 
 export const PERF_COUNTER_WATER_GENERATION_MS = 'waterGenerationMs';
 export const PERF_COUNTER_WATER_UPLOAD_BYTES = 'waterUploadBytes';
+export const PERF_COUNTER_WATER_PROJECTED_CAUSTIC_FRAMES = 'waterProjectedCausticFrames';
+export const PERF_COUNTER_WATER_PROJECTED_CAUSTIC_CPU_MS = 'waterProjectedCausticCpuMs';
+// Per-frame tallies of resident water chunks, counted before frustum culling.
+// `wet` chunks are offered to the renderer and `dry` ones are withheld; of the
+// wet ones only those inside the frustum are actually submitted. Read `wet`
+// first when the frame rate collapses in a world that looks dry — a single
+// submitted water chunk makes the renderer copy the viewport colour and depth
+// buffers for the whole frame.
+export const PERF_COUNTER_WATER_CHUNKS_WET = 'waterChunksWet';
+export const PERF_COUNTER_WATER_CHUNKS_DRY = 'waterChunksDry';
+// Wet chunks near enough to use the refracting material variant. While this
+// stays 0 the frame pays no viewport copies at all, so it is the number to
+// watch when the frame rate drops on approaching a shoreline.
+export const PERF_COUNTER_WATER_CHUNKS_REFRACTIVE = 'waterChunksRefractive';
 
 export const PerfCounters = {
   inc(name, amount = 1) {

@@ -1,4 +1,5 @@
 import { CharacterMotor } from './character/CharacterMotor.js';
+import { ensureCollisionP6QaFixture } from './CollisionP6QaFixture.js';
 import { subscribeCollisionComposition } from './CollisionPlayerBridge.js';
 import { createCollisionRuntime } from './CollisionRuntime.js';
 import { TerrainCollisionProvider } from './providers/TerrainCollisionProvider.js';
@@ -16,10 +17,12 @@ const qaMode = fixtureQa || productionQa;
 let runtime = null;
 let motor = null;
 let player = null;
+let collisionObjectSource = null;
 let frameId = null;
 let sampleCandidateIds = null;
 let qaTarget = null;
 let targetPositioned = false;
+let fixtureError = null;
 let disposed = false;
 
 function publish(status) {
@@ -32,6 +35,7 @@ function publish(status) {
     player: player?.getStatus() ?? null,
     sampleCandidateIds,
     target: qaTarget,
+    fixtureError: fixtureError?.message ?? null,
   });
   if (qaScenario === 'collision-p1') window.__collisionP1Qa = payload;
   if (qaScenario === 'collision-p2') window.__collisionP2Qa = payload;
@@ -41,6 +45,21 @@ function publish(status) {
   if (qaScenario === 'collision-p6') window.__collisionP6Qa = payload;
   if (qaScenario === 'collision-p7') window.__collisionP7Qa = payload;
   if (qaScenario === 'collision-p8') window.__collisionP8Qa = payload;
+}
+
+function ensureP6Fixture() {
+  if (qaScenario !== 'collision-p6' || !collisionObjectSource?.objectMap) return null;
+  try {
+    const fixture = ensureCollisionP6QaFixture(
+      collisionObjectSource.objectMap,
+      window.location.search,
+    );
+    fixtureError = null;
+    return fixture;
+  } catch (error) {
+    fixtureError = error instanceof Error ? error : new Error(String(error));
+    return null;
+  }
 }
 
 function sampleCandidates() {
@@ -85,6 +104,11 @@ function positionProductionPlayer(status) {
 
 function updateQa() {
   if (disposed || !qaMode) return;
+  if (qaScenario === 'collision-p6' && !ensureP6Fixture()) {
+    publish('waiting-fixture');
+    frameId = requestAnimationFrame(updateQa);
+    return;
+  }
   if (window.__editor && runtime) {
     window.__editor.collision = runtime;
     window.__editor.characterMotor = motor;
@@ -151,6 +175,10 @@ function attach({
     return;
   }
 
+  collisionObjectSource = objectSource;
+  if (qaScenario === 'collision-p6' && !ensureP6Fixture()) {
+    publish('waiting-fixture');
+  }
   player = nextPlayer;
   runtime = createCollisionRuntime({
     terrainView: player.terrainView,
@@ -194,4 +222,5 @@ window.addEventListener('pagehide', () => {
   motor = null;
   runtime = null;
   player = null;
+  collisionObjectSource = null;
 }, { once: true });

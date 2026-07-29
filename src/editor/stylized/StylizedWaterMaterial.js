@@ -1,13 +1,17 @@
 import * as THREE from 'three/webgpu';
 import {
   abs,
+  cameraFar,
+  cameraNear,
   cameraPosition,
   clamp,
   dot,
+  exp,
   float,
   floor,
   fract,
   length,
+  linearDepth,
   max,
   min,
   mix,
@@ -15,6 +19,7 @@ import {
   positionLocal,
   positionWorld,
   pow,
+  screenUV,
   sin,
   smoothstep,
   step,
@@ -22,10 +27,18 @@ import {
   uv,
   vec2,
   vec3,
+  viewportDepthTexture,
+  viewportOpaqueMipTexture,
+  viewportSafeUV,
 } from 'three/tsl';
 import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
+
+// Radius in the voronoi F1 distance field that the caustic filaments trace.
+// Mean F1 over a unit cell sits near 0.5, so a slightly tighter ring keeps the
+// filaments inside their own cell and lets neighbours cross rather than merge.
+const CAUSTIC_RING_RADIUS = 0.4;
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -83,6 +96,15 @@ function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
   return result;
 }
 
+function refractionWarp(coarsePoint, finePoint) {
+  const coarse = stylizedFbm(coarsePoint).sub(0.5).mul(2);
+  const fine = stylizedFbm(finePoint).sub(0.5).mul(2);
+  return vec2(
+    coarse.mul(0.7).add(fine.mul(0.3)),
+    coarse.mul(-0.35).add(fine.mul(0.65)),
+  );
+}
+
 export function createStylizedWaterMaterial({
   surfaceMaskTexture,
   waterFieldTexture,
@@ -93,6 +115,12 @@ export function createStylizedWaterMaterial({
   chunkWorldSize,
   time,
   config,
+  // Build-time opt-out. Sampling the viewport colour and depth textures makes
+  // the renderer copy both buffers for the whole frame, and it does so as soon
+  // as a material carrying those nodes is used at all — hiding the mesh does
+  // not avoid it. Chunks far from the camera get a variant built without the
+  // branch so a player away from water pays nothing.
+  enableRefraction = true,
 }) {
   const water = config.water;
   const quality = resolveWaterQualityFeatures(water);
@@ -101,20 +129,36 @@ export function createStylizedWaterMaterial({
     .mul((waterFieldSize - 1) / waterFieldSize)
     .add(0.5 / waterFieldSize);
   const surface = texture(surfaceMaskTexture, terrainUv);
-  const exactCoverage = createSurfaceClassNodes(surface).water;
+  const exactCoverage = createSurfaceClassNodes(surface).waterCoverage;
   const waterField = texture(waterFieldTexture, fieldUv);
   const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
+  const waterDepth = max(waterField.b, 0);
+  const shoreDistance = max(waterField.a, 0);
+  // The water field inherits a surface height onto dry vertices so the sheet
+  // stays continuous across chunk seams, and this mesh reuses the terrain grid.
+  // Coverage alone therefore keeps the sheet fully opaque up to a cell inland,
+  // where alphaTest cuts it along terrain triangle edges — the hard polygonal
+  // wedges over the beach. Depth is the honest thickness of the body and
+  // reaches zero on the waterline itself, so fading what the surface
+  // contributes as it thins puts the edge back on the contour.
+  const waterlineFade = smoothstep(
+    0,
+    max(float(water.optics.shorelineFadeDepth), 1e-4),
+    waterDepth,
+  );
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
   );
   const fallbackFlow = vec2(water.flowX, water.flowZ);
   let currentFlow = fallbackFlow;
+  let currentStrength = float(0);
   if (quality.flow) {
     const encodedFlow = texture(waterFlowTexture, fieldUv).rg;
     const decodedCellFlow = encodedFlow.mul(2).sub(1);
     const decodedFlow = vec2(decodedCellFlow.x, decodedCellFlow.y.negate());
-    const currentMask = step(0.05, length(decodedFlow));
+    currentStrength = clamp(length(decodedFlow), 0, 1);
+    const currentMask = step(0.05, currentStrength);
     currentFlow = mix(
       fallbackFlow,
       decodedFlow.mul(water.currentInfluence),
@@ -147,34 +191,203 @@ export function createStylizedWaterMaterial({
   const seg0 = clamp(ramp.div(midPos), 0, 1);
   const seg1 = clamp(ramp.sub(midPos).div(max(float(1).sub(midPos), 1e-4)), 0, 1);
   const inSeg1 = step(midPos, ramp);
-  let color = mix(
+  const legacyColor = mix(
     mix(colorNode(water.deepColor), colorNode(water.midColor), seg0),
     mix(colorNode(water.midColor), colorNode(water.highlightColor), seg1),
     inSeg1,
   );
+
+  const distance = length(positionWorld.xz.sub(cameraPosition.xz));
+  const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
+  let color = legacyColor;
+  let alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
+    .mul(fade)
+    .mul(waterCoverage)
+    .mul(waterlineFade);
+  let opticalDistance = float(0);
+  // How much of the bed still reaches the eye. Caustics are light landing on
+  // the bed, so they must not survive where the body has already absorbed it.
+  let bedVisibility = float(1);
+  let bodyColor = legacyColor;
+  let surfaceDetailMix = float(0);
+  let foamAmount = float(0);
+
+  if (quality.depthOptics) {
+    const optics = water.optics;
+    const viewVector = cameraPosition.sub(positionWorld);
+    const viewCosine = clamp(
+      abs(viewVector.y).div(max(length(viewVector), 1e-4)),
+      optics.minimumViewCosine,
+      1,
+    );
+    const cameraSubmersionDepth = max(positionWorld.y.sub(cameraPosition.y), 0);
+    const underwaterBlend = smoothstep(
+      0,
+      optics.surfaceTransitionDepth,
+      cameraSubmersionDepth,
+    );
+    const verticalDistance = mix(waterDepth, cameraSubmersionDepth, underwaterBlend);
+    opticalDistance = min(
+      verticalDistance.div(viewCosine),
+      optics.maximumOpticalDistance,
+    );
+    const transmission = exp(opticalDistance.mul(-optics.absorptionDensity));
+    const absorbed = oneMinus(transmission);
+    bedVisibility = transmission;
+    const depthMix = smoothstep(optics.shallowDepth, optics.deepDepth, waterDepth);
+    const depthColor = mix(
+      colorNode(optics.shallowColor),
+      colorNode(optics.deepColor),
+      depthMix,
+    );
+    bodyColor = mix(
+      depthColor,
+      colorNode(optics.underwaterColor),
+      underwaterBlend.mul(optics.underwaterTintStrength),
+    );
+    surfaceDetailMix = float(optics.surfaceDetailStrength).mul(fade).mul(waterlineFade);
+    color = mix(bodyColor, legacyColor, surfaceDetailMix);
+    alpha = mix(
+      float(optics.minimumOpacity),
+      float(optics.maximumOpacity),
+      absorbed,
+    ).mul(waterCoverage).mul(waterlineFade);
+  }
+
+  if (quality.foam && water.foam.enabled) {
+    const foam = water.foam;
+    const shoreBand = oneMinus(smoothstep(0, foam.shoreWidth, shoreDistance));
+    const flowPhase = dot(worldXZ, currentFlow)
+      .mul(foam.flowBandScale)
+      .sub(time.mul(foam.flowBandSpeed));
+    const flowBand = pow(
+      sin(flowPhase).mul(0.5).add(0.5),
+      foam.flowBandContrast,
+    ).mul(currentStrength).mul(foam.flowStrength);
+    const noiseBreakup = mix(
+      float(1),
+      smoothstep(0.18, 0.82, noiseFac),
+      foam.noiseStrength,
+    );
+    foamAmount = max(shoreBand, flowBand)
+      .mul(noiseBreakup)
+      .mul(foam.intensity * quality.foamStrength)
+      .mul(waterCoverage);
+  }
+
+  if (enableRefraction && quality.refraction && water.refraction.enabled) {
+    const refraction = water.refraction;
+    const coarsePoint = worldXZ
+      .mul(refraction.coarseScale)
+      .add(currentFlow.mul(time.mul(refraction.coarseSpeed)));
+    const finePoint = worldXZ
+      .mul(refraction.fineScale)
+      .sub(currentFlow.mul(time.mul(refraction.fineSpeed)))
+      .add(vec2(31.73, 11.29));
+    const depthFactor = smoothstep(
+      refraction.depthFadeStart,
+      refraction.depthFadeEnd,
+      waterDepth,
+    );
+    const distortionUv = refractionWarp(coarsePoint, finePoint)
+      .mul(refraction.strength * quality.refractionStrength)
+      .mul(depthFactor);
+    const baseViewportUv = viewportSafeUV(screenUV);
+    const distortedViewportUv = viewportSafeUV(baseViewportUv.add(distortionUv));
+    const depthRange = cameraFar.sub(cameraNear);
+    const waterViewDistance = linearDepth().mul(depthRange).add(cameraNear);
+    const baseViewDistance = linearDepth(
+      viewportDepthTexture(baseViewportUv),
+    ).mul(depthRange).add(cameraNear);
+    const distortedViewDistance = linearDepth(
+      viewportDepthTexture(distortedViewportUv),
+    ).mul(depthRange).add(cameraNear);
+    const validDepth = step(
+      waterViewDistance.add(refraction.depthBiasMeters),
+      distortedViewDistance,
+    );
+    const acceptedViewportUv = mix(
+      baseViewportUv,
+      distortedViewportUv,
+      validDepth,
+    );
+    const acceptedViewDistance = mix(
+      baseViewDistance,
+      distortedViewDistance,
+      validDepth,
+    );
+    const sceneColor = viewportOpaqueMipTexture(
+      acceptedViewportUv,
+      float(refraction.mipLevel),
+    ).rgb;
+    const coefficients = vec3(
+      refraction.absorptionCoefficients[0],
+      refraction.absorptionCoefficients[1],
+      refraction.absorptionCoefficients[2],
+    );
+    const channelTransmission = exp(coefficients.mul(opticalDistance).negate());
+    const refractedBody = sceneColor.mul(channelTransmission)
+      .add(bodyColor.mul(oneMinus(channelTransmission)));
+    const physicalColor = mix(
+      bodyColor,
+      refractedBody,
+      refraction.sceneColorStrength,
+    );
+    color = mix(physicalColor, legacyColor, surfaceDetailMix);
+    alpha = waterCoverage.mul(waterlineFade);
+
+    if (quality.intersectionFoam && water.foam.enabled) {
+      const foam = water.foam;
+      const sceneGap = max(acceptedViewDistance.sub(waterViewDistance), 0);
+      const contact = oneMinus(smoothstep(
+        foam.intersectionDepth,
+        foam.intersectionDepth + foam.intersectionSoftness,
+        sceneGap,
+      ));
+      const intersectionFoam = contact
+        .mul(foam.intersectionStrength * quality.intersectionFoamStrength)
+        .mul(waterCoverage);
+      foamAmount = max(foamAmount, intersectionFoam);
+    }
+  }
+
   if (quality.caustics) {
     const caustics = water.caustics;
     const causticUv = worldXZ.mul(caustics.scale)
       .add(currentFlow.mul(time.mul(caustics.speed)));
-    const causticNoise = stylizedFbm(causticUv);
+    // A ring band around each voronoi point, not FBM. Light focused by a rippled
+    // surface lands on the bed as a web of thin filaments; FBM can only make
+    // soft blobs, which is why the water read as flat tint from above however
+    // much the intensity was raised. Isolating one radius of the F1 distance
+    // field draws a ring per cell, and neighbouring rings overlap into that web
+    // — for one voronoi rather than the two a border metric would need. The
+    // cell points drift on their own clock, so the web crawls.
+    const causticRing = abs(
+      voronoiF1(causticUv, time, caustics.speed).sub(CAUSTIC_RING_RADIUS),
+    );
+    const causticNet = clamp(oneMinus(causticRing.mul(caustics.contrast)), 0, 1);
     const shallow = oneMinus(smoothstep(
       caustics.depthFadeStart,
       caustics.depthFadeEnd,
-      waterField.b,
+      waterDepth,
     ));
-    const causticAmount = pow(clamp(causticNoise, 0, 1), caustics.contrast)
+    const causticAmount = causticNet.mul(causticNet)
       .mul(caustics.intensity * quality.causticStrength)
-      .mul(shallow);
+      .mul(shallow)
+      .mul(bedVisibility)
+      .mul(waterlineFade);
     color = color.add(colorNode(water.highlightColor).mul(causticAmount));
   }
 
-  const distance = length(positionWorld.xz.sub(cameraPosition.xz));
-  const fade = oneMinus(pow(clamp(distance.div(water.fadeDistance), 0, 1), water.fadeStrength));
-  const alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
-    .mul(fade)
-    .mul(waterCoverage);
-  const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
+  if (quality.foam && water.foam.enabled) {
+    color = mix(
+      color,
+      colorNode(water.foam.color),
+      clamp(foamAmount, 0, 1),
+    );
+  }
 
+  const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,

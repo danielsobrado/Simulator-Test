@@ -11,9 +11,9 @@ import {
   pow,
   smoothstep,
   uniform,
-  vec2,
   vec3,
 } from 'three/tsl';
+import { cloudMotionCoordinatesNode } from './AtmosphereMotion.js';
 import { directionFromAngles } from './StylizedGodRaysPostProcess.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 
@@ -24,9 +24,12 @@ function colorNode(value) {
 
 function cloudCoverageNode({ config, time, direction }) {
   const projected = direction.xz.div(max(direction.y.add(0.55), 0.16));
-  const cloudUv = projected.mul(config.sky.cloudScale).add(
-    vec2(time.mul(config.sky.cloudSpeed), time.mul(config.sky.cloudSpeed * 0.37)),
-  );
+  const cloudUv = cloudMotionCoordinatesNode({
+    projected,
+    timeNode: time,
+    scale: config.sky.cloudScale,
+    speed: config.sky.cloudSpeed,
+  });
   const cloudNoise = stylizedFbm(cloudUv);
   const cloudShape = smoothstep(
     config.sky.cloudDensity,
@@ -201,7 +204,9 @@ export class StylizedSkyView {
 
   update(timestamp, camera) {
     if (!camera) return;
-    this.time.value = timestamp / 1000;
+    const timeSeconds = timestamp / 1000;
+    this.time.value = timeSeconds;
+    this.terrainView.godRays.setTime(timeSeconds);
     this.mesh.position.copy(camera.position);
     this.cloudMaskMesh.position.copy(camera.position);
     this.directional.position.copy(camera.position).addScaledVector(

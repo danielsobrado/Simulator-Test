@@ -48,8 +48,12 @@ export function collisionChunkForCanonical(canonicalX, canonicalZ, chunkWorldSiz
   assertFinite(canonicalZ, 'canonicalZ');
   if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
   return Object.freeze({
-    chunkX: assertSafeChunkCoordinate(Math.floor(canonicalX / chunkWorldSize)),
-    chunkZ: assertSafeChunkCoordinate(Math.floor(-canonicalZ / chunkWorldSize)),
+    chunkX: assertSafeChunkCoordinate(Math.floor(canonicalX / chunkWorldSize) + 0),
+    // `+ 0` clears the negative zero the mirroring produces at z 0. A chunk
+    // coordinate of -0 keys and compares as 0 everywhere except `Object.is`,
+    // which is exactly where it would surface: as an assertion comparing two
+    // values that print identically.
+    chunkZ: assertSafeChunkCoordinate(Math.floor(-canonicalZ / chunkWorldSize) + 0),
   });
 }
 
@@ -63,6 +67,9 @@ export function collisionChunkCanonicalBounds(chunkX, chunkZ, chunkWorldSize) {
     maxX: (chunkX + 1) * chunkWorldSize,
     minY: -Number.MAX_VALUE,
     maxY: Number.MAX_VALUE,
+    // Canonical Z runs opposite to chunk Z: chunk 0 spans z -chunkWorldSize..0.
+    // Every consumer of this helper — the spatial bins, chunk bounds and the
+    // owner-overlap check — is written against that mirroring.
     minZ: -(chunkZ + 1) * chunkWorldSize,
     maxZ: -chunkZ * chunkWorldSize,
   });

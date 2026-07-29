@@ -53,51 +53,6 @@ function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
   return material;
 }
 
-function createCrossCanopyGeometry(bounds) {
-  const centerX = (bounds.min.x + bounds.max.x) * 0.5;
-  const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
-  const halfX = Math.max(0.1, (bounds.max.x - bounds.min.x) * 0.5);
-  const halfZ = Math.max(0.1, (bounds.max.z - bounds.min.z) * 0.5);
-  const lowY = bounds.min.y;
-  const shoulderY = lowY + (bounds.max.y - lowY) * 0.42;
-  const highY = bounds.max.y;
-  const positions = new Float32Array([
-    centerX - halfX, lowY, centerZ,
-    centerX + halfX, lowY, centerZ,
-    centerX + halfX * 0.82, shoulderY, centerZ,
-    centerX, highY, centerZ,
-    centerX - halfX * 0.82, shoulderY, centerZ,
-    centerX, lowY, centerZ - halfZ,
-    centerX, lowY, centerZ + halfZ,
-    centerX, shoulderY, centerZ + halfZ * 0.82,
-    centerX, highY, centerZ,
-    centerX, shoulderY, centerZ - halfZ * 0.82,
-  ]);
-  const indices = [
-    0, 1, 2, 0, 2, 4, 4, 2, 3,
-    5, 6, 7, 5, 7, 9, 9, 7, 8,
-  ];
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return geometry;
-}
-
-function createBoxForBounds(bounds, minimumWidth = 0.08) {
-  const size = bounds.getSize(new THREE.Vector3());
-  const center = bounds.getCenter(new THREE.Vector3());
-  const geometry = new THREE.BoxGeometry(
-    Math.max(minimumWidth, size.x),
-    Math.max(minimumWidth, size.y),
-    Math.max(minimumWidth, size.z),
-  );
-  geometry.translate(center.x, center.y, center.z);
-  return geometry;
-}
-
 export function createTreeProxyPrototype(parts, config) {
   const combinedBounds = unionBounds(parts);
   const leafBounds = unionBounds(parts, 'leaf') ?? combinedBounds;
@@ -145,8 +100,6 @@ export function createTreeProxyPrototype(parts, config) {
   trunkGeometry.translate(trunkCenter.x, trunkCenter.y, trunkCenter.z);
   trunkGeometry.computeBoundingBox();
   trunkGeometry.computeBoundingSphere();
-  const proxyTrunkBounds = trunkGeometry.boundingBox.clone();
-  const fallbackCanopyGeometry = createCrossCanopyGeometry(leafBounds);
 
   return {
     height: Math.max(0.1, combinedBounds.max.y - combinedBounds.min.y),
@@ -164,23 +117,6 @@ export function createTreeProxyPrototype(parts, config) {
       },
       {
         geometry: trunkGeometry,
-        material: makeMaterial(config.trees.barkTint),
-        kind: 'trunk',
-      },
-    ],
-    fallbackImpostorParts: [
-      {
-        geometry: fallbackCanopyGeometry,
-        material: makeTreeLeafMaterial(
-          config.trees.leafTop,
-          config,
-          fallbackCanopyGeometry.boundingBox,
-          THREE.DoubleSide,
-        ),
-        kind: 'leaf',
-      },
-      {
-        geometry: createBoxForBounds(proxyTrunkBounds),
         material: makeMaterial(config.trees.barkTint),
         kind: 'trunk',
       },

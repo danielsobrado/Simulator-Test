@@ -22,6 +22,16 @@ hitch count tracks how much chunk streaming is still in flight — always compar
 runs at the same `--warmup`, and prefer an A/B against the unmodified code over
 comparing to the recorded baseline on a different machine.
 
+Treat every `viewport*Texture` TSL node as a whole-scene, per-frame cost, never a
+per-pixel one. Sampling `viewportDepthTexture` or `viewportOpaqueMipTexture` makes
+the renderer copy the colour buffer, copy the depth buffer and build a mip chain
+for the entire frame. The cost is **binary and not avoidable by visibility**:
+measured, one such mesh costs the same as forty, and setting `visible = false` or
+frustum-culling every one of them saves nothing. The only way out is to not build
+those nodes into the material — keep them behind a build-time flag and compile a
+variant without them for anything that does not need them
+(`docs/perf-investigation-2026-07-28.md`).
+
 ## Asset startup
 
 Only the trees and the shared scene may block the first frame.

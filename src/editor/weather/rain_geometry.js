@@ -126,25 +126,15 @@ function createSnowGeometry(seed) {
     const o = i * 4;
     const band = rng.float();
     const area = band < 0.42 ? SNOW_NEAR_AREA : band < 0.74 ? SNOW_MID_AREA : SNOW_FAR_AREA;
+    const sizeRoll = rng.float();
+    const sizeBias = Math.pow(sizeRoll, 3.2);
     offset[o] = rng.range(-area * 0.5, area * 0.5);
     offset[o + 1] = rng.float();
     offset[o + 2] = rng.range(-area * 0.5, area * 0.5);
-    if (band < 0.42) {
-      offset[o + 3] = rng.range(1.1, 2.4);
-      shape[o] = rng.range(0.11, 0.23);
-      shape[o + 1] = rng.range(0.38, 0.82);
-      shape[o + 2] = rng.range(0.18, 0.3);
-    } else if (band < 0.74) {
-      offset[o + 3] = rng.range(1.85, 3.1);
-      shape[o] = rng.range(0.065, 0.135);
-      shape[o + 1] = rng.range(0.24, 0.5);
-      shape[o + 2] = rng.range(0.25, 0.39);
-    } else {
-      offset[o + 3] = rng.range(2.4, 4.2);
-      shape[o] = rng.range(0.035, 0.078);
-      shape[o + 1] = rng.range(0.1, 0.3);
-      shape[o + 2] = rng.range(0.32, 0.48);
-    }
+    offset[o + 3] = rng.range(1.25, 2.5) + sizeBias * 1.3;
+    shape[o] = 0.022 + sizeBias * 0.105;
+    shape[o + 1] = rng.range(0.2, 0.46) + Math.pow(sizeRoll, 0.7) * rng.range(0.08, 0.28);
+    shape[o + 2] = rng.range(0.12, 0.44);
     shape[o + 3] = rng.float();
   }
   geometry.setAttribute("aSnowOffset", new THREE.InstancedBufferAttribute(offset, 4));

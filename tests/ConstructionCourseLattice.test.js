@@ -50,7 +50,11 @@ test('the bed field actually ramps', () => {
   const bedOffset = createBedField(SEED, COURSE_HEIGHT, { amplitude: 0.14 });
   let lowest = Infinity;
   let highest = -Infinity;
-  for (let s = 0; s < 40; s += 0.05) {
+  // Sampled over 120 m rather than 40 m. The bed wavelength is 15-29 m so the
+  // course carries two long waves, and for some seeds a 40 m window lands
+  // inside a stretch where they partially cancel — the field is fine, the
+  // sample was just shorter than the drift it is measuring.
+  for (let s = 0; s < 120; s += 0.05) {
     lowest = Math.min(lowest, bedOffset(3, s));
     highest = Math.max(highest, bedOffset(3, s));
   }

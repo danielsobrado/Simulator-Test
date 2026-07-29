@@ -29,6 +29,7 @@ function resolveMaskConfig(request) {
       roadTileId: provided.roadTileId,
       waterTileId: provided.waterTileId ?? 0,
       grassTileIds: [...provided.grassTileIds],
+      waterlineDepth: provided.waterlineDepth,
     };
   }
   return createSurfaceMaskConfig(null);

@@ -2,13 +2,71 @@ water:
   qualityTier: high
   currentAnimationSpeed: 0.22
   currentInfluence: 0.85
+  optics:
+    shallowColor: '#72d8e8'
+    deepColor: '#0b4a68'
+    underwaterColor: '#15596d'
+    absorptionDensity: 0.42
+    minimumOpacity: 0.08
+    maximumOpacity: 0.94
+    shallowDepth: 0.2
+    deepDepth: 6
+    maximumOpticalDistance: 14
+    minimumViewCosine: 0.22
+    surfaceTransitionDepth: 0.75
+    # Thickness over which the sheet fades out at the bank. Keep it under the
+    # ~0.12 m the surface sits above terrain, or the waterline reads as a step.
+    shorelineFadeDepth: 0.35
+    surfaceDetailStrength: 0.28
+    underwaterTintStrength: 0.35
+  refraction:
+    enabled: true
+    strength: 0.012
+    coarseScale: 0.045
+    fineScale: 0.16
+    coarseSpeed: 0.05
+    fineSpeed: 0.13
+    depthFadeStart: 0.08
+    depthFadeEnd: 1.8
+    depthBiasMeters: 0.15
+    mipLevel: 0
+    sceneColorStrength: 0.94
+    absorptionCoefficients: [0.72, 0.28, 0.12]
+  foam:
+    enabled: true
+    color: '#e8fbff'
+    intensity: 0.78
+    shoreWidth: 1.6
+    noiseStrength: 0.42
+    flowStrength: 0.32
+    flowBandScale: 0.58
+    flowBandSpeed: 0.42
+    flowBandContrast: 2.4
+    intersectionDepth: 0.28
+    intersectionSoftness: 0.38
+    intersectionStrength: 0.82
   caustics:
-    intensity: 0.18
+    # Tuned for the voronoi filament web, which concentrates its light into thin
+    # lines instead of spreading it over a blob, so it needs a higher intensity
+    # than the old FBM to read at all. Absorption thins it out with depth.
+    intensity: 0.5
     scale: 0.45
-    speed: 0.11
-    contrast: 2.2
+    speed: 0.34
+    # Filament sharpness, not an exponent: the band is 1/contrast wide in the
+    # distance field, so raising this thins the lines and darkens between them.
+    contrast: 3
     depthFadeStart: 0.35
     depthFadeEnd: 4.5
+  projectedCaustics:
+    enabled: true
+    color: '#b9f4e5'
+    intensity: 0.16
+    scale: 0.42
+    speed: 0.55
+    contrast: 2.6
+    depthFadeStart: 0.15
+    depthFadeEnd: 6
+    maxDistance: 45
 
 aquaticPlants:
   water:

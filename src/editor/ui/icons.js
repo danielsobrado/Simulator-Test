@@ -114,8 +114,11 @@ export function hasIcon(name) {
  * open or print the word "undefined" into the page.
  */
 export function icon(name, { size = 18, className = '' } = {}) {
+  // `hasIcon` rather than `ICONS[name]`: a plain object inherits from
+  // Object.prototype, so `ICONS.constructor` is a *function* — truthy, and
+  // interpolated straight into the markup as native source.
+  if (!hasIcon(name)) return '';
   const body = ICONS[name];
-  if (!body) return '';
   const classAttribute = className ? ` class="${escapeAttribute(className)}"` : '';
   return `<svg${classAttribute} viewBox="${ICON_VIEWBOX}" width="${size}" height="${size}"`
     + ' fill="none" stroke="currentColor" stroke-width="1.5"'

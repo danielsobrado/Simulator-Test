@@ -1,0 +1,91 @@
+version: 1
+
+defaults:
+  enabled: false
+
+  minimumStone:
+    width: 0.32
+    height: 0.18
+    depth: 0.20
+
+  bevel:
+    widthRatio:
+      min: 0.070
+      max: 0.115
+
+    depthRatio:
+      min: 0.060
+      max: 0.105
+
+    absoluteMinimum: 0.012
+    absoluteMaximum: 0.055
+
+  cornerVariation:
+    amount: 0.18
+    correlation: 0.62
+
+  edgeVariation:
+    amount: 0.10
+    midpointBias: 0.35
+
+  verticalBias:
+    top: 1.12
+    bottom: 0.92
+
+  cornerFlattening:
+    chance: 0.14
+    strengthMin: 0.08
+    strengthMax: 0.18
+
+  segments:
+    near: 2
+    coarse: 1
+
+  safeguards:
+    minimumFaceAreaRatio: 0.58
+    minimumEdgeLength: 0.06
+    maximumInsetEdgeRatio: 0.28
+    maximumDepthFraction: 0.35
+    maximumMortarFraction: 0.65
+
+  categories:
+    field: 1.0
+    coping: 0.20
+    ashlar: 0.10
+    quoin: 0.08
+    voussoir: 0.05
+    merlon: 0.15
+    recess: 0.0
+
+styles:
+  soft-limestone-rubble:
+    enabled: true
+
+    bevel:
+      widthRatio:
+        min: 0.080
+        max: 0.125
+
+      depthRatio:
+        min: 0.065
+        max: 0.110
+
+      absoluteMinimum: 0.014
+      absoluteMaximum: 0.052
+
+    cornerVariation:
+      amount: 0.22
+      correlation: 0.68
+
+    edgeVariation:
+      amount: 0.11
+      midpointBias: 0.32
+
+    verticalBias:
+      top: 1.16
+      bottom: 0.90
+
+    cornerFlattening:
+      chance: 0.12
+      strengthMin: 0.07
+      strengthMax: 0.15

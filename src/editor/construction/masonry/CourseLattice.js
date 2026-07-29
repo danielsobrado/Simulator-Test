@@ -44,6 +44,28 @@ export const MAX_BED_AMPLITUDE = 0.2;
 export const MIN_SPLIT_HEIGHT = 0.14;
 
 /**
+ * Shortest bed wavelength, in metres of arc.
+ *
+ * A stone face is a **convex quad** — `createBeveledQuadProfile` insets the ring
+ * and a concave one triangulates inside out, which is why the face contract is
+ * four corners and not a polyline. So a stone's top edge is a straight *chord*
+ * of the bed line, and the course above chords the same line over different
+ * intervals, because that is what bonding means. Two chords of a curve over
+ * different intervals bow apart in the middle.
+ *
+ * The gap is the chord's sagitta, about `A(pi w / L)^2 / 2` for amplitude `A`,
+ * stone width `w` and wavelength `L`. At the original 3-9 m that reached 24 mm
+ * on a real wall — wider than the mortar joint meant to hide it. Holding
+ * `L >= 15 m` keeps it near a millimetre at `A = 0.09`, `w = 0.9`, so the joint
+ * absorbs it and the faces stay convex.
+ *
+ * Longer waves also read better: the bed line drifts across a whole run rather
+ * than rippling within one stone's length.
+ */
+const MIN_BED_WAVELENGTH = 15;
+const BED_WAVELENGTH_RANGE = 14;
+
+/**
  * Bed joints that ramp along the wall instead of running dead level.
  *
  * The reference offsets every point vertically from a ramp over its X position
@@ -74,9 +96,8 @@ export function createBedField(seed, courseHeight, { amplitude = 0.14, waves = 2
     for (let wave = 0; wave < waves; wave += 1) {
       const hash = mixSeed(seed ^ BED_HASH, course * 8 + wave);
       built.push({
-        // 3 m to 9 m: shorter than a module, so the ramp is visible within one
-        // build unit rather than reading as the whole wall leaning.
-        frequency: (Math.PI * 2) / (3 + lane(hash, 8) * 6),
+        frequency: (Math.PI * 2)
+          / (MIN_BED_WAVELENGTH + lane(hash, 8) * BED_WAVELENGTH_RANGE),
         phase: lane(hash, 0) * Math.PI * 2,
         amplitude: perWave * (0.55 + lane(hash, 16) * 0.45),
       });
@@ -85,14 +106,15 @@ export function createBedField(seed, courseHeight, { amplitude = 0.14, waves = 2
     return built;
   };
 
-  return (course, s) => {
-    if (course <= 0) return 0;
+  const smoothAt = (course, s) => {
     let offset = 0;
     for (const wave of wavesFor(course)) {
       offset += wave.amplitude * Math.sin(s * wave.frequency + wave.phase);
     }
     return offset;
   };
+
+  return (course, s) => (course <= 0 ? 0 : smoothAt(course, s));
 }
 
 /**
@@ -222,21 +244,38 @@ export function resolveCellCorners(cell, {
 }) {
   const bedAt = (course, s) => course * courseHeight + bedOffset(course, s);
 
+  /**
+   * A point at height fraction `v` on the head joint at `jointS`.
+   *
+   * `y` must be **linear in v** along the whole joint, because a neighbouring
+   * cell may be split at any `v` and its corner has to land exactly on this
+   * line. Two things would break that and both are handled here:
+   *
+   * - Evaluating the bed at the tilted `s` rather than at the joint's own two
+   *   ends makes a leaning joint a curve — the bed-chord failure rotated
+   *   ninety degrees.
+   * - Clamping *after* interpolating makes the clamped part of the joint bend.
+   *   The ceiling is applied to the two endpoints, then interpolated, so a
+   *   clamped joint is still a straight line and a split still lands on it.
+   */
   const corner = (v, jointS, tilt) => {
-    const s = jointS + tilt * (v - 0.5);
-    const bottom = bedAt(cell.courseIndex, s);
-    const top = bedAt(cell.courseIndex + 1, s);
-    let y = bottom + (top - bottom) * v;
-    if (ceilingAt) y = Math.min(y, ceilingAt(s));
-    return [s, Math.max(0, y)];
+    const bottomS = jointS - tilt * 0.5;
+    const topS = jointS + tilt * 0.5;
+    let bottom = bedAt(cell.courseIndex, bottomS);
+    let top = bedAt(cell.courseIndex + 1, topS);
+    if (ceilingAt) {
+      bottom = Math.min(bottom, ceilingAt(bottomS));
+      top = Math.min(top, ceilingAt(topS));
+    }
+    return [jointS + tilt * (v - 0.5), Math.max(0, bottom + (top - bottom) * v)];
   };
 
-  const points = [
-    corner(cell.v0, cell.s0, tiltLeft),
-    corner(cell.v0, cell.s1, tiltRight),
-    corner(cell.v1, cell.s1, tiltRight),
-    corner(cell.v1, cell.s0, tiltLeft),
-  ];
+  const bottomLeft = corner(cell.v0, cell.s0, tiltLeft);
+  const bottomRight = corner(cell.v0, cell.s1, tiltRight);
+  const topRight = corner(cell.v1, cell.s1, tiltRight);
+  const topLeft = corner(cell.v1, cell.s0, tiltLeft);
+
+  const points = [bottomLeft, bottomRight, topRight, topLeft];
 
   let minS = Infinity;
   let maxS = -Infinity;
@@ -262,6 +301,53 @@ export function resolveCellCorners(cell, {
     width,
     height,
   };
+}
+
+/**
+ * Resolve a cell's leaves, giving away the band of any the ceiling collapses.
+ *
+ * `resolveCellCorners` returns null when the wall-top clamp flattens a leaf
+ * below `minHeight`. Dropping it outright leaves a **hole**: the leaf beneath
+ * still stops at its own split line while the unsplit neighbour beside it runs
+ * all the way to the ceiling, so the wall shows a notch under the coping. Give
+ * the collapsed band to the leaf directly below it in the same column instead
+ * and the column reaches the ceiling either way.
+ *
+ * @returns `{ leaves, faces }` in the input order, `faces[i]` null only where a
+ *   leaf collapsed with nothing beneath it to absorb it.
+ */
+export function resolveLeafFaces(leaves, options) {
+  // A vertical split gives each leaf its own head joints, so the tilt has to be
+  // resolved per leaf rather than taken once for the parent cell.
+  const resolve = (leaf) => resolveCellCorners(leaf, options.resolveTilt
+    ? {
+      ...options,
+      tiltLeft: options.resolveTilt(leaf.s0),
+      tiltRight: options.resolveTilt(leaf.s1),
+    }
+    : options);
+  const adjusted = leaves.map((leaf) => ({ ...leaf }));
+  const faces = adjusted.map(resolve);
+
+  // Bottom-up, so a stack of two collapsed leaves folds into one survivor.
+  const order = adjusted
+    .map((leaf, index) => index)
+    .sort((a, b) => adjusted[a].v0 - adjusted[b].v0);
+  for (const index of order) {
+    if (faces[index]) continue;
+    const failed = adjusted[index];
+    const below = order.find((other) => (
+      other !== index
+      && faces[other]
+      && Math.abs(adjusted[other].s0 - failed.s0) < 1e-9
+      && Math.abs(adjusted[other].s1 - failed.s1) < 1e-9
+      && Math.abs(adjusted[other].v1 - failed.v0) < 1e-9
+    ));
+    if (below === undefined) continue;
+    adjusted[below] = { ...adjusted[below], v1: failed.v1 };
+    faces[below] = resolve(adjusted[below]) ?? faces[below];
+  }
+  return { leaves: adjusted, faces };
 }
 
 /**

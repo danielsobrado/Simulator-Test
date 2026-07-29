@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RAIN_IMPACT_PROFILE } from "./rain_constants.js";
 const RAIN_VERTEX = (
   /* glsl */
   `
@@ -248,7 +249,7 @@ void main() {
   vec3 ref = abs(n.y) < 0.95 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
   vec3 tangent = normalize(cross(ref, n));
   vec3 bitangent = normalize(cross(n, tangent));
-  vec3 worldPosition = aSplashCenter + (tangent * local.x + bitangent * local.y) * scale + n * 0.035;
+  vec3 worldPosition = aSplashCenter + (tangent * local.x + bitangent * local.y) * scale + n * ${RAIN_IMPACT_PROFILE.hard.surfaceOffset};
 
   vLocal = position.xy;
   vAge = age;
@@ -270,16 +271,16 @@ varying float vActive;
 void main() {
   float r = length(vLocal);
   if (r > 1.04) discard;
-  float radius = mix(0.18, 0.78, smoothstep(0.0, 0.78, vAge));
-  float ring = 1.0 - smoothstep(0.018, 0.075, abs(r - radius));
+  float young = smoothstep(0.0, 0.05, vAge) * (1.0 - smoothstep(0.28, 0.48, vAge));
+  float radius = mix(0.06, 0.42, smoothstep(0.0, 0.36, vAge));
+  float ring = 1.0 - smoothstep(0.025, 0.07, abs(r - radius));
   float axis = min(abs(vLocal.x), abs(vLocal.y));
   float diag = min(abs(vLocal.x + vLocal.y), abs(vLocal.x - vLocal.y)) * 0.7;
   float ray = (1.0 - smoothstep(0.025, 0.13, min(axis, diag)))
-    * smoothstep(0.08, 0.24, r)
-    * (1.0 - smoothstep(0.52, 1.0, r));
-  float center = 1.0 - smoothstep(0.02, 0.16, r);
-  float fade = (1.0 - smoothstep(0.58, 1.0, vAge)) * smoothstep(0.0, 0.08, vAge);
-  float alpha = (ring * 0.62 + ray * 0.55 + center * 0.32) * fade * vActive * uOpacity * clamp(uIntensity, 0.0, 1.6);
+    * smoothstep(0.04, 0.1, r)
+    * (1.0 - smoothstep(0.24, 0.46, r));
+  float center = (1.0 - smoothstep(0.015, 0.1, r)) * (1.0 - smoothstep(0.08, 0.24, vAge));
+  float alpha = (ring * 0.34 + ray * 0.28 + center * 0.38) * young * vActive * uOpacity * clamp(uIntensity, 0.0, 1.6);
   if (alpha < 0.01) discard;
   gl_FragColor = vec4(uColor, alpha);
 }
@@ -298,13 +299,18 @@ varying float vActive;
 void main() {
   float r = length(vLocal);
   if (r > 1.04) discard;
-  float radiusA = mix(0.14, 0.86, smoothstep(0.0, 0.9, vAge));
-  float radiusB = mix(0.04, 0.54, smoothstep(0.14, 0.96, vAge));
-  float ringA = 1.0 - smoothstep(0.015, 0.055, abs(r - radiusA));
-  float ringB = 1.0 - smoothstep(0.012, 0.045, abs(r - radiusB));
-  float center = (1.0 - smoothstep(0.03, 0.13, r)) * (1.0 - smoothstep(0.0, 0.35, vAge));
-  float fade = (1.0 - smoothstep(0.62, 1.0, vAge)) * smoothstep(0.0, 0.07, vAge);
-  float alpha = (ringA * 0.76 + ringB * 0.42 + center * 0.18) * fade * vActive * uOpacity * clamp(uIntensity, 0.0, 1.6);
+  float rippleAge = clamp((vAge - 0.08) / 0.78, 0.0, 1.0);
+  float rippleRadius = mix(0.1, 0.9, smoothstep(0.0, 1.0, rippleAge));
+  float rippleWidth = mix(0.018, 0.052, rippleAge);
+  float ripple = 1.0 - smoothstep(rippleWidth, rippleWidth * 2.2, abs(r - rippleRadius));
+  ripple *= smoothstep(0.06, 0.16, vAge) * (1.0 - smoothstep(0.7, 0.98, vAge));
+  float crownRadius = mix(0.05, 0.24, smoothstep(0.0, 0.2, vAge));
+  float crown = (1.0 - smoothstep(0.02, 0.065, abs(r - crownRadius)))
+    * (1.0 - smoothstep(0.16, 0.3, vAge));
+  float center = (1.0 - smoothstep(0.02, 0.09, r))
+    * (1.0 - smoothstep(0.06, 0.18, vAge));
+  float alpha = (ripple * 0.52 + crown * 0.32 + center * 0.22)
+    * vActive * uOpacity * clamp(uIntensity, 0.0, 1.6);
   if (alpha < 0.01) discard;
   gl_FragColor = vec4(uColor, alpha);
 }
@@ -579,15 +585,16 @@ function createStormShaderMaterial() {
   };
 }
 function createSplashShaderMaterial(kind) {
+  const profile = RAIN_IMPACT_PROFILE[kind];
   const uniforms = {
     uCenter: { value: new THREE.Vector3() },
     uTime: { value: 0 },
-    uRate: { value: kind === "hard" ? 1.72 : 1.18 },
+    uRate: { value: profile.rate },
     uIntensity: { value: 1 },
     uWindX: { value: 0 },
     uWindZ: { value: 0 },
     uColor: { value: new THREE.Color(kind === "hard" ? 14282751 : 10479359) },
-    uOpacity: { value: kind === "hard" ? 0.84 : 0.48 }
+    uOpacity: { value: profile.opacity }
   };
   const material = new THREE.ShaderMaterial({
     uniforms,

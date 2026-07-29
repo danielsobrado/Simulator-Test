@@ -29,12 +29,11 @@ function buildTile(item) {
   // `aria-pressed` only where the caller actually models a pressed state;
   // emitting it on a plain action would announce a toggle that does not exist.
   const pressed = item.active === undefined ? '' : ` aria-pressed="${Boolean(item.active)}"`;
-  const color = item.color ? ` style="--tile-color:${escapeAttribute(item.color)}"` : '';
   return `<button type="button" role="menuitem" class="${classes.join(' ')}"`
     + ` data-grid-item="${escapeAttribute(item.id)}"`
     + ` aria-label="${escapeAttribute(item.label)}"`
     + ` title="${escapeAttribute(item.label)}"`
-    + `${pressed}${color}>`
+    + `${pressed}>`
     // Icon markup is inserted raw — see the note in `markup.js`. It must come
     // from `icons.js`, never from a world document.
     + `${item.icon ?? ''}</button>`;
@@ -43,7 +42,7 @@ function buildTile(item) {
 /**
  * Build the panel's markup.
  *
- * @param options.groups `[{ id, label, columns, items: [{ id, icon, label, active, color }] }]`
+ * @param options.groups `[{ id, label, columns, items: [{ id, icon, label, active }] }]`
  * @param options.columns default column count for groups that do not set one.
  */
 export function buildIconGridMarkup({ groups = [], columns = DEFAULT_COLUMNS } = {}) {

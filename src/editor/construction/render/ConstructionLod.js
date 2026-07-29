@@ -132,7 +132,22 @@ function mergeCornerRing(group, key, s, y) {
  * frame, so the cell's own corner is simply whichever leaf corner sits furthest
  * into that corner. Reconstructing it keeps the coarse band's stone count at or
  * below what it was before the lattice, instead of inheriting the split.
+ *
+ * Appearance identity: largest leaf wins; equal-area ties pick the lowest
+ * stableIndex so leaf order cannot repaint the merged stone.
  */
+export function selectDominantPlacement(leaves) {
+  return leaves.reduce((best, candidate) => {
+    if (!best) return candidate;
+    const bestArea = best.width * best.height;
+    const candidateArea = candidate.width * candidate.height;
+    if (candidateArea !== bestArea) {
+      return candidateArea > bestArea ? candidate : best;
+    }
+    return candidate.stableIndex < best.stableIndex ? candidate : best;
+  }, null);
+}
+
 function mergeCellLeaves(group) {
   const corners = CORNER_DIRECTIONS.map(([alongS, alongY], slot) => {
     let best = null;
@@ -160,12 +175,7 @@ function mergeCellLeaves(group) {
   const s = (minS + maxS) / 2;
   const y = (minY + maxY) / 2;
 
-  // Inherit shading, depth and straddle from the biggest leaf, so the merged
-  // stone keeps the identity the eye was most likely tracking.
-  const dominant = group.reduce(
-    (best, leaf) => (leaf.width * leaf.height > best.width * best.height ? leaf : best),
-    group[0],
-  );
+  const dominant = selectDominantPlacement(group);
 
   const mergedStoneCorners = corners.map(([cornerS, cornerY]) => [cornerS - s, cornerY - y]);
   const mergedMortarCorners = mergeCornerRing(group, 'mortarCorners', s, y);
@@ -324,6 +334,9 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
   }
   if (field.length === 0) return placements;
 
+  const jointProfile = constructionJointProfile(styleKey);
+  // Preserve intentional ruin notches: never stretch across a gap larger than the
+  // normal every-other-course thin (one omitted lattice course).
   const courses = new Map();
   for (const placement of mergeSplitCells(field)) {
     const key = placement.courseIndex != null
@@ -336,14 +349,43 @@ export function coarsePlacements(placements, { styleKey = null } = {}) {
   const meanY = (course) => (
     course.reduce((total, placement) => total + placement.y, 0) / course.length
   );
+  const courseIndexSpan = (course) => {
+    let minimum = Infinity;
+    let maximum = -Infinity;
+    for (const placement of course) {
+      const index = placement.courseIndex ?? placement.support?.courseIndex;
+      if (index == null) continue;
+      minimum = Math.min(minimum, index);
+      maximum = Math.max(maximum, index);
+    }
+    return { minimum, maximum };
+  };
   const ordered = [...courses.values()].sort((a, b) => meanY(a) - meanY(b));
 
-  const jointProfile = constructionJointProfile(styleKey);
   const merged = [];
   for (let index = 0; index < ordered.length; index += 2) {
     const course = ordered[index];
     const above = ordered[index + 1];
-    const step = above ? Math.max(0, meanY(above) - meanY(course)) : 0;
+    let step = 0;
+    if (above) {
+      const belowSpan = courseIndexSpan(course);
+      const aboveSpan = courseIndexSpan(above);
+      // Normal coarse thin keeps N and N+2. Anything wider implies a missing
+      // ruin course between survivors — do not grow stones through that notch.
+      let ruinGap = false;
+      if (
+        Number.isFinite(belowSpan.maximum)
+        && Number.isFinite(aboveSpan.minimum)
+        && aboveSpan.minimum - belowSpan.maximum > 2
+      ) {
+        // Normal coarse thin keeps N and N+2. A wider jump means at least one
+        // additional lattice course was removed by ruin support — do not fill it.
+        ruinGap = true;
+      }
+      if (!ruinGap) {
+        step = Math.max(0, meanY(above) - meanY(course));
+      }
+    }
     for (const placement of course) {
       const stretched = stretchOverGap(placement, step);
       merged.push(amplifyCoarseJoints(stretched, jointProfile));

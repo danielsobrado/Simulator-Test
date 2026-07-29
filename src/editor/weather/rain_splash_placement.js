@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Rng, hashCombine, hashString } from '../_clod_shims/seed.js';
 import {
   REPOSITION_DISTANCE,
+  RAIN_IMPACT_PROFILE,
   SPLASH_AREA,
   TAU,
   WATER_DEPTH_EPSILON,
@@ -45,7 +46,8 @@ class RainSplashPlacement {
       buffers.normal[c] = point.normal.x;
       buffers.normal[c + 1] = point.normal.y;
       buffers.normal[c + 2] = point.normal.z;
-      buffers.params[p] = kind === "hard" ? rng.range(0.28, 0.62) : rng.range(0.45, 0.92);
+      const profile = RAIN_IMPACT_PROFILE[kind];
+      buffers.params[p] = rng.range(profile.minScale, profile.maxScale);
       buffers.params[p + 1] = rng.float();
       buffers.params[p + 2] = rng.range(0, TAU);
       buffers.params[p + 3] = 1;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MeadowWeatherSystem } from './meadow.js';
+import { MEADOW_MODE_VISUAL_AMOUNT, MeadowWeatherSystem } from './meadow.js';
 import {
   readSunbeamMoteRuntimeSettings,
   resolveSunbeamMoteVisualState,
@@ -68,13 +68,7 @@ export function createWeatherController(deps) {
 
   const currentMeadowSettings = () => {
     const settings = getSettings();
-    return {
-      enabled: true,
-      intensity: settings.weatherIntensity,
-      windX: settings.weatherWindX,
-      windZ: settings.weatherWindZ,
-      motes: cloneMoteSettings(sunbeamMotes),
-    };
+    return resolveMeadowSettings(settings, sunbeamMotes);
   };
   const currentWindSettings = () => {
     const settings = getSettings();
@@ -154,7 +148,9 @@ export function createWeatherController(deps) {
       meadowWeather.update(deltaSeconds, elapsedSeconds, effectCenter, {
         cameraPosition,
         sunDirection,
-        amount: getSettings().weatherMode === 'meadow' ? Math.max(0.15, visual.amount) : visual.amount,
+        amount: getSettings().weatherMode === 'meadow'
+          ? Math.max(MEADOW_MODE_VISUAL_AMOUNT, visual.amount)
+          : visual.amount,
         coldBlend: visual.coldBlend,
         localMist: visual.localMist,
       });
@@ -183,6 +179,18 @@ function cloneMoteSettings(settings) {
   };
 }
 
+function resolveMeadowSettings(weatherSettings, moteSettings) {
+  const motes = cloneMoteSettings(moteSettings);
+  motes.enabled = motes.enabled || weatherSettings.weatherMode === 'meadow';
+  return {
+    enabled: true,
+    intensity: weatherSettings.weatherIntensity,
+    windX: weatherSettings.weatherWindX,
+    windZ: weatherSettings.weatherWindZ,
+    motes,
+  };
+}
+
 function normalizeSunDirection(value) {
   const fallback = new THREE.Vector3(0.35, 0.85, 0.25);
   if (!value) return fallback;
@@ -196,4 +204,7 @@ function normalizeSunDirection(value) {
   return fallback;
 }
 
-export { DEFAULT_SETTINGS as DEFAULT_WEATHER_SETTINGS };
+export {
+  DEFAULT_SETTINGS as DEFAULT_WEATHER_SETTINGS,
+  resolveMeadowSettings,
+};

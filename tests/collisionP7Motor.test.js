@@ -93,5 +93,6 @@ test('the same construction wall blocks beside its doorway', () => {
 
   assert.equal(result.blocked, true);
   assert.ok(result.position.z > 0.2, `wall was crossed at z=${result.position.z}`);
-  assert.ok(result.contacts.some((contact) => contact.sourceId.startsWith('construction:')));
+  // `contacts` is a list of source-id strings, not of contact objects.
+  assert.ok(result.contacts.some((sourceId) => sourceId.startsWith('construction:')));
 });

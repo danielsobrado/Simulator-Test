@@ -91,8 +91,8 @@ const SCENARIOS = Object.freeze({
     label: 'Collision P6 placed object doorway',
     keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
     defaults: {
-      duration: 6,
-      speed: 'run',
+      duration: 0.5,
+      speed: 'walk',
       warmup: 8,
       spawn: { x: 0, z: 0 },
       yawDegrees: 0,

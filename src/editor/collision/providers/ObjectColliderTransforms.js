@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { objectCollisionLayers } from '../../ObjectColliderLibrary.js';
 import { createCollisionSourceId } from '../CollisionIds.js';
 import { COLLISION_LAYERS } from '../CollisionLayers.js';
-import { createCanonicalAabb } from '../colliders/ColliderBounds.js';
+import { collisionChunkForCanonical, createCanonicalAabb } from '../colliders/ColliderBounds.js';
 import {
   COLLIDER_TYPE_BOX,
   COLLIDER_TYPE_CAPSULE,
@@ -34,11 +34,17 @@ function layersFor(definition) {
   return COLLISION_LAYERS[key];
 }
 
+/**
+ * The third place this mapping was written by hand, and the third to omit the Z
+ * mirroring. It now delegates, so a collider's owner cannot disagree with the
+ * chunk `CollisionResidency` loads for the same point.
+ */
 function ownerChunk(rootMatrix, chunkWorldSize) {
-  return Object.freeze({
-    chunkX: Math.floor(rootMatrix.elements[12] / chunkWorldSize),
-    chunkZ: Math.floor(rootMatrix.elements[14] / chunkWorldSize),
-  });
+  return Object.freeze(collisionChunkForCanonical(
+    rootMatrix.elements[12],
+    rootMatrix.elements[14],
+    chunkWorldSize,
+  ));
 }
 
 function canonicalAabbFromBox(box) {
@@ -54,7 +60,11 @@ function canonicalAabbFromBox(box) {
 
 function yawFromQuaternion(quaternion) {
   LOCAL_X.set(1, 0, 0).applyQuaternion(quaternion);
-  return Math.atan2(-LOCAL_X.z, LOCAL_X.x);
+  // `+ 0` normalises the negative zero: an unrotated part has `LOCAL_X.z === 0`,
+  // and negating it hands `atan2` a -0, which it returns unchanged. That is
+  // arithmetically 0 but not `Object.is` equal to it, so an unrotated collider's
+  // yaw compared unequal to the 0 it should be.
+  return Math.atan2(-LOCAL_X.z, LOCAL_X.x) + 0;
 }
 
 function isTilted(quaternion) {
@@ -181,6 +191,13 @@ function transformDescription(description, rootMatrix) {
   throw new Error(`Unsupported object collider type: ${description.type}.`);
 }
 
+/**
+ * @param options.ownerChunk the chunk the caller has already decided owns this
+ *   object. The provider picks an owner from the placement's canonical centre in
+ *   order to filter candidates; deriving a second one here from the root matrix
+ *   let the two disagree for an object whose centre and origin straddle a chunk
+ *   boundary, and `replaceOwnerChunk` rejects the whole batch when they do.
+ */
 export function createObjectColliderRecords({
   object,
   definition,
@@ -188,6 +205,7 @@ export function createObjectColliderRecords({
   placement = null,
   descriptions,
   chunkWorldSize,
+  ownerChunk: ownerChunkOverride = null,
 }) {
   const layers = layersFor(definition);
   if (layers === null || descriptions.length === 0) return Object.freeze([]);
@@ -196,7 +214,7 @@ export function createObjectColliderRecords({
     object,
     resolvedPlacement.surface,
   );
-  const owner = ownerChunk(rootMatrix, chunkWorldSize);
+  const owner = ownerChunkOverride ?? ownerChunk(rootMatrix, chunkWorldSize);
   const records = descriptions.map((description) => {
     const transformed = transformDescription(description, rootMatrix);
     return createPrimitiveCollider({

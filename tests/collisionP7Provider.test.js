@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createCollisionSourceId } from '../src/editor/collision/CollisionIds.js';
 import { ConstructionCollisionProvider } from '../src/editor/collision/providers/ConstructionCollisionProvider.js';
 import { ConstructionCollisionSource } from '../src/editor/collision/providers/ConstructionCollisionSource.js';
 import { compileConstructionCollision } from '../src/editor/construction/compile/ConstructionCollisionCompiler.js';
@@ -63,8 +64,15 @@ test('elevated doorway bands preserve clearance above the highest grade', () => 
     ...provider.buildChunkData(-1, 0).colliders,
     ...provider.buildChunkData(0, 0).colliders,
   ];
+  // Built with the same helper the provider uses, not by concatenation: box ids
+  // themselves contain colons, so `createCollisionSourceId` percent-encodes each
+  // segment to keep the colon unambiguous as the separator.
   const lintel = colliders.find(
-    (collider) => collider.sourceId === `construction:${record.id}:${lintelBox.id}`,
+    (collider) => collider.sourceId === createCollisionSourceId(
+      'construction',
+      record.id,
+      lintelBox.id,
+    ),
   );
 
   assert.ok(lintel);

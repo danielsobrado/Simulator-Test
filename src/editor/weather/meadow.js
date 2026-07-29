@@ -3,10 +3,10 @@ import { getSunLightGpuAtlas } from "../_clod_shims/sun_light_gpu_atlas.js";
 import {
   DEFAULT_MEADOW_WEATHER_SETTINGS,
   MEADOW_CELL_SIZE,
+  MEADOW_MODE_VISUAL_AMOUNT,
   MEADOW_PARTICLE_COUNT
 } from "./meadow_defaults.js";
 import { createMeadowGeometry, createMeadowNodeMaterial, createMeadowShaderMaterial } from "./meadow_material.js";
-import { DEFAULT_MEADOW_WEATHER_SETTINGS as DEFAULT_MEADOW_WEATHER_SETTINGS2, MEADOW_CELL_SIZE as MEADOW_CELL_SIZE2, MEADOW_PARTICLE_COUNT as MEADOW_PARTICLE_COUNT2 } from "./meadow_defaults.js";
 class MeadowWeatherSystem {
   group = new THREE.Group();
   meadowMaterial;
@@ -109,8 +109,9 @@ function cloneSettings(settings) {
   };
 }
 export {
-  DEFAULT_MEADOW_WEATHER_SETTINGS2 as DEFAULT_MEADOW_WEATHER_SETTINGS,
-  MEADOW_CELL_SIZE2 as MEADOW_CELL_SIZE,
-  MEADOW_PARTICLE_COUNT2 as MEADOW_PARTICLE_COUNT,
+  DEFAULT_MEADOW_WEATHER_SETTINGS,
+  MEADOW_CELL_SIZE,
+  MEADOW_MODE_VISUAL_AMOUNT,
+  MEADOW_PARTICLE_COUNT,
   MeadowWeatherSystem
 };

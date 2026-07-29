@@ -399,3 +399,368 @@ test('wide soft-limestone joints still cover adjacent backing', () => {
     assert.ok(leftMax + 1e-6 >= rightMin);
   }
 });
+
+function packSoftLimestone(length = 12) {
+  const soft = constructionStyle('soft-limestone-rubble');
+  const record = normalizeConstructionRecord({
+    version: 1,
+    id: 'construction-soft',
+    revision: 1,
+    seed: 3141,
+    kind: 'wall',
+    style: { key: 'soft-limestone-rubble', version: 1 },
+    dimensions: { height: 3.5, thickness: 0.8 },
+    path: createCubicBezierPathFromStroke([
+      [0, 0], [length / 3, 0], [(length * 2) / 3, 0], [length, 0],
+    ], { simplifyTolerance: 0.01 }),
+    features: [],
+  });
+  const arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
+  const profile = createWallTopProfile(record, arcTable, { style: soft });
+  const packed = packCurvedWall({
+    arcTable,
+    arcRange: [0, arcTable.totalLength],
+    style: soft,
+    thickness: record.dimensions.thickness,
+    seed: record.seed,
+    seedOffset: 0,
+    topHeightAt: profile.heightAt,
+    ruinFactorAt: profile.ruinFactorAt,
+  });
+  return { record, arcTable, placements: packed.stones, soft };
+}
+
+function positionFingerprint(geometry) {
+  return Array.from(geometry.getAttribute('position').array);
+}
+
+test('soft limestone near field lattice stones use relief geometry', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const field = placements.filter((stone) => (
+    stone.category === 'field'
+    && stone.corners
+    && stone.width >= 0.32
+    && stone.height >= 0.18
+  ));
+  assert.ok(field.length > 0);
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(field.slice(0, 24), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'near',
+  });
+  assert.ok(built.stats.reliefStones > 0);
+  assert.equal(built.stats.reliefFallbacks, 0);
+  assert.equal(built.meshes.length, 2);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('soft limestone coarse field stones use soft-coarse geometry', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(placements.slice(0, 40), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+  });
+  assert.ok(built.stats.coarseSoftStones > 0);
+  assert.equal(built.stats.nearSoftStones, 0);
+  assert.equal(built.stats.reliefFallbacks, 0);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('legacy coursed rubble output remains without relief', () => {
+  const { record, arcTable, placements } = packStraight(8);
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(placements.slice(0, 40), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'near',
+  });
+  assert.equal(built.stats.reliefStones, 0);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('quoins voussoirs and coping do not use relief', () => {
+  const soft = constructionStyle('soft-limestone-rubble');
+  const path = createCubicBezierPathFromStroke([
+    [0, 0], [8, 0], [16, 0], [24, 0],
+  ], { simplifyTolerance: 0.01 });
+  const record = normalizeConstructionRecord({
+    version: 1,
+    id: 'construction-dressings',
+    revision: 1,
+    seed: 3141,
+    kind: 'wall',
+    style: { key: 'soft-limestone-rubble', version: 1 },
+    dimensions: { height: 3.5, thickness: 0.8 },
+    path,
+    features: [{
+      id: 'door-1',
+      kind: 'door',
+      segmentId: path.segments[0].id,
+      arcFraction: 0.5,
+      width: 2.2,
+      height: 2.6,
+      sill: 0,
+      profile: 'round',
+      dressed: true,
+      group: null,
+    }],
+  });
+  const arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
+  const profile = createWallTopProfile(record, arcTable, { style: soft });
+  const opening = {
+    id: 'door-1',
+    kind: 'door',
+    profile: 'round',
+    s: arcTable.totalLength * 0.5,
+    width: 2.2,
+    sill: 0,
+    height: 2.6,
+    dressed: true,
+    group: null,
+  };
+  const packed = packCurvedWall({
+    arcTable,
+    arcRange: [0, arcTable.totalLength],
+    style: soft,
+    thickness: record.dimensions.thickness,
+    seed: record.seed,
+    seedOffset: 0,
+    topHeightAt: profile.heightAt,
+    ruinFactorAt: profile.ruinFactorAt,
+    openings: [opening],
+  });
+  const dressings = packed.stones.filter((stone) => (
+    stone.category === 'quoin'
+    || stone.category === 'voussoir'
+    || stone.category === 'coping'
+  ));
+  assert.ok(dressings.length > 0, 'expected dressed stones');
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(dressings, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'near',
+  });
+  assert.equal(built.stats.reliefStones, 0);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('mortar descriptors stay identical with relief enabled and disabled', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const subset = placements.slice(0, 20);
+  const withRelief = [];
+  const withoutRelief = [];
+  for (const placement of subset) {
+    const shaped = {
+      width: placement.width,
+      height: placement.height,
+      depth: placement.depth,
+      position: [placement.s, placement.y, 0],
+      rotation: [0, 0, placement.roll ?? 0],
+      bevelRatio: 0.08,
+      skew: [0, 0],
+      protrusion: 0,
+    };
+    const params = {
+      width: placement.width,
+      height: placement.height,
+      depth: placement.depth,
+      position: shaped.position,
+      rotation: shaped.rotation,
+    };
+    const enabled = resolveStoneShape({
+      placement,
+      params,
+      shaped,
+      detail: 2,
+      relief: { enabled: true, front: { enabled: true }, back: { enabled: true } },
+    });
+    const disabled = resolveStoneShape({
+      placement,
+      params,
+      shaped,
+      detail: 2,
+      relief: null,
+    });
+    withRelief.push(createMortarDescriptor({ placement, stoneShape: enabled }));
+    withoutRelief.push(createMortarDescriptor({ placement, stoneShape: disabled }));
+  }
+  assert.deepEqual(withRelief, withoutRelief);
+});
+
+test('relief geometry does not exceed original stone footprint bounds', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const field = placements.filter((stone) => (
+    stone.category === 'field' && stone.corners && stone.width >= 0.32 && stone.height >= 0.18
+  )).slice(0, 8);
+  const materials = materialsFor(record);
+  const relieved = buildModuleMasonry(field, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+  });
+  const flat = buildModuleMasonry(field, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    disableRelief: true,
+  });
+  const relievedBox = relieved.meshes[1].geometry.boundingBox;
+  const flatBox = flat.meshes[1].geometry.boundingBox;
+  const epsilon = 0.01;
+  assert.ok(relievedBox.min.x >= flatBox.min.x - epsilon);
+  assert.ok(relievedBox.max.x <= flatBox.max.x + epsilon);
+  assert.ok(relievedBox.min.y >= flatBox.min.y - epsilon);
+  assert.ok(relievedBox.max.y <= flatBox.max.y + epsilon);
+  assert.ok(relievedBox.min.z >= flatBox.min.z - epsilon);
+  assert.ok(relievedBox.max.z <= flatBox.max.z + epsilon);
+  for (const mesh of [...relieved.meshes, ...flat.meshes]) mesh.geometry.dispose();
+});
+
+test('deterministic rebuild produces identical stone positions', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const subset = placements.slice(0, 16);
+  const materials = materialsFor(record);
+  const first = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+  });
+  const firstPositions = positionFingerprint(first.meshes[1].geometry);
+  for (const mesh of first.meshes) mesh.geometry.dispose();
+  const second = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+  });
+  assert.deepEqual(positionFingerprint(second.meshes[1].geometry), firstPositions);
+  for (const mesh of second.meshes) mesh.geometry.dispose();
+});
+
+test('soft limestone near field stones receive edge wear', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const field = placements.filter((stone) => (
+    stone.category === 'field'
+    && stone.corners
+    && stone.width >= 0.32
+    && stone.height >= 0.18
+    && stone.depth >= 0.2
+  ));
+  const materials = materialsFor(record);
+  const built = buildModuleMasonry(field.slice(0, 24), {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'near',
+  });
+  assert.ok(built.stats.edgeWearEligible > 0);
+  assert.ok(built.stats.edgeWearStones > 0);
+  assert.ok(built.stats.edgeWearFallbacks / Math.max(1, built.stats.edgeWearEligible) < 0.05);
+  assert.equal(built.meshes.length, 2);
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('coarse soft limestone applies reduced soft geometry for field stones', () => {
+  const { record, arcTable, placements } = packSoftLimestone(8);
+  const materials = materialsFor(record);
+  const coarse = coarsePlacements(placements.slice(0, 80), {
+    styleKey: 'soft-limestone-rubble',
+  });
+  const built = buildModuleMasonry(coarse, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+  });
+  assert.ok(built.stats.coarseSoftStones > 0);
+  assert.ok(built.stats.edgeWearStones > 0);
+  assert.ok(built.stats.nearSoftStones === 0);
+  const stone = built.meshes.find((mesh) => (
+    mesh.userData.constructionMaterialSlot === CONSTRUCTION_MATERIAL_SLOT.STONE
+  ));
+  assert.equal(stone.userData.constructionGeometryTier, 'coarse-soft');
+  assert.equal(stone.userData.constructionLodBand, 'coarse');
+  for (const mesh of built.meshes) mesh.geometry.dispose();
+});
+
+test('soft-coarse mortar descriptors match legacy-coarse mortar descriptors', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const materials = materialsFor(record);
+  const coarse = coarsePlacements(placements.slice(0, 24), {
+    styleKey: 'soft-limestone-rubble',
+  });
+  const softCoarse = buildModuleMasonry(coarse, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+  });
+  const legacyCoarse = buildModuleMasonry(coarse, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    lodBand: 'coarse',
+    disableRelief: true,
+    disableEdgeWear: true,
+  });
+  assert.equal(softCoarse.stats.mortarPrisms, legacyCoarse.stats.mortarPrisms);
+  assert.equal(softCoarse.stats.mortarTriangles, legacyCoarse.stats.mortarTriangles);
+  for (const mesh of [...softCoarse.meshes, ...legacyCoarse.meshes]) {
+    mesh.geometry.dispose();
+  }
+});
+
+test('mortar descriptors stay identical with edge wear enabled and disabled', () => {
+  const { record, arcTable, placements } = packSoftLimestone(6);
+  const materials = materialsFor(record);
+  const subset = placements.slice(0, 16);
+  const withWear = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+  });
+  const withoutWear = buildModuleMasonry(subset, {
+    record,
+    materials,
+    arcTable,
+    moduleOrigin: { x: 0, z: 0 },
+    groundHeightAt: () => 0,
+    disableEdgeWear: true,
+  });
+  assert.equal(withWear.stats.mortarTriangles, withoutWear.stats.mortarTriangles);
+  assert.equal(withWear.stats.mortarPrisms, withoutWear.stats.mortarPrisms);
+  for (const mesh of [...withWear.meshes, ...withoutWear.meshes]) mesh.geometry.dispose();
+});

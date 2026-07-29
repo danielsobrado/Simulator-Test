@@ -5,12 +5,43 @@
  */
 
 import { TILE_BY_ID, hexToRgbBytes } from '../tileCatalog.js';
+import { halfToFloat } from '../water/WaterField.js';
 
 const DIST_INF = 1e9;
 const SQRT2 = Math.SQRT2;
+const WATER_FIELD_CHANNELS = 4;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function smoothstep(edge0, edge1, value) {
+  const t = clamp((value - edge0) / Math.max(edge1 - edge0, 1e-9), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Water occupancy of one cell, as the wettest of its four corner vertices.
+ *
+ * The water surface is drawn from this field, so classifying land from the
+ * marine tile id alone leaves the two disagreeing about where the bank is:
+ * every lake and river reads as dry, and even on a marine coast the tile edge
+ * falls a whole cell away from the waterline. Grass then grows out into the
+ * shallows. Reading the same field the surface reads puts both on one bank.
+ */
+function sampleCellWaterOccupancy(field, localX, localZ, waterlineDepth) {
+  let occupancy = 0;
+  for (let cornerZ = 0; cornerZ <= 1; cornerZ += 1) {
+    for (let cornerX = 0; cornerX <= 1; cornerX += 1) {
+      const index = ((localZ + cornerZ) * field.width + (localX + cornerX))
+        * WATER_FIELD_CHANNELS;
+      const coverage = clamp(halfToFloat(field.pixels[index]), 0, 1);
+      if (coverage <= 0) continue;
+      const depth = Math.max(0, halfToFloat(field.pixels[index + 2]));
+      occupancy = Math.max(occupancy, coverage * smoothstep(0, waterlineDepth, depth));
+    }
+  }
+  return occupancy;
 }
 
 export function getSurfaceMaskSearchRadius(blendCells) {
@@ -23,6 +54,13 @@ export function createSurfaceMaskConfig(stylizedConfig) {
     roadTileId: stylizedConfig?.path?.tileId ?? 13,
     waterTileId: stylizedConfig?.water?.tileId ?? 0,
     grassTileIds: [...(stylizedConfig?.grass?.tileIds ?? [3, 4, 5, 6, 7, 8, 9, 12, 14])],
+    // Depth at which a cell counts as fully wet for surface classification.
+    // Roughly a grass blade's height: shallower than this and blades still
+    // read as bank growth standing in the margin rather than drowned ones.
+    waterlineDepth: Math.max(
+      0.01,
+      stylizedConfig?.water?.optics?.shorelineFadeDepth ?? 0.35,
+    ),
   };
 }
 
@@ -129,8 +167,15 @@ export function buildSurfaceMaskPixels({
   chunkSize,
   sampleTile,
   maskConfig,
+  waterField = null,
 }) {
   const blendCells = Math.max(0.5, maskConfig.blendCells);
+  const waterlineDepth = Math.max(0.01, maskConfig.waterlineDepth ?? 0.35);
+  const usableWaterField = waterField?.pixels
+    && waterField.width === chunkSize + 1
+    && waterField.height === chunkSize + 1
+    ? waterField
+    : null;
   const searchRadius = getSurfaceMaskSearchRadius(blendCells);
   const roadTileId = maskConfig.roadTileId;
   const waterTileId = maskConfig.waterTileId;
@@ -156,9 +201,13 @@ export function buildSurfaceMaskPixels({
         : 0;
       const tileId = tiles[cellIndex];
       const offset = cellIndex * 4;
+      const tileWater = tileId === waterTileId ? 1 : 0;
+      const fieldWater = usableWaterField
+        ? sampleCellWaterOccupancy(usableWaterField, localX, localZ, waterlineDepth)
+        : 0;
       mask[offset] = Math.round(pathInfluence * 255);
       mask[offset + 1] = grassTileIds.has(tileId) ? 255 : 0;
-      mask[offset + 2] = tileId === waterTileId ? 255 : 0;
+      mask[offset + 2] = Math.round(Math.max(tileWater, fieldWater) * 255);
       mask[offset + 3] = 255;
     }
   }
@@ -168,6 +217,9 @@ export function buildSurfaceMaskPixels({
 
 /**
  * Attach tilePixels + surfaceMaskPixels to a page. Mutates and returns page.
+ *
+ * Runs after enrichPageWaterField so the water class can be read from the same
+ * field the water surface is drawn from.
  */
 export function enrichPageRenderPixels(page, sampleTile, maskConfig, tileDefinitions = null) {
   const chunkSize = Math.sqrt(page.tiles.length) | 0;
@@ -179,6 +231,13 @@ export function enrichPageRenderPixels(page, sampleTile, maskConfig, tileDefinit
     chunkSize,
     sampleTile,
     maskConfig,
+    waterField: page.waterFieldPixels
+      ? {
+        pixels: page.waterFieldPixels,
+        width: page.waterFieldWidth,
+        height: page.waterFieldHeight,
+      }
+      : null,
   });
   page.renderPixelsDirty = false;
   return page;

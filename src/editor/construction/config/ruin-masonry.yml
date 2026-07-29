@@ -1,0 +1,80 @@
+version: 1
+
+defaults:
+  enabled: true
+
+  macro:
+    wavelength: 6.3
+    fineWavelengthRatio: 0.31
+    lowWeight: 0.72
+    fineWeight: 0.38
+    bias: -0.12
+    collapseDepth: 0.82
+    minimumHeight: 0.20
+
+  damage:
+    reach:
+      base: 0.35
+      perFactor: 1.60
+
+    probability:
+      base: 0.10
+      topProximity: 0.48
+      clusterInfluence: 0.38
+      stoneNoiseInfluence: 0.10
+      removeThreshold: 0.58
+
+    cluster:
+      wavelength: 2.4
+      fineWavelengthRatio: 0.43
+      minimumWidth: 0.90
+      preferredWidth: 2.20
+      severeThreshold: 0.78
+      isolatedHoleThreshold: 0.90
+
+    protectedFooting:
+      courses: 1
+      minimumHeight: 0.32
+
+  support:
+    minimumOverlapRatio: 0.34
+    strongOverlapRatio: 0.56
+    minimumAbsoluteOverlap: 0.10
+    maximumCantilever: 0.22
+    verticalTolerance: 0.09
+    foundationTolerance: 0.14
+    maximumPropagationSteps: 32
+
+  crown:
+    removeUnsupportedPinnacles: true
+    maximumUnsupportedToothCourses: 0
+    maximumSupportedToothCourses: 3
+    minimumToothWidth: 0.22
+    isolatedToothStrongSupport: 0.62
+    maximumBridgeSpan: 0.24
+
+  openings:
+    protectLowerJambs: true
+    jambMinimumSupport: 0.42
+    archRequiresBothSprings: true
+    removeFloatingKeystone: true
+    springFieldSupportRatio: 0.48
+    voussoirContactRatio: 0.22
+    partialArchMaxCantilever: 0.18
+
+  lod:
+    preserveDamageVoids: true
+    coarseMayMergeAcrossClusters: false
+    shellSampleSpacing: 0.35
+
+styles:
+  soft-limestone-rubble:
+    damage:
+      cluster:
+        wavelength: 2.8
+        minimumWidth: 1.00
+        preferredWidth: 2.60
+
+    support:
+      minimumOverlapRatio: 0.36
+      strongOverlapRatio: 0.58

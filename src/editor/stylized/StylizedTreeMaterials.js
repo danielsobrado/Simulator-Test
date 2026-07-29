@@ -21,6 +21,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import { authoredTexture } from './AuthoredTextureNode.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { registerTreeWindTime } from './forest/TreeWindTime.js';
 
@@ -97,7 +98,7 @@ export function createStylizedLeafMaterial({
     gradient,
   );
   const baseColor = preserveSourceColor && map
-    ? texture(map, uv()).rgb.mul(colorNode(source?.color ?? '#ffffff'))
+    ? authoredTexture(map).rgb.mul(colorNode(source?.color ?? '#ffffff'))
     : paletteColor;
   const variation = stylizedFbm(
     positionLocal.xz.add(positionLocal.y).mul(config.trees.variationScale),
@@ -116,7 +117,7 @@ export function createStylizedLeafMaterial({
   material.positionNode = finalPosition;
   material.colorNode = applyCanopyRim(leafColor, config, palette);
   if (map) {
-    material.opacityNode = texture(map, uv()).a;
+    material.opacityNode = authoredTexture(map).a;
     material.alphaTest = alphaTest > 0
       ? alphaTest
       : (source?.alphaTest > 0 ? source.alphaTest : 0.5);
@@ -149,7 +150,7 @@ export function createAuthoredTrunkMaterial({
     });
     const baseColor = colorNode(source?.color ?? '#ffffff');
     material.colorNode = sourceMap
-      ? texture(sourceMap, uv()).rgb.mul(baseColor)
+      ? authoredTexture(sourceMap).rgb.mul(baseColor)
       : baseColor;
     return material;
   }

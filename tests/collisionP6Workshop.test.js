@@ -80,7 +80,7 @@ test('a workshop definition registered after boot receives a bounded solid envel
     rotation: 0,
   });
 
-  const built = provider.buildChunkData(0, -1);
+  const built = provider.buildChunkData(0, 0);
   assert.equal(provider.getProfileCount(), 2);
   assert.equal(built.colliders.length, 1);
   assert.equal(built.colliders[0].sourceId, `object:${placed.id}:wall`);

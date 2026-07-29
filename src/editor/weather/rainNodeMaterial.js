@@ -24,6 +24,7 @@ import {
   vec4
 } from "three/tsl";
 import { fbm, hash12, hardSplashFragment, waterSplashFragment } from "./rain_node_material_helpers.js";
+import { RAIN_IMPACT_PROFILE } from "./rain_constants.js";
 function makeMat(name, frag, pos) {
   const m = new MeshBasicNodeMaterial();
   m.name = name;
@@ -164,8 +165,9 @@ function createStormNodeMaterial() {
   return makeHandle(makeMat("weather-storm-node", frag()), uT, uI);
 }
 function createSplashNodeMaterial(kind) {
-  const uT = uniform(0), uRate = uniform(kind === "hard" ? 1.72 : 1.18), uI = uniform(1);
-  const uCol = uniform(new THREE.Color(kind === "hard" ? 14282751 : 10479359)), uOp = uniform(kind === "hard" ? 0.84 : 0.48);
+  const profile = RAIN_IMPACT_PROFILE[kind];
+  const uT = uniform(0), uRate = uniform(profile.rate), uI = uniform(1);
+  const uCol = uniform(new THREE.Color(kind === "hard" ? 14282751 : 10479359)), uOp = uniform(profile.opacity);
   const aC = attribute("aSplashCenter", "vec3"), aN = attribute("aSplashNormal", "vec3");
   const aP = attribute("aSplashParams", "vec4"), sPos = positionGeometry;
   const age = fract(uT.mul(uRate).add(aP.y));
@@ -177,7 +179,7 @@ function createSplashNodeMaterial(kind) {
   const ref = abs(n.y).lessThan(0.95).select(vec3(0, 1, 0), vec3(1, 0, 0));
   const tangent = normalize(cross(ref, n));
   const bitangent = normalize(cross(n, tangent));
-  const wPos = aC.add(tangent.mul(local.x).add(bitangent.mul(local.y)).mul(scale)).add(n.mul(0.035));
+  const wPos = aC.add(tangent.mul(local.x).add(bitangent.mul(local.y)).mul(scale)).add(n.mul(profile.surfaceOffset));
   const frag = kind === "hard" ? hardSplashFragment(age, aP, uCol, uOp, uI) : waterSplashFragment(age, aP, uCol, uOp, uI);
   return makeHandle(makeMat(`weather-${kind}-splash-node`, frag, wPos), uT, uI);
 }

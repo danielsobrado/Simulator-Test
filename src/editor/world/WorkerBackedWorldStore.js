@@ -126,18 +126,21 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
       ?? this.surfaceMaskConfig;
     delete page.grassScatter;
     delete page.flowerScatter;
-    enrichPageRenderPixels(
-      page,
-      (cellX, cellZ) => this.getTile(cellX, cellZ),
-      maskConfig,
-      (tileId) => this.generator.getTileDefinition?.(tileId),
-    );
+    // Water first, as in generateBaseWorldChunk: the surface mask classifies
+    // land from this field, so rebuilding the mask against the pre-edit field
+    // would leave the bank a revision behind the water the edit just moved.
     const waterStartedAt = performance.now();
     enrichPageWaterField(
       page,
       (cellX, cellZ) => sampleWorldStoreWater(this, cellX, cellZ),
     );
     recordWaterGeneration(page, performance.now() - waterStartedAt);
+    enrichPageRenderPixels(
+      page,
+      (cellX, cellZ) => this.getTile(cellX, cellZ),
+      maskConfig,
+      (tileId) => this.generator.getTileDefinition?.(tileId),
+    );
     return page;
   }
 

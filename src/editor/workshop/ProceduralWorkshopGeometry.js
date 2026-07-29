@@ -151,8 +151,19 @@ function shortestEdgeLength(ring) {
  * still measures its nominal size. Returns null on a degenerate ring so the
  * caller can fall back.
  */
-function insetRing(ring, radius) {
+export function insetRing(ring, radius) {
+  return insetRingVariable(ring, ring.map(() => radius));
+}
+
+/**
+ * Offset each edge by its own inset distance and re-intersect neighbours.
+ *
+ * `edgeInset[i]` applies to the edge from ring[i] → ring[(i+1)%n]. Interior lies
+ * to the left of travel on a counter-clockwise ring. Returns null on collapse.
+ */
+export function insetRingVariable(ring, edgeInset) {
   const count = ring.length;
+  if (edgeInset.length !== count) return null;
   const lines = [];
   for (let index = 0; index < count; index += 1) {
     const [x0, y0] = ring[index];
@@ -160,11 +171,11 @@ function insetRing(ring, radius) {
     const dx = x1 - x0;
     const dy = y1 - y0;
     const length = Math.hypot(dx, dy);
-    if (!(length > 1e-9)) return null;
-    // The interior lies to the left of travel on a counter-clockwise ring.
+    const inset = edgeInset[index];
+    if (!(length > 1e-9) || !(inset >= 0) || !Number.isFinite(inset)) return null;
     lines.push({
-      x: x0 + (-dy / length) * radius,
-      y: y0 + (dx / length) * radius,
+      x: x0 + (-dy / length) * inset,
+      y: y0 + (dx / length) * inset,
       dx: dx / length,
       dy: dy / length,
     });
@@ -176,13 +187,15 @@ function insetRing(ring, radius) {
     const cross = a.dx * b.dy - a.dy * b.dx;
     if (Math.abs(cross) < 1e-6) return null;
     const t = ((b.x - a.x) * b.dy - (b.y - a.y) * b.dx) / cross;
-    inset.push([a.x + a.dx * t, a.y + a.dy * t]);
+    const point = [a.x + a.dx * t, a.y + a.dy * t];
+    if (!point.every(Number.isFinite)) return null;
+    inset.push(point);
   }
   return inset;
 }
 
 /** An inset that swallowed the ring flips an edge or collapses the area. */
-function insetSurvived(ring, inset) {
+export function insetSurvived(ring, inset) {
   if (!(polygonArea(inset) > 1e-8)) return false;
   for (let index = 0; index < inset.length; index += 1) {
     const next = (index + 1) % inset.length;
@@ -193,6 +206,142 @@ function insetSurvived(ring, inset) {
     if (originalX * insetX + originalY * insetY <= 0) return false;
   }
   return true;
+}
+
+function pointInPolygon(point, ring) {
+  // Ray cast; treats boundary as inside.
+  const [px, py] = point;
+  let inside = false;
+  for (let index = 0, j = ring.length - 1; index < ring.length; j = index, index += 1) {
+    const [xi, yi] = ring[index];
+    const [xj, yj] = ring[j];
+    const denom = yj - yi || 1e-15;
+    const intersect = ((yi > py) !== (yj > py))
+      && (px < ((xj - xi) * (py - yi)) / denom + xi);
+    if (intersect) inside = !inside;
+  }
+  // Also accept points extremely close to an edge.
+  for (let index = 0; index < ring.length; index += 1) {
+    const [x0, y0] = ring[index];
+    const [x1, y1] = ring[(index + 1) % ring.length];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const lengthSq = dx * dx + dy * dy;
+    if (!(lengthSq > 0)) continue;
+    const t = clamp01(((px - x0) * dx + (py - y0) * dy) / lengthSq);
+    const qx = x0 + dx * t;
+    const qy = y0 + dy * t;
+    if (Math.hypot(px - qx, py - qy) <= 1e-6) return true;
+  }
+  return inside;
+}
+
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function segmentsIntersectProperly(a0, a1, b0, b1) {
+  const orient = (p, q, r) => {
+    const value = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
+    if (Math.abs(value) < 1e-12) return 0;
+    return value > 0 ? 1 : 2;
+  };
+  const o1 = orient(a0, a1, b0);
+  const o2 = orient(a0, a1, b1);
+  const o3 = orient(b0, b1, a0);
+  const o4 = orient(b0, b1, a1);
+  return o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4;
+}
+
+function ringSelfIntersects(ring) {
+  const count = ring.length;
+  for (let i = 0; i < count; i += 1) {
+    const a0 = ring[i];
+    const a1 = ring[(i + 1) % count];
+    for (let j = i + 1; j < count; j += 1) {
+      if (Math.abs(i - j) <= 1 || (i === 0 && j === count - 1)) continue;
+      const b0 = ring[j];
+      const b1 = ring[(j + 1) % count];
+      // Skip adjacent edges that share a vertex.
+      if (
+        (i + 1) % count === j
+        || (j + 1) % count === i
+      ) continue;
+      if (segmentsIntersectProperly(a0, a1, b0, b1)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate a variable inset against masonry safeguards.
+ *
+ * @returns {{valid:boolean, reason?:string, areaRatio?:number}}
+ */
+export function variableInsetSurvived(sourceRing, inset, safeguards = {}) {
+  if (!inset || inset.length !== sourceRing.length) {
+    return { valid: false, reason: 'source-ring-invalid' };
+  }
+  for (const point of inset) {
+    if (!point.every(Number.isFinite)) {
+      return { valid: false, reason: 'non-finite-vertex' };
+    }
+  }
+  const sourceArea = polygonArea(sourceRing);
+  const insetArea = polygonArea(inset);
+  if (!(Math.abs(sourceArea) > 1e-8)) {
+    return { valid: false, reason: 'source-ring-invalid' };
+  }
+  if (!(insetArea > 1e-8)) {
+    return { valid: false, reason: 'minimum-face-area', areaRatio: 0 };
+  }
+  if (Math.sign(insetArea) !== Math.sign(sourceArea)) {
+    return { valid: false, reason: 'variable-inset-self-intersection' };
+  }
+  if (!insetSurvived(sourceRing, inset)) {
+    return { valid: false, reason: 'variable-inset-self-intersection' };
+  }
+  if (ringSelfIntersects(inset)) {
+    return { valid: false, reason: 'variable-inset-self-intersection' };
+  }
+  const areaRatio = insetArea / sourceArea;
+  const minimumAreaRatio = safeguards.minimumFaceAreaRatio ?? 0.58;
+  if (areaRatio < minimumAreaRatio) {
+    return { valid: false, reason: 'minimum-face-area', areaRatio };
+  }
+  const minimumEdgeLength = safeguards.minimumEdgeLength ?? 0.06;
+  const maximumInsetEdgeRatio = safeguards.maximumInsetEdgeRatio ?? 0.28;
+  for (let index = 0; index < inset.length; index += 1) {
+    const next = (index + 1) % inset.length;
+    const edgeLength = Math.hypot(
+      inset[next][0] - inset[index][0],
+      inset[next][1] - inset[index][1],
+    );
+    if (edgeLength < minimumEdgeLength) {
+      return { valid: false, reason: 'minimum-edge-length' };
+    }
+    const sourceLength = Math.hypot(
+      sourceRing[next][0] - sourceRing[index][0],
+      sourceRing[next][1] - sourceRing[index][1],
+    );
+    // Approximate per-edge inset from corner displacement.
+    const midSource = [
+      (sourceRing[index][0] + sourceRing[next][0]) / 2,
+      (sourceRing[index][1] + sourceRing[next][1]) / 2,
+    ];
+    const midInset = [
+      (inset[index][0] + inset[next][0]) / 2,
+      (inset[index][1] + inset[next][1]) / 2,
+    ];
+    const insetDistance = Math.hypot(midInset[0] - midSource[0], midInset[1] - midSource[1]);
+    if (insetDistance > sourceLength * maximumInsetEdgeRatio + 1e-6) {
+      return { valid: false, reason: 'maximum-inset-edge-ratio' };
+    }
+    if (!pointInPolygon(inset[index], sourceRing)) {
+      return { valid: false, reason: 'outside-source-ring' };
+    }
+  }
+  return { valid: true, areaRatio };
 }
 
 function scaleAboutCentroid(ring, factor) {
@@ -208,6 +357,45 @@ function scaleAboutCentroid(ring, factor) {
     centroidX + (x - centroidX) * factor,
     centroidY + (y - centroidY) * factor,
   ]);
+}
+
+/**
+ * Shared bevel-profile solve for an arbitrary planar quad.
+ *
+ * Normalises winding, picks a safe bevel radius from the shortest edge, insets
+ * the ring, and falls back to centroid scaling when the inset collapses. Used by
+ * both the flat `beveledQuadPrism` extrusion and the pillowed relief builder so
+ * the two stay in lockstep on footprint and depth.
+ *
+ * @param options.corners four `[x, y]` pairs in the unit's own face plane,
+ *   already centred on the unit origin. Winding is fixed up here.
+ */
+export function createBeveledQuadProfile({
+  corners,
+  depth,
+  bevelRatio = 0.055,
+}) {
+  const ring = corners.map(([x, y]) => [x, y]);
+  if (polygonArea(ring) < 0) ring.reverse();
+
+  const edge = shortestEdgeLength(ring);
+  const radius = Math.max(1e-4, Math.min(edge, depth) * bevelRatio);
+  const offset = insetRing(ring, radius);
+  // A sliver whose inset swallowed itself would hand `ExtrudeGeometry` a
+  // self-intersecting shape, which triangulates into inverted faces. Shrinking
+  // about the centroid instead is always simple and keeps the winding.
+  const profile = offset && insetSurvived(ring, offset)
+    ? offset
+    : scaleAboutCentroid(ring, Math.max(0.3, 1 - (2 * radius) / Math.max(edge, 1e-4)));
+  const extrusionDepth = Math.max(0.02, depth - radius * 2);
+
+  return {
+    ring,
+    profile,
+    radius,
+    extrusionDepth,
+    insetSucceeded: Boolean(offset && insetSurvived(ring, offset)),
+  };
 }
 
 /**
@@ -241,18 +429,11 @@ export function beveledQuadPrism({
   detail = 2,
   bevelRatio = 0.055,
 }) {
-  const ring = corners.map(([x, y]) => [x, y]);
-  if (polygonArea(ring) < 0) ring.reverse();
-
-  const edge = shortestEdgeLength(ring);
-  const radius = Math.max(1e-4, Math.min(edge, depth) * bevelRatio);
-  const offset = insetRing(ring, radius);
-  // A sliver whose inset swallowed itself would hand `ExtrudeGeometry` a
-  // self-intersecting shape, which triangulates into inverted faces. Shrinking
-  // about the centroid instead is always simple and keeps the winding.
-  const profile = offset && insetSurvived(ring, offset)
-    ? offset
-    : scaleAboutCentroid(ring, Math.max(0.3, 1 - (2 * radius) / Math.max(edge, 1e-4)));
+  const { profile, radius, extrusionDepth } = createBeveledQuadProfile({
+    corners,
+    depth,
+    bevelRatio,
+  });
 
   const shape = new THREE.Shape();
   shape.moveTo(profile[0][0], profile[0][1]);
@@ -261,7 +442,6 @@ export function beveledQuadPrism({
   }
   shape.closePath();
 
-  const extrusionDepth = Math.max(0.02, depth - radius * 2);
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: extrusionDepth,
     steps: 1,

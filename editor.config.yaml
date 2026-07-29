@@ -871,8 +871,14 @@ stylizedSurface:
     # the colony rule rejects lotus everywhere else, while rooted plants remain
     # sparse enough for the six shared instanced renderers.
     perChunk: 24
-    # Marine and wetland are canonical Azgaar IDs 0 and 12.
-    tileIds: [0, 12]
+    # Water is a field laid over the terrain, not a biome, so a lake or river
+    # covering grassland leaves those cells classified as their dry biome. A
+    # marine/wetland-only gate therefore rejects every candidate in inland
+    # water before the placement rule can look at it, and those bodies come out
+    # empty. Admit the biomes that can flood — deserts (1, 2) and glacier (11)
+    # stay out so oases and ice keep bare beds — and let the water rule below
+    # decide on coverage, depth, shore distance and current.
+    tileIds: [0, 3, 4, 5, 6, 7, 8, 9, 10, 12]
     minScale: 0.78
     maxScale: 1.3
     radius: 0.42
@@ -1075,11 +1081,11 @@ stylizedSurface:
       decay: 0.92
       weight: 0.35
       exposure: 0.85
-      # Keep screen-space dust subtle; stronger moving grain reads as flicker
-      # once bright shafts cross detailed foliage.
-      dustStrength: 0.04
-      dustScale: 3
-      dustSpeed: 0.008
+      # A broad, smoothly advected density field breaks rigid spokes into soft
+      # evolving volumes without screen-pixel shimmer.
+      dustStrength: 0.65
+      dustScale: 4.5
+      dustSpeed: 0.04
       # Cloud colour remains softly translucent, but its denser transmission
       # mask can still carve strong shafts around the sun.
       cloudOcclusion: 0.9
@@ -1115,7 +1121,7 @@ stylizedSurface:
     sunEmission: 1.4
     sunGlowFalloff: 53
     sunGlowIntensity: 0.45
-    cloudSpeed: 0.012
+    cloudSpeed: 0.02
     cloudScale: 8.5
     cloudDensity: 0.36
     cloudSharpness: 0.05

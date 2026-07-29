@@ -1,4 +1,5 @@
 import { constructionJointProfile } from '../config/ConstructionJointProfiles.generated.js';
+import { constructionRuinProfile } from '../config/ConstructionRuinConfig.generated.js';
 import { packCourse } from '../../workshop/ProceduralWorkshopCoursePacker.js';
 import { createRandom, mixSeed } from '../../workshop/ProceduralRandom.js';
 import { layoutOpening, openingHalfWidthAt, survivingIntervals } from './OpeningLayout.js';
@@ -6,11 +7,17 @@ import {
   createBedField,
   jointTilt,
   resolveCellCorners,
+  resolveLeafFaces,
   scaleCorners,
   splitCell,
 } from './CourseLattice.js';
 import { clampJointWidths, sampleJointWidths } from './JointWidthField.js';
 import { layoutMerlon } from './MerlonOrnament.js';
+import { CONSTRUCTION_SUPPORT_ROLE } from './ConstructionSupportRoles.js';
+import {
+  createRuinDamageField,
+  isProtectedFooting,
+} from './RuinDamageField.js';
 
 /**
  * Course-solve a curved wall in arc length.
@@ -53,7 +60,6 @@ const COPING_HEIGHT = 0.16;
 /** How far coping oversails the wall face, as a fraction of thickness. */
 const COPING_OVERSAIL = 1.14;
 
-const RUIN_HASH = 0x6ec1b5f3;
 const SHAPE_HASH = 0x27d4eb2d;
 const BOUNDARY_HASH = 0x1b873593;
 
@@ -132,27 +138,14 @@ export function chordSagitta(width, curvature) {
 }
 
 /**
- * Collapse eats the top courses first and leaves a footing, which is what makes
- * a ruin read as masonry that fell rather than as vertical noise.
- *
- * Keyed on `stableIndex` rather than on a sequential PRNG draw: a stone's fate
- * must not depend on how many stones happened to survive before it, or raising
- * one end of a wall would re-roll the other end.
- */
-function shouldDropRuinStone(ruinFactor, y, localTop, seed, stableIndex) {
-  if (ruinFactor <= 0) return false;
-  const topDistance = Math.max(0, localTop - y);
-  const reach = 0.35 + ruinFactor * 1.6;
-  const proximity = Math.max(0, 1 - topDistance / reach);
-  const chance = ruinFactor * (0.12 + proximity * 0.62);
-  return hashUnit(seed ^ RUIN_HASH, stableIndex) < chance;
-}
-
-/**
  * @param options.arcRange `[s0, s1]` — this module's slice of the path.
  * @param options.topHeightAt `(s) => number` height above grade, from `WallTopProfile`.
  * @param options.ruinFactorAt `(s) => 0..1`, from `WallTopProfile`.
+ * @param options.ruinStateAt `(s) => { factor, nominalHeight, collapsedHeight }`.
  * @param options.seedOffset module index, so each module forks the stream.
+ * @param options.deferRuinRemoval when true (ruined walls), emit damage
+ *   candidates instead of dropping stones inline — the wall-wide support
+ *   resolver owns final removal.
  */
 export function packCurvedWall({
   arcTable,
@@ -163,6 +156,7 @@ export function packCurvedWall({
   seedOffset = 0,
   topHeightAt,
   ruinFactorAt = () => 0,
+  ruinStateAt = null,
   slopeAt = () => 0,
   crenellationsOver = () => [],
   topStyle = 'flat',
@@ -187,15 +181,30 @@ export function packCurvedWall({
    */
   heightReference = null,
   budget = MAX_MODULE_STONES,
+  deferRuinRemoval = topStyle === 'ruined',
 }) {
   const [s0, s1] = arcRange;
   const span = s1 - s0;
   const stones = [];
   const jointProfile = constructionJointProfile(style.key);
+  const ruinProfile = constructionRuinProfile(style.key);
+  const ruinField = deferRuinRemoval
+    ? createRuinDamageField({
+      seed,
+      profile: ruinProfile,
+      ruinFactorAt,
+    })
+    : null;
+  const resolveRuinState = ruinStateAt ?? ((s) => Object.freeze({
+    factor: ruinFactorAt(s),
+    nominalHeight: topHeightAt(s),
+    collapsedHeight: topHeightAt(s),
+  }));
   const stats = {
     courses: 0,
     stones: 0,
     dropped: 0,
+    ruinCandidates: 0,
     overBudget: false,
     targetWidth: style.targetWidth,
     jointSamples: 0,
@@ -368,29 +377,72 @@ export function packCurvedWall({
         },
       );
 
-      for (let ordinal = 0; ordinal < leaves.length; ordinal += 1) {
-        const leaf = leaves[ordinal];
+      // Both tilts come from the joint's own arc position, so the neighbour
+      // sharing that joint — in this cell, the next cell, or the next module —
+      // resolves the identical corner and the two stones meet exactly.
+      //
+      // Resolved as a set rather than one at a time: where the wall-top clamp
+      // collapses a leaf, its band goes to the leaf below instead of vanishing
+      // and leaving a notch under the coping.
+      const resolved = resolveLeafFaces(leaves, {
+        bedOffset,
+        courseHeight,
+        ceilingAt: bodyHeightAt,
+        minHeight: MIN_LEAF_HEIGHT,
+        resolveTilt: tiltAt,
+      });
+
+      for (let ordinal = 0; ordinal < resolved.leaves.length; ordinal += 1) {
+        const leaf = resolved.leaves[ordinal];
         const index = baseIndex + cell * LEAVES_PER_CELL + ordinal;
         const leafWidth = leaf.s1 - leaf.s0;
         const leafCenter = (leaf.s0 + leaf.s1) / 2;
 
-        // Both tilts come from the joint's own arc position, so the neighbour
-        // sharing that joint — in this cell, the next cell, or the next module —
-        // resolves the identical corner and the two stones meet exactly.
-        const face = resolveCellCorners(leaf, {
-          bedOffset,
-          courseHeight,
-          tiltLeft: tiltAt(leaf.s0),
-          tiltRight: tiltAt(leaf.s1),
-          ceilingAt: bodyHeightAt,
-          minHeight: MIN_LEAF_HEIGHT,
-        });
+        const face = resolved.faces[ordinal];
         if (!face) continue;
 
-        if (shouldDropRuinStone(ruinFactorAt(leafCenter), face.anchorY, localTop, seed, index)) {
-          stats.dropped += 1;
-          continue;
+        const verticalValues = face.corners.map(([, yValue]) => face.anchorY + yValue);
+        const supportBottom = Math.min(...verticalValues);
+        const supportTop = Math.max(...verticalValues);
+        const role = course === 0
+          ? CONSTRUCTION_SUPPORT_ROLE.FOUNDATION
+          : CONSTRUCTION_SUPPORT_ROLE.FIELD;
+        const support = Object.freeze({
+          role,
+          span: Object.freeze([leaf.s0, leaf.s1]),
+          bottom: supportBottom,
+          top: supportTop,
+          courseIndex: course,
+          groupId: null,
+        });
+
+        let ruinMeta = null;
+        if (ruinField) {
+          const state = resolveRuinState(leafCenter);
+          const protectedFooting = isProtectedFooting({
+            support,
+            courseIndex: course,
+          }, ruinProfile);
+          const candidate = ruinField.evaluateStone({
+            s: leafCenter,
+            courseIndex: course,
+            stableIndex: index,
+            yTop: supportTop,
+            collapsedTop: state.collapsedHeight,
+            protectedFooting,
+          });
+          if (candidate.remove) stats.ruinCandidates += 1;
+          // Legacy counter: preliminary damage still reports as "dropped"
+          // candidates until the wall-wide resolver finalises survivors.
+          if (candidate.remove) stats.dropped += 1;
+          ruinMeta = Object.freeze({
+            candidate: candidate.remove,
+            score: candidate.score,
+            clusterScore: candidate.clusterScore,
+            proximity: candidate.proximity,
+          });
         }
+
         if (stones.length >= budget) {
           stats.overBudget = true;
           continue;
@@ -472,13 +524,15 @@ export function packCurvedWall({
           courseIndex: course,
           cellIndex: baseIndex + cell,
           heightRatio: face.anchorY / heightScale,
+          support,
+          ...(ruinMeta ? { ruin: ruinMeta } : {}),
         }));
       }
     }
   }
 
   /** Shared emitter for the dressing passes, which differ only in placement. */
-  const emitUnit = (category, s, y, index, size) => {
+  const emitUnit = (category, s, y, index, size, supportMeta = null) => {
     if (stones.length >= budget) {
       stats.overBudget = true;
       return;
@@ -486,6 +540,23 @@ export function packCurvedWall({
     const frame = arcTable.frameAt(s);
     const curvature = arcTable.curvatureAt(s);
     const straddle = -Math.sign(curvature) * chordSagitta(size.width, curvature) * 0.5;
+    const packedWidth = size.packedWidth ?? size.width;
+    const height = size.height;
+    const role = supportMeta?.role
+      ?? (category === 'coping'
+        ? CONSTRUCTION_SUPPORT_ROLE.COPING
+        : category === 'merlon'
+          ? CONSTRUCTION_SUPPORT_ROLE.MERLON
+          : category === 'voussoir'
+            ? CONSTRUCTION_SUPPORT_ROLE.ARCH
+            : CONSTRUCTION_SUPPORT_ROLE.JAMB);
+    const bottom = y - height / 2;
+    const top = y + height / 2;
+    let aboveEnvelope = false;
+    if (ruinField && resolveRuinState) {
+      const state = resolveRuinState(s);
+      aboveEnvelope = top > state.collapsedHeight + 0.05;
+    }
     stones.push(Object.freeze({
       category,
       s,
@@ -493,14 +564,34 @@ export function packCurvedWall({
       // Dressings sit at an explicit offset from the centreline (a voussoir
       // ring stands proud of each face); field units only straddle the chord.
       offsetNormal: straddle + (size.offsetNormal ?? 0),
-      packedWidth: size.packedWidth ?? size.width,
+      packedWidth,
       width: size.width,
-      height: size.height,
+      height,
       depth: size.depth,
       yaw: frame.yaw,
       roll: size.roll ?? 0,
       stableIndex: index,
       heightRatio: Math.min(1, y / heightScale),
+      support: Object.freeze({
+        role,
+        span: Object.freeze([s - packedWidth / 2, s + packedWidth / 2]),
+        bottom,
+        top,
+        courseIndex: supportMeta?.courseIndex ?? -1,
+        jambOrdinal: supportMeta?.jambOrdinal ?? null,
+        groupId: supportMeta?.groupId ?? null,
+        archOrdinal: supportMeta?.archOrdinal ?? null,
+        side: supportMeta?.side ?? null,
+      }),
+      ...(ruinField ? {
+        ruin: Object.freeze({
+          candidate: false,
+          score: 0,
+          clusterScore: 0,
+          proximity: 0,
+          aboveEnvelope,
+        }),
+      } : {}),
     }));
   };
 
@@ -591,7 +682,31 @@ export function packCurvedWall({
   let dressingIndex = baseIndex + INDEX_DRESSING;
   for (const opening of openings) {
     const { jambs, voussoirs, keystone } = layoutOpening(opening, { thickness, minWidth: style.minWidth });
-    for (const unit of [...jambs, ...voussoirs, ...(keystone ? [keystone] : [])]) {
+    const openingId = opening.id ?? `opening@${opening.s}`;
+    let jambOrdinal = 0;
+    for (const unit of jambs) {
+      if (unit.s < s0 - 0.5 || unit.s > s1 + 0.5) continue;
+      const index = dressingIndex;
+      dressingIndex += 1;
+      const side = unit.s < opening.s ? -1 : 1;
+      emitUnit(unit.category, unit.s, unit.y, index, {
+        width: unit.width,
+        height: unit.height,
+        depth: unit.depth,
+        roll: unit.roll,
+        offsetNormal: unit.offsetNormal,
+      }, {
+        role: CONSTRUCTION_SUPPORT_ROLE.JAMB,
+        groupId: `opening:${openingId}:${side < 0 ? 'left' : 'right'}-jamb`,
+        courseIndex: -1,
+        jambOrdinal,
+        side,
+        archOrdinal: 0,
+      });
+      jambOrdinal += 1;
+    }
+    let archOrdinal = 0;
+    for (const unit of voussoirs) {
       if (unit.s < s0 - 0.5 || unit.s > s1 + 0.5) continue;
       const index = dressingIndex;
       dressingIndex += 1;
@@ -601,7 +716,33 @@ export function packCurvedWall({
         depth: unit.depth,
         roll: unit.roll,
         offsetNormal: unit.offsetNormal,
+      }, {
+        role: CONSTRUCTION_SUPPORT_ROLE.ARCH,
+        groupId: `opening:${openingId}:arch`,
+        courseIndex: -1,
+        jambOrdinal: null,
+        archOrdinal,
       });
+      archOrdinal += 1;
+    }
+    if (keystone) {
+      if (!(keystone.s < s0 - 0.5 || keystone.s > s1 + 0.5)) {
+        const index = dressingIndex;
+        dressingIndex += 1;
+        emitUnit(keystone.category, keystone.s, keystone.y, index, {
+          width: keystone.width,
+          height: keystone.height,
+          depth: keystone.depth,
+          roll: keystone.roll,
+          offsetNormal: keystone.offsetNormal,
+        }, {
+          role: CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
+          groupId: `opening:${openingId}:arch`,
+          courseIndex: -1,
+          jambOrdinal: null,
+          archOrdinal: 999,
+        });
+      }
     }
   }
 

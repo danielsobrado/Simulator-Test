@@ -50,6 +50,16 @@ test('an unknown icon degrades to nothing rather than to "undefined"', () => {
   assert.equal(hasIcon('cut'), true);
 });
 
+test('an inherited property name is not an icon', () => {
+  // `ICONS` is a plain object, so a bare `ICONS[name]` lookup walks the
+  // prototype: `constructor` resolves to a function, which is truthy and used to
+  // land its native source in the markup. `hasIcon` and `icon` must agree.
+  for (const name of ['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty']) {
+    assert.equal(hasIcon(name), false, `${name} must not count as an icon`);
+    assert.equal(icon(name), '', `${name} must not render`);
+  }
+});
+
 test('size and class name are caller-controlled and escaped', () => {
   const sized = icon('door', { size: 24 });
   assert.ok(sized.includes('width="24"'));
