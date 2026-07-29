@@ -114,6 +114,46 @@ function applyWeatherMaterialPolicy(systems) {
   }
 }
 
+function installWarmupProbe(scene, precompile) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+  const material = new THREE.PointsMaterial({
+    size: 0.001,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+  });
+  material.colorWrite = false;
+  material.toneMapped = false;
+
+  const probe = new THREE.Points(geometry, material);
+  probe.name = 'weather-shader-warmup-probe';
+  probe.frustumCulled = false;
+  probe.renderOrder = -1_000_000;
+  let queued = false;
+  let disposed = false;
+
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    probe.removeFromParent();
+    geometry.dispose();
+    material.dispose();
+  };
+
+  probe.onBeforeRender = (renderer, _scene, camera) => {
+    if (queued || disposed) return;
+    queued = true;
+    probe.onBeforeRender = () => {};
+    queueMicrotask(() => {
+      if (!disposed) void precompile(renderer, camera);
+    });
+  };
+  scene.add(probe);
+  return dispose;
+}
+
 /**
  * Weather VFX controller. StylizedSkyView remains the lighting authority; this
  * controller owns precipitation, airborne particles, wind and lightning only.
@@ -125,6 +165,7 @@ export function createWeatherController(deps) {
   });
   let sunbeamMotes = readSunbeamMoteRuntimeSettings(settings.weatherMode === 'meadow');
   let disposed = false;
+  let disposeWarmupProbe = () => {};
 
   const isWebGpu = deps.isWebGpu !== false;
   const meadowWeather = new MeadowWeatherSystem({
@@ -227,19 +268,31 @@ export function createWeatherController(deps) {
     if (typeof compile !== 'function') return false;
 
     const visibility = systems.map((system) => system.group.visible);
+    let restored = false;
+    const restoreVisibility = () => {
+      if (restored) return;
+      restored = true;
+      systems.forEach((system, index) => {
+        system.group.visible = visibility[index];
+      });
+    };
+
     try {
       for (const system of systems) system.group.visible = true;
-      await compile.call(renderer, deps.scene, camera);
+      const compilation = compile.call(renderer, deps.scene, camera);
+      restoreVisibility();
+      await compilation;
       return true;
     } catch (error) {
       console.warn('[weather] Shader precompile failed; first activation may hitch.', error);
       return false;
     } finally {
-      systems.forEach((system, index) => {
-        system.group.visible = visibility[index];
-      });
+      restoreVisibility();
+      disposeWarmupProbe();
     }
   };
+
+  disposeWarmupProbe = installWarmupProbe(deps.scene, precompile);
 
   return {
     applySettings,
@@ -293,6 +346,7 @@ export function createWeatherController(deps) {
     dispose() {
       if (disposed) return;
       disposed = true;
+      disposeWarmupProbe();
       for (const system of systems) system.dispose();
     },
   };
