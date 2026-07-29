@@ -62,7 +62,12 @@ export function createSpellRuntime(deps) {
   const targetDirection = new THREE.Vector3();
   const targetNormal = new THREE.Vector3(0, 1, 0);
   let earthTargetOverride = null;
+  let viewState = null;
   let disposed = false;
+
+  const isCastMode = () => isWalkMode()
+    && viewState?.paused !== true
+    && viewState?.awaitingSpawn !== true;
 
   const getTerrainTarget = (maxRange) => {
     const camera = getCamera();
@@ -101,18 +106,9 @@ export function createSpellRuntime(deps) {
   });
 
   const casts = {
-    fire: (durationMs = config.fire.castDurationMs) => {
-      vfx.playFire(durationMs);
-      return true;
-    },
-    water: (durationMs = config.water.castDurationMs) => {
-      vfx.playWater(durationMs);
-      return true;
-    },
-    air: (durationMs = config.air.castDurationMs) => {
-      vfx.playAir(durationMs);
-      return true;
-    },
+    fire: (durationMs = config.fire.castDurationMs) => vfx.playFire(durationMs) !== false,
+    water: (durationMs = config.water.castDurationMs) => vfx.playWater(durationMs) !== false,
+    air: (durationMs = config.air.castDurationMs) => vfx.playAir(durationMs) !== false,
     earth: (durationMs = config.earth.castDurationMs) => {
       const target = getTerrainTarget(gameplay.maxRangeM);
       if (!target) return false;
@@ -123,18 +119,16 @@ export function createSpellRuntime(deps) {
       earthTargetOverride = { point: target.point, normal: target.normal };
       return vfx.playEarth(durationMs) !== false;
     },
-    lightning: (durationMs = config.lightning.castDurationMs) => {
-      vfx.playLightning(durationMs);
-      return true;
-    },
-    fireball: (durationMs = config.fireball.castDurationMs) => {
-      vfx.playFireball(durationMs);
-      return true;
-    },
+    lightning: (durationMs = config.lightning.castDurationMs) => (
+      vfx.playLightning(durationMs) !== false
+    ),
+    fireball: (durationMs = config.fireball.castDurationMs) => (
+      vfx.playFireball(durationMs) !== false
+    ),
   };
 
   const cast = (spellId, durationMs) => {
-    if (disposed || !isWalkMode() || deps.isInputBlocked?.()) return false;
+    if (disposed || !isCastMode() || deps.isInputBlocked?.()) return false;
     const play = casts[spellId];
     return typeof play === 'function' ? play(durationMs) : false;
   };
@@ -154,21 +148,24 @@ export function createSpellRuntime(deps) {
 
   const menuEl = document.getElementById(config.menu.rootId);
   const syncMenuVisibility = () => {
-    const visible = isWalkMode();
+    const visible = isCastMode();
     menuEl?.classList.toggle('spell-menu-hidden', !visible);
     if (menuEl) {
       menuEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
       menuEl.toggleAttribute('inert', !visible);
     }
   };
-  syncMenuVisibility();
 
   const unsubscribeMode = typeof deps.subscribeViewMode === 'function'
-    ? deps.subscribeViewMode(syncMenuVisibility)
+    ? deps.subscribeViewMode((state) => {
+      viewState = state;
+      syncMenuVisibility();
+    })
     : null;
+  syncMenuVisibility();
 
   const onKeyDown = (event) => {
-    if (!isWalkMode() || deps.isInputBlocked?.()) return;
+    if (!isCastMode() || deps.isInputBlocked?.()) return;
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (consumesGameplayShortcut(event.target)) return;
 
@@ -192,7 +189,8 @@ export function createSpellRuntime(deps) {
       if (!disposed) vfx.update(nowMs);
     },
     precompile(renderer) {
-      if (!disposed) vfx.precompile(renderer);
+      if (!disposed) return vfx.precompile(renderer);
+      return false;
     },
     dispose() {
       if (disposed) return;
