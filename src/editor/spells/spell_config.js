@@ -1,5 +1,4 @@
 import { load } from 'js-yaml';
-import spellsYamlText from '../../../config/spells.yaml?raw';
 import spellDefaults from './spells_yaml_defaults.json' with { type: 'json' };
 
 const BEAM_VFX_SCHEMA = Object.freeze({
@@ -170,7 +169,7 @@ function parseSpellDocument(document) {
   });
 }
 
-export function parseSpellConfig(source = spellsYamlText) {
+export function parseSpellConfig(source = spellDefaults) {
   try {
     return parseSpellDocument(sourceDocument(source));
   } catch (error) {
