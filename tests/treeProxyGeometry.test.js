@@ -21,7 +21,7 @@ function horizontalDiameter(geometry) {
 }
 
 function disposeProxy(proxy) {
-  for (const part of [...proxy.proxyParts, ...proxy.fallbackImpostorParts]) {
+  for (const part of proxy.proxyParts) {
     part.geometry.dispose();
     part.material.dispose();
   }
@@ -35,16 +35,16 @@ test('tree proxies keep branch extents out of the low-LOD trunk diameter', () =>
       try {
         const canopy = proxy.proxyParts.find((part) => part.kind === 'leaf');
         const trunk = proxy.proxyParts.find((part) => part.kind === 'trunk');
-        const fallbackTrunk = proxy.fallbackImpostorParts.find((part) => part.kind === 'trunk');
         const canopyDiameter = horizontalDiameter(canopy.geometry);
 
+        assert.equal(
+          proxy.fallbackImpostorParts,
+          undefined,
+          `${prototype.speciesId} must reuse proxyParts for loading fallback`,
+        );
         assert.ok(
           horizontalDiameter(trunk.geometry) <= canopyDiameter * 0.16,
           `${prototype.speciesId} proxy trunk is wider than 16% of its canopy`,
-        );
-        assert.ok(
-          horizontalDiameter(fallbackTrunk.geometry) <= canopyDiameter * 0.16,
-          `${prototype.speciesId} fallback trunk is wider than 16% of its canopy`,
         );
       } finally {
         disposeProxy(proxy);

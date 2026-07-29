@@ -41,7 +41,7 @@ function prototype(index) {
   };
 }
 
-test('falls back to cross-card geometry while textured impostors are unavailable', () => {
+test('falls back to low-poly proxy geometry while textured impostors are unavailable', () => {
   const near = createRenderer();
   const proxy = createRenderer();
   const fallback = createRenderer();
@@ -81,8 +81,8 @@ test('falls back to cross-card geometry while textured impostors are unavailable
       clusterRenderers: [[cluster]],
     });
 
-    // Prototypes without a baked atlas render `fallbackImpostorParts` — the
-    // cross-card canopy — so the impostor band never goes empty.
+    // Prototypes without a baked atlas reuse the low-poly tree proxy, so the
+    // impostor band never goes empty.
     assert.equal(near.count, 0);
     assert.equal(proxy.count, 0);
     assert.equal(fallback.count, 1);

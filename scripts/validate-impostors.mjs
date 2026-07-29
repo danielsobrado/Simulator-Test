@@ -66,6 +66,7 @@ async function main() {
   }
   const manifest = validateTreeImpostorManifest(
     JSON.parse(await readFile(MANIFEST_PATH, 'utf8')),
+    { allowLegacy: !REQUIRED },
   );
   if (manifest.requiresRuntimeBake && !await runtimeBakeEnabled()) {
     throw new Error(

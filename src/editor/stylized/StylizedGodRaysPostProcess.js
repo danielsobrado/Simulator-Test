@@ -4,35 +4,32 @@ import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
 import {
   Fn,
   clamp,
-  dot,
   exp,
   float,
-  floor,
-  fract,
   getViewPosition,
-  max,
   mix,
   pass,
-  pow,
   rtt,
-  screenCoordinate,
   screenUV,
-  smoothstep,
-  step,
-  time,
   uniform,
-  vec2,
   vec3,
   vec4,
 } from 'three/tsl';
+import { buildDustGodRays } from './GodRaysScreenScattering.js';
+export {
+  advectedDustDensityReference,
+  dustModulationReference,
+  godRaysCloudTransmissionReference,
+  godRaysOcclusionContrastReference,
+  godRaysRadialStepReference,
+  godRaysScreenFalloffReference,
+  godRaysScreenUvCoverageReference,
+  godRaysSunSourceReference,
+  godRaysVisibilityReference,
+} from './GodRaysScreenScattering.js';
 
-const SKY_DEPTH_THRESHOLD = 0.9999;
-const SUN_SCATTER_RADIUS_UV = 0.22;
-const REFERENCE_SAMPLE_COUNT = 12;
-const GOD_RAYS_SCREEN_FALLOFF_RADIUS = 1.4;
 const SUN_FADE_UV_MARGIN = 0.35;
 const SUN_FADE_FORWARD_END = 0.12;
-const IGN_MAGIC = Object.freeze({ x: 0.06711056, y: 0.00583715, scale: 52.9829189 });
 const GOD_RAY_TECHNIQUES = Object.freeze(['screen-space', 'volumetric']);
 
 export function directionFromAngles(elevationDegrees, azimuthDegrees) {
@@ -43,210 +40,6 @@ export function directionFromAngles(elevationDegrees, azimuthDegrees) {
     Math.sin(elevation),
     Math.cos(elevation) * Math.sin(azimuth),
   ).normalize();
-}
-
-export function interleavedGradientNoiseReference(pixelX, pixelY) {
-  const inner = IGN_MAGIC.x * pixelX + IGN_MAGIC.y * pixelY;
-  const innerFract = inner - Math.floor(inner);
-  const outer = IGN_MAGIC.scale * innerFract;
-  return outer - Math.floor(outer);
-}
-
-export function godRaysScreenUvCoverageReference(u, v) {
-  return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? 1 : 0;
-}
-
-export function godRaysCloudTransmissionReference(cloudCoverage, occlusionStrength) {
-  return 1 - clamp01(cloudCoverage) * clamp01(occlusionStrength);
-}
-
-export function godRaysVisibilityReference(depth, cloudTransmission) {
-  return depth >= SKY_DEPTH_THRESHOLD ? clamp01(cloudTransmission) : 0;
-}
-
-export function godRaysOcclusionContrastReference(visibilities) {
-  if (!Array.isArray(visibilities) || visibilities.length === 0) return 0;
-  const nearSunSamples = visibilities.slice(-8);
-  let visibleSum = 0;
-  let visibleSquaredSum = 0;
-  for (const visibility of nearSunSamples) {
-    const clamped = clamp01(visibility);
-    visibleSum += clamped;
-    visibleSquaredSum += clamped * clamped;
-  }
-  const visibleShare = visibleSum / nearSunSamples.length;
-  const visibleSquaredShare = visibleSquaredSum / nearSunSamples.length;
-  const variance = visibleSquaredShare - visibleShare * visibleShare;
-  return variance <= 1e-8 ? 0 : smooth01((variance - 0.02) / 0.22);
-}
-
-export function godRaysSunSourceReference(distanceToSun) {
-  return 1 - smooth01(distanceToSun / SUN_SCATTER_RADIUS_UV);
-}
-
-export function godRaysRadialStepReference(distanceToSun, density, samples) {
-  return Math.max(0, distanceToSun) * Math.max(0, density) / Math.max(1, samples);
-}
-
-export function dustModulationReference(dust, grain, strength) {
-  const clustered = smooth01((dust - 0.25) / 0.5);
-  const filaments = clustered * clustered * 1.65 + 0.08;
-  const motes = smooth01((grain - 0.86) / 0.135) * clustered * 0.4;
-  return 1 + (filaments + motes - 1) * clamp01(strength);
-}
-
-function interleavedGradientNoise(pixel) {
-  return fract(float(IGN_MAGIC.scale).mul(fract(dot(pixel, vec2(IGN_MAGIC.x, IGN_MAGIC.y)))));
-}
-
-function screenUvCoverage(coord) {
-  return step(0, coord.x)
-    .mul(step(coord.x, 1))
-    .mul(step(0, coord.y))
-    .mul(step(coord.y, 1));
-}
-
-function hashNoise2(point) {
-  return fract(dot(point, vec2(127.1, 311.7)).sin().mul(43758.5453));
-}
-
-function valueNoise2(point) {
-  const lattice = floor(point);
-  const fraction = fract(point);
-  const curve = fraction.mul(fraction).mul(float(3).sub(fraction.mul(2)));
-  const a = hashNoise2(lattice);
-  const b = hashNoise2(lattice.add(vec2(1, 0)));
-  const c = hashNoise2(lattice.add(vec2(0, 1)));
-  const d = hashNoise2(lattice.add(vec2(1, 1)));
-  return mix(mix(a, b, curve.x), mix(c, d, curve.x), curve.y);
-}
-
-/**
- * Radial screen-space light scattering ported from drusniel-voxels-bevy.
- * A smooth visibility-variance gate suppresses rays in uniformly clear or
- * uniformly blocked regions, while subtle beam-space noise breaks up shafts.
- */
-export function buildDustGodRays({
-  depthTex,
-  cloudTex,
-  uvNode,
-  sunUv,
-  intensity,
-  density,
-  decay,
-  weight,
-  exposure,
-  samples,
-  dustStrength,
-  dustScale,
-  dustSpeed,
-}) {
-  return Fn(() => {
-    const skyThreshold = float(SKY_DEPTH_THRESHOLD);
-    const delta = uvNode.sub(sunUv).mul(density.mul(1 / samples)).toConst();
-    const coord = uvNode.toVar();
-    const sampleScale = float(REFERENCE_SAMPLE_COUNT / samples);
-    const perSampleDecay = pow(decay, sampleScale);
-    const illuminationDecay = float(1).toVar();
-    const accumulated = vec3(0).toVar();
-    const visibilityAccumulated = float(0).toVar();
-    const visibilitySquaredAccumulated = float(0).toVar();
-    const visibilitySampleCount = float(0).toVar();
-
-    for (let index = 0; index < samples; index += 1) {
-      coord.subAssign(delta);
-      const coverage = screenUvCoverage(coord);
-      const skyVisibility = step(skyThreshold, depthTex.sample(coord).r)
-        .mul(cloudTex.sample(coord).r);
-      const sampleDistanceToSun = coord.sub(sunUv).length();
-      const contrastWeight = coverage.mul(
-        float(1).sub(smoothstep(0.18, 0.32, sampleDistanceToSun)),
-      );
-      visibilityAccumulated.addAssign(skyVisibility.mul(contrastWeight));
-      visibilitySquaredAccumulated.addAssign(
-        skyVisibility.mul(skyVisibility).mul(contrastWeight),
-      );
-      visibilitySampleCount.addAssign(contrastWeight);
-      const sampleWeight = illuminationDecay
-        .mul(weight)
-        .mul(sampleScale)
-        .mul(coverage);
-      const sunSource = float(1).sub(smoothstep(
-        0,
-        SUN_SCATTER_RADIUS_UV,
-        sampleDistanceToSun,
-      ));
-      accumulated.addAssign(
-        vec3(skyVisibility)
-          .mul(sunSource)
-          .mul(sampleWeight),
-      );
-      illuminationDecay.mulAssign(perSampleDecay);
-    }
-
-    const visibleShare = clamp(
-      visibilityAccumulated.div(visibilitySampleCount.max(1e-4)),
-      0,
-      1,
-    );
-    const visibleSquaredShare = visibilitySquaredAccumulated
-      .div(visibilitySampleCount.max(1e-4));
-    // Reuse the full radial sample set for a gradual visibility variance. Clear
-    // sky, solid silhouettes, and uniform cloud layers remain at zero, while an
-    // edge changes the gate in small increments instead of toggling eight probes.
-    const visibilityVariance = visibleSquaredShare
-      .sub(visibleShare.mul(visibleShare));
-    const occlusionContrast = smoothstep(
-      0.02,
-      0.24,
-      visibilityVariance,
-    );
-
-    const toSun = sunUv.sub(uvNode);
-    const distanceToSun = toSun.length();
-    const beamDirection = toSun.div(distanceToSun.max(1e-4));
-    const drift = time.mul(dustSpeed);
-    const radialDistance = distanceToSun.mul(dustScale);
-    const beamPoint = beamDirection
-      .mul(dustScale)
-      .add(vec2(radialDistance.mul(0.45), radialDistance.mul(-0.31)))
-      .add(vec2(drift, drift.mul(0.7071)));
-    const octave1 = valueNoise2(beamPoint);
-    const octave2 = valueNoise2(
-      beamPoint
-        .mul(2.7)
-        .add(vec2(17.13, 9.71))
-        .add(distanceToSun.mul(dustScale.mul(0.35))),
-    );
-    const dust = octave1.mul(0.65).add(octave2.mul(0.35));
-    const clusteredDust = smoothstep(0.25, 0.75, dust);
-    const filaments = clusteredDust.mul(clusteredDust).mul(1.65).add(0.08);
-    const grainDrift = time.mul(dustSpeed.mul(48));
-    const grain = interleavedGradientNoise(
-      screenCoordinate.xy.add(vec2(grainDrift, grainDrift.mul(0.618))),
-    );
-    const motes = smoothstep(0.86, 0.995, grain)
-      .mul(clusteredDust)
-      .mul(0.4);
-    const dustFactor = mix(
-      float(1),
-      filaments.add(motes),
-      clamp(dustStrength, 0, 1),
-    );
-    const screenFalloff = float(1).sub(
-      smoothstep(0, GOD_RAYS_SCREEN_FALLOFF_RADIUS, distanceToSun),
-    );
-
-    return max(
-      accumulated
-        .mul(occlusionContrast)
-        .mul(dustFactor)
-        .mul(screenFalloff)
-        .mul(exposure)
-        .mul(intensity),
-      vec3(0),
-    );
-  })();
 }
 
 const viewDirection = new THREE.Vector3();
@@ -274,10 +67,6 @@ function clamp01(value) {
 function smooth01(value) {
   const clamped = clamp01(value);
   return clamped * clamped * (3 - 2 * clamped);
-}
-
-export function godRaysScreenFalloffReference(distanceToSun) {
-  return 1 - smooth01(distanceToSun / GOD_RAYS_SCREEN_FALLOFF_RADIUS);
 }
 
 export function sunScreenFade(info, marginUv = SUN_FADE_UV_MARGIN) {
@@ -374,6 +163,7 @@ export class StylizedGodRaysPostProcess {
     this.dustStrength = uniform(config?.dustStrength ?? 0.85);
     this.dustScale = uniform(config?.dustScale ?? 9);
     this.dustSpeed = uniform(config?.dustSpeed ?? 0.025);
+    this.atmosphereTime = uniform(0);
     this.tint = uniform(normalizedColorVector(sunColor ?? '#ffffff'));
     const volumetric = this.config.volumetric;
     this.volumetricIntensity = uniform(volumetric.intensity ?? 1);
@@ -410,6 +200,10 @@ export class StylizedGodRaysPostProcess {
     if (this.volumetricLight === light) return;
     this.disposeVolumetricPipeline();
     this.volumetricLight = light;
+  }
+
+  setTime(timeSeconds) {
+    if (Number.isFinite(timeSeconds)) this.atmosphereTime.value = timeSeconds;
   }
 
   shouldRender(camera) {
@@ -458,6 +252,7 @@ export class StylizedGodRaysPostProcess {
       dustStrength: this.dustStrength,
       dustScale: this.dustScale,
       dustSpeed: this.dustSpeed,
+      timeNode: this.atmosphereTime,
     });
     this.raysTexture = rtt(rays).setResolutionScale(this.config.resolutionScale ?? 0.5);
     this.raysTexture.renderTarget.texture.name = 'God Rays Half Resolution';

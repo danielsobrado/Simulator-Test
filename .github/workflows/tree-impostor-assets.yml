@@ -8,21 +8,44 @@ on:
       - .github/workflows/tree-impostor-assets.yml
       - editor.config.yaml
       - public/assets/grass-scene.glb
+      - public/assets/textures/bark/**
+      - public/assets/textures/leaf/foliage_512a.png
+      - public/assets/trees/**
       - scripts/bake-tree-impostors.mjs
       - scripts/validate-impostors.mjs
+      - src/editor/stylized/AuthoredTextureNode.js
+      - src/editor/stylized/StylizedNoiseNodes.js
+      - src/editor/stylized/StylizedPrototypeBake.js
+      - src/editor/stylized/StylizedTreeMaterials.js
+      - src/editor/stylized/StylizedTreePrototypes.js
       - src/editor/stylized/StylizedTreeView.js
       - src/editor/stylized/TreeLodAssembler.js
+      - src/editor/stylized/forest/ForestSpeciesGeometry.js
+      - src/editor/stylized/forest/ProceduralBarkTextures.js
+      - src/editor/stylized/forest/TreeWindTime.js
+      - src/editor/stylized/forest/proceduralGeometry.js
       - src/editor/stylized/impostor/**
   pull_request:
     paths:
       - .github/workflows/tree-impostor-assets.yml
-      - docs/qa/impostor-bake-trigger.md
       - editor.config.yaml
       - public/assets/grass-scene.glb
+      - public/assets/textures/bark/**
+      - public/assets/textures/leaf/foliage_512a.png
+      - public/assets/trees/**
       - scripts/bake-tree-impostors.mjs
       - scripts/validate-impostors.mjs
+      - src/editor/stylized/AuthoredTextureNode.js
+      - src/editor/stylized/StylizedNoiseNodes.js
+      - src/editor/stylized/StylizedPrototypeBake.js
+      - src/editor/stylized/StylizedTreeMaterials.js
+      - src/editor/stylized/StylizedTreePrototypes.js
       - src/editor/stylized/StylizedTreeView.js
       - src/editor/stylized/TreeLodAssembler.js
+      - src/editor/stylized/forest/ForestSpeciesGeometry.js
+      - src/editor/stylized/forest/ProceduralBarkTextures.js
+      - src/editor/stylized/forest/TreeWindTime.js
+      - src/editor/stylized/forest/proceduralGeometry.js
       - src/editor/stylized/impostor/**
 
 permissions:

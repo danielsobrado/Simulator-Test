@@ -15,10 +15,27 @@ const REPOSITION_DISTANCE = 8;
 const WATER_DEPTH_EPSILON = 0.035;
 const WATER_MASK_EPSILON = 0.05;
 const TAU = Math.PI * 2;
+const RAIN_IMPACT_PROFILE = Object.freeze({
+  hard: Object.freeze({
+    minScale: 0.04,
+    maxScale: 0.1,
+    rate: 3.4,
+    opacity: 0.34,
+    surfaceOffset: 0.012
+  }),
+  water: Object.freeze({
+    minScale: 0.06,
+    maxScale: 0.18,
+    rate: 2.7,
+    opacity: 0.24,
+    surfaceOffset: 0.012
+  })
+});
 export {
   DROP_COUNT,
   HARD_SPLASH_COUNT,
   RAIN_AREA,
+  RAIN_IMPACT_PROFILE,
   REPOSITION_DISTANCE,
   SANDSTORM_FAR_COUNT,
   SANDSTORM_MID_COUNT,

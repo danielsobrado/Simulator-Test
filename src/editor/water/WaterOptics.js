@@ -52,6 +52,12 @@ export function validateWaterOpticsConfig(config) {
     5,
   );
   assertFiniteRange(
+    config.shorelineFadeDepth,
+    'stylizedSurface.water.optics.shorelineFadeDepth',
+    0.01,
+    5,
+  );
+  assertFiniteRange(
     config.surfaceDetailStrength,
     'stylizedSurface.water.optics.surfaceDetailStrength',
     0,
@@ -112,5 +118,9 @@ export function computeWaterOpticsSample({
     transmission,
     opacity: clamp(opacity, config.minimumOpacity, config.maximumOpacity),
     depthMix: smoothstep(config.shallowDepth, config.deepDepth, safeDepth),
+    // How much of the surface sheet survives where the body thins out. The
+    // water field extends the surface onto dry vertices to keep it continuous
+    // across chunk seams, so without this the sheet paints over the beach.
+    shorelineFade: smoothstep(0, config.shorelineFadeDepth, safeDepth),
   });
 }

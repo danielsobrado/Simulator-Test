@@ -59,14 +59,14 @@ function hardSplashFragment(age, params, color, opacity, intensity) {
     const p = uv().mul(2).sub(1);
     const r = length(p);
     r.greaterThan(1.04).discard();
-    const radius = mix(0.18, 0.78, smoothstep(0, 0.78, age));
-    const ring = float(1).sub(smoothstep(0.018, 0.075, abs(r.sub(radius))));
+    const young = smoothstep(0, 0.05, age).mul(float(1).sub(smoothstep(0.28, 0.48, age)));
+    const radius = mix(0.06, 0.42, smoothstep(0, 0.36, age));
+    const ring = float(1).sub(smoothstep(0.025, 0.07, abs(r.sub(radius))));
     const axis = min(abs(p.x), abs(p.y));
     const diag = min(abs(p.x.add(p.y)), abs(p.x.sub(p.y))).mul(0.7);
-    const ray = float(1).sub(smoothstep(0.025, 0.13, min(axis, diag))).mul(smoothstep(0.08, 0.24, r)).mul(float(1).sub(smoothstep(0.52, 1, r)));
-    const center = float(1).sub(smoothstep(0.02, 0.16, r));
-    const fade = float(1).sub(smoothstep(0.58, 1, age)).mul(smoothstep(0, 0.08, age));
-    const alpha = ring.mul(0.62).add(ray.mul(0.55)).add(center.mul(0.32)).mul(fade).mul(params.w).mul(opacity).mul(clamp(intensity, 0, 1.6));
+    const ray = float(1).sub(smoothstep(0.025, 0.13, min(axis, diag))).mul(smoothstep(0.04, 0.1, r)).mul(float(1).sub(smoothstep(0.24, 0.46, r)));
+    const center = float(1).sub(smoothstep(0.015, 0.1, r)).mul(float(1).sub(smoothstep(0.08, 0.24, age)));
+    const alpha = ring.mul(0.34).add(ray.mul(0.28)).add(center.mul(0.38)).mul(young).mul(params.w).mul(opacity).mul(clamp(intensity, 0, 1.6));
     alpha.lessThan(0.01).discard();
     return vec4(color, alpha);
   })();
@@ -76,13 +76,19 @@ function waterSplashFragment(age, params, color, opacity, intensity) {
     const p = uv().mul(2).sub(1);
     const r = length(p);
     r.greaterThan(1.04).discard();
-    const radiusA = mix(0.14, 0.86, smoothstep(0, 0.9, age));
-    const radiusB = mix(0.04, 0.54, smoothstep(0.14, 0.96, age));
-    const ringA = float(1).sub(smoothstep(0.015, 0.055, abs(r.sub(radiusA))));
-    const ringB = float(1).sub(smoothstep(0.012, 0.045, abs(r.sub(radiusB))));
-    const center = float(1).sub(smoothstep(0.03, 0.13, r)).mul(float(1).sub(smoothstep(0, 0.35, age)));
-    const fade = float(1).sub(smoothstep(0.62, 1, age)).mul(smoothstep(0, 0.07, age));
-    const alpha = ringA.mul(0.76).add(ringB.mul(0.42)).add(center.mul(0.18)).mul(fade).mul(params.w).mul(opacity).mul(clamp(intensity, 0, 1.6));
+    const rippleAge = clamp(age.sub(0.08).div(0.78), 0, 1);
+    const rippleRadius = mix(0.1, 0.9, smoothstep(0, 1, rippleAge));
+    const rippleWidth = mix(0.018, 0.052, rippleAge);
+    const ripple = float(1).sub(smoothstep(rippleWidth, rippleWidth.mul(2.2), abs(r.sub(rippleRadius))))
+      .mul(smoothstep(0.06, 0.16, age))
+      .mul(float(1).sub(smoothstep(0.7, 0.98, age)));
+    const crownRadius = mix(0.05, 0.24, smoothstep(0, 0.2, age));
+    const crown = float(1).sub(smoothstep(0.02, 0.065, abs(r.sub(crownRadius))))
+      .mul(float(1).sub(smoothstep(0.16, 0.3, age)));
+    const center = float(1).sub(smoothstep(0.02, 0.09, r))
+      .mul(float(1).sub(smoothstep(0.06, 0.18, age)));
+    const alpha = ripple.mul(0.52).add(crown.mul(0.32)).add(center.mul(0.22))
+      .mul(params.w).mul(opacity).mul(clamp(intensity, 0, 1.6));
     alpha.lessThan(0.01).discard();
     return vec4(color, alpha);
   })();

@@ -1,8 +1,9 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import {
-  PERF_COUNTER_WATER_CHUNKS_DRAWN,
+  PERF_COUNTER_WATER_CHUNKS_WET,
   PERF_COUNTER_WATER_CHUNKS_DRY,
+  PERF_COUNTER_WATER_CHUNKS_REFRACTIVE,
   PERF_COUNTER_WATER_UPLOAD_BYTES,
   PerfCounters,
 } from '../performance/qa/PerfCounters.js';
@@ -11,6 +12,11 @@ import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
 
 const WATER_FIELD_CHANNELS = 4;
 const WATER_FLOW_CHANNELS = 2;
+// Chebyshev radius, in chunks around the focus chunk, within which water is
+// refracted. Wide enough that the swap happens well outside the range where
+// refraction reads as anything but a faint tint, narrow enough that standing
+// away from a shoreline submits no refractive material at all.
+const REFRACTION_CHUNK_RADIUS = 2;
 
 export class StylizedWaterSlot {
   constructor({ terrainSlot, terrainView, config }) {
@@ -56,7 +62,7 @@ export class StylizedWaterSlot {
     this.uploadedPage = null;
     this.uploadedFieldRevision = -1;
     this.hasWaterCoverage = false;
-    this.material = createStylizedWaterMaterial({
+    this.materialOptions = {
       surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
       waterFieldTexture: this.waterFieldTexture,
       waterFlowTexture: this.waterFlowTexture,
@@ -66,16 +72,57 @@ export class StylizedWaterSlot {
       chunkWorldSize: terrainView.chunkWorldSize,
       time: this.time,
       config,
-    });
-    this.material.side = THREE.DoubleSide;
-    this.material.needsUpdate = true;
+    };
+    this.material = this.createMaterial(false);
+    // Built on first approach to water, never up front: a material carrying the
+    // viewport-texture nodes costs the whole frame a colour copy, a depth copy
+    // and a mip chain, so a session that never nears water must never create it.
+    this.refractiveMaterial = null;
     this.mesh = new THREE.Mesh(terrainView.geometry, this.material);
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.visible = false;
     this.mesh.renderOrder = 2;
+    // Left unculled: the plane is displaced along local Z by the surface height,
+    // so its own bounds are wrong, and a per-slot bounding sphere measured no
+    // faster — the viewport-copy cost is binary in the number of refractive
+    // chunks, not proportional, so culling some of them buys nothing.
     this.mesh.frustumCulled = false;
     this.mesh.name = `stylized-water-${terrainSlot.slotIndex}`;
     terrainView.scene.add(this.mesh);
+  }
+
+  createMaterial(enableRefraction) {
+    const material = createStylizedWaterMaterial({
+      ...this.materialOptions,
+      enableRefraction,
+    });
+    material.side = THREE.DoubleSide;
+    material.needsUpdate = true;
+    return material;
+  }
+
+  /**
+   * Whether this chunk is close enough to the camera to be worth refracting.
+   *
+   * Measured in chunks from the focus chunk rather than metres so it needs no
+   * camera pose: the focus chunk already tracks the viewer. Distant water keeps
+   * the plain variant, which is what lets a player away from the shore avoid the
+   * viewport copies entirely.
+   */
+  isWithinRefractionRange() {
+    const focus = this.terrainView.focusChunk;
+    const descriptor = this.terrainSlot.descriptor;
+    if (!focus || !descriptor) return false;
+    return Math.abs(descriptor.chunkX - focus.chunkX) <= REFRACTION_CHUNK_RADIUS
+      && Math.abs(descriptor.chunkZ - focus.chunkZ) <= REFRACTION_CHUNK_RADIUS;
+  }
+
+  resolveMaterial() {
+    if (!this.hasWaterCoverage || !this.isWithinRefractionRange()) return this.material;
+    if (this.refractiveMaterial === null) {
+      this.refractiveMaterial = this.createMaterial(true);
+    }
+    return this.refractiveMaterial;
   }
 
   uploadField(page) {
@@ -129,9 +176,14 @@ export class StylizedWaterSlot {
     // scene a backbuffer copy, a depth copy and a mip chain.
     this.mesh.visible = this.hasWaterCoverage;
     PerfCounters.inc(
-      this.hasWaterCoverage ? PERF_COUNTER_WATER_CHUNKS_DRAWN : PERF_COUNTER_WATER_CHUNKS_DRY,
+      this.hasWaterCoverage ? PERF_COUNTER_WATER_CHUNKS_WET : PERF_COUNTER_WATER_CHUNKS_DRY,
     );
     if (!this.hasWaterCoverage) return;
+    const material = this.resolveMaterial();
+    if (this.mesh.material !== material) this.mesh.material = material;
+    if (material === this.refractiveMaterial) {
+      PerfCounters.inc(PERF_COUNTER_WATER_CHUNKS_REFRACTIVE);
+    }
     this.mesh.position.copy(this.terrainSlot.mesh.position);
   }
 
@@ -140,5 +192,6 @@ export class StylizedWaterSlot {
     this.waterFieldTexture.dispose();
     this.waterFlowTexture.dispose();
     this.material.dispose();
+    this.refractiveMaterial?.dispose();
   }
 }

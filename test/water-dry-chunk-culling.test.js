@@ -62,6 +62,50 @@ test('a missing field reads as dry rather than throwing', () => {
   assert.equal(waterFieldHasCoverage(undefined), false);
 });
 
+test('refraction is a build-time branch so a far material never carries the nodes', async () => {
+  const source = await readFile(
+    new URL('../src/editor/stylized/StylizedWaterMaterial.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /enableRefraction = true,/);
+  assert.match(source, /if \(enableRefraction && quality\.refraction && water\.refraction\.enabled\)/);
+  // The viewport nodes must sit inside that branch — hoisting them out would
+  // reintroduce the whole-frame copy for every chunk regardless of the flag.
+  const branch = source.match(
+    /if \(enableRefraction && quality\.refraction[\s\S]*?\n {2}\}/,
+  )?.[0] ?? '';
+  assert.match(branch, /viewportDepthTexture/);
+  assert.match(branch, /viewportOpaqueMipTexture/);
+});
+
+test('the slot only builds the refractive variant for chunks near the viewer', async () => {
+  const source = await readFile(
+    new URL('../src/editor/stylized/StylizedWaterSlot.js', import.meta.url),
+    'utf8',
+  );
+  // The plain variant is the one built up front; the refractive one is lazy, so
+  // a session that never approaches water never creates it.
+  assert.match(source, /this\.material = this\.createMaterial\(false\);/);
+  assert.match(source, /this\.refractiveMaterial = null;/);
+  const resolve = source.match(/resolveMaterial\(\)[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(resolve, /isWithinRefractionRange\(\)/);
+  assert.match(resolve, /this\.refractiveMaterial === null/);
+  assert.ok(
+    resolve.indexOf('isWithinRefractionRange') < resolve.indexOf('createMaterial(true)'),
+    'range is checked before the refractive material is built',
+  );
+});
+
+test('both material variants are disposed with the slot', async () => {
+  const source = await readFile(
+    new URL('../src/editor/stylized/StylizedWaterSlot.js', import.meta.url),
+    'utf8',
+  );
+  const dispose = source.match(/dispose\(\)[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(dispose, /this\.material\.dispose\(\);/);
+  assert.match(dispose, /this\.refractiveMaterial\?\.dispose\(\);/);
+});
+
 test('the water slot hides dry chunks so the viewport copy is not triggered', async () => {
   const source = await readFile(
     new URL('../src/editor/stylized/StylizedWaterSlot.js', import.meta.url),

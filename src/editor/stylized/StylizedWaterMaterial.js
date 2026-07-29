@@ -35,6 +35,11 @@ import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
+// Radius in the voronoi F1 distance field that the caustic filaments trace.
+// Mean F1 over a unit cell sits near 0.5, so a slightly tighter ring keeps the
+// filaments inside their own cell and lets neighbours cross rather than merge.
+const CAUSTIC_RING_RADIUS = 0.4;
+
 function colorNode(value) {
   const color = new THREE.Color(value);
   return vec3(color.r, color.g, color.b);
@@ -110,6 +115,12 @@ export function createStylizedWaterMaterial({
   chunkWorldSize,
   time,
   config,
+  // Build-time opt-out. Sampling the viewport colour and depth textures makes
+  // the renderer copy both buffers for the whole frame, and it does so as soon
+  // as a material carrying those nodes is used at all — hiding the mesh does
+  // not avoid it. Chunks far from the camera get a variant built without the
+  // branch so a player away from water pays nothing.
+  enableRefraction = true,
 }) {
   const water = config.water;
   const quality = resolveWaterQualityFeatures(water);
@@ -118,11 +129,23 @@ export function createStylizedWaterMaterial({
     .mul((waterFieldSize - 1) / waterFieldSize)
     .add(0.5 / waterFieldSize);
   const surface = texture(surfaceMaskTexture, terrainUv);
-  const exactCoverage = createSurfaceClassNodes(surface).water;
+  const exactCoverage = createSurfaceClassNodes(surface).waterCoverage;
   const waterField = texture(waterFieldTexture, fieldUv);
   const waterCoverage = max(exactCoverage, clamp(waterField.r, 0, 1));
   const waterDepth = max(waterField.b, 0);
   const shoreDistance = max(waterField.a, 0);
+  // The water field inherits a surface height onto dry vertices so the sheet
+  // stays continuous across chunk seams, and this mesh reuses the terrain grid.
+  // Coverage alone therefore keeps the sheet fully opaque up to a cell inland,
+  // where alphaTest cuts it along terrain triangle edges — the hard polygonal
+  // wedges over the beach. Depth is the honest thickness of the body and
+  // reaches zero on the waterline itself, so fading what the surface
+  // contributes as it thins puts the edge back on the contour.
+  const waterlineFade = smoothstep(
+    0,
+    max(float(water.optics.shorelineFadeDepth), 1e-4),
+    waterDepth,
+  );
   const worldXZ = vec2(
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
@@ -179,8 +202,12 @@ export function createStylizedWaterMaterial({
   let color = legacyColor;
   let alpha = mix(float(water.deepOpacity), float(water.opacity), ramp)
     .mul(fade)
-    .mul(waterCoverage);
+    .mul(waterCoverage)
+    .mul(waterlineFade);
   let opticalDistance = float(0);
+  // How much of the bed still reaches the eye. Caustics are light landing on
+  // the bed, so they must not survive where the body has already absorbed it.
+  let bedVisibility = float(1);
   let bodyColor = legacyColor;
   let surfaceDetailMix = float(0);
   let foamAmount = float(0);
@@ -206,6 +233,7 @@ export function createStylizedWaterMaterial({
     );
     const transmission = exp(opticalDistance.mul(-optics.absorptionDensity));
     const absorbed = oneMinus(transmission);
+    bedVisibility = transmission;
     const depthMix = smoothstep(optics.shallowDepth, optics.deepDepth, waterDepth);
     const depthColor = mix(
       colorNode(optics.shallowColor),
@@ -217,13 +245,13 @@ export function createStylizedWaterMaterial({
       colorNode(optics.underwaterColor),
       underwaterBlend.mul(optics.underwaterTintStrength),
     );
-    surfaceDetailMix = float(optics.surfaceDetailStrength).mul(fade);
+    surfaceDetailMix = float(optics.surfaceDetailStrength).mul(fade).mul(waterlineFade);
     color = mix(bodyColor, legacyColor, surfaceDetailMix);
     alpha = mix(
       float(optics.minimumOpacity),
       float(optics.maximumOpacity),
       absorbed,
-    ).mul(waterCoverage);
+    ).mul(waterCoverage).mul(waterlineFade);
   }
 
   if (quality.foam && water.foam.enabled) {
@@ -247,7 +275,7 @@ export function createStylizedWaterMaterial({
       .mul(waterCoverage);
   }
 
-  if (quality.refraction && water.refraction.enabled) {
+  if (enableRefraction && quality.refraction && water.refraction.enabled) {
     const refraction = water.refraction;
     const coarsePoint = worldXZ
       .mul(refraction.coarseScale)
@@ -306,7 +334,7 @@ export function createStylizedWaterMaterial({
       refraction.sceneColorStrength,
     );
     color = mix(physicalColor, legacyColor, surfaceDetailMix);
-    alpha = waterCoverage;
+    alpha = waterCoverage.mul(waterlineFade);
 
     if (quality.intersectionFoam && water.foam.enabled) {
       const foam = water.foam;
@@ -327,15 +355,27 @@ export function createStylizedWaterMaterial({
     const caustics = water.caustics;
     const causticUv = worldXZ.mul(caustics.scale)
       .add(currentFlow.mul(time.mul(caustics.speed)));
-    const causticNoise = stylizedFbm(causticUv);
+    // A ring band around each voronoi point, not FBM. Light focused by a rippled
+    // surface lands on the bed as a web of thin filaments; FBM can only make
+    // soft blobs, which is why the water read as flat tint from above however
+    // much the intensity was raised. Isolating one radius of the F1 distance
+    // field draws a ring per cell, and neighbouring rings overlap into that web
+    // — for one voronoi rather than the two a border metric would need. The
+    // cell points drift on their own clock, so the web crawls.
+    const causticRing = abs(
+      voronoiF1(causticUv, time, caustics.speed).sub(CAUSTIC_RING_RADIUS),
+    );
+    const causticNet = clamp(oneMinus(causticRing.mul(caustics.contrast)), 0, 1);
     const shallow = oneMinus(smoothstep(
       caustics.depthFadeStart,
       caustics.depthFadeEnd,
       waterDepth,
     ));
-    const causticAmount = pow(clamp(causticNoise, 0, 1), caustics.contrast)
+    const causticAmount = causticNet.mul(causticNet)
       .mul(caustics.intensity * quality.causticStrength)
-      .mul(shallow);
+      .mul(shallow)
+      .mul(bedVisibility)
+      .mul(waterlineFade);
     color = color.add(colorNode(water.highlightColor).mul(causticAmount));
   }
 

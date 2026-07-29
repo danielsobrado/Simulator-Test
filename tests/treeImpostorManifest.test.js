@@ -91,6 +91,19 @@ test('accepts legacy atlases only as runtime-bake migration inputs', () => {
   assert.equal(result.prototypes[0].normalEncoding, TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING);
 });
 
+test('rejects legacy migration atlases when current offline assets are required', () => {
+  const value = prototype();
+  delete value.normalEncoding;
+
+  assert.throws(() => validateTreeImpostorManifest({
+    ...manifest([value]),
+    version: TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION,
+    sourceSignature: 'tree-impostor-v1-12345678',
+  }, {
+    allowLegacy: false,
+  }), /legacy.*runtime bake/i);
+});
+
 test('rejects stale source signatures for renderable v3 assets', () => {
   assert.throws(() => validateTreeImpostorManifest(manifest(), {
     expectedSourceSignature: 'tree-impostor-v2-deadbeef',

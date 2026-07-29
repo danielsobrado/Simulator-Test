@@ -4,6 +4,7 @@ import {
   createFlockMembers,
   createOrbitFlightPlan,
   sampleOrbitFlight,
+  sampleWingFlap,
   wildlifeDelaySeconds,
   wildlifeRange,
 } from './ambientWildlifeMath.js';
@@ -17,11 +18,23 @@ const SCRATCH = {
 
 function createBirdSilhouetteGeometry() {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-    0, 0.05, 0, -1.2, 0.42, 0, -0.12, -0.12, 0,
-    0, 0.05, 0, 0.12, -0.12, 0, 1.2, 0.42, 0,
+  const flatPose = [
+    0, 0.05, 0, -1.2, 0.05, 0, -0.12, -0.12, 0,
+    0, 0.05, 0, 0.12, -0.12, 0, 1.2, 0.05, 0,
     -0.1, 0.08, 0, 0.1, 0.08, 0, 0, -0.58, 0,
-  ], 3));
+  ];
+  const upstroke = new Array(flatPose.length).fill(0);
+  const downstroke = new Array(flatPose.length).fill(0);
+  upstroke[4] = 0.48;
+  upstroke[16] = 0.48;
+  downstroke[4] = -0.34;
+  downstroke[16] = -0.34;
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(flatPose, 3));
+  geometry.morphAttributes.position = [
+    new THREE.Float32BufferAttribute(upstroke, 3),
+    new THREE.Float32BufferAttribute(downstroke, 3),
+  ];
+  geometry.morphTargetsRelative = true;
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -56,6 +69,7 @@ class DistantBirdFlockTier {
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.wingMorph = { morphTargetInfluences: [0, 0] };
     root.add(this.mesh);
   }
 
@@ -127,8 +141,9 @@ class DistantBirdFlockTier {
     const sample = sampleOrbitFlight(this.active.plan, progress);
     const origin = this.terrainView.floatingOrigin.getState();
     const cameraQuaternion = camera.getWorldQuaternion(SCRATCH.quaternion);
+    const elapsedSeconds = (timestamp - this.active.startedAt) / 1000;
     this.active.members.forEach((member, index) => {
-      const flap = 0.84 + Math.sin(timestamp * 0.006 + member.phase) * 0.16;
+      const wingPose = sampleWingFlap(member, elapsedSeconds);
       SCRATCH.position.set(
         sample.x + sample.tangentX * member.along - sample.tangentZ * member.side - origin.x,
         sample.y + member.height,
@@ -136,7 +151,7 @@ class DistantBirdFlockTier {
       );
       SCRATCH.scale.set(
         this.config.size * member.scale,
-        this.config.size * member.scale * flap,
+        this.config.size * member.scale,
         this.config.size * member.scale,
       );
       SCRATCH.matrix.compose(
@@ -145,10 +160,14 @@ class DistantBirdFlockTier {
         SCRATCH.scale,
       );
       this.mesh.setMatrixAt(index, SCRATCH.matrix);
+      this.wingMorph.morphTargetInfluences[0] = Math.max(0, wingPose);
+      this.wingMorph.morphTargetInfluences[1] = Math.max(0, -wingPose);
+      this.mesh.setMorphAt(index, this.wingMorph);
     });
     this.mesh.count = this.active.members.length;
     this.mesh.visible = true;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.morphTexture.needsUpdate = true;
     PerfCounters.set('distantBirdInstances', this.mesh.count);
   }
 

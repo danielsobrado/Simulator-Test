@@ -17,6 +17,7 @@ const optics = Object.freeze({
   maximumOpticalDistance: 14,
   minimumViewCosine: 0.22,
   surfaceTransitionDepth: 0.75,
+  shorelineFadeDepth: 0.35,
   surfaceDetailStrength: 0.28,
   underwaterTintStrength: 0.35,
 });

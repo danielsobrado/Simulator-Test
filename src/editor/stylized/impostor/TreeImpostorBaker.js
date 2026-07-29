@@ -2,10 +2,8 @@ import * as THREE from 'three/webgpu';
 import {
   float,
   normalView,
-  texture,
-  uv,
-  vec4,
 } from 'three/tsl';
+import { authoredTexture } from '../AuthoredTextureNode.js';
 import { createDilatedAtlasTile } from './TreeImpostorAtlasPixels.js';
 import { createCaptureDirections } from './impostorFrame.js';
 import { TREE_IMPOSTOR_NORMAL_ENCODING } from './TreeImpostorManifest.js';
@@ -30,16 +28,27 @@ function unionBounds(parts) {
   return bounds;
 }
 
-function createBakeMaterial(part, normalPass) {
+export function createTreeImpostorBakeMaterial(part, normalPass) {
   const sourceMap = part.sourceMap ?? null;
   if (normalPass) {
     const material = new THREE.MeshBasicNodeMaterial({
       side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide,
     });
     const foliageMask = float(part.kind === 'leaf' ? 1 : 0);
-    material.colorNode = vec4(normalView.mul(0.5).add(0.5), foliageMask);
+    material.colorNode = normalView.mul(0.5).add(0.5);
+    material.opacityNode = foliageMask;
+    // NodeMaterial forces alpha to 1 for opaque NormalBlending materials.
+    // NoBlending keeps depth writes and RGB normals intact while preserving
+    // opacityNode as the foliage classification in render-target alpha.
+    material.blending = THREE.NoBlending;
     if (sourceMap) {
-      material.maskNode = texture(sourceMap, uv()).a.greaterThan(0.5);
+      // Leave the UV node implicit so TextureNode applies KHR_texture_transform.
+      // gltfpack rescales foliage UVs and stores the inverse transform on the
+      // texture; sampling raw `uv()` makes the entire leaf card transparent.
+      const alphaCutoff = part.material.alphaTest > 0
+        ? part.material.alphaTest
+        : 0.5;
+      material.maskNode = authoredTexture(sourceMap).a.greaterThan(alphaCutoff);
     }
     material.transparent = false;
     material.depthWrite = true;
@@ -72,7 +81,7 @@ function createPrototypeScene(parts, normalPass) {
   for (const part of parts) {
     const mesh = new THREE.Mesh(
       createBakeGeometry(part.geometry),
-      createBakeMaterial(part, normalPass),
+      createTreeImpostorBakeMaterial(part, normalPass),
     );
     mesh.frustumCulled = false;
     scene.add(mesh);

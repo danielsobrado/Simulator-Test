@@ -30,7 +30,10 @@ test('captured scene colour uses RGB absorption and manual coverage compositing'
   );
   assert.match(source, /sceneColor\.mul\(channelTransmission\)/);
   assert.match(source, /bodyColor\.mul\(oneMinus\(channelTransmission\)\)/);
-  assert.match(source, /alpha = waterCoverage;/);
+  // Coverage composites the body manually because the refracted colour already
+  // carries the scene behind it; the waterline fade is what keeps that opaque
+  // sheet from painting over the beach where the body has no thickness.
+  assert.match(source, /alpha = waterCoverage\.mul\(waterlineFade\);/);
 });
 
 test('refraction uses only two additional FBM samples', () => {

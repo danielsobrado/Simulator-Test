@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { validateEditorConfig } from '../src/config/validateEditorConfig.js';
 import {
   StylizedGodRaysPostProcess,
+  advectedDustDensityReference,
   dustModulationReference,
   exponentialHeightFogReference,
   godRaysCloudTransmissionReference,
@@ -17,10 +18,10 @@ import {
   godRaysScreenUvCoverageReference,
   godRaysSunSourceReference,
   godRaysVisibilityReference,
-  interleavedGradientNoiseReference,
   projectSunToScreen,
   sunScreenFade,
 } from '../src/editor/stylized/StylizedGodRaysPostProcess.js';
+import { cloudMotionCoordinatesReference } from '../src/editor/stylized/AtmosphereMotion.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -43,9 +44,9 @@ function enabledConfig() {
     decay: 0.92,
     weight: 0.35,
     exposure: 0.85,
-    dustStrength: 0.04,
-    dustScale: 3,
-    dustSpeed: 0.008,
+    dustStrength: 0.65,
+    dustScale: 4.5,
+    dustSpeed: 0.04,
     cloudOcclusion: 0.9,
     volumetric: {
       intensity: 1,
@@ -99,27 +100,82 @@ test('sun projection honors a parented camera world position', () => {
   assert.ok(Math.abs(info.v - 0.5) < 1e-4);
 });
 
-test('interleaved gradient noise is deterministic and decorrelates neighbors', () => {
-  for (let y = 0; y < 8; y += 1) {
-    for (let x = 0; x < 8; x += 1) {
-      const value = interleavedGradientNoiseReference(x, y);
-      assert.ok(value >= 0 && value < 1);
-      assert.equal(interleavedGradientNoiseReference(x, y), value);
-    }
-  }
-  const center = interleavedGradientNoiseReference(10, 10);
-  assert.ok(Math.abs(interleavedGradientNoiseReference(11, 10) - center) > 0.05);
-  assert.ok(Math.abs(interleavedGradientNoiseReference(10, 11) - center) > 0.05);
-});
-
-test('dust modulation carves dark lanes and adds sparse bright motes', () => {
+test('two smooth dust octaves carve dark lanes and bright density patches', () => {
   assert.equal(dustModulationReference(0.5, 0.5, 0), 1);
   const darkLane = dustModulationReference(0.1, 0.5, 0.8);
   const dustyShaft = dustModulationReference(0.7, 0.5, 0.8);
-  const brightMote = dustModulationReference(0.7, 0.99, 0.8);
+  const brightDetail = dustModulationReference(0.7, 0.99, 0.8);
   assert.ok(darkLane < 0.3);
   assert.ok(dustyShaft > 1);
-  assert.ok(brightMote > dustyShaft);
+  assert.ok(brightDetail > dustyShaft);
+});
+
+test('default radial dust has readable slow motion instead of a fixed spoke multiplier', () => {
+  const config = enabledConfig();
+  const darkDensity = dustModulationReference(0.1, 0.5, config.dustStrength);
+  const brightDensity = dustModulationReference(0.7, 0.5, config.dustStrength);
+  const tenSecondDrift = config.dustSpeed * 10;
+
+  assert.ok(
+    brightDensity - darkDensity >= 0.25,
+    'default dust contrast must visibly break up the integrated radial spokes',
+  );
+  assert.ok(
+    tenSecondDrift >= 0.2 && tenSecondDrift <= 0.8,
+    'default dust must cross a readable fraction of one smooth noise cell in ten seconds',
+  );
+});
+
+test('advected radial dust evolves continuously rather than blinking between frames', () => {
+  const config = enabledConfig();
+  const sample = (timeSeconds) => advectedDustDensityReference({
+    u: 0.37,
+    v: 0.62,
+    timeSeconds,
+    scale: config.dustScale,
+    speed: config.dustSpeed,
+    strength: config.dustStrength,
+  });
+  const start = sample(0);
+  const nextFrame = sample(1 / 60);
+  const tenSeconds = sample(10);
+
+  assert.equal(sample(0), start, 'the dust field must be deterministic');
+  assert.ok(
+    Math.abs(nextFrame - start) < 0.01,
+    'adjacent frames must remain temporally smooth',
+  );
+  assert.ok(
+    Math.abs(tenSeconds - start) > 0.05,
+    'the density field must visibly evolve over several seconds',
+  );
+});
+
+test('clouds drift and subtly evolve without adjacent-frame popping', () => {
+  const config = yaml.load(readFileSync(path.join(root, 'editor.config.yaml'), 'utf8'));
+  const sky = config.stylizedSurface.sky;
+  const sample = (timeSeconds) => cloudMotionCoordinatesReference({
+    projectedX: 0.37,
+    projectedY: -0.24,
+    timeSeconds,
+    scale: sky.cloudScale,
+    speed: sky.cloudSpeed,
+  });
+  const start = sample(0);
+  const nextFrame = sample(1 / 60);
+  const tenSeconds = sample(10);
+  const rigidTenSeconds = {
+    x: 0.37 * sky.cloudScale + sky.cloudSpeed * 10,
+    y: -0.24 * sky.cloudScale + sky.cloudSpeed * 10 * 0.37,
+  };
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  assert.ok(distance(start, nextFrame) < 0.002, 'cloud motion must stay smooth frame to frame');
+  assert.ok(distance(start, tenSeconds) > 0.1, 'cloud drift must be visible over several seconds');
+  assert.ok(
+    distance(tenSeconds, rigidTenSeconds) > 0.02,
+    'cloud silhouettes must evolve instead of translating as a rigid texture',
+  );
 });
 
 test('screen coverage includes exact edges and rejects outside samples', () => {
@@ -337,6 +393,22 @@ test('god ray settings switch techniques and update live uniforms safely', () =>
   assert.equal(clamped.volumetricResolutionScale, 1);
   assert.equal(clamped.volumetricRaymarchSteps, 8);
   assert.equal(clamped.cloudOcclusion, 0);
+  effect.dispose();
+});
+
+test('the scene clock explicitly drives animated dust in the god-ray RTT', () => {
+  const effect = new StylizedGodRaysPostProcess({
+    renderer: { samples: 4 },
+    scene: new THREE.Scene(),
+    config: enabledConfig(),
+    sunDirection: new THREE.Vector3(0, 0, -1),
+    sunColor: '#fff4d6',
+  });
+
+  effect.setTime(12.5);
+  assert.equal(effect.atmosphereTime.value, 12.5);
+  effect.setTime(Number.NaN);
+  assert.equal(effect.atmosphereTime.value, 12.5);
   effect.dispose();
 });
 

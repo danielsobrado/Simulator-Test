@@ -163,6 +163,7 @@ function validatePrototype(prototype, expectedIndex, normalEncoding) {
 }
 
 export function validateTreeImpostorManifest(manifest, {
+  allowLegacy = true,
   expectedPrototypeCount = null,
   expectedSourceSignature = null,
 } = {}) {
@@ -170,6 +171,11 @@ export function validateTreeImpostorManifest(manifest, {
     throw new Error('Tree impostor manifest is invalid.');
   }
   const legacy = manifest.version === TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION;
+  if (legacy && !allowLegacy) {
+    throw new Error(
+      `Tree impostor manifest v${manifest.version} is a legacy migration format that requires runtime bake.`,
+    );
+  }
   if (!legacy && manifest.version !== TREE_IMPOSTOR_MANIFEST_VERSION) {
     throw new Error(
       `Tree impostor manifest version ${manifest.version} is unsupported; expected ${TREE_IMPOSTOR_MANIFEST_VERSION}.`,

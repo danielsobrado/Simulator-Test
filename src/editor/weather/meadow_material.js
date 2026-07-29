@@ -28,9 +28,12 @@ import { Rng, hashCombine, hashString } from '../_clod_shims/seed.js';
 import { getSunLightGpuAtlas } from "../_clod_shims/sun_light_gpu_atlas.js";
 import {
   DEFAULT_MEADOW_WEATHER_SETTINGS,
+  MEADOW_ALPHA_CUTOFF,
   MEADOW_BOUNDS_RADIUS,
   MEADOW_FAR_COUNT,
   MEADOW_MID_COUNT,
+  MEADOW_MIN_ATLAS_VISIBILITY,
+  MEADOW_MIN_FORWARD_SCATTER,
   MEADOW_NEAR_COUNT,
   MEADOW_PARTICLE_COUNT,
   MEADOW_RING_RADIUS
@@ -179,16 +182,17 @@ void main() {
   float densityRoll = fract(sin(vSeed * 91.731 + 17.17) * 43758.5453123); if (densityRoll > uDensity) discard;
   vec2 rawUv = (vWorldPosition.xz - vec2(uSunVisibilityOriginX, uSunVisibilityOriginZ)) / max(uSunVisibilityWorldSize, 0.001);
   float inside = step(0.0, rawUv.x) * step(rawUv.x, 1.0) * step(0.0, rawUv.y) * step(rawUv.y, 1.0) * uSunVisibilityValid;
-  float visibility = smoothstep(uVisibilityStart, max(uVisibilityStart + 0.001, uVisibilityEnd), texture2D(uSunVisibilityAtlas, clamp(rawUv, 0.0, 1.0)).r) * inside;
+  float sampledVisibility = smoothstep(uVisibilityStart, max(uVisibilityStart + 0.001, uVisibilityEnd), texture2D(uSunVisibilityAtlas, clamp(rawUv, 0.0, 1.0)).r);
+  float visibility = mix(${MEADOW_MIN_ATLAS_VISIBILITY}, sampledVisibility, inside);
   vec3 toCamera = normalize(uCameraPosition - vWorldPosition);
-  float forwardScatter = pow(max(dot(toCamera, -normalize(uSunDirection)), 0.0), max(1.0, uForwardScatterPower));
+  float forwardScatter = mix(${MEADOW_MIN_FORWARD_SCATTER}, 1.0, pow(max(dot(toCamera, -normalize(uSunDirection)), 0.0), max(1.0, uForwardScatterPower)));
   float localMist = mix(uMistFloor, 1.0, clamp(uLocalMist, 0.0, 1.0));
   vec2 q = vUv * 2.0 - 1.0; float core = 1.0 - smoothstep(0.08, 0.58, length(q));
   float halo = 1.0 - smoothstep(0.18, 1.02, length(q));
   float mote = 0.78 + 0.22 * sin(vSeed * 13.7 + q.x * 19.0 + q.y * 23.0);
   float alpha = (core * 0.72 + halo * 0.34) * mote * vAlpha * uOpacity * clamp(uIntensity, 0.0, 1.6)
     * uStrength * uVisualAmount * visibility * forwardScatter * localMist;
-  if (alpha < 0.006) discard;
+  if (alpha < ${MEADOW_ALPHA_CUTOFF}) discard;
   vec3 color = mix(uWarmColor, uColdColor, clamp(uColdBlend, 0.0, 1.0));
   gl_FragColor = vec4(mix(color, vec3(1.0), vGlow * 0.12), alpha);
 }`;
@@ -349,15 +353,20 @@ function createMeadowNodeMaterial() {
     );
     const atlasUv = vec2(clamp(rawUv.x, 0, 1), clamp(rawUv.y, 0, 1));
     const inside = step(0, rawUv.x).mul(step(rawUv.x, 1)).mul(step(0, rawUv.y)).mul(step(rawUv.y, 1)).mul(uAtlasValid);
-    const visibility = smoothstep(uVisibilityStart, max(uVisibilityStart.add(1e-3), uVisibilityEnd), texture(atlas.texture, atlasUv).r).mul(inside);
+    const sampledVisibility = smoothstep(uVisibilityStart, max(uVisibilityStart.add(1e-3), uVisibilityEnd), texture(atlas.texture, atlasUv).r);
+    const visibility = mix(MEADOW_MIN_ATLAS_VISIBILITY, sampledVisibility, inside);
     const toCamera = normalize(uCameraPosition.sub(worldCenter));
-    const forwardScatter = pow(max(dot(toCamera, normalize(uSunDirection.mul(-1))), 0), max(uForwardScatterPower, 1));
+    const forwardScatter = mix(
+      MEADOW_MIN_FORWARD_SCATTER,
+      1,
+      pow(max(dot(toCamera, normalize(uSunDirection.mul(-1))), 0), max(uForwardScatterPower, 1))
+    );
     const localMist = mix(uMistFloor, 1, clamp(uLocalMist, 0, 1));
     const core = float(1).sub(smoothstep(0.08, 0.58, d));
     const halo = float(1).sub(smoothstep(0.18, 1.02, d));
     const mote = float(0.78).add(sin(aShape.w.mul(13.7).add(p.x.mul(19)).add(p.y.mul(23))).mul(0.22));
     const alpha = core.mul(0.72).add(halo.mul(0.34)).mul(mote).mul(aShape.y).mul(ringFade).mul(mix(0.75, 1.45, wave)).mul(uOpacity).mul(clamp(uIntensity, 0, 1.6)).mul(uStrength).mul(uVisualAmount).mul(visibility).mul(forwardScatter).mul(localMist);
-    alpha.lessThan(6e-3).discard();
+    alpha.lessThan(MEADOW_ALPHA_CUTOFF).discard();
     const color = mix(uWarmColor, uColdColor, clamp(uColdBlend, 0, 1));
     return vec4(mix(color, vec3(1, 1, 1), wave.mul(0.12)), alpha);
   });

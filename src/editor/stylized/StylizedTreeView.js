@@ -151,7 +151,6 @@ export class StylizedTreeView {
     this.prototypeTileIds = null;
     this.leafTints = createForestLeafTintTable({ config });
     this.proxyPrototypes = [];
-    this.fallbackImpostorPrototypes = [];
     this.renderers = [];
     this.proxyRenderers = [];
     this.fallbackImpostorRenderers = [];
@@ -458,7 +457,6 @@ export class StylizedTreeView {
     const impostorCapacity = capacityFor(settings.impostorRadius);
     const proxies = this.prototypes.map((parts) => createTreeProxyPrototype(parts, this.config));
     this.proxyPrototypes = proxies.map((prototype) => prototype.proxyParts);
-    this.fallbackImpostorPrototypes = proxies.map((prototype) => prototype.fallbackImpostorParts);
     this.prototypeHeight = Math.max(...proxies.map((prototype) => prototype.height));
     this.prototypeWidth = Math.max(...proxies.map((prototype) => prototype.width));
     this.renderers = createInstancedRenderers({
@@ -479,7 +477,7 @@ export class StylizedTreeView {
     });
     this.fallbackImpostorRenderers = createInstancedRenderers({
       root: this.root,
-      partsByPrototype: this.fallbackImpostorPrototypes,
+      partsByPrototype: this.proxyPrototypes,
       capacity: impostorCapacity,
       name: 'stylized-pine-impostor-fallback',
       castShadow: false,
@@ -523,7 +521,7 @@ export class StylizedTreeView {
       },
     });
     this.impostorReady = this.initializeImpostors(impostorCapacity).catch((error) => {
-      console.warn('Tree impostor initialization failed; cross-card fallback remains active.', error);
+      console.warn('Tree impostor initialization failed; low-poly proxy fallback remains active.', error);
       return null;
     });
   }
@@ -751,7 +749,6 @@ export class StylizedTreeView {
     disposeTreeImpostorAtlases(this.impostorAtlases);
     disposePrototypeParts(this.prototypes);
     disposePrototypeParts(this.proxyPrototypes);
-    disposePrototypeParts(this.fallbackImpostorPrototypes);
     disposePrototypeParts(this.clusterPrototypes);
     disposePrototypeParts(this.understoryPrototypes);
     this.prototypeIndicesByAsset.clear();
