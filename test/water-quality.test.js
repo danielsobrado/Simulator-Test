@@ -77,6 +77,8 @@ const base = Object.freeze({
 test('quality tiers preserve geography while selecting bounded visual features', () => {
   assert.deepEqual(resolveWaterQualityFeatures({ qualityTier: 'low' }), {
     flow: false,
+    cellularSurface: false,
+    fresnelStrength: 0,
     depthOptics: false,
     refraction: false,
     refractionStrength: 0,
@@ -91,6 +93,8 @@ test('quality tiers preserve geography while selecting bounded visual features',
   });
   const medium = resolveWaterQualityFeatures({ qualityTier: 'medium' });
   assert.equal(medium.flow, true);
+  assert.equal(medium.cellularSurface, true);
+  assert.ok(medium.fresnelStrength > 0);
   assert.equal(medium.depthOptics, true);
   assert.equal(medium.refraction, false);
   assert.equal(medium.foam, true);
@@ -101,11 +105,13 @@ test('quality tiers preserve geography while selecting bounded visual features',
   assert.equal(high.refraction, true);
   assert.equal(high.intersectionFoam, true);
   assert.equal(high.projectedCaustics, true);
+  assert.ok(high.fresnelStrength > medium.fresnelStrength);
   const ultra = resolveWaterQualityFeatures({ qualityTier: 'ultra' });
   assert.ok(ultra.refractionStrength > 1);
   assert.ok(ultra.foamStrength > 1);
   assert.ok(ultra.causticStrength > 1);
   assert.ok(ultra.projectedCausticStrength > 1);
+  assert.ok(ultra.fresnelStrength > high.fresnelStrength);
 });
 
 test('visual config rejects invalid W2 optics and surface effects', () => {
