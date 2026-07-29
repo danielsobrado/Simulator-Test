@@ -71,8 +71,38 @@ test('Earth edit converts render coordinates and commits a lower sculpt', () => 
   assert.equal(request.centerX, 51);
   assert.equal(request.centerZ, 101);
   assert.equal(request.operation, 'lower');
+  assert.equal(request.shape, 'sphere');
   assert.equal(request.brushSize, 3);
   assert.equal(request.strength, 1.5);
+});
+
+test('cube Earth edits reach the heightfield with the accepted shape', () => {
+  let request = null;
+  const view = terrainView({
+    sculpt: (options) => {
+      request = options;
+      return { indices: ['50:100'], before: [0], after: [1] };
+    },
+  });
+
+  const result = applyEarthTerrainEdit(
+    view,
+    new THREE.Vector3(),
+    {
+      enabled: true,
+      operation: 'add',
+      shape: 'cube',
+      radiusM: 4,
+      heightM: 2,
+      strength: 0.5,
+      falloff: 0.35,
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  assert.equal(request.shape, 'cube');
+  assert.equal(request.operation, 'raise');
 });
 
 test('unsupported Earth shapes fail without mutating terrain', () => {

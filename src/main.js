@@ -694,8 +694,6 @@ async function startEditor() {
       raycastTerrain: (ray, maxRange) => raycastTerrainHeightfield(terrainView, ray, maxRange),
     })
     : null;
-  spellRuntime?.precompile?.(terrainView.renderer);
-
   if (perfQaConfig?.scenarioId === 'object-town') {
     createObjectTownQaScene({
       target: perfQaConfig.buildingCount,
@@ -714,6 +712,7 @@ async function startEditor() {
   boot.start('prewarm', 'Compiling shaders — this is the long one');
   let finishWaterPrewarm = null;
   try {
+    await spellRuntime?.precompile?.(terrainView.renderer);
     stylizedSurface.prewarmStreamingResources(terrainView.renderer);
     finishWaterPrewarm = stylizedSurface.beginWaterRefractionPrewarm();
     await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);

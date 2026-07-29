@@ -26,7 +26,6 @@ test('spell source objects are reused across casts', () => {
   assert.match(source, /const fireballSource = \{ point: fireballPoseScratch\.base, direction: fireballPoseScratch\.dir \};/);
 });
 
-test('shader prewarm prefers async compilation and reports failures', () => {
-  assert.match(source, /const compile = renderer\.compileAsync \?\? renderer\.compile;/);
-  assert.match(source, /Shader precompile failed; first cast may hitch/);
+test('spell controller delegates shader readiness to the behavioral precompiler', () => {
+  assert.match(source, /return precompileSpellObjects\(renderer, scene, getCamera\(\)\);/);
 });

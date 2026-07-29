@@ -5,6 +5,7 @@ import { createEarthSpellVfx } from './earth_spell_vfx.js';
 import { createFireNodeMaterial } from './fire_node_material.js';
 import { createFireballSpellVfx } from './fireball_spell_vfx.js';
 import { createLightningSpellVfx } from './lightning_spell_vfx.js';
+import { precompileSpellObjects } from './spell_precompiler.js';
 import { createWaterNodeMaterial } from './water_node_material.js';
 
 const ENABLE_VISIBLE_FALLBACK = false;
@@ -15,14 +16,6 @@ const SPELL_LIGHT_ENVELOPE = Object.freeze({
   pulseStrength: 0.08,
   pulseCycles: 8,
 });
-const SPELL_PREWARM_NAME_PREFIXES = Object.freeze([
-  'fire-spell',
-  'water-spell',
-  'air-spell',
-  'earth-spell',
-  'lightning-spell',
-  'fireball-spell',
-]);
 const SPELL_VISIBLE_PROGRESS_FLOOR = 0.035;
 
 function createPoseScratch() {
@@ -330,28 +323,7 @@ export function createSpellVfxController(deps) {
       fireball?.update(frameNow);
     },
     precompile(renderer) {
-      const compile = renderer.compileAsync ?? renderer.compile;
-      if (typeof compile !== 'function') return false;
-      const toggled = [];
-      for (const child of scene.children) {
-        if (child.visible) continue;
-        if (SPELL_PREWARM_NAME_PREFIXES.some((prefix) => child.name.startsWith(prefix))) {
-          child.visible = true;
-          toggled.push(child);
-        }
-      }
-      if (toggled.length === 0) return false;
-      try {
-        const compilation = compile.call(renderer, scene, getCamera());
-        compilation?.catch?.((error) => {
-          console.warn('[spells] Shader precompile failed; first cast may hitch.', error);
-        });
-      } catch (error) {
-        console.warn('[spells] Shader precompile failed; first cast may hitch.', error);
-      } finally {
-        for (const object of toggled) object.visible = false;
-      }
-      return true;
+      return precompileSpellObjects(renderer, scene, getCamera());
     },
     dispose() {
       if (disposed) return;

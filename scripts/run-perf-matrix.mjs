@@ -3,9 +3,14 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluatePerfMatrix } from './perf-matrix-gates.mjs';
+import { acquirePerfRunLock } from './perf-run-lock.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'tmp', 'perf-matrix');
+fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+const releaseRunLock = acquirePerfRunLock(path.join(root, 'tmp', 'perf-matrix.lock'));
+process.once('exit', releaseRunLock);
 
 function readArg(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -27,11 +32,20 @@ function runScript(script, args) {
 }
 
 function reportSummary(report) {
+  const stylized = report.config?.world?.stylizedSurface;
   return {
     scenario: report.scenario,
     summary: report.summary,
     collision: report.collision,
     adapter: report.adapter,
+    density: {
+      treesPerChunk: stylized?.trees?.perChunk ?? null,
+      candidateBudgetPerChunk:
+        stylized?.trees?.habitat?.candidateBudgetPerChunk ?? null,
+      maxAcceptedPerChunk:
+        stylized?.trees?.habitat?.maxAcceptedPerChunk ?? null,
+      bladesPerCell: stylized?.grass?.bladesPerCell ?? null,
+    },
     counters: {
       rendererWebGPUBackend: report.counters?.rendererWebGPUBackend ?? 0,
       rendererWebGLBackend: report.counters?.rendererWebGLBackend ?? 0,
@@ -133,6 +147,10 @@ const matrix = {
   cases: results,
   water,
 };
+matrix.gate = evaluatePerfMatrix(matrix, {
+  requireCases: !waterOnly,
+  requireWater: includeWater,
+});
 fs.writeFileSync(matrixPath, `${JSON.stringify(matrix, null, 2)}\n`);
 console.log(JSON.stringify({
   outPath: matrixPath,
@@ -149,11 +167,13 @@ console.log(JSON.stringify({
     pass: water.acceptance?.pass ?? null,
     p95Ms: water.report?.summary?.dt?.p95Ms ?? null,
   },
+  gate: matrix.gate,
 }, null, 2));
 
 if (
   results.some((entry) => entry.execution.code !== 0 || !entry.report)
   || (water && (water.execution.code !== 0 || !water.report))
+  || !matrix.gate.passed
 ) {
   process.exitCode = 1;
 }

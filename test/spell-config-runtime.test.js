@@ -66,6 +66,26 @@ test('spell parser clamps unsafe tuning values', () => {
   assert.deepEqual(parsed.lightning.vfx.coreColor, [1, 0, 0.5]);
 });
 
+test('invalid spell leaf values preserve generated defaults', () => {
+  const parsed = parseSpellConfig({
+    spells: {
+      fire: {
+        cast_duration_ms: 'not-a-duration',
+        audio: { volume: 'not-a-volume' },
+        vfx: {
+          glow_color: ['not-a-color'],
+          glow_intensity: 'not-an-intensity',
+        },
+      },
+    },
+  });
+
+  assert.equal(parsed.fire.castDurationMs, defaultSpellConfig.fire.castDurationMs);
+  assert.equal(parsed.fire.audio.volume, defaultSpellConfig.fire.audio.volume);
+  assert.deepEqual(parsed.fire.vfx.glowColor, defaultSpellConfig.fire.vfx.glowColor);
+  assert.equal(parsed.fire.vfx.glowIntensity, defaultSpellConfig.fire.vfx.glowIntensity);
+});
+
 test('malformed YAML falls back without preventing startup', () => {
   const parsed = parseSpellConfig('spells: [');
   assert.equal(parsed.fire.id, 'fire');

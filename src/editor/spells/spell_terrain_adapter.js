@@ -44,7 +44,7 @@ export function applyEarthTerrainEdit(terrainView, renderPoint, config) {
   if (!terrainView?.heightField || !terrainView?.floatingOrigin || !config?.enabled) {
     return Object.freeze({ ok: false, changed: false, reason: 'terrain-edit-unavailable' });
   }
-  if (config.shape !== 'sphere') {
+  if (config.shape !== 'sphere' && config.shape !== 'cube') {
     return Object.freeze({ ok: false, changed: false, reason: 'unsupported-earth-shape' });
   }
 
@@ -61,6 +61,7 @@ export function applyEarthTerrainEdit(terrainView, renderPoint, config) {
     centerX,
     centerZ,
     brushSize,
+    shape: config.shape,
     operation,
     strength,
     smoothFactor: clamp(1 - config.falloff, 0, 1),

@@ -101,17 +101,28 @@ function readString(record, fallbackRecord, key, lastResort) {
   return typeof value === 'string' && value.trim() ? value.trim() : lastResort;
 }
 
+function finiteValue(record, key) {
+  const candidate = record?.[key];
+  if (candidate === null || candidate === undefined) return null;
+  const value = Number(candidate);
+  return Number.isFinite(value) ? value : null;
+}
+
 function readNumber(record, fallbackRecord, key, minimum, maximum) {
-  const value = Number(fallbackValue(record, fallbackRecord, key));
-  if (!Number.isFinite(value)) return minimum;
+  const value = finiteValue(record, key) ?? finiteValue(fallbackRecord, key);
+  if (value === null) return minimum;
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function colorValue(record, key) {
+  const candidate = record?.[key];
+  if (!Array.isArray(candidate) || candidate.length !== 3) return null;
+  const color = candidate.map(Number);
+  return color.every(Number.isFinite) ? color : null;
+}
+
 function readColor(record, fallbackRecord, key) {
-  const value = fallbackValue(record, fallbackRecord, key);
-  if (!Array.isArray(value) || value.length !== 3) return [1, 1, 1];
-  const color = value.map(Number);
-  if (!color.every(Number.isFinite)) return [1, 1, 1];
+  const color = colorValue(record, key) ?? colorValue(fallbackRecord, key) ?? [1, 1, 1];
   return color.map((channel) => Math.max(0, Math.min(1, channel)));
 }
 

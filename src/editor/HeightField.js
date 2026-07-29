@@ -1,5 +1,6 @@
 const HEIGHT_EPSILON = 1e-4;
 const VALID_OPERATIONS = new Set(['raise', 'lower', 'smooth']);
+const VALID_SHAPES = new Set(['sphere', 'cube']);
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -8,6 +9,12 @@ function clamp(value, minimum, maximum) {
 function smoothFalloff(distance, radius) {
   const normalized = clamp(1 - distance / radius, 0, 1);
   return normalized * normalized * (3 - 2 * normalized);
+}
+
+function brushDistance(shape, x, z, centerX, centerZ) {
+  const offsetX = Math.abs(x - centerX);
+  const offsetZ = Math.abs(z - centerZ);
+  return shape === 'cube' ? Math.max(offsetX, offsetZ) : Math.hypot(offsetX, offsetZ);
 }
 
 export class HeightField {
@@ -73,6 +80,7 @@ export class HeightField {
     centerX,
     centerZ,
     brushSize,
+    shape = 'sphere',
     operation,
     strength,
     smoothFactor,
@@ -82,6 +90,9 @@ export class HeightField {
   }) {
     if (!VALID_OPERATIONS.has(operation)) {
       throw new Error(`Unknown heightfield operation: ${operation}.`);
+    }
+    if (!VALID_SHAPES.has(shape)) {
+      throw new Error(`Unknown heightfield brush shape: ${shape}.`);
     }
 
     const radius = Math.max(1, (brushSize + 1) / 2);
@@ -96,7 +107,7 @@ export class HeightField {
 
     for (let z = minimumZ; z <= maximumZ; z += 1) {
       for (let x = minimumX; x <= maximumX; x += 1) {
-        const distance = Math.hypot(x - centerVertexX, z - centerVertexZ);
+        const distance = brushDistance(shape, x, z, centerVertexX, centerVertexZ);
         if (distance > radius) {
           continue;
         }

@@ -117,3 +117,28 @@ test('painting and sculpting patches undo across chunk borders', () => {
   store.applyHeightPatch(heightPatch, 'undo');
   assert.equal(store.getHeight(4, 0), heightBefore);
 });
+
+test('cube sculpting includes footprint corners that sphere sculpting excludes', () => {
+  const sphereStore = createStore();
+  const cubeStore = createStore();
+  const cornerX = -1;
+  const cornerZ = -1;
+  const sphereBefore = sphereStore.getHeight(cornerX, cornerZ);
+  const cubeBefore = cubeStore.getHeight(cornerX, cornerZ);
+  const options = {
+    centerX: 0,
+    centerZ: 0,
+    brushSize: 3,
+    operation: 'raise',
+    strength: 2,
+    smoothFactor: 0.5,
+    minHeight: -100,
+    maxHeight: 100,
+  };
+
+  sphereStore.sculpt({ ...options, shape: 'sphere' });
+  cubeStore.sculpt({ ...options, shape: 'cube' });
+
+  assert.equal(sphereStore.getHeight(cornerX, cornerZ), sphereBefore);
+  assert.ok(cubeStore.getHeight(cornerX, cornerZ) > cubeBefore);
+});

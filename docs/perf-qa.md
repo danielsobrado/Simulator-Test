@@ -110,6 +110,21 @@ Report kind: `simcity-dnd-perf-qa` (version `2`).
 | `npm run qa:perf:matrix` | Runs standard/dense-forest/high-grass/dense-mixed plus the construction corridor, then the deterministic water acceptance route; writes `tmp/perf-matrix-latest.json` |
 | `npm run qa:perf:parse` | `scripts/parse-perf-qa.mjs` — prints a short summary from a report or CDP extract JSON |
 
+The matrix is a gate, not only a batch runner. It exits non-zero unless:
+
+- all required cases produced measured frames on WebGPU with no WebGL backend;
+- collision readiness and its p95 gate passed in every movement case;
+- measured p95 stayed at or below 33.3 ms and hitch rate at or below 2%;
+- the report proves the requested tree/candidate/grass multipliers were applied;
+- the construction corridor had at least 12 resident wall modules and non-zero masonry;
+- the water route passed entry, swim, dive, surface, dry-exit, caustic, origin, and frame gates.
+
+The verdict and any failure messages are stored in `gate` inside
+`tmp/perf-matrix-latest.json`. The runner also owns
+`tmp/perf-matrix.lock`; a concurrent matrix exits immediately instead of
+silently sharing the GPU and corrupting both measurements. A stale lock is
+recovered when its recorded PID is no longer alive.
+
 Extra CLI flags for `qa:perf`:
 
 ```bash

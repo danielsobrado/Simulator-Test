@@ -32,6 +32,52 @@ new terrain ring completes, cold water-refraction bindings become resident, and
 one rock manifest can still exceed its nominal time budget. Steady p95 remains
 below 13 ms in every density/wall matrix case.
 
+## Incoming-main regression hardening
+
+A review of the 24-commit spell repair series plus the final terrain-crossing
+change found three contract gaps. They are fixed and covered by behavioral
+tests:
+
+1. Spell `compileAsync()` was started without returning an awaitable readiness
+   boundary. Startup now awaits a dedicated spell precompiler, and its test
+   holds hidden spell objects visible until a deferred compilation promise
+   settles. This keeps first-cast pipeline work under the loading overlay.
+2. `cube` was accepted by Earth spell configuration but rejected at terrain
+   commit. Finite and infinite heightfields now support square footprints using
+   Chebyshev brush distance; the existing spherical brush remains the default.
+3. Invalid spell leaf values selected schema minima or white instead of the
+   generated YAML defaults. Numeric and colour readers now validate the override,
+   then the generated fallback, before using a last-resort constant.
+
+The focused spell gate now contains 29 tests. The complete suite passed all
+1,651 tests, and the Vite production build succeeded.
+
+## Authoritative post-review matrix
+
+The matrix runner now validates workload activation as well as process success.
+It records the effective density knobs, requires WebGPU-only counters, checks
+collision readiness, requires resident wall geometry, and applies portable
+33.3 ms p95 / 2% hitch-rate ceilings. It also uses an exclusive PID lock after
+an overlapping headed run demonstrated that two concurrent GPU tests can
+produce plausible but invalid regressions.
+
+Isolated NVIDIA Lovelace results at 1280×720, 8 s warmup + 8 s measurement:
+
+| Case | Effective load | Avg FPS | p95 | p99 | Max | Hitch rate |
+|---|---|---:|---:|---:|---:|---:|
+| Standard | 12 trees/chunk, 576 grass blades/cell | 170.91 | 7.5 ms | 10.2 ms | 100.5 ms | 0.15% |
+| Dense forest | 24 trees/chunk, 2× candidate/acceptance budgets | 136.71 | 8.9 ms | 10.4 ms | 42.9 ms | 0.09% |
+| High grass | 1,152 grass blades/cell | 97.86 | 12.7 ms | 18.2 ms | 148.8 ms | 0.13% |
+| Dense mixed | Both 2× envelopes | 114.51 | 11.9 ms | 28.3 ms | 89.9 ms | 0.33% |
+| Construction corridor | 96 modules, 551 stones | 161.82 | 7.9 ms | 15.8 ms | 152.2 ms | 0.46% |
+| Water acceptance | 8.36 m max immersion | — | 6.3 ms | — | — | 0.10% |
+
+Every case reported `rendererWebGPUBackend=1`,
+`rendererWebGLBackend=0`; water reached submerged and returned dry, with a
+3.3 ms maximum projected-caustics CPU cost. The matrix verdict was `passed:
+true` with no failures. Isolated maxima remain cold-streaming events, so release
+decisions should still repeat the matrix as described under Remaining work.
+
 ## Findings and changes
 
 ### 1. The QA overlay was an O(n log n) per-frame workload

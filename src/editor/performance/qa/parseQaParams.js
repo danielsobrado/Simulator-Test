@@ -1,3 +1,5 @@
+import { resolvePerfQaDensityProfile } from './PerfQaDensityProfiles.js';
+
 const SCENARIOS = Object.freeze({
   move: {
     id: 'move',
@@ -200,7 +202,7 @@ export function parseQaParams(search = '') {
     buildingCount: scenario.id === 'object-town'
       ? Math.max(1, Math.min(256, Math.floor(readNumber(params, 'buildings', 64))))
       : null,
-    densityProfile: params.get('density') ?? 'standard',
+    densityProfile: resolvePerfQaDensityProfile(params.get('density') ?? 'standard').id,
   });
 }
 
