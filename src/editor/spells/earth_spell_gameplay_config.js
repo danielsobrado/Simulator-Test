@@ -1,5 +1,5 @@
 import { load } from 'js-yaml';
-import spellsYamlText from '../../../config/spells.yaml?raw';
+import spellDefaults from './spells_yaml_defaults.json' with { type: 'json' };
 
 const VALID_OPERATIONS = new Set(['add', 'remove']);
 const VALID_SHAPES = new Set(['sphere', 'cube']);
@@ -44,7 +44,7 @@ function sourceRecord(source) {
 }
 
 export function parseEarthSpellGameplayConfig(
-  source = spellsYamlText,
+  source = spellDefaults,
   fallback = DEFAULT_EARTH_SPELL_GAMEPLAY_CONFIG,
 ) {
   const root = sourceRecord(source);
