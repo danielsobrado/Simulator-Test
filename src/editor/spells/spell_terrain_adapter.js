@@ -118,13 +118,13 @@ export function raycastTerrainHeightfield(terrainView, ray, maxDistance = 40) {
   for (let index = 1; index <= stepCount; index += 1) {
     const distance = index * actualStep;
     const error = sampleHeightError(terrainView, normalizedRay, distance, point);
-    if (error <= RAYCAST_HIT_EPSILON_M) {
+    if (error <= 0) {
       let low = previousDistance;
       let high = distance;
       for (let refinement = 0; refinement < BINARY_REFINEMENT_STEPS; refinement += 1) {
         const middle = (low + high) * 0.5;
         const middleError = sampleHeightError(terrainView, normalizedRay, middle, point);
-        if (middleError > RAYCAST_HIT_EPSILON_M) low = middle;
+        if (middleError > 0) low = middle;
         else high = middle;
       }
       return createHit(terrainView, normalizedRay, high, point, normal);
