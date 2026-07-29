@@ -1,172 +1,162 @@
-import { emitAudio } from "../_clod_shims/audio.js";
-import { defaultSpellConfig } from "./spell_config.js";
-function createSpellMenu(deps = {}) {
+import { emitAudio } from '../_clod_shims/audio.js';
+import { defaultSpellConfig } from './spell_config.js';
+
+const MISS_FLASH_MS = 280;
+const SPELL_BUTTONS = Object.freeze([
+  { id: 'fire', key: 1, icon: '🔥', method: 'playFire' },
+  { id: 'water', key: 2, icon: '💧', method: 'playWater' },
+  { id: 'air', key: 3, icon: '💨', method: 'playAir' },
+  { id: 'earth', key: 4, icon: '🪨', method: 'playEarth' },
+  { id: 'lightning', key: 5, icon: '⚡', method: 'playLightning' },
+  { id: 'fireball', key: 6, icon: '☄️', method: 'playFireball' },
+]);
+
+function resolveMenuRoot(rootId, suppliedRoot) {
+  if (suppliedRoot) return { root: suppliedRoot, owned: false };
+  const existing = document.getElementById(rootId);
+  if (existing) return { root: existing, owned: false };
+  const root = document.createElement('nav');
+  root.id = rootId;
+  document.body.appendChild(root);
+  return { root, owned: true };
+}
+
+function stopUiPropagation(event) {
+  event.stopPropagation();
+}
+
+function createSpellButton({ key, icon, label, onClick }) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = `${key} ${icon} ${label}`;
+  button.title = `${label} spell (${key})`;
+  button.setAttribute('aria-pressed', 'false');
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+export function createSpellMenu(deps = {}) {
   const config = deps.config ?? defaultSpellConfig;
-  const root = deps.root ?? ensureMenuRoot(config.menu.rootId);
-  const shouldRemoveRoot = deps.root === void 0;
-  const controller = deps.controller;
-  let fireActiveReset = 0;
-  let waterActiveReset = 0;
-  let airActiveReset = 0;
-  let earthActiveReset = 0;
-  let lightningActiveReset = 0;
-  let fireballActiveReset = 0;
+  const controller = deps.controller ?? {};
+  const { root, owned } = resolveMenuRoot(config.menu.rootId, deps.root);
+  const resetTimers = new Map();
+  let missFlashTimer = 0;
   let dragOffset = null;
+
   root.replaceChildren();
-  root.setAttribute("aria-label", "Spell menu");
-  const title = document.createElement("span");
-  title.className = "spell-menu-title";
+  root.setAttribute('aria-label', 'Spell menu');
+
+  const title = document.createElement('span');
+  title.className = 'spell-menu-title';
   title.textContent = config.menu.title;
-  const slots = document.createElement("div");
-  slots.className = "spell-menu-slots";
-  const fireButton = createSpellButton(`1 \u{1F525} ${config.fire.label}`, `${config.fire.label} spell (1)`, () => castFire());
-  const waterButton = createSpellButton(`2 \u{1F4A7} ${config.water.label}`, `${config.water.label} spell (2)`, () => castWater());
-  const airButton = createSpellButton(`3 \u{1F4A8} ${config.air.label}`, `${config.air.label} spell (3)`, () => castAir());
-  const earthButton = createSpellButton(`4 \u{1FAA8} ${config.earth.label}`, `${config.earth.label} spell (4)`, () => castEarth());
-  const lightningButton = createSpellButton(`5 \u26A1 ${config.lightning.label}`, `${config.lightning.label} spell (5)`, () => castLightning());
-  const fireballButton = createSpellButton(`6 \u2604\uFE0F ${config.fireball.label}`, `${config.fireball.label} spell (6)`, () => castFireball());
-  root.addEventListener("pointerdown", stopUiPropagation);
-  root.addEventListener("click", stopUiPropagation);
-  slots.append(fireButton, waterButton, airButton, earthButton, lightningButton, fireballButton);
+
+  const slots = document.createElement('div');
+  slots.className = 'spell-menu-slots';
+  const buttons = new Map();
+
+  const flashMiss = (button) => {
+    window.clearTimeout(missFlashTimer);
+    button.classList.add('spell-miss');
+    missFlashTimer = window.setTimeout(() => {
+      button.classList.remove('spell-miss');
+      missFlashTimer = 0;
+    }, MISS_FLASH_MS);
+  };
+
+  const castSpell = (descriptor) => {
+    const entry = config[descriptor.id];
+    const button = buttons.get(descriptor.id);
+    if (!entry || !button) return false;
+
+    window.clearTimeout(resetTimers.get(descriptor.id));
+    const play = controller[descriptor.method];
+    const fired = typeof play === 'function'
+      && play(entry.castDurationMs) !== false;
+    if (!fired) {
+      button.setAttribute('aria-pressed', 'false');
+      flashMiss(button);
+      return false;
+    }
+
+    button.setAttribute('aria-pressed', 'true');
+    emitAudio(`spell.${descriptor.id}.cast`, {
+      volume: entry.audio.volume,
+      durationMs: entry.castDurationMs,
+    });
+    resetTimers.set(descriptor.id, window.setTimeout(() => {
+      button.setAttribute('aria-pressed', 'false');
+      resetTimers.delete(descriptor.id);
+    }, entry.castDurationMs));
+    return true;
+  };
+
+  for (const descriptor of SPELL_BUTTONS) {
+    const entry = config[descriptor.id];
+    const button = createSpellButton({
+      key: descriptor.key,
+      icon: descriptor.icon,
+      label: entry.label,
+      onClick: () => castSpell(descriptor),
+    });
+    buttons.set(descriptor.id, button);
+    slots.append(button);
+  }
+
   root.append(title, slots);
-  title.addEventListener("pointerdown", onDragStart);
-  function onDragStart(event) {
+  root.addEventListener('pointerdown', stopUiPropagation);
+  root.addEventListener('click', stopUiPropagation);
+
+  const onDragMove = (event) => {
+    if (!dragOffset) return;
+    const maximumLeft = Math.max(0, window.innerWidth - root.offsetWidth);
+    const maximumTop = Math.max(0, window.innerHeight - root.offsetHeight);
+    const left = Math.max(0, Math.min(maximumLeft, event.clientX - dragOffset.x));
+    const top = Math.max(0, Math.min(maximumTop, event.clientY - dragOffset.y));
+    root.style.left = `${left}px`;
+    root.style.top = `${top}px`;
+  };
+
+  const onDragEnd = () => {
+    dragOffset = null;
+    root.classList.remove('dragging');
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+  };
+
+  const onDragStart = (event) => {
     if (!(event.target instanceof HTMLElement) || !title.contains(event.target)) return;
     event.preventDefault();
     const rect = root.getBoundingClientRect();
     dragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
     root.style.left = `${rect.left}px`;
     root.style.top = `${rect.top}px`;
-    root.style.transform = "none";
-    root.style.bottom = "auto";
-    root.style.right = "auto";
-    root.classList.add("dragging");
-    window.addEventListener("pointermove", onDragMove);
-    window.addEventListener("pointerup", onDragEnd);
-  }
-  function onDragMove(event) {
-    if (!dragOffset) return;
-    root.style.left = `${event.clientX - dragOffset.x}px`;
-    root.style.top = `${event.clientY - dragOffset.y}px`;
-  }
-  function onDragEnd() {
-    dragOffset = null;
-    root.classList.remove("dragging");
-    window.removeEventListener("pointermove", onDragMove);
-    window.removeEventListener("pointerup", onDragEnd);
-  }
-  function castFire() {
-    window.clearTimeout(fireActiveReset);
-    fireButton.setAttribute("aria-pressed", "true");
-    controller?.playFire(config.fire.castDurationMs);
-    emitAudio("spell.fire.cast", { volume: config.fire.audio.volume, durationMs: config.fire.castDurationMs });
-    fireActiveReset = window.setTimeout(() => fireButton.setAttribute("aria-pressed", "false"), config.fire.castDurationMs);
-  }
-  function castWater() {
-    window.clearTimeout(waterActiveReset);
-    waterButton.setAttribute("aria-pressed", "true");
-    controller?.playWater(config.water.castDurationMs);
-    emitAudio("spell.water.cast", { volume: config.water.audio.volume, durationMs: config.water.castDurationMs });
-    waterActiveReset = window.setTimeout(() => waterButton.setAttribute("aria-pressed", "false"), config.water.castDurationMs);
-  }
-  function castAir() {
-    window.clearTimeout(airActiveReset);
-    airButton.setAttribute("aria-pressed", "true");
-    controller?.playAir(config.air.castDurationMs);
-    emitAudio("spell.air.cast", { volume: config.air.audio.volume, durationMs: config.air.castDurationMs });
-    airActiveReset = window.setTimeout(() => airButton.setAttribute("aria-pressed", "false"), config.air.castDurationMs);
-  }
-  function castEarth() {
-    window.clearTimeout(earthActiveReset);
-    earthButton.setAttribute("aria-pressed", "true");
-    const fired = controller?.playEarth(config.earth.castDurationMs);
-    if (!fired) flashSpellMiss(earthButton);
-    emitAudio("spell.earth.cast", { volume: config.earth.audio.volume, durationMs: config.earth.castDurationMs });
-    earthActiveReset = window.setTimeout(() => earthButton.setAttribute("aria-pressed", "false"), config.earth.castDurationMs);
-  }
-  let missFlashReset = 0;
-  function flashSpellMiss(button) {
-    window.clearTimeout(missFlashReset);
-    button.classList.add("spell-miss");
-    missFlashReset = window.setTimeout(() => button.classList.remove("spell-miss"), 280);
-  }
-  function castLightning() {
-    window.clearTimeout(lightningActiveReset);
-    lightningButton.setAttribute("aria-pressed", "true");
-    controller?.playLightning(config.lightning.castDurationMs);
-    emitAudio("spell.lightning.cast", { volume: config.lightning.audio.volume, durationMs: config.lightning.castDurationMs });
-    lightningActiveReset = window.setTimeout(
-      () => lightningButton.setAttribute("aria-pressed", "false"),
-      config.lightning.castDurationMs
-    );
-  }
-  function castFireball() {
-    window.clearTimeout(fireballActiveReset);
-    fireballButton.setAttribute("aria-pressed", "true");
-    controller?.playFireball(config.fireball.castDurationMs);
-    emitAudio("spell.fireball.cast", { volume: config.fireball.audio.volume, durationMs: config.fireball.castDurationMs });
-    fireballActiveReset = window.setTimeout(
-      () => fireballButton.setAttribute("aria-pressed", "false"),
-      config.fireball.castDurationMs
-    );
-  }
+    root.style.transform = 'none';
+    root.style.bottom = 'auto';
+    root.style.right = 'auto';
+    root.classList.add('dragging');
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+  };
+
+  title.addEventListener('pointerdown', onDragStart);
+
   return {
-    castFire,
-    castWater,
-    castAir,
-    castEarth,
-    castLightning,
-    castFireball,
-    dispose: () => {
-      window.clearTimeout(fireActiveReset);
-      window.clearTimeout(waterActiveReset);
-      window.clearTimeout(airActiveReset);
-      window.clearTimeout(earthActiveReset);
-      window.clearTimeout(lightningActiveReset);
-      window.clearTimeout(fireballActiveReset);
-      window.clearTimeout(missFlashReset);
-      fireActiveReset = 0;
-      waterActiveReset = 0;
-      airActiveReset = 0;
-      earthActiveReset = 0;
-      lightningActiveReset = 0;
-      fireballActiveReset = 0;
-      missFlashReset = 0;
+    castFire: () => castSpell(SPELL_BUTTONS[0]),
+    castWater: () => castSpell(SPELL_BUTTONS[1]),
+    castAir: () => castSpell(SPELL_BUTTONS[2]),
+    castEarth: () => castSpell(SPELL_BUTTONS[3]),
+    castLightning: () => castSpell(SPELL_BUTTONS[4]),
+    castFireball: () => castSpell(SPELL_BUTTONS[5]),
+    dispose() {
+      for (const timer of resetTimers.values()) window.clearTimeout(timer);
+      resetTimers.clear();
+      window.clearTimeout(missFlashTimer);
       if (dragOffset) onDragEnd();
-      title.removeEventListener("pointerdown", onDragStart);
-      root.removeEventListener("pointerdown", stopUiPropagation);
-      root.removeEventListener("click", stopUiPropagation);
-      fireButton.remove();
-      waterButton.remove();
-      airButton.remove();
-      earthButton.remove();
-      lightningButton.remove();
-      fireballButton.remove();
-      if (shouldRemoveRoot) root.remove();
+      title.removeEventListener('pointerdown', onDragStart);
+      root.removeEventListener('pointerdown', stopUiPropagation);
+      root.removeEventListener('click', stopUiPropagation);
+      if (owned) root.remove();
       else root.replaceChildren();
-    }
+    },
   };
 }
-function createSpellButton(label, title, onClick) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = label;
-  button.title = title;
-  button.setAttribute("aria-pressed", "false");
-  button.addEventListener("click", onClick);
-  return button;
-}
-function ensureMenuRoot(rootId) {
-  const existing = document.getElementById(rootId);
-  if (existing) return existing;
-  const root = document.createElement("nav");
-  root.id = rootId;
-  document.body.appendChild(root);
-  return root;
-}
-function stopUiPropagation(event) {
-  event.stopPropagation();
-}
-export {
-  createSpellMenu
-};
