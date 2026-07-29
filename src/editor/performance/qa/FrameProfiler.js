@@ -22,6 +22,7 @@ export class FrameProfiler {
     this.frames = [];
     this.recording = false;
     this.frameIndex = 0;
+    this.droppedFrameCount = 0;
     this.lastTimestamp = null;
     this.phaseStartedAt = 0;
     this.current = null;
@@ -31,6 +32,7 @@ export class FrameProfiler {
     this.recording = true;
     this.frames.length = 0;
     this.frameIndex = 0;
+    this.droppedFrameCount = 0;
     this.lastTimestamp = null;
     this.current = null;
   }
@@ -98,6 +100,7 @@ export class FrameProfiler {
 
     if (this.frames.length >= this.maxFrames) {
       this.frames.shift();
+      this.droppedFrameCount += 1;
     }
     this.frames.push(this.current);
     const frame = this.current;
@@ -137,6 +140,9 @@ export class FrameProfiler {
 
     return {
       frameCount: measured.length,
+      retainedFrameCount: this.frames.length,
+      droppedFrameCount: this.droppedFrameCount,
+      frameBufferComplete: this.droppedFrameCount === 0,
       durationMs,
       avgFps: durationMs > 0 ? (measured.length * 1000) / durationMs : null,
       dt: {

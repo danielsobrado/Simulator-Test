@@ -1,0 +1,141 @@
+version: 1
+repeats: 3
+baselineCase: open-ground-baseline
+hitchMs: 33.3
+timeoutPaddingSeconds: 90
+
+viewport:
+  width: 1600
+  height: 900
+  deviceScaleFactor: 1
+
+gates:
+  collisionP95Ms: 0.83
+  maxHitches: 0
+  maxReadinessMisses: 0
+  maxFailedChunks: 0
+  maxFinalQueueDepth: 0
+  requireCanonicalSignature: true
+  requireConsistentAdapter: true
+
+requiredCoverage:
+  - open-ground-run
+  - dense-forest-run
+  - scree-field-traversal
+  - walkable-rock-climb-loop
+  - dense-object-town
+  - long-curved-wall-traversal
+  - repeated-collision-chunk-crossing
+  - controlled-collision-frame-ab
+  - floating-origin-rebase-during-movement
+  - construction-edit-rebuild-nearby
+  - collision-unload-reload-cycle
+  - long-soak-10m
+
+cases:
+  - id: open-ground-baseline
+    label: Open-ground no-collision baseline
+    scenario: move
+    collisionRequired: false
+    warmupSeconds: 12
+    durationSeconds: 60
+    speed: run
+    minimumCounts: {}
+    minimumProviderComponents: {}
+    coverage:
+      - open-ground-run
+
+  - id: production-tree-trunk
+    label: Production tree trunk
+    scenario: collision-p3
+    collisionRequired: true
+    warmupSeconds: 8
+    durationSeconds: 6
+    speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
+    minimumProviderComponents:
+      trees:
+        colliders: 1
+    coverage:
+      - tree-trunk-production
+
+  - id: production-blocking-rock
+    label: Production blocking rock
+    scenario: collision-p4
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 7
+    speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
+    minimumProviderComponents:
+      rocks:
+        blocking: 1
+    coverage:
+      - blocking-rock-production
+
+  - id: walkable-rock-bvh
+    label: Walkable rock BVH
+    scenario: collision-p5
+    collisionRequired: true
+    warmupSeconds: 12
+    durationSeconds: 10
+    speed: run
+    minimumCounts:
+      candidates: 1
+      bvhQueries: 1
+      triangleTests: 1
+    minimumProviderComponents:
+      rocks:
+        walkable: 1
+    coverage:
+      - walkable-rock-contact
+
+  - id: placed-object-doorway
+    label: Placed-object doorway
+    scenario: collision-p6
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 9
+    speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
+    minimumProviderComponents:
+      objects:
+        colliders: 1
+    coverage:
+      - placed-object-doorway
+
+  - id: construction-wall
+    label: Construction wall
+    scenario: collision-p7
+    collisionRequired: true
+    warmupSeconds: 10
+    durationSeconds: 5
+    speed: run
+    minimumCounts:
+      candidates: 1
+      primitiveTests: 1
+    minimumProviderComponents:
+      constructions:
+        colliders: 1
+    coverage:
+      - construction-wall
+
+  - id: full-stack-chunk-crossing
+    label: Full-stack repeated collision chunk crossing
+    scenario: collision-p8
+    collisionRequired: true
+    warmupSeconds: 12
+    durationSeconds: 60
+    speed: run
+    minimumCounts:
+      broadphaseQueries: 1
+      activeChunks: 1
+    minimumProviderComponents: {}
+    coverage:
+      - repeated-collision-chunk-crossing

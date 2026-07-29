@@ -14,6 +14,10 @@ function formatMs(value) {
   return `${value.toFixed(1)}ms`;
 }
 
+function collisionStatus(playerController) {
+  return playerController.collisionRuntime?.getStatus?.() ?? null;
+}
+
 export class PerfQaHarness {
   constructor({
     config,
@@ -46,6 +50,8 @@ export class PerfQaHarness {
       avgFps: null,
       lastDtMs: null,
       hitchCount: 0,
+      collisionReady: null,
+      collisionFailure: null,
     };
     this.overlay = null;
     this.boundDownload = () => this.download();
@@ -78,6 +84,7 @@ export class PerfQaHarness {
         <div><dt>Frame dt</dt><dd data-role="dt">—</dd></div>
         <div><dt>Avg FPS</dt><dd data-role="fps">—</dd></div>
         <div><dt>Hitches</dt><dd data-role="hitches">0</dd></div>
+        <div><dt>Collision</dt><dd data-role="collision">—</dd></div>
         <div><dt>Pose</dt><dd data-role="pose">—</dd></div>
       </dl>
       <pre data-role="log"></pre>
@@ -113,6 +120,8 @@ export class PerfQaHarness {
       avgFps: null,
       lastDtMs: null,
       hitchCount: 0,
+      collisionReady: null,
+      collisionFailure: null,
     };
 
     this.playerController.setHarnessActive(true);
@@ -154,6 +163,9 @@ export class PerfQaHarness {
     originSnap = false,
     forcePredictiveRefresh = false,
   } = {}) {
+    const collision = collisionStatus(this.playerController);
+    this.live.collisionReady = collision?.ready ?? null;
+    this.live.collisionFailure = collision?.failure?.message ?? null;
     if (!this.recording) {
       this.renderOverlayThrottled();
       return null;
@@ -174,6 +186,8 @@ export class PerfQaHarness {
         z: playerStatus.position.z,
         grounded: playerStatus.grounded,
         running: playerStatus.running,
+        collisionReady: collision?.ready ?? null,
+        collisionFailure: collision?.failure ?? null,
       },
       originSnap,
       forcePredictiveRefresh,
@@ -249,6 +263,7 @@ export class PerfQaHarness {
     this.playerController.setHarnessKeys([]);
     this.playerController.setHarnessActive(false);
     this.profiler.stop();
+    const collision = collisionStatus(this.playerController);
     this.report = buildPerfReport({
       config: this.config,
       profiler: this.profiler,
@@ -267,6 +282,8 @@ export class PerfQaHarness {
           stylizedSurface: this.editorConfig.stylizedSurface ?? null,
         }
         : null,
+      collisionConfig: this.editorConfig?.collision ?? null,
+      collisionStatus: collision,
     });
     if (typeof window !== 'undefined') {
       window.__perfQaReport = this.report;
@@ -279,6 +296,8 @@ export class PerfQaHarness {
     this.log(
       `Done · avg ${this.report.summary.avgFps?.toFixed?.(1) ?? '—'} fps`
       + ` · p99 ${formatMs(this.report.summary.dt.p99Ms)}`
+      + ` · collision p95 ${formatMs(this.report.collision.timingsMs.total.p95Ms)}`
+      + ` · gate ${this.report.collision.gate.passed ? 'pass' : 'fail'}`
       + ` · hitches ${this.report.summary.hitchCount}`,
     );
     if (this.config.download) {
@@ -311,6 +330,7 @@ export class PerfQaHarness {
       download: () => this.download(),
       restart: () => this.start(),
       counters: () => PerfCounters.snapshot(),
+      collision: () => collisionStatus(this.playerController),
     };
   }
 
@@ -346,6 +366,13 @@ export class PerfQaHarness {
     this.overlay.querySelector('[data-role="fps"]').textContent =
       Number.isFinite(this.live.avgFps) ? this.live.avgFps.toFixed(1) : '—';
     this.overlay.querySelector('[data-role="hitches"]').textContent = String(this.live.hitchCount);
+    this.overlay.querySelector('[data-role="collision"]').textContent = this.live.collisionFailure
+      ? `failed · ${this.live.collisionFailure}`
+      : this.live.collisionReady === null
+        ? 'inactive'
+        : this.live.collisionReady
+          ? 'ready'
+          : 'loading';
     this.overlay.querySelector('[data-role="pose"]').textContent =
       `${player.x.toFixed(1)}, ${player.z.toFixed(1)}`;
     this.overlay.querySelector('[data-role="download"]').disabled = !this.report;
