@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CollisionResidency } from '../src/editor/collision/CollisionResidency.js';
 import { CollisionWorld } from '../src/editor/collision/CollisionWorld.js';
+import { collisionChunkCanonicalBounds } from '../src/editor/collision/colliders/ColliderBounds.js';
 import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
 
 const CONFIG = Object.freeze({
@@ -17,13 +18,14 @@ function createWorld() {
 }
 
 function chunkAabb(chunkX, chunkZ) {
+  const bounds = collisionChunkCanonicalBounds(chunkX, chunkZ, 128);
   return {
-    minX: chunkX * 128 + 1,
+    minX: bounds.minX + 1,
     minY: 0,
-    minZ: chunkZ * 128 + 1,
-    maxX: chunkX * 128 + 2,
+    minZ: bounds.minZ + 1,
+    maxX: bounds.minX + 2,
     maxY: 2,
-    maxZ: chunkZ * 128 + 2,
+    maxZ: bounds.minZ + 2,
   };
 }
 
@@ -56,14 +58,14 @@ test('velocity prefetch reverses route priority without retaining stale queued c
   });
 
   residency.update({ focus: { x: 1, z: 1 }, velocity: { x: 300, z: 0 } });
-  assert.deepEqual(residency.getStatus().predictedChunk, { chunkX: 2, chunkZ: 0 });
-  assert.equal(residency.desiredKeys.has('2:0'), true);
+  assert.deepEqual(residency.getStatus().predictedChunk, { chunkX: 2, chunkZ: -1 });
+  assert.equal(residency.desiredKeys.has('2:-1'), true);
 
   residency.update({ focus: { x: 1, z: 1 }, velocity: { x: -300, z: 0 } });
-  assert.deepEqual(residency.getStatus().predictedChunk, { chunkX: -3, chunkZ: 0 });
-  assert.equal(residency.desiredKeys.has('-3:0'), true);
-  assert.equal(residency.desiredKeys.has('2:0'), false);
-  assert.equal(residency.queue.some(({ key }) => key === '2:0'), false);
+  assert.deepEqual(residency.getStatus().predictedChunk, { chunkX: -3, chunkZ: -1 });
+  assert.equal(residency.desiredKeys.has('-3:-1'), true);
+  assert.equal(residency.desiredKeys.has('2:-1'), false);
+  assert.equal(residency.queue.some(({ key }) => key === '2:-1'), false);
 });
 
 test('teleport destination remains blocked until its owner chunk is ready', () => {
@@ -77,12 +79,12 @@ test('teleport destination remains blocked until its owner chunk is ready', () =
   });
 
   residency.update({ focus: { x: 900, z: 1 }, velocity: { x: 0, z: 0 } });
-  const before = residency.checkDestination(chunkAabb(7, 0));
+  const before = residency.checkDestination(chunkAabb(7, -1));
   assert.equal(before.ready, false);
-  assert.deepEqual(before.missing, ['7:0']);
+  assert.deepEqual(before.missing, ['7:-1']);
 
   residency.flush();
-  const after = residency.checkDestination(chunkAabb(7, 0));
+  const after = residency.checkDestination(chunkAabb(7, -1));
   assert.equal(after.ready, true);
   assert.deepEqual(after.missing, []);
 });
@@ -106,13 +108,13 @@ test('failed chunks expose structured context and stay unsafe', () => {
   residency.update({ focus: { x: 1, z: 1 }, velocity: { x: 0, z: 0 } });
   residency.flush();
   const status = residency.getStatus();
-  const readiness = residency.checkDestination(chunkAabb(0, 0));
+  const readiness = residency.checkDestination(chunkAabb(0, -1));
 
   assert.equal(status.ready, false);
   assert.deepEqual(status.failure, {
     providerId: 'production-natural-props',
     phase: 'chunk-build',
-    chunkKey: '0:0',
+    chunkKey: '0:-1',
     sourceId: 'rock:42',
     prototypeId: 'rock-walkable:granite',
     message: 'Missing required walkable proxy.',

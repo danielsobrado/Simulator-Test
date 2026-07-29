@@ -9,14 +9,16 @@ import {
   COLLIDER_TYPE_BOX,
   createPrimitiveCollider,
 } from '../src/editor/collision/colliders/ColliderRecords.js';
+import { collisionChunkForCanonical } from '../src/editor/collision/colliders/ColliderBounds.js';
 import { FloatingOrigin } from '../src/editor/world/FloatingOrigin.js';
 
 function collider() {
+  const owner = collisionChunkForCanonical(1028, -511.5, 128);
   return createPrimitiveCollider({
     sourceId: 'construction:wall:segment-1',
     type: COLLIDER_TYPE_BOX,
-    ownerChunkX: 8,
-    ownerChunkZ: -4,
+    ownerChunkX: owner.chunkX,
+    ownerChunkZ: owner.chunkZ,
     aabb: {
       minX: 1024,
       minY: 10,
@@ -36,8 +38,8 @@ test('floating-origin changes do not alter canonical collision signatures or bou
   const world = new CollisionWorld({ chunkWorldSize: 128, binSize: 16 });
   const record = collider();
   world.replaceOwnerChunk({
-    chunkX: 8,
-    chunkZ: -4,
+    chunkX: record.ownerChunkX,
+    chunkZ: record.ownerChunkZ,
     revision: 1,
     colliders: [record],
   });
@@ -64,8 +66,8 @@ test('canonical signatures are deterministic across identical reloads', () => {
   const record = collider();
   for (const world of [first, second]) {
     world.replaceOwnerChunk({
-      chunkX: 8,
-      chunkZ: -4,
+      chunkX: record.ownerChunkX,
+      chunkZ: record.ownerChunkZ,
       revision: 1,
       colliders: [record],
     });
