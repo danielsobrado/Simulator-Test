@@ -28,8 +28,15 @@ test('all six spell slots route through one guarded cast API', () => {
     /const SPELL_IDS = Object\.freeze\(\['fire', 'water', 'air', 'earth', 'lightning', 'fireball'\]\);/,
   );
   assert.match(runtimeSource, /const cast = \(spellId, durationMs\) => \{/);
-  assert.match(runtimeSource, /disposed \|\| !isWalkMode\(\) \|\| deps\.isInputBlocked\?\.\(\)/);
+  assert.match(runtimeSource, /disposed \|\| !isCastMode\(\) \|\| deps\.isInputBlocked\?\.\(\)/);
   assert.match(runtimeSource, /return \{\s*cast,/);
+});
+
+test('casting and menu visibility stop while player mode is paused', () => {
+  assert.match(runtimeSource, /viewState\?\.paused !== true/);
+  assert.match(runtimeSource, /viewState\?\.awaitingSpawn !== true/);
+  assert.match(runtimeSource, /deps\.subscribeViewMode\(\(state\) => \{/);
+  assert.match(runtimeSource, /const visible = isCastMode\(\);/);
 });
 
 test('spell keyboard handling covers top-row and numpad digits', () => {
