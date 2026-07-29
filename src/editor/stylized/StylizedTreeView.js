@@ -125,6 +125,20 @@ function disposePrototypeParts(prototypes) {
   prototypes.length = 0;
 }
 
+export function shouldScheduleTreeLodRebuild({
+  planChanged,
+  manifestsBuilt,
+  queueRemaining,
+  lastRebuildAt,
+  timestamp,
+  minimumIntervalMs,
+}) {
+  if (!planChanged && !manifestsBuilt) return false;
+  if (!Number.isFinite(lastRebuildAt)) return true;
+  if (queueRemaining === 0 && manifestsBuilt) return true;
+  return timestamp - lastRebuildAt >= minimumIntervalMs;
+}
+
 export class StylizedTreeView {
   constructor({
     terrainView,
@@ -166,6 +180,8 @@ export class StylizedTreeView {
     this.manifestStore = null;
     this.chunkLodStates = new Map();
     this.lastUpdateKey = null;
+    this.lastLodRebuildAt = Number.NEGATIVE_INFINITY;
+    this.lodRebuildIntervalMs = config.streaming?.treeLodRebuildIntervalMs ?? 33;
     this.pendingLodRebuild = null;
     this.disposed = false;
     this.root = new THREE.Group();
@@ -540,7 +556,7 @@ export class StylizedTreeView {
       console.warn('Tree impostor assets could not be loaded; runtime bake will be attempted.', error);
       return null;
     });
-    if (!atlases && settings.runtimeBake !== false) {
+    if (!atlases && (forceBake || settings.runtimeBake !== false)) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       atlases = await new TreeImpostorBaker({
         renderer: this.terrainView.renderer,
@@ -623,13 +639,21 @@ export class StylizedTreeView {
     ));
     const manifestFlush = this.manifestStore.flush();
 
-    if (key !== this.lastUpdateKey || manifestFlush.built > 0) {
+    if (shouldScheduleTreeLodRebuild({
+      planChanged: key !== this.lastUpdateKey,
+      manifestsBuilt: manifestFlush.built > 0,
+      queueRemaining: manifestFlush.remaining,
+      lastRebuildAt: this.lastLodRebuildAt,
+      timestamp,
+      minimumIntervalMs: this.lodRebuildIntervalMs,
+    })) {
       // Defer heavy instance writes to the budgeted tree build queue.
       this.pendingLodRebuild = {
         key: `tree-lod:${key}`,
         updateKey: key,
         plan,
         rockSource,
+        timestamp,
       };
     }
 
@@ -654,6 +678,7 @@ export class StylizedTreeView {
     if (!job) return false;
     this.pendingLodRebuild = null;
     this.lastUpdateKey = job.updateKey;
+    this.lastLodRebuildAt = job.timestamp;
     rebuildTreeLod({
       plan: job.plan,
       rockSource: job.rockSource,

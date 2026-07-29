@@ -1,4 +1,7 @@
-import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import {
+  PerfCounters,
+  resetWaterChunkGauges,
+} from '../performance/qa/PerfCounters.js';
 import { vec3 } from 'three/tsl';
 import {
   collectObjectBoulderPlacements,
@@ -362,8 +365,11 @@ export class StylizedSurfaceView {
   }
 
   updateRendererCounters() {
-    const info = this.terrainView.renderer.info;
+    const renderer = this.terrainView.renderer;
+    const info = renderer.info;
     if (!info) return;
+    PerfCounters.set('rendererWebGPUBackend', renderer.backend?.isWebGPUBackend ? 1 : 0);
+    PerfCounters.set('rendererWebGLBackend', renderer.backend?.isWebGLBackend ? 1 : 0);
     for (const [name, value] of [
       ['rendererDrawCalls', info.render?.calls],
       ['rendererTriangles', info.render?.triangles],
@@ -381,9 +387,111 @@ export class StylizedSurfaceView {
     this.skyView?.setFogDensity(fogDensity);
   }
 
+  /**
+   * Allocate and upload the fixed slot texture set while the boot overlay is
+   * still visible. Terrain streaming reuses these slots; allowing the first
+   * chunk boundary to initialize them made GPU texture creation land directly
+   * in a movement frame.
+   */
+  prewarmStreamingResources(renderer = this.terrainView.renderer) {
+    const textures = new Set();
+    for (const terrainSlot of this.terrainView.slots) {
+      for (const texture of [
+        terrainSlot.tileTexture,
+        terrainSlot.surfaceMaskTexture,
+        terrainSlot.heightTexture,
+        terrainSlot.forestFloorTexture,
+      ]) {
+        if (texture) textures.add(texture);
+      }
+    }
+    for (const waterSlot of this.waterSlots) {
+      textures.add(waterSlot.waterFieldTexture);
+      textures.add(waterSlot.waterFlowTexture);
+    }
+    for (const grassSlot of this.slots) {
+      grassSlot.pinResources();
+      textures.add(grassSlot.trampleTexture);
+    }
+    for (const texture of textures) renderer.initTexture(texture);
+    PerfCounters.set('streamingTexturesPrewarmed', textures.size);
+    PerfCounters.set('grassSlotsPinned', this.slots.length);
+    return textures.size;
+  }
+
+  /**
+   * Temporarily submit one refractive water mesh during boot. Compilation alone
+   * does not allocate Three's viewport colour/depth targets; without this warm
+   * render, the first shoreline frame creates them while the player is moving.
+   */
+  beginWaterRefractionPrewarm() {
+    if (this.waterSlots.length === 0) return null;
+    // The initial resident window is already exercised during startup. Warm
+    // the unused pool slots that streaming will claim at the first boundary;
+    // warming every slot multiplied viewport-node resources with no additional
+    // hitch benefit.
+    const slots = this.waterSlots.filter((slot) => !slot.terrainSlot.descriptor);
+    if (slots.length === 0) slots.push(this.waterSlots[0]);
+    const previous = slots.map((slot) => ({
+      slot,
+      material: slot.mesh.material,
+      visible: slot.mesh.visible,
+    }));
+    for (const slot of slots) {
+      slot.mesh.material = slot.ensureRefractiveMaterial();
+      slot.mesh.visible = true;
+      slot.refractionPrewarmed = true;
+    }
+    return () => {
+      for (const state of previous) {
+        state.slot.mesh.material = state.material;
+        state.slot.mesh.visible = state.visible;
+      }
+    };
+  }
+
+  prewarmOneDistantWaterSlot() {
+    let candidate = null;
+    let candidateDistance = Number.POSITIVE_INFINITY;
+    const focus = this.terrainView.focusChunkKey ? this.terrainView.focusChunk : null;
+    if (!focus) return false;
+    for (const slot of this.waterSlots) {
+      const descriptor = slot.terrainSlot.descriptor;
+      if (
+        !descriptor
+        || !slot.hasWaterCoverage
+        || slot.refractionPrewarmed
+        || slot.isWithinRefractionRange()
+      ) {
+        continue;
+      }
+      const distance = Math.max(
+        Math.abs(descriptor.chunkX - focus.chunkX),
+        Math.abs(descriptor.chunkZ - focus.chunkZ),
+      );
+      if (distance < candidateDistance) {
+        candidate = slot;
+        candidateDistance = distance;
+      }
+    }
+    if (!candidate) return false;
+    // Submit one still-distant wet chunk with the refractive variant for a
+    // single frame. Its material/texture bindings are then resident before the
+    // chunk reaches the near-water band, spreading N cold initializations over
+    // N ordinary frames instead of one shoreline hitch.
+    candidate.mesh.material = candidate.ensureRefractiveMaterial();
+    candidate.refractionPrewarmed = true;
+    PerfCounters.inc('waterRefractionSlotsPrewarmed');
+    return true;
+  }
+
   update(timestamp, camera) {
     if (!this.enabled || this.impostorBakeMode) return;
     this.frameStartedAt = performance.now();
+    // These are gauges, not lifetime counters. Reset them before the slot pass
+    // so reports describe current water residency instead of accumulating one
+    // increment per slot on every frame.
+    resetWaterChunkGauges();
     this.updateRendererCounters();
     // Ahead of the layer updates: a variant installed here is picked up by this
     // frame's rebuild scheduling rather than waiting for the next one.
@@ -432,6 +540,7 @@ export class StylizedSurfaceView {
     this.updateForestGroundTextures();
     this.flowerView?.update(timestamp);
     for (const slot of this.waterSlots) slot.update(timestamp);
+    this.prewarmOneDistantWaterSlot();
 
     const focusChunk = this.terrainView.focusChunkKey ? this.terrainView.focusChunk : null;
     const rockRadius = this.config.rocks.radius;

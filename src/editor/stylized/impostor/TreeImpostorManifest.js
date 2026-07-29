@@ -3,7 +3,7 @@ export const TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION = 2;
 export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-a';
 export const TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING = 'view-normal-rgb-coverage-a';
 
-const SOURCE_SIGNATURE_VERSION = 2;
+const SOURCE_SIGNATURE_VERSION = 3;
 const REQUIRED_NUMERIC_FIELDS = Object.freeze([
   'columns',
   'rows',
@@ -94,10 +94,16 @@ export function createTreeImpostorSourceSignature(prototypes, config) {
   if (!Array.isArray(prototypes) || prototypes.length === 0) {
     throw new Error('Tree impostor source signature requires at least one prototype.');
   }
+  const {
+    enabled: _enabled,
+    manifest: _manifest,
+    runtimeBake: _runtimeBake,
+    ...impostorBakeConfig
+  } = config?.lod?.impostor ?? {};
   const configuration = JSON.stringify({
     trees: config?.trees ?? null,
     treeVariants: config?.assets?.treeVariants ?? null,
-    impostor: config?.lod?.impostor ?? null,
+    impostor: impostorBakeConfig,
     normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
   });
   let hash = hashText(0x811c9dc5, configuration);

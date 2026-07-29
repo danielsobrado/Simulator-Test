@@ -48,6 +48,7 @@ const warmup = readArg('warmup', '2');
 const speed = readArg('speed', 'run');
 const hitchMs = readArg('hitchMs', '33.3');
 const buildings = readArg('buildings');
+const density = readArg('density');
 const collisionDebug = readArg('collisionDebug');
 const spawnX = readArg('x');
 const spawnZ = readArg('z');
@@ -66,6 +67,11 @@ const screenshotPath = screenshotArg === null ? null : path.resolve(screenshotAr
 const screenshotReportPath = screenshotPath === null
   ? null
   : path.relative(root, screenshotPath).replaceAll('\\', '/');
+const cpuProfileArg = readArg('cpu-profile');
+const cpuProfilePath = cpuProfileArg === null ? null : path.resolve(cpuProfileArg);
+const cpuProfileReportPath = cpuProfilePath === null
+  ? null
+  : path.relative(root, cpuProfilePath).replaceAll('\\', '/');
 const runnerPath = path.join(
   outDir,
   `perf-qa-playwright-runner-${process.pid}-${randomUUID()}.cjs`,
@@ -81,6 +87,7 @@ const query = new URLSearchParams({
   autostart: '1',
 });
 setOptionalQuery(query, 'buildings', buildings);
+setOptionalQuery(query, 'density', density);
 setOptionalQuery(query, 'collisionDebug', collisionDebug);
 setOptionalQuery(query, 'x', spawnX);
 setOptionalQuery(query, 'z', spawnZ);
@@ -91,6 +98,7 @@ const targetUrl = `${baseUrl.replace(/\/$/, '')}/?${query.toString()}`;
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 if (screenshotPath !== null) fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+if (cpuProfilePath !== null) fs.mkdirSync(path.dirname(cpuProfilePath), { recursive: true });
 
 fs.writeFileSync(
   runnerPath,
@@ -100,6 +108,8 @@ const fs = require('fs');
 
 (async () => {
   let browser = null;
+  let cdp = null;
+  let cpuProfiling = false;
   try {
     browser = await chromium.launch({
       headless: ${hasFlag('headed') ? 'false' : 'true'},
@@ -187,6 +197,14 @@ const fs = require('fs');
     }
     console.log('WebGPU adapter: ' + JSON.stringify(adapter));
 
+    if (${JSON.stringify(cpuProfilePath)} !== null) {
+      cdp = await page.context().newCDPSession(page);
+      await cdp.send('Profiler.enable');
+      await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
+      await cdp.send('Profiler.start');
+      cpuProfiling = true;
+    }
+
     // Vite can briefly replace the document while applying a pending full
     // reload. The harness API is republished by the next bootstrap, so keep
     // polling through that gap instead of turning a harmless reload into a
@@ -195,6 +213,14 @@ const fs = require('fs');
       timeout: ${timeoutMs},
     });
     const report = await page.evaluate(() => window.__perfQa.getReport());
+    if (cpuProfiling) {
+      const { profile } = await cdp.send('Profiler.stop');
+      cpuProfiling = false;
+      fs.writeFileSync(
+        ${JSON.stringify(cpuProfilePath?.replace(/\\/g, '/') ?? null)},
+        JSON.stringify(profile),
+      );
+    }
     report.adapter = adapter;
     report.capture = {
       viewport: {
@@ -204,12 +230,14 @@ const fs = require('fs');
       },
       rendererBackend,
       screenshot: ${JSON.stringify(screenshotReportPath)},
+      cpuProfile: ${JSON.stringify(cpuProfileReportPath)},
     };
     ${screenshotPath === null ? '' : `await page.screenshot({ path: ${JSON.stringify(screenshotPath.replace(/\\/g, '/'))} });`}
     fs.writeFileSync(${JSON.stringify(outPath.replace(/\\/g, '/'))}, JSON.stringify(report, null, 2) + '\\n');
     console.log(JSON.stringify({
       outPath: ${JSON.stringify(outPath.replace(/\\/g, '/'))},
       screenshotPath: ${JSON.stringify(screenshotPath?.replace(/\\/g, '/') ?? null)},
+      cpuProfilePath: ${JSON.stringify(cpuProfilePath?.replace(/\\/g, '/') ?? null)},
       adapter,
       capture: report.capture,
       scenario: report.scenario?.id,
@@ -227,6 +255,9 @@ const fs = require('fs');
         : null,
     }, null, 2));
   } finally {
+    if (cpuProfiling) {
+      await cdp?.send('Profiler.stop').catch(() => {});
+    }
     await browser?.close();
   }
 })().catch((error) => {

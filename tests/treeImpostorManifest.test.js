@@ -139,7 +139,7 @@ test('source signature changes with geometry or bake configuration', () => {
   const configChanged = createTreeImpostorSourceSignature([
     [{ kind: 'leaf', geometry: geometry(1), sourceMap: null }],
   ], { ...config, lod: { impostor: { columns: 16 } } });
-  assert.match(first, /^tree-impostor-v2-/);
+  assert.match(first, /^tree-impostor-v3-/);
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });
@@ -162,4 +162,42 @@ test('source signature changes with authored tree material configuration', () =>
   });
 
   assert.notEqual(first, changed);
+});
+
+test('source signature ignores runtime-only impostor policy', () => {
+  const prototypeParts = [[{
+    kind: 'leaf',
+    geometry: geometry(1),
+    sourceMap: null,
+  }]];
+  const bakeSettings = {
+    columns: 8,
+    rows: 2,
+    tileSize: 128,
+    gutter: 4,
+  };
+  const enabled = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    lod: {
+      impostor: {
+        ...bakeSettings,
+        enabled: true,
+        manifest: '/assets/impostors/trees/manifest.json',
+        runtimeBake: true,
+      },
+    },
+  });
+  const readbackFree = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    lod: {
+      impostor: {
+        ...bakeSettings,
+        enabled: false,
+        manifest: '/different/runtime/path.json',
+        runtimeBake: false,
+      },
+    },
+  });
+
+  assert.equal(enabled, readbackFree);
 });

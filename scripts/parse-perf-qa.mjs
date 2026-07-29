@@ -67,6 +67,8 @@ const subPhases = [
   'tilePixels',
   'surfaceMask',
   'textureCommit',
+  'rockManifestBuild',
+  'grassResourceAllocation',
   'grassScatter',
   'grassTrample',
   'grassBufferUpload',

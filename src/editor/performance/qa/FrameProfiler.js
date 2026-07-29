@@ -23,6 +23,8 @@ export class FrameProfiler {
     this.recording = false;
     this.frameIndex = 0;
     this.droppedFrameCount = 0;
+    this.measuredFrameCount = 0;
+    this.measuredDurationMs = 0;
     this.lastTimestamp = null;
     this.phaseStartedAt = 0;
     this.current = null;
@@ -33,6 +35,8 @@ export class FrameProfiler {
     this.frames.length = 0;
     this.frameIndex = 0;
     this.droppedFrameCount = 0;
+    this.measuredFrameCount = 0;
+    this.measuredDurationMs = 0;
     this.lastTimestamp = null;
     this.current = null;
   }
@@ -97,6 +101,10 @@ export class FrameProfiler {
     this.current.player = player;
     this.current.originSnap = Boolean(originSnap);
     this.current.forcePredictiveRefresh = Boolean(forcePredictiveRefresh);
+    if (this.current.dt > 0) {
+      this.measuredFrameCount += 1;
+      this.measuredDurationMs += this.current.dt;
+    }
 
     if (this.frames.length >= this.maxFrames) {
       this.frames.shift();
@@ -106,6 +114,12 @@ export class FrameProfiler {
     const frame = this.current;
     this.current = null;
     return frame;
+  }
+
+  getLiveAverageFps() {
+    return this.measuredDurationMs > 0
+      ? (this.measuredFrameCount * 1000) / this.measuredDurationMs
+      : null;
   }
 
   getFrames() {

@@ -26,6 +26,25 @@ const SCENARIOS = Object.freeze({
     keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
     defaults: { duration: 14, speed: 'run', warmup: 8 },
   },
+  'construction-ring': {
+    id: 'construction-ring',
+    label: 'Dense construction wall corridor',
+    keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+    defaults: {
+      duration: 14,
+      speed: 'run',
+      warmup: 10,
+      spawn: { x: 0, z: -24 },
+      yawDegrees: 0,
+    },
+  },
+  'water-acceptance': {
+    id: 'water-acceptance',
+    label: 'Dry-to-deep water acceptance',
+    // The external water runner drives enter/dive/surface/exit explicitly.
+    keys: () => [],
+    defaults: { duration: 24, speed: 'walk', warmup: 4 },
+  },
   'collision-p0': {
     id: 'collision-p0',
     label: 'Collision P0 fixture baseline',
@@ -181,6 +200,7 @@ export function parseQaParams(search = '') {
     buildingCount: scenario.id === 'object-town'
       ? Math.max(1, Math.min(256, Math.floor(readNumber(params, 'buildings', 64))))
       : null,
+    densityProfile: params.get('density') ?? 'standard',
   });
 }
 

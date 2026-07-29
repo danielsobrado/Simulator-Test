@@ -255,6 +255,19 @@ export function createCollisionRuntime({
   let lastFocus = null;
   let lastTimestamp = null;
 
+  function getLiveStatus() {
+    const residencyStatus = residency.getStatus();
+    const providerStatus = provider.getStatus?.() ?? null;
+    return Object.freeze({
+      active: true,
+      qaMode,
+      qaScenario: activeQaScenario,
+      residency: residencyStatus,
+      ready: residencyStatus.ready,
+      failure: residencyStatus.failure ?? providerRefreshFailure(providerStatus),
+    });
+  }
+
   function updateRuntime(focus, timestamp) {
     let velocity = { x: 0, z: 0 };
     if (lastFocus && Number.isFinite(lastTimestamp) && timestamp > lastTimestamp) {
@@ -323,20 +336,16 @@ export function createCollisionRuntime({
     getCanonicalSignature() {
       return canonicalCollisionSignature(world);
     },
+    getLiveStatus,
     getStatus() {
       const composition = updateWorldCompositionCounters(world);
-      const residencyStatus = residency.getStatus();
       const providerStatus = provider.getStatus?.() ?? null;
+      const liveStatus = getLiveStatus();
       return Object.freeze({
-        active: true,
-        qaMode,
-        qaScenario: activeQaScenario,
+        ...liveStatus,
         canonicalSignature: canonicalCollisionSignature(world),
         provider: providerStatus,
         world: Object.freeze({ ...world.getStatus(), ...composition }),
-        residency: residencyStatus,
-        ready: residencyStatus.ready,
-        failure: residencyStatus.failure ?? providerRefreshFailure(providerStatus),
       });
     },
     dispose() {

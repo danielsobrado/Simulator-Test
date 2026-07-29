@@ -78,6 +78,7 @@ export class StylizedWaterSlot {
     // viewport-texture nodes costs the whole frame a colour copy, a depth copy
     // and a mip chain, so a session that never nears water must never create it.
     this.refractiveMaterial = null;
+    this.refractionPrewarmed = false;
     this.mesh = new THREE.Mesh(terrainView.geometry, this.material);
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.visible = false;
@@ -119,6 +120,13 @@ export class StylizedWaterSlot {
 
   resolveMaterial() {
     if (!this.hasWaterCoverage || !this.isWithinRefractionRange()) return this.material;
+    if (this.refractiveMaterial === null) {
+      this.refractiveMaterial = this.createMaterial(true);
+    }
+    return this.refractiveMaterial;
+  }
+
+  ensureRefractiveMaterial() {
     if (this.refractiveMaterial === null) {
       this.refractiveMaterial = this.createMaterial(true);
     }

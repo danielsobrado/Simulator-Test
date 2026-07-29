@@ -1,4 +1,5 @@
 import { ensureCollisionP7QaFixture } from '../collision/CollisionP7QaFixture.js';
+import { ensureConstructionPerfQaFixture } from './ConstructionPerfQaFixture.js';
 import { constructionCollisionSource } from '../collision/providers/ConstructionCollisionSource.js';
 import { normalizeConstructionRecord } from './ConstructionSchema.js';
 
@@ -162,6 +163,7 @@ export class ConstructionStore {
     this.nextId = Math.max(1, ...normalized.map(({ id }) => numericSuffix(id) + 1));
     this.emit({ kind: 'replace', before: null, after: this.list() });
     ensureCollisionP7QaFixture(this, browserSearch());
+    ensureConstructionPerfQaFixture(this, browserSearch());
   }
 
   toDocument() {

@@ -55,3 +55,9 @@ export const PerfCounters = {
     return result;
   },
 };
+
+export function resetWaterChunkGauges() {
+  PerfCounters.set(PERF_COUNTER_WATER_CHUNKS_WET, 0);
+  PerfCounters.set(PERF_COUNTER_WATER_CHUNKS_DRY, 0);
+  PerfCounters.set(PERF_COUNTER_WATER_CHUNKS_REFRACTIVE, 0);
+}

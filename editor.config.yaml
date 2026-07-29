@@ -624,7 +624,9 @@ stylizedSurface:
     impostor:
       enabled: true
       manifest: /assets/impostors/trees/manifest.json
-      runtimeBake: true
+      # Normal gameplay stays GPU-readback-free. Use ?bakeImpostors=1 through
+      # the offline bake command when atlases need to be regenerated.
+      runtimeBake: false
       columns: 8
       rows: 2
       tileSize: 128

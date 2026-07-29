@@ -111,6 +111,12 @@ export class StylizedRockView {
     this.clusterField = null;
     this.signature = '';
     this.manifestCache = new Map();
+    this.manifestBuildsThisFrame = 0;
+    this.manifestBuildBudgetMs = config.streaming?.rockManifestBuildBudgetMs
+      ?? config.streaming?.heavyBuildBudgetMs
+      ?? 3;
+    this.manifestFrameStartedAt = 0;
+    this.prototypeBiomeRulesSignature = '[]';
     // Chunks other scatter layers asked about since the last prune. Bounded by
     // their request windows, which are a few hundred chunks of ~14 placements.
     this.blockerRequests = new Set();
@@ -164,6 +170,7 @@ export class StylizedRockView {
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
     });
+    this.prototypeBiomeRulesSignature = JSON.stringify(this.prototypeBiomeRules);
     const newPrototypes = extracted.map(({ geometry, source }) => ({
       geometry,
       material: cloneMaterial(source, this.config),
@@ -223,6 +230,8 @@ export class StylizedRockView {
 
   update(timestamp, camera) {
     if (this.disposed || this.prototypes.length === 0 || !this.terrainView.focusChunkKey || !camera) return;
+    this.manifestBuildsThisFrame = 0;
+    this.manifestFrameStartedAt = performance.now();
     const focus = this.terrainView.focusChunk;
     const origin = this.terrainView.floatingOrigin.getState();
     this.root.position.set(-origin.x, 0, -origin.z);
@@ -274,6 +283,21 @@ export class StylizedRockView {
   applyPendingRebuild() {
     const job = this.pendingRebuild;
     if (!job) return false;
+    for (let chunkZ = job.focus.chunkZ - job.placementRadius;
+      chunkZ <= job.focus.chunkZ + job.placementRadius;
+      chunkZ += 1) {
+      for (let chunkX = job.focus.chunkX - job.placementRadius;
+        chunkX <= job.focus.chunkX + job.placementRadius;
+        chunkX += 1) {
+        if (this.cachedManifestForChunk(chunkX, chunkZ) !== null) continue;
+        // Manifest generation samples terrain and the regional scatter field.
+        // Preparing at most one cold chunk per frame makes the configured
+        // budget apply inside a residency-ring rebuild rather than only around
+        // the otherwise uninterruptible whole-ring operation.
+        this.prepareManifestForChunk(chunkX, chunkZ);
+        return true;
+      }
+    }
     this.pendingRebuild = null;
     this.lastUpdateKey = job.updateKey;
     this.rebuild(job.focus, job.placementRadius, job.plan);
@@ -321,22 +345,35 @@ export class StylizedRockView {
     };
   }
 
-  manifestForChunk(chunkX, chunkZ) {
-    const key = [
+  manifestKey(chunkX, chunkZ) {
+    return [
       this.revisionTracker.signature(chunkX, chunkZ, 1),
       this.prototypes.length,
       this.clusterField?.signature ?? 'uniform',
       this.regionalCharacterField?.signature ?? 'uniform-regions',
-      JSON.stringify(this.prototypeBiomeRules),
+      this.prototypeBiomeRulesSignature,
       this.pathClearance?.signature ?? 'nopath',
       this.biomeAssetPalette?.revision ?? 0,
     ].join('|');
+  }
+
+  cachedManifestForChunk(chunkX, chunkZ) {
+    const key = this.manifestKey(chunkX, chunkZ);
     const cacheKey = `${chunkX}:${chunkZ}`;
     const cached = this.manifestCache.get(cacheKey);
     if (cached?.key === key) {
       this.placementsByChunk.set(cacheKey, cached.placements);
       return cached.placements;
     }
+    return null;
+  }
+
+  manifestForChunk(chunkX, chunkZ) {
+    const cached = this.cachedManifestForChunk(chunkX, chunkZ);
+    if (cached !== null) return cached;
+    const key = this.manifestKey(chunkX, chunkZ);
+    const cacheKey = `${chunkX}:${chunkZ}`;
+    const startedAt = performance.now();
 
     const placements = buildStableChunkManifest({
       kind: 'rock',
@@ -366,7 +403,25 @@ export class StylizedRockView {
     });
     this.manifestCache.set(cacheKey, { key, placements });
     this.placementsByChunk.set(cacheKey, placements);
+    const elapsed = performance.now() - startedAt;
+    PerfCounters.inc('rockManifestBuilds');
+    PerfCounters.inc('rockManifestBuildMs', elapsed);
+    PerfCounters.set('rockManifestBuild', elapsed);
     return placements;
+  }
+
+  prepareManifestForChunk(chunkX, chunkZ) {
+    const cached = this.cachedManifestForChunk(chunkX, chunkZ);
+    if (cached !== null) return cached;
+    const elapsed = performance.now() - this.manifestFrameStartedAt;
+    if (
+      this.manifestBuildsThisFrame >= 1
+      || (this.manifestFrameStartedAt > 0 && elapsed >= this.manifestBuildBudgetMs)
+    ) {
+      return null;
+    }
+    this.manifestBuildsThisFrame += 1;
+    return this.manifestForChunk(chunkX, chunkZ);
   }
 
   rebuild(focus, placementRadius, plan) {
@@ -464,6 +519,28 @@ export class StylizedRockView {
         const neighbourZ = chunkZ + offsetZ;
         this.blockerRequests.add(`${neighbourX}:${neighbourZ}`);
         placements.push(...this.manifestForChunk(neighbourX, neighbourZ));
+      }
+    }
+    return placements;
+  }
+
+  /**
+   * Returns a complete blocker halo only after its cold manifests have been
+   * prepared. A caller may retry next frame; each retry advances at most one
+   * cold rock chunk through `prepareManifestForChunk`.
+   */
+  getPreparedBlockersForChunk(chunkX, chunkZ, halo = 1) {
+    const placements = [];
+    for (let offsetZ = -halo; offsetZ <= halo; offsetZ += 1) {
+      for (let offsetX = -halo; offsetX <= halo; offsetX += 1) {
+        const neighbourX = chunkX + offsetX;
+        const neighbourZ = chunkZ + offsetZ;
+        const key = `${neighbourX}:${neighbourZ}`;
+        this.blockerRequests.add(key);
+        const manifest = this.cachedManifestForChunk(neighbourX, neighbourZ)
+          ?? this.prepareManifestForChunk(neighbourX, neighbourZ);
+        if (!manifest) return null;
+        placements.push(...manifest);
       }
     }
     return placements;

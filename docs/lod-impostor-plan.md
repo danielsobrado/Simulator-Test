@@ -76,8 +76,12 @@ non-contiguous prototype indices and invalid dimensions or paths. A rejected
 manifest is disposed and runtime baking or the low-poly proxy fallback takes over.
 
 Generated files are optional only for development. `npm run validate:assets`
-permits the runtime fallback. `npm run verify` and release CI use the strict
-production validator and fail when the generated assets are missing or stale.
+permits the low-poly proxy fallback. Normal gameplay keeps `runtimeBake: false`
+so missing or stale atlases cannot trigger GPU-to-CPU render-target readbacks.
+The explicit `?bakeImpostors=1` workflow overrides that setting and owns the only
+two readbacks (albedo and normal atlas capture). `npm run verify` and release CI
+use the strict production validator and fail when generated assets are missing
+or stale.
 
 The production workflow is `.github/workflows/tree-impostor-assets.yml`. It bakes,
 runs the strict validator, tests and builds, uploads the generated files as an

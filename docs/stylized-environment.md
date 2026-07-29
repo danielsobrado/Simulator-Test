@@ -32,6 +32,14 @@ stylizedSurface:
 
 ## Rendering architecture
 
+- **Normal runtime is GPU-readback-free.** The editor uses Three.js's
+  `WebGPURenderer`, TSL materials, storage buffers, compute culling, and indirect
+  draws without mapping GPU buffers or reading render targets. Tree atlas
+  readback exists only in explicit `?bakeImpostors=1` asset-generation mode;
+  missing runtime atlases use the low-poly proxy fallback. The renderer requests
+  a high-performance WebGPU adapter first; an unexpected WebGL fallback emits a
+  warning and records `rendererWebGPUBackend=0` / `rendererWebGLBackend=1` in
+  performance counters.
 - **`StylizedSkyView` is the scene's single lighting authority (2026-07-25).** It
   evicts any scene child tagged `userData.fallbackLighting` when it is
   constructed. `ObjectView` adds such a hemisphere/directional pair for the

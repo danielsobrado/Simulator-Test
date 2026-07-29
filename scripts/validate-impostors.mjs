@@ -61,7 +61,10 @@ async function main() {
     if (REQUIRED) {
       throw new Error(`Required tree impostor manifest is missing: ${MANIFEST_PATH}`);
     }
-    console.log('tree impostor manifest not present; runtime bake fallback remains enabled');
+    const fallback = await runtimeBakeEnabled()
+      ? 'runtime bake fallback remains enabled'
+      : 'runtime will use the readback-free low-poly proxy fallback';
+    console.log(`tree impostor manifest not present; ${fallback}`);
     return;
   }
   const manifest = validateTreeImpostorManifest(

@@ -208,6 +208,7 @@ export function buildPerfReport({
       keys: config.keys,
       hitchMs: config.hitchMs,
       buildingCount: config.buildingCount ?? null,
+      densityProfile: config.densityProfile ?? 'standard',
     },
     config: {
       player: playerConfig,

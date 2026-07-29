@@ -334,6 +334,7 @@ export class StylizedGrassSlot {
     this.pendingRebuild = null;
     this.buildState = null;
     this.inactiveFrames = 0;
+    this.resourcesPinned = false;
   }
 
   createTrampleTexture() {
@@ -361,6 +362,7 @@ export class StylizedGrassSlot {
 
   ensureResources() {
     if (this.geometry) return;
+    const allocationStartedAt = performance.now();
     this.createTrampleTexture();
     this.instanceBase = new THREE.InstancedBufferAttribute(
       new Float32Array(this.maxInstances * 3),
@@ -409,6 +411,14 @@ export class StylizedGrassSlot {
     this.mesh.material = this.material;
     this.mesh.receiveShadow = true;
     PerfCounters.inc('grassResourceAllocations');
+    const allocationMs = performance.now() - allocationStartedAt;
+    PerfCounters.inc('grassResourceAllocationMs', allocationMs);
+    PerfCounters.set('grassResourceAllocation', allocationMs);
+  }
+
+  pinResources() {
+    this.ensureResources();
+    this.resourcesPinned = true;
   }
 
   /**
@@ -503,7 +513,9 @@ export class StylizedGrassSlot {
       this.inactiveFrames += 1;
       const releaseFrames = this.config.streaming?.inactiveReleaseFrames
         ?? DEFAULT_INACTIVE_RELEASE_FRAMES;
-      if (this.inactiveFrames >= releaseFrames) this.releaseResources();
+      if (!this.resourcesPinned && this.inactiveFrames >= releaseFrames) {
+        this.releaseResources();
+      }
       return;
     }
 

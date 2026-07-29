@@ -35,6 +35,7 @@ import { assetStartupTelemetry } from './editor/performance/AssetStartupTelemetr
 import { PerfCounters } from './editor/performance/qa/PerfCounters.js';
 import { PerfQaHarness } from './editor/performance/qa/PerfQaHarness.js';
 import { createObjectTownQaScene } from './editor/performance/qa/ObjectTownQaScene.js';
+import { applyPerfQaDensityProfile } from './editor/performance/qa/PerfQaDensityProfiles.js';
 import { parseQaParams } from './editor/performance/qa/parseQaParams.js';
 import { PlayerController } from './editor/player/PlayerController.js';
 import { ViewModeController } from './editor/player/ViewModeController.js';
@@ -122,6 +123,10 @@ async function startEditor() {
     bootSceneSettingsError = error;
   }
   const config = loadEditorConfig();
+  const perfQaConfig = parseQaParams(window.location.search);
+  if (perfQaConfig) {
+    applyPerfQaDensityProfile(config, perfQaConfig.densityProfile);
+  }
   const localAssetObjectUrls = [];
   if (bootSceneSettings) {
     try {
@@ -691,7 +696,6 @@ async function startEditor() {
     : null;
   spellRuntime?.precompile?.(terrainView.renderer);
 
-  const perfQaConfig = parseQaParams(window.location.search);
   if (perfQaConfig?.scenarioId === 'object-town') {
     createObjectTownQaScene({
       target: perfQaConfig.buildingCount,
@@ -708,11 +712,19 @@ async function startEditor() {
   // Doing it here moves the cost into load, where a stall is not a stutter.
   releaseAssetProgress();
   boot.start('prewarm', 'Compiling shaders — this is the long one');
+  let finishWaterPrewarm = null;
   try {
+    stylizedSurface.prewarmStreamingResources(terrainView.renderer);
+    finishWaterPrewarm = stylizedSurface.beginWaterRefractionPrewarm();
     await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);
+    if (finishWaterPrewarm) {
+      await terrainView.renderer.renderAsync(terrainView.scene, editorCamera.camera);
+    }
     terrainView.prewarmPostProcessing(playerController.camera);
   } catch (error) {
     console.warn('Render pipeline pre-warm failed; pipelines will compile on demand.', error);
+  } finally {
+    finishWaterPrewarm?.();
   }
   boot.finish();
 

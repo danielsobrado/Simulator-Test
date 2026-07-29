@@ -14,8 +14,13 @@ function formatMs(value) {
   return `${value.toFixed(1)}ms`;
 }
 
-function collisionStatus(playerController) {
-  return playerController.collisionRuntime?.getStatus?.() ?? null;
+function collisionStatus(playerController, { lightweight = false } = {}) {
+  const runtime = playerController.collisionRuntime;
+  if (!runtime) return null;
+  if (lightweight && typeof runtime.getLiveStatus === 'function') {
+    return runtime.getLiveStatus();
+  }
+  return runtime.getStatus?.() ?? null;
 }
 
 export class PerfQaHarness {
@@ -163,7 +168,7 @@ export class PerfQaHarness {
     originSnap = false,
     forcePredictiveRefresh = false,
   } = {}) {
-    const collision = collisionStatus(this.playerController);
+    const collision = collisionStatus(this.playerController, { lightweight: true });
     this.live.collisionReady = collision?.ready ?? null;
     this.live.collisionFailure = collision?.failure?.message ?? null;
     if (!this.recording) {
@@ -207,8 +212,7 @@ export class PerfQaHarness {
             : ''),
         );
       }
-      const summary = this.profiler.summarize();
-      this.live.avgFps = summary.avgFps;
+      this.live.avgFps = this.profiler.getLiveAverageFps();
     }
 
     this.renderOverlayThrottled();
@@ -253,6 +257,12 @@ export class PerfQaHarness {
   applyPhaseKeys() {
     const phase = this.plan.phases[this.phaseIndex];
     this.playerController.setHarnessKeys(phase?.keys ?? []);
+  }
+
+  setKeys(codes = []) {
+    if (this.status !== 'running') return false;
+    this.playerController.setHarnessKeys(codes);
+    return true;
   }
 
   finish() {
@@ -324,6 +334,7 @@ export class PerfQaHarness {
     }
     window.__perfQa = {
       status: this.status,
+      setKeys: (codes) => this.setKeys(codes),
       config: this.config,
       live: this.live,
       getReport: () => this.report,

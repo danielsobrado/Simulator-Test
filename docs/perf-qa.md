@@ -16,6 +16,10 @@ Deterministic harness for reproducing and measuring player-mode stutter while mo
 > to not be compiled in. Check `waterChunksRefractive` before blaming geometry
 > for a whole-scene collapse. That document also records a residual `stylized`
 > phase regression from the same day that has **not** been bisected yet.
+>
+> The 2026-07-29 critical-path review, harness fixes, density/construction/water
+> matrix, and remaining cold-streaming costs are documented in
+> [perf-investigation-2026-07-29.md](perf-investigation-2026-07-29.md).
 
 ## Quick start
 
@@ -23,11 +27,14 @@ Deterministic harness for reproducing and measuring player-mode stutter while mo
 # Terminal 1 — app must already be serving
 npm run dev
 
-# Terminal 2 — headless Chromium run (writes tmp/perf-qa-latest.json)
-npm run qa:perf
+# Terminal 2 — headed Chromium is required for authoritative WebGPU numbers
+npm run qa:perf -- --headed
 
 # Optional: print a short parse summary
 npm run qa:perf:parse
+
+# Vegetation density + construction wall + water acceptance matrix
+npm run qa:perf:matrix -- --headed
 ```
 
 Or open the app with query params (overlay + optional JSON download):
@@ -55,6 +62,7 @@ When a run finishes, the report is available as:
 | `hitchMs` | `~33.3` | Frame-dt threshold that counts as a hitch |
 | `autostart` | `1` | Start as soon as stylized assets are ready |
 | `download` | `1` | Auto-download the JSON report when done |
+| `density` | `standard` | `standard`, `dense-forest`, `high-grass`, or `dense-mixed` QA load envelope |
 
 ### Scenarios
 
@@ -65,14 +73,21 @@ When a run finishes, the report is available as:
 | `diagonal` | Hold `W`+`D` |
 | `chunk-cross` | Long forward run intended to cross chunk boundaries |
 | `object-town` | Deterministic 64/256-building masonry town; set `buildings=64` or `256` |
+| `construction-ring` | Twelve deterministic 96 m wall constructions around a clear movement corridor |
+| `water-acceptance` | External phase driver: dry → swim → dive → surface → dry |
+
+Density profiles are QA-only multipliers applied before worker and stylized
+systems are created. `dense-forest` doubles tree placement/candidate budgets,
+`high-grass` doubles `bladesPerCell`, and `dense-mixed` does both. They do not
+change Azgaar biome IDs, tile persistence, or production configuration.
 
 The harness enters walk mode at a fixed pose, bypasses pointer lock, and injects keys so runs are repeatable without mouse capture.
 
 ## What the report contains
 
-Report kind: `simcity-dnd-perf-qa` (version `1`).
+Report kind: `simcity-dnd-perf-qa` (version `2`).
 
-- **Scenario + config snapshot** — spawn, keys, hitch threshold, player/world/stylized knobs used for the run
+- **Scenario + config snapshot** — spawn, keys, density profile, hitch threshold, and player/world/stylized knobs used for the run
 - **Summary** — frame count, duration, avg FPS, dt min/p50/p95/p99/max/mean, hitch count/rate
 - **Phase timings** — CPU time inside the animation loop for:
   - `terrainCommit` (budgeted memcpy commits from the worker page queue)
@@ -83,6 +98,7 @@ Report kind: `simcity-dnd-perf-qa` (version `1`).
   - `voxel`
   - `render`
 - **Counters** — totals for grass/flower/tree/rock rebuilds, terrain slot assigns/uploads, floating-origin snaps
+- **Backend gauges** — `rendererWebGPUBackend` / `rendererWebGLBackend` make an unexpected fallback visible in every report
 - **Hitch frames** — every frame with `dt > hitchMs`, including phase breakdown, counter deltas, streaming/voxel/player snapshots
 - **Samples** — downsampled frames, plus any hitch, expensive phase (≥8 ms), or non-empty counter-delta frame
 
@@ -91,6 +107,7 @@ Report kind: `simcity-dnd-perf-qa` (version `1`).
 | Script | Role |
 |--------|------|
 | `npm run qa:perf` | `scripts/run-perf-qa.mjs` — Playwright Chromium, waits for `window.__perfQa.status === 'done'`, writes `tmp/perf-qa-latest.json` |
+| `npm run qa:perf:matrix` | Runs standard/dense-forest/high-grass/dense-mixed plus the construction corridor, then the deterministic water acceptance route; writes `tmp/perf-matrix-latest.json` |
 | `npm run qa:perf:parse` | `scripts/parse-perf-qa.mjs` — prints a short summary from a report or CDP extract JSON |
 
 Extra CLI flags for `qa:perf`:
@@ -98,8 +115,18 @@ Extra CLI flags for `qa:perf`:
 ```bash
 npm run qa:perf -- --qa move --duration 8 --warmup 1 --speed walk --url http://localhost:5173
 npm run qa:perf -- --headed --qa object-town --buildings 256 --warmup 8 --duration 14
+npm run qa:perf -- --headed --qa diagonal --density dense-mixed --warmup 8 --duration 14
+npm run qa:perf -- --headed --qa construction-ring --warmup 10 --duration 14
+npm run qa:perf -- --headed --cpu-profile tmp/diagonal.cpuprofile
+npm run qa:perf:matrix -- --headed --warmup 8 --duration 8
+npm run qa:perf:matrix -- --headed --water-only
 npm run qa:perf -- --headed
 ```
+
+The runner rejects software/fallback adapters. Headless Chromium commonly fails
+that gate on Windows, so use `--headed` for comparisons. `--cpu-profile` writes
+a Chrome sampled CPU profile alongside the JSON without making profiling the
+default measurement path.
 
 ## Code map
 

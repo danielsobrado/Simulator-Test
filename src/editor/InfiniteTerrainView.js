@@ -30,6 +30,17 @@ import {
 const PICK_ITERATIONS = 6;
 const PREVIEW_HEIGHT_OFFSET = 0.08;
 
+export function inspectRendererBackend(renderer) {
+  const backend = renderer?.backend;
+  const webgpu = Boolean(backend?.isWebGPUBackend);
+  const webgl = Boolean(backend?.isWebGLBackend);
+  return Object.freeze({
+    mode: webgpu ? 'webgpu' : webgl ? 'webgl' : 'unknown',
+    webgpu,
+    webgl,
+  });
+}
+
 /**
  * Riparian distance source for the forest habitat field. `rangeMeters` bounds the
  * halo the chamfer pass has to cover, so it must be at least the widest water
@@ -167,7 +178,13 @@ export class InfiniteTerrainView {
     this.worldStore = worldStore;
     this.floatingOrigin = floatingOrigin;
     this.streamingConfig = streamingConfig;
+    this.rendererConfig = rendererConfig;
     this.stylizedConfig = stylizedConfig;
+    this.rendererBackendStatus = Object.freeze({
+      mode: 'uninitialized',
+      webgpu: false,
+      webgl: false,
+    });
     this.surfaceMaskConfig = createSurfaceMaskConfig(stylizedConfig);
     this.chunkSize = worldStore.chunkSize;
     this.chunkWorldSize = this.chunkSize * worldStore.tileSize;
@@ -266,8 +283,21 @@ export class InfiniteTerrainView {
 
   async initialize() {
     await this.renderer.init();
+    this.rendererBackendStatus = inspectRendererBackend(this.renderer);
+    PerfCounters.set('rendererWebGPUBackend', this.rendererBackendStatus.webgpu ? 1 : 0);
+    PerfCounters.set('rendererWebGLBackend', this.rendererBackendStatus.webgl ? 1 : 0);
+    if (!this.rendererBackendStatus.webgpu && !this.rendererConfig.forceWebGL) {
+      console.warn(
+        `WebGPU backend unavailable; using ${this.rendererBackendStatus.mode} fallback. `
+        + 'GPU compute vegetation and voxel paths will use their documented fallbacks.',
+      );
+    }
     await this.updateStreaming({ x: 0, z: 0 }, 0, true);
     await this.drainPendingUploads();
+  }
+
+  getRendererBackendStatus() {
+    return this.rendererBackendStatus;
   }
 
   setAnimationLoop(callback) {

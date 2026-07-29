@@ -141,7 +141,10 @@ export class TreeManifestStore {
     const clearRadius = this.config.trees.clearRadius ?? this.terrainView.worldStore.tileSize;
     const rocks = Array.isArray(rockSource)
       ? rockSource
-      : rockSource?.getBlockersForChunk?.(chunkX, chunkZ, 1) ?? [];
+      : rockSource?.getPreparedBlockersForChunk
+        ? rockSource.getPreparedBlockersForChunk(chunkX, chunkZ, 1)
+        : rockSource?.getBlockersForChunk?.(chunkX, chunkZ, 1) ?? [];
+    if (rocks === null) return null;
     const constructionBounds = this.constructionQueryBounds(chunkX, chunkZ, clearRadius);
     const constructionRevision = this.objectMap?.signatureForBounds?.(constructionBounds)
       ?? this.objectMap?.revision
@@ -181,7 +184,8 @@ export class TreeManifestStore {
     const key = `${chunkX}:${chunkZ}`;
     const cached = this.cache.get(key);
     if (!cached) return null;
-    return cached.signature === this.context(chunkX, chunkZ, rockSource).signature
+    const context = this.context(chunkX, chunkZ, rockSource);
+    return context && cached.signature === context.signature
       ? cached.placements
       : null;
   }
@@ -252,6 +256,7 @@ export class TreeManifestStore {
 
   build(chunkX, chunkZ, rockSource) {
     const context = this.context(chunkX, chunkZ, rockSource);
+    if (!context) return null;
     const perChunk = this.config.trees.perChunk;
     const maxAccepted = Math.max(
       1,
@@ -444,9 +449,18 @@ export class TreeManifestStore {
 
   flush() {
     const result = this.queue.flush((job) => {
+      if (!this.activeKeys.has(job.key)) {
+        this.pendingKeys.delete(job.key);
+        return false;
+      }
+      const placements = this.build(job.chunkX, job.chunkZ, job.rockSource);
+      if (!placements) {
+        // The rock source prepared one blocker manifest this frame. Preserve
+        // this tree job until the complete deterministic halo is available.
+        this.queue.enqueue(job);
+        return true;
+      }
       this.pendingKeys.delete(job.key);
-      if (!this.activeKeys.has(job.key)) return false;
-      this.build(job.chunkX, job.chunkZ, job.rockSource);
       this.onBuilt?.();
       return true;
     });

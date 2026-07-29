@@ -94,15 +94,70 @@ async function discoverRoute(page) {
     const terrain = editor.stylizedSurface.terrainView;
     const worldStore = terrain.worldStore;
     const tileSize = worldStore.tileSize;
-    const route = findWaterAcceptanceRoute({
-      getWaterSample: (x, z) => terrain.getCanonicalWater(x, z),
-      getGroundHeight: (x, z) => worldStore.sampleHeight(x / tileSize, -z / tileSize),
-    });
+    const waterCache = new Map();
+    const groundCache = new Map();
+    const key = (x, z) => `${x.toFixed(3)}:${z.toFixed(3)}`;
+    const getWaterSample = (x, z) => {
+      const sampleKey = key(x, z);
+      if (!waterCache.has(sampleKey)) {
+        waterCache.set(sampleKey, terrain.getCanonicalWater(x, z));
+      }
+      return waterCache.get(sampleKey);
+    };
+    const getGroundHeight = (x, z) => {
+      const sampleKey = key(x, z);
+      if (!groundCache.has(sampleKey)) {
+        groundCache.set(sampleKey, worldStore.sampleHeight(x / tileSize, -z / tileSize));
+      }
+      return groundCache.get(sampleKey);
+    };
+    const searchProfiles = [
+      {},
+      {
+        searchRadius: 384,
+        sampleStep: 6,
+        maximumDryDistance: 120,
+        minimumDepth: 4,
+      },
+      {
+        searchRadius: 1024,
+        sampleStep: 12,
+        maximumDryDistance: 200,
+        minimumDepth: 4,
+        routeSampleStep: 2,
+      },
+      {
+        searchRadius: 1024,
+        sampleStep: 12,
+        maximumDryDistance: 120,
+        minimumDepth: 2,
+        routeSampleStep: 2,
+      },
+    ];
+    let route = null;
+    let routeSearch = null;
+    for (const options of searchProfiles) {
+      route = findWaterAcceptanceRoute({
+        getWaterSample,
+        getGroundHeight,
+        ...options,
+      });
+      if (route) {
+        routeSearch = options;
+        break;
+      }
+    }
     return {
       route,
+      routeSearch,
+      discoverySamples: {
+        water: waterCache.size,
+        ground: groundCache.size,
+      },
       qualityTier: editor.config.stylizedSurface?.water?.qualityTier ?? 'high',
       eyeHeight: editor.config.player?.eyeHeight ?? 1.7,
       walkSpeed: editor.config.player?.walkSpeed ?? 4,
+      swimSpeed: editor.config.player?.water?.swimSpeed ?? 3,
       swimDepth: editor.config.player?.water?.swimDepth ?? 1.35,
     };
   });
@@ -166,9 +221,55 @@ async function samplePhase({ page, tracker, phaseId, durationSeconds, previousOr
   return origin;
 }
 
+async function sampleUntilTarget({
+  page,
+  tracker,
+  phaseId,
+  target,
+  maximumSeconds,
+  previousOrigin,
+}) {
+  const startedAt = performance.now();
+  const deadline = startedAt + maximumSeconds * 1000;
+  let origin = previousOrigin;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  while (performance.now() < deadline) {
+    const sample = await readPlayerSample(page, phaseId, origin);
+    tracker.observe(sample);
+    origin = sample.origin;
+    const distance = Math.hypot(
+      sample.player.x - target.x,
+      sample.player.z - target.z,
+    );
+    closestDistance = Math.min(closestDistance, distance);
+    if (distance <= 0.75) {
+      return {
+        origin,
+        reached: true,
+        closestDistance,
+        elapsedSeconds: (performance.now() - startedAt) / 1000,
+      };
+    }
+    await page.waitForTimeout(50);
+  }
+  return {
+    origin,
+    reached: false,
+    closestDistance,
+    elapsedSeconds: (performance.now() - startedAt) / 1000,
+  };
+}
+
 async function setKeys(page, { down = [], up = [] }) {
-  for (const key of up) await page.keyboard.up(key);
-  for (const key of down) await page.keyboard.down(key);
+  await page.evaluate(({ downCodes, upCodes }) => {
+    const active = new Set(window.__waterQaKeys ?? []);
+    for (const code of upCodes) active.delete(code);
+    for (const code of downCodes) active.add(code);
+    window.__waterQaKeys = [...active];
+    if (!window.__perfQa?.setKeys?.(window.__waterQaKeys)) {
+      throw new Error('Performance QA harness is not accepting external water-phase keys.');
+    }
+  }, { downCodes: down, upCodes: up });
 }
 
 async function main() {
@@ -195,7 +296,7 @@ async function main() {
     const page = await browser.newPage();
     page.setDefaultTimeout(120_000);
 
-    await page.goto(`${baseUrl}/?qa=move&autostart=0&download=0`, {
+    await page.goto(`${baseUrl}/?qa=water-acceptance&autostart=0&download=0`, {
       waitUntil: 'domcontentloaded',
     });
     const adapter = await inspectAdapter(page);
@@ -206,22 +307,29 @@ async function main() {
 
     const discovery = await discoverRoute(page);
     if (!discovery.route) {
-      throw new Error('No deterministic dry-to-deep shoreline route was found.');
+      throw new Error(
+        `No deterministic dry-to-deep shoreline route was found: ${
+          JSON.stringify(discovery.discoverySamples)
+        }`,
+      );
     }
 
     const enterSeconds = clamp(
-      discovery.route.distance / Math.max(0.5, discovery.walkSpeed) + 1.5,
-      4,
-      9,
+      discovery.route.distance / Math.max(
+        0.5,
+        Math.min(discovery.walkSpeed, discovery.swimSpeed),
+      ) + 2,
+      2,
+      30,
     );
     const diveSeconds = 4;
     const surfaceSeconds = 4;
-    const exitSeconds = enterSeconds + diveSeconds + 2;
+    const exitSeconds = enterSeconds + 3;
     const settleSeconds = 2;
     const measuredSeconds = enterSeconds + diveSeconds + surfaceSeconds + exitSeconds + settleSeconds;
     const warmupSeconds = 4;
     const query = new URLSearchParams({
-      qa: 'move',
+      qa: 'water-acceptance',
       x: String(discovery.route.start.x),
       z: String(discovery.route.start.z),
       yaw: String(discovery.route.yawDegrees),
@@ -246,15 +354,17 @@ async function main() {
     let origin = null;
 
     await setKeys(page, { down: ['KeyW'] });
-    origin = await samplePhase({
+    const entry = await sampleUntilTarget({
       page,
       tracker,
       phaseId: 'enter-water',
-      durationSeconds: enterSeconds,
+      target: discovery.route.target,
+      maximumSeconds: enterSeconds,
       previousOrigin: origin,
     });
+    origin = entry.origin;
 
-    await setKeys(page, { down: ['ControlLeft'] });
+    await setKeys(page, { up: ['KeyW'], down: ['ControlLeft'] });
     origin = await samplePhase({
       page,
       tracker,
@@ -308,7 +418,9 @@ async function main() {
       performanceAuthoritative: authoritativePerformance,
       waterAcceptance: acceptance,
       phases: {
-        enterSeconds,
+        enterSeconds: entry.elapsedSeconds,
+        entryReachedTarget: entry.reached,
+        entryClosestDistance: entry.closestDistance,
         diveSeconds,
         surfaceSeconds,
         exitSeconds,
