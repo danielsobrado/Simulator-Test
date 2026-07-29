@@ -395,8 +395,7 @@ export function createStylizedWaterMaterial({
   // what made the bank polygonal. Tapering the lift out as the body thins sets
   // the sheet down onto the bed exactly at the waterline, so the terrain
   // occludes the rest per pixel and the bank follows the contour, not the grid.
-  const surfaceHeight = waterField.g
-    .add(waterSurfaceOrigin)
+  const surfaceHeight = waterField.g.add(waterSurfaceOrigin)
     .add(float(water.heightOffset).mul(waterlineFade));
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
