@@ -187,7 +187,11 @@ const fs = require('fs');
     }
     console.log('WebGPU adapter: ' + JSON.stringify(adapter));
 
-    await page.waitForFunction(() => window.__perfQa.status === 'done', null, {
+    // Vite can briefly replace the document while applying a pending full
+    // reload. The harness API is republished by the next bootstrap, so keep
+    // polling through that gap instead of turning a harmless reload into a
+    // failed performance run.
+    await page.waitForFunction(() => window.__perfQa?.status === 'done', null, {
       timeout: ${timeoutMs},
     });
     const report = await page.evaluate(() => window.__perfQa.getReport());

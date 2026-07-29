@@ -46,15 +46,16 @@ water:
     intersectionSoftness: 0.38
     intersectionStrength: 0.82
   caustics:
-    # Tuned for the voronoi filament web, which concentrates its light into thin
-    # lines instead of spreading it over a blob, so it needs a higher intensity
-    # than the old FBM to read at all. Absorption thins it out with depth.
-    intensity: 0.5
+    # The voronoi web concentrates its light into thin lines instead of
+    # spreading it over a blob, so it needs a *lower* intensity than the old
+    # FBM, not a higher one: at 0.5 the filaments read as cracked ice over the
+    # whole shallows. Absorption thins it further with depth.
+    intensity: 0.12
     scale: 0.45
     speed: 0.34
     # Filament sharpness, not an exponent: the band is 1/contrast wide in the
     # distance field, so raising this thins the lines and darkens between them.
-    contrast: 3
+    contrast: 5
     depthFadeStart: 0.35
     depthFadeEnd: 4.5
   projectedCaustics:

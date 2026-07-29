@@ -387,7 +387,17 @@ export function createStylizedWaterMaterial({
     );
   }
 
-  const surfaceHeight = waterField.g.add(waterSurfaceOrigin).add(water.heightOffset);
+  // The offset lifts the sheet clear of the bed so shallow water cannot z-fight
+  // with it. Applied at full strength it also floats the sheet over the beach:
+  // the bank rises through a flat surface, so on a 1:16 shore 0.12 m of lift
+  // still hangs two metres inland. That overhang is what alpha had to cut, and
+  // alpha only resolves at the 2 m cell grid the field is stored on, which is
+  // what made the bank polygonal. Tapering the lift out as the body thins sets
+  // the sheet down onto the bed exactly at the waterline, so the terrain
+  // occludes the rest per pixel and the bank follows the contour, not the grid.
+  const surfaceHeight = waterField.g
+    .add(waterSurfaceOrigin)
+    .add(float(water.heightOffset).mul(waterlineFade));
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,
