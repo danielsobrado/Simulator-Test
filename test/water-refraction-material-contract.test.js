@@ -36,7 +36,8 @@ test('captured scene colour uses RGB absorption and manual coverage compositing'
   assert.match(source, /alpha = waterCoverage\.mul\(waterlineFade\);/);
 });
 
-test('refraction uses only two additional FBM samples', () => {
+test('refraction uses only two bounded FBM samples', () => {
   const helper = source.match(/function refractionWarp\([\s\S]*?\n\}/)?.[0] ?? '';
-  assert.equal((helper.match(/stylizedFbm\(/g) ?? []).length, 2);
+  assert.equal((helper.match(/stylizedFbm2\(/g) ?? []).length, 2);
+  assert.equal((helper.match(/stylizedFbm\(/g) ?? []).length, 0);
 });
