@@ -2,6 +2,8 @@
  * Interval support helpers for ruin masonry.
  */
 
+const SORTED_INDEX_CACHE = new WeakMap();
+
 export function intervalOverlap(a0, a1, b0, b1) {
   const start = Math.max(a0, b0);
   const end = Math.min(a1, b1);
@@ -71,25 +73,82 @@ export function coverageWithinSpan(span0, span1, supports) {
   };
 }
 
-/**
- * Binary-search candidates sorted by span start for possible supporters.
- */
-export function findOverlapCandidates(sortedByStart, s0, s1, pad = 0) {
-  if (!sortedByStart.length) return [];
-  const target = s0 - pad;
-  let low = 0;
-  let high = sortedByStart.length;
-  while (low < high) {
-    const mid = (low + high) >> 1;
-    const start = sortedByStart[mid].support.span[0];
-    if (start < target) low = mid + 1;
-    else high = mid;
+function overlaps(candidate, start, end) {
+  const span = candidate?.support?.span;
+  return Array.isArray(span) && span[0] <= end && span[1] >= start;
+}
+
+function sortedBySpanStart(candidates) {
+  for (let index = 1; index < candidates.length; index += 1) {
+    if (candidates[index - 1].support.span[0] > candidates[index].support.span[0]) {
+      return false;
+    }
   }
+  return true;
+}
+
+function sortedIntervalIndex(candidates) {
+  const cached = SORTED_INDEX_CACHE.get(candidates);
+  if (cached) return cached;
+
+  const prefixMaximumEnd = new Float64Array(candidates.length);
+  let maximum = -Infinity;
+  for (let index = 0; index < candidates.length; index += 1) {
+    maximum = Math.max(maximum, candidates[index].support.span[1]);
+    prefixMaximumEnd[index] = maximum;
+  }
+  const built = Object.freeze({ prefixMaximumEnd });
+  SORTED_INDEX_CACHE.set(candidates, built);
+  return built;
+}
+
+function firstPrefixReaching(prefixMaximumEnd, endExclusive, target) {
+  let low = 0;
+  let high = endExclusive;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (prefixMaximumEnd[middle] < target) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+/**
+ * Return every interval that may support [s0,s1].
+ *
+ * Sorted pools use a prefix-maximum index so long intervals from an earlier
+ * overlapping course are not dropped and lookup remains O(log n + matches).
+ * Course-major unsorted pools use the complete linear fallback.
+ */
+export function findOverlapCandidates(candidates, s0, s1, pad = 0) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return [];
+  const start = s0 - pad;
+  const end = s1 + pad;
+
+  if (!sortedBySpanStart(candidates)) {
+    return candidates.filter((candidate) => overlaps(candidate, start, end));
+  }
+
+  let low = 0;
+  let high = candidates.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (candidates[middle].support.span[0] < start) low = middle + 1;
+    else high = middle;
+  }
+
   const result = [];
-  for (let index = Math.max(0, low - 1); index < sortedByStart.length; index += 1) {
-    const candidate = sortedByStart[index];
-    if (candidate.support.span[0] > s1 + pad) break;
-    if (candidate.support.span[1] >= s0 - pad) result.push(candidate);
+  if (low > 0) {
+    const { prefixMaximumEnd } = sortedIntervalIndex(candidates);
+    const first = firstPrefixReaching(prefixMaximumEnd, low, start);
+    for (let index = first; index < low; index += 1) {
+      if (candidates[index].support.span[1] >= start) result.push(candidates[index]);
+    }
+  }
+  for (let index = low; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (candidate.support.span[0] > end) break;
+    if (candidate.support.span[1] >= start) result.push(candidate);
   }
   return result;
 }
