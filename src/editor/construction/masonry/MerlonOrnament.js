@@ -95,7 +95,7 @@ export function layoutMerlon(merlon, {
     if (cellWidth < Math.max(0.09, minWidth * 0.4)) {
       // Too narrow to course; lay the row as one stone rather than as splinters.
       units.push({
-        category: 'field',
+        category: 'merlon',
         s: merlon.s,
         y,
         width: rowWidth,
@@ -110,7 +110,7 @@ export function layoutMerlon(merlon, {
       // merlon still bonds onto the wall below it.
       if (pierced && cell === 1 && row >= 1 && row <= 2) continue;
       units.push({
-        category: 'field',
+        category: 'merlon',
         s: merlon.s + (cell + 0.5 - cells / 2) * cellWidth,
         y,
         width: cellWidth,
@@ -122,10 +122,9 @@ export function layoutMerlon(merlon, {
 
   // "A random border edge is extruded (random length)." One cantilevered stone
   // off the side of the crown — a corbel, in masonry terms. `ashlar` rather than
-  // `field` so `IRREGULARITY_CATEGORY_SCALE` keeps it worked: a corbel shaped
-  // like field rubble reads as a stone that fell and happened to stick. Not
-  // `coping` either, which means "the course that finishes a wall top" elsewhere
-  // in the packer, and a crenellated wall has none.
+  // `merlon`/`field` so `IRREGULARITY_CATEGORY_SCALE` keeps it worked: a corbel
+  // shaped like rubble reads as a stone that fell and happened to stick. The
+  // packer still tags it with the MERLON support role.
   if (bridge === 3 && lane(spurHash, 0) < 0.45) {
     const side = lane(spurHash, 8) < 0.5 ? -1 : 1;
     const crownWidth = rowWidthAt(rows - 1);

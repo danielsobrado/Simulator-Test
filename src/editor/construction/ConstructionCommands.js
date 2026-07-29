@@ -1,13 +1,15 @@
 import {
   closeCubicBezierPath,
   cubicBezierDirtySegments,
-  deleteCubicBezierAnchor,
   insertCubicBezierAnchor,
+  deleteCubicBezierAnchor,
   moveCubicBezierAnchor,
   openCubicBezierPath,
+  sampleCubicBezierPath,
   setCubicBezierHandle,
 } from './curve/CubicBezierPath.js';
 import { flattenHandlesAround } from './curve/CurveSnapping.js';
+import { createCurveArcTable } from './masonry/CurveArcTable.js';
 
 /** Segments adjacent to a segment, which a handle move reaches through. */
 function neighbouringSegments(path, segmentId) {
@@ -49,6 +51,34 @@ function reconcileToPath(record, path) {
     top: { ...record.top, profile },
     dropped: (record.top.profile.length - profile.length)
       + (record.features.length - features.length),
+  };
+}
+
+/**
+ * After splitting a segment, re-host openings and top points at the same world
+ * arc positions. The first half keeps the old segment id; anything that fell on
+ * the second half must move onto the new segment with a rescaled arcFraction.
+ */
+function remapAnchorsAfterInsert(record, beforePath, afterPath) {
+  const beforeTable = createCurveArcTable(sampleCubicBezierPath(beforePath));
+  const afterTable = createCurveArcTable(sampleCubicBezierPath(afterPath));
+  const remap = (segmentId, arcFraction) => {
+    const s = beforeTable.toArc(segmentId, arcFraction);
+    return afterTable.fromArc(s);
+  };
+  const features = record.features.map((feature) => {
+    const next = remap(feature.segmentId, feature.arcFraction);
+    return { ...feature, segmentId: next.segmentId, arcFraction: next.arcFraction };
+  });
+  const profile = record.top.profile.map((point) => {
+    const next = remap(point.segmentId, point.arcFraction);
+    return { ...point, segmentId: next.segmentId, arcFraction: next.arcFraction };
+  });
+  return {
+    ...record,
+    path: { ...afterPath, features },
+    features,
+    top: { ...record.top, profile },
   };
 }
 
@@ -97,7 +127,8 @@ export function executeConstructionCommand(store, command) {
     if (!before) throw new Error(`Unknown construction ${command.constructionId}.`);
     const dirtySegmentIds = neighbouringSegments(before.path, command.segmentId);
     const path = insertCubicBezierAnchor(before.path, command.segmentId, command.t);
-    const after = store.update(before.id, { ...before, path }, { dirtySegmentIds });
+    const remapped = remapAnchorsAfterInsert(before, before.path, path);
+    const after = store.update(before.id, remapped, { dirtySegmentIds });
     return change(before, after, { dirtySegmentIds });
   }
   if (command.type === 'delete_anchor') {

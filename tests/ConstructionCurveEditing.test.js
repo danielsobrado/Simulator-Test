@@ -206,6 +206,19 @@ test('the eraser trick: deleting from a closed loop reopens it', () => {
   assert.equal(opened.segments.length, opened.anchors.length - 1);
 });
 
+test('deleting from a minimal 3-anchor closed loop reopens it', () => {
+  const square = createCubicBezierPathFromStroke([
+    [0, 0], [4, 0], [4, 4], [0, 4],
+  ], { simplifyTolerance: 0.01 });
+  const loop = closeCubicBezierPath(square, { dropAnchorId: square.anchors.at(-1).id });
+  assert.equal(loop.closed, true);
+  assert.equal(loop.anchors.length, 3);
+  const opened = deleteCubicBezierAnchor(loop, loop.anchors[1].id);
+  assert.equal(opened.closed, false);
+  assert.equal(opened.anchors.length, 2);
+  assert.equal(opened.segments.length, 1);
+});
+
 test('open and close round-trip an anchor count', () => {
   const loop = circlePath();
   const opened = openCubicBezierPath(loop);

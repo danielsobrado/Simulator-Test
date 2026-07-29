@@ -265,6 +265,37 @@ function createStoneGeometry(stoneShape, {
       });
     }
     // Topology failed progressive clamp — fall through to relief-only / flat.
+    // Coarse skips the reliefQuadPrism branch below, so flag the soft failure
+    // here or stats / warn paths under-report it.
+    if (geometryTier === 'coarse') {
+      const geometry = stoneShape.lattice
+        ? beveledQuadPrism({
+          corners: stoneShape.corners,
+          depth: stoneShape.depth,
+          position: stoneShape.position,
+          rotation: stoneShape.rotation,
+          bevelRatio: stoneShape.bevelRatio,
+          detail: stoneShape.detail,
+        })
+        : beveledBox({
+          width: stoneShape.width,
+          height: stoneShape.height,
+          depth: stoneShape.depth,
+          position: stoneShape.position,
+          rotation: stoneShape.rotation,
+          bevelRatio: stoneShape.bevelRatio,
+          skew: stoneShape.skew,
+          detail: stoneShape.detail,
+        });
+      return {
+        geometry,
+        reliefApplied: false,
+        reliefFallback: Boolean(stoneShape.relief?.enabled),
+        edgeWearApplied: false,
+        edgeWearFallback: Boolean(stoneShape.edgeWear?.front?.enabled),
+        geometryTier: 'legacy',
+      };
+    }
   }
 
   if (stoneShape.lattice && stoneShape.relief?.enabled && geometryTier !== 'coarse') {

@@ -8,12 +8,20 @@ const OPTIONS = { minWidth: 0.26, thickness: 0.8, seed: 3141, index: 28_000 };
 function crown(count = 64, overrides = {}) {
   const merlons = [];
   for (let index = 0; index < count; index += 1) {
-    merlons.push(layoutMerlon(
-      { s: index * 1.18, width: 0.65, base: 3.5, height: 0.72 },
-      { ...OPTIONS, ...overrides, index: 28_000 + index * 16 },
-    ));
+    const shape = { s: index * 1.18, width: 0.65, base: 3.5, height: 0.72 };
+    merlons.push({
+      ...layoutMerlon(shape, { ...OPTIONS, ...overrides, index: 28_000 + index * 16 }),
+      shape,
+    });
   }
   return merlons;
+}
+
+function bodyUnits(ornament) {
+  const { s, width } = ornament.shape;
+  return ornament.units.filter((unit) => (
+    Math.abs(unit.s - s) + unit.width / 2 <= width / 2 + 1e-6
+  ));
 }
 
 test('a merlon is bonded masonry, not one block', () => {
@@ -89,7 +97,7 @@ test('some merlons are pierced and the slit is a clean void', () => {
     // Three columns, four rows, less the two cells the slit takes out. Counting
     // the cells rather than measuring the geometry is deliberate: the void is
     // made by *omitting* stones, so what has to be right is which ones are gone.
-    const body = ornament.units.filter(({ category }) => category === 'field');
+    const body = bodyUnits(ornament);
     assert.equal(ornament.columns, 3);
     assert.equal(ornament.rows, 4);
     assert.equal(body.length, ornament.rows * ornament.columns - 2);
@@ -113,7 +121,7 @@ test('a solid merlon breaks bond between its rows', () => {
   assert.ok(solid.length > 20);
   for (const ornament of solid) {
     const rows = new Map();
-    for (const unit of ornament.units.filter(({ category }) => category === 'field')) {
+    for (const unit of bodyUnits(ornament)) {
       const key = unit.y.toFixed(6);
       if (!rows.has(key)) rows.set(key, []);
       rows.get(key).push(unit);
@@ -155,7 +163,7 @@ test('a merlon too narrow to course lays whole rows instead of splinters', () =>
     { ...OPTIONS, minWidth: 0.34 },
   );
   assert.ok(units.length > 0);
-  for (const unit of units.filter(({ category }) => category === 'field')) {
+  for (const unit of units.filter(({ category }) => category === 'merlon')) {
     assert.ok(unit.width >= 0.09, `splinter ${unit.width} m wide`);
   }
 });

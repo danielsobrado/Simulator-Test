@@ -416,7 +416,10 @@ export function deleteCubicBezierAnchor(input, anchorId) {
   if (path.type !== 'cubicBezier') throw new Error('Expected a cubic Bézier path.');
   const index = path.anchors.findIndex(({ id }) => id === anchorId);
   if (index < 0) throw new Error(`Unknown cubic Bézier anchor ${anchorId}.`);
-  const minimum = path.closed ? 4 : 3;
+  // Closed loops can be as small as three anchors (close-via-snap drops one
+  // endpoint). Deleting one must reopen that ring; requiring four made the
+  // documented "delete a sliver" workflow fail on every minimal loop.
+  const minimum = 3;
   if (path.anchors.length < minimum) {
     throw new Error('A construction path needs at least two anchors.');
   }

@@ -53,6 +53,9 @@ export const IRREGULARITY_CATEGORY_SCALE = Object.freeze({
   ashlar: 0.45,
   quoin: 0.35,
   voussoir: 0.3,
+  // Crenellation ornaments: slightly quieter than field rubble so the crown
+  // reads as worked stone without the full field jitter budget.
+  merlon: 0.55,
 });
 
 /**

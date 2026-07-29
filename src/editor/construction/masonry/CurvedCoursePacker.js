@@ -672,6 +672,12 @@ export function packCurvedWall({
           width: Math.max(0.1, unit.width - inset),
           height: Math.max(0.1, unit.height - inset * 0.7),
           depth: unit.depth,
+        }, {
+          role: CONSTRUCTION_SUPPORT_ROLE.MERLON,
+          groupId: `merlon:${merlon.s.toFixed(3)}`,
+          courseIndex: -1,
+          jambOrdinal: null,
+          archOrdinal: 0,
         });
       }
     }
@@ -679,13 +685,23 @@ export function packCurvedWall({
 
   // Dressings last: they are placed against the void, not packed into a course,
   // and their categories scale the jitter down so they read as worked stone.
+  //
+  // Exclusive ownership by opening centre — the planner feeds the same opening
+  // into every overlapping module, and a soft ±0.5 m window would otherwise
+  // double-emit jambs/voussoirs on module seams.
+  const ownsOpeningDressing = (opening) => {
+    const s = opening.s;
+    if (s < s0 || s > s1) return false;
+    if (s < s1) return true;
+    return s1 >= wallEnd - 1e-9;
+  };
   let dressingIndex = baseIndex + INDEX_DRESSING;
   for (const opening of openings) {
+    if (!ownsOpeningDressing(opening)) continue;
     const { jambs, voussoirs, keystone } = layoutOpening(opening, { thickness, minWidth: style.minWidth });
     const openingId = opening.id ?? `opening@${opening.s}`;
     let jambOrdinal = 0;
     for (const unit of jambs) {
-      if (unit.s < s0 - 0.5 || unit.s > s1 + 0.5) continue;
       const index = dressingIndex;
       dressingIndex += 1;
       const side = unit.s < opening.s ? -1 : 1;
@@ -707,7 +723,6 @@ export function packCurvedWall({
     }
     let archOrdinal = 0;
     for (const unit of voussoirs) {
-      if (unit.s < s0 - 0.5 || unit.s > s1 + 0.5) continue;
       const index = dressingIndex;
       dressingIndex += 1;
       emitUnit(unit.category, unit.s, unit.y, index, {
@@ -726,23 +741,21 @@ export function packCurvedWall({
       archOrdinal += 1;
     }
     if (keystone) {
-      if (!(keystone.s < s0 - 0.5 || keystone.s > s1 + 0.5)) {
-        const index = dressingIndex;
-        dressingIndex += 1;
-        emitUnit(keystone.category, keystone.s, keystone.y, index, {
-          width: keystone.width,
-          height: keystone.height,
-          depth: keystone.depth,
-          roll: keystone.roll,
-          offsetNormal: keystone.offsetNormal,
-        }, {
-          role: CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
-          groupId: `opening:${openingId}:arch`,
-          courseIndex: -1,
-          jambOrdinal: null,
-          archOrdinal: 999,
-        });
-      }
+      const index = dressingIndex;
+      dressingIndex += 1;
+      emitUnit(keystone.category, keystone.s, keystone.y, index, {
+        width: keystone.width,
+        height: keystone.height,
+        depth: keystone.depth,
+        roll: keystone.roll,
+        offsetNormal: keystone.offsetNormal,
+      }, {
+        role: CONSTRUCTION_SUPPORT_ROLE.KEYSTONE,
+        groupId: `opening:${openingId}:arch`,
+        courseIndex: -1,
+        jambOrdinal: null,
+        archOrdinal: 999,
+      });
     }
   }
 

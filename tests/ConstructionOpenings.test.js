@@ -411,3 +411,43 @@ test('soft-limestone-rubble openings stay clear and keep plumb jambs', () => {
     assert.ok(leaves.length <= 2);
   }
 });
+
+test('a segmental void closes at the authored crown', () => {
+  const arch = opening({ profile: 'segmental', height: 2.6, width: 2.4 });
+  const crown = arch.sill + arch.height;
+  assert.equal(openingHalfWidthAt(arch, crown), 0, 'void must pinch at sill+height');
+  assert.ok(openingHalfWidthAt(arch, crown - 0.05) > 0, 'void still open just below the crown');
+  assert.ok(openingHalfWidthAt(arch, arch.sill + arch.height * 0.72) === 1.2, 'full width at springing');
+  const { keystone, voussoirs } = layoutOpening(arch, { thickness: 0.8 });
+  assert.ok(keystone.y <= crown + 0.3, `keystone at ${keystone.y} overshoots crown ${crown}`);
+  assert.ok(voussoirs.every((unit) => unit.y <= crown + 0.35));
+  assert.ok(openingCrownHeight(arch) <= crown + 0.3);
+});
+
+test('a pointed void pinches at the authored crown with leaf dressings', () => {
+  const arch = opening({ profile: 'pointed', height: 2.8, width: 2.0 });
+  const crown = arch.sill + arch.height;
+  assert.equal(openingHalfWidthAt(arch, crown), 0);
+  assert.ok(openingHalfWidthAt(arch, crown - 0.1) > 0);
+  const { keystone, voussoirs } = layoutOpening(arch, { thickness: 0.8 });
+  assert.ok(voussoirs.length > 0);
+  assert.ok(Math.abs(keystone.y - crown) < 0.05, `keystone ${keystone.y} vs crown ${crown}`);
+  // Dressings stay near the two leaf arcs rather than climbing a full semicircle.
+  assert.ok(voussoirs.every((unit) => unit.y <= crown + 0.2));
+});
+
+test('only the module that owns the opening centre emits dressings', () => {
+  const context = setup({}, straight(30));
+  const arch = opening({ s: 12 });
+  const left = pack(context, [arch], { arcRange: [0, 12], wallRange: [0, 30] });
+  const right = pack(context, [arch], { arcRange: [12, 24], wallRange: [0, 30] });
+  const keystones = (stones) => stones.filter((stone) => stone.support?.role === 'keystone');
+  assert.equal(keystones(left.stones).length, 0, 'left module ends at the centre and must not dress');
+  assert.equal(keystones(right.stones).length, 1, 'right module owns the centre');
+
+  const interior = opening({ s: 6 });
+  const leftInterior = pack(context, [interior], { arcRange: [0, 12], wallRange: [0, 30] });
+  const rightInterior = pack(context, [interior], { arcRange: [12, 24], wallRange: [0, 30] });
+  assert.equal(keystones(leftInterior.stones).length, 1);
+  assert.equal(keystones(rightInterior.stones).length, 0);
+});

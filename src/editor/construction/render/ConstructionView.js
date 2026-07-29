@@ -3,7 +3,7 @@ import { cubicBezierPathBounds, sampleCubicBezierPath } from '../curve/CubicBezi
 import { createCurveArcTable } from '../masonry/CurveArcTable.js';
 import { buildModuleMasonry } from '../compile/ConstructionMasonryBuilder.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
-import { createConstructionMaterials } from './ConstructionMaterials.js';
+import { createConstructionMaterials, releaseConstructionMaterials } from './ConstructionMaterials.js';
 import { coarsePlacements, moduleProjectedPixels } from './ConstructionLod.js';
 import {
   evaluateBuildRequest,
@@ -24,6 +24,7 @@ import {
 import { sampleRuinEnvelopeHeight } from '../masonry/RuinEnvelope.js';
 
 const HANDLE_RADIUS = 0.16;
+const TANGENT_HANDLE_RADIUS = 0.09;
 
 /**
  * Record origins snap to this grid so an ordinary edit does not move the origin
@@ -88,7 +89,9 @@ export class ConstructionView {
     this.entries = new Map();
     this.buildQueue = [];
     this.handleMeshes = [];
+    this.handleLines = [];
     this.selectedId = null;
+    this.selectedAnchorId = null;
     this.previewMesh = null;
     this.previewOrigin = { x: 0, z: 0 };
     this.previewedConstructionId = null;
@@ -163,8 +166,17 @@ export class ConstructionView {
     this.invalidPreviewMaterial = this.previewMaterial.clone();
     this.invalidPreviewMaterial.color.set('#d26666');
     this.handleGeometry = new THREE.SphereGeometry(HANDLE_RADIUS, 12, 8);
+    this.tangentHandleGeometry = new THREE.SphereGeometry(TANGENT_HANDLE_RADIUS, 10, 8);
     this.handleMaterial = new THREE.MeshBasicMaterial({
       color: '#ffe091',
+      depthTest: false,
+    });
+    this.tangentHandleMaterial = new THREE.MeshBasicMaterial({
+      color: '#9ec5ff',
+      depthTest: false,
+    });
+    this.tangentLineMaterial = new THREE.LineBasicMaterial({
+      color: '#9ec5ff',
       depthTest: false,
     });
     // Snapping is silent otherwise: the anchor just lands somewhere slightly
@@ -202,6 +214,7 @@ export class ConstructionView {
       for (const mesh of module.meshes ?? []) mesh.geometry.dispose();
       module.shellMesh?.geometry.dispose();
     }
+    releaseConstructionMaterials(entry.materials);
     this.root.remove(entry.group);
     this.entries.delete(constructionId);
     this.buildQueue = this.buildQueue.filter((job) => job.constructionId !== constructionId);
@@ -249,7 +262,9 @@ export class ConstructionView {
 
     if (hint?.materialOnly && entry.shellMesh) {
       // Geometry is unchanged; only the material assignment can differ.
+      const previous = entry.materials;
       entry.materials = this.createMaterials(record);
+      releaseConstructionMaterials(previous);
       this.applyEntryMaterials(entry);
       return;
     }
@@ -257,7 +272,11 @@ export class ConstructionView {
     // Rebuilt per revision: the arc table is the shared arc-length view the
     // masonry builder places against, and must match the path the plan solved.
     entry.arcTable = createCurveArcTable(sampleCubicBezierPath(record.path));
-    entry.materials = this.createMaterials(record);
+    {
+      const previous = entry.materials;
+      entry.materials = this.createMaterials(record);
+      releaseConstructionMaterials(previous);
+    }
 
     // Cached so a module shell is a slice of the same sampled curve the record
     // shell used, rather than a second sampling that could seam differently.
@@ -670,6 +689,7 @@ export class ConstructionView {
       && resident.pendingBuildKey !== expectedKey
     ) {
       this.stats.staleBuildsDiscarded += 1;
+      resident.pendingBuildKey = null;
       return;
     }
     const source = module.placements ?? [];
@@ -692,11 +712,13 @@ export class ConstructionView {
       || entry.modules.get(module.id).hash !== module.contentHash
     ) {
       this.stats.staleBuildsDiscarded += 1;
+      resident.pendingBuildKey = null;
       for (const mesh of built.meshes ?? []) mesh.geometry.dispose();
       return;
     }
     if ((resident.requestedBand ?? lodBand) !== lodBand) {
       this.stats.staleBuildsDiscarded += 1;
+      resident.pendingBuildKey = null;
       for (const mesh of built.meshes ?? []) mesh.geometry.dispose();
       return;
     }
@@ -849,10 +871,11 @@ export class ConstructionView {
     entry.shellMesh.visible = !covered;
   }
 
-  setSelection(constructionId) {
+  setSelection(constructionId, anchorId = null) {
     this.selectedId = constructionId && this.store.get(constructionId)
       ? String(constructionId)
       : null;
+    this.selectedAnchorId = this.selectedId && anchorId ? String(anchorId) : null;
     for (const [id, entry] of this.entries) this.applySelectionMaterial(id, entry);
     this.rebuildHandles();
   }
@@ -864,10 +887,22 @@ export class ConstructionView {
   }
 
   rebuildHandles() {
-    for (const mesh of this.handleMeshes) this.root.remove(mesh);
+    for (const mesh of this.handleMeshes) {
+      this.root.remove(mesh);
+      if (mesh.geometry && mesh.geometry !== this.handleGeometry
+        && mesh.geometry !== this.tangentHandleGeometry) {
+        mesh.geometry.dispose();
+      }
+    }
+    for (const line of this.handleLines) {
+      this.root.remove(line);
+      line.geometry.dispose();
+    }
     this.handleMeshes = [];
+    this.handleLines = [];
     const record = this.selectedId ? this.store.get(this.selectedId) : null;
     if (!record || record.path.type !== 'cubicBezier') return;
+    const anchors = new Map(record.path.anchors.map((anchor) => [anchor.id, anchor]));
     for (const anchor of record.path.anchors) {
       const mesh = new THREE.Mesh(this.handleGeometry, this.handleMaterial);
       const at = this.handleAnchorPosition(record, anchor);
@@ -875,26 +910,67 @@ export class ConstructionView {
       mesh.renderOrder = 100;
       mesh.userData.constructionId = record.id;
       mesh.userData.anchorId = anchor.id;
+      mesh.userData.handleKind = 'anchor';
       this.root.add(mesh);
       this.handleMeshes.push(mesh);
+    }
+    // Tangent gizmos only for the selected anchor — emitting them for every
+    // node turns a long wall into a forest of always-on-top spheres.
+    const selectedAnchor = this.selectedAnchorId
+      ? anchors.get(this.selectedAnchorId)
+      : null;
+    if (!selectedAnchor) return;
+    const anchorAt = this.handleAnchorPosition(record, selectedAnchor);
+    for (const segment of record.path.segments) {
+      const ends = [];
+      if (segment.startAnchorId === selectedAnchor.id) {
+        ends.push({ which: 'start', offset: segment.startHandle });
+      }
+      if (segment.endAnchorId === selectedAnchor.id) {
+        ends.push({ which: 'end', offset: segment.endHandle });
+      }
+      for (const { which, offset } of ends) {
+        const worldX = selectedAnchor.position[0] + offset[0];
+        const worldZ = selectedAnchor.position[1] + offset[1];
+        const render = this.floatingOrigin.toRender(worldX, worldZ);
+        const height = this.terrainView.getCanonicalHeight(worldX, worldZ) ?? 0;
+        const handleY = height + record.dimensions.height + 0.28;
+        const mesh = new THREE.Mesh(this.tangentHandleGeometry, this.tangentHandleMaterial);
+        mesh.position.set(render.x, handleY, render.z);
+        mesh.renderOrder = 101;
+        mesh.userData.constructionId = record.id;
+        mesh.userData.anchorId = selectedAnchor.id;
+        mesh.userData.handleKind = 'tangent';
+        mesh.userData.segmentId = segment.id;
+        mesh.userData.which = which;
+        this.root.add(mesh);
+        this.handleMeshes.push(mesh);
+
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(anchorAt.x, anchorAt.y, anchorAt.z),
+          new THREE.Vector3(render.x, handleY, render.z),
+        ]);
+        const line = new THREE.Line(lineGeometry, this.tangentLineMaterial);
+        line.renderOrder = 99;
+        line.frustumCulled = false;
+        this.root.add(line);
+        this.handleLines.push(line);
+      }
     }
   }
 
   repositionHandles() {
     const record = this.selectedId ? this.store.get(this.selectedId) : null;
     if (!record || record.path.type !== 'cubicBezier') return;
-    const anchors = new Map(record.path.anchors.map((anchor) => [anchor.id, anchor]));
-    for (const mesh of this.handleMeshes) {
-      const anchor = anchors.get(mesh.userData.anchorId);
-      if (!anchor) continue;
-      const at = this.handleAnchorPosition(record, anchor);
-      mesh.position.set(at.x, at.y, at.z);
-    }
+    // Tangents and connector lines depend on handle offsets; cheapest correct
+    // path after an origin rebase is a full rebuild.
+    this.rebuildHandles();
   }
 
   /** Tint the dragged anchor's handle to show which snap is about to apply. */
   setSnapFeedback(anchorId, snapKind) {
     for (const mesh of this.handleMeshes) {
+      if (mesh.userData.handleKind === 'tangent') continue;
       const active = anchorId && mesh.userData.anchorId === anchorId && snapKind;
       mesh.material = active
         ? this.snapMaterials.get(snapKind) ?? this.handleMaterial
@@ -1060,6 +1136,9 @@ export class ConstructionView {
       ? {
         constructionId: found.object.userData.constructionId,
         anchorId: found.object.userData.anchorId,
+        handleKind: found.object.userData.handleKind ?? 'anchor',
+        segmentId: found.object.userData.segmentId ?? null,
+        which: found.object.userData.which ?? null,
       }
       : null;
   }
@@ -1074,7 +1153,10 @@ export class ConstructionView {
     this.previewMaterial.dispose();
     this.invalidPreviewMaterial.dispose();
     this.handleGeometry.dispose();
+    this.tangentHandleGeometry.dispose();
     this.handleMaterial.dispose();
+    this.tangentHandleMaterial.dispose();
+    this.tangentLineMaterial.dispose();
     for (const material of this.snapMaterials.values()) material.dispose();
     this.snapMaterials.clear();
   }

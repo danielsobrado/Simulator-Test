@@ -140,3 +140,54 @@ test('malformed construction payloads fail transactionally', () => {
   assert.deepEqual(store.toDocument(), before);
 });
 
+test('insert_anchor remaps openings and top points onto the correct half', () => {
+  const store = new ConstructionStore();
+  const path = createCubicBezierPathFromStroke([
+    [0, 0], [10, 0.01], [20, -0.01], [30, 0],
+  ], {
+    simplifyTolerance: 0.001,
+    anchorPrefix: 'construction-1-anchor',
+    segmentPrefix: 'construction-1-segment',
+  });
+  const segmentId = path.segments[1].id;
+  store.add({
+    ...record(),
+    path,
+    features: [{
+      id: 'opening-1',
+      kind: 'arch',
+      segmentId,
+      arcFraction: 0.8,
+      width: 2,
+      height: 2.4,
+      sill: 0,
+      profile: 'round',
+      dressed: true,
+      group: null,
+    }],
+    top: {
+      style: 'flat',
+      base: 3.5,
+      profile: [{ segmentId, arcFraction: 0.8, height: 4.2 }],
+      ruinSeed: 0,
+    },
+  });
+
+  const before = store.get('construction-1');
+  const change = executeConstructionCommand(store, {
+    type: 'insert_anchor',
+    constructionId: 'construction-1',
+    segmentId,
+    t: 0.5,
+  });
+  const after = change.after;
+  assert.equal(after.path.segments.length, before.path.segments.length + 1);
+  assert.equal(after.features.length, 1);
+  assert.equal(after.top.profile.length, 1);
+  // World placement stays on the far half: new host is the second half segment.
+  assert.notEqual(after.features[0].segmentId, segmentId);
+  assert.equal(after.features[0].segmentId, after.top.profile[0].segmentId);
+  assert.ok(after.features[0].arcFraction > 0.4);
+  assert.ok(after.features[0].arcFraction < 0.8);
+});
+

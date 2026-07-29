@@ -231,6 +231,8 @@ test('crenellations emit bonded merlons above the crown', () => {
 
   const above = stones.filter(({ y }) => y > 3.5);
   assert.ok(above.length > 0, 'merlons must sit above the crown');
+  assert.ok(above.every((stone) => stone.support?.role === 'merlon'));
+  assert.ok(above.some((stone) => stone.category === 'merlon'));
   // Merlons are packed courses, not single blocks.
   const merlonCount = new Set(above.map(({ s }) => Math.round(s / 1.18))).size;
   assert.ok(above.length > merlonCount, 'expected more than one stone per merlon');

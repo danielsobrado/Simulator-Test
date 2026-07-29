@@ -6,6 +6,7 @@ import { createCubicBezierPathFromStroke } from '../src/editor/construction/curv
 import {
   createConstructionMaterials,
   disposeConstructionMaterials,
+  releaseConstructionMaterials,
 } from '../src/editor/construction/render/ConstructionMaterials.js';
 import {
   normalizeWorkshopMaterialDocument,
@@ -85,4 +86,21 @@ test('editing a custom preset with the same id invalidates the material cache', 
   assert.ok(second.stone.color.equals(new THREE.Color('#8094a0')));
   assert.equal(first.stone.roughness, 0.91);
   assert.equal(second.stone.roughness, 0.67);
+});
+
+test('releaseConstructionMaterials drops the last user and disposes materials', () => {
+  const document = materialDocument({ baseColor: '#b7793f', roughness: 0.91 });
+  const first = createConstructionMaterials(wall(), document);
+  const second = createConstructionMaterials(wall(), document);
+  assert.equal(second, first);
+
+  releaseConstructionMaterials(first);
+  const stillShared = createConstructionMaterials(wall(), document);
+  assert.equal(stillShared, first);
+  releaseConstructionMaterials(stillShared);
+  releaseConstructionMaterials(stillShared);
+
+  const recreated = createConstructionMaterials(wall(), document);
+  assert.notEqual(recreated, first);
+  assert.notEqual(recreated.stone.uuid, first.stone.uuid);
 });

@@ -16,6 +16,7 @@ import {
   createCubicBezierPathFromStroke,
   findCubicBezierSelfIntersections,
   moveCubicBezierAnchor,
+  setCubicBezierHandle,
 } from './construction/curve/CubicBezierPath.js';
 import {
   flattenHandlesAround,
@@ -28,7 +29,7 @@ import {
   flattenTop,
 } from './construction/masonry/WallTopEdit.js';
 import { createWallTopProfile } from './construction/masonry/WallTopProfile.js';
-import { cutFeatureStyle, resolveCutStroke } from './construction/ConstructionCutStroke.js';
+import { cutFeatureStyle, resolveCutStroke, resolveWindowGroup, WINDOW_LINK_ARC } from './construction/ConstructionCutStroke.js';
 
 /** Commit a raise/lower burst as one history entry once the keys settle. */
 const TOP_EDIT_COMMIT_MS = 250;
@@ -317,10 +318,13 @@ export class EditorController {
     this.emitState();
   }
 
-  setSelectedConstruction(constructionId) {
+  setSelectedConstruction(constructionId, anchorId = null) {
     const id = constructionId == null ? null : String(constructionId);
     this.selectedConstructionId = id && this.constructionStore?.get(id) ? id : null;
-    this.constructionView?.setSelection(this.selectedConstructionId);
+    this.selectedAnchorId = this.selectedConstructionId && anchorId
+      ? String(anchorId)
+      : null;
+    this.constructionView?.setSelection(this.selectedConstructionId, this.selectedAnchorId);
   }
 
   /** Run a construction command, commit it to history, and report failures. */
@@ -470,6 +474,20 @@ export class EditorController {
       this.constructionStore?.applyChange(entry, direction);
       const target = direction === 'undo' ? entry.before : entry.after;
       this.setSelectedConstruction(target?.id ?? null);
+      return;
+    }
+
+    if (entry.kind === 'construction-batch') {
+      const changes = direction === 'undo'
+        ? [...entry.changes].reverse()
+        : entry.changes;
+      for (const change of changes) {
+        this.constructionStore?.applyChange(change, direction);
+      }
+      const last = direction === 'undo'
+        ? entry.changes[0]?.before
+        : entry.changes.at(-1)?.after;
+      this.setSelectedConstruction(last?.id ?? null);
       return;
     }
 
@@ -686,7 +704,7 @@ export class EditorController {
    * door. Repeated strokes stack arches until the field masonry between them is
    * consumed, which is how a standalone arcade gets built.
    */
-  commitCutStroke(stroke) {
+  commitCutStroke(stroke, { link = true } = {}) {
     if (!this.constructionStore || stroke.length < 2) return;
     const records = this.constructionStore.list();
     const cuts = resolveCutStroke(stroke, records, {
@@ -701,23 +719,83 @@ export class EditorController {
       this.emitNotice('Draw across a wall to carve an arch, or up to one for a door.', true);
       return;
     }
-    let added = 0;
+
+    // Group by wall and apply each wall once so one Alt-drag is one undo step
+    // even when it carves several openings (possibly across several walls).
+    const byWall = new Map();
     for (const cut of cuts) {
-      const record = this.constructionStore.get(cut.constructionId);
-      if (!record) continue;
-      const featureId = nextOpeningFeatureId(record);
-      const change = this.runConstructionCommand({
-        type: 'add_feature',
-        constructionId: cut.constructionId,
-        feature: {
-          id: featureId,
-          ...this.cutFeatureStyle(cut),
-          segmentId: cut.segmentId,
-          arcFraction: cut.arcFraction,
-          width: cut.width,
-        },
+      if (!byWall.has(cut.constructionId)) byWall.set(cut.constructionId, []);
+      byWall.get(cut.constructionId).push(cut);
+    }
+
+    const batch = [];
+    let added = 0;
+    for (const [constructionId, wallCuts] of byWall) {
+      const before = this.constructionStore.get(constructionId);
+      if (!before) continue;
+      const arcTable = this.constructionView?.arcTableFor(constructionId);
+      let working = before;
+      const dirty = new Set();
+      for (const cut of wallCuts) {
+        const featureId = nextOpeningFeatureId(working);
+        const style = this.cutFeatureStyle(cut);
+        const group = style.kind === 'window'
+          ? resolveWindowGroup(
+            working,
+            { segmentId: cut.segmentId, arcFraction: cut.arcFraction },
+            arcTable,
+            { link },
+          )
+          : null;
+        let features = working.features;
+        if (group && arcTable) {
+          const s = arcTable.toArc(cut.segmentId, cut.arcFraction);
+          features = features.map((entry) => {
+            if (entry.kind !== 'window' || entry.segmentId !== cut.segmentId) return entry;
+            const other = arcTable.toArc(entry.segmentId, entry.arcFraction);
+            if (Math.abs(other - s) > WINDOW_LINK_ARC) return entry;
+            return { ...entry, group };
+          });
+        }
+        features = [
+          ...features,
+          {
+            id: featureId,
+            ...style,
+            segmentId: cut.segmentId,
+            arcFraction: cut.arcFraction,
+            width: cut.width,
+            group,
+          },
+        ];
+        dirty.add(cut.segmentId);
+        working = {
+          ...working,
+          features,
+          path: { ...working.path, features },
+        };
+        added += 1;
+      }
+      const after = this.constructionStore.update(constructionId, working, {
+        dirtySegmentIds: [...dirty],
       });
-      if (change) added += 1;
+      batch.push(Object.freeze({
+        kind: 'construction',
+        before,
+        after,
+        dirtySegmentIds: Object.freeze([...dirty]),
+        materialOnly: false,
+        dropped: 0,
+      }));
+    }
+
+    if (batch.length === 1) {
+      this.commitHistory(batch[0]);
+    } else if (batch.length > 1) {
+      this.commitHistory(Object.freeze({
+        kind: 'construction-batch',
+        changes: Object.freeze(batch),
+      }));
     }
     if (added > 0) {
       this.emitNotice(`Carved ${added} opening${added === 1 ? '' : 's'}.`);
@@ -780,13 +858,26 @@ export class EditorController {
       if (handle) {
         const before = this.constructionStore.get(handle.constructionId);
         this.selectedAnchorId = handle.anchorId;
-        this.constructionAnchorDrag = {
-          ...handle,
-          before,
-          candidate: before,
-          snap: null,
-        };
+        this.constructionView?.setSelection(handle.constructionId, handle.anchorId);
+        if (handle.handleKind === 'tangent') {
+          this.constructionAnchorDrag = {
+            ...handle,
+            before,
+            candidate: before,
+            snap: null,
+            handleMode: event.altKey ? 'corner' : 'smooth',
+          };
+        } else {
+          this.constructionAnchorDrag = {
+            ...handle,
+            before,
+            candidate: before,
+            snap: null,
+            handleMode: null,
+          };
+        }
         this.canvas.setPointerCapture(event.pointerId);
+        this.emitState();
         return;
       }
       this.selectedAnchorId = null;
@@ -854,6 +945,33 @@ export class EditorController {
 
     if (this.constructionAnchorDrag) {
       const drag = this.constructionAnchorDrag;
+      if (drag.handleKind === 'tangent') {
+        const anchor = drag.before.path.anchors.find(({ id }) => id === drag.anchorId);
+        if (!anchor) return;
+        const offset = {
+          x: point.x - anchor.position[0],
+          z: point.z - anchor.position[1],
+        };
+        const path = setCubicBezierHandle(
+          drag.before.path,
+          drag.segmentId,
+          drag.which,
+          offset,
+          { mode: drag.handleMode ?? 'smooth' },
+        );
+        drag.candidate = {
+          ...drag.before,
+          revision: drag.before.revision + 1,
+          path,
+          features: path.features,
+        };
+        this.constructionView.setDraft(drag.candidate, {
+          constructionId: drag.constructionId,
+          valid: findCubicBezierSelfIntersections(path).length === 0,
+          anchorId: drag.anchorId,
+        });
+        return;
+      }
       // Snapping is on by default; Left Ctrl suppresses it. Both source
       // descriptions of the reference game reduce to this one rule.
       const snap = resolveAnchorSnap({
@@ -908,7 +1026,8 @@ export class EditorController {
       this.constructionCutArmed = false;
       this.constructionView.clearDraft();
       if (cutting) {
-        this.commitCutStroke(stroke);
+        // Left Ctrl suppresses auto-linking nearby windows into a shared group.
+        this.commitCutStroke(stroke, { link: !event.ctrlKey });
         this.emitState();
         return;
       }
@@ -952,31 +1071,47 @@ export class EditorController {
         if (findCubicBezierSelfIntersections(drag.candidate.path).length > 0) {
           throw new Error('Construction paths cannot intersect themselves.');
         }
-        const anchor = drag.candidate.path.anchors.find(({ id }) => id === drag.anchorId);
-        // Dragging one end onto the other closes the loop: the dragged anchor
-        // is dropped and the wrap-around segment takes its place, so a circle
-        // comes out seamless rather than with a doubled anchor at the seam.
-        const change = drag.snap?.closesLoop
-          ? executeConstructionCommand(this.constructionStore, {
-            type: 'close_path',
+        if (drag.handleKind === 'tangent') {
+          const segment = drag.candidate.path.segments.find(({ id }) => id === drag.segmentId);
+          const offset = drag.which === 'start' ? segment.startHandle : segment.endHandle;
+          const change = executeConstructionCommand(this.constructionStore, {
+            type: 'move_handle',
             constructionId: drag.constructionId,
-            dropAnchorId: drag.anchorId,
-          })
-          : executeConstructionCommand(this.constructionStore, {
-            type: 'move_anchor',
-            constructionId: drag.constructionId,
-            anchorId: drag.anchorId,
-            position: anchor.position,
-            flattenHandles: drag.snap?.flattenHandles === true,
+            segmentId: drag.segmentId,
+            which: drag.which,
+            offset: { x: offset[0], z: offset[1] },
+            mode: drag.handleMode ?? 'smooth',
           });
-        this.commitHistory(change);
-        if (change.dropped > 0) {
-          this.emitNotice(
-            `Dropped ${change.dropped} wall detail${change.dropped === 1 ? '' : 's'} on the removed span.`,
-          );
+          this.commitHistory(change);
+          this.setSelectedConstruction(drag.constructionId, drag.anchorId);
+          this.emitMap();
+        } else {
+          const anchor = drag.candidate.path.anchors.find(({ id }) => id === drag.anchorId);
+          // Dragging one end onto the other closes the loop: the dragged anchor
+          // is dropped and the wrap-around segment takes its place, so a circle
+          // comes out seamless rather than with a doubled anchor at the seam.
+          const change = drag.snap?.closesLoop
+            ? executeConstructionCommand(this.constructionStore, {
+              type: 'close_path',
+              constructionId: drag.constructionId,
+              dropAnchorId: drag.anchorId,
+            })
+            : executeConstructionCommand(this.constructionStore, {
+              type: 'move_anchor',
+              constructionId: drag.constructionId,
+              anchorId: drag.anchorId,
+              position: anchor.position,
+              flattenHandles: drag.snap?.flattenHandles === true,
+            });
+          this.commitHistory(change);
+          if (change.dropped > 0) {
+            this.emitNotice(
+              `Dropped ${change.dropped} wall detail${change.dropped === 1 ? '' : 's'} on the removed span.`,
+            );
+          }
+          this.setSelectedConstruction(drag.constructionId, drag.anchorId);
+          this.emitMap();
         }
-        this.setSelectedConstruction(drag.constructionId);
-        this.emitMap();
       } catch (error) {
         this.emitNotice(error.message, true);
       }

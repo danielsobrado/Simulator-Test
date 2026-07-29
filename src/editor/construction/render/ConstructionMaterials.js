@@ -191,18 +191,28 @@ function presetTexture(document, preset, kind) {
     preset.repeat,
     preset.rotation,
   ].join('|');
-  if (!PRESET_TEXTURE_CACHE.has(key)) {
-    if (PRESET_TEXTURE_CACHE.size >= MAX_PRESET_TEXTURE_CACHE) return null;
-    const image = new Image();
-    const texture = new THREE.Texture(image);
-    image.addEventListener('load', () => {
-      texture.needsUpdate = true;
-    }, { once: true });
-    image.src = source.dataUrl;
-    texture.name = `construction-pbr-${sourceId}`;
-    texture.userData.sharedSurface = true;
-    PRESET_TEXTURE_CACHE.set(key, configurePresetTexture(texture, preset, kind));
+  if (PRESET_TEXTURE_CACHE.has(key)) {
+    // Refresh LRU order: Map iterates in insertion order.
+    const texture = PRESET_TEXTURE_CACHE.get(key);
+    PRESET_TEXTURE_CACHE.delete(key);
+    PRESET_TEXTURE_CACHE.set(key, texture);
+    return texture;
   }
+  while (PRESET_TEXTURE_CACHE.size >= MAX_PRESET_TEXTURE_CACHE) {
+    const oldest = PRESET_TEXTURE_CACHE.keys().next().value;
+    const stale = PRESET_TEXTURE_CACHE.get(oldest);
+    PRESET_TEXTURE_CACHE.delete(oldest);
+    stale?.dispose?.();
+  }
+  const image = new Image();
+  const texture = new THREE.Texture(image);
+  image.addEventListener('load', () => {
+    texture.needsUpdate = true;
+  }, { once: true });
+  image.src = source.dataUrl;
+  texture.name = `construction-pbr-${sourceId}`;
+  texture.userData.sharedSurface = true;
+  PRESET_TEXTURE_CACHE.set(key, configurePresetTexture(texture, preset, kind));
   return PRESET_TEXTURE_CACHE.get(key);
 }
 
@@ -277,6 +287,22 @@ export function createConstructionMaterials(record, materialDocument = null) {
   const materials = Object.freeze({ stone, stoneSelected, mortar });
   cache.set(key, { materials, users: 1 });
   return materials;
+}
+
+/**
+ * Drop one user of a materials bundle. When the last user goes, dispose the
+ * GPU objects so style/preset/seed edits cannot retain pipelines forever.
+ */
+export function releaseConstructionMaterials(materials) {
+  if (!materials) return;
+  for (const [key, entry] of cache.entries()) {
+    if (entry.materials !== materials) continue;
+    entry.users -= 1;
+    if (entry.users > 0) return;
+    for (const material of Object.values(entry.materials)) material.dispose();
+    cache.delete(key);
+    return;
+  }
 }
 
 /** Test seam and teardown hook; materials are otherwise shared for the session. */
