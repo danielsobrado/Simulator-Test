@@ -1,7 +1,12 @@
 import * as THREE from 'three';
+import { earthSpellGameplayConfig } from './earth_spell_gameplay_config.js';
 import { defaultSpellConfig } from './spell_config.js';
 import { createSpellMenu } from './spell_menu.js';
 import { createSpellVfxController } from './spell_vfx_controller.js';
+
+const FIREBALL_COLLISION_PROBE_PADDING_M = 1.5;
+const FIREBALL_COLLISION_PROBE_SECONDS = 0.075;
+const SPELL_IDS = Object.freeze(['fire', 'water', 'air', 'earth', 'lightning', 'fireball']);
 
 function meshConfig(vfx) {
   return {
@@ -19,18 +24,45 @@ function meshConfig(vfx) {
   };
 }
 
+function consumesGameplayShortcut(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable
+    || tagName === 'input'
+    || tagName === 'textarea'
+    || tagName === 'select'
+    || tagName === 'button';
+}
+
+function fireballCollisionRange(config) {
+  const probeSeconds = FIREBALL_COLLISION_PROBE_SECONDS;
+  return Math.max(
+    3,
+    config.launchSpeed * probeSeconds
+      + Math.abs(config.liftSpeed) * probeSeconds
+      + 0.5 * Math.max(0, config.gravity) * probeSeconds * probeSeconds
+      + config.projectileRadius * 2
+      + FIREBALL_COLLISION_PROBE_PADDING_M,
+  );
+}
+
 /**
- * Walk-mode spell VFX. Earth digs are VFX-only here (no CLOD convergence).
- * The menu is visible only while the player is in walk mode.
+ * Walk-mode spell runtime.
+ *
+ * Terrain interaction is supplied by the raycast hit capability, keeping the
+ * spell system independent from the simulator world-store implementation.
  */
 export function createSpellRuntime(deps) {
   const config = deps.config ?? defaultSpellConfig;
+  const gameplay = deps.earthGameplayConfig ?? earthSpellGameplayConfig;
   const scene = deps.scene;
   const getCamera = () => deps.getCamera();
   const isWalkMode = () => deps.isWalkMode?.() === true;
   const targetRay = new THREE.Ray();
   const targetDirection = new THREE.Vector3();
   const targetNormal = new THREE.Vector3(0, 1, 0);
+  let earthTargetOverride = null;
+  let disposed = false;
 
   const getTerrainTarget = (maxRange) => {
     const camera = getCamera();
@@ -38,9 +70,18 @@ export function createSpellRuntime(deps) {
     targetRay.origin.copy(camera.position);
     targetRay.direction.copy(targetDirection);
     const hit = deps.raycastTerrain?.(targetRay, maxRange) ?? null;
-    return hit
-      ? { point: hit.point.clone(), normal: (hit.normal ?? targetNormal).clone() }
-      : null;
+    if (!hit) return null;
+    return {
+      point: hit.point.clone(),
+      normal: (hit.normal ?? targetNormal).clone(),
+      commitEarthEdit: hit.commitEarthEdit,
+    };
+  };
+
+  const getEarthVfxTarget = () => {
+    const override = earthTargetOverride;
+    earthTargetOverride = null;
+    return override ?? getTerrainTarget(gameplay.maxRangeM);
   };
 
   const vfx = createSpellVfxController({
@@ -52,33 +93,66 @@ export function createSpellRuntime(deps) {
     earth: config.earth.vfx,
     lightning: config.lightning.vfx,
     fireball: config.fireball.vfx,
-    getEarthTarget: () => getTerrainTarget(config.earth.vfx.impactRadius * 4 || 10),
+    getEarthTarget: getEarthVfxTarget,
     getLightningTarget: () => getTerrainTarget(config.lightning.vfx.maxRange),
-    raycastFireballTerrain: (origin, direction, maxDistance) => {
-      targetRay.origin.copy(origin);
-      targetRay.direction.copy(direction).normalize();
-      const hit = deps.raycastTerrain?.(targetRay, maxDistance) ?? null;
-      return hit
-        ? { point: hit.point.clone(), normal: (hit.normal ?? targetNormal).clone() }
-        : null;
-    },
+    raycastFireballTerrain: (ray) => (
+      deps.raycastTerrain?.(ray, fireballCollisionRange(config.fireball.vfx)) ?? null
+    ),
   });
+
+  const casts = {
+    fire: (durationMs = config.fire.castDurationMs) => {
+      vfx.playFire(durationMs);
+      return true;
+    },
+    water: (durationMs = config.water.castDurationMs) => {
+      vfx.playWater(durationMs);
+      return true;
+    },
+    air: (durationMs = config.air.castDurationMs) => {
+      vfx.playAir(durationMs);
+      return true;
+    },
+    earth: (durationMs = config.earth.castDurationMs) => {
+      const target = getTerrainTarget(gameplay.maxRangeM);
+      if (!target) return false;
+      if (gameplay.enabled) {
+        const result = target.commitEarthEdit?.(gameplay);
+        if (!result?.ok || !result.changed) return false;
+      }
+      earthTargetOverride = { point: target.point, normal: target.normal };
+      return vfx.playEarth(durationMs) !== false;
+    },
+    lightning: (durationMs = config.lightning.castDurationMs) => {
+      vfx.playLightning(durationMs);
+      return true;
+    },
+    fireball: (durationMs = config.fireball.castDurationMs) => {
+      vfx.playFireball(durationMs);
+      return true;
+    },
+  };
+
+  const cast = (spellId, durationMs) => {
+    if (disposed || !isWalkMode() || deps.isInputBlocked?.()) return false;
+    const play = casts[spellId];
+    return typeof play === 'function' ? play(durationMs) : false;
+  };
 
   const menu = createSpellMenu({
     config,
     root: deps.menuRoot,
     controller: {
-      playFire: (ms) => vfx.playFire(ms ?? config.fire.castDurationMs),
-      playWater: (ms) => vfx.playWater(ms ?? config.water.castDurationMs),
-      playAir: (ms) => vfx.playAir(ms ?? config.air.castDurationMs),
-      playEarth: (ms) => vfx.playEarth(ms ?? config.earth.castDurationMs),
-      playLightning: (ms) => vfx.playLightning(ms ?? config.lightning.castDurationMs),
-      playFireball: (ms) => vfx.playFireball(ms ?? config.fireball.castDurationMs),
+      playFire: (durationMs) => cast('fire', durationMs),
+      playWater: (durationMs) => cast('water', durationMs),
+      playAir: (durationMs) => cast('air', durationMs),
+      playEarth: (durationMs) => cast('earth', durationMs),
+      playLightning: (durationMs) => cast('lightning', durationMs),
+      playFireball: (durationMs) => cast('fireball', durationMs),
     },
   });
 
   const menuEl = document.getElementById(config.menu.rootId);
-
   const syncMenuVisibility = () => {
     const visible = isWalkMode();
     menuEl?.classList.toggle('spell-menu-hidden', !visible);
@@ -90,47 +164,39 @@ export function createSpellRuntime(deps) {
   syncMenuVisibility();
 
   const unsubscribeMode = typeof deps.subscribeViewMode === 'function'
-    ? deps.subscribeViewMode(() => syncMenuVisibility())
+    ? deps.subscribeViewMode(syncMenuVisibility)
     : null;
 
-  const castByDigit = (digit) => {
-    if (digit === 1) menu.castFire();
-    else if (digit === 2) menu.castWater();
-    else if (digit === 3) menu.castAir();
-    else if (digit === 4) menu.castEarth();
-    else if (digit === 5) menu.castLightning();
-    else if (digit === 6) menu.castFireball();
-  };
-
   const onKeyDown = (event) => {
-    if (!isWalkMode()) return;
+    if (!isWalkMode() || deps.isInputBlocked?.()) return;
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    const target = event.target;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-      return;
-    }
-    const code = event.code;
-    if (code === 'Digit1' || code === 'Numpad1') castByDigit(1);
-    else if (code === 'Digit2' || code === 'Numpad2') castByDigit(2);
-    else if (code === 'Digit3' || code === 'Numpad3') castByDigit(3);
-    else if (code === 'Digit4' || code === 'Numpad4') castByDigit(4);
-    else if (code === 'Digit5' || code === 'Numpad5') castByDigit(5);
-    else if (code === 'Digit6' || code === 'Numpad6') castByDigit(6);
-    else return;
+    if (consumesGameplayShortcut(event.target)) return;
+
+    const numericCode = event.code.startsWith('Digit')
+      ? Number(event.code.slice(5))
+      : event.code.startsWith('Numpad')
+        ? Number(event.code.slice(6))
+        : 0;
+    const spellId = SPELL_IDS[numericCode - 1];
+    if (!spellId) return;
     event.preventDefault();
+    cast(spellId);
   };
 
   window.addEventListener('keydown', onKeyDown, true);
 
   return {
+    cast,
     syncMenuVisibility,
     update(nowMs) {
-      vfx.update(nowMs);
+      if (!disposed) vfx.update(nowMs);
     },
     precompile(renderer) {
-      vfx.precompile(renderer);
+      if (!disposed) vfx.precompile(renderer);
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       window.removeEventListener('keydown', onKeyDown, true);
       unsubscribeMode?.();
       menu.dispose();
