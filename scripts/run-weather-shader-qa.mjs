@@ -103,6 +103,10 @@ async function captureViewport(page, mode) {
   }
 }
 
+function shaderErrors(messages) {
+  return messages.filter((message) => shaderErrorPattern.test(message));
+}
+
 async function run() {
   await mkdir(outputDirectory, { recursive: true });
   const port = await reservePort(requestedPort);
@@ -139,7 +143,9 @@ async function run() {
     const runtimeErrors = [];
     page.on('pageerror', (error) => runtimeErrors.push(`pageerror: ${error.message}`));
     page.on('console', (message) => {
-      if (message.type() === 'error') runtimeErrors.push(`console: ${message.text()}`);
+      if (message.type() === 'error' || message.type() === 'warning') {
+        runtimeErrors.push(`${message.type()}: ${message.text()}`);
+      }
     });
 
     await page.goto(baseUrl, { waitUntil: 'load', timeout: timeoutMs });
@@ -148,14 +154,21 @@ async function run() {
     const hasWebGpu = await page.evaluate(() => Boolean(navigator.gpu));
     assert.equal(hasWebGpu, true, 'Chromium did not expose WebGPU.');
 
-    const baselineErrorCount = runtimeErrors.length;
+    await delay(settleMs);
+    const warmupErrors = shaderErrors(runtimeErrors);
+    assert.deepEqual(
+      warmupErrors,
+      [],
+      `Weather shader warmup failed:\n${warmupErrors.join('\n')}`,
+    );
+
     for (const mode of modes) {
       const startedAt = performance.now();
       const errorStart = runtimeErrors.length;
       await setWeatherMode(page, mode);
       await delay(settleMs);
       const modeErrors = runtimeErrors.slice(errorStart);
-      const shaderErrors = modeErrors.filter((message) => shaderErrorPattern.test(message));
+      const modeShaderErrors = shaderErrors(modeErrors);
       const screenshotHash = await captureViewport(page, mode);
       report.modes.push({
         mode,
@@ -163,10 +176,14 @@ async function run() {
         screenshotHash,
         errors: modeErrors,
       });
-      assert.deepEqual(shaderErrors, [], `${mode} produced shader/runtime errors:\n${shaderErrors.join('\n')}`);
+      assert.deepEqual(
+        modeShaderErrors,
+        [],
+        `${mode} produced shader/runtime errors:\n${modeShaderErrors.join('\n')}`,
+      );
     }
 
-    report.errors = runtimeErrors.slice(baselineErrorCount);
+    report.errors = runtimeErrors;
     await setWeatherMode(page, 'off');
   } finally {
     await browser?.close();
