@@ -1,4 +1,5 @@
-import spellDefaults from './spells_yaml_defaults.json' with { type: 'json' };
+import { load } from 'js-yaml';
+import spellsYamlText from '../../../config/spells.yaml?raw';
 
 const VALID_OPERATIONS = new Set(['add', 'remove']);
 const VALID_SHAPES = new Set(['sphere', 'cube']);
@@ -35,15 +36,15 @@ function integer(record, key, fallback, minimum, maximum) {
 function sourceRecord(source) {
   if (typeof source !== 'string') return asRecord(source);
   try {
-    return asRecord(JSON.parse(source));
+    return asRecord(load(source));
   } catch (error) {
-    console.warn('[spells] Invalid generated spell defaults; using Earth defaults.', error);
+    console.warn('[spells] Invalid spell YAML; using Earth defaults.', error);
     return null;
   }
 }
 
 export function parseEarthSpellGameplayConfig(
-  source = spellDefaults,
+  source = spellsYamlText,
   fallback = DEFAULT_EARTH_SPELL_GAMEPLAY_CONFIG,
 ) {
   const root = sourceRecord(source);
