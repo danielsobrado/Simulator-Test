@@ -99,12 +99,12 @@
   top: 12px;
   right: 12px;
   width: 188px;
-  padding: 8px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 12px;
-  background: rgb(16 23 19 / 88%);
-  box-shadow: 0 6px 22px rgb(0 0 0 / 38%);
-  backdrop-filter: blur(10px);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 28%));
 }
 
 [data-view-mode='player'] .panel--minimap > h2,
@@ -116,7 +116,25 @@
 
 [data-view-mode='player'] .panel--minimap .minimap-frame,
 [data-view-mode='player-spawn'] .panel--minimap .minimap-frame {
+  border: 0;
   border-radius: 50%;
+  background: rgb(13 18 15 / 38%);
+  -webkit-mask-image: radial-gradient(
+    circle,
+    #000 0 84%,
+    rgb(0 0 0 / 94%) 88%,
+    rgb(0 0 0 / 62%) 93%,
+    rgb(0 0 0 / 24%) 97%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    circle,
+    #000 0 84%,
+    rgb(0 0 0 / 94%) 88%,
+    rgb(0 0 0 / 62%) 93%,
+    rgb(0 0 0 / 24%) 97%,
+    transparent 100%
+  );
 }
 
 /*

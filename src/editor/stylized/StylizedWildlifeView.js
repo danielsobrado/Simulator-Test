@@ -47,7 +47,7 @@ function canonicalCameraPosition(terrainView, camera) {
   };
 }
 
-class DistantBirdFlockTier {
+export class DistantBirdFlockTier {
   constructor({ terrainView, config, seed, root }) {
     this.terrainView = terrainView;
     this.config = config;
@@ -63,13 +63,18 @@ class DistantBirdFlockTier {
     });
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, config.maxBirds);
     this.mesh.name = 'stylized-distant-bird-flocks';
-    this.mesh.count = 0;
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.wingMorph = { morphTargetInfluences: [0, 0] };
+    // InstancedMesh lazily sizes morphTexture from the current draw count.
+    // Prime it while count still equals the full capacity; the first flock is
+    // otherwise written while count is zero and creates a zero-length texture.
+    this.mesh.setMorphAt(0, this.wingMorph);
+    this.mesh.morphTexture.needsUpdate = true;
+    this.mesh.count = 0;
     root.add(this.mesh);
   }
 

@@ -425,7 +425,8 @@ export class EditorUi {
               ${this.rangeControl('Exposure', 'screenExposure', 0.01, 2, 0.02, 2)}
               ${this.rangeControl('Dust strength', 'screenDustStrength', 0, 1, 0.01, 2)}
               ${this.rangeControl('Dust scale', 'screenDustScale', 0.1, 12, 0.1, 1)}
-              ${this.rangeControl('Dust motion', 'screenDustSpeed', 0, 0.1, 0.001, 3)}
+              ${this.rangeControl('Dust animation speed', 'screenDustSpeed', 0, 0.2, 0.001, 3)}
+              <p class="panel-note">Set dust animation speed to 0 to freeze the atmospheric motion.</p>
             </div>
 
             <div class="settings-group" data-god-rays-section="volumetric" hidden>

@@ -372,6 +372,7 @@ test('god ray settings switch techniques and update live uniforms safely', () =>
   const settings = effect.setSettings({
     technique: 'volumetric',
     screenDensity: 1.35,
+    screenDustSpeed: 0.075,
     cloudOcclusion: 0.4,
     volumetricRaymarchSteps: 57.6,
     volumetricBlurSoftness: 1.25,
@@ -380,6 +381,8 @@ test('god ray settings switch techniques and update live uniforms safely', () =>
   assert.equal(settings.technique, 'volumetric');
   assert.equal(settings.screenDensity, 1.35);
   assert.equal(effect.density.value, 1.35);
+  assert.equal(settings.screenDustSpeed, 0.075);
+  assert.equal(effect.dustSpeed.value, 0.075);
   assert.equal(cloudOcclusionUniform.value, 0.4);
   assert.equal(settings.volumetricRaymarchSteps, 58);
   assert.equal(effect.volumetricBlurSoftness.value, 1.25);
@@ -388,10 +391,13 @@ test('god ray settings switch techniques and update live uniforms safely', () =>
   const clamped = effect.setSettings({
     volumetricResolutionScale: 4,
     volumetricRaymarchSteps: 2,
+    screenDustSpeed: 4,
     cloudOcclusion: -5,
   });
   assert.equal(clamped.volumetricResolutionScale, 1);
   assert.equal(clamped.volumetricRaymarchSteps, 8);
+  assert.equal(clamped.screenDustSpeed, 0.2);
+  assert.equal(effect.dustSpeed.value, 0.2);
   assert.equal(clamped.cloudOcclusion, 0);
   effect.dispose();
 });

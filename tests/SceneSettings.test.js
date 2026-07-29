@@ -30,7 +30,7 @@ test('scene settings capture map, environment, biome, asset, and placement state
   const document = createSceneSettingsDocument({
     name: 'Eldara look',
     map: { kind: 'url', url: '../maps/eldara.json', label: 'Eldara' },
-    godRays: { enabled: true, screenIntensity: 1.4 },
+    godRays: { enabled: true, screenIntensity: 1.4, screenDustSpeed: 0.075 },
     biomeAssets: {
       kind: 'simcity-dnd-biome-assets',
       version: 1,
@@ -49,6 +49,7 @@ test('scene settings capture map, environment, biome, asset, and placement state
   assert.equal(document.name, 'Eldara look');
   assert.equal(document.map.url, '../maps/eldara.json');
   assert.equal(document.environment.godRays.screenIntensity, 1.4);
+  assert.equal(document.environment.godRays.screenDustSpeed, 0.075);
   assert.equal(document.assets[0].id, 'granite');
   assert.deepEqual(document.assets[0].tileIds, [3, 4]);
   assert.equal(document.placement.regionSize, 512);
