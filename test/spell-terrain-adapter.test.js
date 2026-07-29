@@ -53,7 +53,7 @@ test('Earth edit converts render coordinates and commits a lower sculpt', () => 
 
   const result = applyEarthTerrainEdit(
     view,
-    new THREE.Vector3(2, 1, -2),
+    new THREE.Vector3(2.9, 1, -2.9),
     {
       enabled: true,
       operation: 'remove',
