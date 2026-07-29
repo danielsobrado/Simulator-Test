@@ -50,8 +50,8 @@ export function applyEarthTerrainEdit(terrainView, renderPoint, config) {
 
   const tileSize = terrainView.worldStore.tileSize;
   const canonical = terrainView.floatingOrigin.toCanonical(renderPoint.x, renderPoint.z);
-  const centerX = canonical.x / tileSize;
-  const centerZ = -canonical.z / tileSize;
+  const centerX = Math.floor(canonical.x / tileSize);
+  const centerZ = Math.floor(-canonical.z / tileSize);
   const radiusCells = Math.max(0.5, config.radiusM / tileSize);
   const brushSize = Math.max(1, Math.round(radiusCells * 2 - 1));
   const operation = config.operation === 'add' ? 'raise' : 'lower';
@@ -110,8 +110,8 @@ export function raycastTerrainHeightfield(terrainView, ray, maxDistance = 40) {
   const actualStep = maxDistance / stepCount;
 
   let previousDistance = 0;
-  let previousError = sampleHeightError(terrainView, normalizedRay, 0, point);
-  if (previousError <= RAYCAST_HIT_EPSILON_M) {
+  const initialError = sampleHeightError(terrainView, normalizedRay, 0, point);
+  if (initialError <= RAYCAST_HIT_EPSILON_M) {
     return createHit(terrainView, normalizedRay, 0, point, normal);
   }
 
@@ -130,7 +130,6 @@ export function raycastTerrainHeightfield(terrainView, ray, maxDistance = 40) {
       return createHit(terrainView, normalizedRay, high, point, normal);
     }
     previousDistance = distance;
-    previousError = error;
   }
 
   return null;
