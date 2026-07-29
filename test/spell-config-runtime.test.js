@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { load } from 'js-yaml';
 import {
   defaultSpellConfig,
   parseSpellConfig,
 } from '../src/editor/spells/spell_config.js';
+import generatedDefaults from '../src/editor/spells/spells_yaml_defaults.json' with { type: 'json' };
 
-test('spell runtime reads the checked-in YAML configuration', () => {
+test('generated spell defaults remain in sync with config/spells.yaml', async () => {
+  const yaml = await readFile(
+    new URL('../config/spells.yaml', import.meta.url),
+    'utf8',
+  );
+  assert.deepEqual(generatedDefaults, load(yaml));
+});
+
+test('spell runtime reads the generated YAML configuration', () => {
   assert.equal(defaultSpellConfig.menu.rootId, 'spell-menu');
   assert.equal(defaultSpellConfig.fire.castDurationMs, 2600);
   assert.equal(defaultSpellConfig.lightning.vfx.segmentCount, 52);
