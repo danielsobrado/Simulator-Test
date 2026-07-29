@@ -10,6 +10,7 @@ import {
   float,
   floor,
   fract,
+  fwidth,
   length,
   linearDepth,
   max,
@@ -32,13 +33,16 @@ import {
   viewportSafeUV,
 } from 'three/tsl';
 import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
-import { stylizedFbm } from './StylizedNoiseNodes.js';
+import { stylizedFbm2 } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
-// Radius in the voronoi F1 distance field that the caustic filaments trace.
-// Mean F1 over a unit cell sits near 0.5, so a slightly tighter ring keeps the
-// filaments inside their own cell and lets neighbours cross rather than merge.
 const CAUSTIC_RING_RADIUS = 0.4;
+const CAUSTIC_AA_SCALE = 1.25;
+const FRESNEL_POWER = 5;
+const LOW_SURFACE_RAMP_MIN = 0.2;
+const LOW_SURFACE_RAMP_MAX = 0.8;
+const SURFACE_NOISE_OFFSET = Object.freeze([19.1, 47.2]);
+const REFRACTION_FINE_OFFSET = Object.freeze([31.73, 11.29]);
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -57,25 +61,26 @@ function cellPoint(seed, time, cellSpeed) {
   return float(0.5).add(float(0.5).mul(sin(time.mul(cellSpeed).add(seed.mul(6.2831)))));
 }
 
-function neighborDistance(p, time, cellSpeed, offsetX, offsetZ) {
-  const integer = floor(p);
-  const fraction = fract(p);
+function neighborDistance(integer, fraction, time, cellSpeed, offsetX, offsetZ) {
   const neighbor = vec2(offsetX, offsetZ);
   const point = cellPoint(hash2(integer.add(neighbor)), time, cellSpeed);
   return length(neighbor.add(point).sub(fraction));
 }
 
-function voronoiF1(p, time, cellSpeed) {
-  let nearest = neighborDistance(p, time, cellSpeed, -1, -1);
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 0, -1));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 1, -1));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, -1, 0));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 0, 0));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 1, 0));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, -1, 1));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 0, 1));
-  nearest = min(nearest, neighborDistance(p, time, cellSpeed, 1, 1));
-  return nearest;
+function voronoiDistances(position, time, cellSpeed) {
+  const integer = floor(position);
+  const fraction = fract(position);
+  return [
+    neighborDistance(integer, fraction, time, cellSpeed, -1, -1),
+    neighborDistance(integer, fraction, time, cellSpeed, 0, -1),
+    neighborDistance(integer, fraction, time, cellSpeed, 1, -1),
+    neighborDistance(integer, fraction, time, cellSpeed, -1, 0),
+    neighborDistance(integer, fraction, time, cellSpeed, 0, 0),
+    neighborDistance(integer, fraction, time, cellSpeed, 1, 0),
+    neighborDistance(integer, fraction, time, cellSpeed, -1, 1),
+    neighborDistance(integer, fraction, time, cellSpeed, 0, 1),
+    neighborDistance(integer, fraction, time, cellSpeed, 1, 1),
+  ];
 }
 
 function smoothMin(a, b, k) {
@@ -83,22 +88,29 @@ function smoothMin(a, b, k) {
   return min(a, b).sub(h.mul(h).mul(h).mul(k).div(6));
 }
 
-function voronoiSmoothF1(p, time, cellSpeed, smoothness) {
-  let result = neighborDistance(p, time, cellSpeed, -1, -1);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 0, -1), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 1, -1), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, -1, 0), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 0, 0), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 1, 0), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, -1, 1), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 0, 1), smoothness);
-  result = smoothMin(result, neighborDistance(p, time, cellSpeed, 1, 1), smoothness);
-  return result;
+function voronoiF1(position, time, cellSpeed) {
+  const distances = voronoiDistances(position, time, cellSpeed);
+  let nearest = distances[0];
+  for (let index = 1; index < distances.length; index += 1) {
+    nearest = min(nearest, distances[index]);
+  }
+  return nearest;
+}
+
+function voronoiMetrics(position, time, cellSpeed, smoothness) {
+  const distances = voronoiDistances(position, time, cellSpeed);
+  let nearest = distances[0];
+  let smoothNearest = distances[0];
+  for (let index = 1; index < distances.length; index += 1) {
+    nearest = min(nearest, distances[index]);
+    smoothNearest = smoothMin(smoothNearest, distances[index], smoothness);
+  }
+  return { nearest, smoothNearest };
 }
 
 function refractionWarp(coarsePoint, finePoint) {
-  const coarse = stylizedFbm(coarsePoint).sub(0.5).mul(2);
-  const fine = stylizedFbm(finePoint).sub(0.5).mul(2);
+  const coarse = stylizedFbm2(coarsePoint).sub(0.5).mul(2);
+  const fine = stylizedFbm2(finePoint).sub(0.5).mul(2);
   return vec2(
     coarse.mul(0.7).add(fine.mul(0.3)),
     coarse.mul(-0.35).add(fine.mul(0.65)),
@@ -171,21 +183,39 @@ export function createStylizedWaterMaterial({
   const noiseOffset = quality.flow ? currentOffset : legacyNoiseOffset;
   const surfaceOffset = quality.flow ? currentOffset : legacySurfaceOffset;
 
-  const noiseFac = stylizedFbm(
-    worldXZ.mul(water.noiseScale).add(noiseOffset),
+  const noisePoint = worldXZ.mul(water.noiseScale).add(noiseOffset);
+  const surfaceNoise = vec2(
+    stylizedFbm2(noisePoint),
+    stylizedFbm2(noisePoint.add(vec2(
+      SURFACE_NOISE_OFFSET[0],
+      SURFACE_NOISE_OFFSET[1],
+    ))),
   );
-  const distort = noiseFac.sub(0.5).mul(water.distortAmount);
+  const noiseFac = surfaceNoise.x.add(surfaceNoise.y).mul(0.5);
+  const distort = surfaceNoise.sub(0.5).mul(water.distortAmount);
   const sampleUv = worldXZ.mul(water.scale)
     .add(surfaceOffset)
-    .add(vec2(distort, distort));
+    .add(distort);
 
-  const edge = voronoiF1(sampleUv, time, water.cellSpeed)
-    .sub(voronoiSmoothF1(sampleUv, time, water.cellSpeed, float(water.cellSmoothness)));
-  const ramp = smoothstep(
-    water.edgeThreshold - water.edgeSoftness,
-    water.edgeThreshold + water.edgeSoftness,
-    edge,
-  );
+  let ramp = smoothstep(LOW_SURFACE_RAMP_MIN, LOW_SURFACE_RAMP_MAX, noiseFac);
+  if (quality.cellularSurface) {
+    const metrics = voronoiMetrics(
+      sampleUv,
+      time,
+      water.cellSpeed,
+      float(water.cellSmoothness),
+    );
+    const edge = metrics.nearest.sub(metrics.smoothNearest);
+    const edgeWidth = max(
+      float(water.edgeSoftness),
+      fwidth(edge).mul(0.75),
+    );
+    ramp = smoothstep(
+      float(water.edgeThreshold).sub(edgeWidth),
+      float(water.edgeThreshold).add(edgeWidth),
+      edge,
+    );
+  }
 
   const midPos = max(float(water.midPos), 1e-4);
   const seg0 = clamp(ramp.div(midPos), 0, 1);
@@ -210,6 +240,7 @@ export function createStylizedWaterMaterial({
   let bedVisibility = float(1);
   let bodyColor = legacyColor;
   let surfaceDetailMix = float(0);
+  let surfaceReflection = float(0);
   let foamAmount = float(0);
 
   if (quality.depthOptics) {
@@ -246,6 +277,11 @@ export function createStylizedWaterMaterial({
       underwaterBlend.mul(optics.underwaterTintStrength),
     );
     surfaceDetailMix = float(optics.surfaceDetailStrength).mul(fade).mul(waterlineFade);
+    surfaceReflection = pow(oneMinus(viewCosine), FRESNEL_POWER)
+      .mul(quality.fresnelStrength)
+      .mul(oneMinus(underwaterBlend))
+      .mul(fade)
+      .mul(waterlineFade);
     color = mix(bodyColor, legacyColor, surfaceDetailMix);
     alpha = mix(
       float(optics.minimumOpacity),
@@ -283,7 +319,7 @@ export function createStylizedWaterMaterial({
     const finePoint = worldXZ
       .mul(refraction.fineScale)
       .sub(currentFlow.mul(time.mul(refraction.fineSpeed)))
-      .add(vec2(31.73, 11.29));
+      .add(vec2(REFRACTION_FINE_OFFSET[0], REFRACTION_FINE_OFFSET[1]));
     const depthFactor = smoothstep(
       refraction.depthFadeStart,
       refraction.depthFadeEnd,
@@ -365,7 +401,12 @@ export function createStylizedWaterMaterial({
     const causticRing = abs(
       voronoiF1(causticUv, time, caustics.speed).sub(CAUSTIC_RING_RADIUS),
     );
-    const causticNet = clamp(oneMinus(causticRing.mul(caustics.contrast)), 0, 1);
+    const configuredWidth = float(1).div(max(float(caustics.contrast), 1e-4));
+    const causticWidth = max(
+      configuredWidth,
+      fwidth(causticRing).mul(CAUSTIC_AA_SCALE),
+    );
+    const causticNet = oneMinus(smoothstep(0, causticWidth, causticRing));
     const shallow = oneMinus(smoothstep(
       caustics.depthFadeStart,
       caustics.depthFadeEnd,
@@ -377,6 +418,14 @@ export function createStylizedWaterMaterial({
       .mul(bedVisibility)
       .mul(waterlineFade);
     color = color.add(colorNode(water.highlightColor).mul(causticAmount));
+  }
+
+  if (quality.fresnelStrength > 0) {
+    color = mix(
+      color,
+      colorNode(water.highlightColor),
+      clamp(surfaceReflection, 0, 1),
+    );
   }
 
   if (quality.foam && water.foam.enabled) {

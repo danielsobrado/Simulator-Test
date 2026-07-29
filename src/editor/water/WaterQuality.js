@@ -18,6 +18,8 @@ export const WATER_QUALITY_TIERS = Object.freeze([
 const FEATURES_BY_TIER = Object.freeze({
   [WATER_QUALITY_LOW]: Object.freeze({
     flow: false,
+    cellularSurface: false,
+    fresnelStrength: 0,
     depthOptics: false,
     refraction: false,
     refractionStrength: 0,
@@ -32,6 +34,8 @@ const FEATURES_BY_TIER = Object.freeze({
   }),
   [WATER_QUALITY_MEDIUM]: Object.freeze({
     flow: true,
+    cellularSurface: true,
+    fresnelStrength: 0.28,
     depthOptics: true,
     refraction: false,
     refractionStrength: 0,
@@ -46,6 +50,8 @@ const FEATURES_BY_TIER = Object.freeze({
   }),
   [WATER_QUALITY_HIGH]: Object.freeze({
     flow: true,
+    cellularSurface: true,
+    fresnelStrength: 0.42,
     depthOptics: true,
     refraction: true,
     refractionStrength: 1,
@@ -60,6 +66,8 @@ const FEATURES_BY_TIER = Object.freeze({
   }),
   [WATER_QUALITY_ULTRA]: Object.freeze({
     flow: true,
+    cellularSurface: true,
+    fresnelStrength: 0.52,
     depthOptics: true,
     refraction: true,
     refractionStrength: 1.25,

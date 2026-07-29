@@ -35,12 +35,21 @@ function noise2(position) {
   return mix(north, south, curve.y);
 }
 
-export function stylizedFbm(position) {
+function stylizedFbm2Sum(position) {
   const octave0 = noise2(position).mul(0.5);
   const octave1 = noise2(position.mul(2.03).add(vec2(3.1, 7.7))).mul(0.25);
+  return octave0.add(octave1);
+}
+
+export function stylizedFbm2(position) {
+  return stylizedFbm2Sum(position).div(0.75);
+}
+
+export function stylizedFbm(position) {
+  const lowerOctaves = stylizedFbm2Sum(position);
   const octave2 = noise2(position.mul(4.1209).add(vec2(9.393, 23.331))).mul(0.125);
   const octave3 = noise2(position.mul(8.365427).add(vec2(22.168, 55.062))).mul(0.0625);
-  return octave0.add(octave1).add(octave2).add(octave3).div(0.9375);
+  return lowerOctaves.add(octave2).add(octave3).div(0.9375);
 }
 
 export function stylizedDirtMask(worldXZ, settings) {
