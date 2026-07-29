@@ -28,7 +28,7 @@
     "qa:collision": "node scripts/run-collision-acceptance.mjs",
     "qa:collision:release": "node scripts/run-collision-acceptance.mjs --release",
     "qa:water:acceptance": "node scripts/run-water-acceptance-qa.mjs",
-    "qa:spells": "node --test test/spell-runtime-contract.test.js test/spell-terrain-adapter.test.js test/spell-config-runtime.test.js test/spell-menu-contract.test.js test/spell-precompiler.test.js test/spell-vfx-performance-contract.test.js test/earth-spell-gameplay-config.test.js",
+    "qa:spells": "node --test test/spell-runtime-contract.test.js test/spell-terrain-adapter.test.js test/spell-config-runtime.test.js test/spell-menu-contract.test.js test/spell-precompiler.test.js test/spell-vfx-performance-contract.test.js test/earth-spell-gameplay-config.test.js test/spell-hotkey-precedence.test.js",
     "qa:assets:startup": "node scripts/run-asset-startup-qa.mjs",
     "verify:asset-serving": "node scripts/verify-asset-serving.mjs",
     "qa:workshop:install": "playwright install chromium",

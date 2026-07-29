@@ -272,6 +272,19 @@ async function setKeys(page, { down = [], up = [] }) {
   }, { downCodes: down, upCodes: up });
 }
 
+function collectGpuValidationErrors(page) {
+  const counts = new Map();
+  const record = (text) => {
+    const message = text.replace(/\s+/g, ' ').trim().slice(0, 240);
+    counts.set(message, (counts.get(message) ?? 0) + 1);
+  };
+  page.on('console', (message) => {
+    const text = message.text();
+    if (/GPUValidationError|GPUOutOfMemoryError|Uncaptured WebGPU/i.test(text)) record(text);
+  });
+  return counts;
+}
+
 async function main() {
   const baseUrl = readArg('url', DEFAULT_URL).replace(/\/$/, '');
   const useExistingServer = hasFlag('existing-server') || process.argv.includes('--url');
@@ -295,6 +308,11 @@ async function main() {
     });
     const page = await browser.newPage();
     page.setDefaultTimeout(120_000);
+    // Water is the only material that samples the viewport colour and depth
+    // textures, so this is the run where a mis-sized framebuffer copy shows up.
+    // A validation error discards the whole command buffer for that frame, which
+    // no frame-time metric would ever report as a failure.
+    const gpuErrors = collectGpuValidationErrors(page);
 
     await page.goto(`${baseUrl}/?qa=water-acceptance&autostart=0&download=0`, {
       waitUntil: 'domcontentloaded',
@@ -412,11 +430,18 @@ async function main() {
       summary: perfReport.summary,
       thresholds,
     });
+    const gpuValidationErrors = [...gpuErrors.entries()]
+      .map(([message, count]) => ({ count, message }))
+      .sort((left, right) => right.count - left.count);
+    const gpuValidationErrorCount = gpuValidationErrors
+      .reduce((total, entry) => total + entry.count, 0);
     const report = {
       ...perfReport,
       adapter,
       performanceAuthoritative: authoritativePerformance,
       waterAcceptance: acceptance,
+      gpuValidationErrorCount,
+      gpuValidationErrors,
       phases: {
         enterSeconds: entry.elapsedSeconds,
         entryReachedTarget: entry.reached,
@@ -434,14 +459,16 @@ async function main() {
       outPath: OUT_PATH,
       adapter,
       performanceAuthoritative: authoritativePerformance,
-      pass: acceptance.pass,
+      pass: acceptance.pass && gpuValidationErrorCount === 0,
       gates: acceptance.gates,
       metrics: acceptance.metrics,
       frameP95Ms: perfReport.summary.dt.p95Ms,
       hitchRate: perfReport.summary.hitchRate,
+      gpuValidationErrorCount,
+      gpuValidationErrors: gpuValidationErrors.slice(0, 4),
     }, null, 2));
 
-    if (!acceptance.pass) process.exitCode = 1;
+    if (!acceptance.pass || gpuValidationErrorCount > 0) process.exitCode = 1;
   } finally {
     await browser?.close();
     if (server) {

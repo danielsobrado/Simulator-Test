@@ -233,6 +233,14 @@ export class InfiniteTerrainView {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.domElement.setAttribute('aria-label', 'Drusniel World infinite world editor viewport');
     container.append(this.renderer.domElement);
+    // Size the drawing buffer here rather than waiting for the bootstrap's
+    // ResizeObserver. Until that observer is installed the canvas keeps the
+    // 300x150 HTML default, and every GPU texture allocated during those first
+    // frames is stuck at that size for the rest of the session: three caches one
+    // viewport framebuffer texture per render target but clones them from a
+    // shared `Source`, so the lazy resize check in `ViewportTextureNode` only
+    // ever reallocates whichever clone runs first after the canvas grows.
+    this.resize(container.clientWidth, container.clientHeight);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#0a100c');

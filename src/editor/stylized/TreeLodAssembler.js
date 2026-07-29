@@ -108,8 +108,27 @@ function impostorRecord(placement, atlas, fade, ditherDirection, resolveLeafTint
   };
 }
 
-export function selectTreePhysicalRepresentation({ band, hasImpostor }) {
-  if (band === 'impostor') return hasImpostor ? 'impostor' : 'fallback';
+const IMPOSTOR_VERTICAL_MORPH_MIN = 0.82;
+const IMPOSTOR_VERTICAL_MORPH_MAX = 1.18;
+
+export function isTreeImpostorMorphologyCompatible(placement) {
+  // The current atlas has one canonical crown per prototype. Keep age classes
+  // with materially different crown heights on the connected proxy until the
+  // offline baker emits morphology buckets for them.
+  if (placement.ageClass && placement.ageClass !== 'mature') return false;
+  const verticalCrownScale = treeMorphology(placement)[1];
+  return verticalCrownScale >= IMPOSTOR_VERTICAL_MORPH_MIN
+    && verticalCrownScale <= IMPOSTOR_VERTICAL_MORPH_MAX;
+}
+
+export function selectTreePhysicalRepresentation({
+  band,
+  hasImpostor,
+  morphologyCompatible = true,
+}) {
+  if (band === 'impostor') {
+    return hasImpostor && morphologyCompatible ? 'impostor' : 'fallback';
+  }
   return band;
 }
 
@@ -205,7 +224,7 @@ export function rebuildTreeLod({
             ?? placement.prototypeIndex;
           const atlas = impostorAtlases[prototypeIndex];
           const batch = impostorBatches[prototypeIndex];
-          if (atlas && batch) {
+          if (atlas && batch && isTreeImpostorMorphologyCompatible(placement)) {
             impostors[prototypeIndex].push(impostorRecord(
               placement,
               atlas,
@@ -251,6 +270,7 @@ export function rebuildTreeLod({
           const physical = selectTreePhysicalRepresentation({
             band: representation.band,
             hasImpostor: Boolean(atlas && batch),
+            morphologyCompatible: isTreeImpostorMorphologyCompatible(placement),
           });
           if (physical === 'impostor') {
             impostors[prototypeIndex].push(impostorRecord(

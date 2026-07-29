@@ -30,8 +30,16 @@ import { mortarProfile } from './ConstructionMortarConfig.js';
  */
 
 const cache = new Map();
+/** @type {Map<string, { texture: THREE.Texture, users: number }>} */
 const PRESET_TEXTURE_CACHE = new Map();
 const MAX_PRESET_TEXTURE_CACHE = 64;
+const PRESET_TEXTURE_SLOTS = Object.freeze([
+  'map',
+  'normalMap',
+  'roughnessMap',
+  'metalnessMap',
+  'bumpMap',
+]);
 let sourceSignatureCache = new WeakMap();
 
 function hashText(value) {
@@ -178,12 +186,11 @@ function configurePresetTexture(texture, preset, kind) {
   return texture;
 }
 
-function presetTexture(document, preset, kind) {
-  if (typeof Image === 'undefined') return null;
+function presetTextureKey(document, preset, kind) {
   const sourceId = preset.sources?.[kind];
   const source = document?.materialLibrary?.sources?.[sourceId];
   if (!source) return null;
-  const key = [
+  return [
     kind,
     sourceId,
     sourceSignature(source),
@@ -191,19 +198,51 @@ function presetTexture(document, preset, kind) {
     preset.repeat,
     preset.rotation,
   ].join('|');
-  if (PRESET_TEXTURE_CACHE.has(key)) {
-    // Refresh LRU order: Map iterates in insertion order.
-    const texture = PRESET_TEXTURE_CACHE.get(key);
-    PRESET_TEXTURE_CACHE.delete(key);
-    PRESET_TEXTURE_CACHE.set(key, texture);
-    return texture;
-  }
+}
+
+/**
+ * Drop unused preset textures (users === 0) in LRU order until there is room.
+ * In-use textures stay — disposing them would blank live painted walls.
+ */
+function evictUnusedPresetTextures() {
   while (PRESET_TEXTURE_CACHE.size >= MAX_PRESET_TEXTURE_CACHE) {
-    const oldest = PRESET_TEXTURE_CACHE.keys().next().value;
-    const stale = PRESET_TEXTURE_CACHE.get(oldest);
-    PRESET_TEXTURE_CACHE.delete(oldest);
-    stale?.dispose?.();
+    let removed = false;
+    for (const [key, entry] of PRESET_TEXTURE_CACHE) {
+      if (entry.users > 0) continue;
+      entry.texture.dispose?.();
+      PRESET_TEXTURE_CACHE.delete(key);
+      removed = true;
+      break;
+    }
+    if (!removed) break;
   }
+}
+
+function touchPresetTextureEntry(key, entry) {
+  // Refresh LRU order: Map iterates in insertion order.
+  PRESET_TEXTURE_CACHE.delete(key);
+  PRESET_TEXTURE_CACHE.set(key, entry);
+}
+
+/**
+ * Look up or create a shared preset texture without retaining it.
+ * Live material bundles must call `acquirePresetTexture` so LRU cannot dispose
+ * maps still referenced by painted walls.
+ */
+function getPresetTexture(document, preset, kind) {
+  if (typeof Image === 'undefined') return null;
+  const key = presetTextureKey(document, preset, kind);
+  if (!key) return null;
+
+  let entry = PRESET_TEXTURE_CACHE.get(key);
+  if (entry) {
+    touchPresetTextureEntry(key, entry);
+    return entry.texture;
+  }
+
+  evictUnusedPresetTextures();
+  const sourceId = preset.sources?.[kind];
+  const source = document?.materialLibrary?.sources?.[sourceId];
   const image = new Image();
   const texture = new THREE.Texture(image);
   image.addEventListener('load', () => {
@@ -212,8 +251,50 @@ function presetTexture(document, preset, kind) {
   image.src = source.dataUrl;
   texture.name = `construction-pbr-${sourceId}`;
   texture.userData.sharedSurface = true;
-  PRESET_TEXTURE_CACHE.set(key, configurePresetTexture(texture, preset, kind));
-  return PRESET_TEXTURE_CACHE.get(key);
+  entry = {
+    texture: configurePresetTexture(texture, preset, kind),
+    users: 0,
+  };
+  PRESET_TEXTURE_CACHE.set(key, entry);
+  return entry.texture;
+}
+
+/**
+ * Retain a shared preset texture for a material bundle's lifetime.
+ * Each unique key is retained once per acquire list.
+ */
+function acquirePresetTexture(document, preset, kind, acquiredKeys) {
+  const key = presetTextureKey(document, preset, kind);
+  if (!key) return null;
+  const texture = getPresetTexture(document, preset, kind);
+  if (!texture) return null;
+  if (!acquiredKeys.includes(key)) {
+    const entry = PRESET_TEXTURE_CACHE.get(key);
+    if (entry) entry.users += 1;
+    acquiredKeys.push(key);
+  }
+  return texture;
+}
+
+function releasePresetTextureKeys(keys) {
+  if (!keys?.length) return;
+  for (const key of keys) {
+    const entry = PRESET_TEXTURE_CACHE.get(key);
+    if (!entry) continue;
+    entry.users -= 1;
+    if (entry.users > 0) continue;
+    entry.texture.dispose?.();
+    PRESET_TEXTURE_CACHE.delete(key);
+  }
+}
+
+/** Detach shared preset maps so `material.dispose()` cannot free live refs. */
+function detachPresetTextures(material, presetTextures) {
+  if (!presetTextures?.size) return;
+  for (const slot of PRESET_TEXTURE_SLOTS) {
+    const texture = material[slot];
+    if (texture && presetTextures.has(texture)) material[slot] = null;
+  }
 }
 
 /**
@@ -222,18 +303,26 @@ function presetTexture(document, preset, kind) {
  * Same colour / map rules as the workshop component painter so a granite petal
  * on a live wall matches granite in the workshop.
  */
-export function applyConstructionMaterialPreset(material, preset, materialDocument = null) {
+export function applyConstructionMaterialPreset(
+  material,
+  preset,
+  materialDocument = null,
+  acquiredKeys = null,
+) {
   if (!preset) return material;
+  const take = acquiredKeys
+    ? (kind) => acquirePresetTexture(materialDocument, preset, kind, acquiredKeys)
+    : (kind) => getPresetTexture(materialDocument, preset, kind);
   const result = material.clone();
   result.color.set(preset.baseColor).multiply(new THREE.Color(preset.tint));
   result.roughness = preset.roughness;
   result.metalness = preset.metalness;
   if (result.normalScale?.setScalar) result.normalScale.setScalar(preset.normalStrength);
   if ('bumpScale' in result) result.bumpScale = preset.heightStrength;
-  const albedo = presetTexture(materialDocument, preset, 'albedo');
-  const normal = presetTexture(materialDocument, preset, 'normal');
-  const orm = presetTexture(materialDocument, preset, 'orm');
-  const height = presetTexture(materialDocument, preset, 'height');
+  const albedo = take('albedo');
+  const normal = take('normal');
+  const orm = take('orm');
+  const height = take('height');
   if (albedo) result.map = albedo;
   if (normal) result.normalMap = normal;
   if (height) result.bumpMap = height;
@@ -256,6 +345,7 @@ export function createConstructionMaterials(record, materialDocument = null) {
     found.users += 1;
     return found.materials;
   }
+  const acquiredKeys = [];
   const style = constructionStyle(record.style.key);
   let stone = createStoneMaterial(record, style);
   const stonePresetId = record.style?.materials?.stone ?? null;
@@ -263,7 +353,12 @@ export function createConstructionMaterials(record, materialDocument = null) {
     ? getWorkshopMaterialPreset(materialDocument, stonePresetId)
     : null;
   if (stonePreset) {
-    stone = applyConstructionMaterialPreset(stone, stonePreset, materialDocument);
+    stone = applyConstructionMaterialPreset(
+      stone,
+      stonePreset,
+      materialDocument,
+      acquiredKeys,
+    );
   }
   // Selection tints rather than replaces. Swapping to a flat gold material
   // would drop `vertexColors` and take every baked joint line with it, so a
@@ -280,12 +375,27 @@ export function createConstructionMaterials(record, materialDocument = null) {
     ? getWorkshopMaterialPreset(materialDocument, mortarPresetId)
     : null;
   if (mortarPreset) {
-    mortar = applyConstructionMaterialPreset(mortar, mortarPreset, materialDocument);
+    mortar = applyConstructionMaterialPreset(
+      mortar,
+      mortarPreset,
+      materialDocument,
+      acquiredKeys,
+    );
     mortar.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.MORTAR;
   }
 
   const materials = Object.freeze({ stone, stoneSelected, mortar });
-  cache.set(key, { materials, users: 1 });
+  const presetTextures = new Set();
+  for (const textureKey of acquiredKeys) {
+    const entry = PRESET_TEXTURE_CACHE.get(textureKey);
+    if (entry) presetTextures.add(entry.texture);
+  }
+  cache.set(key, {
+    materials,
+    users: 1,
+    presetKeys: Object.freeze([...acquiredKeys]),
+    presetTextures,
+  });
   return materials;
 }
 
@@ -299,7 +409,11 @@ export function releaseConstructionMaterials(materials) {
     if (entry.materials !== materials) continue;
     entry.users -= 1;
     if (entry.users > 0) return;
-    for (const material of Object.values(entry.materials)) material.dispose();
+    for (const material of Object.values(entry.materials)) {
+      detachPresetTextures(material, entry.presetTextures);
+      material.dispose();
+    }
+    releasePresetTextureKeys(entry.presetKeys);
     cache.delete(key);
     return;
   }
@@ -307,11 +421,19 @@ export function releaseConstructionMaterials(materials) {
 
 /** Test seam and teardown hook; materials are otherwise shared for the session. */
 export function disposeConstructionMaterials() {
-  for (const { materials } of cache.values()) {
-    for (const material of Object.values(materials)) material.dispose();
+  for (const entry of cache.values()) {
+    for (const material of Object.values(entry.materials)) {
+      detachPresetTextures(material, entry.presetTextures);
+      material.dispose();
+    }
   }
   cache.clear();
-  for (const texture of PRESET_TEXTURE_CACHE.values()) texture.dispose?.();
+  for (const entry of PRESET_TEXTURE_CACHE.values()) entry.texture.dispose?.();
   PRESET_TEXTURE_CACHE.clear();
   sourceSignatureCache = new WeakMap();
+}
+
+/** Test seam: how many preset textures are currently cached. */
+export function presetTextureCacheSize() {
+  return PRESET_TEXTURE_CACHE.size;
 }

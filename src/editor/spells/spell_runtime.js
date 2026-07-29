@@ -164,10 +164,13 @@ export function createSpellRuntime(deps) {
     : null;
   syncMenuVisibility();
 
-  const onKeyDown = (event) => {
-    if (!isCastMode() || deps.isInputBlocked?.()) return;
-    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (consumesGameplayShortcut(event.target)) return;
+  /**
+   * @returns {boolean} true when the event was claimed as a spell cast
+   */
+  const handleKeyDown = (event) => {
+    if (disposed || !isCastMode() || deps.isInputBlocked?.()) return false;
+    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (consumesGameplayShortcut(event.target)) return false;
 
     const numericCode = event.code.startsWith('Digit')
       ? Number(event.code.slice(5))
@@ -175,15 +178,26 @@ export function createSpellRuntime(deps) {
         ? Number(event.code.slice(6))
         : 0;
     const spellId = SPELL_IDS[numericCode - 1];
-    if (!spellId) return;
+    if (!spellId) return false;
     event.preventDefault();
     cast(spellId);
+    return true;
   };
 
-  window.addEventListener('keydown', onKeyDown, true);
+  // Prefer attachSpellHotkeys() from the composition root *before* PlayerController
+  // registers — it capture-stops every non-Escape key while walking. The optional
+  // local listener remains for harnesses that construct the runtime in isolation.
+  const onKeyDown = (event) => {
+    if (handleKeyDown(event)) event.stopImmediatePropagation();
+  };
+  const registerKeys = deps.registerKeys !== false;
+  if (registerKeys) {
+    window.addEventListener('keydown', onKeyDown, true);
+  }
 
   return {
     cast,
+    handleKeyDown,
     syncMenuVisibility,
     update(nowMs) {
       if (!disposed) vfx.update(nowMs);
@@ -195,10 +209,30 @@ export function createSpellRuntime(deps) {
     dispose() {
       if (disposed) return;
       disposed = true;
-      window.removeEventListener('keydown', onKeyDown, true);
+      if (registerKeys) {
+        window.removeEventListener('keydown', onKeyDown, true);
+      }
       unsubscribeMode?.();
       menu.dispose();
       vfx.dispose();
     },
   };
+}
+
+/**
+ * Capture-phase digit hotkeys must register before PlayerController, which
+ * stopImmediatePropagates every non-Escape key while walking. Returns a dispose
+ * function; `getHandler` is re-read each key so the runtime can bind late.
+ *
+ * @param {() => ((event: KeyboardEvent) => boolean) | null | undefined} getHandler
+ * @param {Window | EventTarget} [target]
+ */
+export function attachSpellHotkeys(getHandler, target = window) {
+  const onKeyDown = (event) => {
+    if (getHandler()?.(event) === true) {
+      event.stopImmediatePropagation();
+    }
+  };
+  target.addEventListener('keydown', onKeyDown, true);
+  return () => target.removeEventListener('keydown', onKeyDown, true);
 }

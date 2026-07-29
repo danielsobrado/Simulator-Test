@@ -127,6 +127,9 @@ export class ViewModeController {
   beginSpawnSelection() {
     this.awaitingSpawn = true;
     this.spacePressed = false;
+    // Drop orbit brush/object ghosts immediately — spawn hover must not keep
+    // a raise/paint preview pinned to the ground under the cursor.
+    this.onLeaveOrbitEditing?.();
     this.emit();
   }
 
@@ -148,6 +151,9 @@ export class ViewModeController {
     if (requestPointerLock) {
       this.playerController.requestPointerLock();
     }
+    // Direct spawn (world map / harness) skips beginSpawnSelection, so clear
+    // here too — otherwise the last orbit brush stays rendered while walking.
+    this.onLeaveOrbitEditing?.();
     emitAudio('camera.mode.player');
     this.emit();
   }

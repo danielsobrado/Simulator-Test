@@ -98,6 +98,12 @@ export class EditorController {
     this.constructionGizmo = null;
     /** `() => boolean` — true while paused for editing inside player mode. */
     this.playerEditingProvider = null;
+    /**
+     * `() => boolean` — true only in orbit edit. Spawn pick and walk keep the
+     * terrain/object brush tool selected so returning to orbit restores it, but
+     * must not leave (or revive) the translucent brush ghost on the ground.
+     */
+    this.editPreviewsAllowedProvider = null;
     this.rightPointerStart = null;
     this.tool = 'terrain';
     this.terrainMode = 'paint';
@@ -1651,7 +1657,18 @@ export class EditorController {
     this.selectBrush(this.brushSizes[nextIndex]);
   }
 
+  /** Hide terrain/object brush ghosts without changing the active tool. */
+  clearHoverPreviews() {
+    this.hoveredCell = null;
+    this.updatePreviews();
+  }
+
   updatePreviews() {
+    if (this.editPreviewsAllowedProvider && !this.editPreviewsAllowedProvider()) {
+      this.terrainView.setPreview(null);
+      this.objectView.setPreview(null);
+      return;
+    }
     if (this.tool === 'construction') {
       this.terrainView.setPreview(null);
       this.objectView.setPreview(null);

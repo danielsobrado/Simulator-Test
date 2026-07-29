@@ -44,6 +44,16 @@ function createGeometry(source, capacity, tinted, morphed) {
   return geometry;
 }
 
+export function treeMorphologyPivotY(geometry, kind) {
+  if (kind !== 'leaf') return 0;
+  geometry.computeBoundingBox();
+  // Scaling around local zero drags every shortened crown toward the ground.
+  // Its authored lower edge is the stable attachment point to the trunk.
+  return Number.isFinite(geometry.boundingBox?.min.y)
+    ? geometry.boundingBox.min.y
+    : 0;
+}
+
 export function createInstancedRenderers({
   root,
   partsByPrototype,
@@ -59,6 +69,7 @@ export function createInstancedRenderers({
     const material = createDitheredMaterial(part.material, {
       tinted,
       kind: morphed ? part.kind : null,
+      morphologyPivotY: treeMorphologyPivotY(part.geometry, part.kind),
     });
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
     mesh.count = 0;

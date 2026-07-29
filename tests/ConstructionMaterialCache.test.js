@@ -7,8 +7,11 @@ import {
   createConstructionMaterials,
   disposeConstructionMaterials,
   releaseConstructionMaterials,
+  applyConstructionMaterialPreset,
+  presetTextureCacheSize,
 } from '../src/editor/construction/render/ConstructionMaterials.js';
 import {
+  getWorkshopMaterialPreset,
   normalizeWorkshopMaterialDocument,
 } from '../src/editor/workshop/ProceduralWorkshopMaterialConfig.js';
 
@@ -103,4 +106,96 @@ test('releaseConstructionMaterials drops the last user and disposes materials', 
   const recreated = createConstructionMaterials(wall(), document);
   assert.notEqual(recreated, first);
   assert.notEqual(recreated.stone.uuid, first.stone.uuid);
+});
+
+test('LRU eviction does not dispose textures still held by live materials', () => {
+  const previousImage = globalThis.Image;
+  globalThis.Image = class FakeImage {
+    addEventListener() {}
+    // eslint-disable-next-line class-methods-use-this
+    set src(_value) {}
+  };
+
+  const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  function paintedDocument(presetId) {
+    return normalizeWorkshopMaterialDocument({
+      materialLibrary: {
+        presets: {
+          [presetId]: {
+            id: presetId,
+            label: presetId,
+            family: 'stone',
+            baseColor: '#b7793f',
+            tint: '#ffffff',
+            roughness: 0.9,
+            metalness: 0,
+            normalStrength: 0.4,
+            heightStrength: 0.12,
+            weathering: 0.2,
+            mapping: 'projected',
+            repeat: 1,
+            rotation: 0,
+            alignment: 'world',
+            sources: { albedo: `${presetId}-albedo` },
+          },
+        },
+        sources: {
+          [`${presetId}-albedo`]: {
+            kind: 'albedo',
+            name: `${presetId}.png`,
+            dataUrl: pixel,
+          },
+        },
+      },
+      materialAreaOverrides: { [`library:${presetId}`]: presetId },
+    });
+  }
+
+  function paintedWall(presetId, seed = 17) {
+    return normalizeConstructionRecord({
+      ...wall(),
+      seed,
+      id: `construction-${presetId}`,
+      style: {
+        key: 'soft-limestone-rubble',
+        version: 1,
+        materials: { stone: presetId },
+      },
+    });
+  }
+
+  try {
+    const liveDocument = paintedDocument('live-stone');
+    const live = createConstructionMaterials(paintedWall('live-stone'), liveDocument);
+    const kept = live.stone.map;
+    assert.ok(kept, 'live wall should carry a shared albedo map');
+
+    let disposed = 0;
+    const originalDispose = kept.dispose.bind(kept);
+    kept.dispose = (...args) => {
+      disposed += 1;
+      return originalDispose(...args);
+    };
+
+    // Flood the cache with unretained textures (users === 0). Eviction may run,
+    // but the retained live map must stay alive.
+    for (let index = 0; index < 80; index += 1) {
+      const id = `fill-stone-${index}`;
+      const document = paintedDocument(id);
+      applyConstructionMaterialPreset(
+        live.stone.clone(),
+        getWorkshopMaterialPreset(document, id),
+        document,
+      );
+    }
+
+    assert.equal(disposed, 0, 'live albedo was disposed while still referenced');
+    assert.equal(live.stone.map, kept);
+    assert.ok(presetTextureCacheSize() <= 80);
+
+    releaseConstructionMaterials(live);
+  } finally {
+    globalThis.Image = previousImage;
+  }
 });

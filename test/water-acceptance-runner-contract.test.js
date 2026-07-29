@@ -29,5 +29,15 @@ test('water acceptance runner drives enter, dive, surface and exit phases', () =
 test('water acceptance runner writes a gated report', () => {
   assert.match(source, /water-acceptance-latest\.json/);
   assert.match(source, /tracker\.buildResult/);
-  assert.match(source, /if \(!acceptance\.pass\) process\.exitCode = 1/);
+  assert.match(source, /if \(!acceptance\.pass \|\| gpuValidationErrorCount > 0\) process\.exitCode = 1/);
+});
+
+// Water is the only material sampling the viewport colour and depth textures,
+// so this run is where a mis-sized framebuffer copy surfaces. Such a copy
+// discards the frame's whole command buffer without moving any frame-time
+// metric, so the run has to fail on the validation error itself.
+test('water acceptance runner fails on WebGPU validation errors', () => {
+  assert.match(source, /collectGpuValidationErrors/);
+  assert.match(source, /GPUValidationError\|GPUOutOfMemoryError\|Uncaptured WebGPU/);
+  assert.match(source, /gpuValidationErrorCount/);
 });

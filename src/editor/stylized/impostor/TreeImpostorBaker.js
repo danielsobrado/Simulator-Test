@@ -28,6 +28,54 @@ function unionBounds(parts) {
   return bounds;
 }
 
+const IMPOSTOR_FRAME_PADDING = 1.04;
+
+export function measureTreeImpostorProjection(
+  parts,
+  directions,
+  padding = IMPOSTOR_FRAME_PADDING,
+) {
+  // A 3D bounding sphere wastes most of a rectangular atlas tile. Measure the
+  // actual vertices in every baked camera basis so thin trunks retain pixels.
+  const bounds = unionBounds(parts);
+  const center = bounds.getCenter(new THREE.Vector3());
+  let halfWidth = 0;
+  let halfHeight = 0;
+
+  for (const direction of directions) {
+    const horizontalLength = Math.max(
+      0.0001,
+      Math.hypot(direction.x, direction.z),
+    );
+    const rightX = direction.z / horizontalLength;
+    const rightZ = -direction.x / horizontalLength;
+    const upX = -direction.y * rightZ;
+    const upY = horizontalLength;
+    const upZ = direction.y * rightX;
+
+    for (const part of parts) {
+      const position = part.geometry.getAttribute('position');
+      if (!position) continue;
+      for (let index = 0; index < position.count; index += 1) {
+        const x = position.getX(index) - center.x;
+        const y = position.getY(index) - center.y;
+        const z = position.getZ(index) - center.z;
+        halfWidth = Math.max(halfWidth, Math.abs(x * rightX + z * rightZ));
+        halfHeight = Math.max(
+          halfHeight,
+          Math.abs(x * upX + y * upY + z * upZ),
+        );
+      }
+    }
+  }
+
+  const safePadding = Math.max(1, Number(padding) || 1);
+  return Object.freeze({
+    width: Math.max(0.1, halfWidth * 2 * safePadding),
+    height: Math.max(0.1, halfHeight * 2 * safePadding),
+  });
+}
+
 export function createTreeImpostorBakeMaterial(part, normalPass) {
   const sourceMap = part.sourceMap ?? null;
   if (normalPass) {
@@ -188,8 +236,16 @@ export class TreeImpostorBaker {
       stencilBuffer: false,
     });
     target.texture.colorSpace = THREE.NoColorSpace;
-    const camera = new THREE.OrthographicCamera(-radius, radius, radius, -radius, 0.01, radius * 6);
     const directions = createCaptureDirections(settings);
+    const projection = measureTreeImpostorProjection(parts, directions);
+    const camera = new THREE.OrthographicCamera(
+      -projection.width * 0.5,
+      projection.width * 0.5,
+      projection.height * 0.5,
+      -projection.height * 0.5,
+      0.01,
+      radius * 6,
+    );
     const albedoScene = createPrototypeScene(parts, false);
     const normalScene = createPrototypeScene(parts, true);
     const previousTarget = renderer.getRenderTarget?.() ?? null;
@@ -281,8 +337,8 @@ export class TreeImpostorBaker {
       gutter,
       lowElevationDegrees: settings.lowElevationDegrees,
       highElevationDegrees: settings.highElevationDegrees,
-      width: radius * 2,
-      height: radius * 2,
+      width: projection.width,
+      height: projection.height,
       depth: Math.max(0.1, size.z),
       centerY: center.y,
       radius,

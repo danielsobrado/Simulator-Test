@@ -23,17 +23,19 @@ export function createSourceOpacityNode(material) {
   return opacity;
 }
 
-function applyMorphology(material, sourceMaterial, kind) {
+function applyMorphology(material, sourceMaterial, kind, pivotY) {
   if (kind !== 'leaf' && kind !== 'trunk') return;
   const morphology = attribute('instanceMorphology', 'vec3');
   const sourcePosition = sourceMaterial.positionNode ?? positionLocal;
   const horizontalScale = kind === 'leaf' ? morphology.x : morphology.z;
   const verticalScale = kind === 'leaf' ? morphology.y : float(1);
+  const verticalPivot = float(pivotY);
   material.positionNode = vec3(
     sourcePosition.x.mul(horizontalScale),
-    sourcePosition.y.mul(verticalScale),
+    sourcePosition.y.sub(verticalPivot).mul(verticalScale).add(verticalPivot),
     sourcePosition.z.mul(horizontalScale),
   );
+  material.userData.treeMorphologyPivotY = pivotY;
 }
 
 /**
@@ -44,6 +46,7 @@ function applyMorphology(material, sourceMaterial, kind) {
 export function createDitheredMaterial(sourceMaterial, {
   tinted = false,
   kind = null,
+  morphologyPivotY = 0,
 } = {}) {
   const material = sourceMaterial.clone();
   // Packed per-instance scalars; see createGeometry in StylizedLodRuntime for why these
@@ -66,7 +69,7 @@ export function createDitheredMaterial(sourceMaterial, {
       : colorVariation;
     material.colorNode = material.colorNode.mul(variation);
   }
-  applyMorphology(material, sourceMaterial, kind);
+  applyMorphology(material, sourceMaterial, kind, morphologyPivotY);
   material.alphaTest = Math.max(0.5, sourceMaterial.alphaTest ?? 0);
   material.transparent = false;
   material.depthWrite = true;

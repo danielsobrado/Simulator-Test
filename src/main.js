@@ -50,7 +50,7 @@ import {
   createWeatherTerrainSamplers,
   raycastTerrainHeightfield,
 } from './editor/weather/weather_terrain_adapters.js';
-import { createSpellRuntime } from './editor/spells/spell_runtime.js';
+import { attachSpellHotkeys, createSpellRuntime } from './editor/spells/spell_runtime.js';
 import './editor/weather/weather.css';
 import './editor/spells/spell_menu.css';
 import { applySceneAssetSettings } from './editor/settings/SceneSettings.js';
@@ -351,13 +351,18 @@ async function startEditor() {
 
   // Overlay shortcuts are owned by GameplayOverlayController so inventory and
   // the world map no longer depend on listener registration order versus the
-  // player controller's capture-phase key handling.
+  // player controller's capture-phase key handling. Spell digits (1–6) need the
+  // same early capture slot — PlayerController swallows every other key while
+  // walking — but must register *after* overlays so an open inventory still
+  // claims 1/2 for weapon sets.
   let playerController;
   let viewModeController;
   let controller;
   const gameplayOverlayController = new GameplayOverlayController({
     getPlayerController: () => playerController,
   });
+  let spellKeyHandler = null;
+  const detachSpellHotkeys = attachSpellHotkeys(() => spellKeyHandler);
   const inventoryStore = new InventoryStore(ITEM_CATALOG, null, {
     capacity: PLAYER_STARTING_LOADOUT.capacity,
   });
@@ -446,7 +451,14 @@ async function startEditor() {
   // editing works from the player's first-person view as well as the orbit one.
   controller.cameraProvider = () => viewModeController.camera;
   controller.playerEditingProvider = () => viewModeController.paused;
+  // Terrain/object brush ghosts are orbit-only; keep the tool selected so
+  // returning from player mode restores raise/paint, but hide the preview
+  // during spawn pick and walk (paused editing uses construction only).
+  controller.editPreviewsAllowedProvider = () => (
+    viewModeController.mode === PLAYER_MODE_EDIT && !viewModeController.awaitingSpawn
+  );
   viewModeController.onPausedEditing = () => controller.selectTool('construction');
+  viewModeController.onLeaveOrbitEditing = () => controller.clearHoverPreviews();
   // Flat wall tops become walkable: the provider composes into the same ground
   // height function the player physics already samples.
   playerController.constructionGround = new ConstructionGroundProvider({
@@ -691,8 +703,14 @@ async function startEditor() {
       getCamera: () => viewModeController.camera,
       isWalkMode: () => viewModeController.mode === PLAYER_MODE_WALK,
       subscribeViewMode: (listener) => viewModeController.subscribe(listener),
+      isInputBlocked: () => gameplayOverlayController.isWorldInputBlocked(),
       raycastTerrain: (ray, maxRange) => raycastTerrainHeightfield(terrainView, ray, maxRange),
+      // Keys are claimed by attachSpellHotkeys() above, before PlayerController.
+      registerKeys: false,
     })
+    : null;
+  spellKeyHandler = spellRuntime
+    ? (event) => spellRuntime.handleKeyDown(event)
     : null;
   if (perfQaConfig?.scenarioId === 'object-town') {
     createObjectTownQaScene({
@@ -908,6 +926,8 @@ async function startEditor() {
     stylizedSurface.dispose();
     weatherController?.dispose();
     weatherUi?.dispose();
+    spellKeyHandler = null;
+    detachSpellHotkeys();
     spellRuntime?.dispose();
     worldMapUi.dispose();
     worldMapController.dispose();
