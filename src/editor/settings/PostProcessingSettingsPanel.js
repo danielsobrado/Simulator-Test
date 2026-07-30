@@ -13,7 +13,10 @@ import {
 } from '../../render/postprocessing/PostProcessingPresets.js';
 
 const TOPOLOGY_RANGE_PATHS = new Set([
+  'renderScale',
   'bloom.levels',
+  'ssr.resolutionScale',
+  'screenSpaceShafts.resolutionScale',
   'screenSpaceShafts.samples',
   'depthOfField.taps',
 ]);
