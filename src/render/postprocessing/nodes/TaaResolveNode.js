@@ -53,8 +53,9 @@ export function taaFeedbackWeightReference(options) {
     reactiveStrength,
     clipDistance,
     historyValid = true,
+    globalReactive = false,
   } = options;
-  if (!historyValid) return 0;
+  if (!historyValid || globalReactive) return 0;
   const motionFactor = 1
     - clamp01Reference(motionPixels / motionRejectionPixels) * 0.60;
   const reactiveFactor = 1 - reactiveMask * reactiveStrength;
@@ -67,11 +68,18 @@ export function taaFeedbackWeightReference(options) {
 
 export const taaHistoryWeightReference = taaFeedbackWeightReference;
 
-export function taaVarianceClipRangesReference(mean, sigma, varianceGamma) {
+export function taaVarianceClipRangesReference(
+  mean,
+  sigma,
+  varianceGamma,
+  historyClampStrength = 1,
+) {
+  const safeStrength = Math.max(1e-5, Number(historyClampStrength));
+  const effectiveGamma = Number(varianceGamma) / safeStrength;
   const gamma = [
-    varianceGamma,
-    varianceGamma * 1.25,
-    varianceGamma * 1.25,
+    effectiveGamma,
+    effectiveGamma * 1.25,
+    effectiveGamma * 1.25,
   ];
   return {
     min: mean.map((value, index) => value - sigma[index] * gamma[index]),
@@ -155,8 +163,10 @@ function buildResolve({
   currentViewProjectionInverse,
   previousViewProjection,
   historyValid,
+  globalReactive,
   feedback,
   varianceGamma,
+  historyClampStrength,
   depthRejectionMinMeters,
   depthRejectionScale,
   reactiveStrength,
@@ -226,10 +236,12 @@ function buildResolve({
     mean.divAssign(9);
     secondMoment.divAssign(9);
     const sigma = max(secondMoment.sub(mean.mul(mean)), vec3(0)).sqrt();
+    const safeClampStrength = max(historyClampStrength, 1e-5);
+    const effectiveGamma = varianceGamma.div(safeClampStrength);
     const gamma = vec3(
-      varianceGamma,
-      varianceGamma.mul(1.25),
-      varianceGamma.mul(1.25),
+      effectiveGamma,
+      effectiveGamma.mul(1.25),
+      effectiveGamma.mul(1.25),
     );
     const extent = sigma.mul(gamma);
     const clippedYCoCg = clamp(
@@ -237,7 +249,11 @@ function buildResolve({
       mean.sub(extent),
       mean.add(extent),
     );
-    const clippedHistory = yCoCgToRgb(clippedYCoCg).max(vec3(0));
+    const varianceClippedHistory = yCoCgToRgb(clippedYCoCg).max(vec3(0));
+    const clippedHistory = historyClampStrength.lessThanEqual(1e-5).select(
+      rawHistory,
+      varianceClippedHistory,
+    );
 
     const currentGeometry = step(rawDepth, 0.9999);
     const previousGeometry = step(1e-6, previousDepth);
@@ -253,6 +269,7 @@ function buildResolve({
     const accepted = uvCoverage(previousUv)
       .mul(float(1).sub(backgroundMismatch.min(1)))
       .mul(float(1).sub(depthRejected.select(1, 0)))
+      .mul(float(1).sub(globalReactive))
       .mul(historyValid);
 
     const motionPixels = velocity.mul(outputResolution).length();
@@ -291,8 +308,10 @@ export class TaaResolveNode {
     this.currentViewProjectionInverse = uniform(new THREE.Matrix4());
     this.previousViewProjection = uniform(new THREE.Matrix4());
     this.historyValid = uniform(0);
+    this.globalReactive = uniform(0);
     this.feedback = uniform(settings.feedback);
     this.varianceGamma = uniform(settings.varianceGamma);
+    this.historyClampStrength = uniform(settings.historyClampStrength);
     this.depthRejectionMinMeters = uniform(settings.depthRejectionMinMeters);
     this.depthRejectionScale = uniform(settings.depthRejectionScale);
     this.reactiveStrength = uniform(settings.reactiveStrength);
@@ -331,8 +350,10 @@ export class TaaResolveNode {
       currentViewProjectionInverse: this.currentViewProjectionInverse,
       previousViewProjection: this.previousViewProjection,
       historyValid: this.historyValid,
+      globalReactive: this.globalReactive,
       feedback: this.feedback,
       varianceGamma: this.varianceGamma,
+      historyClampStrength: this.historyClampStrength,
       depthRejectionMinMeters: this.depthRejectionMinMeters,
       depthRejectionScale: this.depthRejectionScale,
       reactiveStrength: this.reactiveStrength,
@@ -372,8 +393,10 @@ export class TaaResolveNode {
     this.previousViewProjection.value.copy(frameState.previousViewProjection);
     this.jitterNdc.value.copy(frameState.jitterNdc);
     this.historyValid.value = frameState.historyValid ? 1 : 0;
+    this.globalReactive.value = frameState.globalReactive ? 1 : 0;
     this.feedback.value = this.settings.feedback;
     this.varianceGamma.value = this.settings.varianceGamma;
+    this.historyClampStrength.value = this.settings.historyClampStrength;
     this.depthRejectionMinMeters.value = this.settings.depthRejectionMinMeters;
     this.depthRejectionScale.value = this.settings.depthRejectionScale;
     this.reactiveStrength.value = this.settings.reactiveStrength;
