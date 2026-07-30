@@ -6,6 +6,10 @@ import {
 } from './PostProcessingConfig.js';
 import { PostProcessingGraph } from './PostProcessingGraph.js';
 
+const CAMERA_TELEPORT_DISTANCE_SQUARED = 64 * 64;
+const CAMERA_ROTATION_DOT_MINIMUM = Math.cos(THREE.MathUtils.degToRad(45) * 0.5);
+const CAMERA_FOV_EPSILON_DEGREES = 0.5;
+
 function loadStoredSettings(defaults) {
   if (typeof localStorage === 'undefined' || !defaults.persistenceKey) return defaults;
   try {
@@ -58,6 +62,11 @@ export class PostProcessingController {
     this.lastGodRaysTechnique = null;
     this.lastVolumetricReady = null;
     this.savedRendererState = null;
+    this.cameraStateValid = false;
+    this.lastRenderedCamera = null;
+    this.lastCameraPosition = new THREE.Vector3();
+    this.lastCameraQuaternion = new THREE.Quaternion();
+    this.lastCameraFov = null;
   }
 
   subscribe(listener) {
@@ -129,9 +138,37 @@ export class PostProcessingController {
     this.lastInvalidationReason = reason;
   }
 
+  cameraDiscontinuous(camera) {
+    if (!this.cameraStateValid || this.lastRenderedCamera !== camera) return false;
+    const teleported = this.lastCameraPosition.distanceToSquared(camera.position)
+      > CAMERA_TELEPORT_DISTANCE_SQUARED;
+    const rotatedAbruptly = Math.abs(this.lastCameraQuaternion.dot(camera.quaternion))
+      < CAMERA_ROTATION_DOT_MINIMUM;
+    const currentFov = Number.isFinite(camera.fov) ? camera.fov : null;
+    const fovChanged = currentFov !== null
+      && this.lastCameraFov !== null
+      && Math.abs(currentFov - this.lastCameraFov) > CAMERA_FOV_EPSILON_DEGREES;
+    return teleported || rotatedAbruptly || fovChanged;
+  }
+
+  captureCameraState(camera) {
+    this.lastRenderedCamera = camera;
+    this.lastCameraPosition.copy(camera.position);
+    this.lastCameraQuaternion.copy(camera.quaternion);
+    this.lastCameraFov = Number.isFinite(camera.fov) ? camera.fov : null;
+    this.cameraStateValid = true;
+  }
+
+  volumetricReady() {
+    return Boolean(
+      this.godRays.enabled
+      && this.godRays.technique === 'volumetric'
+      && this.godRays.canBuildVolumetricPipeline(),
+    );
+  }
+
   graphNeedsRefresh(camera) {
-    const volumetricReady = this.godRays.technique === 'volumetric'
-      && this.godRays.canBuildVolumetricPipeline();
+    const volumetricReady = this.volumetricReady();
     return this.graph === null
       || this.camera !== camera
       || this.lastGodRaysEnabled !== this.godRays.enabled
@@ -150,11 +187,12 @@ export class PostProcessingController {
     this.camera = camera;
     this.lastGodRaysEnabled = this.godRays.enabled;
     this.lastGodRaysTechnique = this.godRays.technique;
-    this.lastVolumetricReady = this.godRays.technique === 'volumetric'
-      && this.godRays.canBuildVolumetricPipeline();
+    this.lastVolumetricReady = this.volumetricReady();
   }
 
   render(camera) {
+    if (this.cameraDiscontinuous(camera)) this.invalidate('camera-discontinuity');
+    this.captureCameraState(camera);
     if (!this.settings.enabled || this.failed) {
       this.setRendererOwnership(false);
       return false;
