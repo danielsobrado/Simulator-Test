@@ -204,7 +204,7 @@ export function buildDustGodRays({
       coord.subAssign(delta);
       const coverage = screenUvCoverage(coord);
       const skyVisibility = step(skyThreshold, depthTex.sample(coord).r)
-        .mul(cloudTex.sample(coord).r);
+        .mul(cloudTex ? cloudTex.sample(coord).r : float(1));
       const sampleDistanceToSun = coord.sub(sunUv).length();
       const contrastWeight = coverage.mul(
         float(1).sub(smoothstep(0.18, 0.32, sampleDistanceToSun)),

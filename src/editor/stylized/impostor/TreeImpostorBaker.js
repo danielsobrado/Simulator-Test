@@ -145,10 +145,6 @@ function disposeSceneResources(scene) {
 }
 
 async function renderScene(renderer, scene, camera) {
-  if (typeof renderer.renderAsync === 'function') {
-    await renderer.renderAsync(scene, camera);
-    return;
-  }
   const result = renderer.render(scene, camera);
   if (result && typeof result.then === 'function') await result;
 }

@@ -46,7 +46,7 @@ function createValidConfig() {
       maxPitchDegrees: 85,
     },
     renderer: {
-      antialias: true,
+      antialias: false,
       forceWebGL: false,
       maxPixelRatio: 2,
     },

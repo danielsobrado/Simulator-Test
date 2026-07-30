@@ -6,11 +6,25 @@ import {
   PLAYER_MODES,
 } from './playerConstants.js';
 
+export const CAMERA_VIEW_FIRST = 'first';
+export const CAMERA_VIEW_THIRD = 'third';
+
+/** The key that flips between them. Claimed on the capture phase — see below. */
+export const CAMERA_VIEW_TOGGLE_CODE = 'KeyV';
+
 export class ViewModeController {
-  constructor({ editorCamera, playerController, terrainView }) {
+  constructor({
+    editorCamera, playerController, terrainView, thirdPersonCamera = null,
+  }) {
     this.editorCamera = editorCamera;
     this.playerController = playerController;
     this.terrainView = terrainView;
+    /**
+     * Optional second camera for walk mode. Absent, the toggle is inert and walk
+     * mode behaves exactly as it did before the character existed.
+     */
+    this.thirdPersonCamera = thirdPersonCamera;
+    this.cameraView = CAMERA_VIEW_FIRST;
     this.canvas = terrainView.renderer.domElement;
     this.mode = PLAYER_MODE_EDIT;
     /**
@@ -23,6 +37,7 @@ export class ViewModeController {
     this.paused = false;
     this.awaitingSpawn = false;
     this.spacePressed = false;
+    this._lastTimestamp = null;
     this.listeners = new Set();
     this.unsubscribePlayer = playerController.subscribe(() => this.emit());
     this.editorCamera.setEnabled(true);
@@ -39,18 +54,62 @@ export class ViewModeController {
   }
 
   get camera() {
-    return this.mode === PLAYER_MODE_WALK
-      ? this.playerController.camera
-      : this.editorCamera.camera;
+    if (this.mode !== PLAYER_MODE_WALK) return this.editorCamera.camera;
+    return this.isThirdPerson
+      ? this.thirdPersonCamera.camera
+      : this.playerController.camera;
+  }
+
+  get isThirdPerson() {
+    return this.cameraView === CAMERA_VIEW_THIRD && this.thirdPersonCamera !== null;
   }
 
   getState() {
     return Object.freeze({
       mode: this.mode,
+      cameraView: this.cameraView,
       paused: this.paused,
       awaitingSpawn: this.awaitingSpawn,
       player: this.playerController.getStatus(),
     });
+  }
+
+  /**
+   * Flip between first and third person.
+   *
+   * @returns {boolean} whether the view actually changed
+   */
+  toggleCameraView() {
+    if (!this.thirdPersonCamera || this.mode !== PLAYER_MODE_WALK) return false;
+    this.cameraView = this.cameraView === CAMERA_VIEW_THIRD
+      ? CAMERA_VIEW_FIRST
+      : CAMERA_VIEW_THIRD;
+    if (this.isThirdPerson) {
+      // The boom has no idea where the player is until it has run once; easing
+      // in from wherever it was left flies the camera across the map.
+      this.thirdPersonCamera.reset();
+      this.thirdPersonCamera.update(0, this.playerController.getStatus());
+    }
+    this.onCameraViewChange?.(this.cameraView);
+    this.emit();
+    return true;
+  }
+
+  /**
+   * Capture-phase key handler for the view toggle.
+   *
+   * `PlayerController` stops immediate propagation on every non-Escape key while
+   * walking, so this has to be attached before it is constructed — see
+   * `attachCaptureHotkey`. Returns true when the event was claimed.
+   */
+  handleCameraViewKey(event) {
+    if (event.code !== CAMERA_VIEW_TOGGLE_CODE) return false;
+    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (this.mode !== PLAYER_MODE_WALK || this.paused || this.awaitingSpawn) return false;
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return false;
+    event.preventDefault();
+    return this.toggleCameraView();
   }
 
   /** Suspend walking so the world can be edited from the player's viewpoint. */
@@ -148,6 +207,10 @@ export class ViewModeController {
     this.mode = PLAYER_MODE_WALK;
     this.editorCamera.setEnabled(false);
     this.playerController.setEnabled(true, spawn);
+    // The boom carries the last walk's pose; entering somewhere else entirely
+    // would otherwise be a long swoop across the world.
+    this.thirdPersonCamera?.reset();
+    this._lastTimestamp = null;
     if (requestPointerLock) {
       this.playerController.requestPointerLock();
     }
@@ -202,12 +265,21 @@ export class ViewModeController {
   resize(width, height) {
     this.editorCamera.resize(width, height);
     this.playerController.resize(width, height);
+    this.thirdPersonCamera?.resize(width, height);
   }
 
   update(timestamp) {
     if (this.mode === PLAYER_MODE_WALK) {
       this.playerController.update(timestamp);
+      if (this.isThirdPerson) {
+        const deltaSeconds = this._lastTimestamp === null
+          ? 0
+          : (timestamp - this._lastTimestamp) / 1000;
+        this.thirdPersonCamera.update(deltaSeconds, this.playerController.getStatus());
+      }
+      this._lastTimestamp = timestamp;
     } else {
+      this._lastTimestamp = null;
       this.editorCamera.update();
     }
   }
@@ -227,6 +299,7 @@ export class ViewModeController {
   shiftWorld(shiftX, shiftZ) {
     this.editorCamera.shiftWorld(shiftX, shiftZ);
     this.playerController.shiftWorld(shiftX, shiftZ);
+    this.thirdPersonCamera?.shiftWorld(shiftX, shiftZ);
   }
 
   emit() {

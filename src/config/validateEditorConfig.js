@@ -861,6 +861,44 @@ export function validatePostProcessing(config) {
   );
 }
 
+/**
+ * The player's drow, and the third-person boom it is seen from.
+ *
+ * Optional in its entirety: the whole section absent means the character is on
+ * with its built-in defaults, which is what `editor.config.yaml` documents.
+ */
+function assertCharacterConfig(character) {
+  if (character === undefined) return;
+  if (typeof character !== 'object' || character === null || Array.isArray(character)) {
+    throw new Error('Invalid editor configuration: character must be an object.');
+  }
+  for (const name of ['enabled', 'visibleInFirstPerson']) {
+    if (character[name] !== undefined && typeof character[name] !== 'boolean') {
+      throw new Error(`Invalid editor configuration: character.${name} must be boolean.`);
+    }
+  }
+
+  const boom = character.thirdPerson;
+  if (boom === undefined) return;
+  if (typeof boom !== 'object' || boom === null || Array.isArray(boom)) {
+    throw new Error('Invalid editor configuration: character.thirdPerson must be an object.');
+  }
+  for (const name of ['distance', 'pivotHeight', 'minDistance', 'clearance', 'damping']) {
+    if (boom[name] !== undefined && (!Number.isFinite(boom[name]) || boom[name] <= 0)) {
+      throw new Error(`Invalid editor configuration: character.thirdPerson.${name} must be positive.`);
+    }
+  }
+  // Shoulder offset is the one that may legitimately be zero or negative — zero
+  // centres the character and negative swings the boom over the other shoulder.
+  if (boom.shoulder !== undefined && !Number.isFinite(boom.shoulder)) {
+    throw new Error('Invalid editor configuration: character.thirdPerson.shoulder must be finite.');
+  }
+  if (boom.distance !== undefined && boom.minDistance !== undefined
+      && boom.minDistance > boom.distance) {
+    throw new Error('Invalid editor configuration: character.thirdPerson.minDistance must not exceed distance.');
+  }
+}
+
 export function validateEditorConfig(config) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
     throw new Error('Invalid editor configuration: expected a YAML object.');
@@ -915,6 +953,8 @@ export function validateEditorConfig(config) {
   if (!Number.isFinite(config.world.seaLevel)) {
     throw new Error('Invalid editor configuration: world.seaLevel must be finite.');
   }
+
+  assertCharacterConfig(config.character);
 
   if (config.world.farTerrain !== undefined) {
     const far = config.world.farTerrain;

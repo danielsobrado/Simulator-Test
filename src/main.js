@@ -52,6 +52,12 @@ import {
   raycastTerrainHeightfield,
 } from './editor/weather/weather_terrain_adapters.js';
 import { attachSpellHotkeys, createSpellRuntime } from './editor/spells/spell_runtime.js';
+import { attachCaptureHotkey } from './editor/input/attachCaptureHotkey.js';
+import { ThirdPersonCamera } from './editor/player/ThirdPersonCamera.js';
+import { CharacterView } from './editor/character/CharacterView.js';
+
+/** How long the drow holds the casting stance after a spell fires. */
+const SPELL_CAST_POSE_MS = 520;
 import './editor/weather/weather.css';
 import './editor/spells/spell_menu.css';
 import { applySceneAssetSettings } from './editor/settings/SceneSettings.js';
@@ -459,18 +465,40 @@ async function startEditor() {
   });
   const worldMapUi = new WorldMapUi({ root, controller: worldMapController });
 
+  // The view toggle has to outrank PlayerController's capture-phase key handler,
+  // which stops immediate propagation on every non-Escape key while walking. Same
+  // reason and same mechanism as the spell digits above.
+  let cameraViewKeyHandler = null;
+  const detachCameraViewHotkey = attachCaptureHotkey(() => cameraViewKeyHandler);
+
   playerController = new PlayerController({
     canvas: terrainView.renderer.domElement,
     terrainView,
     config: config.player,
     farPlane: nearView.farPlane,
   });
+  // Both the boom and the drow's feet read the ground through the player
+  // controller, so all three agree about wall tops and construction decks.
+  const characterGround = {
+    heightAt: (x, z) => playerController.getGroundHeight(x, z),
+  };
+  const characterEnabled = config.character?.enabled !== false;
+  const thirdPersonCamera = characterEnabled
+    ? new ThirdPersonCamera({
+      terrain: characterGround,
+      fovDegrees: config.player.fovDegrees,
+      farPlane: nearView.farPlane,
+      config: config.character?.thirdPerson,
+    })
+    : null;
   viewModeController = new ViewModeController({
     editorCamera,
     playerController,
     terrainView,
+    thirdPersonCamera,
     objectView,
   });
+  cameraViewKeyHandler = (event) => viewModeController.handleCameraViewKey(event);
   let previousViewMode = viewModeController.mode;
   let previousActiveCamera = viewModeController.camera;
   temporalUnsubscribers.push(
@@ -782,6 +810,37 @@ async function startEditor() {
       POST_PROCESSING_REACTIVE_EVENTS.WEATHER_STARTED,
     );
   }
+
+  // The drow. Created after the weather settings exist, because the garments feel
+  // the same wind everything else does.
+  const characterView = characterEnabled
+    ? new CharacterView({
+      scene: terrainView.scene,
+      terrain: characterGround,
+      sunDirection: terrainView.godRays.sunDirection,
+      config: {
+        ...(config.character ?? {}),
+        // The pose blends saturate at the game's own run speed, not at a
+        // human's. Left at the source's 5.4 m/s the drow would be pinned in a
+        // full sprint pose from the first step.
+        runSpeed: config.player.walkSpeed * config.player.runMultiplier,
+      },
+      getWeatherSettings: () => ({
+        enabled: weatherEnabled && weatherSettings.weatherMode !== 'off',
+        intensity: weatherSettings.weatherIntensity,
+        windX: weatherSettings.weatherWindX,
+        windZ: weatherSettings.weatherWindZ,
+      }),
+    })
+    : null;
+  // Hidden outside walk mode: there is no player to hang it off, and the orbit
+  // camera has no use for a figure standing at the last spawn point.
+  characterView?.setVisible(false);
+  // Visible in first person too, by default. The near plane clips the cowl and
+  // the shoulders away, so what is left is your own robe, boots and hands
+  // looking down — plus the shadow, which is what actually sells standing in the
+  // world rather than floating over it.
+  const characterInFirstPerson = config.character?.visibleInFirstPerson !== false;
   const weatherUi = weatherEnabled
     ? createWeatherUi({
       root,
@@ -813,6 +872,13 @@ async function startEditor() {
         postProcessingController.notifyReactive(
           POST_PROCESSING_REACTIVE_EVENTS.SPELL_STARTED,
         );
+        // Raise the drow's arms along the aim. Pushed on the cast rather than
+        // polled, so the pose and the effect start on the same frame.
+        characterView?.beginCastAlongCamera(
+          SPELL_CAST_POSE_MS,
+          viewModeController.camera,
+          performance.now(),
+        );
       },
       // Keys are claimed by attachSpellHotkeys() above, before PlayerController.
       registerKeys: false,
@@ -843,6 +909,8 @@ async function startEditor() {
       terrainView,
       viewModeController,
       playerController,
+      thirdPersonCamera,
+      characterView,
       weatherSettings,
       weatherController,
       spellRuntime,
@@ -898,8 +966,9 @@ async function startEditor() {
     finishWaterPrewarm = stylizedSurface.beginWaterRefractionPrewarm();
     await terrainView.renderer.compileAsync(terrainView.scene, editorCamera.camera);
     if (finishWaterPrewarm) {
-      await terrainView.renderer.renderAsync(terrainView.scene, editorCamera.camera);
+      terrainView.renderer.render(terrainView.scene, editorCamera.camera);
     }
+    await characterView?.prewarm(terrainView.renderer, playerController.camera);
     await postProcessingController.precompile(playerController.camera);
     terrainView.prewarmPostProcessing(playerController.camera);
   } catch (error) {
@@ -949,6 +1018,7 @@ async function startEditor() {
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   let lastWeatherTimestamp = null;
+  let lastCharacterTimestamp = null;
   terrainView.setAnimationLoop((timestamp) => {
     if (!active) return;
 
@@ -999,9 +1069,33 @@ async function startEditor() {
       // Construction geometry is origin-local, so a rebase only moves each
       // record's group — no dispose, no rebuild, no hitch.
       constructionView.rebase();
+      // Planted feet, simulated garment nodes and the camera boom are all
+      // absolute render-space positions held across frames, so they rebase with
+      // everything else or the drow is left a chunk behind.
+      characterView?.shiftWorld(rebase.shiftX, rebase.shiftZ);
       renderFocus = viewModeController.getFocusWorld();
     }
     if (profiling) perfQa.mark('floatingOrigin');
+
+    if (characterView) {
+      const walking = viewModeController.mode === PLAYER_MODE_WALK
+        && !viewModeController.paused;
+      const wantVisible = walking
+        && (viewModeController.isThirdPerson || characterInFirstPerson);
+      if (characterView.visible !== wantVisible) characterView.setVisible(wantVisible);
+      if (wantVisible) {
+        const deltaSeconds = lastCharacterTimestamp === null
+          ? 0
+          : (frameTimestamp - lastCharacterTimestamp) / 1000;
+        characterView.update(
+          deltaSeconds,
+          playerController.getStatus(),
+          frameTimestamp,
+        );
+      }
+      lastCharacterTimestamp = wantVisible ? frameTimestamp : null;
+      if (profiling) perfQa.mark('character');
+    }
 
     macroFarTerrain.update();
     const backdropActive = macroFarTerrain.isActive();
@@ -1093,6 +1187,8 @@ async function startEditor() {
     weatherUi?.dispose();
     spellKeyHandler = null;
     detachSpellHotkeys();
+    detachCameraViewHotkey();
+    characterView?.dispose();
     spellRuntime?.dispose();
     worldMapUi.dispose();
     worldMapController.dispose();

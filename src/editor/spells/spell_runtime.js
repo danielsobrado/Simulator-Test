@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { attachCaptureHotkey } from '../input/attachCaptureHotkey.js';
 import { earthSpellGameplayConfig } from './earth_spell_gameplay_config.js';
 import { defaultSpellConfig } from './spell_config.js';
 import { createSpellMenu } from './spell_menu.js';
@@ -230,11 +231,5 @@ export function createSpellRuntime(deps) {
  * @param {Window | EventTarget} [target]
  */
 export function attachSpellHotkeys(getHandler, target = window) {
-  const onKeyDown = (event) => {
-    if (getHandler()?.(event) === true) {
-      event.stopImmediatePropagation();
-    }
-  };
-  target.addEventListener('keydown', onKeyDown, true);
-  return () => target.removeEventListener('keydown', onKeyDown, true);
+  return attachCaptureHotkey(getHandler, target);
 }

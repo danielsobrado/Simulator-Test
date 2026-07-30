@@ -381,16 +381,7 @@ export class PlayerController {
       config: this.config,
       forward: this.forward,
       right: this.right,
-      // Walls are part of the ground, not obstacles: a flat-topped wall is a
-      // height field over a narrow ribbon, so it composes into the same
-      // function rather than needing collision response.
-      getGroundHeight: (x, z) => {
-        const terrain = this.terrainView.getWorldHeight(x, z);
-        if (!this.constructionGround) return terrain;
-        const canonical = this.terrainView.floatingOrigin.toCanonical(x, z);
-        const wall = this.constructionGround.heightAt(canonical.x, canonical.z);
-        return wall === null ? terrain : Math.max(terrain, wall);
-      },
+      getGroundHeight: (x, z) => this.getGroundHeight(x, z),
       getWaterSample: typeof this.terrainView.getWorldWater === 'function'
         ? (x, z) => this.terrainView.getWorldWater(x, z)
         : null,
@@ -410,6 +401,26 @@ export class PlayerController {
     this.underwaterView?.update(current);
     this.emitWaterEvents(previousState, nextState, current);
     if (waterChanged || collisionChanged) this.emit();
+  }
+
+  /**
+   * The surface the player stands on, at a render-space point.
+   *
+   * Walls are part of the ground, not obstacles: a flat-topped wall is a height
+   * field over a narrow ribbon, so it composes into the same function rather
+   * than needing collision response.
+   *
+   * Public because the character's feet and the third-person boom have to agree
+   * with the physics about where the ground is. Two of the three sampling the
+   * terrain directly would put the drow's boots through a wall it is standing
+   * on.
+   */
+  getGroundHeight(x, z) {
+    const terrain = this.terrainView.getWorldHeight(x, z);
+    if (!this.constructionGround) return terrain;
+    const canonical = this.terrainView.floatingOrigin.toCanonical(x, z);
+    const wall = this.constructionGround.heightAt(canonical.x, canonical.z);
+    return wall === null ? terrain : Math.max(terrain, wall);
   }
 
   getFocusWorld() {

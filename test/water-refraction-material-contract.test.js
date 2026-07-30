@@ -41,3 +41,15 @@ test('refraction uses only two bounded FBM samples', () => {
   assert.equal((helper.match(/stylizedFbm2\(/g) ?? []).length, 2);
   assert.equal((helper.match(/stylizedFbm\(/g) ?? []).length, 0);
 });
+
+test('shipped renderer keeps MSAA off while refraction samples viewport depth', async () => {
+  // three.js WebGPU + ACES allocates an MSAA tone-map target when antialias is
+  // true. viewportDepthTexture then binds a 1x1 non-MSAA Depth24Plus stub against
+  // a multisampled bind layout (Sample count / multisampled GPUValidationError).
+  // Temporal AA is the supported anti-aliasing path.
+  const { readFile } = await import('node:fs/promises');
+  const { default: yaml } = await import('js-yaml');
+  const config = yaml.load(await readFile(new URL('../editor.config.yaml', import.meta.url), 'utf8'));
+  assert.equal(config.renderer.antialias, false);
+  assert.equal(config.stylizedSurface.postProcessing.antiAliasing.enabled, true);
+});

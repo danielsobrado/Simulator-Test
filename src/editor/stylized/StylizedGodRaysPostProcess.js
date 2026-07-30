@@ -214,11 +214,14 @@ export class StylizedGodRaysPostProcess {
     if (!this.scenePass) {
       this.scenePass = pass(this.scene, camera, { samples: this.renderer.samples });
       this.scenePass.name = 'God Rays Scene Pass';
-      this.cloudPass = this.cloudMaskScene ? pass(this.cloudMaskScene, camera) : null;
-      if (this.cloudPass) {
-        this.cloudPass.name = 'God Rays Cloud Transmission Pass';
-        this.cloudPass.getTexture('output').name = 'God Rays Cloud Transmission';
-      }
+    }
+    // Cloud mask is attached by StylizedSkyView after InfiniteTerrainView
+    // constructs god rays. If the first ensureScenePass raced ahead of that,
+    // bind the pass here instead of freezing cloudPass at null forever.
+    if (!this.cloudPass && this.cloudMaskScene) {
+      this.cloudPass = pass(this.cloudMaskScene, camera);
+      this.cloudPass.name = 'God Rays Cloud Transmission Pass';
+      this.cloudPass.getTexture('output').name = 'God Rays Cloud Transmission';
     }
     this.scenePass.camera = camera;
     if (this.cloudPass) this.cloudPass.camera = camera;
@@ -227,9 +230,7 @@ export class StylizedGodRaysPostProcess {
   }
 
   cloudTransmissionNode() {
-    return this.cloudPass
-      ? this.cloudPass.getTextureNode('output')
-      : vec4(1);
+    return this.cloudPass ? this.cloudPass.getTextureNode('output') : null;
   }
 
   ensureScreenPipeline(camera) {
@@ -308,11 +309,13 @@ export class StylizedGodRaysPostProcess {
       heightFalloff: this.heightFogFalloff,
       maxDistance: this.heightFogMaxDistance,
     });
-    const cloudTransmissionFactor = mix(
-      float(1),
-      cloudTransmission.sample(screenUV).r,
-      this.volumetricCloudInfluence,
-    );
+    const cloudTransmissionFactor = cloudTransmission
+      ? mix(
+        float(1),
+        cloudTransmission.sample(screenUV).r,
+        this.volumetricCloudInfluence,
+      )
+      : float(1);
     const rayAmount = blurredRays
       .sample(screenUV)
       .r
