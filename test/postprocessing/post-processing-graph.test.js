@@ -62,6 +62,30 @@ test('temporal AA mode participates in graph topology', () => {
   assert.match(createPostProcessingTopologySignature(disabled), /\|aaMode:off/);
 });
 
+test('TAAU render scale participates in graph topology', () => {
+  const full = settings();
+  full.renderScale = 1;
+  full.antiAliasing = { enabled: true, mode: 'traau' };
+  const reduced = structuredClone(full);
+  reduced.renderScale = 0.67;
+  assert.notEqual(
+    createPostProcessingTopologySignature(full),
+    createPostProcessingTopologySignature(reduced),
+  );
+});
+
+test('plain TAA ignores render scale in graph topology', () => {
+  const first = settings();
+  first.renderScale = 1;
+  first.antiAliasing = { enabled: true, mode: 'traa' };
+  const second = structuredClone(first);
+  second.renderScale = 0.67;
+  assert.equal(
+    createPostProcessingTopologySignature(first),
+    createPostProcessingTopologySignature(second),
+  );
+});
+
 test('tone mapping mode participates in graph topology', () => {
   const agx = settings();
   agx.toneMapping = { enabled: true, mode: 'agx' };
@@ -75,6 +99,28 @@ test('tone mapping mode participates in graph topology', () => {
     createPostProcessingTopologySignature(aces),
   );
   assert.match(createPostProcessingTopologySignature(disabled), /\|toneMode:none/);
+});
+
+test('SSR resolution scale participates in graph topology', () => {
+  const low = settings();
+  low.ssr = { enabled: true, resolutionScale: 0.25 };
+  const high = settings();
+  high.ssr = { enabled: true, resolutionScale: 0.75 };
+  assert.notEqual(
+    createPostProcessingTopologySignature(low),
+    createPostProcessingTopologySignature(high),
+  );
+});
+
+test('shaft resolution scale participates in graph topology', () => {
+  const low = settings();
+  low.screenSpaceShafts = { enabled: true, resolutionScale: 0.25, samples: 16 };
+  const high = settings();
+  high.screenSpaceShafts = { enabled: true, resolutionScale: 0.75, samples: 16 };
+  assert.notEqual(
+    createPostProcessingTopologySignature(low),
+    createPostProcessingTopologySignature(high),
+  );
 });
 
 test('DOF tap count participates in graph topology', () => {
