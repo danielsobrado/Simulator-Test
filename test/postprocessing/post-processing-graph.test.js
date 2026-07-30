@@ -76,3 +76,15 @@ test('tone mapping mode participates in graph topology', () => {
   );
   assert.match(createPostProcessingTopologySignature(disabled), /\|toneMode:none/);
 });
+
+test('DOF tap count participates in graph topology', () => {
+  const low = settings();
+  low.depthOfField = { enabled: true, taps: 8 };
+  const high = settings();
+  high.depthOfField = { enabled: true, taps: 24 };
+
+  assert.notEqual(
+    createPostProcessingTopologySignature(low),
+    createPostProcessingTopologySignature(high),
+  );
+});
