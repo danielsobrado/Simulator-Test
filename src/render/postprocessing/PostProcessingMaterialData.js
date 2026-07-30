@@ -1,4 +1,5 @@
-import { vec4 } from 'three/tsl';
+import * as THREE from 'three/webgpu';
+import { materialReference, vec4 } from 'three/tsl';
 
 export const REFLECTION_CLASSES = Object.freeze({
   NONE: 0,
@@ -10,6 +11,14 @@ export const REFLECTION_CLASSES = Object.freeze({
 });
 
 const REFLECTION_CLASS_SCALE = 255;
+const MATERIAL_DATA_ACCESSOR_FLAG = Symbol.for('drusniel.postProcessingMaterialDataAccessors');
+
+export const MATERIAL_DATA_REFERENCE_PROPERTIES = Object.freeze({
+  roughness: 'postProcessingRoughness',
+  reactive: 'postProcessingReactive',
+  reflectionClass: 'postProcessingReflectionClass',
+  bloomBoost: 'postProcessingBloomBoost',
+});
 
 export const MATERIAL_DATA_CATEGORIES = Object.freeze({
   TERRAIN: Object.freeze({ roughness: 1, reactive: 0, reflectionClass: REFLECTION_CLASSES.NONE, bloomBoost: 0 }),
@@ -27,9 +36,20 @@ export const defaultMaterialData = Object.freeze({
   bloomBoost: 0,
 });
 
+function clamp01(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : fallback;
+}
+
+function normalizeReflectionClass(value) {
+  const number = Number(value);
+  return Number.isFinite(number)
+    ? Math.min(REFLECTION_CLASS_SCALE, Math.max(0, Math.round(number)))
+    : defaultMaterialData.reflectionClass;
+}
+
 export function encodeReflectionClass(reflectionClass) {
-  return Math.min(REFLECTION_CLASS_SCALE, Math.max(0, Math.round(reflectionClass)))
-    / REFLECTION_CLASS_SCALE;
+  return normalizeReflectionClass(reflectionClass) / REFLECTION_CLASS_SCALE;
 }
 
 export function decodeReflectionClass(encodedClass) {
@@ -39,42 +59,75 @@ export function decodeReflectionClass(encodedClass) {
   );
 }
 
-export function packMaterialData(data = defaultMaterialData) {
-  return Object.freeze([
-    data.roughness ?? defaultMaterialData.roughness,
-    data.reactive ?? defaultMaterialData.reactive,
-    encodeReflectionClass(data.reflectionClass ?? defaultMaterialData.reflectionClass),
-    data.bloomBoost ?? defaultMaterialData.bloomBoost,
-  ]);
-}
-
-export function packMaterialDataNode(data = defaultMaterialData) {
-  return vec4(
-    data.roughness ?? defaultMaterialData.roughness,
-    data.reactive ?? defaultMaterialData.reactive,
-    encodeReflectionClass(data.reflectionClass ?? defaultMaterialData.reflectionClass),
-    data.bloomBoost ?? defaultMaterialData.bloomBoost,
-  );
+function readMaterialData(material, key) {
+  const data = material?.userData?.postProcessingMaterialData ?? defaultMaterialData;
+  if (key === 'reflectionClass') return encodeReflectionClass(data.reflectionClass);
+  return clamp01(data[key], defaultMaterialData[key]);
 }
 
 /**
- * Registers post-processing material metadata without assigning `mrtNode`.
- * Per-material `mrtNode` overrides compile empty OutputType structs during
- * non-MRT paths (god rays / compileAsync prewarm). The scene pass already
- * writes default material data; category metadata is kept on userData for
- * later attribute-driven overrides.
+ * Pass-level MRT nodes can safely read these per-object material references.
+ * Keeping metadata in userData preserves it across Material.clone()/copy().
  */
+export function installMaterialDataAccessors() {
+  const prototype = THREE.Material.prototype;
+  if (prototype[MATERIAL_DATA_ACCESSOR_FLAG]) return false;
+
+  for (const [key, property] of Object.entries(MATERIAL_DATA_REFERENCE_PROPERTIES)) {
+    if (Object.getOwnPropertyDescriptor(prototype, property)) continue;
+    Object.defineProperty(prototype, property, {
+      configurable: true,
+      enumerable: false,
+      get() {
+        return readMaterialData(this, key);
+      },
+    });
+  }
+
+  Object.defineProperty(prototype, MATERIAL_DATA_ACCESSOR_FLAG, {
+    configurable: true,
+    value: true,
+  });
+  return true;
+}
+
+installMaterialDataAccessors();
+
+export function packMaterialData(data = defaultMaterialData) {
+  return Object.freeze([
+    clamp01(data.roughness, defaultMaterialData.roughness),
+    clamp01(data.reactive, defaultMaterialData.reactive),
+    encodeReflectionClass(data.reflectionClass),
+    clamp01(data.bloomBoost, defaultMaterialData.bloomBoost),
+  ]);
+}
+
+export function packMaterialDataNode(data = null) {
+  if (data) {
+    return vec4(...packMaterialData(data));
+  }
+  return vec4(
+    materialReference(MATERIAL_DATA_REFERENCE_PROPERTIES.roughness, 'float'),
+    materialReference(MATERIAL_DATA_REFERENCE_PROPERTIES.reactive, 'float'),
+    materialReference(MATERIAL_DATA_REFERENCE_PROPERTIES.reflectionClass, 'float'),
+    materialReference(MATERIAL_DATA_REFERENCE_PROPERTIES.bloomBoost, 'float'),
+  );
+}
+
 export function assignMaterialData(material, data = {}) {
   if (!material?.isNodeMaterial) {
     throw new TypeError('Post-processing material data requires a NodeMaterial.');
   }
-  const packed = {
-    roughness: data.roughness ?? material.roughnessNode ?? material.roughness ?? 1,
-    reactive: data.reactive ?? defaultMaterialData.reactive,
-    reflectionClass: data.reflectionClass ?? defaultMaterialData.reflectionClass,
-    bloomBoost: data.bloomBoost ?? defaultMaterialData.bloomBoost,
-  };
-  material.userData.postProcessingMaterialData = Object.freeze({ ...packed });
+  const roughnessFallback = Number.isFinite(Number(material.roughness))
+    ? Number(material.roughness)
+    : defaultMaterialData.roughness;
+  const packed = Object.freeze({
+    roughness: clamp01(data.roughness, roughnessFallback),
+    reactive: clamp01(data.reactive, defaultMaterialData.reactive),
+    reflectionClass: normalizeReflectionClass(data.reflectionClass),
+    bloomBoost: clamp01(data.bloomBoost, defaultMaterialData.bloomBoost),
+  });
+  material.userData.postProcessingMaterialData = packed;
   return material;
 }
 
