@@ -14,6 +14,8 @@ import { PostProcessingResources } from './PostProcessingResources.js';
 import { createPostProcessingWarmupVariants } from './PostProcessingWarmup.js';
 import { isPostProcessingEnabled } from './nodes/PostCommon.js';
 
+const MAX_TEMPORAL_FRAME_GAP_MS = 250;
+
 export class PostProcessingController {
   constructor({
     renderer,
@@ -38,9 +40,6 @@ export class PostProcessingController {
     this.rendererState = null;
     this.failedTopologySignature = null;
     this.lastFailure = null;
-    if (isPostProcessingEnabled(this.settings) && !this.isBypassed()) {
-      this.takeRendererOutputOwnership();
-    }
 
     this.resources = new PostProcessingResources(renderer);
     this.frameState = new PostProcessingFrameState();
@@ -59,9 +58,7 @@ export class PostProcessingController {
       this.settings = settings;
       this.topologySignature = createPostProcessingTopologySignature(settings);
       this.clearFailure();
-      if (isPostProcessingEnabled(settings) && !this.isBypassed()) {
-        this.takeRendererOutputOwnership();
-      } else {
+      if (!isPostProcessingEnabled(settings) || this.isBypassed()) {
         this.graph = null;
         this.resources.deactivateGraph();
         this.restoreRendererOutput();
@@ -87,18 +84,16 @@ export class PostProcessingController {
     this.lastFailure = null;
   }
 
-  syncRendererOutputOwnership() {
-    if (
-      isPostProcessingEnabled(this.settings)
+  prepareRenderPath() {
+    const available = isPostProcessingEnabled(this.settings)
       && !this.isBypassed()
-      && !this.isCurrentTopologyFailed()
-    ) {
-      this.takeRendererOutputOwnership();
-    } else {
+      && !this.isCurrentTopologyFailed();
+    if (!available) {
       this.graph = null;
       this.resources.deactivateGraph();
       this.restoreRendererOutput();
     }
+    return available;
   }
 
   takeRendererOutputOwnership() {
@@ -167,10 +162,25 @@ export class PostProcessingController {
     });
   }
 
-  updateFrame(camera, graph = this.graph, settings = this.settings) {
+  resetHistoryAfterGap(timestampMs) {
+    const previous = this.frameState.lastTimestampMs;
+    if (
+      previous !== null
+      && Number.isFinite(previous)
+      && timestampMs - previous > MAX_TEMPORAL_FRAME_GAP_MS
+    ) {
+      this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.RENDER_PATH_CHANGED);
+    }
+  }
+
+  updateFrame(
+    camera,
+    graph = this.graph,
+    settings = this.settings,
+    timestampMs = typeof performance !== 'undefined' ? performance.now() : 0,
+  ) {
     const globallyReactive = this.invalidation.consumeReactiveFrame();
     if (globallyReactive) this.history.ssrValid = false;
-    const timestampMs = typeof performance !== 'undefined' ? performance.now() : 0;
     this.frameState.beginFrame(
       camera,
       this.resources,
@@ -208,20 +218,17 @@ export class PostProcessingController {
   }
 
   render(camera) {
-    if (this.disposed) return false;
-    this.syncRendererOutputOwnership();
-    if (
-      !isPostProcessingEnabled(this.settings)
-      || this.isBypassed()
-      || this.isCurrentTopologyFailed()
-    ) return false;
+    if (this.disposed || !this.prepareRenderPath()) return false;
 
+    const timestampMs = typeof performance !== 'undefined' ? performance.now() : 0;
+    this.resetHistoryAfterGap(timestampMs);
     let frameStarted = false;
     let rendered = false;
+    this.takeRendererOutputOwnership();
     try {
       this.ensureGraph(camera);
       frameStarted = true;
-      this.updateFrame(camera);
+      this.updateFrame(camera, this.graph, this.settings, timestampMs);
       this.graph.render();
       rendered = true;
       this.diagnostics.frameRendered();
@@ -233,57 +240,57 @@ export class PostProcessingController {
       return this.handleFailure(error);
     } finally {
       if (frameStarted) this.finishFrame(rendered);
+      this.restoreRendererOutput();
     }
   }
 
   async precompile(camera) {
-    if (this.disposed) return false;
-    if (this.isBypassed()) return false;
+    if (this.disposed || this.isBypassed()) return false;
     const variants = createPostProcessingWarmupVariants(this.settings);
-    await this.resources.withWarmupTarget(async () => {
-      for (const { settings } of variants) {
-        const signature = createPostProcessingTopologySignature(settings);
-        let created = false;
-        const graph = this.resources.acquireGraph(signature, () => {
-          created = true;
-          return this.createGraph(camera, settings, signature);
-        });
-        this.resources.resizeGraph(signature, 8, 8, 1);
-        let frameStarted = false;
-        try {
-          frameStarted = true;
-          this.updateFrame(camera, graph, settings);
-          await graph.precompile();
-        } catch (error) {
-          this.resources.discardGraph(signature);
-          throw error;
-        } finally {
-          if (frameStarted) this.finishFrame(false);
+    this.takeRendererOutputOwnership();
+    try {
+      await this.resources.withWarmupTarget(async () => {
+        for (const { settings } of variants) {
+          const signature = createPostProcessingTopologySignature(settings);
+          let created = false;
+          const graph = this.resources.acquireGraph(signature, () => {
+            created = true;
+            return this.createGraph(camera, settings, signature);
+          });
+          this.resources.resizeGraph(signature, 8, 8, 1);
+          let frameStarted = false;
+          try {
+            frameStarted = true;
+            this.updateFrame(camera, graph, settings);
+            await graph.precompile();
+          } catch (error) {
+            this.resources.discardGraph(signature);
+            throw error;
+          } finally {
+            if (frameStarted) this.finishFrame(false);
+          }
+          if (created) this.diagnostics.graphBuilt(signature);
         }
-        if (created) this.diagnostics.graphBuilt(signature);
-      }
-    });
+      });
 
-    if (isPostProcessingEnabled(this.settings)) {
-      this.ensureGraph(camera);
-    } else {
-      this.graph = null;
-      this.resources.deactivateGraph();
+      if (isPostProcessingEnabled(this.settings)) {
+        this.ensureGraph(camera);
+      } else {
+        this.graph = null;
+        this.resources.deactivateGraph();
+      }
+      return true;
+    } finally {
+      this.restoreRendererOutput();
     }
-    return true;
   }
 
   warmup(camera) {
-    if (this.disposed) return false;
-    this.syncRendererOutputOwnership();
-    if (
-      !isPostProcessingEnabled(this.settings)
-      || this.isBypassed()
-      || this.isCurrentTopologyFailed()
-    ) return false;
+    if (this.disposed || !this.prepareRenderPath()) return false;
 
     let frameStarted = false;
     let rendered = false;
+    this.takeRendererOutputOwnership();
     try {
       this.ensureGraph(camera);
       frameStarted = true;
@@ -295,6 +302,7 @@ export class PostProcessingController {
       return this.handleFailure(error);
     } finally {
       if (frameStarted) this.finishFrame(rendered);
+      this.restoreRendererOutput();
     }
   }
 
