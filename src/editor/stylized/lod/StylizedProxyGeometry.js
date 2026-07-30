@@ -68,6 +68,10 @@ export function createTreeProxyPrototype(parts, config) {
     [-0.22, -0.08, 0.04, 0.68],
     [0.2, -0.02, -0.08, 0.72],
     [0, 0.24, 0.08, 0.62],
+    // A low central lobe overlaps the trunk axis. The three silhouette lobes
+    // can leave an empty pocket around that axis even when their AABBs overlap,
+    // which reads as a floating crown at proxy distance.
+    [0, -0.22, 0, 0.5],
   ].map(([offsetX, offsetY, offsetZ, scale], index) => {
     const geometry = new THREE.DodecahedronGeometry(0.5, 0);
     geometry.scale(
@@ -84,10 +88,15 @@ export function createTreeProxyPrototype(parts, config) {
     geometry.computeBoundingSphere();
     return geometry;
   });
+  const connectorBounds = crownLobeGeometries.at(-1).boundingBox.clone();
   const canopyGeometry = mergeGeometries(crownLobeGeometries, false);
   crownLobeGeometries.forEach((geometry) => geometry.dispose());
   canopyGeometry.computeBoundingBox();
   canopyGeometry.computeBoundingSphere();
+  canopyGeometry.userData.trunkConnectorBounds = {
+    min: connectorBounds.min.toArray(),
+    max: connectorBounds.max.toArray(),
+  };
   const branchInclusiveDiameter = Math.max(trunkSize.x, trunkSize.z);
   const proxyTrunkDiameter = Math.min(branchInclusiveDiameter, crownWidth * 0.14);
   const trunkGeometry = new THREE.CylinderGeometry(

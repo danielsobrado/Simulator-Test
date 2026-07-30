@@ -25,6 +25,7 @@ import {
 
 const BUSH_CLUSTER_SEED_OFFSET = 0x5b;
 const BUSH_PRIORITY_CHANNEL = 31;
+const BUSH_RANDOM_CHANNEL_OFFSET = 64;
 
 // Reused across a rebuild; see the matching note in StylizedRockView.
 const BUSH_UP = new THREE.Vector3(0, 1, 0);
@@ -42,6 +43,7 @@ function lodSettings(config) {
     enabled: config.lod?.enabled !== false,
     meshRadius,
     proxyRadius,
+    forceNearWithinMeshRadius: bush.forceNearWithinMeshRadius === true,
     transitionMs: bush.transitionMs ?? 220,
     thresholds: {
       nearPixels: bush.nearPixels ?? 12,
@@ -72,8 +74,8 @@ function disposePrototypes(prototypes) {
  * Boulders are hard blockers. Trees deliberately are not: reading the tree
  * manifest would make bush acceptance depend on whether that manifest happens to
  * be cached, and placement must stay independent of residency and approach
- * direction. Canopy thinning plus the trees' own 3.5 m clearance keeps overlap
- * rare without that coupling.
+ * direction. Bushes instead use an independent deterministic random channel,
+ * preventing exact tree/bush coordinate collisions without that coupling.
  */
 export class StylizedBushView {
   constructor({
@@ -300,6 +302,7 @@ export class StylizedBushView {
       maxScale: bushes.maxScale,
       radiusForScale: (scale) => bushes.radius * scale,
       blockers: blockers.placements,
+      randomChannelOffset: BUSH_RANDOM_CHANNEL_OFFSET,
       priorityChannel: BUSH_PRIORITY_CHANNEL,
       candidateEvaluator: this.createCandidateEvaluator(),
     });
@@ -335,6 +338,7 @@ export class StylizedBushView {
           proxyRadius: settings.proxyRadius,
           impostorRadius: settings.proxyRadius,
           clusterRadius: settings.proxyRadius,
+          forceNearWithinMeshRadius: settings.forceNearWithinMeshRadius,
         },
         transitionStates: this.chunkLodStates,
         timestamp,

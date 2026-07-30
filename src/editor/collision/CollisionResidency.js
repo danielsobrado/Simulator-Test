@@ -1,4 +1,5 @@
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
+import { isCollisionBuildDeferred } from './CollisionBuildResult.js';
 import { COLLISION_GAUGE_COUNTERS } from './CollisionPerfCounters.js';
 import { collisionChunkKey, parseCollisionChunkKey } from './CollisionIds.js';
 import {
@@ -360,6 +361,7 @@ export class CollisionResidency {
     let attempted = 0;
     let built = 0;
     let frameError = null;
+    const deferredJobs = [];
     while (this.queue.length > 0 && attempted < this.config.buildsPerFrame) {
       if (attempted > 0 && this.now() - startedAt >= this.config.buildBudgetMs) break;
       const job = this.queue.shift();
@@ -371,6 +373,10 @@ export class CollisionResidency {
         if (result && typeof result.then === 'function') {
           throw new Error('Collision residency builders must be synchronous.');
         }
+        if (isCollisionBuildDeferred(result)) {
+          deferredJobs.push(job);
+          continue;
+        }
         const revision = result?.revision ?? 0;
         const colliders = result?.colliders ?? [];
         if (this.commitOwnerChunk(job, result, revision, colliders)) built += 1;
@@ -379,6 +385,20 @@ export class CollisionResidency {
         const failure = this.recordRetry(job.key, error);
         this.logger.error?.('Collision chunk build failed.', failure, error);
       }
+    }
+    for (const job of deferredJobs) {
+      if (!this.desiredKeys.has(job.key)
+          || this.world.isOwnerChunkReady(job.chunkX, job.chunkZ)
+          || this.queuedByKey.has(job.key)) {
+        continue;
+      }
+      this.queuedByKey.set(job.key, job);
+      this.queue.push(job);
+    }
+    if (deferredJobs.length > 0) {
+      this.queue.sort(
+        (left, right) => left.priority - right.priority || left.sequence - right.sequence,
+      );
     }
     if (frameError) this.lastBuildError = frameError;
     else if (attempted > 0 && this.retryByKey.size === 0) {

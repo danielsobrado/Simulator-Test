@@ -3,7 +3,18 @@ export const TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION = 2;
 export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-a';
 export const TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING = 'view-normal-rgb-coverage-a';
 
-const SOURCE_SIGNATURE_VERSION = 3;
+const SOURCE_SIGNATURE_VERSION = 4;
+const RUNTIME_TREE_FIELDS = new Set([
+  'enabled',
+  'residentRadius',
+  'perChunk',
+  'minScale',
+  'maxScale',
+  'tileIds',
+  'clearRadius',
+  'groveMix',
+  'habitat',
+]);
 const REQUIRED_NUMERIC_FIELDS = Object.freeze([
   'columns',
   'rows',
@@ -90,6 +101,13 @@ function prototypeToken(parts) {
   }).join('|');
 }
 
+function treeBakeConfiguration(trees) {
+  if (!trees || typeof trees !== 'object') return null;
+  return Object.fromEntries(
+    Object.entries(trees).filter(([key]) => !RUNTIME_TREE_FIELDS.has(key)),
+  );
+}
+
 export function createTreeImpostorSourceSignature(prototypes, config) {
   if (!Array.isArray(prototypes) || prototypes.length === 0) {
     throw new Error('Tree impostor source signature requires at least one prototype.');
@@ -101,7 +119,8 @@ export function createTreeImpostorSourceSignature(prototypes, config) {
     ...impostorBakeConfig
   } = config?.lod?.impostor ?? {};
   const configuration = JSON.stringify({
-    trees: config?.trees ?? null,
+    trees: treeBakeConfiguration(config?.trees),
+    wind: config?.wind ?? null,
     treeVariants: config?.assets?.treeVariants ?? null,
     impostor: impostorBakeConfig,
     normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,

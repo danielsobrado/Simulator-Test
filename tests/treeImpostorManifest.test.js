@@ -139,7 +139,7 @@ test('source signature changes with geometry or bake configuration', () => {
   const configChanged = createTreeImpostorSourceSignature([
     [{ kind: 'leaf', geometry: geometry(1), sourceMap: null }],
   ], { ...config, lod: { impostor: { columns: 16 } } });
-  assert.match(first, /^tree-impostor-v3-/);
+  assert.match(first, /^tree-impostor-v4-/);
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });
@@ -200,4 +200,56 @@ test('source signature ignores runtime-only impostor policy', () => {
   });
 
   assert.equal(enabled, readbackFree);
+});
+
+test('source signature ignores runtime tree density and residency policy', () => {
+  const prototypeParts = [[{
+    kind: 'leaf',
+    geometry: geometry(1),
+    sourceMap: null,
+  }]];
+  const base = {
+    trees: {
+      leafTop: '#78a95c',
+      perChunk: 96,
+      residentRadius: 5,
+      habitat: { density: 0.5, candidateBudgetPerChunk: 1000 },
+    },
+    wind: { direction: [1, 0], speed: 1.3 },
+    lod: { impostor: { columns: 8 } },
+  };
+  const dense = {
+    ...base,
+    trees: {
+      ...base.trees,
+      perChunk: 384,
+      residentRadius: 9,
+      habitat: { density: 2, candidateBudgetPerChunk: 4000 },
+    },
+  };
+
+  assert.equal(
+    createTreeImpostorSourceSignature(prototypeParts, base),
+    createTreeImpostorSourceSignature(prototypeParts, dense),
+  );
+});
+
+test('source signature changes when wind affecting the baked silhouette changes', () => {
+  const prototypeParts = [[{
+    kind: 'leaf',
+    geometry: geometry(1),
+    sourceMap: null,
+  }]];
+  const first = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    wind: { direction: [1, 0], speed: 1.3 },
+    lod: { impostor: {} },
+  });
+  const changed = createTreeImpostorSourceSignature(prototypeParts, {
+    trees: {},
+    wind: { direction: [0, 1], speed: 1.3 },
+    lod: { impostor: {} },
+  });
+
+  assert.notEqual(first, changed);
 });

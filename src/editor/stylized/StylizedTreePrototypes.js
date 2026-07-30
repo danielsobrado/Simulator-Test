@@ -99,6 +99,103 @@ export function extractPrototypePartsFromRoots(roots, config) {
   return baked.map(({ geometry, kind, source }) => ({ geometry, kind, source }));
 }
 
+function overlapsHorizontally(left, right, padding = 0.05) {
+  return left.min.x <= right.max.x + padding
+    && left.max.x + padding >= right.min.x
+    && left.min.z <= right.max.z + padding
+    && left.max.z + padding >= right.min.z;
+}
+
+function horizontalCenter(bounds) {
+  return new THREE.Vector2(
+    (bounds.min.x + bounds.max.x) * 0.5,
+    (bounds.min.z + bounds.max.z) * 0.5,
+  );
+}
+
+function recenterPrototypeParts(parts) {
+  const bounds = new THREE.Box3();
+  let trunkMinY = Number.POSITIVE_INFINITY;
+  for (const part of parts) {
+    part.geometry.computeBoundingBox();
+    bounds.union(part.geometry.boundingBox);
+    if (part.kind === 'trunk') {
+      trunkMinY = Math.min(trunkMinY, part.geometry.boundingBox.min.y);
+    }
+  }
+  const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+  const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
+  for (const part of parts) {
+    part.geometry.translate(-centerX, -trunkMinY, -centerZ);
+    part.geometry.computeBoundingBox();
+    part.geometry.computeBoundingSphere();
+  }
+  return parts;
+}
+
+/**
+ * Some source packs put several complete showroom trees under one hierarchy
+ * node. Keeping that node as one scatter prototype makes the near LOD draw a
+ * grove per placement, while the generated proxy collapses the grove into one
+ * enormous crown and one unrelated central trunk.
+ *
+ * Separate non-overlapping trunk footprints, then attach each crown to its
+ * nearest trunk cluster. Branch meshes from one broadleaf overlap in XZ and
+ * remain together; only genuinely disconnected tree bases become prototypes.
+ */
+export function splitDisconnectedTreeParts(parts) {
+  const trunks = parts.filter((part) => part.kind === 'trunk');
+  if (trunks.length < 2) return [parts];
+
+  for (const part of parts) part.geometry.computeBoundingBox();
+  const clusters = [];
+  for (const trunk of trunks) {
+    const touching = clusters.filter((cluster) => cluster.some(
+      (member) => overlapsHorizontally(
+        member.geometry.boundingBox,
+        trunk.geometry.boundingBox,
+      ),
+    ));
+    if (touching.length === 0) {
+      clusters.push([trunk]);
+      continue;
+    }
+    const merged = [trunk, ...touching.flat()];
+    for (const cluster of touching) clusters.splice(clusters.indexOf(cluster), 1);
+    clusters.push(merged);
+  }
+  if (clusters.length < 2) return [parts];
+
+  const groups = clusters.map((trunkParts) => ({
+    parts: [...trunkParts],
+    bounds: trunkParts.reduce(
+      (bounds, part) => bounds.union(part.geometry.boundingBox),
+      new THREE.Box3(),
+    ),
+  }));
+  for (const part of parts) {
+    if (part.kind === 'trunk') continue;
+    const partCenter = horizontalCenter(part.geometry.boundingBox);
+    let nearest = groups[0];
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const group of groups) {
+      const distance = partCenter.distanceToSquared(horizontalCenter(group.bounds));
+      if (distance < nearestDistance) {
+        nearest = group;
+        nearestDistance = distance;
+      }
+    }
+    nearest.parts.push(part);
+  }
+
+  // A shared crown over several stems is one authored tree, not a showroom
+  // collection. Preserve it rather than manufacturing a bare-tree prototype.
+  if (groups.some((group) => !group.parts.some((part) => part.kind === 'leaf'))) {
+    return [parts];
+  }
+  return groups.map((group) => recenterPrototypeParts(group.parts));
+}
+
 export function createRootCollarGeometry(parts) {
   const trunkParts = parts.filter((part) => part.kind === 'trunk');
   if (trunkParts.length === 0) return null;

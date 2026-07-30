@@ -1,35 +1,28 @@
 import * as THREE from 'three/webgpu';
 import {
-  cameraViewMatrix,
   clamp,
   float,
   mix,
   positionLocal,
-  texture,
-  uv,
   vec3,
   vec4,
 } from 'three/tsl';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { authoredTexture } from './AuthoredTextureNode.js';
 
 export const BUSH_CAST_SHADOW = false;
-export const BUSH_PROXY_TRIANGLES = 24;
+export const BUSH_PROXY_TRIANGLES = 60;
 
 const DEFAULT_PROXY_COLOR = '#6d9a5d';
 const MIN_PROXY_EXTENT = 0.05;
+const PROXY_FIT_MARGIN = 2e-7;
 const WHITE_THRESHOLD = 0.92;
 const WHITE_SPREAD = 0.05;
-const PROXY_CARD_ANGLES = Object.freeze([0, Math.PI / 2, Math.PI / 4]);
-const PROXY_OUTLINE = Object.freeze([
-  Object.freeze([-0.50, 0.18]),
-  Object.freeze([-0.43, 0.60]),
-  Object.freeze([-0.18, 0.82]),
-  Object.freeze([0.02, 1.00]),
-  Object.freeze([0.22, 0.78]),
-  Object.freeze([0.50, 0.56]),
-  Object.freeze([0.42, 0.16]),
-  Object.freeze([0.02, 0.00]),
+const PROXY_LOBES = Object.freeze([
+  Object.freeze([-0.24, -0.08, 0.02, 0.62, 0.76, 0.72]),
+  Object.freeze([0.24, -0.06, -0.04, 0.62, 0.8, 0.72]),
+  Object.freeze([0, 0.16, 0.06, 0.68, 0.78, 0.62]),
 ]);
-const PROXY_CENTER = Object.freeze([0, 0.48]);
 
 function usesCutout(material) {
   return Boolean(
@@ -56,7 +49,7 @@ function authoredColorNode(material) {
   const value = new THREE.Color(material.color ?? '#ffffff');
   const baseColor = vec3(value.r, value.g, value.b);
   const rgb = material.map
-    ? texture(material.map, uv()).rgb.mul(baseColor)
+    ? authoredTexture(material.map).rgb.mul(baseColor)
     : baseColor;
   return vec4(rgb, 1);
 }
@@ -102,29 +95,20 @@ function expandedProxyBounds(sourceGeometry) {
   return new THREE.Box3(center.clone().sub(half), center.clone().add(half));
 }
 
-function appendProxyCard({ positions, indices, bounds, angle }) {
-  const sourceSize = bounds.getSize(new THREE.Vector3());
-  const sourceCenter = bounds.getCenter(new THREE.Vector3());
-  const baseVertex = positions.length / 3;
-  const cosAngle = Math.cos(angle);
-  const sinAngle = Math.sin(angle);
-  const writeVertex = ([horizontal, vertical]) => {
-    positions.push(
-      sourceCenter.x + horizontal * sourceSize.x * cosAngle,
-      bounds.min.y + vertical * sourceSize.y,
-      sourceCenter.z + horizontal * sourceSize.z * sinAngle,
-    );
-  };
-
-  writeVertex(PROXY_CENTER);
-  for (const point of PROXY_OUTLINE) writeVertex(point);
-  for (let index = 0; index < PROXY_OUTLINE.length; index += 1) {
-    indices.push(
-      baseVertex,
-      baseVertex + 1 + index,
-      baseVertex + 1 + ((index + 1) % PROXY_OUTLINE.length),
-    );
-  }
+function fitGeometryToBounds(geometry, bounds) {
+  geometry.computeBoundingBox();
+  const current = geometry.boundingBox;
+  const currentSize = current.getSize(new THREE.Vector3());
+  const currentCenter = current.getCenter(new THREE.Vector3());
+  const targetSize = bounds.getSize(new THREE.Vector3());
+  const targetCenter = bounds.getCenter(new THREE.Vector3());
+  geometry.translate(-currentCenter.x, -currentCenter.y, -currentCenter.z);
+  geometry.scale(
+    (targetSize.x + PROXY_FIT_MARGIN) / Math.max(MIN_PROXY_EXTENT, currentSize.x),
+    (targetSize.y + PROXY_FIT_MARGIN) / Math.max(MIN_PROXY_EXTENT, currentSize.y),
+    (targetSize.z + PROXY_FIT_MARGIN) / Math.max(MIN_PROXY_EXTENT, currentSize.z),
+  );
+  geometry.translate(targetCenter.x, targetCenter.y, targetCenter.z);
 }
 
 export function createBushProxyGeometry(sourceGeometry) {
@@ -132,19 +116,19 @@ export function createBushProxyGeometry(sourceGeometry) {
     throw new Error('Bush proxy generation requires buffer geometry.');
   }
   const proxyBounds = expandedProxyBounds(sourceGeometry);
-  const positions = [];
-  const indices = [];
-  for (const angle of PROXY_CARD_ANGLES) {
-    appendProxyCard({ positions, indices, bounds: proxyBounds, angle });
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
+  const lobes = PROXY_LOBES.map(([x, y, z, width, height, depth]) => {
+    const geometry = new THREE.IcosahedronGeometry(1, 0);
+    geometry.scale(width, height, depth);
+    geometry.translate(x, y, z);
+    return geometry;
+  });
+  const geometry = mergeGeometries(lobes, false);
+  lobes.forEach((lobe) => lobe.dispose());
+  fitGeometryToBounds(geometry, proxyBounds);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  geometry.userData.proxyKind = 'crossed-foliage-cards';
+  geometry.userData.proxyKind = 'clustered-low-poly-canopy';
   return geometry;
 }
 
@@ -158,13 +142,12 @@ export function createBushProxyMaterial(sourceMaterial, {
   const top = value.clone().lerp(new THREE.Color('#d7ef9a'), 0.22);
   const height = Math.max(MIN_PROXY_EXTENT, maximumHeight - minimumHeight);
   const heightMix = clamp(positionLocal.y.sub(float(minimumHeight)).div(float(height)), 0, 1);
-  const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
+  const material = new THREE.MeshLambertNodeMaterial({ flatShading: true });
   material.colorNode = mix(
     vec3(bottom.r, bottom.g, bottom.b),
     vec3(top.r, top.g, top.b),
     heightMix,
   );
-  material.normalNode = vec3(0, 1, 0).transformDirection(cameraViewMatrix);
   material.transparent = false;
   material.depthWrite = true;
   return material;

@@ -404,6 +404,7 @@ export class ProceduralWorkshopUi {
   async open() {
     if (this.disposed) return;
     const revision = ++this.openRevision;
+    this.root.classList.add('is-workshop-open');
     this.overlay.hidden = false;
     try {
       await this.ensureRenderer();
@@ -423,6 +424,7 @@ export class ProceduralWorkshopUi {
     this.planRevision += 1;
     this.planner.cancel();
     this.overlay.hidden = true;
+    this.root.classList.remove('is-workshop-open');
     this.componentController?.cancelAttachmentPlacement();
     this.materialController?.setActive(false);
     window.clearTimeout(this.previewTimer);

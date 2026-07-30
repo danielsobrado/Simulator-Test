@@ -5,6 +5,7 @@ import {
   treeColorVariation,
   treeLeanAngles,
   treeMorphology,
+  treeProxyMorphology,
   treeRenderSeed,
 } from '../src/editor/stylized/forest/TreeAppearance.js';
 
@@ -26,6 +27,21 @@ test('tree morphology thins crowns with foliage density', () => {
   assert.equal(trunk, 1);
   assert.ok(Math.abs(horizontal - 0.8) < 1e-12);
   assert.ok(Math.abs(vertical - 0.64) < 1e-12);
+});
+
+test('tree proxy morphology keeps the abstract crown connected to its trunk', () => {
+  assert.deepEqual(treeProxyMorphology({
+    crownScale: 0.42,
+    crownAspect: 0.78,
+    trunkScale: 0.94,
+    foliageDensity: 0.55,
+  }), [0.55, 1, 0.94]);
+  assert.deepEqual(treeProxyMorphology({
+    crownScale: 1.2,
+    crownAspect: 1.1,
+    trunkScale: 1.2,
+    foliageDensity: 1,
+  }), [1.32, 1.2, 1.2]);
 });
 
 test('tree lean angles follow leanX/leanZ and branch droop', () => {

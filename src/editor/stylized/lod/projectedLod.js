@@ -89,7 +89,13 @@ export function clampLodToRadii({
   proxyRadius,
   impostorRadius,
   clusterRadius,
+  forceNearWithinMeshRadius = false,
 }) {
+  // Chunk-center projection can underestimate a layer whose instances span the
+  // whole chunk. Layers opting into a physical near guarantee keep full geometry
+  // around the player even when the chunk center itself projects very small.
+  if (forceNearWithinMeshRadius && chunkDistance <= meshRadius) return 'near';
+
   let result = band;
   if (chunkDistance > clusterRadius) {
     result = 'culled';

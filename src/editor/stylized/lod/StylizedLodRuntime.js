@@ -54,6 +54,21 @@ export function treeMorphologyPivotY(geometry, kind) {
     : 0;
 }
 
+export function treeMorphologyPivot(parts, part) {
+  const pivotY = treeMorphologyPivotY(part.geometry, part.kind);
+  const horizontalBounds = new THREE.Box3();
+  horizontalBounds.makeEmpty();
+  const trunkParts = parts.filter((candidate) => candidate.kind === 'trunk');
+  for (const candidate of trunkParts.length > 0 ? trunkParts : parts) {
+    candidate.geometry.computeBoundingBox();
+    horizontalBounds.union(candidate.geometry.boundingBox);
+  }
+  const center = horizontalBounds.isEmpty()
+    ? new THREE.Vector3()
+    : horizontalBounds.getCenter(new THREE.Vector3());
+  return { x: center.x, y: pivotY, z: center.z };
+}
+
 export function createInstancedRenderers({
   root,
   partsByPrototype,
@@ -69,7 +84,7 @@ export function createInstancedRenderers({
     const material = createDitheredMaterial(part.material, {
       tinted,
       kind: morphed ? part.kind : null,
-      morphologyPivotY: treeMorphologyPivotY(part.geometry, part.kind),
+      morphologyPivot: treeMorphologyPivot(parts, part),
     });
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
     mesh.count = 0;

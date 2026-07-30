@@ -14,6 +14,10 @@
   pointer-events: auto;
 }
 
+.is-workshop-open .weather-panel {
+  display: none;
+}
+
 .weather-panel-title {
   margin-bottom: 8px;
   font-weight: 600;

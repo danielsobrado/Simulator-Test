@@ -100,17 +100,19 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
     normalSample.a,
   );
   const signedFade = parameters.y;
-  const coverage = albedo.a.mul(signedFade.abs());
-  const visible = step(
+  const fadeMask = step(
     orientedScreenDitherThreshold(parameters.z, signedFade),
-    coverage,
+    signedFade.abs(),
   );
 
   const material = new THREE.MeshLambertNodeMaterial({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
   material.colorNode = albedo.rgb.mul(colorMultiplier);
   material.normalNode = worldNormal;
-  material.opacityNode = visible;
+  // Keep atlas alpha stable at full coverage. Feeding it into the stochastic
+  // fade threshold re-dithered every soft foliage edge in screen space and made
+  // distant crowns shimmer during camera motion.
+  material.opacityNode = albedo.a.mul(fadeMask);
   material.alphaTest = 0.5;
   material.transparent = false;
   material.depthWrite = true;

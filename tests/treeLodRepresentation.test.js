@@ -24,13 +24,19 @@ test('tree impostor band uses the low-poly proxy fallback when no atlas batch ex
   );
 });
 
-test('single-shape impostors reject age and crown morphologies they cannot represent', () => {
+test('authored impostors cover living age classes and reject dead or extreme crowns', () => {
   assert.equal(isTreeImpostorMorphologyCompatible({
     ageClass: 'young',
     crownScale: 0.8,
     crownAspect: 1,
     foliageDensity: 0.9,
-  }), false);
+  }), true);
+  assert.equal(isTreeImpostorMorphologyCompatible({
+    ageClass: 'sapling',
+    crownScale: 0.55,
+    crownAspect: 1,
+    foliageDensity: 0.9,
+  }), true);
   assert.equal(isTreeImpostorMorphologyCompatible({
     ageClass: 'mature',
     crownScale: 1,
@@ -38,9 +44,15 @@ test('single-shape impostors reject age and crown morphologies they cannot repre
     foliageDensity: 1,
   }), true);
   assert.equal(isTreeImpostorMorphologyCompatible({
+    ageClass: 'dead',
+    crownScale: 1,
+    crownAspect: 1,
+    foliageDensity: 1,
+  }), false);
+  assert.equal(isTreeImpostorMorphologyCompatible({
     ageClass: 'mature',
     crownScale: 1,
     crownAspect: 1,
-    foliageDensity: 0.55,
+    foliageDensity: 0.2,
   }), false);
 });

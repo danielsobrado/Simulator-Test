@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { MEADOW_MODE_VISUAL_AMOUNT, MeadowWeatherSystem } from './meadow.js';
+import {
+  MEADOW_MODE_VISUAL_AMOUNT,
+  MEADOW_MODE_VISIBILITY_GAIN,
+  MeadowWeatherSystem,
+} from './meadow.js';
 import {
   readSunbeamMoteRuntimeSettings,
   resolveSunbeamMoteVisualState,
@@ -145,15 +149,12 @@ export function createWeatherController(deps) {
       }
       const visual = resolveSunbeamMoteVisualState(readActiveBiomeVisualState());
       const sunDirection = normalizeSunDirection(deps.getSunDirection?.());
-      meadowWeather.update(deltaSeconds, elapsedSeconds, effectCenter, {
-        cameraPosition,
-        sunDirection,
-        amount: getSettings().weatherMode === 'meadow'
-          ? Math.max(MEADOW_MODE_VISUAL_AMOUNT, visual.amount)
-          : visual.amount,
-        coldBlend: visual.coldBlend,
-        localMist: visual.localMist,
-      });
+      meadowWeather.update(
+        deltaSeconds,
+        elapsedSeconds,
+        effectCenter,
+        resolveMeadowEnvironment(getSettings(), visual, cameraPosition, sunDirection),
+      );
       windWeather.update(deltaSeconds, elapsedSeconds, cameraPosition);
       rainWeather.update(deltaSeconds, elapsedSeconds, cameraPosition, effectCenter);
       snowWeather.update(deltaSeconds, elapsedSeconds, cameraPosition);
@@ -191,6 +192,25 @@ function resolveMeadowSettings(weatherSettings, moteSettings) {
   };
 }
 
+function resolveMeadowEnvironment(
+  weatherSettings,
+  visual,
+  cameraPosition,
+  sunDirection,
+) {
+  const explicitMeadow = weatherSettings.weatherMode === 'meadow';
+  return {
+    cameraPosition,
+    sunDirection,
+    amount: explicitMeadow
+      ? Math.max(MEADOW_MODE_VISUAL_AMOUNT, visual.amount)
+      : visual.amount,
+    coldBlend: visual.coldBlend,
+    localMist: visual.localMist,
+    visibilityGain: explicitMeadow ? MEADOW_MODE_VISIBILITY_GAIN : 1,
+  };
+}
+
 function normalizeSunDirection(value) {
   const fallback = new THREE.Vector3(0.35, 0.85, 0.25);
   if (!value) return fallback;
@@ -206,5 +226,6 @@ function normalizeSunDirection(value) {
 
 export {
   DEFAULT_SETTINGS as DEFAULT_WEATHER_SETTINGS,
+  resolveMeadowEnvironment,
   resolveMeadowSettings,
 };

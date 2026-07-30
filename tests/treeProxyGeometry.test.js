@@ -46,6 +46,23 @@ test('tree proxies keep branch extents out of the low-LOD trunk diameter', () =>
           horizontalDiameter(trunk.geometry) <= canopyDiameter * 0.16,
           `${prototype.speciesId} proxy trunk is wider than 16% of its canopy`,
         );
+        const connector = canopy.geometry.userData.trunkConnectorBounds;
+        trunk.geometry.computeBoundingBox();
+        const trunkBounds = trunk.geometry.boundingBox;
+        const connectorContainsTrunkAxis = (
+          trunkBounds.getCenter(new THREE.Vector3()).x >= connector.min[0]
+          && trunkBounds.getCenter(new THREE.Vector3()).x <= connector.max[0]
+          && trunkBounds.getCenter(new THREE.Vector3()).z >= connector.min[2]
+          && trunkBounds.getCenter(new THREE.Vector3()).z <= connector.max[2]
+        );
+        const connectorOverlapsTrunk = (
+          Math.min(connector.max[1], trunkBounds.max.y)
+          > Math.max(connector.min[1], trunkBounds.min.y)
+        );
+        assert.ok(
+          connectorContainsTrunkAxis && connectorOverlapsTrunk,
+          `${prototype.speciesId} proxy crown must physically cover the trunk attachment`,
+        );
       } finally {
         disposeProxy(proxy);
       }

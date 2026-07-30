@@ -4,6 +4,7 @@ import {
   DEFAULT_MEADOW_WEATHER_SETTINGS,
   MEADOW_CELL_SIZE,
   MEADOW_MODE_VISUAL_AMOUNT,
+  MEADOW_MODE_VISIBILITY_GAIN,
   MEADOW_PARTICLE_COUNT
 } from "./meadow_defaults.js";
 import { createMeadowGeometry, createMeadowNodeMaterial, createMeadowShaderMaterial } from "./meadow_material.js";
@@ -112,6 +113,7 @@ export {
   DEFAULT_MEADOW_WEATHER_SETTINGS,
   MEADOW_CELL_SIZE,
   MEADOW_MODE_VISUAL_AMOUNT,
+  MEADOW_MODE_VISIBILITY_GAIN,
   MEADOW_PARTICLE_COUNT,
   MeadowWeatherSystem
 };

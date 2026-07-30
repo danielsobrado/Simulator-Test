@@ -191,20 +191,24 @@ function createCandidate({
   minScale,
   maxScale,
   radiusForScale,
+  randomChannelOffset,
   priorityChannel,
   candidateEvaluator,
 }) {
+  const random01 = (channel) => (
+    scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + channel)
+  );
   const cellX = chunkX * chunkSize
-    + Math.floor(scatterRandom01(chunkX, chunkZ, index, 0) * chunkSize);
+    + Math.floor(random01(0) * chunkSize);
   const cellZ = chunkZ * chunkSize
-    + Math.floor(scatterRandom01(chunkX, chunkZ, index, 1) * chunkSize);
+    + Math.floor(random01(1) * chunkSize);
   const tileId = tileAt(cellX, cellZ);
   if (!tileIds.has(tileId)) return null;
 
   const center = cellCenterToWorld(cellX, cellZ, tileSize);
-  const x = center.x + (scatterRandom01(chunkX, chunkZ, index, 2) - 0.5) * tileSize;
-  const z = center.z + (scatterRandom01(chunkX, chunkZ, index, 3) - 0.5) * tileSize;
-  const prototypeRoll = scatterRandom01(chunkX, chunkZ, index, 4);
+  const x = center.x + (random01(2) - 0.5) * tileSize;
+  const z = center.z + (random01(3) - 0.5) * tileSize;
+  const prototypeRoll = random01(4);
   // World coordinates go to the selector as well as the biome: prototype choice
   // varies within a biome by regional character and forest canopy, both of which
   // are sampled from position.
@@ -217,8 +221,8 @@ function createCandidate({
     throw new Error('prototypeIndexForRoll must return an available prototype index.');
   }
   const scale = minScale
-    + scatterRandom01(chunkX, chunkZ, index, 5) * (maxScale - minScale);
-  const rotationY = scatterRandom01(chunkX, chunkZ, index, 6) * Math.PI * 2;
+    + random01(5) * (maxScale - minScale);
+  const rotationY = random01(6) * Math.PI * 2;
   const id = stableId(kind, chunkX, chunkZ, index);
   const candidate = Object.freeze({
     stableId: id,
@@ -247,6 +251,8 @@ function createCandidate({
  * candidateEvaluator may reject a candidate or attach immutable domain metadata.
  * maxAccepted limits every owner chunk's authoritative candidates before spacing,
  * so candidates that cannot render never create invisible blockers.
+ * randomChannelOffset gives independent scatter layers distinct deterministic
+ * candidate streams without making either layer depend on the other's residency.
  */
 export function buildStableChunkManifest({
   kind,
@@ -265,11 +271,15 @@ export function buildStableChunkManifest({
   radiusForScale,
   blockers = [],
   haloChunks = 1,
+  randomChannelOffset = 0,
   priorityChannel = DEFAULT_PRIORITY_CHANNEL,
   candidateEvaluator = null,
   maxAccepted = Number.POSITIVE_INFINITY,
 }) {
   if (!Number.isInteger(prototypeCount) || prototypeCount < 1) return Object.freeze([]);
+  if (!Number.isSafeInteger(randomChannelOffset) || randomChannelOffset < 0) {
+    throw new Error('randomChannelOffset must be a non-negative safe integer.');
+  }
   const acceptedLimit = normalizeAcceptedLimit(maxAccepted);
   const eligibleTileIds = tileIds instanceof Set ? tileIds : new Set(tileIds);
   const candidates = [];
@@ -296,6 +306,7 @@ export function buildStableChunkManifest({
           minScale,
           maxScale,
           radiusForScale,
+          randomChannelOffset,
           priorityChannel,
           candidateEvaluator,
         });

@@ -31,6 +31,44 @@ test('stable manifests are repeatable', () => {
   assert.equal(placementSignature(first), placementSignature(second));
 });
 
+test('scatter layers can use independent deterministic candidate positions', () => {
+  const shared = {
+    ...options(0, 0),
+    radiusForScale: () => 0,
+  };
+  const trees = buildStableChunkManifest({
+    ...shared,
+    kind: 'tree',
+  });
+  const bushes = buildStableChunkManifest({
+    ...shared,
+    kind: 'bush',
+    randomChannelOffset: 64,
+  });
+  const repeatedBushes = buildStableChunkManifest({
+    ...shared,
+    kind: 'bush',
+    randomChannelOffset: 64,
+  });
+
+  assert.equal(trees.length, shared.perChunk);
+  assert.equal(bushes.length, shared.perChunk);
+  assert.deepEqual(bushes, repeatedBushes);
+  assert.ok(trees.every((tree, index) => (
+    tree.x !== bushes[index].x || tree.z !== bushes[index].z
+  )));
+});
+
+test('scatter random channel offsets reject invalid values', () => {
+  assert.throws(
+    () => buildStableChunkManifest({
+      ...options(0, 0),
+      randomChannelOffset: -1,
+    }),
+    /randomChannelOffset/,
+  );
+});
+
 test('shared-boundary acceptance does not depend on focus traversal', () => {
   const left = buildStableChunkManifest(options(0, 0));
   const right = buildStableChunkManifest(options(1, 0));

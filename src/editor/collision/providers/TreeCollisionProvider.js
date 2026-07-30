@@ -1,5 +1,8 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import {
+  isCollisionBuildDeferred,
+} from '../CollisionBuildResult.js';
+import {
   collisionChunkKey,
   createCollisionSourceId,
   parseCollisionChunkKey,
@@ -130,6 +133,7 @@ export class TreeCollisionProvider {
 
   buildChunkData(chunkX, chunkZ) {
     const snapshot = this.source.snapshotChunk(chunkX, chunkZ);
+    if (isCollisionBuildDeferred(snapshot)) return snapshot;
     const colliders = [];
     for (const placement of snapshot.placements) {
       if (placement.ownerChunkX !== chunkX || placement.ownerChunkZ !== chunkZ) {
@@ -182,6 +186,7 @@ export class TreeCollisionProvider {
   buildOwnerChunk(chunkX, chunkZ) {
     const key = collisionChunkKey(chunkX, chunkZ);
     const data = this.buildChunkData(chunkX, chunkZ);
+    if (isCollisionBuildDeferred(data)) return data;
     const revision = this.nextRevision;
     this.nextRevision += 1;
     this.recordChunk(key, revision, data);
@@ -224,6 +229,7 @@ export class TreeCollisionProvider {
     let attempted = 0;
     let rebuilt = 0;
     let frameError = null;
+    const deferredKeys = [];
     while (this.pendingRefresh.length > 0 && attempted < this.buildsPerFrame) {
       if (attempted > 0 && this.now() - startedAt >= this.buildBudgetMs) break;
       const key = this.pendingRefresh.shift();
@@ -238,6 +244,10 @@ export class TreeCollisionProvider {
       }
       try {
         const data = this.buildChunkData(chunkX, chunkZ);
+        if (isCollisionBuildDeferred(data)) {
+          deferredKeys.push(key);
+          continue;
+        }
         if (data.signature === previous.signature) continue;
         const revision = this.nextRevision;
         this.nextRevision += 1;
@@ -250,6 +260,11 @@ export class TreeCollisionProvider {
         frameError = error;
         this.logger.error?.(`Tree collision refresh failed for ${key}.`, error);
       }
+    }
+    for (const key of deferredKeys) {
+      if (!this.chunkStates.has(key) || this.pendingRefreshKeys.has(key)) continue;
+      this.pendingRefreshKeys.add(key);
+      this.pendingRefresh.push(key);
     }
     if (frameError) this.lastError = frameError;
     else if (attempted > 0) this.lastError = null;

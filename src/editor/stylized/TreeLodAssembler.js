@@ -4,6 +4,7 @@ import {
   treeColorVariation,
   treeLeanAngles,
   treeMorphology,
+  treeProxyMorphology,
   treeRenderSeed,
 } from './forest/TreeAppearance.js';
 import { aggregateCanopyClusters } from './lod/canopyCluster.js';
@@ -45,9 +46,11 @@ function recordBatchStats(statsByMode, stats) {
   target.dropped += stats.dropped;
 }
 
-function leafAppearance(placement, resolveLeafTint) {
+function leafAppearance(placement, resolveLeafTint, proxyReadable = false) {
   const tint = resolveLeafTint?.(placement) ?? UNTINTED;
-  const morphology = treeMorphology(placement);
+  const morphology = proxyReadable
+    ? treeProxyMorphology(placement)
+    : treeMorphology(placement);
   return {
     morphology,
     colorVariation: treeColorVariation(placement),
@@ -61,9 +64,15 @@ function leafAppearance(placement, resolveLeafTint) {
   };
 }
 
-function geometryInstance(placement, fade, ditherDirection, resolveLeafTint) {
+function geometryInstance(
+  placement,
+  fade,
+  ditherDirection,
+  resolveLeafTint,
+  proxyReadable = false,
+) {
   const heightScale = placement.heightScale ?? placement.scale;
-  const appearance = leafAppearance(placement, resolveLeafTint);
+  const appearance = leafAppearance(placement, resolveLeafTint, proxyReadable);
   const lean = treeLeanAngles(placement);
   return {
     matrix: createMatrix({
@@ -108,14 +117,16 @@ function impostorRecord(placement, atlas, fade, ditherDirection, resolveLeafTint
   };
 }
 
-const IMPOSTOR_VERTICAL_MORPH_MIN = 0.82;
-const IMPOSTOR_VERTICAL_MORPH_MAX = 1.18;
+const IMPOSTOR_VERTICAL_MORPH_MIN = 0.45;
+const IMPOSTOR_VERTICAL_MORPH_MAX = 1.45;
 
 export function isTreeImpostorMorphologyCompatible(placement) {
-  // The current atlas has one canonical crown per prototype. Keep age classes
-  // with materially different crown heights on the connected proxy until the
-  // offline baker emits morphology buckets for them.
-  if (placement.ageClass && placement.ageClass !== 'mature') return false;
+  // Height age variation already lives in the billboard scale and horizontal
+  // crown variation lives in its appearance channel. Living age classes stay
+  // close enough to the canonical silhouette for the exact authored atlas to
+  // beat a generic geometry proxy at distance. Dead trees and truly extreme
+  // crown envelopes retain the connected fallback.
+  if (placement.ageClass === 'dead') return false;
   const verticalCrownScale = treeMorphology(placement)[1];
   return verticalCrownScale >= IMPOSTOR_VERTICAL_MORPH_MIN
     && verticalCrownScale <= IMPOSTOR_VERTICAL_MORPH_MAX;
@@ -238,6 +249,7 @@ export function rebuildTreeLod({
               representation.fade,
               ditherDirection,
               resolveLeafTint,
+              true,
             ));
           }
         }
@@ -286,6 +298,7 @@ export function rebuildTreeLod({
               representation.fade,
               ditherDirection,
               resolveLeafTint,
+              true,
             ));
           }
           continue;
@@ -296,6 +309,7 @@ export function rebuildTreeLod({
           representation.fade,
           ditherDirection,
           resolveLeafTint,
+          representation.band !== 'near',
         );
         const target = representation.band === 'near' ? near : proxy;
         target[prototypeIndex].push(instance);

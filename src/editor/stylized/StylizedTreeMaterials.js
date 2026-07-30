@@ -26,7 +26,6 @@ import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { registerTreeWindTime } from './forest/TreeWindTime.js';
 
 const TWO_PI = Math.PI * 2;
-
 function colorNode(value) {
   const color = new THREE.Color(value);
   return vec3(color.r, color.g, color.b);
@@ -120,7 +119,9 @@ export function createStylizedLeafMaterial({
     material.opacityNode = authoredTexture(map).a;
     material.alphaTest = alphaTest > 0
       ? alphaTest
-      : (source?.alphaTest > 0 ? source.alphaTest : 0.5);
+      : (source?.alphaTest > 0
+        ? source.alphaTest
+        : (config.trees.cardAlphaTest ?? 0.32));
   }
   material.transparent = false;
   return material;

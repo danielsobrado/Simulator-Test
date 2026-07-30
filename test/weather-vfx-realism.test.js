@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import { Rng } from '../src/editor/_clod_shims/seed.js';
 import { createSnowGeometry, createSplashGeometry } from '../src/editor/weather/rain_geometry.js';
 import { RainSplashPlacement } from '../src/editor/weather/rain_splash_placement.js';
-import { resolveMeadowSettings } from '../src/editor/weather/weather_controller.js';
+import {
+  resolveMeadowEnvironment,
+  resolveMeadowSettings,
+} from '../src/editor/weather/weather_controller.js';
 
 function sortedSnowSizes(seed = 0x51eaf00d) {
   const geometry = createSnowGeometry(seed);
@@ -96,4 +99,46 @@ test('selecting meadow enables motes even when startup mode was off', () => {
 
   assert.equal(settings.motes.enabled, true);
   assert.equal(runtimeMotes.enabled, false, 'runtime preferences remain immutable');
+});
+
+test('explicit meadow weather receives a strong visibility gain without boosting ambient motes', () => {
+  const visual = { amount: 0.2, coldBlend: 0.1, localMist: 0 };
+  const cameraPosition = new THREE.Vector3(1, 2, 3);
+  const sunDirection = new THREE.Vector3(0, 1, 0);
+
+  const ambient = resolveMeadowEnvironment(
+    { weatherMode: 'off' },
+    visual,
+    cameraPosition,
+    sunDirection,
+  );
+  const meadow = resolveMeadowEnvironment(
+    { weatherMode: 'meadow' },
+    visual,
+    cameraPosition,
+    sunDirection,
+  );
+
+  assert.equal(ambient.visibilityGain, 1);
+  assert.ok(meadow.visibilityGain >= 4);
+  assert.ok(meadow.amount > ambient.amount);
+});
+
+test('tree foliage LODs do not split crowns into an alpha-to-coverage pipeline', () => {
+  const ditherMaterial = readFileSync(
+    new URL('../src/editor/stylized/lod/StylizedDitheredMaterial.js', import.meta.url),
+    'utf8',
+  );
+  const treeMaterial = readFileSync(
+    new URL('../src/editor/stylized/StylizedTreeMaterials.js', import.meta.url),
+    'utf8',
+  );
+  const impostorMaterial = readFileSync(
+    new URL('../src/editor/stylized/impostor/TreeImpostorMaterial.js', import.meta.url),
+    'utf8',
+  );
+
+  assert.doesNotMatch(ditherMaterial, /alphaToCoverage\s*=\s*true/);
+  assert.doesNotMatch(treeMaterial, /alphaToCoverage\s*=\s*true/);
+  assert.doesNotMatch(impostorMaterial, /alphaToCoverage\s*=\s*true/);
 });

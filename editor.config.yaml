@@ -588,9 +588,14 @@ stylizedSurface:
     enabled: true
     tree:
       meshRadius: 1
-      proxyRadius: 3
+      # The generic geometry proxy cannot preserve all 18 authored silhouettes.
+      # Collapse its normal band so validated impostor atlases take over after
+      # the near ring; it remains available only as the missing-atlas fallback.
+      proxyRadius: 1
       impostorRadius: 5
       clusterRadius: 8
+      # Chunk-center projection must never place a proxy beside the player.
+      forceNearWithinMeshRadius: true
       nearPixels: 32
       proxyPixels: 8
       impostorPixels: 2
@@ -613,8 +618,11 @@ stylizedSurface:
       hysteresisRatio: 0.15
       transitionMs: 240
     bush:
+      # Full authored foliage beside the player, then a fitted volumetric shrub
+      # proxy in the outer resident ring.
       meshRadius: 1
       proxyRadius: 2
+      forceNearWithinMeshRadius: true
       nearPixels: 12
       proxyPixels: 3
       impostorPixels: 1

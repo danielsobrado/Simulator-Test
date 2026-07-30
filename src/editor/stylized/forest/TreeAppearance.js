@@ -42,6 +42,23 @@ export function treeMorphology(placement) {
   ];
 }
 
+/**
+ * The low-poly proxy has one cylinder spanning the authored trunk bounds and
+ * three solid crown lobes. Applying the near mesh's vertical crown shrink to
+ * that abstraction exposes the full-height cylinder above a tiny canopy, which
+ * reads as a detached pole. The placement matrix already carries age/height,
+ * so keep the proxy's vertical envelope connected and retain only bounded
+ * horizontal silhouette variation.
+ */
+export function treeProxyMorphology(placement) {
+  const [horizontal, vertical, trunk] = treeMorphology(placement);
+  return [
+    Math.max(0.55, horizontal),
+    Math.max(1, vertical),
+    trunk,
+  ];
+}
+
 /** Lean angles (radians) from clod-style leanX/leanZ components. */
 export function treeLeanAngles(placement) {
   const leanX = Number(placement.leanX) || 0;

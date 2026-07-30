@@ -72,6 +72,11 @@ test('bush materials retain authored texture channels and use cutout rendering',
   assert.equal(material.depthWrite, true);
   assert.ok(material.alphaTest >= 0.35);
   assert.ok(createSourceOpacityNode(material));
+  assert.equal(
+    createSourceOpacityNode({ map }).node.uvNode,
+    null,
+    'optimized glTF texture transforms require an implicit UV node',
+  );
 
   material.dispose();
   source.dispose();
@@ -80,7 +85,7 @@ test('bush materials retain authored texture channels and use cutout rendering',
   normalMap.dispose();
 });
 
-test('bush proxies use crossed foliage silhouettes fitted to authored bounds', () => {
+test('bush proxies use fitted volumetric foliage clusters', () => {
   const geometry = new THREE.SphereGeometry(1, 24, 12);
   geometry.scale(1.4, 0.8, 0.9);
   geometry.translate(0, 0.8, 0);
@@ -101,9 +106,9 @@ test('bush proxies use crossed foliage silhouettes fitted to authored bounds', (
   assert.equal(triangleCount(proxy.geometry), BUSH_PROXY_TRIANGLES);
   assert.ok(triangleCount(proxy.geometry) < triangleCount(geometry));
   assert.ok(proxySize.distanceTo(sourceSize) < 1e-6);
-  assert.equal(proxy.geometry.userData.proxyKind, 'crossed-foliage-cards');
+  assert.equal(proxy.geometry.userData.proxyKind, 'clustered-low-poly-canopy');
   assert.ok(proxy.material.colorNode);
-  assert.ok(proxy.material.normalNode);
+  assert.equal(proxy.material.flatShading, true);
   assert.equal(BUSH_CAST_SHADOW, false);
 
   proxy.geometry.dispose();

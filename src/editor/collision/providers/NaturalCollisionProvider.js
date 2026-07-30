@@ -1,5 +1,8 @@
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import {
+  isCollisionBuildDeferred,
+} from '../CollisionBuildResult.js';
+import {
   COLLISION_RETRY_BASE_MS,
   COLLISION_RETRY_MAX_MS,
 } from '../CollisionLimits.js';
@@ -20,6 +23,7 @@ function sampleFromCollider(collider) {
 
 function componentData(component, chunkX, chunkZ) {
   const data = component.provider.buildChunkData(chunkX, chunkZ);
+  if (isCollisionBuildDeferred(data)) return data;
   if (!data || typeof data.signature !== 'string' || !Array.isArray(data.colliders)) {
     throw new Error(`Collision component ${component.id} returned invalid chunk data.`);
   }
@@ -34,7 +38,12 @@ function componentData(component, chunkX, chunkZ) {
 }
 
 function combinedData(components, chunkX, chunkZ) {
-  const entries = components.map((component) => componentData(component, chunkX, chunkZ));
+  const entries = [];
+  for (const component of components) {
+    const entry = componentData(component, chunkX, chunkZ);
+    if (isCollisionBuildDeferred(entry)) return entry;
+    entries.push(entry);
+  }
   const colliders = entries.flatMap((entry) => entry.colliders);
   colliders.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
   return Object.freeze({
@@ -197,6 +206,7 @@ export class NaturalCollisionProvider {
 
   buildOwnerChunk(chunkX, chunkZ) {
     const data = combinedData(this.components, chunkX, chunkZ);
+    if (isCollisionBuildDeferred(data)) return data;
     const revision = this.nextRevision;
     this.nextRevision += 1;
     return Object.freeze({ revision, colliders: data.colliders, providerData: data });
@@ -309,6 +319,7 @@ export class NaturalCollisionProvider {
     let rebuilt = 0;
     let frameError = null;
     const changedCounts = Object.create(null);
+    const deferredKeys = [];
     while (this.pendingRefresh.length > 0 && attempted < this.buildsPerFrame) {
       if (attempted > 0 && this.now() - startedAt >= this.buildBudgetMs) break;
       const key = this.pendingRefresh.shift();
@@ -323,6 +334,10 @@ export class NaturalCollisionProvider {
       }
       try {
         const data = combinedData(this.components, chunkX, chunkZ);
+        if (isCollisionBuildDeferred(data)) {
+          deferredKeys.push(key);
+          continue;
+        }
         if (data.signature === previous.signature) {
           this.retryByKey.delete(key);
           continue;
@@ -344,6 +359,7 @@ export class NaturalCollisionProvider {
         this.logger.error?.(`Natural collision refresh failed for ${key}.`, error);
       }
     }
+    for (const key of deferredKeys) this.enqueueRefreshKey(key);
 
     if (frameError) this.lastError = frameError;
     else if (!this.sourceRetry && this.retryByKey.size === 0) this.lastError = null;

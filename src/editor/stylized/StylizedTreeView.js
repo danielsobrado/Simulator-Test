@@ -7,6 +7,7 @@ import {
   extractPrototypeParts,
   extractPrototypePartsFromRoots,
   findPrototypeRoots,
+  splitDisconnectedTreeParts,
 } from './StylizedTreePrototypes.js';
 import { resolveAuthoredPrototypeGroups } from './StylizedPrototypeBake.js';
 import {
@@ -104,6 +105,7 @@ function lodSettings(config) {
     proxyRadius,
     impostorRadius,
     clusterRadius,
+    forceNearWithinMeshRadius: tree.forceNearWithinMeshRadius === true,
     transitionMs: tree.transitionMs ?? 320,
     thresholds: {
       nearPixels: tree.nearPixels ?? 32,
@@ -342,65 +344,68 @@ export class StylizedTreeView {
       ? resolveAuthoredPrototypeGroups(scene, prototypeGroups, sourceLabel)
       : scene.children.flatMap(
         (child) => findPrototypeRoots(child, extractionConfig).map((root) => [root]),
-      );
+    );
     const firstIndex = this.prototypes.length;
     for (const roots of rootGroups) {
-      const baked = roots.length === 1
+      const extracted = roots.length === 1
         ? extractPrototypeParts(roots[0], extractionConfig)
         : extractPrototypePartsFromRoots(roots, extractionConfig);
-      if (!baked) continue;
-      if (scale !== 1) {
-        for (const part of baked) {
-          part.geometry.scale(scale, scale, scale);
-          part.geometry.computeBoundingBox();
-          part.geometry.computeBoundingSphere();
+      if (!extracted) continue;
+      const prototypeGroupsForRoot = splitDisconnectedTreeParts(extracted);
+      for (const baked of prototypeGroupsForRoot) {
+        if (scale !== 1) {
+          for (const part of baked) {
+            part.geometry.scale(scale, scale, scale);
+            part.geometry.computeBoundingBox();
+            part.geometry.computeBoundingSphere();
+          }
         }
-      }
-      const parts = baked.map((part) => {
-        const source = firstMaterial(
-          part.source,
-          part.kind === 'leaf'
-            ? extractionConfig.assets.leafMaterial
-            : extractionConfig.assets.trunkMaterial,
-        );
-        let sourceMap = null;
-        if (source?.map) {
-          sourceMap = source.map.clone();
-          sourceMap.needsUpdate = true;
-          this.textures.push(sourceMap);
-        }
-        const material = part.kind === 'leaf'
-          ? createStylizedLeafMaterial({
-            source,
-            leafMap: sourceMap,
-            bounds: {
-              minY: part.geometry.boundingBox.min.y,
-              maxY: part.geometry.boundingBox.max.y,
-            },
-            time: this.time,
-            config: this.config,
-            preserveSourceColor: preserveSourceAppearance,
-          })
-          : (preserveSourceAppearance
-            ? createAuthoredTrunkMaterial({
+        const parts = baked.map((part) => {
+          const source = firstMaterial(
+            part.source,
+            part.kind === 'leaf'
+              ? extractionConfig.assets.leafMaterial
+              : extractionConfig.assets.trunkMaterial,
+          );
+          let sourceMap = null;
+          if (source?.map) {
+            sourceMap = source.map.clone();
+            sourceMap.needsUpdate = true;
+            this.textures.push(sourceMap);
+          }
+          const material = part.kind === 'leaf'
+            ? createStylizedLeafMaterial({
               source,
-              sourceMap,
-              barkTextures: authoredBarkTextures,
-              barkScale: authoredBarkScale,
+              leafMap: sourceMap,
+              bounds: {
+                minY: part.geometry.boundingBox.min.y,
+                maxY: part.geometry.boundingBox.max.y,
+              },
+              time: this.time,
+              config: this.config,
+              preserveSourceColor: preserveSourceAppearance,
             })
-            : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config }));
-        return {
-          geometry: part.geometry,
-          material,
-          kind: part.kind,
-          sourceMap,
-        };
-      });
-      // Imported variants already include their authored trunk base. The generic
-      // collar is sized from all trunk/branch bounds, which can turn a spreading
-      // broadleaf into a conspicuous polygonal plinth.
-      if (!preserveSourceAppearance) attachRootCollar(parts);
-      if (parts.length > 0) this.prototypes.push(parts);
+            : (preserveSourceAppearance
+              ? createAuthoredTrunkMaterial({
+                source,
+                sourceMap,
+                barkTextures: authoredBarkTextures,
+                barkScale: authoredBarkScale,
+              })
+              : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config }));
+          return {
+            geometry: part.geometry,
+            material,
+            kind: part.kind,
+            sourceMap,
+          };
+        });
+        // Imported variants already include their authored trunk base. The generic
+        // collar is sized from all trunk/branch bounds, which can turn a spreading
+        // broadleaf into a conspicuous polygonal plinth.
+        if (!preserveSourceAppearance) attachRootCollar(parts);
+        if (parts.length > 0) this.prototypes.push(parts);
+      }
     }
     return this.prototypes.length - firstIndex;
   }

@@ -175,7 +175,7 @@ uniform vec3 uCameraPosition; uniform vec3 uSunDirection; uniform vec3 uWarmColo
 uniform float uSunVisibilityOriginX; uniform float uSunVisibilityOriginZ; uniform float uSunVisibilityWorldSize; uniform float uSunVisibilityValid;
 uniform float uVisibilityStart; uniform float uVisibilityEnd; uniform float uDensity; uniform float uOpacity;
 uniform float uIntensity; uniform float uStrength; uniform float uForwardScatterPower; uniform float uMistFloor;
-uniform float uVisualAmount; uniform float uColdBlend; uniform float uLocalMist;
+uniform float uVisualAmount; uniform float uColdBlend; uniform float uLocalMist; uniform float uVisibilityGain;
 varying vec2 vUv; varying float vAlpha; varying float vSeed; varying float vGlow; varying vec3 vWorldPosition;
 void main() {
   vec2 p = vUv * 2.0 - 1.0; float d = length(p); if (d > 1.05) discard;
@@ -191,7 +191,7 @@ void main() {
   float halo = 1.0 - smoothstep(0.18, 1.02, length(q));
   float mote = 0.78 + 0.22 * sin(vSeed * 13.7 + q.x * 19.0 + q.y * 23.0);
   float alpha = (core * 0.72 + halo * 0.34) * mote * vAlpha * uOpacity * clamp(uIntensity, 0.0, 1.6)
-    * uStrength * uVisualAmount * visibility * forwardScatter * localMist;
+    * uStrength * uVisualAmount * visibility * forwardScatter * localMist * uVisibilityGain;
   if (alpha < ${MEADOW_ALPHA_CUTOFF}) discard;
   vec3 color = mix(uWarmColor, uColdColor, clamp(uColdBlend, 0.0, 1.0));
   gl_FragColor = vec4(mix(color, vec3(1.0), vGlow * 0.12), alpha);
@@ -225,6 +225,7 @@ function createMeadowShaderMaterial() {
     uVisualAmount: { value: 0 },
     uColdBlend: { value: 0 },
     uLocalMist: { value: 0 },
+    uVisibilityGain: { value: 1 },
     uWarmColor: { value: new THREE.Color().setRGB(...moteDefaults.warmColorRgb) },
     uColdColor: { value: new THREE.Color().setRGB(...moteDefaults.coldColorRgb) }
   };
@@ -310,6 +311,7 @@ function createMeadowNodeMaterial() {
   const uVisualAmount = uniform(0);
   const uColdBlend = uniform(0);
   const uLocalMist = uniform(0);
+  const uVisibilityGain = uniform(1);
   const uWarmColor = uniform(new THREE.Color().setRGB(...defaults.warmColorRgb));
   const uColdColor = uniform(new THREE.Color().setRGB(...defaults.coldColorRgb));
   const uAtlasOriginX = uniform(atlas.originX);
@@ -365,7 +367,7 @@ function createMeadowNodeMaterial() {
     const core = float(1).sub(smoothstep(0.08, 0.58, d));
     const halo = float(1).sub(smoothstep(0.18, 1.02, d));
     const mote = float(0.78).add(sin(aShape.w.mul(13.7).add(p.x.mul(19)).add(p.y.mul(23))).mul(0.22));
-    const alpha = core.mul(0.72).add(halo.mul(0.34)).mul(mote).mul(aShape.y).mul(ringFade).mul(mix(0.75, 1.45, wave)).mul(uOpacity).mul(clamp(uIntensity, 0, 1.6)).mul(uStrength).mul(uVisualAmount).mul(visibility).mul(forwardScatter).mul(localMist);
+    const alpha = core.mul(0.72).add(halo.mul(0.34)).mul(mote).mul(aShape.y).mul(ringFade).mul(mix(0.75, 1.45, wave)).mul(uOpacity).mul(clamp(uIntensity, 0, 1.6)).mul(uStrength).mul(uVisualAmount).mul(visibility).mul(forwardScatter).mul(localMist).mul(uVisibilityGain);
     alpha.lessThan(MEADOW_ALPHA_CUTOFF).discard();
     const color = mix(uWarmColor, uColdColor, clamp(uColdBlend, 0, 1));
     return vec4(mix(color, vec3(1, 1, 1), wave.mul(0.12)), alpha);
@@ -414,6 +416,7 @@ function createMeadowNodeMaterial() {
       uVisualAmount.value = environment.amount;
       uColdBlend.value = environment.coldBlend;
       uLocalMist.value = environment.localMist;
+      uVisibilityGain.value = environment.visibilityGain ?? 1;
     },
     setSunVisibilityAtlas: (originX, originZ, worldSize, valid) => {
       uAtlasOriginX.value = originX;
@@ -446,6 +449,7 @@ function applyShaderEnvironment(uniforms, environment) {
   uniforms.uVisualAmount.value = environment.amount;
   uniforms.uColdBlend.value = environment.coldBlend;
   uniforms.uLocalMist.value = environment.localMist;
+  uniforms.uVisibilityGain.value = environment.visibilityGain ?? 1;
 }
 export {
   createMeadowGeometry,
