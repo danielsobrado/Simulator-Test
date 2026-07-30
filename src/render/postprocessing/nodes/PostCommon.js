@@ -43,6 +43,10 @@ export function createPostProcessingTopologySignature(settings) {
     ? Math.max(8, Math.min(48, Math.round(settings.screenSpaceShafts.samples)))
     : 'off';
   signature += `|shaftSamples:${shaftSamples}`;
+  const dofTaps = enabled && settings?.depthOfField?.enabled === true
+    ? Math.max(4, Math.min(32, Math.round(settings.depthOfField.taps ?? 16)))
+    : 'off';
+  signature += `|dofTaps:${dofTaps}`;
   const diagnosticsEnabled = enabled && settings?.diagnostics?.enabled === true;
   signature += `|debug:${diagnosticsEnabled ? settings.diagnostics.debugView : 'off'}`;
   return signature;
