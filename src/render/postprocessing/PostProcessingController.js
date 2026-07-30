@@ -21,6 +21,7 @@ export class PostProcessingController {
     sunDirection,
     sunColor = '#ffffff',
     bypassProvider = null,
+    focusDistanceProvider = null,
   }) {
     this.renderer = renderer;
     this.scene = scene;
@@ -28,6 +29,7 @@ export class PostProcessingController {
     this.sunDirection = sunDirection;
     this.sunColor = sunColor;
     this.bypassProvider = bypassProvider;
+    this.focusDistanceProvider = focusDistanceProvider;
     this.settings = postProcessingStore.get();
     this.topologySignature = createPostProcessingTopologySignature(this.settings);
     this.graph = null;
@@ -130,13 +132,28 @@ export class PostProcessingController {
 
   updateFrame(camera) {
     this.invalidation.beginFrame();
+    const timestampMs = typeof performance !== 'undefined' ? performance.now() : 0;
     this.frameState.beginFrame(
       camera,
       this.resources,
       this.history,
       this.settings,
+      timestampMs,
     );
+    this.updateFocusDistance(camera);
     this.graph.updateUniforms(this.frameState, this.settings);
+  }
+
+  updateFocusDistance(camera) {
+    const dof = this.settings.depthOfField;
+    if (!dof?.enabled) return;
+    const current = this.frameState.focusDistance;
+    const target = dof.focusMode === 'manual'
+      ? dof.manualFocusMeters
+      : this.focusDistanceProvider?.(dof.focusMode, camera, current);
+    if (!Number.isFinite(target)) return;
+    const alpha = 1 - Math.exp(-dof.focusSmoothing * this.frameState.deltaSeconds);
+    this.frameState.focusDistance = current + (target - current) * alpha;
   }
 
   finishFrame(rendered) {
@@ -236,5 +253,6 @@ export class PostProcessingController {
     this.store = null;
     this.sunDirection = null;
     this.bypassProvider = null;
+    this.focusDistanceProvider = null;
   }
 }

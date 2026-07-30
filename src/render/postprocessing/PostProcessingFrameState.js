@@ -10,6 +10,10 @@ export class PostProcessingFrameState {
   constructor() {
     this.camera = null;
     this.frame = 0;
+    this.timeSeconds = 0;
+    this.deltaSeconds = 0;
+    this.focusDistance = 6.2;
+    this.lastTimestampMs = null;
     this.width = 1;
     this.height = 1;
     this.pixelRatio = 1;
@@ -27,9 +31,15 @@ export class PostProcessingFrameState {
     this.previousViewProjection = new THREE.Matrix4();
   }
 
-  beginFrame(camera, resources, history = null, settings = null) {
+  beginFrame(camera, resources, history = null, settings = null, timestampMs = 0) {
     this.camera = camera;
     this.frame += 1;
+    const currentTimestamp = Number.isFinite(timestampMs) ? timestampMs : 0;
+    this.deltaSeconds = this.lastTimestampMs == null
+      ? 0
+      : Math.min(0.1, Math.max(0, (currentTimestamp - this.lastTimestampMs) / 1000));
+    this.lastTimestampMs = currentTimestamp;
+    this.timeSeconds = currentTimestamp / 1000;
     this.width = resources.width;
     this.height = resources.height;
     this.pixelRatio = resources.pixelRatio;

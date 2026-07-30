@@ -61,6 +61,7 @@ import {
 } from './editor/settings/SceneSettingsRuntime.js';
 import { createPostProcessingSettings } from './render/postprocessing/PostProcessingSettings.js';
 import { PostProcessingController } from './render/postprocessing/PostProcessingController.js';
+import { PostProcessingFocusResolver } from './render/postprocessing/PostProcessingFocusResolver.js';
 import {
   POST_PROCESSING_REACTIVE_EVENTS,
   POST_PROCESSING_RESET_REASONS,
@@ -538,6 +539,16 @@ async function startEditor() {
     inventoryStore,
     worldInputBlockedProvider: () => gameplayOverlayController.isWorldInputBlocked(),
   });
+  const postProcessingFocus = new PostProcessingFocusResolver({
+    terrainView,
+    playerController,
+    editorController: controller,
+    objectView,
+    constructionView,
+  });
+  postProcessingController.focusDistanceProvider = (mode, camera, previousFocus) => (
+    postProcessingFocus.resolve(mode, camera, previousFocus)
+  );
   controller.onDocumentLoaded = (reason) => {
     const resetReason = POST_PROCESSING_RESET_REASONS[reason]
       ?? POST_PROCESSING_RESET_REASONS.WORLD_LOADED;

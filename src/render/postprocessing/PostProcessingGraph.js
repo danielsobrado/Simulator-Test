@@ -12,6 +12,7 @@ import { packMaterialDataNode } from './PostProcessingMaterialData.js';
 import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
 import { BloomNode } from './nodes/BloomNode.js';
+import { CinematicDofNode } from './nodes/CinematicDofNode.js';
 import { ContrastSharpenNode } from './nodes/ContrastSharpenNode.js';
 import { HierarchicalDepthNode } from './nodes/HierarchicalDepthNode.js';
 import { ScreenSpaceShaftNode } from './nodes/ScreenSpaceShaftNode.js';
@@ -116,6 +117,14 @@ export class PostProcessingGraph {
       })
       : null;
     const resolvedOutput = this.taaResolve?.outputNode ?? preTaaOutput;
+    this.depthOfField = settings?.depthOfField?.enabled === true
+      ? new CinematicDofNode({
+        sourceNode: resolvedOutput,
+        depthNode: this.inputs.depth,
+        settings: settings.depthOfField,
+      })
+      : null;
+    const postDofOutput = this.depthOfField?.outputNode ?? resolvedOutput;
     this.bloom = settings?.bloom?.enabled === true
       ? new BloomNode({
         sourceNode: resolvedOutput,
@@ -126,7 +135,7 @@ export class PostProcessingGraph {
       : null;
     this.bloomTextureNode = this.bloom?.outputNode ?? null;
     this.toneMapping = new ToneMappingNode({
-      sourceNode: resolvedOutput,
+      sourceNode: postDofOutput,
       bloomNode: this.bloomTextureNode,
       settings: settings.toneMapping,
       bloomIntensity: settings?.bloom?.intensity ?? 0,
@@ -208,6 +217,10 @@ export class PostProcessingGraph {
       this.taaResolve.settings = settings?.antiAliasing ?? this.taaResolve.settings;
       this.taaResolve.updateUniforms(frameState);
     }
+    this.depthOfField?.updateUniforms(
+      frameState,
+      settings?.depthOfField ?? this.depthOfField.settings,
+    );
     this.bloom?.updateUniforms(
       settings?.bloom ?? this.bloom.settings,
       settings?.toneMapping?.exposure ?? 1,
@@ -244,6 +257,10 @@ export class PostProcessingGraph {
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
+    this.depthOfField?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
     this.sharpen?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
@@ -267,6 +284,7 @@ export class PostProcessingGraph {
     this.disposed = true;
     this.sharpen?.dispose();
     this.bloom?.dispose();
+    this.depthOfField?.dispose();
     this.taaResolve?.dispose();
     this.ssr?.dispose();
     this.hierarchicalDepth?.dispose();
