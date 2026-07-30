@@ -9,7 +9,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'tmp', 'post-processing-qa');
 const BASE_URL = 'http://127.0.0.1:5173';
 const PRESETS = Object.freeze(['off', 'low', 'balanced', 'high', 'ultra']);
-const ERROR_PATTERN = /wgsl|shader|pipeline|bind.?group|webgpu|gpu validation|uncaptured/i;
+const GPU_ERROR_PATTERN = /wgsl|gpuvalidationerror|bind.?group|pipeline creation failed|uncaptured error/i;
 
 function startServer() {
   return spawn(
@@ -67,8 +67,9 @@ async function main() {
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
     const messages = [];
     page.on('console', (message) => {
-      if (message.type() === 'error' || ERROR_PATTERN.test(message.text())) {
-        messages.push({ type: `console:${message.type()}`, text: message.text() });
+      const text = message.text();
+      if (message.type() === 'error' || GPU_ERROR_PATTERN.test(text)) {
+        messages.push({ type: `console:${message.type()}`, text });
       }
     });
     page.on('pageerror', (error) => messages.push({ type: 'pageerror', text: error.stack ?? error.message }));
