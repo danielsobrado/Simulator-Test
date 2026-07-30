@@ -89,6 +89,12 @@ export class PostProcessingInvalidation {
     }
   }
 
+  consumeReactiveFrame() {
+    const reactive = this.isReactive();
+    this.beginFrame();
+    return reactive;
+  }
+
   isReactive() {
     return this.reactiveFrames.size > 0;
   }
