@@ -33,6 +33,29 @@ function withoutConsoleError(callback) {
   }
 }
 
+test('successful render scopes renderer output ownership to the call', () => {
+  const { controller, renderer } = createController();
+  let renderedWithManualOutput = false;
+  controller.ensureGraph = () => {
+    controller.graph = {
+      topologySignature: controller.topologySignature,
+      render() {
+        renderedWithManualOutput = renderer.toneMapping === 0
+          && renderer.toneMappingExposure === 1;
+      },
+    };
+    return controller.graph;
+  };
+  controller.updateFrame = () => {};
+  controller.finishFrame = () => {};
+
+  assert.equal(controller.render({}), true);
+  assert.equal(renderedWithManualOutput, true);
+  assert.equal(renderer.toneMapping, 7);
+  assert.equal(renderer.toneMappingExposure, 1.12);
+  controller.dispose();
+});
+
 test('render failure restores renderer output and disables the failed topology', () => {
   const { controller, renderer } = createController();
   let finished = false;
