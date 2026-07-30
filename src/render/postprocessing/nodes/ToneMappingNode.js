@@ -4,8 +4,8 @@ import {
   float,
   max,
   pow,
-  renderOutput,
   screenUV,
+  toneMapping,
   uniform,
   vec3,
   vec4,
@@ -53,8 +53,9 @@ export function toneMappingAdjustmentsReference(
 }
 
 /**
- * Owns the linear HDR composite, artistic grading, tone mapping, and output
- * colour-space conversion while the post-processing graph is active.
+ * Owns the linear HDR composite, artistic grading, and tone-mapping curve.
+ * Output colour conversion remains a separate graph step so vignette can run
+ * in display-linear space.
  */
 export class ToneMappingNode {
   constructor({
@@ -62,7 +63,6 @@ export class ToneMappingNode {
     bloomNode = null,
     settings,
     bloomIntensity = 0,
-    outputColorSpace = THREE.SRGBColorSpace,
   }) {
     this.exposure = uniform(settings.exposure);
     this.contrast = uniform(settings.contrast);
@@ -96,14 +96,13 @@ export class ToneMappingNode {
       return vec4(colour, float(1));
     })();
 
-    const toneMapping = settings.enabled === false
+    const toneMappingMode = settings.enabled === false
       ? THREE.NoToneMapping
       : toneMappingConstantForMode(settings.mode);
-    this.outputNode = renderOutput(
-      adjustedHdr,
-      toneMapping,
-      outputColorSpace,
-    );
+    this.outputNode = Fn(() => vec4(
+      toneMapping(toneMappingMode, 1, adjustedHdr.rgb),
+      1,
+    ))();
   }
 
   updateUniforms(settings, bloomIntensity = 0) {

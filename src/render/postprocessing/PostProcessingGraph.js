@@ -15,6 +15,10 @@ import { BloomNode } from './nodes/BloomNode.js';
 import { CinematicDofNode } from './nodes/CinematicDofNode.js';
 import { ContrastSharpenNode } from './nodes/ContrastSharpenNode.js';
 import { HierarchicalDepthNode } from './nodes/HierarchicalDepthNode.js';
+import {
+  FilmGrainNode,
+  createVignetteNode,
+} from './nodes/LensEffectsNode.js';
 import { ScreenSpaceShaftNode } from './nodes/ScreenSpaceShaftNode.js';
 import { SelectiveSsrNode } from './nodes/SelectiveSsrNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
@@ -139,15 +143,31 @@ export class PostProcessingGraph {
       bloomNode: this.bloomTextureNode,
       settings: settings.toneMapping,
       bloomIntensity: settings?.bloom?.intensity ?? 0,
-      outputColorSpace: renderer.outputColorSpace,
     });
+    this.vignette = settings?.vignette?.enabled === true
+      ? createVignetteNode(this.toneMapping.outputNode, settings.vignette)
+      : null;
+    const displayLinearOutput = this.vignette?.outputNode
+      ?? this.toneMapping.outputNode;
+    this.outputConversion = renderOutput(
+      displayLinearOutput,
+      THREE.NoToneMapping,
+      renderer.outputColorSpace,
+    );
     this.sharpen = settings?.sharpen?.enabled === true
       ? new ContrastSharpenNode({
-        sourceNode: this.toneMapping.outputNode,
+        sourceNode: this.outputConversion,
         settings: settings.sharpen,
       })
       : null;
-    const finalOutput = this.sharpen?.outputNode ?? this.toneMapping.outputNode;
+    const postSharpenOutput = this.sharpen?.outputNode ?? this.outputConversion;
+    this.grain = settings?.grain?.enabled === true
+      ? new FilmGrainNode({
+        sourceNode: postSharpenOutput,
+        settings: settings.grain,
+      })
+      : null;
+    const finalOutput = this.grain?.outputNode ?? postSharpenOutput;
     const debugOverride = settings?.diagnostics?.enabled === true
       && settings.diagnostics.debugView !== 'final';
 
@@ -229,7 +249,9 @@ export class PostProcessingGraph {
       settings?.toneMapping,
       settings?.bloom?.intensity ?? 0,
     );
+    this.vignette?.updateUniforms(settings?.vignette);
     this.sharpen?.updateUniforms(settings?.sharpen);
+    this.grain?.updateUniforms(frameState, settings?.grain);
   }
 
   resize(width, height, pixelRatio = 1) {
@@ -265,6 +287,10 @@ export class PostProcessingGraph {
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
+    this.grain?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
   }
 
   async precompile() {
@@ -282,6 +308,7 @@ export class PostProcessingGraph {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.grain?.dispose();
     this.sharpen?.dispose();
     this.bloom?.dispose();
     this.depthOfField?.dispose();
