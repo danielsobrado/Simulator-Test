@@ -171,6 +171,7 @@ export class InfiniteTerrainView {
     streamingConfig,
     rendererConfig,
     stylizedConfig,
+    postProcessingController = null,
   }) {
     this.container = container;
     this.tileMap = tileMap;
@@ -180,6 +181,7 @@ export class InfiniteTerrainView {
     this.streamingConfig = streamingConfig;
     this.rendererConfig = rendererConfig;
     this.stylizedConfig = stylizedConfig;
+    this.postProcessing = postProcessingController;
     this.rendererBackendStatus = Object.freeze({
       mode: 'uninitialized',
       webgpu: false,
@@ -314,15 +316,22 @@ export class InfiniteTerrainView {
 
   resize(width, height) {
     this.renderer.setSize(Math.max(1, width), Math.max(1, height), false);
+    this.postProcessing?.resize(width, height);
+  }
+
+  setPostProcessingController(controller) {
+    this.postProcessing = controller;
   }
 
   render(camera) {
+    if (this.postProcessing?.render(camera)) return;
     if (!this.godRays.render(camera)) {
       this.renderer.render(this.scene, camera);
     }
   }
 
   prewarmPostProcessing(camera) {
+    if (this.postProcessing?.warmup(camera)) return true;
     return this.godRays.prewarm(camera);
   }
 

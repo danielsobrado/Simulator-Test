@@ -60,6 +60,7 @@ import {
   SceneSettingsRuntime,
 } from './editor/settings/SceneSettingsRuntime.js';
 import { createPostProcessingSettings } from './render/postprocessing/PostProcessingSettings.js';
+import { PostProcessingController } from './render/postprocessing/PostProcessingController.js';
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
 import { ConstructionStore } from './editor/construction/ConstructionStore.js';
 import { ConstructionMaterialStore } from './editor/construction/ConstructionMaterialStore.js';
@@ -274,6 +275,12 @@ async function startEditor() {
     worldStore.dispose();
     throw error;
   }
+  const postProcessingController = new PostProcessingController({
+    renderer: terrainView.renderer,
+    scene: terrainView.scene,
+    postProcessingStore,
+  });
+  terrainView.setPostProcessingController(postProcessingController);
 
   const objectView = new ObjectView({
     terrainView,
@@ -775,6 +782,7 @@ async function startEditor() {
     if (finishWaterPrewarm) {
       await terrainView.renderer.renderAsync(terrainView.scene, editorCamera.camera);
     }
+    await postProcessingController.precompile(playerController.camera);
     terrainView.prewarmPostProcessing(playerController.camera);
   } catch (error) {
     console.warn('Render pipeline pre-warm failed; pipelines will compile on demand.', error);
@@ -982,6 +990,7 @@ async function startEditor() {
     constructionView.dispose();
     constructionCompiler.dispose();
     frameRateDisplay.dispose();
+    postProcessingController.dispose();
     terrainView.dispose();
     worldStore.dispose();
     localAssetObjectUrls.forEach((url) => URL.revokeObjectURL(url));
