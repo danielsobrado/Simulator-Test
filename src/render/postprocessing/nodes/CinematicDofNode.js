@@ -21,8 +21,18 @@ import {
 } from 'three/tsl';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const TAP_COUNT = 16;
+const DEFAULT_TAP_COUNT = 16;
+const MIN_TAP_COUNT = 4;
+const MAX_TAP_COUNT = 32;
 const MIN_BLUR_RADIUS_PIXELS = 1.5;
+
+function clampTapCount(value) {
+  const taps = Number(value);
+  return Math.max(
+    MIN_TAP_COUNT,
+    Math.min(MAX_TAP_COUNT, Math.round(Number.isFinite(taps) ? taps : DEFAULT_TAP_COUNT)),
+  );
+}
 
 function smoothstepReference(edge0, edge1, value) {
   if (edge0 === edge1) return value < edge0 ? 0 : 1;
@@ -74,6 +84,7 @@ export class CinematicDofNode {
   constructor({ sourceNode, depthNode, settings }) {
     this.disposed = false;
     this.settings = settings;
+    this.tapCount = clampTapCount(settings.taps);
     this.focusDistance = uniform(settings.manualFocusMeters);
     this.maxCoCPixels = uniform(settings.maxCoCPixels);
     this.nearStartRatio = uniform(settings.nearStartRatio);
@@ -135,8 +146,8 @@ export class CinematicDofNode {
         const colourSum = centre.toVar();
         const weightSum = float(1).toVar();
 
-        for (let index = 0; index < TAP_COUNT; index += 1) {
-          const radialShare = Math.sqrt((index + 0.5) / TAP_COUNT);
+        for (let index = 0; index < this.tapCount; index += 1) {
+          const radialShare = Math.sqrt((index + 0.5) / this.tapCount);
           const angle = rotation.add(index * GOLDEN_ANGLE);
           const tapDistance = centreRadius.mul(radialShare);
           const offsetPixels = vec2(angle.cos(), angle.sin()).mul(tapDistance);
