@@ -3,10 +3,13 @@ import {
   Fn,
   clamp,
   float,
+  fract,
   getViewPosition,
   mix,
+  rand,
   screenUV,
   smoothstep,
+  time,
   vec2,
   vec3,
   vec4,
@@ -29,7 +32,7 @@ export function gradeHdr(inputNode, exposureNode, contrastNode, saturationNode) 
 export function vignette(inputNode, intensityNode, innerRadiusNode, outerRadiusNode) {
   return Fn(() => {
     const distance = screenUV.sub(vec2(0.5)).length().mul(1.41421356237);
-    const falloff = smoothstep(outerRadiusNode, innerRadiusNode, distance);
+    const falloff = float(1).sub(smoothstep(innerRadiusNode, outerRadiusNode, distance));
     const factor = mix(float(1), falloff, intensityNode);
     return vec4(inputNode.rgb.mul(factor), inputNode.a);
   })();
@@ -50,6 +53,14 @@ export function contrastAdaptiveSharpen(textureNode, amountNode) {
       .mul(strength.mul(4).add(1))
       .sub(left.add(right).add(down).add(up).mul(strength));
     return vec4(clamp(sharpened, localMin, localMax), center.a);
+  })();
+}
+
+export function filmGrain(inputNode, intensityNode) {
+  return Fn(() => {
+    const seed = fract(screenUV.mul(4096).add(time));
+    const noise = rand(seed).sub(0.5).mul(intensityNode);
+    return vec4(inputNode.rgb.add(noise), inputNode.a);
   })();
 }
 
