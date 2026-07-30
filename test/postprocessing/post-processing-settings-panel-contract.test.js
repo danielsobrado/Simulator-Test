@@ -23,10 +23,13 @@ test('settings panel exposes every screen-space shaft control', async () => {
   }
 });
 
-test('compile-time range controls update on change rather than every input frame', async () => {
+test('allocation and compile-time range controls update on change', async () => {
   const source = await readFile(sourceUrl, 'utf8');
   for (const path of [
+    'renderScale',
     'bloom.levels',
+    'ssr.resolutionScale',
+    'screenSpaceShafts.resolutionScale',
     'screenSpaceShafts.samples',
     'depthOfField.taps',
   ]) {
