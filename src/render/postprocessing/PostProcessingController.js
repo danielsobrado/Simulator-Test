@@ -36,6 +36,8 @@ export class PostProcessingController {
     this.graph = null;
     this.disposed = false;
     this.rendererState = null;
+    this.failedTopologySignature = null;
+    this.lastFailure = null;
     if (isPostProcessingEnabled(this.settings) && !this.isBypassed()) {
       this.takeRendererOutputOwnership();
     }
@@ -56,6 +58,7 @@ export class PostProcessingController {
       const renderScaleChanged = settings.renderScale !== this.settings.renderScale;
       this.settings = settings;
       this.topologySignature = createPostProcessingTopologySignature(settings);
+      this.clearFailure();
       if (isPostProcessingEnabled(settings) && !this.isBypassed()) {
         this.takeRendererOutputOwnership();
       } else {
@@ -75,8 +78,21 @@ export class PostProcessingController {
     return this.bypassProvider?.() === true;
   }
 
+  isCurrentTopologyFailed() {
+    return this.failedTopologySignature === this.topologySignature;
+  }
+
+  clearFailure() {
+    this.failedTopologySignature = null;
+    this.lastFailure = null;
+  }
+
   syncRendererOutputOwnership() {
-    if (isPostProcessingEnabled(this.settings) && !this.isBypassed()) {
+    if (
+      isPostProcessingEnabled(this.settings)
+      && !this.isBypassed()
+      && !this.isCurrentTopologyFailed()
+    ) {
       this.takeRendererOutputOwnership();
     } else {
       this.graph = null;
@@ -100,6 +116,23 @@ export class PostProcessingController {
     this.renderer.toneMapping = this.rendererState.toneMapping;
     this.renderer.toneMappingExposure = this.rendererState.toneMappingExposure;
     this.rendererState = null;
+  }
+
+  handleFailure(error, signature = this.topologySignature) {
+    if (this.failedTopologySignature !== signature) {
+      console.error(
+        'Post-processing failed; restoring the base renderer for this topology.',
+        error,
+      );
+    }
+    this.failedTopologySignature = signature;
+    this.lastFailure = error;
+    if (this.graph?.topologySignature === signature) this.graph = null;
+    this.resources.discardGraph(signature);
+    this.resources.deactivateGraph();
+    this.restoreRendererOutput();
+    this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.POST_GRAPH_REBUILT);
+    return false;
   }
 
   ensureGraph(camera) {
@@ -135,7 +168,8 @@ export class PostProcessingController {
   }
 
   updateFrame(camera, graph = this.graph, settings = this.settings) {
-    this.invalidation.beginFrame();
+    const globallyReactive = this.invalidation.consumeReactiveFrame();
+    if (globallyReactive) this.history.ssrValid = false;
     const timestampMs = typeof performance !== 'undefined' ? performance.now() : 0;
     this.frameState.beginFrame(
       camera,
@@ -143,6 +177,7 @@ export class PostProcessingController {
       this.history,
       settings,
       timestampMs,
+      globallyReactive,
     );
     this.updateFocusDistance(camera, settings);
     graph.updateUniforms(this.frameState, settings);
@@ -175,21 +210,30 @@ export class PostProcessingController {
   render(camera) {
     if (this.disposed) return false;
     this.syncRendererOutputOwnership();
-    if (!isPostProcessingEnabled(this.settings) || this.isBypassed()) return false;
-    this.ensureGraph(camera);
-    this.updateFrame(camera);
+    if (
+      !isPostProcessingEnabled(this.settings)
+      || this.isBypassed()
+      || this.isCurrentTopologyFailed()
+    ) return false;
+
+    let frameStarted = false;
     let rendered = false;
     try {
+      this.ensureGraph(camera);
+      frameStarted = true;
+      this.updateFrame(camera);
       this.graph.render();
       rendered = true;
+      this.diagnostics.frameRendered();
+      if (this.settings.diagnostics?.showGpuTimings) {
+        this.diagnostics.requestGpuTimings(this.renderer, this.graph.gpuPasses);
+      }
+      return true;
+    } catch (error) {
+      return this.handleFailure(error);
     } finally {
-      this.finishFrame(rendered);
+      if (frameStarted) this.finishFrame(rendered);
     }
-    this.diagnostics.frameRendered();
-    if (this.settings.diagnostics?.showGpuTimings) {
-      this.diagnostics.requestGpuTimings(this.renderer, this.graph.gpuPasses);
-    }
-    return true;
   }
 
   async precompile(camera) {
@@ -205,11 +249,16 @@ export class PostProcessingController {
           return this.createGraph(camera, settings, signature);
         });
         this.resources.resizeGraph(signature, 8, 8, 1);
-        this.updateFrame(camera, graph, settings);
+        let frameStarted = false;
         try {
+          frameStarted = true;
+          this.updateFrame(camera, graph, settings);
           await graph.precompile();
+        } catch (error) {
+          this.resources.discardGraph(signature);
+          throw error;
         } finally {
-          this.finishFrame(false);
+          if (frameStarted) this.finishFrame(false);
         }
         if (created) this.diagnostics.graphBuilt(signature);
       }
@@ -227,17 +276,26 @@ export class PostProcessingController {
   warmup(camera) {
     if (this.disposed) return false;
     this.syncRendererOutputOwnership();
-    if (!isPostProcessingEnabled(this.settings) || this.isBypassed()) return false;
-    this.ensureGraph(camera);
-    this.updateFrame(camera);
+    if (
+      !isPostProcessingEnabled(this.settings)
+      || this.isBypassed()
+      || this.isCurrentTopologyFailed()
+    ) return false;
+
+    let frameStarted = false;
     let rendered = false;
     try {
+      this.ensureGraph(camera);
+      frameStarted = true;
+      this.updateFrame(camera);
       this.graph.warmup();
       rendered = true;
+      return true;
+    } catch (error) {
+      return this.handleFailure(error);
     } finally {
-      this.finishFrame(rendered);
+      if (frameStarted) this.finishFrame(rendered);
     }
-    return true;
   }
 
   resize(width, height) {
@@ -247,11 +305,12 @@ export class PostProcessingController {
       || this.resources.pixelRatio !== pixelRatio;
     this.resources.resize(width, height, pixelRatio);
     if (changed) {
-      this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.RESIZE);
+      this.invalidate(POST_PROCESSING_RESET_REASONS.RESIZE);
     }
   }
 
   invalidate(reason) {
+    this.clearFailure();
     this.invalidation.invalidate(reason);
   }
 
@@ -260,7 +319,7 @@ export class PostProcessingController {
   }
 
   clearHistory() {
-    this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.MANUAL_RESET);
+    this.invalidate(POST_PROCESSING_RESET_REASONS.MANUAL_RESET);
   }
 
   dispose() {
@@ -277,5 +336,6 @@ export class PostProcessingController {
     this.sunDirection = null;
     this.bypassProvider = null;
     this.focusDistanceProvider = null;
+    this.lastFailure = null;
   }
 }
