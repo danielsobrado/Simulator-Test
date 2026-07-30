@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three/webgpu';
 import { PostProcessingController } from '../../src/render/postprocessing/PostProcessingController.js';
 
 function createController() {
@@ -40,7 +41,7 @@ test('successful render scopes renderer output ownership to the call', () => {
     controller.graph = {
       topologySignature: controller.topologySignature,
       render() {
-        renderedWithManualOutput = renderer.toneMapping === 0
+        renderedWithManualOutput = renderer.toneMapping === THREE.NoToneMapping
           && renderer.toneMappingExposure === 1;
       },
     };
