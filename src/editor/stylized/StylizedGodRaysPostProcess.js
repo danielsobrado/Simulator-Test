@@ -365,15 +365,9 @@ export class StylizedGodRaysPostProcess {
 
   prewarm(camera) {
     if (!this.shouldRender(camera)) return false;
-    this.ensureScreenPipeline(camera);
+    this.ensurePipeline(camera);
     this.updateUniforms(camera);
-    this.screenPipeline.render();
-    if (this.canBuildVolumetricPipeline()) {
-      this.ensureVolumetricPipeline(camera)?.render();
-    }
-    this.pipeline = this.technique === 'volumetric' && this.volumetricPipeline
-      ? this.volumetricPipeline
-      : this.screenPipeline;
+    this.pipeline.render();
     return true;
   }
 

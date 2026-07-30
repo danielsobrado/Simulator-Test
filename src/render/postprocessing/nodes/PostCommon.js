@@ -39,6 +39,10 @@ export function createPostProcessingTopologySignature(settings) {
     ? settings.toneMapping.mode
     : 'none';
   signature += `|toneMode:${toneMappingMode}`;
+  const shaftSamples = enabled && settings?.screenSpaceShafts?.enabled === true
+    ? Math.max(8, Math.min(48, Math.round(settings.screenSpaceShafts.samples)))
+    : 'off';
+  signature += `|shaftSamples:${shaftSamples}`;
   const diagnosticsEnabled = enabled && settings?.diagnostics?.enabled === true;
   signature += `|debug:${diagnosticsEnabled ? settings.diagnostics.debugView : 'off'}`;
   return signature;

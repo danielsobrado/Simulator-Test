@@ -14,16 +14,26 @@ import { PostProcessingResources } from './PostProcessingResources.js';
 import { isPostProcessingEnabled } from './nodes/PostCommon.js';
 
 export class PostProcessingController {
-  constructor({ renderer, scene, postProcessingStore }) {
+  constructor({
+    renderer,
+    scene,
+    postProcessingStore,
+    sunDirection,
+    sunColor = '#ffffff',
+    bypassProvider = null,
+  }) {
     this.renderer = renderer;
     this.scene = scene;
     this.store = postProcessingStore;
+    this.sunDirection = sunDirection;
+    this.sunColor = sunColor;
+    this.bypassProvider = bypassProvider;
     this.settings = postProcessingStore.get();
     this.topologySignature = createPostProcessingTopologySignature(this.settings);
     this.graph = null;
     this.disposed = false;
     this.rendererState = null;
-    if (isPostProcessingEnabled(this.settings)) {
+    if (isPostProcessingEnabled(this.settings) && !this.isBypassed()) {
       this.takeRendererOutputOwnership();
     }
 
@@ -43,7 +53,7 @@ export class PostProcessingController {
       const renderScaleChanged = settings.renderScale !== this.settings.renderScale;
       this.settings = settings;
       this.topologySignature = createPostProcessingTopologySignature(settings);
-      if (isPostProcessingEnabled(settings)) {
+      if (isPostProcessingEnabled(settings) && !this.isBypassed()) {
         this.takeRendererOutputOwnership();
       } else {
         this.graph?.dispose();
@@ -56,6 +66,20 @@ export class PostProcessingController {
         );
       }
     });
+  }
+
+  isBypassed() {
+    return this.bypassProvider?.() === true;
+  }
+
+  syncRendererOutputOwnership() {
+    if (isPostProcessingEnabled(this.settings) && !this.isBypassed()) {
+      this.takeRendererOutputOwnership();
+    } else {
+      this.graph?.dispose();
+      this.graph = null;
+      this.restoreRendererOutput();
+    }
   }
 
   takeRendererOutputOwnership() {
@@ -91,6 +115,8 @@ export class PostProcessingController {
       settings: this.settings,
       history: this.history,
       topologySignature: this.topologySignature,
+      sunDirection: this.sunDirection,
+      sunColor: this.sunColor,
     });
     this.graph.resize(
       this.resources.width,
@@ -126,7 +152,9 @@ export class PostProcessingController {
   }
 
   render(camera) {
-    if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
+    if (this.disposed) return false;
+    this.syncRendererOutputOwnership();
+    if (!isPostProcessingEnabled(this.settings) || this.isBypassed()) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
     let rendered = false;
@@ -141,7 +169,9 @@ export class PostProcessingController {
   }
 
   async precompile(camera) {
-    if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
+    if (this.disposed) return false;
+    this.syncRendererOutputOwnership();
+    if (!isPostProcessingEnabled(this.settings) || this.isBypassed()) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
     try {
@@ -153,7 +183,9 @@ export class PostProcessingController {
   }
 
   warmup(camera) {
-    if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
+    if (this.disposed) return false;
+    this.syncRendererOutputOwnership();
+    if (!isPostProcessingEnabled(this.settings) || this.isBypassed()) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
     let rendered = false;
@@ -202,5 +234,7 @@ export class PostProcessingController {
     this.renderer = null;
     this.scene = null;
     this.store = null;
+    this.sunDirection = null;
+    this.bypassProvider = null;
   }
 }

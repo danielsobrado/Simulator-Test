@@ -406,34 +406,27 @@ export class EditorUi {
               <h2>God rays</h2>
               <span class="panel-count">live preview</span>
             </div>
-            <label class="settings-toggle">
-              <span>
-                <strong>Enabled</strong>
-                <small>Perspective player camera only</small>
-              </span>
-              <input type="checkbox" data-god-rays-setting="enabled" />
-            </label>
             <label class="settings-select">
               <span>Technique</span>
               <select data-god-rays-setting="technique">
-                <option value="screen-space">Screen-space radial</option>
-                <option value="volumetric">Volumetric shadow</option>
+                <option value="off">Off</option>
+                <option value="volumetric">Volumetric</option>
+                <option value="screen-space">Screen-space</option>
               </select>
             </label>
 
             <div class="settings-group" data-god-rays-section="screen-space">
-              <h3>Screen-space radial</h3>
-              <p>Cloud-sensitive shafts around the visible sun. Best for distant canopy and cloud silhouettes.</p>
-              ${this.rangeControl('Intensity', 'screenIntensity', 0, 3, 0.05, 2)}
-              ${this.rangeControl('Resolution', 'screenResolutionScale', 0.25, 1, 0.05, 2)}
-              ${this.rangeControl('Ray length', 'screenDensity', 0.1, 2, 0.02, 2)}
-              ${this.rangeControl('Persistence', 'screenDecay', 0, 1, 0.01, 2)}
-              ${this.rangeControl('Sample weight', 'screenWeight', 0.01, 1, 0.01, 2)}
-              ${this.rangeControl('Exposure', 'screenExposure', 0.01, 2, 0.02, 2)}
-              ${this.rangeControl('Dust strength', 'screenDustStrength', 0, 1, 0.01, 2)}
-              ${this.rangeControl('Dust scale', 'screenDustScale', 0.1, 12, 0.1, 1)}
-              ${this.rangeControl('Dust animation speed', 'screenDustSpeed', 0, 0.2, 0.001, 3)}
-              <p class="panel-note">Set dust animation speed to 0 to freeze the atmospheric motion.</p>
+              <h3>Screen-space shafts</h3>
+              <p>Depth-driven HDR shafts composited before reflections and temporal anti-aliasing.</p>
+              ${this.rangeControl('Intensity', 'shaftIntensity', 0, 2, 0.01, 2)}
+              <label class="settings-select">
+                <span>Quality</span>
+                <select data-god-rays-setting="shaftQuality">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
             </div>
 
             <div class="settings-group" data-god-rays-section="volumetric" hidden>
@@ -604,6 +597,9 @@ export class EditorUi {
       ...root.querySelectorAll('[data-god-rays-section]'),
     ];
     this.godRaysEffect = null;
+    this.godRaysTechnique = 'off';
+    this.postProcessingStore = null;
+    this.unsubscribeGodRaysPostProcessing = null;
     this.grassControls = [...root.querySelectorAll('[data-grass-setting]')];
     this.grassTuning = null;
 
@@ -810,20 +806,68 @@ export class EditorUi {
 
   attachGodRays(effect) {
     this.godRaysEffect = effect;
-    this.syncGodRaysSettings(effect?.getSettings?.());
+    const settings = effect?.getSettings?.();
+    this.godRaysTechnique = settings?.enabled ? settings.technique : 'off';
+    this.applyGodRaysTechnique(this.godRaysTechnique, { markCustom: false });
+    this.renderGodRaysSettings();
   }
 
   attachPostProcessing(store) {
     this.postProcessingPanel?.dispose();
+    this.unsubscribeGodRaysPostProcessing?.();
+    this.postProcessingStore = store;
     this.postProcessingPanel = createPostProcessingSettingsPanel({
       root: this.postProcessingPanelRoot,
       store,
       defaults: this.config.stylizedSurface.postProcessing,
     });
+    this.unsubscribeGodRaysPostProcessing = store.subscribe((settings) => {
+      const shaftsEnabled = settings.screenSpaceShafts.enabled === true;
+      if (shaftsEnabled !== (this.godRaysTechnique === 'screen-space')) {
+        const effect = this.godRaysEffect?.getSettings?.();
+        this.godRaysTechnique = shaftsEnabled
+          ? 'screen-space'
+          : effect?.enabled && effect.technique === 'volumetric'
+            ? 'volumetric'
+            : 'off';
+      }
+      this.syncGodRaysRuntimeForPostSettings(settings);
+      this.renderGodRaysSettings();
+    });
   }
 
   syncGodRaysSettings(settings) {
     if (!settings) return;
+    const shaftsEnabled = this.postProcessingStore?.get()?.screenSpaceShafts?.enabled === true;
+    this.godRaysTechnique = settings.enabled && settings.technique === 'volumetric'
+      ? 'volumetric'
+      : shaftsEnabled || (settings.enabled && settings.technique === 'screen-space')
+        ? 'screen-space'
+        : 'off';
+    this.applyGodRaysTechnique(this.godRaysTechnique, { markCustom: false });
+    this.renderGodRaysSettings();
+  }
+
+  resolveShaftQuality(settings = this.postProcessingStore?.get()?.screenSpaceShafts) {
+    if (!settings) return 'medium';
+    if (settings.samples >= 36 || settings.resolutionScale >= 0.7) return 'high';
+    if (settings.samples <= 16 && settings.resolutionScale <= 0.4) return 'low';
+    return 'medium';
+  }
+
+  unifiedGodRaysSettings() {
+    const effect = this.godRaysEffect?.getSettings?.() ?? {};
+    const shafts = this.postProcessingStore?.get()?.screenSpaceShafts ?? {};
+    return {
+      ...effect,
+      technique: this.godRaysTechnique,
+      shaftIntensity: shafts.intensity,
+      shaftQuality: this.resolveShaftQuality(shafts),
+    };
+  }
+
+  renderGodRaysSettings() {
+    const settings = this.unifiedGodRaysSettings();
     for (const control of this.godRaysControls) {
       const value = settings[control.dataset.godRaysSetting];
       if (value === undefined) continue;
@@ -834,6 +878,50 @@ export class EditorUi {
     for (const section of this.godRaysSections) {
       section.hidden = section.dataset.godRaysSection !== settings.technique;
     }
+  }
+
+  syncGodRaysRuntimeForPostSettings(settings = this.postProcessingStore?.get()) {
+    if (!this.godRaysEffect || !settings) return;
+    if (this.godRaysTechnique === 'screen-space') {
+      this.godRaysEffect.setSettings({
+        technique: 'screen-space',
+        enabled: settings.enabled !== true,
+      });
+    } else if (this.godRaysTechnique === 'volumetric') {
+      this.godRaysEffect.setSettings({ technique: 'volumetric', enabled: true });
+    } else {
+      this.godRaysEffect.setSettings({ enabled: false });
+    }
+  }
+
+  applyGodRaysTechnique(technique, { markCustom = true } = {}) {
+    if (!['off', 'volumetric', 'screen-space'].includes(technique)) return;
+    this.godRaysTechnique = technique;
+    this.syncGodRaysRuntimeForPostSettings();
+    const shaftsEnabled = technique === 'screen-space';
+    const currentShaftsEnabled = this.postProcessingStore
+      ?.get()
+      ?.screenSpaceShafts
+      ?.enabled;
+    if (
+      this.postProcessingStore
+      && currentShaftsEnabled !== shaftsEnabled
+    ) {
+      this.postProcessingStore.set(
+        { screenSpaceShafts: { enabled: shaftsEnabled } },
+        { markCustom },
+      );
+    }
+  }
+
+  setShaftQuality(quality) {
+    const levels = {
+      low: { resolutionScale: 0.35, samples: 12 },
+      medium: { resolutionScale: 0.5, samples: 24 },
+      high: { resolutionScale: 0.75, samples: 40 },
+    };
+    if (!levels[quality]) return;
+    this.postProcessingStore?.set({ screenSpaceShafts: levels[quality] });
   }
 
   attachLoading(tracker) {
@@ -1030,18 +1118,23 @@ export class EditorUi {
     this.godRaysPanel.addEventListener('input', (event) => {
       const control = event.target.closest('[data-god-rays-setting]');
       if (!control || !this.godRaysEffect) return;
-      const value = control.type === 'checkbox'
-        ? control.checked
-        : control.tagName === 'SELECT'
-          ? control.value
-          : Number(control.value);
-      const settings = this.godRaysEffect.setSettings({
-        [control.dataset.godRaysSetting]: value,
-      });
-      this.updateGodRaysOutput(control);
-      if (control.dataset.godRaysSetting === 'technique') {
-        this.syncGodRaysSettings(settings);
+      const key = control.dataset.godRaysSetting;
+      const value = control.tagName === 'SELECT'
+        ? control.value
+        : Number(control.value);
+      if (key === 'technique') {
+        this.applyGodRaysTechnique(value);
+      } else if (key === 'shaftIntensity') {
+        this.postProcessingStore?.set({
+          screenSpaceShafts: { intensity: value },
+        }, { coalesce: true });
+      } else if (key === 'shaftQuality') {
+        this.setShaftQuality(value);
+      } else {
+        this.godRaysEffect.setSettings({ [key]: value });
       }
+      this.updateGodRaysOutput(control);
+      this.renderGodRaysSettings();
     });
     this.biomeAssetBiome.addEventListener('change', () => {
       this.selectedBiomeAssetTileId = Number(this.biomeAssetBiome.value);
@@ -1422,9 +1515,8 @@ export class EditorUi {
               ? 'Drag to draw a curved wall'
               : 'Select a wall to edit';
     } else if (state.tool === 'settings') {
-      const settings = this.godRaysEffect?.getSettings?.();
-      this.selection.textContent = settings?.enabled
-        ? `God rays · ${settings.technique === 'volumetric' ? 'volumetric shadow' : 'screen-space'}`
+      this.selection.textContent = this.godRaysTechnique !== 'off'
+        ? `God rays · ${this.godRaysTechnique === 'volumetric' ? 'volumetric shadow' : 'screen-space'}`
         : 'God rays disabled';
     } else {
       this.selection.textContent = state.selectedObject

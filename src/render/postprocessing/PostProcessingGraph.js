@@ -14,6 +14,7 @@ import { createDebugViewNode } from './nodes/DebugViewNode.js';
 import { BloomNode } from './nodes/BloomNode.js';
 import { ContrastSharpenNode } from './nodes/ContrastSharpenNode.js';
 import { HierarchicalDepthNode } from './nodes/HierarchicalDepthNode.js';
+import { ScreenSpaceShaftNode } from './nodes/ScreenSpaceShaftNode.js';
 import { SelectiveSsrNode } from './nodes/SelectiveSsrNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
 import { ToneMappingNode } from './nodes/ToneMappingNode.js';
@@ -31,6 +32,8 @@ export class PostProcessingGraph {
     settings,
     history,
     topologySignature,
+    sunDirection,
+    sunColor,
   }) {
     this.renderer = renderer;
     this.topologySignature = topologySignature;
@@ -76,6 +79,16 @@ export class PostProcessingGraph {
       depth: this.scenePass.getTextureNode('depth'),
     });
 
+    this.screenSpaceShafts = settings?.screenSpaceShafts?.enabled === true
+      ? new ScreenSpaceShaftNode({
+        sourceNode: this.inputs.output,
+        depthNode: this.inputs.depth,
+        settings: settings.screenSpaceShafts,
+        sunDirection,
+        sunColor,
+      })
+      : null;
+    const postShaftOutput = this.screenSpaceShafts?.outputNode ?? this.inputs.output;
     this.hierarchicalDepth = settings?.ssr?.enabled === true
       ? new HierarchicalDepthNode({
         rawDepthNode: this.inputs.depth,
@@ -85,14 +98,14 @@ export class PostProcessingGraph {
       : null;
     this.ssr = this.hierarchicalDepth
       ? new SelectiveSsrNode({
-        sourceNode: this.inputs.output,
+        sourceNode: postShaftOutput,
         inputs: this.inputs,
         depthPyramid: this.hierarchicalDepth,
         history,
         settings: settings.ssr,
       })
       : null;
-    const preTaaOutput = this.ssr?.outputNode ?? this.inputs.output;
+    const preTaaOutput = this.ssr?.outputNode ?? postShaftOutput;
     this.taaResolve = taaEnabled
       ? new TaaResolveNode({
         scenePass: this.scenePass,
@@ -154,6 +167,26 @@ export class PostProcessingGraph {
       this.scenePass.setResolutionScale(nextSceneResolutionScale);
     }
     if (
+      this.screenSpaceShafts
+      && settings?.screenSpaceShafts?.resolutionScale
+        !== this.screenSpaceShafts.resolutionScale
+    ) {
+      this.screenSpaceShafts.resolutionScale = settings.screenSpaceShafts.resolutionScale;
+      const outputWidth = Math.max(
+        1,
+        Math.floor(frameState.width * frameState.pixelRatio),
+      );
+      const outputHeight = Math.max(
+        1,
+        Math.floor(frameState.height * frameState.pixelRatio),
+      );
+      this.screenSpaceShafts.resize(outputWidth, outputHeight);
+    }
+    this.screenSpaceShafts?.updateUniforms(
+      frameState,
+      settings?.screenSpaceShafts ?? this.screenSpaceShafts.settings,
+    );
+    if (
       this.ssr
       && settings?.ssr?.resolutionScale !== this.ssr.resolutionScale
     ) {
@@ -188,6 +221,10 @@ export class PostProcessingGraph {
 
   resize(width, height, pixelRatio = 1) {
     this.scenePass.setSize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.screenSpaceShafts?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
@@ -233,6 +270,7 @@ export class PostProcessingGraph {
     this.taaResolve?.dispose();
     this.ssr?.dispose();
     this.hierarchicalDepth?.dispose();
+    this.screenSpaceShafts?.dispose();
     this.scenePass.dispose();
     this.pipeline.outputColorTransform = this.previousOutputColorTransform;
     this.pipeline.dispose();

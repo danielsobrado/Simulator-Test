@@ -283,6 +283,12 @@ async function startEditor() {
     renderer: terrainView.renderer,
     scene: terrainView.scene,
     postProcessingStore,
+    sunDirection: terrainView.godRays.sunDirection,
+    sunColor: config.stylizedSurface.sky.sunColor,
+    bypassProvider: () => (
+      terrainView.godRays.enabled
+      && terrainView.godRays.technique === 'volumetric'
+    ),
   });
   terrainView.setPostProcessingController(postProcessingController);
   const temporalUnsubscribers = [];

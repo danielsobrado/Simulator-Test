@@ -334,6 +334,13 @@ export class InfiniteTerrainView {
   }
 
   render(camera) {
+    if (
+      this.godRays.enabled
+      && this.godRays.technique === 'volumetric'
+      && this.godRays.render(camera)
+    ) {
+      return;
+    }
     if (this.postProcessing?.render(camera)) return;
     if (!this.godRays.render(camera)) {
       this.renderer.render(this.scene, camera);
@@ -341,6 +348,9 @@ export class InfiniteTerrainView {
   }
 
   prewarmPostProcessing(camera) {
+    if (this.godRays.enabled && this.godRays.technique === 'volumetric') {
+      return this.godRays.prewarm(camera);
+    }
     if (this.postProcessing?.warmup(camera)) return true;
     return this.godRays.prewarm(camera);
   }

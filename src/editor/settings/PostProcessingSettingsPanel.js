@@ -62,16 +62,6 @@ const SECTIONS = Object.freeze([
     ['Temporal feedback', 'ssr.temporalFeedback', 'range', 0.7, 0.97, 0.01, 2],
     ['Edge fade', 'ssr.edgeFade', 'range', 0, 0.5, 0.01, 2],
   ]],
-  ['Light shafts', [
-    ['Enabled', 'screenSpaceShafts.enabled', 'boolean'],
-    ['Resolution scale', 'screenSpaceShafts.resolutionScale', 'range', 0.25, 0.75, 0.05, 2],
-    ['Samples', 'screenSpaceShafts.samples', 'range', 8, 48, 1, 0],
-    ['Intensity', 'screenSpaceShafts.intensity', 'range', 0, 2, 0.01, 2],
-    ['Reach', 'screenSpaceShafts.reach', 'range', 0.1, 1, 0.01, 2],
-    ['Decay', 'screenSpaceShafts.decay', 'range', 0.5, 1, 0.001, 3],
-    ['High sun fade start (°)', 'screenSpaceShafts.highSunFadeStartDegrees', 'range', 0, 90, 1, 0],
-    ['High sun fade end (°)', 'screenSpaceShafts.highSunFadeEndDegrees', 'range', 0, 90, 1, 0],
-  ]],
   ['Depth of field', [
     ['Enabled', 'depthOfField.enabled', 'boolean'],
     ['Focus mode', 'depthOfField.focusMode', 'select', DOF_FOCUS_MODES.map((value) => [value, value])],
