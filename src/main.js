@@ -1,4 +1,5 @@
 import './styles.css';
+import './render/installViewportFramebufferSourcePatch.js';
 import './editor/performance/frameRateDisplay.css';
 import './editor/performance/qa/perfQa.css';
 import './editor/player/playerMode.css';

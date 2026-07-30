@@ -26,8 +26,16 @@ import {
   StylizedGodRaysPostProcess,
   directionFromAngles,
 } from './stylized/StylizedGodRaysPostProcess.js';
+import { patchViewportFramebufferSources } from '../render/patchViewportFramebufferSources.js';
+
+// Water refraction / transmission sample viewport colour+depth via
+// ViewportTextureNode, which clones FramebufferTexture/DepthTexture per render
+// target while sharing Source. Detach those Sources before the first renderer
+// is constructed so resize cannot skip GPU realloc on the second target.
+patchViewportFramebufferSources();
 
 const PICK_ITERATIONS = 6;
+const _resizeSize = /* @__PURE__ */ new THREE.Vector2();
 const PREVIEW_HEIGHT_OFFSET = 0.08;
 
 export function inspectRendererBackend(renderer) {
@@ -238,11 +246,10 @@ export class InfiniteTerrainView {
     container.append(this.renderer.domElement);
     // Size the drawing buffer here rather than waiting for the bootstrap's
     // ResizeObserver. Until that observer is installed the canvas keeps the
-    // 300x150 HTML default, and every GPU texture allocated during those first
-    // frames is stuck at that size for the rest of the session: three caches one
-    // viewport framebuffer texture per render target but clones them from a
-    // shared `Source`, so the lazy resize check in `ViewportTextureNode` only
-    // ever reallocates whichever clone runs first after the canvas grows.
+    // 300x150 HTML default, and early GPU allocations pin that size. Combined
+    // with ViewportTextureNode's per-target clones (mitigated by
+    // patchViewportFramebufferSources), a late first resize used to leave
+    // stale framebuffer copies and WebGPU CopyTextureToTexture validation errors.
     this.resize(container.clientWidth, container.clientHeight);
 
     this.scene = new THREE.Scene();
@@ -316,8 +323,13 @@ export class InfiniteTerrainView {
   }
 
   resize(width, height) {
-    this.renderer.setSize(Math.max(1, width), Math.max(1, height), false);
-    this.postProcessing?.resize(width, height);
+    const nextWidth = Math.max(1, width);
+    const nextHeight = Math.max(1, height);
+    this.renderer.setSize(nextWidth, nextHeight, false);
+    // Drive post targets from the renderer sizes that setSize just committed so
+    // CSS/DPR flooring cannot drift between the drawing buffer and history/RTT.
+    const size = this.renderer.getSize(_resizeSize);
+    this.postProcessing?.resize(size.x, size.y);
   }
 
   setPostProcessingController(controller) {

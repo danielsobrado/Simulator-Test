@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Resize CopyTexture repro</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #111; color: #eee; font: 14px/1.4 ui-monospace, monospace; }
+      #ui { position: fixed; inset: 0 auto auto 0; z-index: 2; padding: 12px; max-width: 48rem; background: rgba(0,0,0,.65); }
+      canvas { position: fixed; inset: 0; width: 100% !important; height: 100% !important; }
+      button { margin-right: 8px; }
+      #log { white-space: pre-wrap; max-height: 50vh; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <div>
+        <button id="run" type="button">Run</button>
+        <span id="status">idle</span>
+      </div>
+      <pre id="log"></pre>
+    </div>
+    <script type="module" src="/scripts/resize-copy-harness/main.js"></script>
+  </body>
+</html>
