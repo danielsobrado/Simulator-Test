@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/post-processing-review
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
