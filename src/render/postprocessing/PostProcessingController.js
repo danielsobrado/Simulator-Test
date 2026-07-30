@@ -60,6 +60,7 @@ export class PostProcessingController {
       scene: this.scene,
       camera,
       settings: this.settings,
+      history: this.history,
       topologySignature: this.topologySignature,
     });
     this.graph.resize(
@@ -74,15 +75,35 @@ export class PostProcessingController {
 
   updateFrame(camera) {
     this.invalidation.beginFrame();
-    this.frameState.beginFrame(camera, this.resources);
-    this.graph.updateUniforms(this.frameState);
+    this.frameState.beginFrame(
+      camera,
+      this.resources,
+      this.history,
+      this.settings,
+    );
+    this.graph.updateUniforms(this.frameState, this.settings);
+  }
+
+  finishFrame(rendered) {
+    // Projection restoration must happen before the unjittered matrices become
+    // next frame's history.
+    this.frameState.restoreCameraProjection();
+    if (rendered && this.frameState.temporalEnabled) {
+      this.history.latchTaaFrame(this.frameState.currentViewProjection);
+    }
   }
 
   render(camera) {
     if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
-    this.graph.render();
+    let rendered = false;
+    try {
+      this.graph.render();
+      rendered = true;
+    } finally {
+      this.finishFrame(rendered);
+    }
     this.diagnostics.frameRendered();
     return true;
   }
@@ -91,7 +112,11 @@ export class PostProcessingController {
     if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
-    await this.graph.precompile();
+    try {
+      await this.graph.precompile();
+    } finally {
+      this.finishFrame(false);
+    }
     return true;
   }
 
@@ -99,7 +124,13 @@ export class PostProcessingController {
     if (this.disposed || !isPostProcessingEnabled(this.settings)) return false;
     this.ensureGraph(camera);
     this.updateFrame(camera);
-    this.graph.warmup();
+    let rendered = false;
+    try {
+      this.graph.warmup();
+      rendered = true;
+    } finally {
+      this.finishFrame(rendered);
+    }
     return true;
   }
 
@@ -133,6 +164,7 @@ export class PostProcessingController {
     this.unsubscribe?.();
     this.graph?.dispose();
     this.resources.dispose();
+    this.history.dispose();
     this.graph = null;
     this.renderer = null;
     this.scene = null;

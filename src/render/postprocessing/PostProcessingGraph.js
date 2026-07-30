@@ -10,6 +10,7 @@ import {
 import { packMaterialDataNode } from './PostProcessingMaterialData.js';
 import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
+import { TaaResolveNode } from './nodes/TaaResolveNode.js';
 
 export { createPostProcessingTopologySignature };
 
@@ -22,6 +23,7 @@ export class PostProcessingGraph {
     scene,
     camera,
     settings,
+    history,
     topologySignature,
   }) {
     this.renderer = renderer;
@@ -36,6 +38,10 @@ export class PostProcessingGraph {
       velocity,
       material: packMaterialDataNode(),
     }));
+    const taaEnabled = settings?.antiAliasing?.enabled === true;
+    const taaUpscale = taaEnabled && settings.antiAliasing.mode === 'traau';
+    this.sceneResolutionScale = taaUpscale ? settings.renderScale : 1;
+    this.scenePass.setResolutionScale(this.sceneResolutionScale);
 
     const outputTexture = this.scenePass.getTexture('output');
     outputTexture.format = THREE.RGBAFormat;
@@ -64,20 +70,48 @@ export class PostProcessingGraph {
       depth: this.scenePass.getTextureNode('depth'),
     });
 
+    this.taaResolve = taaEnabled
+      ? new TaaResolveNode({
+        scenePass: this.scenePass,
+        inputs: this.inputs,
+        history,
+        settings: settings.antiAliasing,
+      })
+      : null;
+    const resolvedOutput = this.taaResolve?.outputNode ?? this.inputs.output;
+    const debugOverride = settings?.diagnostics?.enabled === true
+      && settings.diagnostics.debugView !== 'final';
+
     this.pipeline = new THREE.RenderPipeline(renderer);
-    this.pipeline.outputNode = settings?.diagnostics?.enabled === true
+    this.pipeline.outputNode = debugOverride
       ? createDebugViewNode(this.scenePass, settings.diagnostics.debugView)
-      : this.inputs.output;
+      : resolvedOutput;
   }
 
-  updateUniforms(frameState) {
+  updateUniforms(frameState, settings = null) {
     // Camera identity can change when switching editor/player views without
-    // changing graph topology. Phase 2 has no additional uniforms.
+    // changing graph topology.
     this.scenePass.camera = frameState.camera;
+    const nextSceneResolutionScale = settings?.antiAliasing?.enabled === true
+      && settings.antiAliasing.mode === 'traau'
+      ? settings.renderScale
+      : 1;
+    if (nextSceneResolutionScale !== this.sceneResolutionScale) {
+      this.sceneResolutionScale = nextSceneResolutionScale;
+      this.scenePass.setResolutionScale(nextSceneResolutionScale);
+    }
+    if (this.taaResolve) {
+      this.taaResolve.settings = settings?.antiAliasing ?? this.taaResolve.settings;
+      this.taaResolve.updateUniforms(frameState);
+    }
   }
 
   resize(width, height, pixelRatio = 1) {
     this.scenePass.setSize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.taaResolve?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
@@ -98,6 +132,7 @@ export class PostProcessingGraph {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.taaResolve?.dispose();
     this.scenePass.dispose();
     this.pipeline.dispose();
     this.renderer = null;

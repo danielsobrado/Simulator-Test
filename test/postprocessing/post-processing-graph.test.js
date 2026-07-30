@@ -46,3 +46,18 @@ test('enabled graph with all effects off has a scene-only topology identity', ()
 test('disabled topology does not allocate the scene MRT', () => {
   assert.match(createPostProcessingTopologySignature(settings(false)), /\|mrt:0/);
 });
+
+test('temporal AA mode participates in graph topology', () => {
+  const traa = settings();
+  traa.antiAliasing = { enabled: true, mode: 'traa' };
+  const traau = settings();
+  traau.antiAliasing = { enabled: true, mode: 'traau' };
+  const disabled = settings();
+  disabled.antiAliasing = { enabled: false, mode: 'traau' };
+
+  assert.notEqual(
+    createPostProcessingTopologySignature(traa),
+    createPostProcessingTopologySignature(traau),
+  );
+  assert.match(createPostProcessingTopologySignature(disabled), /\|aaMode:off/);
+});

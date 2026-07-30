@@ -20,6 +20,10 @@ export function createPostProcessingTopologySignature(settings) {
   for (const key of POST_PROCESSING_EFFECT_KEYS) {
     signature += `|${key}:${settings?.[key]?.enabled === true ? 1 : 0}`;
   }
+  const aaMode = enabled && settings?.antiAliasing?.enabled === true
+    ? settings.antiAliasing.mode
+    : 'off';
+  signature += `|aaMode:${aaMode}`;
   const diagnosticsEnabled = enabled && settings?.diagnostics?.enabled === true;
   signature += `|debug:${diagnosticsEnabled ? settings.diagnostics.debugView : 'off'}`;
   return signature;
