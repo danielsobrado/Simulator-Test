@@ -40,6 +40,7 @@ function buildVolumetric(effect, depthTexture, camera, resources) {
   return {
     color: effect.tint.mul(amount),
     rays,
+    screenTexture: null,
   };
 }
 
@@ -65,11 +66,14 @@ function buildScreenSpace(effect, depthTexture, resources) {
   return {
     color: raysTexture.sample(screenUV).rgb.mul(effect.tint),
     rays: null,
+    screenTexture: raysTexture,
   };
 }
 
 export function buildPostProcessingGodRays(effect, depthTexture, camera, resources) {
-  if (!effect.shouldRender(camera)) return { color: null, rays: null };
+  if (!effect.shouldRender(camera)) {
+    return { color: null, rays: null, screenTexture: null };
+  }
   effect.ensureScenePass(camera);
   if (effect.technique === 'volumetric' && effect.canBuildVolumetricPipeline()) {
     return buildVolumetric(effect, depthTexture, camera, resources);
@@ -77,7 +81,10 @@ export function buildPostProcessingGodRays(effect, depthTexture, camera, resourc
   return buildScreenSpace(effect, depthTexture, resources);
 }
 
-export function syncPostProcessingGodRays(effect, rays) {
+export function syncPostProcessingGodRays(effect, rays, screenTexture) {
+  if (screenTexture) {
+    screenTexture.setResolutionScale(effect.config.resolutionScale ?? 0.5);
+  }
   if (!rays) return;
   const config = effect.config.volumetric;
   rays.raymarchSteps.value = config.raymarchSteps;
