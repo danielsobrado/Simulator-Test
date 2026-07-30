@@ -19,7 +19,7 @@ test('settings panel exposes every screen-space shaft control', async () => {
     'screenSpaceShafts.highSunFadeStartDegrees',
     'screenSpaceShafts.highSunFadeEndDegrees',
   ]) {
-    assert.match(source, new RegExp(path.replaceAll('.', '\\.')));
+    assert.ok(source.includes(`'${path}'`), `missing settings control: ${path}`);
   }
 });
 
@@ -30,7 +30,7 @@ test('compile-time range controls update on change rather than every input frame
     'screenSpaceShafts.samples',
     'depthOfField.taps',
   ]) {
-    assert.match(source, new RegExp(`'${path.replaceAll('.', '\\.').replaceAll('\\.', '.')}'`));
+    assert.ok(source.includes(`'${path}'`), `missing topology range: ${path}`);
   }
   assert.match(source, /TOPOLOGY_RANGE_PATHS\.has\(path\)/);
   assert.match(source, /\? 'input'\s*:\s*'change'/);
