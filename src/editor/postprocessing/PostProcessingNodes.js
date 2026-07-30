@@ -73,8 +73,8 @@ export function exponentialHeightFog({
   })();
 }
 
-export function debugDepth(depthTexture) {
-  return vec4(vec3(depthTexture.sample(screenUV).x), 1);
+export function debugDepth(depthNode) {
+  return vec4(vec3(depthNode), 1);
 }
 
 export function debugVelocity(velocityTexture) {
