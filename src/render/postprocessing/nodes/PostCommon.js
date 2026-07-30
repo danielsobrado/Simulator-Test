@@ -35,6 +35,10 @@ export function createPostProcessingTopologySignature(settings) {
     )
     : 'off';
   signature += `|bloomLevels:${bloomLevels}`;
+  const toneMappingMode = enabled && settings?.toneMapping?.enabled === true
+    ? settings.toneMapping.mode
+    : 'none';
+  signature += `|toneMode:${toneMappingMode}`;
   const diagnosticsEnabled = enabled && settings?.diagnostics?.enabled === true;
   signature += `|debug:${diagnosticsEnabled ? settings.diagnostics.debugView : 'off'}`;
   return signature;

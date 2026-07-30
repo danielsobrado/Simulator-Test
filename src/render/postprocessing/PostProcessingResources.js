@@ -1,7 +1,6 @@
 /**
- * Renderer-owned presentation resources. RenderPipeline uses the same renderer,
- * so clear colour, scene background, output colour space, tone mapping and
- * exposure remain exactly those of the direct-render path.
+ * Renderer-owned presentation dimensions. The controller temporarily owns tone
+ * mapping and exposure while the post-processing graph is enabled.
  */
 export class PostProcessingResources {
   constructor(renderer) {

@@ -61,3 +61,18 @@ test('temporal AA mode participates in graph topology', () => {
   );
   assert.match(createPostProcessingTopologySignature(disabled), /\|aaMode:off/);
 });
+
+test('tone mapping mode participates in graph topology', () => {
+  const agx = settings();
+  agx.toneMapping = { enabled: true, mode: 'agx' };
+  const aces = settings();
+  aces.toneMapping = { enabled: true, mode: 'aces' };
+  const disabled = settings();
+  disabled.toneMapping = { enabled: false, mode: 'agx' };
+
+  assert.notEqual(
+    createPostProcessingTopologySignature(agx),
+    createPostProcessingTopologySignature(aces),
+  );
+  assert.match(createPostProcessingTopologySignature(disabled), /\|toneMode:none/);
+});

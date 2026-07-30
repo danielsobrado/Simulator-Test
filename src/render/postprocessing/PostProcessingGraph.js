@@ -5,6 +5,7 @@ import {
   output,
   packNormalToRGB,
   pass,
+  renderOutput,
   velocity,
 } from 'three/tsl';
 import { packMaterialDataNode } from './PostProcessingMaterialData.js';
@@ -12,6 +13,7 @@ import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
 import { BloomNode } from './nodes/BloomNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
+import { ToneMappingNode } from './nodes/ToneMappingNode.js';
 
 export { createPostProcessingTopologySignature };
 
@@ -89,13 +91,26 @@ export class PostProcessingGraph {
       })
       : null;
     this.bloomTextureNode = this.bloom?.outputNode ?? null;
-    const finalOutput = this.bloom?.compositeNode ?? resolvedOutput;
+    this.toneMapping = new ToneMappingNode({
+      sourceNode: resolvedOutput,
+      bloomNode: this.bloomTextureNode,
+      settings: settings.toneMapping,
+      bloomIntensity: settings?.bloom?.intensity ?? 0,
+      outputColorSpace: renderer.outputColorSpace,
+    });
+    const finalOutput = this.toneMapping.outputNode;
     const debugOverride = settings?.diagnostics?.enabled === true
       && settings.diagnostics.debugView !== 'final';
 
     this.pipeline = new THREE.RenderPipeline(renderer);
+    this.previousOutputColorTransform = this.pipeline.outputColorTransform;
+    this.pipeline.outputColorTransform = false;
     this.pipeline.outputNode = debugOverride
-      ? createDebugViewNode(this.scenePass, settings.diagnostics.debugView)
+      ? renderOutput(
+        createDebugViewNode(this.scenePass, settings.diagnostics.debugView),
+        THREE.NoToneMapping,
+        renderer.outputColorSpace,
+      )
       : finalOutput;
   }
 
@@ -118,6 +133,10 @@ export class PostProcessingGraph {
     this.bloom?.updateUniforms(
       settings?.bloom ?? this.bloom.settings,
       settings?.toneMapping?.exposure ?? 1,
+    );
+    this.toneMapping.updateUniforms(
+      settings?.toneMapping,
+      settings?.bloom?.intensity ?? 0,
     );
   }
 
@@ -154,6 +173,7 @@ export class PostProcessingGraph {
     this.bloom?.dispose();
     this.taaResolve?.dispose();
     this.scenePass.dispose();
+    this.pipeline.outputColorTransform = this.previousOutputColorTransform;
     this.pipeline.dispose();
     this.renderer = null;
   }

@@ -134,7 +134,6 @@ export class BloomNode {
     this.threshold = uniform(settings.threshold);
     this.knee = uniform(settings.knee);
     this.bloomBoost = uniform(settings.bloomBoost);
-    this.intensity = uniform(settings.intensity);
     this.sourceResolution = uniform(new THREE.Vector2(1, 1));
     this.levelResolutions = Array.from(
       { length: this.levelCount },
@@ -200,12 +199,6 @@ export class BloomNode {
     }
 
     this.outputNode = combined;
-    this.compositeNode = Fn(() => vec4(
-      sourceNode.sample(screenUV).rgb
-        .mul(this.exposure)
-        .add(this.outputNode.sample(screenUV).rgb.mul(this.intensity)),
-      1,
-    ))();
   }
 
   updateUniforms(settings, exposure = 1) {
@@ -214,7 +207,6 @@ export class BloomNode {
     this.threshold.value = settings.threshold;
     this.knee.value = settings.knee;
     this.bloomBoost.value = settings.bloomBoost;
-    this.intensity.value = settings.intensity;
   }
 
   resize(width, height) {

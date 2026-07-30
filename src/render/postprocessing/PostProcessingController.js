@@ -1,3 +1,4 @@
+import * as THREE from 'three/webgpu';
 import { PostProcessingDiagnostics } from './PostProcessingDiagnostics.js';
 import { PostProcessingFrameState } from './PostProcessingFrameState.js';
 import { PostProcessingHistory } from './PostProcessingHistory.js';
@@ -21,6 +22,10 @@ export class PostProcessingController {
     this.topologySignature = createPostProcessingTopologySignature(this.settings);
     this.graph = null;
     this.disposed = false;
+    this.rendererState = null;
+    if (isPostProcessingEnabled(this.settings)) {
+      this.takeRendererOutputOwnership();
+    }
 
     this.resources = new PostProcessingResources(renderer);
     this.frameState = new PostProcessingFrameState();
@@ -38,12 +43,36 @@ export class PostProcessingController {
       const renderScaleChanged = settings.renderScale !== this.settings.renderScale;
       this.settings = settings;
       this.topologySignature = createPostProcessingTopologySignature(settings);
+      if (isPostProcessingEnabled(settings)) {
+        this.takeRendererOutputOwnership();
+      } else {
+        this.graph?.dispose();
+        this.graph = null;
+        this.restoreRendererOutput();
+      }
       if (renderScaleChanged) {
         this.invalidation.invalidate(
           POST_PROCESSING_RESET_REASONS.RENDER_SCALE_CHANGED,
         );
       }
     });
+  }
+
+  takeRendererOutputOwnership() {
+    if (this.rendererState || !this.renderer) return;
+    this.rendererState = {
+      toneMapping: this.renderer.toneMapping,
+      toneMappingExposure: this.renderer.toneMappingExposure,
+    };
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMappingExposure = 1;
+  }
+
+  restoreRendererOutput() {
+    if (!this.rendererState || !this.renderer) return;
+    this.renderer.toneMapping = this.rendererState.toneMapping;
+    this.renderer.toneMappingExposure = this.rendererState.toneMappingExposure;
+    this.rendererState = null;
   }
 
   ensureGraph(camera) {
@@ -163,6 +192,7 @@ export class PostProcessingController {
     this.disposed = true;
     this.unsubscribe?.();
     this.graph?.dispose();
+    this.restoreRendererOutput();
     this.resources.dispose();
     this.history.dispose();
     this.graph = null;
