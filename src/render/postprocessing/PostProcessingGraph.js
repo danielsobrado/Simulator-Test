@@ -181,6 +181,22 @@ export class PostProcessingGraph {
         renderer.outputColorSpace,
       )
       : finalOutput;
+
+    this.gpuPasses = Object.freeze([
+      'sceneMrt',
+      ...(this.screenSpaceShafts ? ['volumetricOrShafts'] : []),
+      ...(this.hierarchicalDepth ? ['ssrDepthHierarchy'] : []),
+      ...(this.ssr ? ['ssrTrace', 'ssrTemporal'] : []),
+      ...(this.taaResolve ? ['taa'] : []),
+      ...(this.depthOfField ? ['dof'] : []),
+      ...(this.bloom
+        ? ['bloomPrefilter', 'bloomDownsample', 'bloomUpsample']
+        : []),
+      'toneMap',
+      ...(this.sharpen ? ['sharpen'] : []),
+      ...(this.grain ? ['grain'] : []),
+      'totalPost',
+    ]);
   }
 
   updateUniforms(frameState, settings = null) {
@@ -295,6 +311,7 @@ export class PostProcessingGraph {
 
   async precompile() {
     await this.scenePass.compileAsync(this.renderer);
+    this.pipeline.render();
   }
 
   warmup() {
