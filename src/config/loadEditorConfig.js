@@ -14,6 +14,7 @@ import {
   applyWaterVisualConfig,
   validateWaterContentConfig,
 } from '../editor/water/WaterVisualConfig.js';
+import { loadPostProcessingConfig } from './PostProcessingConfigLoader.js';
 import { validateEditorConfig } from './validateEditorConfig.js';
 import { validateStylizedLodConfig } from './validateStylizedLodConfig.js';
 
@@ -33,6 +34,7 @@ export function loadEditorConfig() {
   const config = yaml.load(configSource);
   applyWaterDomainConfig(config, yaml.load(waterConfigSource));
   applyWaterVisualConfig(config, yaml.load(waterVisualConfigSource));
+  loadPostProcessingConfig(config);
   config.collision = createCollisionConfig(yaml.load(collisionConfigSource), runtimeSearch());
   applyRuntimeOverrides(config);
   validateEditorConfig(config);
