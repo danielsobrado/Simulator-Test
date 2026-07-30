@@ -51,6 +51,7 @@ export class PostProcessingGraph {
     this.settings = settings;
     this.resources = [];
     this.materialOverrides = new PostProcessingMaterialOverrides(scene);
+    this.disposed = false;
     this.uniforms = {
       exposure: uniform(settings.toneMapping.exposure),
       contrast: uniform(settings.toneMapping.contrast),
@@ -64,31 +65,36 @@ export class PostProcessingGraph {
       focalLength: uniform(settings.depthOfField.focalLength),
       bokehScale: uniform(settings.depthOfField.bokehScale),
     };
-    this.build();
+    try {
+      this.build();
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   build() {
-    const pipeline = new THREE.RenderPipeline(this.renderer);
-    pipeline.outputColorTransform = false;
-    const scenePass = pass(this.scene, this.camera, {
-      samples: this.settings.antiAliasing.enabled ? 0 : this.renderer.samples,
+    this.pipeline = new THREE.RenderPipeline(this.renderer);
+    this.pipeline.outputColorTransform = false;
+    this.scenePass = pass(this.scene, this.camera, {
+      samples: this.settings.antiAliasing.enabled ? 0 : undefined,
     });
-    scenePass.setMRT(mrt({
+    this.scenePass.setMRT(mrt({
       output,
       normal: packNormalToRGB(normalView),
       velocity,
       metalrough: vec2(metalness, roughness),
     }));
-    scenePass.getTexture('normal').type = THREE.UnsignedByteType;
-    scenePass.getTexture('metalrough').type = THREE.UnsignedByteType;
+    this.scenePass.getTexture('normal').type = THREE.UnsignedByteType;
+    this.scenePass.getTexture('metalrough').type = THREE.UnsignedByteType;
     this.materialOverrides.apply();
 
-    const colorTexture = scenePass.getTextureNode('output');
-    const depthTexture = scenePass.getTextureNode('depth');
-    const linearDepth = scenePass.getLinearDepthNode();
-    const normalTexture = scenePass.getTextureNode('normal');
-    const velocityTexture = scenePass.getTextureNode('velocity');
-    const metalRoughTexture = scenePass.getTextureNode('metalrough');
+    const colorTexture = this.scenePass.getTextureNode('output');
+    const depthTexture = this.scenePass.getTextureNode('depth');
+    const linearDepth = this.scenePass.getLinearDepthNode();
+    const normalTexture = this.scenePass.getTextureNode('normal');
+    const velocityTexture = this.scenePass.getTextureNode('velocity');
+    const metalRoughTexture = this.scenePass.getTextureNode('metalrough');
     const normalNode = sample((uvNode) => unpackRGBToNormal(normalTexture.sample(uvNode)));
     let hdr = colorTexture;
 
@@ -99,6 +105,7 @@ export class PostProcessingGraph {
       this.resources,
     );
     this.volumetricRays = godRayResult.rays;
+    this.screenRaysTexture = godRayResult.screenTexture;
     if (godRayResult.color) hdr = vec4(hdr.rgb.add(godRayResult.color), hdr.a);
 
     if (this.settings.ssr.enabled) {
@@ -137,7 +144,7 @@ export class PostProcessingGraph {
     if (this.settings.depthOfField.enabled) {
       this.dofNode = dof(
         exposed,
-        scenePass.getViewZNode(),
+        this.scenePass.getViewZNode(),
         this.uniforms.focusDistance,
         this.uniforms.focalLength,
         this.uniforms.bokehScale,
@@ -191,9 +198,7 @@ export class PostProcessingGraph {
       display = views[this.settings.diagnostics.debugView] ?? display;
     }
 
-    pipeline.outputNode = display;
-    this.pipeline = pipeline;
-    this.scenePass = scenePass;
+    this.pipeline.outputNode = display;
     this.updateSettings(this.settings);
   }
 
@@ -234,16 +239,26 @@ export class PostProcessingGraph {
       this.ssrNode.thickness.value = settings.ssr.thickness;
       this.ssrNode.screenEdgeFade.value = settings.ssr.edgeFade;
     }
-    syncPostProcessingGodRays(this.godRays, this.volumetricRays);
+    syncPostProcessingGodRays(
+      this.godRays,
+      this.volumetricRays,
+      this.screenRaysTexture,
+    );
   }
 
   render() {
     this.godRays.updateUniforms(this.camera);
-    syncPostProcessingGodRays(this.godRays, this.volumetricRays);
+    syncPostProcessingGodRays(
+      this.godRays,
+      this.volumetricRays,
+      this.screenRaysTexture,
+    );
     this.pipeline.render();
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.materialOverrides.restore();
     this.pipeline?.dispose();
     this.traaNode?.dispose();
