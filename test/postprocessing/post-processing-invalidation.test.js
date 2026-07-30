@@ -68,6 +68,17 @@ test('reactive lifetimes expire deterministically in frames', () => {
   assert.equal(invalidation.isReactive(), false);
 });
 
+test('consumeReactiveFrame reports every configured reactive frame', () => {
+  const { invalidation } = createSystem();
+  invalidation.notifyReactive(POST_PROCESSING_REACTIVE_EVENTS.CHUNK_STREAMED_IN);
+  assert.deepEqual([
+    invalidation.consumeReactiveFrame(),
+    invalidation.consumeReactiveFrame(),
+    invalidation.consumeReactiveFrame(),
+    invalidation.consumeReactiveFrame(),
+  ], [true, true, true, false]);
+});
+
 test('LOD reactive events include transition frames plus two', () => {
   const { invalidation } = createSystem();
   assert.equal(

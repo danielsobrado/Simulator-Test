@@ -21,6 +21,7 @@ export class PostProcessingFrameState {
     this.sourceHeight = 1;
     this.temporalEnabled = false;
     this.historyValid = false;
+    this.globalReactive = false;
     this.projectionJittered = false;
     this.jitterPixels = new THREE.Vector2();
     this.jitterNdc = new THREE.Vector2();
@@ -31,7 +32,14 @@ export class PostProcessingFrameState {
     this.previousViewProjection = new THREE.Matrix4();
   }
 
-  beginFrame(camera, resources, history = null, settings = null, timestampMs = 0) {
+  beginFrame(
+    camera,
+    resources,
+    history = null,
+    settings = null,
+    timestampMs = 0,
+    globalReactive = false,
+  ) {
     this.camera = camera;
     this.frame += 1;
     const currentTimestamp = Number.isFinite(timestampMs) ? timestampMs : 0;
@@ -53,6 +61,7 @@ export class PostProcessingFrameState {
     this.historyValid = this.temporalEnabled
       && history?.taaColourValid === true
       && history?.taaDepthValid === true;
+    this.globalReactive = globalReactive === true;
     this.projectionJittered = false;
     this.jitterPixels.set(0, 0);
     this.jitterNdc.set(0, 0);

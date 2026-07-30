@@ -16,6 +16,18 @@ import {
 } from 'three/tsl';
 
 const VIRTUAL_NOISE_RESOLUTION = 4096;
+const MIN_EDGE_SEPARATION = 1e-4;
+const MAX_VIGNETTE_RADIUS = 2;
+
+function orderedVignetteRadii(innerRadius, outerRadius) {
+  let inner = Math.min(Number(innerRadius), Number(outerRadius));
+  let outer = Math.max(Number(innerRadius), Number(outerRadius));
+  if (outer - inner < MIN_EDGE_SEPARATION) {
+    if (outer < MAX_VIGNETTE_RADIUS) outer += MIN_EDGE_SEPARATION;
+    else inner = Math.max(0, inner - MIN_EDGE_SEPARATION);
+  }
+  return [inner, outer];
+}
 
 function smoothstepReference(edge0, edge1, value) {
   if (edge0 === edge1) return value < edge0 ? 0 : 1;
@@ -31,10 +43,11 @@ export function vignetteFactorReference(
     outerRadius = 1.05,
   } = {},
 ) {
+  const [inner, outer] = orderedVignetteRadii(innerRadius, outerRadius);
   const dx = uv[0] - 0.5;
   const dy = uv[1] - 0.5;
   const distance = Math.hypot(dx, dy) * 1.414;
-  const edge = smoothstepReference(outerRadius, innerRadius, distance);
+  const edge = 1 - smoothstepReference(inner, outer, distance);
   return 1 + (edge - 1) * intensity;
 }
 
@@ -47,9 +60,13 @@ export function grainReference(colour, noise, intensity = 0) {
 }
 
 export function createVignetteNode(sourceNode, settings) {
+  const [initialInner, initialOuter] = orderedVignetteRadii(
+    settings.innerRadius,
+    settings.outerRadius,
+  );
   const intensity = uniform(settings.intensity);
-  const innerRadius = uniform(settings.innerRadius);
-  const outerRadius = uniform(settings.outerRadius);
+  const innerRadius = uniform(initialInner);
+  const outerRadius = uniform(initialOuter);
   const outputNode = Fn(() => {
     const distance = screenUV.sub(vec2(0.5)).length().mul(1.414);
     const factor = mix(
@@ -62,9 +79,13 @@ export function createVignetteNode(sourceNode, settings) {
   return {
     outputNode,
     updateUniforms(next) {
+      const [inner, outer] = orderedVignetteRadii(
+        next.innerRadius,
+        next.outerRadius,
+      );
       intensity.value = next.intensity;
-      innerRadius.value = next.innerRadius;
-      outerRadius.value = next.outerRadius;
+      innerRadius.value = inner;
+      outerRadius.value = outer;
     },
   };
 }

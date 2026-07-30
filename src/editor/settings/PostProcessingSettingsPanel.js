@@ -12,6 +12,15 @@ import {
   resolveSsrQuality,
 } from '../../render/postprocessing/PostProcessingPresets.js';
 
+const TOPOLOGY_RANGE_PATHS = new Set([
+  'renderScale',
+  'bloom.levels',
+  'ssr.resolutionScale',
+  'screenSpaceShafts.resolutionScale',
+  'screenSpaceShafts.samples',
+  'depthOfField.taps',
+]);
+
 const SECTIONS = Object.freeze([
   ['General', [
     ['Enabled', 'enabled', 'boolean'],
@@ -61,6 +70,16 @@ const SECTIONS = Object.freeze([
     ['Intensity', 'ssr.intensity', 'range', 0, 1, 0.01, 2],
     ['Temporal feedback', 'ssr.temporalFeedback', 'range', 0.7, 0.97, 0.01, 2],
     ['Edge fade', 'ssr.edgeFade', 'range', 0, 0.5, 0.01, 2],
+  ]],
+  ['Screen-space shafts', [
+    ['Enabled', 'screenSpaceShafts.enabled', 'boolean'],
+    ['Resolution scale', 'screenSpaceShafts.resolutionScale', 'range', 0.25, 0.75, 0.05, 2],
+    ['Samples', 'screenSpaceShafts.samples', 'range', 8, 48, 1, 0],
+    ['Intensity', 'screenSpaceShafts.intensity', 'range', 0, 2, 0.01, 2],
+    ['Reach', 'screenSpaceShafts.reach', 'range', 0.1, 1, 0.01, 2],
+    ['Decay', 'screenSpaceShafts.decay', 'range', 0.5, 1, 0.001, 3],
+    ['High-sun fade start (°)', 'screenSpaceShafts.highSunFadeStartDegrees', 'range', 0, 90, 1, 0],
+    ['High-sun fade end (°)', 'screenSpaceShafts.highSunFadeEndDegrees', 'range', 0, 90, 1, 0],
   ]],
   ['Depth of field', [
     ['Enabled', 'depthOfField.enabled', 'boolean'],
@@ -146,7 +165,7 @@ function createControl(definition, controls) {
 }
 
 /**
- * Mounts the Phase 1 settings UI. The supplied store follows the
+ * Mounts the post-processing settings UI. The supplied store follows the
  * createPostProcessingSettings get/set/reset/subscribe contract.
  */
 export function createPostProcessingSettingsPanel({
@@ -219,11 +238,15 @@ export function createPostProcessingSettingsPanel({
     if (control.output) {
       control.output.value = Number(value).toFixed(Number(control.dataset.precision));
     }
-    store.set(patchFor(path, value), { coalesce: control.type === 'range' });
+    store.set(patchFor(path, value), {
+      coalesce: control.type === 'range' && !TOPOLOGY_RANGE_PATHS.has(path),
+    });
   };
 
-  for (const control of controls.values()) {
-    const eventName = control.type === 'range' ? 'input' : 'change';
+  for (const [path, control] of controls) {
+    const eventName = control.type === 'range' && !TOPOLOGY_RANGE_PATHS.has(path)
+      ? 'input'
+      : 'change';
     control.addEventListener(eventName, update);
     listeners.push([control, eventName, update]);
   }

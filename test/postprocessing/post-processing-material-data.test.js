@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three/webgpu';
 import {
+  MATERIAL_DATA_CATEGORIES,
+  MATERIAL_DATA_REFERENCE_PROPERTIES,
   REFLECTION_CLASSES,
+  assignWaterMaterialData,
   decodeReflectionClass,
   defaultMaterialData,
   encodeReflectionClass,
@@ -24,4 +28,32 @@ test('reflection class decode rounds to the nearest byte', () => {
 
 test('default material data packs opaque roughness and zero masks', () => {
   assert.deepEqual(packMaterialData(defaultMaterialData), [1, 0, 0, 0]);
+});
+
+test('registered material data is exposed through pass-level material references', () => {
+  const material = assignWaterMaterialData(new THREE.MeshBasicNodeMaterial());
+  assert.equal(
+    material[MATERIAL_DATA_REFERENCE_PROPERTIES.roughness],
+    MATERIAL_DATA_CATEGORIES.WATER.roughness,
+  );
+  assert.equal(
+    material[MATERIAL_DATA_REFERENCE_PROPERTIES.reactive],
+    MATERIAL_DATA_CATEGORIES.WATER.reactive,
+  );
+  assert.equal(
+    decodeReflectionClass(material[MATERIAL_DATA_REFERENCE_PROPERTIES.reflectionClass]),
+    REFLECTION_CLASSES.WATER,
+  );
+});
+
+test('material clones preserve registered metadata through userData', () => {
+  const clone = assignWaterMaterialData(new THREE.MeshBasicNodeMaterial()).clone();
+  assert.equal(
+    decodeReflectionClass(clone[MATERIAL_DATA_REFERENCE_PROPERTIES.reflectionClass]),
+    REFLECTION_CLASSES.WATER,
+  );
+  assert.equal(
+    clone[MATERIAL_DATA_REFERENCE_PROPERTIES.reactive],
+    MATERIAL_DATA_CATEGORIES.WATER.reactive,
+  );
 });

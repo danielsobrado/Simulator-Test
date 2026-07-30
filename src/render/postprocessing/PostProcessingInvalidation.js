@@ -2,6 +2,7 @@ export const POST_PROCESSING_RESET_REASONS = Object.freeze({
   INITIAL_FRAME: 'INITIAL_FRAME',
   RESIZE: 'RESIZE',
   RENDER_SCALE_CHANGED: 'RENDER_SCALE_CHANGED',
+  RENDER_PATH_CHANGED: 'RENDER_PATH_CHANGED',
   CAMERA_MODE_CHANGED: 'CAMERA_MODE_CHANGED',
   CAMERA_TELEPORT: 'CAMERA_TELEPORT',
   CAMERA_FOV_CHANGED: 'CAMERA_FOV_CHANGED',
@@ -87,6 +88,12 @@ export class PostProcessingInvalidation {
       if (frames <= 1) this.reactiveFrames.delete(event);
       else this.reactiveFrames.set(event, frames - 1);
     }
+  }
+
+  consumeReactiveFrame() {
+    const reactive = this.isReactive();
+    this.beginFrame();
+    return reactive;
   }
 
   isReactive() {

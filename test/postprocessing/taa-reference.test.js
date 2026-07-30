@@ -57,6 +57,16 @@ test('TAA feedback reference combines motion, reactivity, and clipping', () => {
     clipDistance: 0,
     historyValid: false,
   }), 0);
+
+  assert.equal(taaFeedbackWeightReference({
+    feedback: 0.9,
+    motionPixels: 0,
+    motionRejectionPixels: 32,
+    reactiveMask: 0,
+    reactiveStrength: 0.9,
+    clipDistance: 0,
+    globalReactive: true,
+  }), 0);
 });
 
 test('TAA depth rejection threshold uses absolute and relative limits', () => {
@@ -77,4 +87,11 @@ test('TAA variance clipping expands chroma by 1.25', () => {
       max: [2.5, -0.1875, 0.40625],
     },
   );
+});
+
+test('history clamp strength tightens the accepted variance range', () => {
+  const normal = taaVarianceClipRangesReference([1, 1, 1], [0.2, 0.2, 0.2], 1, 1);
+  const strong = taaVarianceClipRangesReference([1, 1, 1], [0.2, 0.2, 0.2], 1, 2);
+  assert.ok(strong.min[0] > normal.min[0]);
+  assert.ok(strong.max[0] < normal.max[0]);
 });
