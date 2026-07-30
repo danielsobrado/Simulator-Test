@@ -24,6 +24,17 @@ export function createPostProcessingTopologySignature(settings) {
     ? settings.antiAliasing.mode
     : 'off';
   signature += `|aaMode:${aaMode}`;
+  const requestedBloomLevels = Number(settings?.bloom?.levels);
+  const bloomLevels = enabled && settings?.bloom?.enabled === true
+    ? Math.max(
+      2,
+      Math.min(
+        6,
+        Math.round(Number.isFinite(requestedBloomLevels) ? requestedBloomLevels : 4),
+      ),
+    )
+    : 'off';
+  signature += `|bloomLevels:${bloomLevels}`;
   const diagnosticsEnabled = enabled && settings?.diagnostics?.enabled === true;
   signature += `|debug:${diagnosticsEnabled ? settings.diagnostics.debugView : 'off'}`;
   return signature;

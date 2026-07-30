@@ -10,6 +10,7 @@ import {
 import { packMaterialDataNode } from './PostProcessingMaterialData.js';
 import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
+import { BloomNode } from './nodes/BloomNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
 
 export { createPostProcessingTopologySignature };
@@ -79,13 +80,23 @@ export class PostProcessingGraph {
       })
       : null;
     const resolvedOutput = this.taaResolve?.outputNode ?? this.inputs.output;
+    this.bloom = settings?.bloom?.enabled === true
+      ? new BloomNode({
+        sourceNode: resolvedOutput,
+        materialNode: this.inputs.material,
+        settings: settings.bloom,
+        exposure: settings?.toneMapping?.exposure ?? 1,
+      })
+      : null;
+    this.bloomTextureNode = this.bloom?.outputNode ?? null;
+    const finalOutput = this.bloom?.compositeNode ?? resolvedOutput;
     const debugOverride = settings?.diagnostics?.enabled === true
       && settings.diagnostics.debugView !== 'final';
 
     this.pipeline = new THREE.RenderPipeline(renderer);
     this.pipeline.outputNode = debugOverride
       ? createDebugViewNode(this.scenePass, settings.diagnostics.debugView)
-      : resolvedOutput;
+      : finalOutput;
   }
 
   updateUniforms(frameState, settings = null) {
@@ -104,6 +115,10 @@ export class PostProcessingGraph {
       this.taaResolve.settings = settings?.antiAliasing ?? this.taaResolve.settings;
       this.taaResolve.updateUniforms(frameState);
     }
+    this.bloom?.updateUniforms(
+      settings?.bloom ?? this.bloom.settings,
+      settings?.toneMapping?.exposure ?? 1,
+    );
   }
 
   resize(width, height, pixelRatio = 1) {
@@ -112,6 +127,10 @@ export class PostProcessingGraph {
       Math.max(1, Math.floor(height * pixelRatio)),
     );
     this.taaResolve?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.bloom?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
@@ -132,6 +151,7 @@ export class PostProcessingGraph {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.bloom?.dispose();
     this.taaResolve?.dispose();
     this.scenePass.dispose();
     this.pipeline.dispose();
