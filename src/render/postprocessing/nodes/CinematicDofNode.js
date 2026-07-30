@@ -25,6 +25,7 @@ const DEFAULT_TAP_COUNT = 16;
 const MIN_TAP_COUNT = 4;
 const MAX_TAP_COUNT = 32;
 const MIN_BLUR_RADIUS_PIXELS = 1.5;
+const MIN_TRANSITION_SEPARATION = 1e-4;
 
 function clampTapCount(value) {
   const taps = Number(value);
@@ -32,6 +33,15 @@ function clampTapCount(value) {
     MIN_TAP_COUNT,
     Math.min(MAX_TAP_COUNT, Math.round(Number.isFinite(taps) ? taps : DEFAULT_TAP_COUNT)),
   );
+}
+
+function orderedPair(first, second) {
+  let minimum = Math.min(Number(first), Number(second));
+  let maximum = Math.max(Number(first), Number(second));
+  if (maximum - minimum < MIN_TRANSITION_SEPARATION) {
+    maximum = minimum + MIN_TRANSITION_SEPARATION;
+  }
+  return [minimum, maximum];
 }
 
 function smoothstepReference(edge0, edge1, value) {
@@ -51,10 +61,12 @@ export function cinematicDofCoCReference(
     maxCoCPixels = 3.5,
   } = {},
 ) {
-  const farCoC = smoothstepReference(farStartMeters, farFullMeters, depth);
-  const nearCoC = smoothstepReference(
-    focusDistance * nearStartRatio,
-    focusDistance * nearFullRatio,
+  const [nearFull, nearStart] = orderedPair(nearFullRatio, nearStartRatio);
+  const [farStart, farFull] = orderedPair(farStartMeters, farFullMeters);
+  const farCoC = smoothstepReference(farStart, farFull, depth);
+  const nearCoC = 1 - smoothstepReference(
+    focusDistance * nearFull,
+    focusDistance * nearStart,
     depth,
   );
   const signedCoC = farCoC - nearCoC;
@@ -85,12 +97,20 @@ export class CinematicDofNode {
     this.disposed = false;
     this.settings = settings;
     this.tapCount = clampTapCount(settings.taps);
+    const [nearFullRatio, nearStartRatio] = orderedPair(
+      settings.nearFullRatio,
+      settings.nearStartRatio,
+    );
+    const [farStartMeters, farFullMeters] = orderedPair(
+      settings.farStartMeters,
+      settings.farFullMeters,
+    );
     this.focusDistance = uniform(settings.manualFocusMeters);
     this.maxCoCPixels = uniform(settings.maxCoCPixels);
-    this.nearStartRatio = uniform(settings.nearStartRatio);
-    this.nearFullRatio = uniform(settings.nearFullRatio);
-    this.farStartMeters = uniform(settings.farStartMeters);
-    this.farFullMeters = uniform(settings.farFullMeters);
+    this.nearStartRatio = uniform(nearStartRatio);
+    this.nearFullRatio = uniform(nearFullRatio);
+    this.farStartMeters = uniform(farStartMeters);
+    this.farFullMeters = uniform(farFullMeters);
     this.cameraNear = uniform(0.1);
     this.cameraFar = uniform(5000);
     this.isPerspective = uniform(1);
@@ -123,9 +143,6 @@ export class CinematicDofNode {
         this.farFullMeters,
         depth,
       );
-      // WGSL smoothstep requires ordered edges. This is algebraically the
-      // specification's reversed-edge smoothstep, expressed without undefined
-      // edge ordering.
       const nearCoC = smoothstep(
         this.focusDistance.mul(this.nearFullRatio),
         this.focusDistance.mul(this.nearStartRatio),
@@ -171,12 +188,20 @@ export class CinematicDofNode {
 
   updateUniforms(frameState, settings) {
     this.settings = settings;
+    const [nearFullRatio, nearStartRatio] = orderedPair(
+      settings.nearFullRatio,
+      settings.nearStartRatio,
+    );
+    const [farStartMeters, farFullMeters] = orderedPair(
+      settings.farStartMeters,
+      settings.farFullMeters,
+    );
     this.focusDistance.value = frameState.focusDistance;
     this.maxCoCPixels.value = settings.maxCoCPixels;
-    this.nearStartRatio.value = settings.nearStartRatio;
-    this.nearFullRatio.value = settings.nearFullRatio;
-    this.farStartMeters.value = settings.farStartMeters;
-    this.farFullMeters.value = settings.farFullMeters;
+    this.nearStartRatio.value = nearStartRatio;
+    this.nearFullRatio.value = nearFullRatio;
+    this.farStartMeters.value = farStartMeters;
+    this.farFullMeters.value = farFullMeters;
     this.cameraNear.value = frameState.camera.near;
     this.cameraFar.value = frameState.camera.far;
     this.isPerspective.value = frameState.camera.isPerspectiveCamera ? 1 : 0;
