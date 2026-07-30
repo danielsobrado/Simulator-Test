@@ -213,6 +213,7 @@ export class InfiniteTerrainView {
       commitBudgetMs: streamingConfig.commitBudgetMs ?? TERRAIN_COMMIT_BUDGET_MS,
     });
     this.pendingFetches = new Set();
+    this.streamingListeners = new Set();
 
     // Ask for the discrete GPU explicitly. Without this the browser is free to
     // place the world view on integrated graphics on hybrid machines, which
@@ -323,6 +324,15 @@ export class InfiniteTerrainView {
     this.postProcessing = controller;
   }
 
+  subscribeStreaming(listener) {
+    this.streamingListeners.add(listener);
+    return () => this.streamingListeners.delete(listener);
+  }
+
+  emitStreaming(event) {
+    for (const listener of this.streamingListeners) listener(event);
+  }
+
   render(camera) {
     if (this.postProcessing?.render(camera)) return;
     if (!this.godRays.render(camera)) {
@@ -395,6 +405,13 @@ export class InfiniteTerrainView {
       targets: selection.descriptors,
       focusChunk: selection.currentChunk,
     });
+    const reassigned = plan.assignments.filter(({ evictedKey }) => evictedKey).length;
+    if (reassigned > Math.max(1, Math.floor(this.slots.length / 2))) {
+      this.emitStreaming(Object.freeze({
+        kind: 'mass-chunk-reassignment',
+        count: reassigned,
+      }));
+    }
     for (const slotIndex of plan.retained) {
       this.slots[slotIndex].lastUsed = this.clock;
     }
@@ -510,6 +527,7 @@ export class InfiniteTerrainView {
     if (!ready.tilePixels || !ready.surfaceMaskPixels) {
       throw new Error('Terrain page commit requires tilePixels and surfaceMaskPixels.');
     }
+    const streamedIn = slot.page !== ready;
     const commitStartedAt = performance.now();
     slot.texturePixels.set(ready.tilePixels);
     slot.surfaceMaskPixels.set(ready.surfaceMaskPixels);
@@ -521,6 +539,13 @@ export class InfiniteTerrainView {
     slot.pageRevision = ready.revision;
     slot.mesh.visible = true;
     slot.loading = false;
+    if (streamedIn) {
+      this.emitStreaming(Object.freeze({
+        kind: 'chunk-streamed-in',
+        chunkX: slot.descriptor.chunkX,
+        chunkZ: slot.descriptor.chunkZ,
+      }));
+    }
     const textureCommitMs = performance.now() - commitStartedAt;
     PerfCounters.inc('terrainUploadPages');
     PerfCounters.inc('textureCommitMs', textureCommitMs);
@@ -801,6 +826,7 @@ export class InfiniteTerrainView {
     this.disposed = true;
     this.commitQueue.clear();
     this.pendingFetches.clear();
+    this.streamingListeners.clear();
     this.setAnimationLoop(null);
     this.unsubscribeWorld?.();
     this.preview.geometry.dispose();

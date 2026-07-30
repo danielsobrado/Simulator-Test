@@ -1121,7 +1121,10 @@ export class EditorUi {
               });
             session?.start('apply');
             if (!this.sceneSettingsRuntime) {
-              controller.loadDocument(document, { preserveInventory: true });
+              controller.loadDocument(document, {
+                preserveInventory: true,
+                loadReason: 'WORLD_IMPORTED',
+              });
               this.syncImportedBiomeTiles(document);
               this.minimapCenter = controller.getFocusCell?.() ?? this.minimapCenter;
               this.updateMinimap();
@@ -1511,7 +1514,7 @@ export class EditorUi {
               const saved = await loadFromBrowser(this.config.storage.key);
               if (!saved) return null;
               session?.start('apply');
-              this.controller.loadDocument(saved);
+              this.controller.loadDocument(saved, { loadReason: 'SAVE_RESTORED' });
               this.syncImportedBiomeTiles(saved);
               return saved;
             },

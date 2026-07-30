@@ -254,7 +254,10 @@ export class TerrainAwareEditorController extends EditorController {
     };
   }
 
-  loadDocument(document, { preserveInventory = false } = {}) {
+  loadDocument(document, {
+    preserveInventory = false,
+    loadReason = 'WORLD_LOADED',
+  } = {}) {
     const previousProceduralAssets = this.proceduralAssetManager?.toDocument() ?? null;
     const previousConstructions = this.constructionStore?.toDocument() ?? null;
     const previousConstructionMaterials = this.constructionMaterialStore?.toDocument() ?? null;
@@ -337,6 +340,7 @@ export class TerrainAwareEditorController extends EditorController {
       this.emitNotice(this.importWarnings.join(' '));
     }
     this.emitMap();
+    this.onDocumentLoaded?.(loadReason);
     this.emitState();
   }
 

@@ -130,7 +130,9 @@ export function createSpellRuntime(deps) {
   const cast = (spellId, durationMs) => {
     if (disposed || !isCastMode() || deps.isInputBlocked?.()) return false;
     const play = casts[spellId];
-    return typeof play === 'function' ? play(durationMs) : false;
+    const started = typeof play === 'function' ? play(durationMs) : false;
+    if (started) deps.onCast?.(spellId);
+    return started;
   };
 
   const menu = createSpellMenu({

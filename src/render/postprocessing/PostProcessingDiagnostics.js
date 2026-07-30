@@ -3,6 +3,7 @@ export class PostProcessingDiagnostics {
     this.graphBuilds = 0;
     this.framesRendered = 0;
     this.lastTopologySignature = '';
+    this.lastResetReason = null;
   }
 
   graphBuilt(signature) {
@@ -14,11 +15,16 @@ export class PostProcessingDiagnostics {
     this.framesRendered += 1;
   }
 
+  historyReset(reason) {
+    this.lastResetReason = reason;
+  }
+
   snapshot() {
     return Object.freeze({
       graphBuilds: this.graphBuilds,
       framesRendered: this.framesRendered,
       lastTopologySignature: this.lastTopologySignature,
+      lastResetReason: this.lastResetReason,
     });
   }
 }

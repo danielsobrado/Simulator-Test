@@ -617,6 +617,14 @@ export class StylizedTreeView {
         timestamp,
         transitionMs: settings.transitionMs,
         positionForChunk: (chunkX, chunkZ) => this.manifestStore.lodAnchor(chunkX, chunkZ),
+        onTransition: ({ from, to, durationMs }) => {
+          this.terrainView.postProcessing?.notifyReactive(
+            from === 'impostor' || to === 'impostor'
+              ? 'IMPOSTOR_TRANSITION'
+              : 'VEGETATION_LOD_CHANGED',
+            Math.ceil(durationMs / (1000 / 60)),
+          );
+        },
       })
       : {
         entries: this.createNearOnlyPlan(focus, radius),

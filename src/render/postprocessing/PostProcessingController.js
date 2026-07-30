@@ -1,5 +1,10 @@
 import { PostProcessingDiagnostics } from './PostProcessingDiagnostics.js';
 import { PostProcessingFrameState } from './PostProcessingFrameState.js';
+import { PostProcessingHistory } from './PostProcessingHistory.js';
+import {
+  POST_PROCESSING_RESET_REASONS,
+  PostProcessingInvalidation,
+} from './PostProcessingInvalidation.js';
 import {
   PostProcessingGraph,
   createPostProcessingTopologySignature,
@@ -20,12 +25,24 @@ export class PostProcessingController {
     this.resources = new PostProcessingResources(renderer);
     this.frameState = new PostProcessingFrameState();
     this.diagnostics = new PostProcessingDiagnostics();
+    this.history = new PostProcessingHistory();
+    this.invalidation = new PostProcessingInvalidation({
+      history: this.history,
+      diagnostics: this.diagnostics,
+    });
 
     const canvas = renderer.domElement;
     this.resize(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height);
+    this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.INITIAL_FRAME);
     this.unsubscribe = postProcessingStore.subscribe((settings) => {
+      const renderScaleChanged = settings.renderScale !== this.settings.renderScale;
       this.settings = settings;
       this.topologySignature = createPostProcessingTopologySignature(settings);
+      if (renderScaleChanged) {
+        this.invalidation.invalidate(
+          POST_PROCESSING_RESET_REASONS.RENDER_SCALE_CHANGED,
+        );
+      }
     });
   }
 
@@ -51,10 +68,12 @@ export class PostProcessingController {
       this.resources.pixelRatio,
     );
     this.diagnostics.graphBuilt(this.topologySignature);
+    this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.POST_GRAPH_REBUILT);
     return this.graph;
   }
 
   updateFrame(camera) {
+    this.invalidation.beginFrame();
     this.frameState.beginFrame(camera, this.resources);
     this.graph.updateUniforms(this.frameState);
   }
@@ -86,8 +105,26 @@ export class PostProcessingController {
 
   resize(width, height) {
     const pixelRatio = this.renderer.getPixelRatio();
+    const changed = this.resources.width !== Math.max(1, width)
+      || this.resources.height !== Math.max(1, height)
+      || this.resources.pixelRatio !== pixelRatio;
     this.resources.resize(width, height, pixelRatio);
     this.graph?.resize(width, height, pixelRatio);
+    if (changed) {
+      this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.RESIZE);
+    }
+  }
+
+  invalidate(reason) {
+    this.invalidation.invalidate(reason);
+  }
+
+  notifyReactive(event, transitionFrames = 0) {
+    return this.invalidation.notifyReactive(event, transitionFrames);
+  }
+
+  clearHistory() {
+    this.invalidation.invalidate(POST_PROCESSING_RESET_REASONS.MANUAL_RESET);
   }
 
   dispose() {

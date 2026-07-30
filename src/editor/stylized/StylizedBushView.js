@@ -343,6 +343,12 @@ export class StylizedBushView {
         transitionStates: this.chunkLodStates,
         timestamp,
         transitionMs: settings.transitionMs,
+        onTransition: ({ durationMs }) => {
+          this.terrainView.postProcessing?.notifyReactive(
+            'VEGETATION_LOD_CHANGED',
+            Math.ceil(durationMs / (1000 / 60)),
+          );
+        },
       })
       : {
         entries: this.createNearOnlyPlan(focus, renderRadius),

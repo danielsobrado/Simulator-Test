@@ -61,6 +61,10 @@ import {
 } from './editor/settings/SceneSettingsRuntime.js';
 import { createPostProcessingSettings } from './render/postprocessing/PostProcessingSettings.js';
 import { PostProcessingController } from './render/postprocessing/PostProcessingController.js';
+import {
+  POST_PROCESSING_REACTIVE_EVENTS,
+  POST_PROCESSING_RESET_REASONS,
+} from './render/postprocessing/PostProcessingInvalidation.js';
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
 import { ConstructionStore } from './editor/construction/ConstructionStore.js';
 import { ConstructionMaterialStore } from './editor/construction/ConstructionMaterialStore.js';
@@ -281,6 +285,39 @@ async function startEditor() {
     postProcessingStore,
   });
   terrainView.setPostProcessingController(postProcessingController);
+  const temporalUnsubscribers = [];
+  temporalUnsubscribers.push(
+    floatingOrigin.subscribe(() => {
+      postProcessingController.invalidate(
+        POST_PROCESSING_RESET_REASONS.FLOATING_ORIGIN_REBASE,
+      );
+    }),
+    worldStore.subscribe((change) => {
+      if (change.kind === 'reset') {
+        postProcessingController.invalidate(POST_PROCESSING_RESET_REASONS.WORLD_LOADED);
+      } else if (change.kind === 'tile' || change.kind === 'height') {
+        postProcessingController.notifyReactive(
+          POST_PROCESSING_REACTIVE_EVENTS.TERRAIN_EDIT,
+        );
+      }
+    }),
+    voxelStampStore.subscribe(() => {
+      postProcessingController.notifyReactive(
+        POST_PROCESSING_REACTIVE_EVENTS.VOXEL_EDIT,
+      );
+    }),
+    terrainView.subscribeStreaming((event) => {
+      if (event.kind === 'mass-chunk-reassignment') {
+        postProcessingController.invalidate(
+          POST_PROCESSING_RESET_REASONS.MASS_CHUNK_REASSIGNMENT,
+        );
+      } else if (event.kind === 'chunk-streamed-in') {
+        postProcessingController.notifyReactive(
+          POST_PROCESSING_REACTIVE_EVENTS.CHUNK_STREAMED_IN,
+        );
+      }
+    }),
+  );
 
   const objectView = new ObjectView({
     terrainView,
@@ -294,6 +331,21 @@ async function startEditor() {
     chunkWorldSize: config.world.chunkSize * config.map.tileSize,
   });
   constructionStore.subscribe((change) => {
+    if (change.kind === 'add' || change.kind === 'restore') {
+      postProcessingController.notifyReactive(
+        POST_PROCESSING_REACTIVE_EVENTS.CONSTRUCTION_PLACEMENT,
+      );
+    } else if (change.kind === 'remove' || change.kind === 'clear') {
+      postProcessingController.notifyReactive(
+        POST_PROCESSING_REACTIVE_EVENTS.CONSTRUCTION_REMOVAL,
+      );
+    } else if (change.kind === 'update' || change.kind === 'history') {
+      postProcessingController.notifyReactive(
+        change.after
+          ? POST_PROCESSING_REACTIVE_EVENTS.CONSTRUCTION_PLACEMENT
+          : POST_PROCESSING_REACTIVE_EVENTS.CONSTRUCTION_REMOVAL,
+      );
+    }
     if (change.kind === 'clear' || change.kind === 'replace') {
       constructionSpatialIndex.clear();
       for (const record of constructionStore.list()) constructionSpatialIndex.update(record);
@@ -411,6 +463,31 @@ async function startEditor() {
     terrainView,
     objectView,
   });
+  let previousViewMode = viewModeController.mode;
+  let previousActiveCamera = viewModeController.camera;
+  temporalUnsubscribers.push(
+    viewModeController.subscribe((state) => {
+      const activeCamera = viewModeController.camera;
+      if (state.mode !== previousViewMode) {
+        postProcessingController.invalidate(
+          state.mode === PLAYER_MODE_WALK
+            ? POST_PROCESSING_RESET_REASONS.PLAYER_SPAWNED
+            : POST_PROCESSING_RESET_REASONS.CAMERA_MODE_CHANGED,
+        );
+        previousViewMode = state.mode;
+      } else if (activeCamera !== previousActiveCamera) {
+        postProcessingController.invalidate(
+          POST_PROCESSING_RESET_REASONS.ACTIVE_CAMERA_REPLACED,
+        );
+      }
+      previousActiveCamera = activeCamera;
+    }),
+    playerController.subscribeTeleports(() => {
+      postProcessingController.invalidate(
+        POST_PROCESSING_RESET_REASONS.CAMERA_TELEPORT,
+      );
+    }),
+  );
 
   // Walk mode is not an awaitable call — dropping in re-centres residency and the
   // world fills in over the following frames. So readiness is observed from the
@@ -455,6 +532,11 @@ async function startEditor() {
     inventoryStore,
     worldInputBlockedProvider: () => gameplayOverlayController.isWorldInputBlocked(),
   });
+  controller.onDocumentLoaded = (reason) => {
+    const resetReason = POST_PROCESSING_RESET_REASONS[reason]
+      ?? POST_PROCESSING_RESET_REASONS.WORLD_LOADED;
+    postProcessingController.invalidate(resetReason);
+  };
   controller.focusProvider = () => {
     const renderFocus = viewModeController.getFocusWorld();
     return floatingOrigin.toCanonical(renderFocus.x, renderFocus.z);
@@ -677,13 +759,25 @@ async function startEditor() {
       getSunDirection: () => stylizedSurface.skyView?.sunDirectionValue ?? undefined,
     })
     : null;
+  if (weatherController && weatherSettings.weatherMode !== 'off') {
+    postProcessingController.notifyReactive(
+      POST_PROCESSING_REACTIVE_EVENTS.WEATHER_STARTED,
+    );
+  }
   const weatherUi = weatherEnabled
     ? createWeatherUi({
       root,
       settings: weatherSettings,
       onChange: (next) => {
+        const previousMode = weatherSettings.weatherMode;
         Object.assign(weatherSettings, next);
         weatherController?.applySettings();
+        if (weatherSettings.weatherMode !== 'off'
+            && weatherSettings.weatherMode !== previousMode) {
+          postProcessingController.notifyReactive(
+            POST_PROCESSING_REACTIVE_EVENTS.WEATHER_STARTED,
+          );
+        }
       },
     })
     : null;
@@ -697,6 +791,11 @@ async function startEditor() {
       subscribeViewMode: (listener) => viewModeController.subscribe(listener),
       isInputBlocked: () => gameplayOverlayController.isWorldInputBlocked(),
       raycastTerrain: (ray, maxRange) => raycastTerrainHeightfield(terrainView, ray, maxRange),
+      onCast: () => {
+        postProcessingController.notifyReactive(
+          POST_PROCESSING_REACTIVE_EVENTS.SPELL_STARTED,
+        );
+      },
       // Keys are claimed by attachSpellHotkeys() above, before PlayerController.
       registerKeys: false,
     })
@@ -964,6 +1063,7 @@ async function startEditor() {
 
   window.addEventListener('pagehide', () => {
     active = false;
+    for (const unsubscribe of temporalUnsubscribers) unsubscribe();
     document.removeEventListener('visibilitychange', onVisibilityChange);
     resizeObserver.disconnect();
     perfQa?.dispose();

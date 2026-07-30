@@ -54,6 +54,7 @@ export class PlayerController {
     this.jumpQueued = false;
     this.lastTimestamp = null;
     this.listeners = new Set();
+    this.teleportListeners = new Set();
     this.waterEventListeners = new Set();
     this.forward = new THREE.Vector3();
     this.right = new THREE.Vector3();
@@ -228,6 +229,12 @@ export class PlayerController {
   }
 
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
+    const previousPose = {
+      x: this.state.x,
+      z: this.state.z,
+      yaw: this.yaw,
+      pitch: this.pitch,
+    };
     if (Number.isFinite(x) && Number.isFinite(z)) {
       const previous = this.state;
       this.state = this.createState(x, z);
@@ -242,12 +249,24 @@ export class PlayerController {
     }
     this.applyCameraState();
     this.emit();
+    const pose = Object.freeze({
+      x: this.state.x,
+      z: this.state.z,
+      yaw: this.yaw,
+      pitch: this.pitch,
+    });
+    for (const listener of this.teleportListeners) listener(pose, previousPose);
   }
 
   subscribe(listener) {
     this.listeners.add(listener);
     listener(this.getStatus());
     return () => this.listeners.delete(listener);
+  }
+
+  subscribeTeleports(listener) {
+    this.teleportListeners.add(listener);
+    return () => this.teleportListeners.delete(listener);
   }
 
   subscribeWaterEvents(listener) {
@@ -503,6 +522,7 @@ export class PlayerController {
     document.removeEventListener('pointerlockchange', this.boundHandlers.pointerLockChange);
     this.underwaterView?.dispose();
     this.listeners.clear();
+    this.teleportListeners.clear();
     this.waterEventListeners.clear();
   }
 }

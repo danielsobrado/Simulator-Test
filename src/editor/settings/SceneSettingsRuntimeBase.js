@@ -203,7 +203,7 @@ export class SceneSettingsRuntime {
       if (!worldDocument) {
         throw new Error('The pending world reload document has expired.');
       }
-      this.controller.loadDocument(worldDocument);
+      this.controller.loadDocument(worldDocument, { loadReason: 'SAVE_RESTORED' });
       this.mapSource = this.document.map;
       await this.afterMapLoad?.(worldDocument);
       this.session?.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
@@ -261,7 +261,10 @@ export class SceneSettingsRuntime {
       });
       return worldDocument;
     }
-    this.controller.loadDocument(worldDocument, { preserveInventory: true });
+    this.controller.loadDocument(worldDocument, {
+      preserveInventory: true,
+      loadReason: 'WORLD_IMPORTED',
+    });
     // A world save carries its own look and `loadDocument` has already applied
     // it — putting the pre-import capture back on top would discard it. Only a
     // bare map (an Azgaar export, a terrain-only document) needs the look that

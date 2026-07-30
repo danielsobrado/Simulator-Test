@@ -264,6 +264,7 @@ export function buildChunkLodPlan({
   transitionMs,
   fadeSteps = 8,
   positionForChunk = null,
+  onTransition = null,
 }) {
   const entries = [];
   const signature = [];
@@ -294,6 +295,15 @@ export function buildChunkLodPlan({
       const previous = storedState?.target ?? null;
       const selected = selectProjectedLod({ pixels, previous, ...thresholds });
       const target = clampLodToRadii({ band: selected, chunkDistance, ...radii });
+      if (previous !== null && previous !== target) {
+        onTransition?.({
+          chunkX,
+          chunkZ,
+          from: previous,
+          to: target,
+          durationMs: transitionMs,
+        });
+      }
       let state;
       if (!ready && target !== 'culled') {
         state = waitingState(target, timestamp);
