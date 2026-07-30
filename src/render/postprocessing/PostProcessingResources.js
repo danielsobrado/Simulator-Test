@@ -64,6 +64,15 @@ export class PostProcessingResources {
     this.activeSignature = null;
   }
 
+  discardGraph(signature) {
+    const record = this.graphs.get(signature);
+    if (!record) return false;
+    record.graph.dispose();
+    this.graphs.delete(signature);
+    if (this.activeSignature === signature) this.activeSignature = null;
+    return true;
+  }
+
   resizeGraph(signature, width, height, pixelRatio = 1) {
     const record = this.graphs.get(signature);
     if (!record) return;
