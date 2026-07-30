@@ -12,6 +12,7 @@ import { packMaterialDataNode } from './PostProcessingMaterialData.js';
 import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
 import { BloomNode } from './nodes/BloomNode.js';
+import { ContrastSharpenNode } from './nodes/ContrastSharpenNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
 import { ToneMappingNode } from './nodes/ToneMappingNode.js';
 
@@ -98,7 +99,13 @@ export class PostProcessingGraph {
       bloomIntensity: settings?.bloom?.intensity ?? 0,
       outputColorSpace: renderer.outputColorSpace,
     });
-    const finalOutput = this.toneMapping.outputNode;
+    this.sharpen = settings?.sharpen?.enabled === true
+      ? new ContrastSharpenNode({
+        sourceNode: this.toneMapping.outputNode,
+        settings: settings.sharpen,
+      })
+      : null;
+    const finalOutput = this.sharpen?.outputNode ?? this.toneMapping.outputNode;
     const debugOverride = settings?.diagnostics?.enabled === true
       && settings.diagnostics.debugView !== 'final';
 
@@ -138,6 +145,7 @@ export class PostProcessingGraph {
       settings?.toneMapping,
       settings?.bloom?.intensity ?? 0,
     );
+    this.sharpen?.updateUniforms(settings?.sharpen);
   }
 
   resize(width, height, pixelRatio = 1) {
@@ -150,6 +158,10 @@ export class PostProcessingGraph {
       Math.max(1, Math.floor(height * pixelRatio)),
     );
     this.bloom?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.sharpen?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
@@ -170,6 +182,7 @@ export class PostProcessingGraph {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.sharpen?.dispose();
     this.bloom?.dispose();
     this.taaResolve?.dispose();
     this.scenePass.dispose();
