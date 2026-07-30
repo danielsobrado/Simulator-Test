@@ -120,6 +120,9 @@ export class PostProcessingController {
     if (rendered && this.frameState.temporalEnabled) {
       this.history.latchTaaFrame(this.frameState.currentViewProjection);
     }
+    if (rendered && this.graph?.ssr) {
+      this.history.latchSsrFrame();
+    }
   }
 
   render(camera) {

@@ -17,6 +17,11 @@ export class PostProcessingHistory {
     this.taaHeight = 0;
     this.taaColourTargets = [null, null];
     this.taaDepthTargets = [null, null];
+    this.ssrReadIndex = 0;
+    this.ssrWidth = 0;
+    this.ssrHeight = 0;
+    this.ssrColourTargets = [null, null];
+    this.ssrDepthTargets = [null, null];
     this._latchedViewProjection = new THREE.Matrix4();
   }
 
@@ -27,6 +32,7 @@ export class PostProcessingHistory {
     this.jitterIndex = 0;
     this.previousViewProjection = null;
     this.taaReadIndex = 0;
+    this.ssrReadIndex = 0;
     this.lastResetReason = reason;
     this.resetCount += 1;
   }
@@ -94,14 +100,75 @@ export class PostProcessingHistory {
     this.taaReadIndex = 1 - this.taaReadIndex;
   }
 
+  ensureSsrResources(width, height) {
+    const nextWidth = Math.max(1, Math.floor(width));
+    const nextHeight = Math.max(1, Math.floor(height));
+    if (!this.ssrColourTargets[0]) {
+      for (let index = 0; index < 2; index += 1) {
+        const colour = new THREE.RenderTarget(nextWidth, nextHeight, {
+          format: THREE.RGBAFormat,
+          type: THREE.HalfFloatType,
+          colorSpace: THREE.NoColorSpace,
+          depthBuffer: false,
+        });
+        colour.texture.name = `SSR Colour History ${index}`;
+        const depth = new THREE.RenderTarget(nextWidth, nextHeight, {
+          format: THREE.RedFormat,
+          type: THREE.FloatType,
+          colorSpace: THREE.NoColorSpace,
+          depthBuffer: false,
+        });
+        depth.texture.name = `SSR Linear Depth History ${index}`;
+        this.ssrColourTargets[index] = colour;
+        this.ssrDepthTargets[index] = depth;
+      }
+    } else if (this.ssrWidth !== nextWidth || this.ssrHeight !== nextHeight) {
+      for (let index = 0; index < 2; index += 1) {
+        this.ssrColourTargets[index].setSize(nextWidth, nextHeight);
+        this.ssrDepthTargets[index].setSize(nextWidth, nextHeight);
+      }
+      this.ssrValid = false;
+      this.ssrReadIndex = 0;
+    }
+    this.ssrWidth = nextWidth;
+    this.ssrHeight = nextHeight;
+  }
+
+  get ssrReadColourTarget() {
+    return this.ssrColourTargets[this.ssrReadIndex];
+  }
+
+  get ssrWriteColourTarget() {
+    return this.ssrColourTargets[1 - this.ssrReadIndex];
+  }
+
+  get ssrReadDepthTarget() {
+    return this.ssrDepthTargets[this.ssrReadIndex];
+  }
+
+  get ssrWriteDepthTarget() {
+    return this.ssrDepthTargets[1 - this.ssrReadIndex];
+  }
+
+  latchSsrFrame() {
+    this.ssrValid = true;
+    this.ssrReadIndex = 1 - this.ssrReadIndex;
+  }
+
   dispose() {
     for (let index = 0; index < 2; index += 1) {
       this.taaColourTargets[index]?.dispose();
       this.taaDepthTargets[index]?.dispose();
       this.taaColourTargets[index] = null;
       this.taaDepthTargets[index] = null;
+      this.ssrColourTargets[index]?.dispose();
+      this.ssrDepthTargets[index]?.dispose();
+      this.ssrColourTargets[index] = null;
+      this.ssrDepthTargets[index] = null;
     }
     this.taaWidth = 0;
     this.taaHeight = 0;
+    this.ssrWidth = 0;
+    this.ssrHeight = 0;
   }
 }

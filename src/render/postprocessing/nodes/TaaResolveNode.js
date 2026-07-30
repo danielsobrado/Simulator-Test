@@ -279,6 +279,7 @@ export class TaaResolveNode {
   constructor({
     scenePass,
     inputs,
+    sourceNode = inputs.output,
     history,
     settings,
   }) {
@@ -318,7 +319,7 @@ export class TaaResolveNode {
     );
 
     const resolved = buildResolve({
-      sourceTexture: inputs.output,
+      sourceTexture: sourceNode,
       rawDepthTexture: rawDepth,
       velocityTexture: inputs.velocity,
       materialTexture: inputs.material,

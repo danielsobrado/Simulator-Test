@@ -13,6 +13,8 @@ import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
 import { createDebugViewNode } from './nodes/DebugViewNode.js';
 import { BloomNode } from './nodes/BloomNode.js';
 import { ContrastSharpenNode } from './nodes/ContrastSharpenNode.js';
+import { HierarchicalDepthNode } from './nodes/HierarchicalDepthNode.js';
+import { SelectiveSsrNode } from './nodes/SelectiveSsrNode.js';
 import { TaaResolveNode } from './nodes/TaaResolveNode.js';
 import { ToneMappingNode } from './nodes/ToneMappingNode.js';
 
@@ -74,15 +76,33 @@ export class PostProcessingGraph {
       depth: this.scenePass.getTextureNode('depth'),
     });
 
+    this.hierarchicalDepth = settings?.ssr?.enabled === true
+      ? new HierarchicalDepthNode({
+        rawDepthNode: this.inputs.depth,
+        linearDepthNode: this.scenePass.getViewZNode().negate(),
+        resolutionScale: settings.ssr.resolutionScale,
+      })
+      : null;
+    this.ssr = this.hierarchicalDepth
+      ? new SelectiveSsrNode({
+        sourceNode: this.inputs.output,
+        inputs: this.inputs,
+        depthPyramid: this.hierarchicalDepth,
+        history,
+        settings: settings.ssr,
+      })
+      : null;
+    const preTaaOutput = this.ssr?.outputNode ?? this.inputs.output;
     this.taaResolve = taaEnabled
       ? new TaaResolveNode({
         scenePass: this.scenePass,
         inputs: this.inputs,
+        sourceNode: preTaaOutput,
         history,
         settings: settings.antiAliasing,
       })
       : null;
-    const resolvedOutput = this.taaResolve?.outputNode ?? this.inputs.output;
+    const resolvedOutput = this.taaResolve?.outputNode ?? preTaaOutput;
     this.bloom = settings?.bloom?.enabled === true
       ? new BloomNode({
         sourceNode: resolvedOutput,
@@ -133,6 +153,24 @@ export class PostProcessingGraph {
       this.sceneResolutionScale = nextSceneResolutionScale;
       this.scenePass.setResolutionScale(nextSceneResolutionScale);
     }
+    if (
+      this.ssr
+      && settings?.ssr?.resolutionScale !== this.ssr.resolutionScale
+    ) {
+      this.ssr.resolutionScale = settings.ssr.resolutionScale;
+      this.hierarchicalDepth.resolutionScale = settings.ssr.resolutionScale;
+      const outputWidth = Math.max(
+        1,
+        Math.floor(frameState.width * frameState.pixelRatio),
+      );
+      const outputHeight = Math.max(
+        1,
+        Math.floor(frameState.height * frameState.pixelRatio),
+      );
+      this.hierarchicalDepth.resize(outputWidth, outputHeight);
+      this.ssr.resize(outputWidth, outputHeight);
+    }
+    this.ssr?.updateUniforms(frameState, settings?.ssr ?? this.ssr.settings);
     if (this.taaResolve) {
       this.taaResolve.settings = settings?.antiAliasing ?? this.taaResolve.settings;
       this.taaResolve.updateUniforms(frameState);
@@ -154,6 +192,14 @@ export class PostProcessingGraph {
       Math.max(1, Math.floor(height * pixelRatio)),
     );
     this.taaResolve?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.hierarchicalDepth?.resize(
+      Math.max(1, Math.floor(width * pixelRatio)),
+      Math.max(1, Math.floor(height * pixelRatio)),
+    );
+    this.ssr?.resize(
       Math.max(1, Math.floor(width * pixelRatio)),
       Math.max(1, Math.floor(height * pixelRatio)),
     );
@@ -185,6 +231,8 @@ export class PostProcessingGraph {
     this.sharpen?.dispose();
     this.bloom?.dispose();
     this.taaResolve?.dispose();
+    this.ssr?.dispose();
+    this.hierarchicalDepth?.dispose();
     this.scenePass.dispose();
     this.pipeline.outputColorTransform = this.previousOutputColorTransform;
     this.pipeline.dispose();
