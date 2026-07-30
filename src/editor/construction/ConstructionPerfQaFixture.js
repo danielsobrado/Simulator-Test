@@ -55,7 +55,14 @@ function wallRecord(x, index) {
 
 export function ensureConstructionPerfQaFixture(store, search = '') {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  if (params.get('qa') !== 'construction-ring') return [];
+  const qa = params.get('qa');
+  const capture = params.get('ppCapture') ?? params.get('capture');
+  const needsRing = qa === 'construction-ring'
+    || capture === 'castle'
+    || capture === 'dense-settlement'
+    || capture === 'night-emissive'
+    || params.get('fixture') === 'construction-ring';
+  if (!needsRing) return [];
   return WALL_X_POSITIONS.map((x, index) => (
     store.get(`construction-ring-wall-${index}`)
       ?? store.add(wallRecord(x, index))

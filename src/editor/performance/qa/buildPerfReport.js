@@ -125,6 +125,7 @@ export function buildPerfReport({
   worldConfig = null,
   collisionConfig = null,
   collisionStatus = null,
+  postProcessingCapture = null,
 }) {
   const frames = profiler.getFrames();
   const summary = profiler.summarize();
@@ -191,9 +192,27 @@ export function buildPerfReport({
     ),
   };
 
+  const cpuUpdate = summary.phases
+    ? Object.freeze({
+      p50Ms: round(percentileFromPhases(summary.phases, 'avgMs'), 3),
+      p95Ms: round(
+        Object.values(summary.phases).reduce((sum, phase) => sum + (phase.p95Ms ?? 0), 0),
+        3,
+      ),
+    })
+    : null;
+  const gpuRender = summary.phases?.render
+    ? Object.freeze({
+      p50Ms: round(summary.phases.render.avgMs, 3),
+      p95Ms: round(summary.phases.render.p95Ms, 3),
+    })
+    : null;
+
   return {
     version: 2,
-    kind: 'simcity-dnd-perf-qa',
+    kind: config.captureId || config.scenarioId?.startsWith?.('post-processing')
+      ? 'simcity-dnd-post-processing-qa'
+      : 'simcity-dnd-perf-qa',
     generatedAt: new Date().toISOString(),
     meta,
     scenario: {
@@ -204,11 +223,14 @@ export function buildPerfReport({
       pitchDegrees: config.pitchDegrees,
       warmupSeconds: config.warmupSeconds,
       durationSeconds: config.durationSeconds,
+      warmupFrames: config.warmupFrames ?? null,
+      measureFrames: config.measureFrames ?? null,
       speed: config.speed,
       keys: config.keys,
       hitchMs: config.hitchMs,
       buildingCount: config.buildingCount ?? null,
       densityProfile: config.densityProfile ?? 'standard',
+      captureId: config.captureId ?? null,
     },
     config: {
       player: playerConfig,
@@ -216,6 +238,9 @@ export function buildPerfReport({
       collision: collisionConfig,
     },
     summary: roundedSummary,
+    cpuUpdate,
+    gpuRender,
+    postProcessingCapture,
     collision: buildCollisionReport({
       frames,
       counters,
@@ -226,6 +251,11 @@ export function buildPerfReport({
     hitchFrames: hitches,
     samples,
   };
+}
+
+function percentileFromPhases(phases, key) {
+  const values = Object.values(phases ?? {}).map((phase) => phase[key] ?? 0);
+  return values.reduce((sum, value) => sum + value, 0);
 }
 
 export function downloadPerfReport(report, filename = null) {

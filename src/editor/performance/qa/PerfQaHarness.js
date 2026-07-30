@@ -59,6 +59,7 @@ export class PerfQaHarness {
       collisionFailure: null,
     };
     this.overlay = null;
+    this.phaseFrameCount = 0;
     this.boundDownload = () => this.download();
     this.boundRestart = () => this.start();
   }
@@ -128,6 +129,7 @@ export class PerfQaHarness {
       collisionReady: null,
       collisionFailure: null,
     };
+    this.phaseFrameCount = 0;
 
     this.playerController.setHarnessActive(true);
     this.viewModeController.enterWalkMode(this.config.spawn, {
@@ -139,7 +141,7 @@ export class PerfQaHarness {
       yaw: degreesToRadians(this.config.yawDegrees),
       pitch: degreesToRadians(this.config.pitchDegrees),
     });
-    this.applyPhaseKeys();
+    this.enterPhase(this.plan.phases[0]);
     this.log(`Started ${this.config.scenarioId} at (${this.config.spawn.x}, ${this.config.spawn.z})`);
     this.renderOverlay();
   }
@@ -230,12 +232,31 @@ export class PerfQaHarness {
       return;
     }
 
-    const elapsedSeconds = (timestamp - this.phaseStartedAt) / 1000;
-    this.live.elapsedSeconds = elapsedSeconds;
-    this.live.phase = phase.label;
+    if (Number.isFinite(phase.yawDeltaDegreesPerFrame) && phase.yawDeltaDegreesPerFrame !== 0) {
+      const status = this.playerController.getStatus();
+      this.playerController.setPose({
+        x: status.position.x,
+        z: status.position.z,
+        yaw: status.yaw + degreesToRadians(phase.yawDeltaDegreesPerFrame),
+        pitch: status.pitch,
+      });
+    }
 
-    if (elapsedSeconds < phase.durationSeconds) {
-      return;
+    const useFrames = Number.isFinite(phase.durationFrames);
+    if (useFrames) {
+      this.phaseFrameCount += 1;
+      this.live.elapsedSeconds = this.phaseFrameCount / 60;
+      this.live.phase = phase.label;
+      if (this.phaseFrameCount < phase.durationFrames) {
+        return;
+      }
+    } else {
+      const elapsedSeconds = (timestamp - this.phaseStartedAt) / 1000;
+      this.live.elapsedSeconds = elapsedSeconds;
+      this.live.phase = phase.label;
+      if (elapsedSeconds < phase.durationSeconds) {
+        return;
+      }
     }
 
     this.phaseIndex += 1;
@@ -245,11 +266,38 @@ export class PerfQaHarness {
     }
 
     this.phaseStartedAt = timestamp;
-    if (this.plan.phases[this.phaseIndex].record) {
+    this.phaseFrameCount = 0;
+    const next = this.plan.phases[this.phaseIndex];
+    if (next.record && !this.profiler.recording) {
       this.profiler.start();
       this.lastCounters = PerfCounters.snapshot();
       this.live.hitchCount = 0;
-      this.log(`Measuring for ${this.config.durationSeconds}s…`);
+      const budget = Number.isFinite(next.durationFrames)
+        ? `${next.durationFrames} frames`
+        : `${this.config.durationSeconds}s`;
+      this.log(`Measuring for ${budget}…`);
+    }
+    this.enterPhase(next);
+  }
+
+  enterPhase(phase) {
+    if (!phase) {
+      this.applyPhaseKeys();
+      return;
+    }
+    if (phase.teleport) {
+      const status = this.playerController.getStatus();
+      this.playerController.setPose({
+        x: phase.teleport.x,
+        z: phase.teleport.z,
+        yaw: degreesToRadians(
+          Number.isFinite(phase.yawDegrees) ? phase.yawDegrees : this.config.yawDegrees,
+        ),
+        pitch: Number.isFinite(status.pitch)
+          ? status.pitch
+          : degreesToRadians(this.config.pitchDegrees),
+      });
+      this.log(`Teleported to (${phase.teleport.x}, ${phase.teleport.z})`);
     }
     this.applyPhaseKeys();
   }
@@ -294,6 +342,7 @@ export class PerfQaHarness {
         : null,
       collisionConfig: this.editorConfig?.collision ?? null,
       collisionStatus: collision,
+      postProcessingCapture: this.buildPostProcessingCaptureSnapshot(),
     });
     if (typeof window !== 'undefined') {
       window.__perfQaReport = this.report;
@@ -328,6 +377,48 @@ export class PerfQaHarness {
     return this.report;
   }
 
+  buildPostProcessingCaptureSnapshot() {
+    const counters = PerfCounters.snapshot();
+    const player = this.playerController.getStatus();
+    const streaming = this.terrainView.getStreamingStatus?.() ?? null;
+    const origin = this.terrainView.floatingOrigin?.getState?.()
+      ?? streaming?.origin
+      ?? null;
+    const vegetationInstances = (
+      (counters.treeNearInstances ?? 0)
+      + (counters.treeProxyInstances ?? 0)
+      + (counters.treeImpostorInstances ?? 0)
+      + (counters.bushNearInstances ?? 0)
+      + (counters.bushProxyInstances ?? 0)
+      + (counters.grassLastChunkEffectiveBlades ?? 0)
+    );
+    return {
+      captureId: this.config.captureId ?? null,
+      qualityPreset: this.editorConfig?.stylizedSurface?.postProcessing?.preset ?? 'none',
+      cameraPose: {
+        x: player.position?.x ?? null,
+        y: player.position?.y ?? null,
+        z: player.position?.z ?? null,
+        yaw: player.yaw ?? null,
+        pitch: player.pitch ?? null,
+      },
+      floatingOriginOffset: origin
+        ? { x: origin.x ?? origin.originX ?? 0, z: origin.z ?? origin.originZ ?? 0 }
+        : null,
+      drawCalls: counters.rendererDrawCalls ?? null,
+      triangles: counters.rendererTriangles ?? null,
+      residentTerrainChunks: streaming?.resident ?? null,
+      visibleVegetationInstances: vegetationInstances,
+      visibleConstructionInstances: counters.constructionModulesResident ?? null,
+      activeParticles: (
+        (counters.rendererPoints ?? 0)
+        + (counters.waterProjectedCausticFrames ?? 0)
+      ),
+      warmupFrames: this.config.warmupFrames ?? null,
+      measureFrames: this.config.measureFrames ?? null,
+    };
+  }
+
   publishApi() {
     if (typeof window === 'undefined') {
       return;
@@ -342,6 +433,7 @@ export class PerfQaHarness {
       restart: () => this.start(),
       counters: () => PerfCounters.snapshot(),
       collision: () => collisionStatus(this.playerController),
+      captureSnapshot: () => this.buildPostProcessingCaptureSnapshot(),
     };
   }
 

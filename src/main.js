@@ -625,27 +625,6 @@ async function startEditor() {
   };
   applyViewDistance(false);
 
-  // Dev-only test hook: lets the perf/screenshot harness import a world and
-  // drive the player without the file picker + prompt. Never exposed in builds.
-  if (import.meta.env.DEV) {
-    window.__editor = {
-      controller,
-      worldMapController,
-      gameplayOverlayController,
-      inventoryController,
-      inventoryStore,
-      inventoryUi,
-      config,
-      ui,
-      proceduralWorkshop,
-      constructionStore,
-      constructionView,
-      constructionSpatialIndex,
-      godRays: terrainView.godRays,
-      stylizedSurface,
-      sceneSettingsRuntime,
-    };
-  }
   const voxelPrototype = new GpuVoxelWorld({
     terrainView,
     layout: voxelWorldLayout,
@@ -712,6 +691,59 @@ async function startEditor() {
   spellKeyHandler = spellRuntime
     ? (event) => spellRuntime.handleKeyDown(event)
     : null;
+  // Dev-only test hook: lets the perf/screenshot harness import a world and
+  // drive the player without the file picker + prompt. Never exposed in builds.
+  if (import.meta.env.DEV) {
+    window.__editor = {
+      controller,
+      worldMapController,
+      gameplayOverlayController,
+      inventoryController,
+      inventoryStore,
+      inventoryUi,
+      config,
+      ui,
+      proceduralWorkshop,
+      constructionStore,
+      constructionView,
+      constructionSpatialIndex,
+      godRays: terrainView.godRays,
+      stylizedSurface,
+      sceneSettingsRuntime,
+      terrainView,
+      viewModeController,
+      playerController,
+      weatherSettings,
+      weatherController,
+      spellRuntime,
+      applyPostProcessingCaptureMode(mode = {}) {
+        if (mode.weather && weatherSettings && weatherController) {
+          weatherSettings.weatherMode = mode.weather;
+          weatherSettings.weatherIntensity = Math.max(
+            weatherSettings.weatherIntensity,
+            1.1,
+          );
+          weatherController.applySettings();
+        }
+        if (mode.night && stylizedSurface?.skyView?.directional) {
+          stylizedSurface.skyView.directional.intensity = Math.min(
+            stylizedSurface.skyView.directional.intensity,
+            0.08,
+          );
+          if (stylizedSurface.skyView.hemisphere) {
+            stylizedSurface.skyView.hemisphere.intensity = Math.min(
+              stylizedSurface.skyView.hemisphere.intensity,
+              0.12,
+            );
+          }
+        }
+        if (mode.spell && spellRuntime?.cast) {
+          spellRuntime.cast('fire');
+          spellRuntime.cast('water');
+        }
+      },
+    };
+  }
   if (perfQaConfig?.scenarioId === 'object-town') {
     createObjectTownQaScene({
       target: perfQaConfig.buildingCount,

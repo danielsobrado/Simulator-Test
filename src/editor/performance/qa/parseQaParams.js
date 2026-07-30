@@ -1,10 +1,37 @@
 import { resolvePerfQaDensityProfile } from './PerfQaDensityProfiles.js';
+import {
+  POST_PROCESSING_MEASURE_FRAMES,
+  POST_PROCESSING_WARMUP_FRAMES,
+  createPostProcessingRoutePhases,
+  resolvePostProcessingCapture,
+} from './PostProcessingQaCaptures.js';
 
 const SCENARIOS = Object.freeze({
   move: {
     id: 'move',
     label: 'Forward move',
     keys: ({ running }) => (running ? ['KeyW', 'ShiftLeft'] : ['KeyW']),
+  },
+  'post-processing-capture': {
+    id: 'post-processing-capture',
+    label: 'Post-processing capture',
+    keys: () => [],
+    defaults: {
+      warmupFrames: POST_PROCESSING_WARMUP_FRAMES,
+      measureFrames: POST_PROCESSING_MEASURE_FRAMES,
+      speed: 'walk',
+    },
+  },
+  'post-processing-route': {
+    id: 'post-processing-route',
+    label: 'Post-processing movement route',
+    keys: () => [],
+    defaults: {
+      warmupFrames: POST_PROCESSING_WARMUP_FRAMES,
+      measureFrames: POST_PROCESSING_MEASURE_FRAMES,
+      speed: 'run',
+      multiPhase: true,
+    },
   },
   strafe: {
     id: 'strafe',
@@ -180,33 +207,100 @@ export function parseQaParams(search = '') {
   const defaults = scenario.defaults ?? {};
   const speed = params.get('speed') === 'walk' ? 'walk' : (defaults.speed ?? 'run');
   const running = speed === 'run';
+  const captureId = params.get('ppCapture') || params.get('capture') || null;
+  const capture = captureId ? resolvePostProcessingCapture(captureId) : null;
+  const warmupFramesRaw = params.has('warmupFrames')
+    ? readNumber(params, 'warmupFrames', defaults.warmupFrames ?? null)
+    : (defaults.warmupFrames ?? null);
+  const measureFramesRaw = params.has('measureFrames')
+    ? readNumber(params, 'measureFrames', defaults.measureFrames ?? null)
+    : (defaults.measureFrames ?? null);
+  const useFrameBudget = Number.isFinite(warmupFramesRaw) && Number.isFinite(measureFramesRaw);
+  const densityDefault = capture?.density ?? 'standard';
+
+  const keys = capture?.keys
+    ? Object.freeze([...capture.keys])
+    : Object.freeze(scenario.keys({ running }));
 
   return Object.freeze({
     enabled: true,
     scenarioId: scenario.id,
-    scenarioLabel: scenario.label,
+    scenarioLabel: capture?.label ?? scenario.label,
     spawn: Object.freeze({
-      x: readNumber(params, 'x', defaults.spawn?.x ?? 0),
-      z: readNumber(params, 'z', defaults.spawn?.z ?? 0),
+      x: readNumber(params, 'x', capture?.spawn?.x ?? defaults.spawn?.x ?? 0),
+      z: readNumber(params, 'z', capture?.spawn?.z ?? defaults.spawn?.z ?? 0),
     }),
-    yawDegrees: readNumber(params, 'yaw', defaults.yawDegrees ?? 0),
-    pitchDegrees: readNumber(params, 'pitch', defaults.pitchDegrees ?? 0),
+    yawDegrees: readNumber(
+      params,
+      'yaw',
+      capture?.yawDegrees ?? defaults.yawDegrees ?? 0,
+    ),
+    pitchDegrees: readNumber(
+      params,
+      'pitch',
+      capture?.pitchDegrees ?? defaults.pitchDegrees ?? 0,
+    ),
     warmupSeconds: Math.max(0, readNumber(params, 'warmup', defaults.warmup ?? 2)),
     durationSeconds: Math.max(0.5, readNumber(params, 'duration', defaults.duration ?? 12)),
+    warmupFrames: useFrameBudget ? Math.max(0, Math.floor(warmupFramesRaw)) : null,
+    measureFrames: useFrameBudget ? Math.max(1, Math.floor(measureFramesRaw)) : null,
+    useFrameBudget,
+    multiPhase: Boolean(defaults.multiPhase),
+    captureId: capture?.id ?? captureId,
+    captureFixture: capture?.fixture ?? null,
+    captureWeather: capture?.weather ?? params.get('weather') ?? null,
+    captureNight: Boolean(capture?.night) || readBoolean(params, 'night', false),
+    captureSpell: Boolean(capture?.spell) || readBoolean(params, 'spell', false),
     speed,
     running,
     hitchMs: Math.max(1, readNumber(params, 'hitchMs', 1000 / 30)),
     autostart: readBoolean(params, 'autostart', true),
     download: readBoolean(params, 'download', true),
-    keys: Object.freeze(scenario.keys({ running })),
+    keys,
     buildingCount: scenario.id === 'object-town'
       ? Math.max(1, Math.min(256, Math.floor(readNumber(params, 'buildings', 64))))
       : null,
-    densityProfile: resolvePerfQaDensityProfile(params.get('density') ?? 'standard').id,
+    densityProfile: resolvePerfQaDensityProfile(
+      params.get('density') ?? densityDefault,
+    ).id,
+    floatingOriginThreshold: readNumber(params, 'originThreshold', 4096),
   });
 }
 
 export function createMovementPlan(config) {
+  if (config.multiPhase && config.scenarioId === 'post-processing-route') {
+    return Object.freeze({
+      ...config,
+      phases: createPostProcessingRoutePhases({
+        floatingOriginThreshold: config.floatingOriginThreshold ?? 4096,
+        warmupFrames: config.warmupFrames ?? POST_PROCESSING_WARMUP_FRAMES,
+        measureFrames: config.measureFrames ?? POST_PROCESSING_MEASURE_FRAMES,
+      }),
+    });
+  }
+
+  if (config.useFrameBudget) {
+    return Object.freeze({
+      ...config,
+      phases: Object.freeze([
+        Object.freeze({
+          id: 'warmup',
+          label: 'Warmup (settle streaming)',
+          durationFrames: config.warmupFrames,
+          keys: Object.freeze([]),
+          record: false,
+        }),
+        Object.freeze({
+          id: 'measure',
+          label: config.scenarioLabel,
+          durationFrames: config.measureFrames,
+          keys: config.keys,
+          record: true,
+        }),
+      ]),
+    });
+  }
+
   return Object.freeze({
     ...config,
     phases: Object.freeze([
