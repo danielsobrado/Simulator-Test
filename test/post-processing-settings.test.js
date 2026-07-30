@@ -16,7 +16,7 @@ const defaults = Object.freeze({
     maxVelocityPixels: 96,
     subpixelCorrection: true,
   }),
-  bloom: Object.freeze({ enabled: true, intensity: 0.18, radius: 0.55, threshold: 1.35, softKnee: 0.2 }),
+  bloom: Object.freeze({ enabled: true, intensity: 0.18, radius: 0.55, threshold: 3, softKnee: 0.2 }),
   toneMapping: Object.freeze({ enabled: true, mode: 'agx', exposure: 1, contrast: 1, saturation: 1 }),
   sharpen: Object.freeze({ enabled: true, amount: 0.22 }),
   ssr: Object.freeze({
@@ -39,11 +39,30 @@ test('normalization clamps unsafe values and rejects unknown enums', () => {
     ...structuredClone(defaults),
     bloom: { ...defaults.bloom, intensity: 99 },
     toneMapping: { ...defaults.toneMapping, mode: 'invalid' },
-    ssr: { ...defaults.ssr, quality: 'cinematic' },
+    ssr: {
+      ...defaults.ssr,
+      quality: 'cinematic',
+      maxDistance: 5_000,
+      thickness: -2,
+    },
   });
   assert.equal(result.bloom.intensity, 1.5);
   assert.equal(result.toneMapping.mode, 'agx');
   assert.equal(result.ssr.quality, 'medium');
+  assert.equal(result.ssr.maxDistance, 200);
+  assert.equal(result.ssr.thickness, 0.05);
+});
+
+test('normalization removes unknown fields and repairs vignette radii', () => {
+  const result = normalizePostProcessingSettings(defaults, {
+    ...structuredClone(defaults),
+    unknown: true,
+    bloom: { ...defaults.bloom, invented: 123 },
+    vignette: { ...defaults.vignette, innerRadius: 0.9, outerRadius: 0.4 },
+  });
+  assert.equal('unknown' in result, false);
+  assert.equal('invented' in result.bloom, false);
+  assert.ok(result.vignette.outerRadius > result.vignette.innerRadius);
 });
 
 test('individual changes select the custom preset', () => {
@@ -56,14 +75,17 @@ test('individual changes select the custom preset', () => {
 });
 
 test('presets preserve artistic lens toggles', () => {
-  const current = structuredClone(defaults);
-  current.depthOfField.enabled = true;
-  current.grain.enabled = true;
-  const result = applyPostProcessingPreset(defaults, current, 'high');
-  assert.equal(result.preset, 'high');
-  assert.equal(result.ssr.enabled, true);
-  assert.equal(result.depthOfField.enabled, true);
-  assert.equal(result.grain.enabled, true);
+  for (const preset of ['low', 'balanced', 'high', 'ultra']) {
+    const current = structuredClone(defaults);
+    current.depthOfField.enabled = true;
+    current.vignette.enabled = true;
+    current.grain.enabled = true;
+    const result = applyPostProcessingPreset(defaults, current, preset);
+    assert.equal(result.preset, preset);
+    assert.equal(result.depthOfField.enabled, true);
+    assert.equal(result.vignette.enabled, true);
+    assert.equal(result.grain.enabled, true);
+  }
 });
 
 test('off preset disables the graph without erasing effect settings', () => {
@@ -72,4 +94,10 @@ test('off preset disables the graph without erasing effect settings', () => {
   const result = applyPostProcessingPreset(defaults, current, 'off');
   assert.equal(result.enabled, false);
   assert.equal(result.bloom.intensity, 0.42);
+});
+
+test('balanced bloom stays limited to HDR highlights', () => {
+  const result = applyPostProcessingPreset(defaults, structuredClone(defaults), 'balanced');
+  assert.equal(result.bloom.threshold, 3);
+  assert.ok(result.bloom.threshold > 1);
 });
