@@ -1,4 +1,4 @@
-import { mrt, vec4 } from 'three/tsl';
+import { vec4 } from 'three/tsl';
 
 export const REFLECTION_CLASSES = Object.freeze({
   NONE: 0,
@@ -58,19 +58,23 @@ export function packMaterialDataNode(data = defaultMaterialData) {
 }
 
 /**
- * Registers the material attachment override while preserving global colour,
- * normal, and velocity outputs from the scene MRT.
+ * Registers post-processing material metadata without assigning `mrtNode`.
+ * Per-material `mrtNode` overrides compile empty OutputType structs during
+ * non-MRT paths (god rays / compileAsync prewarm). The scene pass already
+ * writes default material data; category metadata is kept on userData for
+ * later attribute-driven overrides.
  */
 export function assignMaterialData(material, data = {}) {
   if (!material?.isNodeMaterial) {
     throw new TypeError('Post-processing material data requires a NodeMaterial.');
   }
-  material.mrtNode = mrt({
-    material: packMaterialDataNode({
-      ...data,
-      roughness: data.roughness ?? material.roughnessNode ?? material.roughness ?? 1,
-    }),
-  });
+  const packed = {
+    roughness: data.roughness ?? material.roughnessNode ?? material.roughness ?? 1,
+    reactive: data.reactive ?? defaultMaterialData.reactive,
+    reflectionClass: data.reflectionClass ?? defaultMaterialData.reflectionClass,
+    bloomBoost: data.bloomBoost ?? defaultMaterialData.bloomBoost,
+  };
+  material.userData.postProcessingMaterialData = Object.freeze({ ...packed });
   return material;
 }
 

@@ -25,6 +25,8 @@
     "qa:perf:matrix": "node scripts/run-perf-matrix.mjs",
     "qa:perf:parse": "node scripts/parse-perf-qa.mjs",
     "qa:postprocessing": "node scripts/run-post-processing-qa.mjs",
+    "qa:postprocessing:install": "playwright install chromium",
+    "qa:postprocessing:browser": "node scripts/run-post-processing-browser-qa.mjs",
     "qa:collision:install": "playwright install chromium",
     "qa:collision": "node scripts/run-collision-acceptance.mjs",
     "qa:collision:release": "node scripts/run-collision-acceptance.mjs --release",

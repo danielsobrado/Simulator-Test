@@ -845,6 +845,7 @@ async function startEditor() {
       weatherSettings,
       weatherController,
       spellRuntime,
+      postProcessingStore,
       applyPostProcessingCaptureMode(mode = {}) {
         if (mode.weather && weatherSettings && weatherController) {
           weatherSettings.weatherMode = mode.weather;

@@ -223,9 +223,6 @@ export class InfiniteTerrainView {
       antialias: rendererConfig.antialias,
       forceWebGL: rendererConfig.forceWebGL,
       powerPreference: rendererConfig.powerPreference ?? 'high-performance',
-      // Three resolves these queries asynchronously; PostProcessingDiagnostics
-      // never waits on them in the animation loop.
-      trackTimestamp: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, rendererConfig.maxPixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
