@@ -59,6 +59,7 @@ import {
   resolveLocalGlb,
   SceneSettingsRuntime,
 } from './editor/settings/SceneSettingsRuntime.js';
+import { createPostProcessingSettings } from './render/postprocessing/PostProcessingSettings.js';
 import { TerrainAwareEditorController } from './editor/TerrainAwareEditorController.js';
 import { ConstructionStore } from './editor/construction/ConstructionStore.js';
 import { ConstructionMaterialStore } from './editor/construction/ConstructionMaterialStore.js';
@@ -123,6 +124,9 @@ async function startEditor() {
     bootSceneSettingsError = error;
   }
   const config = loadEditorConfig();
+  const postProcessingStore = createPostProcessingSettings(
+    config.stylizedSurface.postProcessing,
+  );
   const perfQaConfig = parseQaParams(window.location.search);
   if (perfQaConfig) {
     applyPerfQaDensityProfile(config, perfQaConfig.densityProfile);
@@ -317,6 +321,7 @@ async function startEditor() {
   // Every stylized GLB already reports through the startup telemetry, so the
   // overlay can name the file it is on without instrumenting each loader.
   const releaseAssetProgress = bindAssetProgress(boot);
+  ui.attachPostProcessing(postProcessingStore);
   ui.attachGodRays(terrainView.godRays);
   ui.attachGrassTuning(stylizedSurface.grassTuning);
   ui.attachLoading(loading);
@@ -541,6 +546,7 @@ async function startEditor() {
     controller,
     biomeAssetPalette,
     godRays: terrainView.godRays,
+    postProcessingStore,
     config,
     boot: bootSceneSettings,
     resolveAzgaarOptions: (summary) => ui.resolveAzgaarImportOptions(summary),

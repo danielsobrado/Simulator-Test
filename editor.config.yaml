@@ -108,6 +108,80 @@ terrain:
   smoothFactor: 0.45
 stylizedSurface:
   enabled: true
+  postProcessing:
+    enabled: true
+    preset: balanced
+    renderScale: 1.0
+    antiAliasing:
+      enabled: true
+      mode: traa
+      jitterSamples: 8
+      feedback: 0.90
+      varianceGamma: 1.25
+      depthRejectionMinMeters: 0.05
+      depthRejectionScale: 0.02
+      reactiveStrength: 0.90
+      motionRejectionPixels: 32
+      historyClampStrength: 1.0
+    bloom:
+      enabled: true
+      intensity: 0.18
+      threshold: 3.0
+      knee: 1.4
+      levels: 4
+      bloomBoost: 3.0
+    toneMapping:
+      enabled: true
+      mode: agx
+      exposure: 1.0
+      contrast: 1.0
+      saturation: 1.0
+    sharpen:
+      enabled: true
+      amount: 0.22
+    ssr:
+      enabled: false
+      resolutionScale: 0.5
+      maxSteps: 32
+      binarySteps: 5
+      maxDistanceMeters: 80
+      thicknessMeters: 0.35
+      roughnessCutoff: 0.45
+      intensity: 0.60
+      temporalFeedback: 0.85
+      edgeFade: 0.08
+    screenSpaceShafts:
+      enabled: true
+      resolutionScale: 0.5
+      samples: 24
+      intensity: 0.40
+      reach: 0.82
+      decay: 0.955
+      highSunFadeStartDegrees: 35
+      highSunFadeEndDegrees: 55
+    depthOfField:
+      enabled: false
+      focusMode: player
+      manualFocusMeters: 6.2
+      focusSmoothing: 4.0
+      maxCoCPixels: 3.5
+      taps: 16
+      nearStartRatio: 0.55
+      nearFullRatio: 0.16
+      farStartMeters: 130
+      farFullMeters: 620
+    vignette:
+      enabled: false
+      intensity: 0.12
+      innerRadius: 0.35
+      outerRadius: 1.05
+    grain:
+      enabled: false
+      intensity: 0.012
+    diagnostics:
+      enabled: false
+      debugView: final
+      showGpuTimings: false
   assets:
     scene: /assets/grass-scene.glb
     trunkMaterial: Material.011

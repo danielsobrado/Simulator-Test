@@ -2,6 +2,10 @@ import {
   BIOME_ASSET_CONFIG_KIND,
   BIOME_ASSET_CONFIG_VERSION,
 } from '../stylized/BiomeAssetPalette.js';
+import {
+  normalizePostProcessingSettings,
+  postProcessingSettingsToPlain,
+} from '../../render/postprocessing/PostProcessingSettings.js';
 
 export const SCENE_SETTINGS_KIND = 'simcity-dnd-scene-settings';
 export const SCENE_SETTINGS_VERSION = 1;
@@ -214,12 +218,16 @@ function normalizeBiomeAssets(document) {
 }
 
 function normalizeEnvironment(environment) {
-  if (environment === undefined || environment === null) return { godRays: {} };
-  const source = object(environment, 'Scene settings environment');
+  const source = environment === undefined || environment === null
+    ? {}
+    : object(environment, 'Scene settings environment');
   const godRays = source.godRays === undefined
     ? {}
     : structuredClone(object(source.godRays, 'Scene settings god rays'));
-  return { godRays };
+  const postProcessing = postProcessingSettingsToPlain(
+    normalizePostProcessingSettings(source.postProcessing),
+  );
+  return { godRays, postProcessing };
 }
 
 /**
@@ -270,6 +278,7 @@ export function createSceneSettingsDocument({
   name,
   map = null,
   godRays = {},
+  postProcessing = {},
   biomeAssets,
   assets = [],
   placement = {},
@@ -279,7 +288,7 @@ export function createSceneSettingsDocument({
     version: SCENE_SETTINGS_VERSION,
     name,
     map,
-    environment: { godRays },
+    environment: { godRays, postProcessing },
     biomeAssets,
     assets,
     placement,

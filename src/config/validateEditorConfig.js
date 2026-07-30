@@ -1,5 +1,9 @@
 import { validateSimulationConfig } from './validateSimulationConfig.js';
 import { clumpsFormCarpet, clumpsPerCell } from '../editor/stylized/grassLodMath.js';
+import {
+  normalizePostProcessingSettings,
+  postProcessingSettingsToPlain,
+} from '../render/postprocessing/PostProcessingSettings.js';
 
 const REQUIRED_POSITIVE_PATHS = Object.freeze([
   Object.freeze(['map', 'tileSize']),
@@ -849,6 +853,14 @@ function validateStylizedSurface(config) {
   }
 }
 
+export function validatePostProcessing(config) {
+  const postProcessing = config.stylizedSurface?.postProcessing;
+  if (postProcessing === undefined) return;
+  config.stylizedSurface.postProcessing = postProcessingSettingsToPlain(
+    normalizePostProcessingSettings(postProcessing),
+  );
+}
+
 export function validateEditorConfig(config) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
     throw new Error('Invalid editor configuration: expected a YAML object.');
@@ -1017,6 +1029,7 @@ export function validateEditorConfig(config) {
   }
 
   validateStylizedSurface(config);
+  validatePostProcessing(config);
   if (config.simulation !== undefined) {
     validateSimulationConfig(config.simulation);
   }

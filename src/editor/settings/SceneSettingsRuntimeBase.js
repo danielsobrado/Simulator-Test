@@ -22,6 +22,17 @@ export const SCENE_SETTINGS_RELOAD_WORLD_KEY = 'simcity-dnd:pending-scene-settin
 export const SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY = 'simcity-dnd:pending-scene-settings-world-key';
 export const SCENE_SETTINGS_SOURCE_URL_SESSION_KEY = 'simcity-dnd:pending-scene-settings-source-url';
 
+function readPostProcessing(adapter, fallback = {}) {
+  return adapter?.get?.() ?? adapter?.getSettings?.() ?? fallback;
+}
+
+function writePostProcessing(adapter, settings) {
+  if (typeof adapter?.set === 'function') {
+    return adapter.set(settings, { markCustom: false });
+  }
+  return adapter?.setSettings?.(settings);
+}
+
 function slug(value) {
   return String(value)
     .normalize('NFKD')
@@ -128,6 +139,8 @@ export class SceneSettingsRuntime {
     controller,
     biomeAssetPalette,
     godRays,
+    postProcessingStore = null,
+    postProcessing = null,
     config,
     boot = null,
     resolveAzgaarOptions = null,
@@ -138,6 +151,7 @@ export class SceneSettingsRuntime {
     this.controller = controller;
     this.biomeAssetPalette = biomeAssetPalette;
     this.godRays = godRays;
+    this.postProcessing = postProcessingStore ?? postProcessing;
     this.config = config;
     this.resolveAzgaarOptions = resolveAzgaarOptions;
     this.afterMapLoad = afterMapLoad;
@@ -150,6 +164,10 @@ export class SceneSettingsRuntime {
         name: 'Current world look',
         biomeAssets: biomeAssetPalette.toDocument(),
         godRays: godRays?.getSettings?.() ?? {},
+        postProcessing: readPostProcessing(
+          this.postProcessing,
+          config.stylizedSurface.postProcessing,
+        ),
         placement: config.stylizedSurface.regionalPlacement ?? {},
       });
     this.sourceUrl = boot?.sourceUrl ?? globalThis.location?.href ?? 'http://localhost/';
@@ -168,6 +186,10 @@ export class SceneSettingsRuntime {
       name,
       map: includeMapDocument ? this.mapSource : toMapReference(this.mapSource),
       godRays: this.godRays?.getSettings?.() ?? {},
+      postProcessing: readPostProcessing(
+        this.postProcessing,
+        this.document.environment.postProcessing,
+      ),
       biomeAssets: this.biomeAssetPalette.toDocument(),
       assets: this.document.assets,
       placement: this.config.stylizedSurface.regionalPlacement ?? this.document.placement,
@@ -198,6 +220,7 @@ export class SceneSettingsRuntime {
   applyVisualSettings(document) {
     const normalized = normalizeSceneSettings(document);
     this.godRays?.setSettings?.(normalized.environment.godRays);
+    writePostProcessing(this.postProcessing, normalized.environment.postProcessing);
     this.biomeAssetPalette.replaceDocument(normalized.biomeAssets);
     this.document = normalized;
     this.mapSource = normalized.map;

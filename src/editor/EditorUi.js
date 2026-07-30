@@ -10,6 +10,7 @@ import {
 } from './storage.js';
 import { selectMinimapBurgs } from './map/minimapBurgs.js';
 import { normalizeSceneSettings } from './settings/SceneSettings.js';
+import { createPostProcessingSettingsPanel } from './settings/PostProcessingSettingsPanel.js';
 import { assetFileName, formatBytes, trackStreamingSettle } from './ui/loadingSources.js';
 import { hexToRgbBytes } from './tileCatalog.js';
 
@@ -396,6 +397,12 @@ export class EditorUi {
             </div>
 
             <div class="panel-head">
+              <h2>Post-processing</h2>
+              <span class="panel-count">Phase 1 settings</span>
+            </div>
+            <div data-role="post-processing-settings"></div>
+
+            <div class="panel-head">
               <h2>God rays</h2>
               <span class="panel-count">live preview</span>
             </div>
@@ -588,6 +595,8 @@ export class EditorUi {
     this.grassBladeReadout = root.querySelector('[data-role="grass-blade-readout"]');
     this.grassBladeProfiles = null;
     this.godRaysPanel = root.querySelector('[data-panel="settings"]');
+    this.postProcessingPanelRoot = root.querySelector('[data-role="post-processing-settings"]');
+    this.postProcessingPanel = null;
     this.godRaysControls = [
       ...root.querySelectorAll('[data-god-rays-setting]'),
     ];
@@ -802,6 +811,15 @@ export class EditorUi {
   attachGodRays(effect) {
     this.godRaysEffect = effect;
     this.syncGodRaysSettings(effect?.getSettings?.());
+  }
+
+  attachPostProcessing(store) {
+    this.postProcessingPanel?.dispose();
+    this.postProcessingPanel = createPostProcessingSettingsPanel({
+      root: this.postProcessingPanelRoot,
+      store,
+      defaults: this.config.stylizedSurface.postProcessing,
+    });
   }
 
   syncGodRaysSettings(settings) {

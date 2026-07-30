@@ -384,6 +384,15 @@ button, input, select { font: inherit; }
 }
 
 .god-rays-settings { display: grid; gap: 12px; }
+.post-processing-settings { display: grid; gap: 9px; }
+.post-processing-settings__section > summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+.post-processing-settings__section > summary h3 {
+  display: inline;
+}
+.post-processing-settings__section:not([open]) > :not(summary) { display: none; }
 .settings-toggle,
 .settings-select {
   display: grid;
