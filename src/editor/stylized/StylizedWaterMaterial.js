@@ -33,6 +33,7 @@ import {
   viewportSafeUV,
 } from 'three/tsl';
 import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
+import { assignWaterMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
 
@@ -456,5 +457,5 @@ export function createStylizedWaterMaterial({
   material.colorNode = color;
   material.opacityNode = alpha;
   material.alphaTest = 0.02;
-  return material;
+  return assignWaterMaterialData(material);
 }

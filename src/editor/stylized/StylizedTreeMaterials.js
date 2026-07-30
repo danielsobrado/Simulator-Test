@@ -24,6 +24,7 @@ import {
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { registerTreeWindTime } from './forest/TreeWindTime.js';
+import { assignTreeFoliageMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
 
 const TWO_PI = Math.PI * 2;
 function colorNode(value) {
@@ -124,7 +125,7 @@ export function createStylizedLeafMaterial({
         : (config.trees.cardAlphaTest ?? 0.32));
   }
   material.transparent = false;
-  return material;
+  return assignTreeFoliageMaterialData(material);
 }
 
 function bumpNormal(height) {

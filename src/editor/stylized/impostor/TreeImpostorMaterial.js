@@ -27,6 +27,7 @@ import {
   TREE_COLOR_VARIATION_RANGE,
 } from '../forest/TreeAppearance.js';
 import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
+import { assignTreeFoliageMaterialData } from '../../../render/postprocessing/PostProcessingMaterialData.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -117,6 +118,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance }
   material.transparent = false;
   material.depthWrite = true;
   material.fog = true;
+  assignTreeFoliageMaterialData(material);
   return {
     material,
     uniforms: { cameraRight, cameraUp, sphericalBlend, time, windStrength },

@@ -25,6 +25,7 @@ import {
   stylizedPatchMask,
   stylizedPathWearMask,
 } from './stylized/StylizedNoiseNodes.js';
+import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessingMaterialData.js';
 
 const HEIGHT_SHADE_SCALE = 0.018;
 const MINIMUM_HEIGHT_SHADE = 0.72;
@@ -204,5 +205,5 @@ export function createTerrainMaterial({
   // view space. A literal local +Z here bypasses those transforms and makes the
   // ground light as though its normal points toward the camera.
   material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
-  return material;
+  return assignTerrainMaterialData(material);
 }

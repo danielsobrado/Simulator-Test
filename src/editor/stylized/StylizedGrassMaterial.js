@@ -30,6 +30,7 @@ import {
   stylizedPathWearMask,
 } from './StylizedNoiseNodes.js';
 import { createSurfaceClassNodes } from './SurfaceMaskNodes.js';
+import { assignGrassMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -349,5 +350,5 @@ export function createStylizedGrassMaterial({
   material.alphaTest = 0.5;
   material.depthWrite = true;
   material.transparent = false;
-  return material;
+  return assignGrassMaterialData(material);
 }

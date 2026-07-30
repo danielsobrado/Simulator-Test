@@ -1,24 +1,73 @@
 import * as THREE from 'three/webgpu';
-import { pass } from 'three/tsl';
+import {
+  mrt,
+  normalView,
+  output,
+  packNormalToRGB,
+  pass,
+  velocity,
+} from 'three/tsl';
+import { packMaterialDataNode } from './PostProcessingMaterialData.js';
 import { createPostProcessingTopologySignature } from './nodes/PostCommon.js';
+import { createDebugViewNode } from './nodes/DebugViewNode.js';
 
 export { createPostProcessingTopologySignature };
 
 /**
- * Phase 2 graph: a beauty scene pass routed directly to RenderPipeline output.
- * Later phases may insert nodes based on the topology signature.
+ * One HDR scene pass produces all full-resolution post-processing inputs.
  */
 export class PostProcessingGraph {
-  constructor({ renderer, scene, camera, topologySignature }) {
+  constructor({
+    renderer,
+    scene,
+    camera,
+    settings,
+    topologySignature,
+  }) {
     this.renderer = renderer;
     this.topologySignature = topologySignature;
     this.disposed = false;
 
     this.scenePass = pass(scene, camera);
     this.scenePass.name = 'World Post-Processing Scene Pass';
+    this.scenePass.setMRT(mrt({
+      output,
+      normal: packNormalToRGB(normalView),
+      velocity,
+      material: packMaterialDataNode(),
+    }));
+
+    const outputTexture = this.scenePass.getTexture('output');
+    outputTexture.format = THREE.RGBAFormat;
+    outputTexture.type = THREE.HalfFloatType;
+
+    const normalTexture = this.scenePass.getTexture('normal');
+    normalTexture.format = THREE.RGBAFormat;
+    normalTexture.type = THREE.UnsignedByteType;
+    normalTexture.colorSpace = THREE.NoColorSpace;
+
+    const velocityTexture = this.scenePass.getTexture('velocity');
+    velocityTexture.format = THREE.RGFormat;
+    velocityTexture.type = THREE.HalfFloatType;
+    velocityTexture.colorSpace = THREE.NoColorSpace;
+
+    const materialTexture = this.scenePass.getTexture('material');
+    materialTexture.format = THREE.RGBAFormat;
+    materialTexture.type = THREE.UnsignedByteType;
+    materialTexture.colorSpace = THREE.NoColorSpace;
+
+    this.inputs = Object.freeze({
+      output: this.scenePass.getTextureNode('output'),
+      normal: this.scenePass.getTextureNode('normal'),
+      velocity: this.scenePass.getTextureNode('velocity'),
+      material: this.scenePass.getTextureNode('material'),
+      depth: this.scenePass.getTextureNode('depth'),
+    });
 
     this.pipeline = new THREE.RenderPipeline(renderer);
-    this.pipeline.outputNode = this.scenePass;
+    this.pipeline.outputNode = settings?.diagnostics?.enabled === true
+      ? createDebugViewNode(this.scenePass, settings.diagnostics.debugView)
+      : this.inputs.output;
   }
 
   updateUniforms(frameState) {

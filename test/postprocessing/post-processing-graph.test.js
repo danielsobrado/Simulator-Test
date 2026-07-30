@@ -39,5 +39,10 @@ test('future effect toggles participate in topology', () => {
 test('enabled graph with all effects off has a scene-only topology identity', () => {
   const signature = createPostProcessingTopologySignature(settings(true));
   assert.match(signature, /^post:1/);
+  assert.match(signature, /\|mrt:1/);
   assert.ok(POST_PROCESSING_EFFECT_KEYS.every((key) => signature.includes(`${key}:0`)));
+});
+
+test('disabled topology does not allocate the scene MRT', () => {
+  assert.match(createPostProcessingTopologySignature(settings(false)), /\|mrt:0/);
 });

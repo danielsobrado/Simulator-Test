@@ -42,6 +42,7 @@ export class PostProcessingController {
       renderer: this.renderer,
       scene: this.scene,
       camera,
+      settings: this.settings,
       topologySignature: this.topologySignature,
     });
     this.graph.resize(

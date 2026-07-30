@@ -8,6 +8,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { assignBushFoliageMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 
 export const BUSH_CAST_SHADOW = false;
@@ -68,7 +69,7 @@ export function cloneBushMaterial(source) {
   }
   material.depthWrite = true;
   material.needsUpdate = true;
-  return material;
+  return assignBushFoliageMaterialData(material);
 }
 
 function proxyColor(sourceMaterial, fallbackColor) {
@@ -150,7 +151,7 @@ export function createBushProxyMaterial(sourceMaterial, {
   );
   material.transparent = false;
   material.depthWrite = true;
-  return material;
+  return assignBushFoliageMaterialData(material);
 }
 
 export function createBushProxyPrototype(prototype, options = {}) {

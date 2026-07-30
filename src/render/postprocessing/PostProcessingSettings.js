@@ -26,6 +26,7 @@ export const DEBUG_VIEWS = Object.freeze([
   'depth',
   'normal',
   'velocity',
+  'material',
   'reactive-mask',
   'reflection-class',
   'bloom',
