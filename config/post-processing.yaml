@@ -10,7 +10,7 @@ bloom:
   enabled: true
   intensity: 0.18
   radius: 0.55
-  threshold: 1.35
+  threshold: 3.0
   softKnee: 0.2
 toneMapping:
   enabled: true
