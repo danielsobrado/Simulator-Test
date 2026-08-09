@@ -55,9 +55,18 @@ export class ViewModeController {
 
   get camera() {
     if (this.mode !== PLAYER_MODE_WALK) return this.editorCamera.camera;
-    return this.isThirdPerson
-      ? this.thirdPersonCamera.camera
-      : this.playerController.camera;
+    if (!this.isThirdPerson) return this.playerController.camera;
+
+    const camera = this.thirdPersonCamera.camera;
+    const playerCamera = this.playerController.camera;
+    // Far-terrain mode updates the player camera at runtime. Keep the optional
+    // third-person camera on the same range without coupling the composition
+    // root to every camera implementation.
+    if (camera.far !== playerCamera.far) {
+      camera.far = playerCamera.far;
+      camera.updateProjectionMatrix();
+    }
+    return camera;
   }
 
   get isThirdPerson() {
