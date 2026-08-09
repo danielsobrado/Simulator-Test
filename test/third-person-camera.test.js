@@ -57,6 +57,24 @@ test('third-person camera detects an obstruction between clear endpoints', () =>
   );
 });
 
+test('third-person camera detects minimum-width construction ribbons', () => {
+  const terrain = {
+    heightAt: (_x, z) => (z >= 1.62 && z <= 1.72 ? 2 : 0),
+  };
+  const view = new ThirdPersonCamera({
+    terrain,
+    fovDegrees: 68,
+    farPlane: 5000,
+  });
+
+  view.update(0, status());
+
+  assert.ok(
+    view.camera.position.z < 1.62,
+    `camera skipped the narrow wall and reached z=${view.camera.position.z}`,
+  );
+});
+
 test('third-person occlusion follows the shoulder-offset path', () => {
   const terrain = {
     heightAt: (x, z) => (x > 0.15 && z >= 1.4 && z <= 2.1 ? 2 : 0),
