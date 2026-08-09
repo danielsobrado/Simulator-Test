@@ -149,9 +149,30 @@ export class InventoryUi {
       host.append(view.button);
     }
 
-    const capacity = this.store.getState().capacity;
     this.bagViews = [];
-    for (let index = 0; index < capacity; index += 1) {
+    this.syncBagSlots(this.store.getState().capacity);
+
+    for (const host of this.tabHosts) {
+      host.innerHTML = WEAPON_SET_IDS.map((setId) => (
+        `<button type="button" class="inventory-set-tab" data-set="${setId}"`
+        + ` aria-label="Weapon set ${weaponSetLabel(setId)}">${weaponSetLabel(setId)}</button>`
+      )).join('');
+    }
+  }
+
+  syncBagSlots(capacity) {
+    if (!Number.isInteger(capacity) || capacity < 0) {
+      throw new Error('Inventory UI capacity must be a non-negative integer.');
+    }
+
+    while (this.bagViews.length > capacity) {
+      const view = this.bagViews.pop();
+      this.slots.delete(serializeLocation(view.location));
+      view.button.remove();
+    }
+
+    while (this.bagViews.length < capacity) {
+      const index = this.bagViews.length;
       const view = new InventorySlotView({
         location: bagLocation(index),
         label: `Bag slot ${index + 1}`,
@@ -162,13 +183,6 @@ export class InventoryUi {
       this.bagViews.push(view);
       this.slots.set(serializeLocation(view.location), view);
       this.bag.append(view.button);
-    }
-
-    for (const host of this.tabHosts) {
-      host.innerHTML = WEAPON_SET_IDS.map((setId) => (
-        `<button type="button" class="inventory-set-tab" data-set="${setId}"`
-        + ` aria-label="Weapon set ${weaponSetLabel(setId)}">${weaponSetLabel(setId)}</button>`
-      )).join('');
     }
   }
 
@@ -263,6 +277,7 @@ export class InventoryUi {
     if (!state.isOpen) return;
 
     const inventory = state.inventory;
+    this.syncBagSlots(inventory.capacity);
     this.repointWeaponSlots(inventory.activeWeaponSet);
     this.patchSlots(state, inventory);
     this.patchWeaponTabs(inventory.activeWeaponSet);
