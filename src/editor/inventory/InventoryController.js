@@ -234,7 +234,9 @@ export class InventoryController {
       return this.store.equipItem(location);
     }
     if (definition?.category === 'consumable') {
-      return this.store.useItem(location);
+      const staged = this.store.useItem(location);
+      if (!staged.ok || !staged.pending) return staged;
+      return this.store.confirmUse(staged.token);
     }
     return { ok: false, code: 'no_action', message: 'No default action for this item.' };
   }
