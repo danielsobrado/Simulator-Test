@@ -6,18 +6,15 @@
  * it reads the controller's pose and never writes to it, so movement, collision,
  * spell aiming and terrain picking all stay exactly as they were.
  *
- * Two things it has to get right, and both are about not putting the camera
- * somewhere the player cannot see from:
- *
- *   occlusion   The boom shortens when the ground would come between the camera
- *               and the character. Sampled along the boom rather than just at the
- *               end, or walking up to a bank pops the camera through it.
- *   damping     The boom length and the pivot are damped, the *angles* are not.
- *               A damped yaw makes the mouse feel like it is dragging treacle;
- *               a snapping boom makes every step down a slope a jolt.
+ * The boom shortens when terrain would cross the actual shoulder-offset camera
+ * path. Rotation stays immediate while boom length and pivot height are damped,
+ * keeping mouse input responsive without making broken ground feel jittery.
  */
 
 import * as THREE from 'three';
+
+const MAX_OCCLUSION_SAMPLES = 64;
+const OCCLUSION_REFINEMENT_STEPS = 3;
 
 const DEFAULTS = Object.freeze({
   distance: 3.4,
@@ -25,15 +22,45 @@ const DEFAULTS = Object.freeze({
   pivotHeight: 1.45,
   /** Lateral offset, so the character sits off-centre and the view is clear. */
   shoulder: 0.42,
-  /** How close the boom may be pulled before the character is simply skipped. */
+  /** Hard floor for the boom when terrain closes in. */
   minDistance: 0.85,
   /** Keep this much air between the camera and the ground. */
   clearance: 0.38,
   /** Exponential rate, 1/s. */
   damping: 11,
   /** Samples along the boom for the occlusion test. */
-  occlusionSamples: 6,
+  occlusionSamples: 8,
 });
+
+function assertPositive(settings, name) {
+  if (!Number.isFinite(settings[name]) || settings[name] <= 0) {
+    throw new Error(`Third-person camera ${name} must be positive.`);
+  }
+}
+
+export function createThirdPersonCameraSettings(config = {}) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error('Third-person camera config must be an object.');
+  }
+  const settings = { ...DEFAULTS, ...config };
+  for (const name of ['distance', 'pivotHeight', 'minDistance', 'clearance', 'damping']) {
+    assertPositive(settings, name);
+  }
+  if (!Number.isFinite(settings.shoulder)) {
+    throw new Error('Third-person camera shoulder must be finite.');
+  }
+  if (!Number.isInteger(settings.occlusionSamples)
+      || settings.occlusionSamples < 1
+      || settings.occlusionSamples > MAX_OCCLUSION_SAMPLES) {
+    throw new Error(
+      `Third-person camera occlusionSamples must be an integer from 1 to ${MAX_OCCLUSION_SAMPLES}.`,
+    );
+  }
+  if (settings.minDistance > settings.distance) {
+    throw new Error('Third-person camera minDistance must not exceed distance.');
+  }
+  return Object.freeze(settings);
+}
 
 function damp(current, target, rate, dt) {
   return target + (current - target) * Math.exp(-rate * dt);
@@ -49,7 +76,7 @@ export class ThirdPersonCamera {
    */
   constructor({ terrain, fovDegrees, farPlane, config = {} }) {
     this.terrain = terrain;
-    this.settings = { ...DEFAULTS, ...config };
+    this.settings = createThirdPersonCameraSettings(config);
     this.camera = new THREE.PerspectiveCamera(fovDegrees, 1, 0.12, farPlane);
     this.camera.name = 'third-person';
     this.camera.rotation.order = 'YXZ';
@@ -83,9 +110,6 @@ export class ThirdPersonCamera {
       this._pivot.set(status.position.x, targetPivotY, status.position.z);
     } else {
       const h = Math.max(1e-4, Math.min(dt, 1 / 15));
-      // X and Z track the player exactly — a damped horizontal pivot lags the
-      // character out of frame during a sprint. Only the height is smoothed,
-      // which is what takes the jitter out of walking over broken ground.
       this._pivot.x = status.position.x;
       this._pivot.z = status.position.z;
       this._pivot.y = damp(this._pivot.y, targetPivotY, s.damping, h);
@@ -98,38 +122,60 @@ export class ThirdPersonCamera {
 
     const wanted = this._resolveBoom(s);
     const h = Math.max(1e-4, Math.min(dt, 1 / 15));
-    // Shortening is immediate, lengthening is eased: a boom that eases *into* an
-    // obstruction has already put the camera inside the hillside by the time it
-    // arrives.
+    // Shortening is immediate, lengthening is eased: easing into an obstruction
+    // puts the camera inside it before the boom catches up.
     this._boom = wanted < this._boom ? wanted : damp(this._boom, wanted, s.damping, h);
 
     this._desired.copy(this._pivot)
       .addScaledVector(this._forward, -this._boom)
       .addScaledVector(this._right, s.shoulder * (this._boom / s.distance));
 
-    // Last resort: never end up under the ground, however the boom resolved.
-    const ground = this.terrain.heightAt(this._desired.x, this._desired.z) + s.clearance;
-    if (this._desired.y < ground) this._desired.y = ground;
+    const ground = this.terrain.heightAt(this._desired.x, this._desired.z);
+    if (Number.isFinite(ground)) {
+      const minimumY = ground + s.clearance;
+      if (this._desired.y < minimumY) this._desired.y = minimumY;
+    }
 
     this.camera.position.copy(this._desired);
     this.camera.rotation.set(pitch, yaw, 0, 'YXZ');
     this.camera.updateMatrixWorld();
   }
 
-  /** How far the boom can extend before the ground gets in the way. */
+  /** How far the boom can extend before terrain crosses its camera path. */
   _resolveBoom(s) {
+    const min = s.minDistance;
     const full = s.distance;
-    const steps = s.occlusionSamples;
-    for (let i = steps; i >= 1; i--) {
-      const t = (i / steps) * full;
-      const x = this._pivot.x - this._forward.x * t;
-      const y = this._pivot.y - this._forward.y * t;
-      const z = this._pivot.z - this._forward.z * t;
-      if (y >= this.terrain.heightAt(x, z) + s.clearance) {
-        return Math.max(s.minDistance, t);
+    if (!this._isBoomPointClear(min, s)) return min;
+
+    let safe = min;
+    const span = full - min;
+    for (let i = 1; i <= s.occlusionSamples; i += 1) {
+      const distance = min + span * (i / s.occlusionSamples);
+      if (this._isBoomPointClear(distance, s)) {
+        safe = distance;
+        continue;
       }
+
+      let low = safe;
+      let high = distance;
+      for (let refinement = 0; refinement < OCCLUSION_REFINEMENT_STEPS; refinement += 1) {
+        const middle = (low + high) * 0.5;
+        if (this._isBoomPointClear(middle, s)) low = middle;
+        else high = middle;
+      }
+      return low;
     }
-    return s.minDistance;
+    return full;
+  }
+
+  _isBoomPointClear(distance, s) {
+    const ratio = distance / s.distance;
+    const shoulder = s.shoulder * ratio;
+    const x = this._pivot.x - this._forward.x * distance + this._right.x * shoulder;
+    const y = this._pivot.y - this._forward.y * distance;
+    const z = this._pivot.z - this._forward.z * distance + this._right.z * shoulder;
+    const ground = this.terrain.heightAt(x, z);
+    return Number.isFinite(ground) && y >= ground + s.clearance;
   }
 
   shiftWorld(shiftX, shiftZ) {
@@ -147,4 +193,7 @@ export class ThirdPersonCamera {
   }
 }
 
-export { DEFAULTS as THIRD_PERSON_DEFAULTS };
+export {
+  DEFAULTS as THIRD_PERSON_DEFAULTS,
+  MAX_OCCLUSION_SAMPLES as THIRD_PERSON_MAX_OCCLUSION_SAMPLES,
+};
