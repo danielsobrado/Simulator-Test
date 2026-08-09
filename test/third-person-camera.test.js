@@ -5,6 +5,11 @@ import {
   createThirdPersonCameraSettings,
   ThirdPersonCamera,
 } from '../src/editor/player/ThirdPersonCamera.js';
+import {
+  CAMERA_VIEW_THIRD,
+  ViewModeController,
+} from '../src/editor/player/ViewModeController.js';
+import { PLAYER_MODE_WALK } from '../src/editor/player/playerConstants.js';
 
 function status() {
   return {
@@ -91,4 +96,22 @@ test('third-person occlusion follows the shoulder-offset path', () => {
     view.camera.position.z < 1.4,
     `camera ignored shoulder-path obstruction and reached z=${view.camera.position.z}`,
   );
+});
+
+test('third-person view follows the player camera far range', () => {
+  const thirdPersonCamera = new ThirdPersonCamera({
+    terrain: { heightAt: () => 0 },
+    fovDegrees: 68,
+    farPlane: 5000,
+  });
+  const controller = Object.create(ViewModeController.prototype);
+  controller.mode = PLAYER_MODE_WALK;
+  controller.cameraView = CAMERA_VIEW_THIRD;
+  controller.thirdPersonCamera = thirdPersonCamera;
+  controller.playerController = { camera: { far: 24000 } };
+
+  const activeCamera = controller.camera;
+
+  assert.equal(activeCamera, thirdPersonCamera.camera);
+  assert.equal(activeCamera.far, 24000);
 });
