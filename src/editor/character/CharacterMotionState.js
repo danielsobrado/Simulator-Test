@@ -113,11 +113,15 @@ export class CharacterMotionState {
     const stepDistance = Math.hypot(dx, dz);
 
     if (stepDistance > TELEPORT_METRES) {
-      // Teleport or an un-shifted rebase: adopt the new position, keep the gait
-      // where it was rather than spinning the phase through a hundred strides.
+      // Teleport or an un-shifted rebase: adopt the new position without
+      // differentiating the discontinuity into a fake sprint or acceleration.
       this._velX = 0;
       this._velZ = 0;
+      this._prevVelX = 0;
+      this._prevVelZ = 0;
       this.speed = 0;
+      this.accelerationX = 0;
+      this.accelerationZ = 0;
     } else {
       this._velX = damp(this._velX, dx / h, SPEED_DAMP, h);
       this._velZ = damp(this._velZ, dz / h, SPEED_DAMP, h);
@@ -196,11 +200,14 @@ export class CharacterMotionState {
     this._initialised = false;
     this._velX = 0;
     this._velZ = 0;
+    this._prevVelX = 0;
+    this._prevVelZ = 0;
     this.speed = 0;
     this.speed01 = 0;
     this.accelerationX = 0;
     this.accelerationZ = 0;
     this.lean = 0;
+    this.stepping = false;
     if (status) {
       this.x = status.position.x;
       this.z = status.position.z;
