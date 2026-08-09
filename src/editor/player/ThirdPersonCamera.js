@@ -13,7 +13,8 @@
 
 import * as THREE from 'three';
 
-const MAX_OCCLUSION_SAMPLES = 64;
+const MAX_OCCLUSION_SAMPLES = 128;
+const TARGET_OCCLUSION_SPACING = 0.1;
 const OCCLUSION_REFINEMENT_STEPS = 3;
 
 const DEFAULTS = Object.freeze({
@@ -28,7 +29,7 @@ const DEFAULTS = Object.freeze({
   clearance: 0.38,
   /** Exponential rate, 1/s. */
   damping: 11,
-  /** Samples along the boom for the occlusion test. */
+  /** Minimum samples along the boom for the occlusion test. */
   occlusionSamples: 8,
 });
 
@@ -147,10 +148,14 @@ export class ThirdPersonCamera {
     const full = s.distance;
     if (!this._isBoomPointClear(min, s)) return min;
 
-    let safe = min;
     const span = full - min;
-    for (let i = 1; i <= s.occlusionSamples; i += 1) {
-      const distance = min + span * (i / s.occlusionSamples);
+    const samples = Math.min(
+      MAX_OCCLUSION_SAMPLES,
+      Math.max(s.occlusionSamples, Math.ceil(span / TARGET_OCCLUSION_SPACING)),
+    );
+    let safe = min;
+    for (let i = 1; i <= samples; i += 1) {
+      const distance = min + span * (i / samples);
       if (this._isBoomPointClear(distance, s)) {
         safe = distance;
         continue;
