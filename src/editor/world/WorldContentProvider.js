@@ -23,38 +23,79 @@ export class IndexedDbWorldContentProvider {
   } = {}) {
     this.databaseName = databaseName;
     this.storeName = storeName;
+    this.database = null;
+    this.databasePromise = null;
+    this.disposed = false;
   }
 
   async open() {
-    if (typeof indexedDB === 'undefined') return null;
-    return new Promise((resolve, reject) => {
+    if (this.disposed || typeof indexedDB === 'undefined') return null;
+    if (this.database) return this.database;
+    if (this.databasePromise) return this.databasePromise;
+
+    this.databasePromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.databaseName, 1);
       request.addEventListener('upgradeneeded', () => {
         if (!request.result.objectStoreNames.contains(this.storeName)) {
           request.result.createObjectStore(this.storeName);
         }
       });
-      request.addEventListener('success', () => resolve(request.result));
-      request.addEventListener('error', () => reject(request.error));
+      request.addEventListener('success', () => {
+        const database = request.result;
+        this.databasePromise = null;
+        if (this.disposed) {
+          database.close();
+          resolve(null);
+          return;
+        }
+        database.addEventListener?.('versionchange', () => {
+          database.close();
+          if (this.database === database) this.database = null;
+        });
+        this.database = database;
+        resolve(database);
+      });
+      request.addEventListener('error', () => {
+        this.databasePromise = null;
+        reject(request.error ?? new Error('IndexedDB world content open failed.'));
+      });
     });
+    return this.databasePromise;
   }
 
   async transact(mode, worldId, chunkX, chunkZ, content = null) {
     const database = await this.open();
     if (!database) return null;
-    try {
-      return await new Promise((resolve, reject) => {
-        const transaction = database.transaction(this.storeName, mode);
+
+    return new Promise((resolve, reject) => {
+      let transaction;
+      let request;
+      let result = null;
+      try {
+        transaction = database.transaction(this.storeName, mode);
         const store = transaction.objectStore(this.storeName);
-        const request = mode === 'readonly'
+        request = mode === 'readonly'
           ? store.get(contentKey(worldId, chunkX, chunkZ))
           : store.put(content, contentKey(worldId, chunkX, chunkZ));
-        request.addEventListener('success', () => resolve(request.result ?? null));
-        request.addEventListener('error', () => reject(request.error));
+      } catch (error) {
+        reject(error);
+        return;
+      }
+
+      request.addEventListener('success', () => {
+        result = request.result ?? null;
       });
-    } finally {
-      database.close();
-    }
+      request.addEventListener('error', () => {
+        reject(request.error ?? new Error('IndexedDB world content request failed.'));
+      });
+      transaction.addEventListener('complete', () => resolve(result));
+      transaction.addEventListener('abort', () => {
+        reject(transaction.error ?? new Error('IndexedDB world content transaction aborted.'));
+      });
+      transaction.addEventListener('error', () => {
+        reject(transaction.error ?? new Error('IndexedDB world content transaction failed.'));
+      });
+    });
   }
 
   async getChunk(worldId, chunkX, chunkZ) {
@@ -63,6 +104,13 @@ export class IndexedDbWorldContentProvider {
 
   async putChunk(worldId, chunkX, chunkZ, content) {
     await this.transact('readwrite', worldId, chunkX, chunkZ, structuredClone(content));
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.database?.close();
+    this.database = null;
   }
 }
 
@@ -150,5 +198,10 @@ export class LocalFirstWorldContentProvider {
 
   async putChunk(worldId, chunkX, chunkZ, content) {
     await this.local.putChunk?.(worldId, chunkX, chunkZ, content);
+  }
+
+  dispose() {
+    this.local.dispose?.();
+    this.remote?.dispose?.();
   }
 }
