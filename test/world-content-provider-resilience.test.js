@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { LocalFirstWorldContentProvider } from '../src/editor/world/WorldContentProvider.js';
+
+async function withCapturedWarnings(run) {
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+  try {
+    await run(warnings);
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
+test('local cache read failures fall through to remote content and warn once', async () => {
+  await withCapturedWarnings(async (warnings) => {
+    const provider = new LocalFirstWorldContentProvider({
+      local: {
+        async getChunk() { throw new Error('indexeddb unavailable'); },
+        async putChunk() {},
+      },
+      remote: {
+        async getChunk(_worldId, chunkX, chunkZ) { return { chunkX, chunkZ }; },
+      },
+    });
+
+    assert.deepEqual(await provider.getChunk('world', 1, 2), { chunkX: 1, chunkZ: 2 });
+    assert.deepEqual(await provider.getChunk('world', 3, 4), { chunkX: 3, chunkZ: 4 });
+    assert.equal(warnings.length, 1);
+  });
+});
+
+test('remote content failures fall back to generated terrain instead of rejecting', async () => {
+  await withCapturedWarnings(async (warnings) => {
+    const provider = new LocalFirstWorldContentProvider({
+      local: { async getChunk() { return null; } },
+      remote: { async getChunk() { throw new Error('HTTP 500'); } },
+    });
+
+    assert.equal(await provider.getChunk('world', 0, 0), null);
+    assert.equal(await provider.getChunk('world', 1, 0), null);
+    assert.equal(warnings.length, 1);
+  });
+});
+
+test('a failed local cache write does not discard successfully loaded remote content', async () => {
+  await withCapturedWarnings(async (warnings) => {
+    const remoteContent = { encounter: 'bridge' };
+    const provider = new LocalFirstWorldContentProvider({
+      local: {
+        async getChunk() { return null; },
+        async putChunk() { throw new Error('quota exceeded'); },
+      },
+      remote: { async getChunk() { return remoteContent; } },
+    });
+
+    assert.deepEqual(await provider.getChunk('world', 5, 6), remoteContent);
+    assert.equal(warnings.length, 1);
+  });
+});
+
+test('explicit content writes still report persistence failures', async () => {
+  const provider = new LocalFirstWorldContentProvider({
+    local: {
+      async getChunk() { return null; },
+      async putChunk() { throw new Error('write failed'); },
+    },
+  });
+
+  await assert.rejects(provider.putChunk('world', 0, 0, { value: 1 }), /write failed/);
+});
