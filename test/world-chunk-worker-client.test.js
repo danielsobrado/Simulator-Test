@@ -33,16 +33,27 @@ class FakeWorker {
   }
 }
 
-test('a failed chunk worker is replaced without rejecting healthy worker requests', async () => {
+function installFakeWorker() {
   const originalWorker = globalThis.Worker;
   FakeWorker.instances = [];
   globalThis.Worker = FakeWorker;
+  return () => {
+    if (originalWorker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = originalWorker;
+  };
+}
 
-  const client = new WorldChunkWorkerClient({
+function createClient() {
+  return new WorldChunkWorkerClient({
     chunkSize: 16,
     generator: new ProceduralWorldGenerator(),
     workerCount: 2,
   });
+}
+
+test('a failed chunk worker is replaced without rejecting healthy worker requests', async () => {
+  const restoreWorker = installFakeWorker();
+  const client = createClient();
 
   try {
     const failedRequest = client.request(0, 0);
@@ -75,7 +86,28 @@ test('a failed chunk worker is replaced without rejecting healthy worker request
     assert.equal(replacementPage.chunkX, 2);
   } finally {
     client.dispose();
-    if (originalWorker === undefined) delete globalThis.Worker;
-    else globalThis.Worker = originalWorker;
+    restoreWorker();
+  }
+});
+
+test('a permanently failing worker slot is disabled without taking down healthy workers', () => {
+  const restoreWorker = installFakeWorker();
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  const client = createClient();
+
+  try {
+    FakeWorker.instances[0].emit('error', { message: 'boom 1', preventDefault() {} });
+    FakeWorker.instances[2].emit('error', { message: 'boom 2', preventDefault() {} });
+    FakeWorker.instances[3].emit('error', { message: 'boom 3', preventDefault() {} });
+
+    assert.equal(FakeWorker.instances.length, 4, 'restart attempts must be bounded');
+    assert.equal(client.workerCount, 1);
+    assert.equal(client.workers[0], null);
+    assert.equal(client.workers[1], FakeWorker.instances[1]);
+  } finally {
+    client.dispose();
+    console.error = originalConsoleError;
+    restoreWorker();
   }
 });
