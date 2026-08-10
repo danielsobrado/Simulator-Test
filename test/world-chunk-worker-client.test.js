@@ -6,8 +6,13 @@ import { WorldChunkWorkerClient } from '../src/editor/world/WorldChunkWorkerClie
 
 class FakeWorker {
   static instances = [];
+  static creationFailuresRemaining = 0;
 
   constructor() {
+    if (FakeWorker.creationFailuresRemaining > 0) {
+      FakeWorker.creationFailuresRemaining -= 1;
+      throw new Error('worker construction failed');
+    }
     this.listeners = new Map();
     this.messages = [];
     this.terminated = false;
@@ -36,6 +41,7 @@ class FakeWorker {
 function installFakeWorker() {
   const originalWorker = globalThis.Worker;
   FakeWorker.instances = [];
+  FakeWorker.creationFailuresRemaining = 0;
   globalThis.Worker = FakeWorker;
   return () => {
     if (originalWorker === undefined) delete globalThis.Worker;
@@ -43,11 +49,11 @@ function installFakeWorker() {
   };
 }
 
-function createClient() {
+function createClient({ workerCount = 2, chunkSize = 16 } = {}) {
   return new WorldChunkWorkerClient({
-    chunkSize: 16,
+    chunkSize,
     generator: new ProceduralWorldGenerator(),
-    workerCount: 2,
+    workerCount,
   });
 }
 
@@ -139,6 +145,26 @@ test('a synchronous postMessage failure releases the worker slot', async () => {
   }
 });
 
+test('worker construction failure falls back to main-thread chunk generation', async () => {
+  const restoreWorker = installFakeWorker();
+  const originalConsoleWarn = console.warn;
+  console.warn = () => {};
+  FakeWorker.creationFailuresRemaining = 2;
+  const client = createClient({ workerCount: 2, chunkSize: 2 });
+
+  try {
+    assert.equal(client.workers.length, 0);
+    assert.equal(client.workerCount, 0);
+    const page = await client.request(4, -3);
+    assert.equal(page.chunkX, 4);
+    assert.equal(page.chunkZ, -3);
+  } finally {
+    client.dispose();
+    console.warn = originalConsoleWarn;
+    restoreWorker();
+  }
+});
+
 test('a permanently failing worker slot is disabled without taking down healthy workers', () => {
   const restoreWorker = installFakeWorker();
   const originalConsoleError = console.error;
@@ -157,6 +183,31 @@ test('a permanently failing worker slot is disabled without taking down healthy 
   } finally {
     client.dispose();
     console.error = originalConsoleError;
+    restoreWorker();
+  }
+});
+
+test('a fully disabled worker pool degrades to main-thread generation', async () => {
+  const restoreWorker = installFakeWorker();
+  const originalConsoleError = console.error;
+  const originalConsoleWarn = console.warn;
+  console.error = () => {};
+  console.warn = () => {};
+  const client = createClient({ workerCount: 1, chunkSize: 2 });
+
+  try {
+    FakeWorker.instances[0].emit('error', { message: 'boom 1', preventDefault() {} });
+    FakeWorker.instances[1].emit('error', { message: 'boom 2', preventDefault() {} });
+    FakeWorker.instances[2].emit('error', { message: 'boom 3', preventDefault() {} });
+
+    assert.equal(client.workers.length, 0);
+    const page = await client.request(-2, 5);
+    assert.equal(page.chunkX, -2);
+    assert.equal(page.chunkZ, 5);
+  } finally {
+    client.dispose();
+    console.error = originalConsoleError;
+    console.warn = originalConsoleWarn;
     restoreWorker();
   }
 });
