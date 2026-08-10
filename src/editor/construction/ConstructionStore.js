@@ -16,10 +16,16 @@ function browserSearch() {
   return typeof window === 'undefined' ? '' : window.location.search;
 }
 
+function withRuntimeRevision(record, watermark) {
+  if (record.revision > watermark) return record;
+  return normalizeConstructionRecord({ ...record, revision: watermark + 1 });
+}
+
 export class ConstructionStore {
   constructor(records = []) {
     this.records = new Map();
     this.listeners = new Set();
+    this.revisionWatermarks = new Map();
     this.nextId = 1;
     this.replaceAll(records);
   }
@@ -54,9 +60,22 @@ export class ConstructionStore {
       .map(clone);
   }
 
+  normalizeForRuntime(input) {
+    const normalized = normalizeConstructionRecord(input);
+    const record = withRuntimeRevision(
+      normalized,
+      this.revisionWatermarks.get(normalized.id) ?? 0,
+    );
+    this.revisionWatermarks.set(record.id, record.revision);
+    return record;
+  }
+
   add(input) {
-    const record = normalizeConstructionRecord(input);
-    if (this.records.has(record.id)) throw new Error(`Construction ${record.id} already exists.`);
+    const normalized = normalizeConstructionRecord(input);
+    if (this.records.has(normalized.id)) {
+      throw new Error(`Construction ${normalized.id} already exists.`);
+    }
+    const record = this.normalizeForRuntime(normalized);
     this.records.set(record.id, record);
     constructionCollisionSource.setActive(record);
     this.nextId = Math.max(this.nextId, numericSuffix(record.id) + 1);
@@ -75,7 +94,7 @@ export class ConstructionStore {
     const current = this.records.get(key);
     if (!current) throw new Error(`Unknown construction ${key}.`);
     const candidate = typeof input === 'function' ? input(clone(current)) : input;
-    const record = normalizeConstructionRecord({
+    const record = this.normalizeForRuntime({
       ...candidate,
       id: key,
       revision: current.revision + 1,
@@ -100,8 +119,11 @@ export class ConstructionStore {
   }
 
   restore(input) {
-    const record = normalizeConstructionRecord(input);
-    if (this.records.has(record.id)) throw new Error(`Construction ${record.id} already exists.`);
+    const normalized = normalizeConstructionRecord(input);
+    if (this.records.has(normalized.id)) {
+      throw new Error(`Construction ${normalized.id} already exists.`);
+    }
+    const record = this.normalizeForRuntime(normalized);
     this.records.set(record.id, record);
     constructionCollisionSource.setActive(record);
     this.nextId = Math.max(this.nextId, numericSuffix(record.id) + 1);
@@ -114,10 +136,11 @@ export class ConstructionStore {
     const source = direction === 'undo' ? change.after : change.before;
     const target = direction === 'undo' ? change.before : change.after;
     if (source) this.records.delete(source.id);
+    let runtimeTarget = null;
     if (target) {
-      const record = normalizeConstructionRecord(target);
-      this.records.set(target.id, record);
-      constructionCollisionSource.setActive(record);
+      runtimeTarget = this.normalizeForRuntime(target);
+      this.records.set(runtimeTarget.id, runtimeTarget);
+      constructionCollisionSource.setActive(runtimeTarget);
     } else if (source) {
       constructionCollisionSource.remove(source.id);
     }
@@ -134,9 +157,9 @@ export class ConstructionStore {
         : undefined;
     this.emit({
       kind: 'history',
-      id: target?.id ?? source?.id,
+      id: runtimeTarget?.id ?? source?.id,
       before: source,
-      after: target,
+      after: runtimeTarget ? clone(runtimeTarget) : null,
       hint,
     });
   }
@@ -153,14 +176,24 @@ export class ConstructionStore {
   replaceAll(records) {
     if (!Array.isArray(records)) throw new Error('Construction payload must be an array.');
     const normalized = records.map(normalizeConstructionRecord);
-    const next = new Map();
+    const seen = new Set();
     for (const record of normalized) {
-      if (next.has(record.id)) throw new Error(`Construction payload duplicates ${record.id}.`);
-      next.set(record.id, record);
+      if (seen.has(record.id)) throw new Error(`Construction payload duplicates ${record.id}.`);
+      seen.add(record.id);
     }
+
+    const nextWatermarks = new Map(this.revisionWatermarks);
+    const runtimeRecords = normalized.map((record) => {
+      const runtimeRecord = withRuntimeRevision(record, nextWatermarks.get(record.id) ?? 0);
+      nextWatermarks.set(runtimeRecord.id, runtimeRecord.revision);
+      return runtimeRecord;
+    });
+    const next = new Map(runtimeRecords.map((record) => [record.id, record]));
+
     this.records = next;
-    constructionCollisionSource.replaceActive(normalized);
-    this.nextId = Math.max(1, ...normalized.map(({ id }) => numericSuffix(id) + 1));
+    this.revisionWatermarks = nextWatermarks;
+    constructionCollisionSource.replaceActive(runtimeRecords);
+    this.nextId = Math.max(1, ...runtimeRecords.map(({ id }) => numericSuffix(id) + 1));
     this.emit({ kind: 'replace', before: null, after: this.list() });
     ensureCollisionP7QaFixture(this, browserSearch());
     ensureConstructionPerfQaFixture(this, browserSearch());
