@@ -1,4 +1,4 @@
-const REMOTE_RETRY_DELAY_MS = 30_000;
+const CONTENT_RETRY_DELAY_MS = 30_000;
 
 function contentKey(worldId, chunkX, chunkZ) {
   return `${worldId}:${chunkX}:${chunkZ}`;
@@ -143,13 +143,18 @@ export class UrlWorldContentProvider {
 }
 
 export class LocalFirstWorldContentProvider {
-  constructor({ local, remote = null }) {
+  constructor({ local, remote = null, retryDelayMs = CONTENT_RETRY_DELAY_MS }) {
     if (!local || typeof local.getChunk !== 'function') {
       throw new Error('Local-first world content requires a local provider.');
     }
+    if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
+      throw new Error('World content retry delay must be a non-negative number.');
+    }
     this.local = local;
     this.remote = remote;
+    this.retryDelayMs = retryDelayMs;
     this.warnedFailures = new Set();
+    this.localRetryAfter = 0;
     this.remoteRetryAfter = 0;
   }
 
@@ -161,14 +166,18 @@ export class LocalFirstWorldContentProvider {
 
   async getChunk(worldId, chunkX, chunkZ) {
     let local = null;
-    try {
-      local = await this.local.getChunk(worldId, chunkX, chunkZ);
-    } catch (error) {
-      this.warnOnce(
-        'local-read',
-        'Local world content is unavailable; continuing without the local cache.',
-        error,
-      );
+    if (Date.now() >= this.localRetryAfter) {
+      try {
+        local = await this.local.getChunk(worldId, chunkX, chunkZ);
+        this.localRetryAfter = 0;
+      } catch (error) {
+        this.localRetryAfter = Date.now() + this.retryDelayMs;
+        this.warnOnce(
+          'local-read',
+          'Local world content is unavailable; continuing without the local cache.',
+          error,
+        );
+      }
     }
     if (local !== null && local !== undefined) return local;
     if (!this.remote || Date.now() < this.remoteRetryAfter) return null;
@@ -178,7 +187,7 @@ export class LocalFirstWorldContentProvider {
       remote = await this.remote.getChunk(worldId, chunkX, chunkZ);
       this.remoteRetryAfter = 0;
     } catch (error) {
-      this.remoteRetryAfter = Date.now() + REMOTE_RETRY_DELAY_MS;
+      this.remoteRetryAfter = Date.now() + this.retryDelayMs;
       this.warnOnce(
         'remote-read',
         'Remote world content is unavailable; continuing with generated terrain.',
@@ -187,10 +196,12 @@ export class LocalFirstWorldContentProvider {
       return null;
     }
 
-    if (remote !== null && remote !== undefined) {
+    if (remote !== null && remote !== undefined && Date.now() >= this.localRetryAfter) {
       try {
         await this.local.putChunk?.(worldId, chunkX, chunkZ, remote);
+        this.localRetryAfter = 0;
       } catch (error) {
+        this.localRetryAfter = Date.now() + this.retryDelayMs;
         this.warnOnce(
           'local-write',
           'Remote world content loaded, but caching it locally failed.',
@@ -202,7 +213,13 @@ export class LocalFirstWorldContentProvider {
   }
 
   async putChunk(worldId, chunkX, chunkZ, content) {
-    await this.local.putChunk?.(worldId, chunkX, chunkZ, content);
+    try {
+      await this.local.putChunk?.(worldId, chunkX, chunkZ, content);
+      this.localRetryAfter = 0;
+    } catch (error) {
+      this.localRetryAfter = Date.now() + this.retryDelayMs;
+      throw error;
+    }
   }
 
   dispose() {
