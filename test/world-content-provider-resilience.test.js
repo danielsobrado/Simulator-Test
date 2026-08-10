@@ -98,6 +98,45 @@ test('explicit content writes still report persistence failures', async () => {
   await assert.rejects(provider.putChunk('world', 0, 0, { value: 1 }), /write failed/);
 });
 
+test('IndexedDB open can recover after a synchronous browser failure', async () => {
+  const originalIndexedDb = globalThis.indexedDB;
+  let openCalls = 0;
+  let closeCalls = 0;
+  const database = {
+    objectStoreNames: { contains: () => true },
+    addEventListener() {},
+    close() { closeCalls += 1; },
+  };
+
+  globalThis.indexedDB = {
+    open() {
+      openCalls += 1;
+      if (openCalls === 1) throw new Error('open blocked');
+      const request = {
+        result: database,
+        error: null,
+        addEventListener(type, listener) {
+          if (type === 'success') queueMicrotask(listener);
+        },
+      };
+      return request;
+    },
+  };
+
+  const provider = new IndexedDbWorldContentProvider();
+  try {
+    await assert.rejects(provider.open(), /open blocked/);
+    assert.equal(provider.databasePromise, null);
+    assert.equal(await provider.open(), database);
+    assert.equal(openCalls, 2);
+  } finally {
+    provider.dispose();
+    assert.equal(closeCalls, 1);
+    if (originalIndexedDb === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = originalIndexedDb;
+  }
+});
+
 test('IndexedDB content provider reuses one connection and closes it on dispose', async () => {
   const originalIndexedDb = globalThis.indexedDB;
   let openCalls = 0;
@@ -111,12 +150,10 @@ test('IndexedDB content provider reuses one connection and closes it on dispose'
   globalThis.indexedDB = {
     open() {
       openCalls += 1;
-      const listeners = new Map();
       const request = {
         result: database,
         error: null,
         addEventListener(type, listener) {
-          listeners.set(type, listener);
           if (type === 'success') queueMicrotask(listener);
         },
       };
