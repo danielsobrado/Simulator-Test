@@ -17,6 +17,8 @@ import { enrichPageWaterField } from '../water/WaterField.js';
 import { sampleWorldStoreWater } from '../water/TerrainWaterQueries.js';
 import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
 
+const MAX_TILE_ID = 255;
+
 function tileIndex(localX, localZ, chunkSize) {
   return localZ * chunkSize + localX;
 }
@@ -43,6 +45,48 @@ function assertGeneratorMetadata(actual, expected) {
     }
   }
   assertCompatibleWaterDomainMetadata(actual, expected);
+}
+
+function decodeAndValidateChunks(chunks, chunkSize, vertexSize) {
+  if (!Array.isArray(chunks)) {
+    throw new Error('Infinite world chunks must be an array.');
+  }
+  const tileCount = chunkSize ** 2;
+  const heightCount = vertexSize ** 2;
+
+  return chunks.map((chunk) => {
+    const decoded = decodeChunkDocument(chunk, chunkSize);
+    if (!Number.isSafeInteger(decoded.x) || !Number.isSafeInteger(decoded.z)) {
+      throw new Error('Infinite world chunk coordinates must be safe integers.');
+    }
+    if (!Array.isArray(decoded.tiles) || !Array.isArray(decoded.heights)) {
+      throw new Error('Infinite world chunk overrides must be arrays.');
+    }
+
+    for (const entry of decoded.tiles) {
+      if (!Array.isArray(entry) || entry.length < 2) {
+        throw new Error('Infinite world tile override must be an [index, value] pair.');
+      }
+      const [index, value] = entry;
+      if (!Number.isInteger(index) || index < 0 || index >= tileCount) {
+        throw new Error('Infinite world tile override index is invalid.');
+      }
+      if (!Number.isInteger(value) || value < 0 || value > MAX_TILE_ID) {
+        throw new Error('Infinite world tile override value must be an unsigned byte.');
+      }
+    }
+
+    for (const entry of decoded.heights) {
+      if (!Array.isArray(entry) || entry.length < 2) {
+        throw new Error('Infinite world height override must be an [index, value] pair.');
+      }
+      const [index, value] = entry;
+      if (!Number.isInteger(index) || index < 0 || index >= heightCount || !Number.isFinite(value)) {
+        throw new Error('Infinite world height override is invalid.');
+      }
+    }
+    return decoded;
+  });
 }
 
 export class WorkerBackedWorldStore extends InfiniteWorldStore {
@@ -221,10 +265,8 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
 
   loadInfiniteDocument(document) {
     assertGeneratorMetadata(document.world?.generator, this.generator.toMetadata());
-    super.loadInfiniteDocument({
-      ...document,
-      chunks: document.chunks?.map((chunk) => decodeChunkDocument(chunk, this.chunkSize)),
-    });
+    const chunks = decodeAndValidateChunks(document.chunks, this.chunkSize, this.vertexSize);
+    super.loadInfiniteDocument({ ...document, chunks });
   }
 
   clearOverrides() {
