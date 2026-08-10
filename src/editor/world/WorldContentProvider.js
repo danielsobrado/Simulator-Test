@@ -35,8 +35,14 @@ export class IndexedDbWorldContentProvider {
     if (this.database) return this.database;
     if (this.databasePromise) return this.databasePromise;
 
+    let request;
+    try {
+      request = indexedDB.open(this.databaseName, 1);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
     this.databasePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.databaseName, 1);
       request.addEventListener('upgradeneeded', () => {
         if (!request.result.objectStoreNames.contains(this.storeName)) {
           request.result.createObjectStore(this.storeName);
