@@ -52,27 +52,31 @@ export class WorldChunkWorkerClient {
     if (typeof Worker === 'function') {
       const count = resolveWorkerCount(workerCount);
       for (let index = 0; index < count; index += 1) {
-        const worker = new Worker(
-          new URL('./worldChunk.worker.js', import.meta.url),
-          { type: 'module' },
-        );
-        worker.addEventListener('message', (event) => this.onMessage(event));
-        worker.addEventListener('error', (event) => this.onError(event));
-        this.workers.push(worker);
-        this.inFlight.push(0);
+        this.workers[index] = this.createWorker(index);
+        this.inFlight[index] = 0;
       }
     }
   }
 
+  createWorker(workerIndex) {
+    const worker = new Worker(
+      new URL('./worldChunk.worker.js', import.meta.url),
+      { type: 'module' },
+    );
+    worker.addEventListener('message', (event) => this.onMessage(event));
+    worker.addEventListener('error', (event) => this.onError(event, workerIndex));
+    return worker;
+  }
+
   get workerCount() {
-    return this.workers.length;
+    return this.workers.reduce((count, worker) => count + Number(Boolean(worker)), 0);
   }
 
   setBaseTerrain(baseTerrain) {
     this.baseTerrain = baseTerrain ? structuredClone(baseTerrain) : null;
     this.worldGenerator = createWorldGenerator(this.generator, this.baseTerrain);
     for (const worker of this.workers) {
-      worker.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+      worker?.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
     }
   }
 
@@ -94,6 +98,9 @@ export class WorldChunkWorkerClient {
         ...request,
         worldGenerator: this.worldGenerator,
       }));
+    }
+    if (this.workerCount === 0) {
+      return Promise.reject(new Error('World chunk worker pool is unavailable.'));
     }
 
     const id = this.nextId;
@@ -144,6 +151,7 @@ export class WorldChunkWorkerClient {
     let best = -1;
     let bestLoad = Number.POSITIVE_INFINITY;
     for (let index = 0; index < this.workers.length; index += 1) {
+      if (!this.workers[index]) continue;
       const load = this.inFlight[index];
       if (load < this.maxInFlightPerWorker && load < bestLoad) {
         best = index;
@@ -199,22 +207,41 @@ export class WorldChunkWorkerClient {
     this.pump();
   }
 
-  onError(event) {
+  onError(event, workerIndex) {
+    if (this.disposed) return;
+
+    event.preventDefault?.();
     const error = new Error(event.message || 'World chunk worker failed.');
-    for (const pending of this.pending.values()) {
+    const failedWorker = this.workers[workerIndex];
+    failedWorker?.terminate();
+    this.workers[workerIndex] = null;
+
+    for (const [id, pending] of this.pending.entries()) {
+      if (pending.workerIndex !== workerIndex) continue;
       pending.reject(error);
+      this.pending.delete(id);
     }
-    this.pending.clear();
-    for (let index = 0; index < this.inFlight.length; index += 1) {
-      this.inFlight[index] = 0;
+    this.inFlight[workerIndex] = 0;
+
+    try {
+      const replacement = this.createWorker(workerIndex);
+      this.workers[workerIndex] = replacement;
+      if (this.baseTerrain) {
+        replacement.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+      }
+    } catch (replacementError) {
+      console.error('Failed to replace world chunk worker.', replacementError);
     }
-    // Fail anything still queued rather than stranding it behind dead workers.
-    const queued = this.queue;
-    this.queue = [];
-    this.queuedByKey.clear();
-    for (const job of queued) {
-      job.reject(error);
+
+    if (this.workerCount === 0) {
+      const queued = this.queue;
+      this.queue = [];
+      this.queuedByKey.clear();
+      for (const job of queued) job.reject(error);
+      return;
     }
+
+    this.pump();
   }
 
   dispose() {
@@ -223,7 +250,7 @@ export class WorldChunkWorkerClient {
     }
     this.disposed = true;
     for (const worker of this.workers) {
-      worker.terminate();
+      worker?.terminate();
     }
     this.workers = [];
     this.inFlight = [];
