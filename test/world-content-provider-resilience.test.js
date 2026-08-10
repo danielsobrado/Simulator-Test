@@ -35,15 +35,22 @@ test('local cache read failures fall through to remote content and warn once', a
   });
 });
 
-test('remote content failures fall back to generated terrain instead of rejecting', async () => {
+test('remote content failures fall back to generated terrain and back off repeated requests', async () => {
   await withCapturedWarnings(async (warnings) => {
+    let remoteCalls = 0;
     const provider = new LocalFirstWorldContentProvider({
       local: { async getChunk() { return null; } },
-      remote: { async getChunk() { throw new Error('HTTP 500'); } },
+      remote: {
+        async getChunk() {
+          remoteCalls += 1;
+          throw new Error('HTTP 500');
+        },
+      },
     });
 
     assert.equal(await provider.getChunk('world', 0, 0), null);
     assert.equal(await provider.getChunk('world', 1, 0), null);
+    assert.equal(remoteCalls, 1);
     assert.equal(warnings.length, 1);
   });
 });
