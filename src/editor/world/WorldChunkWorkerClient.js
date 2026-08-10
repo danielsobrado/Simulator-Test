@@ -2,6 +2,8 @@ import { generateBaseWorldChunk } from './generateWorldChunk.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import { chunkKey } from './WorldCoordinates.js';
 
+const MAX_WORKER_RESTARTS = 2;
+
 /** Resolve the worker pool size from an explicit override or CPU cores. */
 export function resolveWorkerCount(requested) {
   if (Number.isFinite(requested) && requested > 0) {
@@ -48,12 +50,14 @@ export class WorldChunkWorkerClient {
     this.disposed = false;
     this.workers = [];
     this.inFlight = [];
+    this.workerRestartCounts = [];
 
     if (typeof Worker === 'function') {
       const count = resolveWorkerCount(workerCount);
       for (let index = 0; index < count; index += 1) {
         this.workers[index] = this.createWorker(index);
         this.inFlight[index] = 0;
+        this.workerRestartCounts[index] = 0;
       }
     }
   }
@@ -193,8 +197,11 @@ export class WorldChunkWorkerClient {
     }
     this.pending.delete(id);
     this.inFlight[pending.workerIndex] = Math.max(0, this.inFlight[pending.workerIndex] - 1);
+    this.workerRestartCounts[pending.workerIndex] = 0;
     if (error) {
       pending.reject(new Error(error));
+    } else if (!page || typeof page !== 'object') {
+      pending.reject(new Error('World chunk worker returned an invalid page.'));
     } else {
       const completedAt = performance.now();
       page.timings = {
@@ -223,14 +230,24 @@ export class WorldChunkWorkerClient {
     }
     this.inFlight[workerIndex] = 0;
 
-    try {
-      const replacement = this.createWorker(workerIndex);
-      this.workers[workerIndex] = replacement;
-      if (this.baseTerrain) {
-        replacement.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+    const restartCount = (this.workerRestartCounts[workerIndex] ?? 0) + 1;
+    this.workerRestartCounts[workerIndex] = restartCount;
+    if (restartCount <= MAX_WORKER_RESTARTS) {
+      let replacement = null;
+      try {
+        replacement = this.createWorker(workerIndex);
+        if (this.baseTerrain) {
+          replacement.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+        }
+        this.workers[workerIndex] = replacement;
+      } catch (replacementError) {
+        replacement?.terminate();
+        this.workers[workerIndex] = null;
+        this.workerRestartCounts[workerIndex] = MAX_WORKER_RESTARTS + 1;
+        console.error('Failed to replace world chunk worker.', replacementError);
       }
-    } catch (replacementError) {
-      console.error('Failed to replace world chunk worker.', replacementError);
+    } else {
+      console.error(`World chunk worker ${workerIndex} disabled after repeated failures.`, error);
     }
 
     if (this.workerCount === 0) {
@@ -254,6 +271,7 @@ export class WorldChunkWorkerClient {
     }
     this.workers = [];
     this.inFlight = [];
+    this.workerRestartCounts = [];
     const error = new Error('World chunk worker was disposed.');
     for (const pending of this.pending.values()) {
       pending.reject(error);
