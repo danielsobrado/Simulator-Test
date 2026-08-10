@@ -54,10 +54,26 @@ export class WorldChunkWorkerClient {
 
     if (typeof Worker === 'function') {
       const count = resolveWorkerCount(workerCount);
+      let firstCreationError = null;
       for (let index = 0; index < count; index += 1) {
-        this.workers[index] = this.createWorker(index);
+        try {
+          this.workers[index] = this.createWorker(index);
+          this.workerRestartCounts[index] = 0;
+        } catch (error) {
+          firstCreationError ??= error;
+          this.workers[index] = null;
+          this.workerRestartCounts[index] = MAX_WORKER_RESTARTS + 1;
+        }
         this.inFlight[index] = 0;
-        this.workerRestartCounts[index] = 0;
+      }
+      if (this.workerCount === 0) {
+        console.warn(
+          'World chunk workers are unavailable; generation will run on the main thread.',
+          firstCreationError,
+        );
+        this.useMainThreadFallback();
+      } else if (firstCreationError) {
+        console.warn('Some world chunk workers could not start; using reduced capacity.', firstCreationError);
       }
     }
   }
@@ -70,6 +86,12 @@ export class WorldChunkWorkerClient {
     worker.addEventListener('message', (event) => this.onMessage(event));
     worker.addEventListener('error', (event) => this.onError(event, workerIndex, worker));
     return worker;
+  }
+
+  useMainThreadFallback() {
+    this.workers = [];
+    this.inFlight = [];
+    this.workerRestartCounts = [];
   }
 
   get workerCount() {
@@ -96,15 +118,12 @@ export class WorldChunkWorkerClient {
       surfaceMaskConfig: this.surfaceMaskConfig,
       vegetationScatterConfig: this.vegetationScatterConfig,
     };
-    // No workers available (Node/tests): preserve the asynchronous request contract.
+    // No workers available (Node/tests or degraded browser): preserve the async contract.
     if (this.workers.length === 0) {
       return Promise.resolve().then(() => generateBaseWorldChunk({
         ...request,
         worldGenerator: this.worldGenerator,
       }));
-    }
-    if (this.workerCount === 0) {
-      return Promise.reject(new Error('World chunk worker pool is unavailable.'));
     }
 
     const id = this.nextId;
@@ -262,6 +281,8 @@ export class WorldChunkWorkerClient {
       this.queue = [];
       this.queuedByKey.clear();
       for (const job of queued) job.reject(error);
+      console.warn('World chunk worker pool is unavailable; falling back to main-thread generation.');
+      this.useMainThreadFallback();
       return;
     }
 
