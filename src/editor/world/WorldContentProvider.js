@@ -99,26 +99,56 @@ export class LocalFirstWorldContentProvider {
     }
     this.local = local;
     this.remote = remote;
+    this.warnedFailures = new Set();
+  }
+
+  warnOnce(kind, message, error) {
+    if (this.warnedFailures.has(kind)) return;
+    this.warnedFailures.add(kind);
+    console.warn(message, error);
   }
 
   async getChunk(worldId, chunkX, chunkZ) {
-    const local = await this.local.getChunk(worldId, chunkX, chunkZ);
+    let local = null;
+    try {
+      local = await this.local.getChunk(worldId, chunkX, chunkZ);
+    } catch (error) {
+      this.warnOnce(
+        'local-read',
+        'Local world content is unavailable; continuing without the local cache.',
+        error,
+      );
+    }
     if (local !== null && local !== undefined) return local;
     if (!this.remote) return null;
+
+    let remote = null;
     try {
-      const remote = await this.remote.getChunk(worldId, chunkX, chunkZ);
-      if (remote !== null && remote !== undefined) {
-        await this.local.putChunk?.(worldId, chunkX, chunkZ, remote);
-      }
-      return remote ?? null;
+      remote = await this.remote.getChunk(worldId, chunkX, chunkZ);
     } catch (error) {
-      if (error instanceof TypeError) return null;
-      throw error;
+      this.warnOnce(
+        'remote-read',
+        'Remote world content is unavailable; continuing with generated terrain.',
+        error,
+      );
+      return null;
     }
+
+    if (remote !== null && remote !== undefined) {
+      try {
+        await this.local.putChunk?.(worldId, chunkX, chunkZ, remote);
+      } catch (error) {
+        this.warnOnce(
+          'local-write',
+          'Remote world content loaded, but caching it locally failed.',
+          error,
+        );
+      }
+    }
+    return remote ?? null;
   }
 
   async putChunk(worldId, chunkX, chunkZ, content) {
     await this.local.putChunk?.(worldId, chunkX, chunkZ, content);
   }
 }
-
