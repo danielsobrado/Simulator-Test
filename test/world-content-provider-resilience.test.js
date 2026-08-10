@@ -17,11 +17,15 @@ async function withCapturedWarnings(run) {
   }
 }
 
-test('local cache read failures fall through to remote content and warn once', async () => {
+test('local cache read failures fall through to remote content and back off repeated reads', async () => {
   await withCapturedWarnings(async (warnings) => {
+    let localReads = 0;
     const provider = new LocalFirstWorldContentProvider({
       local: {
-        async getChunk() { throw new Error('indexeddb unavailable'); },
+        async getChunk() {
+          localReads += 1;
+          throw new Error('indexeddb unavailable');
+        },
         async putChunk() {},
       },
       remote: {
@@ -31,6 +35,7 @@ test('local cache read failures fall through to remote content and warn once', a
 
     assert.deepEqual(await provider.getChunk('world', 1, 2), { chunkX: 1, chunkZ: 2 });
     assert.deepEqual(await provider.getChunk('world', 3, 4), { chunkX: 3, chunkZ: 4 });
+    assert.equal(localReads, 1);
     assert.equal(warnings.length, 1);
   });
 });
@@ -55,18 +60,29 @@ test('remote content failures fall back to generated terrain and back off repeat
   });
 });
 
-test('a failed local cache write does not discard successfully loaded remote content', async () => {
+test('failed local cache writes back off without discarding remote content', async () => {
   await withCapturedWarnings(async (warnings) => {
     const remoteContent = { encounter: 'bridge' };
+    let localReads = 0;
+    let localWrites = 0;
     const provider = new LocalFirstWorldContentProvider({
       local: {
-        async getChunk() { return null; },
-        async putChunk() { throw new Error('quota exceeded'); },
+        async getChunk() {
+          localReads += 1;
+          return null;
+        },
+        async putChunk() {
+          localWrites += 1;
+          throw new Error('quota exceeded');
+        },
       },
       remote: { async getChunk() { return remoteContent; } },
     });
 
     assert.deepEqual(await provider.getChunk('world', 5, 6), remoteContent);
+    assert.deepEqual(await provider.getChunk('world', 7, 8), remoteContent);
+    assert.equal(localReads, 1);
+    assert.equal(localWrites, 1);
     assert.equal(warnings.length, 1);
   });
 });
