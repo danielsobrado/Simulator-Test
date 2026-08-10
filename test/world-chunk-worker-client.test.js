@@ -90,6 +90,30 @@ test('a failed chunk worker is replaced without rejecting healthy worker request
   }
 });
 
+test('a stale error from a terminated worker cannot kill its replacement', () => {
+  const restoreWorker = installFakeWorker();
+  const client = createClient();
+
+  try {
+    const original = FakeWorker.instances[0];
+    original.emit('error', { message: 'first failure', preventDefault() {} });
+
+    const replacement = FakeWorker.instances[2];
+    assert.equal(client.workers[0], replacement);
+    assert.equal(replacement.terminated, false);
+
+    original.emit('error', { message: 'stale failure', preventDefault() {} });
+
+    assert.equal(client.workers[0], replacement);
+    assert.equal(replacement.terminated, false);
+    assert.equal(FakeWorker.instances.length, 3);
+    assert.equal(client.workerRestartCounts[0], 1);
+  } finally {
+    client.dispose();
+    restoreWorker();
+  }
+});
+
 test('a permanently failing worker slot is disabled without taking down healthy workers', () => {
   const restoreWorker = installFakeWorker();
   const originalConsoleError = console.error;
