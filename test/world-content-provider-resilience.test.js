@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { LocalFirstWorldContentProvider } from '../src/editor/world/WorldContentProvider.js';
+import {
+  IndexedDbWorldContentProvider,
+  LocalFirstWorldContentProvider,
+} from '../src/editor/world/WorldContentProvider.js';
 
 async function withCapturedWarnings(run) {
   const originalWarn = console.warn;
@@ -70,4 +73,48 @@ test('explicit content writes still report persistence failures', async () => {
   });
 
   await assert.rejects(provider.putChunk('world', 0, 0, { value: 1 }), /write failed/);
+});
+
+test('IndexedDB content provider reuses one connection and closes it on dispose', async () => {
+  const originalIndexedDb = globalThis.indexedDB;
+  let openCalls = 0;
+  let closeCalls = 0;
+  const database = {
+    objectStoreNames: { contains: () => true },
+    addEventListener() {},
+    close() { closeCalls += 1; },
+  };
+
+  globalThis.indexedDB = {
+    open() {
+      openCalls += 1;
+      const listeners = new Map();
+      const request = {
+        result: database,
+        error: null,
+        addEventListener(type, listener) {
+          listeners.set(type, listener);
+          if (type === 'success') queueMicrotask(listener);
+        },
+      };
+      return request;
+    },
+  };
+
+  const provider = new IndexedDbWorldContentProvider();
+  try {
+    const [first, second] = await Promise.all([provider.open(), provider.open()]);
+    assert.equal(first, database);
+    assert.equal(second, database);
+    assert.equal(await provider.open(), database);
+    assert.equal(openCalls, 1);
+
+    provider.dispose();
+    assert.equal(closeCalls, 1);
+    assert.equal(await provider.open(), null);
+  } finally {
+    provider.dispose();
+    if (originalIndexedDb === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = originalIndexedDb;
+  }
 });
