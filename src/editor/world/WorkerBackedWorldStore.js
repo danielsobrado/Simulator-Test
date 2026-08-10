@@ -244,6 +244,7 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
 
   dispose() {
     this.pendingChunks.clear();
+    this.contentProvider?.dispose?.();
     this.chunkWorker.dispose();
   }
 }
