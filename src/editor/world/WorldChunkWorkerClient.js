@@ -68,7 +68,7 @@ export class WorldChunkWorkerClient {
       { type: 'module' },
     );
     worker.addEventListener('message', (event) => this.onMessage(event));
-    worker.addEventListener('error', (event) => this.onError(event, workerIndex));
+    worker.addEventListener('error', (event) => this.onError(event, workerIndex, worker));
     return worker;
   }
 
@@ -214,13 +214,14 @@ export class WorldChunkWorkerClient {
     this.pump();
   }
 
-  onError(event, workerIndex) {
+  onError(event, workerIndex, sourceWorker) {
     if (this.disposed) return;
 
     event.preventDefault?.();
+    if (this.workers[workerIndex] !== sourceWorker) return;
+
     const error = new Error(event.message || 'World chunk worker failed.');
-    const failedWorker = this.workers[workerIndex];
-    failedWorker?.terminate();
+    sourceWorker?.terminate();
     this.workers[workerIndex] = null;
 
     for (const [id, pending] of this.pending.entries()) {
