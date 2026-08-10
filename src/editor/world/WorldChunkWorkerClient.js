@@ -96,9 +96,9 @@ export class WorldChunkWorkerClient {
       surfaceMaskConfig: this.surfaceMaskConfig,
       vegetationScatterConfig: this.vegetationScatterConfig,
     };
-    // No workers available (Node/tests): generate synchronously.
+    // No workers available (Node/tests): preserve the asynchronous request contract.
     if (this.workers.length === 0) {
-      return Promise.resolve(generateBaseWorldChunk({
+      return Promise.resolve().then(() => generateBaseWorldChunk({
         ...request,
         worldGenerator: this.worldGenerator,
       }));
@@ -185,7 +185,13 @@ export class WorldChunkWorkerClient {
         requestedAt: job.requestedAt,
         dispatchedAt: performance.now(),
       });
-      this.workers[workerIndex].postMessage({ id: job.id, request: job.request });
+      try {
+        this.workers[workerIndex].postMessage({ id: job.id, request: job.request });
+      } catch (error) {
+        this.pending.delete(job.id);
+        this.inFlight[workerIndex] = Math.max(0, this.inFlight[workerIndex] - 1);
+        job.reject(error instanceof Error ? error : new Error(String(error)));
+      }
     }
   }
 
