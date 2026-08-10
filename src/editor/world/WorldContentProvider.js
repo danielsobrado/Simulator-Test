@@ -1,3 +1,5 @@
+const REMOTE_RETRY_DELAY_MS = 30_000;
+
 function contentKey(worldId, chunkX, chunkZ) {
   return `${worldId}:${chunkX}:${chunkZ}`;
 }
@@ -148,6 +150,7 @@ export class LocalFirstWorldContentProvider {
     this.local = local;
     this.remote = remote;
     this.warnedFailures = new Set();
+    this.remoteRetryAfter = 0;
   }
 
   warnOnce(kind, message, error) {
@@ -168,12 +171,14 @@ export class LocalFirstWorldContentProvider {
       );
     }
     if (local !== null && local !== undefined) return local;
-    if (!this.remote) return null;
+    if (!this.remote || Date.now() < this.remoteRetryAfter) return null;
 
     let remote = null;
     try {
       remote = await this.remote.getChunk(worldId, chunkX, chunkZ);
+      this.remoteRetryAfter = 0;
     } catch (error) {
+      this.remoteRetryAfter = Date.now() + REMOTE_RETRY_DELAY_MS;
       this.warnOnce(
         'remote-read',
         'Remote world content is unavailable; continuing with generated terrain.',
