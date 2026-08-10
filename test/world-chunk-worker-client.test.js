@@ -114,6 +114,31 @@ test('a stale error from a terminated worker cannot kill its replacement', () =>
   }
 });
 
+test('a synchronous postMessage failure releases the worker slot', async () => {
+  const restoreWorker = installFakeWorker();
+  const client = createClient();
+
+  try {
+    const worker = FakeWorker.instances[0];
+    worker.postMessage = () => { throw new Error('clone failed'); };
+
+    await assert.rejects(client.request(0, 0), /clone failed/);
+    assert.equal(client.pending.size, 0);
+    assert.equal(client.inFlight[0], 0);
+
+    worker.postMessage = FakeWorker.prototype.postMessage.bind(worker);
+    const recoveredRequest = client.request(1, 0);
+    assert.equal(worker.messages.at(-1).id, 2);
+    worker.emit('message', {
+      data: { id: 2, page: { chunkX: 1, chunkZ: 0 } },
+    });
+    assert.equal((await recoveredRequest).chunkX, 1);
+  } finally {
+    client.dispose();
+    restoreWorker();
+  }
+});
+
 test('a permanently failing worker slot is disabled without taking down healthy workers', () => {
   const restoreWorker = installFakeWorker();
   const originalConsoleError = console.error;
