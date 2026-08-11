@@ -5,10 +5,74 @@ import {
   createAzgaarMacroWorldSource,
 } from './AzgaarMacroWorldSource.js';
 
+function assertFinitePoint(point, fieldName) {
+  if (!Array.isArray(point)
+      || point.length < 2
+      || !Number.isFinite(Number(point[0]))
+      || !Number.isFinite(Number(point[1]))) {
+    throw new Error(`Azgaar Full JSON ${fieldName} must contain finite x/y coordinates.`);
+  }
+}
+
+function assertPackedCells(document, gridIds) {
+  const cells = document?.pack?.cells;
+  if (!Array.isArray(cells) || cells.length === 0) {
+    throw new Error('Azgaar Full JSON must include non-empty packed cells.');
+  }
+  const ids = new Set();
+  for (const cell of cells) {
+    if (!Number.isSafeInteger(cell?.i) || cell.i < 0) {
+      throw new Error('Azgaar Full JSON packed cells must have non-negative safe-integer ids.');
+    }
+    if (ids.has(cell.i)) {
+      throw new Error(`Azgaar Full JSON contains duplicate packed cell id ${cell.i}.`);
+    }
+    ids.add(cell.i);
+    if (!Number.isSafeInteger(cell.g) || !gridIds.has(cell.g)) {
+      throw new Error(`Azgaar packed cell ${cell.i} references an invalid grid cell.`);
+    }
+    if (cell.p !== undefined) {
+      assertFinitePoint(cell.p, `packed cell ${cell.i} position`);
+    }
+  }
+}
+
+function assertRivers(document) {
+  const rivers = document?.pack?.rivers;
+  if (rivers === undefined) return;
+  if (!Array.isArray(rivers)) {
+    throw new Error('Azgaar Full JSON pack.rivers must be an array when present.');
+  }
+  const ids = new Set();
+  for (const river of rivers) {
+    if (!Number.isSafeInteger(river?.i) || river.i < 0 || ids.has(river.i)) {
+      throw new Error('Azgaar Full JSON rivers must have unique non-negative safe-integer ids.');
+    }
+    ids.add(river.i);
+    if (river.points !== undefined) {
+      if (!Array.isArray(river.points)) {
+        throw new Error(`Azgaar river ${river.i} points must be an array.`);
+      }
+      river.points.forEach((point, index) => {
+        assertFinitePoint(point, `river ${river.i} point ${index}`);
+      });
+    }
+    if (river.cells !== undefined
+        && (!Array.isArray(river.cells)
+          || river.cells.some((cellId) => !Number.isSafeInteger(cellId) || cellId < 0))) {
+      throw new Error(`Azgaar river ${river.i} cells must contain non-negative safe-integer ids.`);
+    }
+  }
+}
+
 function assertAzgaarDocument(document) {
   const description = String(document?.info?.description ?? '').toLowerCase();
   if (!description.includes("azgaar's fantasy map generator")) {
     throw new Error('The selected JSON is not an Azgaar Full JSON export.');
+  }
+  if (!Number.isFinite(Number(document?.info?.width)) || Number(document.info.width) <= 0
+      || !Number.isFinite(Number(document?.info?.height)) || Number(document.info.height) <= 0) {
+    throw new Error('Azgaar Full JSON must include positive map dimensions.');
   }
 
   const cells = document?.grid?.cells;
@@ -31,6 +95,8 @@ function assertAzgaarDocument(document) {
     }
     ids.add(cell.i);
   }
+  assertPackedCells(document, ids);
+  assertRivers(document);
 }
 
 function cloneCampaignArray(value) {
