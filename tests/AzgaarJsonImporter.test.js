@@ -139,12 +139,26 @@ test('rejects minimal or unrelated JSON exports', () => {
   );
 });
 
-test('rejects malformed grid dimensions and duplicate cell ids before import allocation', () => {
+test('rejects malformed grid dimensions and ids before import allocation', () => {
   const invalidDimensions = createAzgaarDocument();
   invalidDimensions.grid.cellsX = 0;
   assert.throws(
     () => importAzgaarFullJson(invalidDimensions, createConfig()),
     /positive grid dimensions/,
+  );
+
+  const incompleteGrid = createAzgaarDocument();
+  incompleteGrid.grid.cells.pop();
+  assert.throws(
+    () => importAzgaarFullJson(incompleteGrid, createConfig()),
+    /grid dimensions must match its cell count/,
+  );
+
+  const missingRowMajorId = createAzgaarDocument();
+  missingRowMajorId.grid.cells[3].i = 7;
+  assert.throws(
+    () => importAzgaarFullJson(missingRowMajorId, createConfig()),
+    /missing row-major cell id 3/,
   );
 
   const duplicateIds = createAzgaarDocument();
@@ -178,12 +192,26 @@ test('rejects malformed packed topology before import allocation', () => {
   );
 });
 
-test('rejects malformed river geometry before import allocation', () => {
-  const invalidRiver = createAzgaarDocument();
-  invalidRiver.pack.rivers[0].points = [[0, 0], [Number.NaN, 1]];
+test('rejects malformed river topology before import allocation', () => {
+  const invalidPoint = createAzgaarDocument();
+  invalidPoint.pack.rivers[0].points = [[0, 0], [Number.NaN, 1]];
   assert.throws(
-    () => importAzgaarFullJson(invalidRiver, createConfig()),
+    () => importAzgaarFullJson(invalidPoint, createConfig()),
     /finite x\/y coordinates/,
+  );
+
+  const danglingCell = createAzgaarDocument();
+  danglingCell.pack.rivers[0].cells = [1, 999];
+  assert.throws(
+    () => importAzgaarFullJson(danglingCell, createConfig()),
+    /references missing packed cell 999/,
+  );
+
+  const invalidWidth = createAzgaarDocument();
+  invalidWidth.pack.rivers[0].width = Number.NaN;
+  assert.throws(
+    () => importAzgaarFullJson(invalidWidth, createConfig()),
+    /width must be a non-negative finite number/,
   );
 });
 
