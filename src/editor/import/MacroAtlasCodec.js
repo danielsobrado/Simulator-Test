@@ -131,11 +131,11 @@ export function encodeMacroField(values, type, metadata = {}) {
     ? encodeRuns(values, definition, runCount)
     : encodeRaw(values, definition);
   return {
+    ...metadata,
     type,
     encoding: useRuns ? definition.rleEncoding : definition.rawEncoding,
     data: bytesToBase64(bytes),
     length: values.length,
-    ...metadata,
   };
 }
 
@@ -148,24 +148,35 @@ export function decodeMacroField(payload, expectedType = payload?.type) {
   if (payload.type !== undefined && payload.type !== type) {
     throw new Error(`Macro atlas field type ${payload.type} does not match ${type}.`);
   }
+  const recordBytes = 2 + definition.bytes;
+  const maximumEncodedBytes = payload.length * recordBytes;
+  const maximumBase64Length = Math.ceil(maximumEncodedBytes / 3) * 4;
+  if (!Number.isSafeInteger(maximumEncodedBytes)
+      || typeof payload.data !== 'string'
+      || payload.data.length > maximumBase64Length) {
+    throw new Error('Macro atlas payload data is larger than its declared length permits.');
+  }
   const bytes = base64ToBytes(payload.data);
-  const result = new definition.Values(payload.length);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
   if (payload.encoding === definition.rawEncoding) {
     if (bytes.byteLength !== payload.length * definition.bytes) {
       throw new Error('Macro atlas raw payload has an invalid size.');
     }
+    const result = new definition.Values(payload.length);
     for (let index = 0; index < result.length; index += 1) {
       result[index] = definition.read(view, index * definition.bytes);
     }
     return result;
   }
 
-  const recordBytes = 2 + definition.bytes;
   if (payload.encoding !== definition.rleEncoding || bytes.byteLength % recordBytes !== 0) {
     throw new Error(`Unsupported macro atlas encoding: ${payload.encoding}.`);
   }
+  if (bytes.byteLength > maximumEncodedBytes) {
+    throw new Error('Macro atlas RLE payload has too many runs.');
+  }
+  const result = new definition.Values(payload.length);
   let target = 0;
   for (let offset = 0; offset < bytes.byteLength; offset += recordBytes) {
     const count = view.getUint16(offset, true);

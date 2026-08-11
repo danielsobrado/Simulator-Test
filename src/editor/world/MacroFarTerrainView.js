@@ -11,7 +11,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
-import { AZGAAR_MACRO_SOURCE_KIND } from '../import/AzgaarMacroWorldSource.js';
+import { isAzgaarMacroWorldSource } from '../import/AzgaarMacroWorldSource.js';
 
 const DEFAULT_RADIUS_METERS = 10000;
 const DEFAULT_INNER_RADIUS_METERS = 256;
@@ -206,7 +206,7 @@ export class MacroFarTerrainView {
     this.builtOriginX = null;
     this.builtOriginZ = null;
     this.job = null;
-    if (baseTerrain?.kind === AZGAAR_MACRO_SOURCE_KIND) {
+    if (isAzgaarMacroWorldSource(baseTerrain)) {
       try {
         this.generator = createWorldGenerator(
           this.worldStore.generator.toMetadata(),

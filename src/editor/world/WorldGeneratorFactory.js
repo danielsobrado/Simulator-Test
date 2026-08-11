@@ -1,12 +1,13 @@
 import { AzgaarMacroWorldGenerator } from './AzgaarMacroWorldGenerator.js';
 import { ProceduralWorldGenerator } from './ProceduralWorldGenerator.js';
 import { ensureWaterDomainGenerator } from '../water/GeneratorWaterAdapter.js';
+import { isAzgaarMacroWorldSource } from '../import/AzgaarMacroWorldSource.js';
 
 export function createWorldGenerator(metadata, baseTerrain = null) {
   if (!baseTerrain) {
     return ensureWaterDomainGenerator(new ProceduralWorldGenerator(metadata), metadata);
   }
-  if (baseTerrain.kind === 'azgaar-macro-v1' || baseTerrain.kind === 'azgaar-macro-v2') {
+  if (isAzgaarMacroWorldSource(baseTerrain)) {
     return ensureWaterDomainGenerator(
       new AzgaarMacroWorldGenerator(baseTerrain, metadata),
       metadata,

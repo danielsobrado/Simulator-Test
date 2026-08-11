@@ -6,6 +6,7 @@ const MACRO_SOURCE_KIND = 'azgaar-macro-v2';
 const MACRO_SOURCE_VERSION = 2;
 const LEGACY_MACRO_SOURCE_KIND = 'azgaar-macro-v1';
 const LEGACY_MACRO_SOURCE_VERSION = 1;
+const MAX_MACRO_ATLAS_CELLS = 4_000_000;
 
 const UNIT_METERS = Object.freeze({
   km: 1000,
@@ -25,6 +26,21 @@ function resolvePositive(value, fallback) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
+function validateAtlasDimensions(atlas) {
+  const width = atlas?.width;
+  const height = atlas?.height;
+  const length = width * height;
+  if (!Number.isInteger(width) || width < 1
+      || !Number.isInteger(height) || height < 1
+      || !Number.isSafeInteger(length)
+      || length > MAX_MACRO_ATLAS_CELLS) {
+    throw new Error(
+      `Azgaar macro atlas dimensions must contain 1–${MAX_MACRO_ATLAS_CELLS} cells.`,
+    );
+  }
+  return { width, height, length };
+}
+
 function resolveAtlasDimensions(document, config) {
   const sourceWidth = Number(document.info?.width);
   const sourceHeight = Number(document.info?.height);
@@ -32,24 +48,29 @@ function resolveAtlasDimensions(document, config) {
     throw new Error('Azgaar Full JSON must include positive map dimensions.');
   }
   const configuredLongEdge = config.import?.azgaarAtlasLongEdge;
+  let atlas;
   if (Number.isInteger(configuredLongEdge) && configuredLongEdge > 0) {
     if (sourceWidth >= sourceHeight) {
-      return {
+      atlas = {
         width: configuredLongEdge,
         height: Math.max(1, Math.round(configuredLongEdge * sourceHeight / sourceWidth)),
       };
+    } else {
+      atlas = {
+        width: Math.max(1, Math.round(configuredLongEdge * sourceWidth / sourceHeight)),
+        height: configuredLongEdge,
+      };
     }
-    return {
-      width: Math.max(1, Math.round(configuredLongEdge * sourceWidth / sourceHeight)),
-      height: configuredLongEdge,
-    };
+  } else {
+    const width = config.import?.azgaarTargetWidth;
+    const height = config.import?.azgaarTargetHeight;
+    if (!Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1) {
+      throw new Error('Azgaar import requires a positive atlas long edge or target dimensions.');
+    }
+    atlas = { width, height };
   }
-  const width = config.import?.azgaarTargetWidth;
-  const height = config.import?.azgaarTargetHeight;
-  if (!Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1) {
-    throw new Error('Azgaar import requires a positive atlas long edge or target dimensions.');
-  }
-  return { width, height };
+  validateAtlasDimensions(atlas);
+  return atlas;
 }
 
 function resolvePhysicalDimensions(document, options = {}) {
@@ -87,12 +108,32 @@ function buildPackByGrid(pack) {
   const result = new Map();
   for (const cell of pack?.cells ?? []) {
     if (!Number.isInteger(cell?.g)) continue;
-    const previous = result.get(cell.g);
-    if (!previous || Number(cell.h ?? 0) > Number(previous.h ?? 0)) {
-      result.set(cell.g, cell);
-    }
+    const cells = result.get(cell.g) ?? [];
+    cells.push(cell);
+    result.set(cell.g, cells);
   }
   return result;
+}
+
+function sourcePackCellAt(cells, sourceX, sourceY) {
+  if (!cells?.length) return null;
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const cell of cells) {
+    const x = Number(cell.p?.[0]);
+    const y = Number(cell.p?.[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const distance = (x - sourceX) ** 2 + (y - sourceY) ** 2;
+    if (distance < nearestDistance
+        || (distance === nearestDistance && Number(cell.i) < Number(nearest?.i))) {
+      nearest = cell;
+      nearestDistance = distance;
+    }
+  }
+  if (nearest) return nearest;
+  return cells.reduce((selected, cell) => (
+    !selected || Number(cell.h ?? 0) > Number(selected.h ?? 0) ? cell : selected
+  ), null);
 }
 
 function createRiverData(document, atlasWidth, atlasHeight, physicalWidthMeters) {
@@ -187,7 +228,16 @@ function encodeGuidanceFields(raw, derived) {
   }));
 }
 
-function decodeLegacyMacroAtlas(source) {
+function assertPayloadLength(payload, expected, name) {
+  if (payload?.length !== expected) {
+    throw new Error(`Macro atlas field ${name} does not match its dimensions.`);
+  }
+}
+
+function decodeLegacyMacroAtlas(source, expected) {
+  assertPayloadLength(source.atlas.heightData, expected, 'heightData');
+  assertPayloadLength(source.atlas.biomeData, expected, 'biomeData');
+  assertPayloadLength(source.atlas.featureData, expected, 'featureData');
   const heights = decodeMacroField(source.atlas.heightData, 'u8');
   const biomes = decodeMacroField(source.atlas.biomeData, 'u8');
   const features = decodeMacroField(source.atlas.featureData, 'u16');
@@ -201,9 +251,18 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
   if (!legacy && !current) {
     throw new Error(`Unsupported base terrain source: ${source?.kind ?? 'unknown'}.`);
   }
-  const expected = source.atlas.width * source.atlas.height;
+  const { length: expected } = validateAtlasDimensions(source.atlas);
+  if (current) {
+    for (const [name, type] of Object.entries(GUIDANCE_FIELD_TYPES)) {
+      const payload = source.atlas.fields?.[name];
+      assertPayloadLength(payload, expected, name);
+      if (payload.type !== type) {
+        throw new Error(`Macro atlas field ${name} must use ${type} values.`);
+      }
+    }
+  }
   const decoded = legacy
-    ? decodeLegacyMacroAtlas(source)
+    ? decodeLegacyMacroAtlas(source, expected)
     : (() => {
       const names = includeGuidance ? Object.keys(GUIDANCE_FIELD_TYPES) : BASIC_V2_FIELDS;
       const fields = Object.fromEntries(names.map((name) => {
@@ -274,7 +333,11 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     for (let x = 0; x < summary.atlasWidth; x += 1) {
       const normalizedX = (x + 0.5) / summary.atlasWidth;
       const gridCell = sourceGridCellAt(document, lookup, normalizedX, normalizedY);
-      const packCell = packByGrid.get(gridCell.i);
+      const packCell = sourcePackCellAt(
+        packByGrid.get(gridCell.i),
+        normalizedX * document.info.width,
+        normalizedY * document.info.height,
+      );
       const index = y * summary.atlasWidth + x;
       raw.elevation[index] = clamp(Math.round(Number(packCell?.h ?? gridCell.h ?? 0)), 0, 100);
       raw.temperature[index] = clamp(Math.round(Number(gridCell.temp ?? 0)), -128, 127);
@@ -352,3 +415,8 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
 
 export const AZGAAR_MACRO_SOURCE_KIND = MACRO_SOURCE_KIND;
 export const AZGAAR_LEGACY_MACRO_SOURCE_KIND = LEGACY_MACRO_SOURCE_KIND;
+export function isAzgaarMacroWorldSource(source) {
+  return (source?.kind === MACRO_SOURCE_KIND && source.version === MACRO_SOURCE_VERSION)
+    || (source?.kind === LEGACY_MACRO_SOURCE_KIND
+      && source.version === LEGACY_MACRO_SOURCE_VERSION);
+}

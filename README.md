@@ -98,7 +98,8 @@ document** containing a compressed `azgaar-macro-v2` guidance atlas. The default
 atlas long edge is
 `import.azgaarAtlasLongEdge: 2000`; the shorter edge follows the Azgaar map
 aspect ratio. Atlas pixels describe continent-scale geography rather than
-literal playable cells.
+literal playable cells. Imports are capped at four million atlas cells to keep
+worker memory bounded when configuration or save data is malformed.
 
 The chunk worker converts canonical world coordinates into atlas coordinates
 and generates detailed `64 × 64` terrain pages only as the camera or player

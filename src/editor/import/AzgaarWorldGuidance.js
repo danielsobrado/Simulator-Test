@@ -19,6 +19,11 @@ function indexAt(x, y, width, height) {
   return clamp(y, 0, height - 1) * width + clamp(x, 0, width - 1);
 }
 
+function terrainNeighborElevation(elevation, index, center, land) {
+  const neighbor = elevation[index];
+  return land && neighbor < LAND_HEIGHT ? center : neighbor;
+}
+
 function distanceToSeeds(seeds, width, height) {
   const length = width * height;
   let hasSeed = false;
@@ -141,10 +146,30 @@ export function deriveAzgaarWorldGuidance({ raw, rivers, width, height }) {
       const river = riverDistance[index] === NO_DISTANCE
         ? 0
         : 1 - clamp(riverDistance[index] / 24, 0, 1);
-      const left = raw.elevation[indexAt(x - 2, y, width, height)];
-      const right = raw.elevation[indexAt(x + 2, y, width, height)];
-      const north = raw.elevation[indexAt(x, y - 2, width, height)];
-      const south = raw.elevation[indexAt(x, y + 2, width, height)];
+      const left = terrainNeighborElevation(
+        raw.elevation,
+        indexAt(x - 2, y, width, height),
+        elevation,
+        land,
+      );
+      const right = terrainNeighborElevation(
+        raw.elevation,
+        indexAt(x + 2, y, width, height),
+        elevation,
+        land,
+      );
+      const north = terrainNeighborElevation(
+        raw.elevation,
+        indexAt(x, y - 2, width, height),
+        elevation,
+        land,
+      );
+      const south = terrainNeighborElevation(
+        raw.elevation,
+        indexAt(x, y + 2, width, height),
+        elevation,
+        land,
+      );
       const localRuggedness = land
         ? clamp(Math.max(Math.abs(right - left), Math.abs(south - north)) / 36, 0, 1)
         : 0;
