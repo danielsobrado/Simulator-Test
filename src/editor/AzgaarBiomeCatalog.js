@@ -118,7 +118,41 @@ function customSourceIds(biomesData, observedSourceIds) {
   return [...ids].sort((left, right) => left - right);
 }
 
-export function createAzgaarBiomeDefinitions(biomesData = {}, observedSourceIds = []) {
+function includesConfiguredKeyword(text, values) {
+  if (!Array.isArray(values)) return false;
+  return values.some((value) => text.includes(String(value).trim().toLowerCase()));
+}
+
+function inferCustomSemantics(name, reliefIcons, config) {
+  const nameText = name.toLowerCase();
+  const iconText = reliefIcons.join(' ').toLowerCase();
+  if (includesConfiguredKeyword(nameText, config?.customBiomeWaterKeywords)) {
+    return { terrainClass: 'water', supportsGrass: false, supportsTrees: false };
+  }
+  if (includesConfiguredKeyword(nameText, config?.customBiomeSnowKeywords)) {
+    return { terrainClass: 'snow', supportsGrass: false, supportsTrees: false };
+  }
+  if (includesConfiguredKeyword(nameText, config?.customBiomeDesertKeywords)) {
+    return { terrainClass: 'desert', supportsGrass: false, supportsTrees: false };
+  }
+  if (includesConfiguredKeyword(nameText, config?.customBiomeSwampKeywords)) {
+    return { terrainClass: 'swamp', supportsGrass: true, supportsTrees: true };
+  }
+  if (includesConfiguredKeyword(nameText, config?.customBiomeForestKeywords)) {
+    return { terrainClass: 'forest', supportsGrass: true, supportsTrees: true };
+  }
+  return {
+    terrainClass: 'plains',
+    supportsGrass: true,
+    supportsTrees: includesConfiguredKeyword(iconText, config?.customBiomeTreeIconKeywords),
+  };
+}
+
+export function createAzgaarBiomeDefinitions(
+  biomesData = {},
+  observedSourceIds = [],
+  semanticConfig = null,
+) {
   const names = Array.isArray(biomesData?.name) ? biomesData.name : [];
   const colors = Array.isArray(biomesData?.color) ? biomesData.color : [];
   const habitability = Array.isArray(biomesData?.habitability) ? biomesData.habitability : [];
@@ -154,31 +188,33 @@ export function createAzgaarBiomeDefinitions(biomesData = {}, observedSourceIds 
       + `${CUSTOM_TILE_ID_END - CUSTOM_TILE_ID_START + 1} are supported.`,
     );
   }
-  const custom = customIds.map((sourceId, index) => createDefinition({
-    sourceId,
-    tileId: CUSTOM_TILE_ID_START + index,
-    name: typeof names[sourceId] === 'string' && names[sourceId].trim()
+  const custom = customIds.map((sourceId, index) => {
+    const name = typeof names[sourceId] === 'string' && names[sourceId].trim()
       ? names[sourceId].trim()
-      : `Custom biome ${sourceId}`,
-    color: validColor(colors[sourceId]) ?? fallbackCustomColor(sourceId),
-    icon: '🗺️',
-    standard: false,
-    terrainClass: 'plains',
-    supportsGrass: true,
-    supportsTrees: false,
-    habitability: Number.isFinite(habitability[sourceId])
-      ? Math.max(0, habitability[sourceId])
-      : 0,
-    movementCost: Number.isFinite(movementCost[sourceId])
-      ? Math.max(0, movementCost[sourceId])
-      : 0,
-    reliefIconDensity: Number.isFinite(iconDensity[sourceId])
-      ? Math.max(0, Math.round(iconDensity[sourceId]))
-      : 0,
-    reliefIcons: Array.isArray(icons[sourceId])
+      : `Custom biome ${sourceId}`;
+    const reliefIcons = Array.isArray(icons[sourceId])
       ? icons[sourceId].filter((icon) => typeof icon === 'string')
-      : [],
-  }));
+      : [];
+    return createDefinition({
+      sourceId,
+      tileId: CUSTOM_TILE_ID_START + index,
+      name,
+      color: validColor(colors[sourceId]) ?? fallbackCustomColor(sourceId),
+      icon: '🗺️',
+      standard: false,
+      ...inferCustomSemantics(name, reliefIcons, semanticConfig),
+      habitability: Number.isFinite(habitability[sourceId])
+        ? Math.max(0, habitability[sourceId])
+        : 0,
+      movementCost: Number.isFinite(movementCost[sourceId])
+        ? Math.max(0, movementCost[sourceId])
+        : 0,
+      reliefIconDensity: Number.isFinite(iconDensity[sourceId])
+        ? Math.max(0, Math.round(iconDensity[sourceId]))
+        : 0,
+      reliefIcons,
+    });
+  });
   return Object.freeze([...standard, ...custom]);
 }
 
