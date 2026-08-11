@@ -35,7 +35,7 @@ const GUIDANCE_FIELD_TYPES = Object.freeze({
   riverFlux: 'u32',
   confluenceFlux: 'u32',
   population: 'u32',
-  settlementScore: 'u16',
+  settlementScore: 'i16',
   harborScore: 'u8',
   havenId: 'u32',
   coastDistance: 'i16',
@@ -54,7 +54,7 @@ const GUIDANCE_FIELD_TYPES = Object.freeze({
 
 const COMPATIBLE_FIELD_TYPES = Object.freeze({
   featureId: Object.freeze(['u32', 'u16']),
-  settlementScore: Object.freeze(['u16', 'i16']),
+  settlementScore: Object.freeze(['i16', 'u16']),
 });
 
 const BASIC_FIELDS = Object.freeze(['elevation', 'biomeId', 'featureId']);
@@ -410,7 +410,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     riverFlux: new Uint32Array(length),
     confluenceFlux: new Uint32Array(length),
     population: new Uint32Array(length),
-    settlementScore: new Uint16Array(length),
+    settlementScore: new Int16Array(length),
     harborScore: new Uint8Array(length),
     havenId: new Uint32Array(length),
   };
@@ -440,7 +440,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffffffff);
       raw.confluenceFlux[index] = clamp(Math.round(Number(packCell?.conf ?? 0)), 0, 0xffffffff);
       raw.population[index] = clamp(Math.round(Number(packCell?.pop ?? 0) * 100), 0, 0xffffffff);
-      raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), 0, 0xffff);
+      raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), -0x8000, 0x7fff);
       raw.harborScore[index] = clamp(Math.round(Number(packCell?.harbor ?? 0)), 0, 255);
       raw.havenId[index] = clamp(Math.round(Number(packCell?.haven ?? 0)), 0, 0xffffffff);
     }
