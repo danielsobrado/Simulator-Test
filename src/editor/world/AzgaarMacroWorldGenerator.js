@@ -1,4 +1,5 @@
 import { decodeMacroAtlas } from '../import/AzgaarMacroWorldSource.js';
+import { WorldGuidanceField } from './WorldGuidanceField.js';
 
 const WATER_TILE_ID = 0;
 const LAND_HEIGHT = 20;
@@ -136,6 +137,7 @@ export class AzgaarMacroWorldGenerator {
     this.heights = decoded.heights;
     this.biomeAtlas = decoded.biomes;
     this.features = decoded.features;
+    this.guidance = null;
     this.biomeBySourceId = new Map(
       source.biomes.map((definition) => [definition.sourceId, definition]),
     );
@@ -184,6 +186,16 @@ export class AzgaarMacroWorldGenerator {
 
   getTileDefinition(tileId) {
     return this.tileDefinitionById.get(tileId) ?? null;
+  }
+
+  sampleGuidance(cellX, cellZ) {
+    this.guidance ??= new WorldGuidanceField(this.source);
+    return this.guidance.sample(cellX, cellZ);
+  }
+
+  sampleBiomeBlend(cellX, cellZ) {
+    this.guidance ??= new WorldGuidanceField(this.source);
+    return this.guidance.sampleBiomeBlend(cellX, cellZ);
   }
 
   getSurfaceMaskConfig(maskConfig) {

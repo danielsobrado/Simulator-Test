@@ -1,11 +1,11 @@
 import { createAzgaarBiomeDefinitions } from '../AzgaarBiomeCatalog.js';
+import { deriveAzgaarWorldGuidance } from './AzgaarWorldGuidance.js';
+import { decodeMacroField, encodeMacroField } from './MacroAtlasCodec.js';
 
-const MACRO_SOURCE_KIND = 'azgaar-macro-v1';
-const MACRO_SOURCE_VERSION = 1;
-const UINT8_RAW = 'base64-u8-v1';
-const UINT8_RLE = 'base64-rle-u8-v1';
-const UINT16_RAW = 'base64-le-u16-v1';
-const UINT16_RLE = 'base64-rle-u16-v1';
+const MACRO_SOURCE_KIND = 'azgaar-macro-v2';
+const MACRO_SOURCE_VERSION = 2;
+const LEGACY_MACRO_SOURCE_KIND = 'azgaar-macro-v1';
+const LEGACY_MACRO_SOURCE_VERSION = 1;
 
 const UNIT_METERS = Object.freeze({
   km: 1000,
@@ -23,128 +23,6 @@ function clamp(value, minimum, maximum) {
 function resolvePositive(value, fallback) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
-}
-
-function bytesToBase64(bytes) {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
-  }
-  let binary = '';
-  const blockSize = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += blockSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + blockSize));
-  }
-  return btoa(binary);
-}
-
-function base64ToBytes(value) {
-  if (typeof value !== 'string') {
-    throw new Error('Macro atlas data must be a base64 string.');
-  }
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(value, 'base64'));
-  }
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function encodeRuns(values, bytesPerValue) {
-  const runs = [];
-  for (let offset = 0; offset < values.length;) {
-    const value = values[offset];
-    let count = 1;
-    while (offset + count < values.length
-        && values[offset + count] === value
-        && count < 0xffff) {
-      count += 1;
-    }
-    runs.push([count, value]);
-    offset += count;
-  }
-  const bytes = new Uint8Array(runs.length * (2 + bytesPerValue));
-  const view = new DataView(bytes.buffer);
-  let offset = 0;
-  for (const [count, value] of runs) {
-    view.setUint16(offset, count, true);
-    offset += 2;
-    if (bytesPerValue === 1) {
-      view.setUint8(offset, value);
-    } else {
-      view.setUint16(offset, value, true);
-    }
-    offset += bytesPerValue;
-  }
-  return bytes;
-}
-
-function encodeValues(values, bytesPerValue) {
-  const raw = new Uint8Array(values.length * bytesPerValue);
-  if (bytesPerValue === 1) {
-    raw.set(values);
-  } else {
-    const view = new DataView(raw.buffer);
-    for (let index = 0; index < values.length; index += 1) {
-      view.setUint16(index * 2, values[index], true);
-    }
-  }
-  const runs = encodeRuns(values, bytesPerValue);
-  const useRuns = runs.byteLength < raw.byteLength;
-  return {
-    encoding: bytesPerValue === 1
-      ? (useRuns ? UINT8_RLE : UINT8_RAW)
-      : (useRuns ? UINT16_RLE : UINT16_RAW),
-    data: bytesToBase64(useRuns ? runs : raw),
-    length: values.length,
-  };
-}
-
-function decodeValues(payload, bytesPerValue) {
-  if (!payload || !Number.isInteger(payload.length) || payload.length < 0) {
-    throw new Error('Macro atlas payload length is invalid.');
-  }
-  const bytes = base64ToBytes(payload.data);
-  const rawEncoding = bytesPerValue === 1 ? UINT8_RAW : UINT16_RAW;
-  const rleEncoding = bytesPerValue === 1 ? UINT8_RLE : UINT16_RLE;
-  const Values = bytesPerValue === 1 ? Uint8Array : Uint16Array;
-  if (payload.encoding === rawEncoding) {
-    if (bytes.byteLength !== payload.length * bytesPerValue) {
-      throw new Error('Macro atlas raw payload has an invalid size.');
-    }
-    if (bytesPerValue === 1) return new Uint8Array(bytes);
-    const result = new Uint16Array(payload.length);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    for (let index = 0; index < result.length; index += 1) {
-      result[index] = view.getUint16(index * 2, true);
-    }
-    return result;
-  }
-  if (payload.encoding !== rleEncoding || bytes.byteLength % (2 + bytesPerValue) !== 0) {
-    throw new Error(`Unsupported macro atlas encoding: ${payload.encoding}.`);
-  }
-  const result = new Values(payload.length);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let target = 0;
-  for (let offset = 0; offset < bytes.byteLength;) {
-    const count = view.getUint16(offset, true);
-    offset += 2;
-    const value = bytesPerValue === 1
-      ? view.getUint8(offset)
-      : view.getUint16(offset, true);
-    offset += bytesPerValue;
-    if (count < 1 || target + count > result.length) {
-      throw new Error('Macro atlas RLE payload is invalid.');
-    }
-    result.fill(value, target, target + count);
-    target += count;
-  }
-  if (target !== result.length) {
-    throw new Error('Macro atlas RLE payload is incomplete.');
-  }
-  return result;
 }
 
 function resolveAtlasDimensions(document, config) {
@@ -246,26 +124,108 @@ function createRiverData(document, atlasWidth, atlasHeight, physicalWidthMeters)
   });
 }
 
+function withoutType(payload) {
+  const { type: _type, ...legacyPayload } = payload;
+  return legacyPayload;
+}
+
 export function createMacroAtlasPayload({ heights, biomes, features }) {
   return {
-    heightData: encodeValues(heights, 1),
-    biomeData: encodeValues(biomes, 1),
-    featureData: encodeValues(features, 2),
+    heightData: withoutType(encodeMacroField(heights, 'u8')),
+    biomeData: withoutType(encodeMacroField(biomes, 'u8')),
+    featureData: withoutType(encodeMacroField(features, 'u16')),
   };
 }
 
-export function decodeMacroAtlas(source) {
-  if (source?.kind !== MACRO_SOURCE_KIND || source.version !== MACRO_SOURCE_VERSION) {
+const BASIC_V2_FIELDS = Object.freeze(['elevation', 'biomeId', 'featureId']);
+const GUIDANCE_FIELD_TYPES = Object.freeze({
+  elevation: 'u8',
+  temperature: 'i8',
+  precipitation: 'u8',
+  waterDistance: 'i8',
+  biomeId: 'u8',
+  featureId: 'u16',
+  riverId: 'u32',
+  riverFlux: 'u32',
+  confluenceFlux: 'u32',
+  population: 'u32',
+  settlementScore: 'i16',
+  harborScore: 'u8',
+  havenId: 'u32',
+  coastDistance: 'i16',
+  riverDistance: 'u16',
+  moisture: 'u8',
+  continentalness: 'u8',
+  wetness: 'u8',
+  mountainness: 'u8',
+  ruggedness: 'u8',
+  valleyness: 'u8',
+  snowPotential: 'u8',
+  forestPotential: 'u8',
+  agriculturalPotential: 'u8',
+  harborPotential: 'u8',
+});
+
+function encodeGuidanceFields(raw, derived) {
+  const values = { ...raw, ...derived };
+  return Object.fromEntries(Object.entries(GUIDANCE_FIELD_TYPES).map(([name, type]) => {
+    const metadata = name === 'population'
+      ? { scale: 0.01, unit: 'azgaar-population' }
+      : name.endsWith('Potential') || [
+        'moisture',
+        'continentalness',
+        'wetness',
+        'mountainness',
+        'ruggedness',
+        'valleyness',
+      ].includes(name)
+        ? { scale: 1 / 255, unit: 'normalized' }
+        : ['coastDistance', 'riverDistance'].includes(name)
+          ? { scale: 1, unit: 'atlas-pixels' }
+          : {};
+    return [name, encodeMacroField(values[name], type, metadata)];
+  }));
+}
+
+function decodeLegacyMacroAtlas(source) {
+  const heights = decodeMacroField(source.atlas.heightData, 'u8');
+  const biomes = decodeMacroField(source.atlas.biomeData, 'u8');
+  const features = decodeMacroField(source.atlas.featureData, 'u16');
+  return { heights, biomes, features, fields: { elevation: heights, biomeId: biomes, featureId: features } };
+}
+
+export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
+  const legacy = source?.kind === LEGACY_MACRO_SOURCE_KIND
+    && source.version === LEGACY_MACRO_SOURCE_VERSION;
+  const current = source?.kind === MACRO_SOURCE_KIND && source.version === MACRO_SOURCE_VERSION;
+  if (!legacy && !current) {
     throw new Error(`Unsupported base terrain source: ${source?.kind ?? 'unknown'}.`);
   }
   const expected = source.atlas.width * source.atlas.height;
-  const heights = decodeValues(source.atlas.heightData, 1);
-  const biomes = decodeValues(source.atlas.biomeData, 1);
-  const features = decodeValues(source.atlas.featureData, 2);
+  const decoded = legacy
+    ? decodeLegacyMacroAtlas(source)
+    : (() => {
+      const names = includeGuidance ? Object.keys(GUIDANCE_FIELD_TYPES) : BASIC_V2_FIELDS;
+      const fields = Object.fromEntries(names.map((name) => {
+        const payload = source.atlas.fields?.[name];
+        if (!payload) throw new Error(`Azgaar macro v2 atlas is missing field ${name}.`);
+        return [name, decodeMacroField(payload, GUIDANCE_FIELD_TYPES[name])];
+      }));
+      return {
+        heights: fields.elevation,
+        biomes: fields.biomeId,
+        features: fields.featureId,
+        fields,
+      };
+    })();
+  const { heights, biomes, features } = decoded;
   if (heights.length !== expected || biomes.length !== expected || features.length !== expected) {
     throw new Error('Macro atlas dimensions do not match its payloads.');
   }
-  return { heights, biomes, features };
+  if (Object.values(decoded.fields).some((values) => values.length !== expected)) {
+    throw new Error('World guidance fields do not match the macro atlas dimensions.');
+  }
+  return decoded;
 }
 
 export function buildAzgaarImportSummary(document, config, options = {}) {
@@ -282,16 +242,29 @@ export function buildAzgaarImportSummary(document, config, options = {}) {
     usedCustomUnitFallback: physical.usedCustomUnitFallback,
     standardBiomeCount: biomeDefinitions.filter((biome) => biome.standard).length,
     customBiomeCount: biomeDefinitions.filter((biome) => !biome.standard).length,
-    estimatedRawBytes: atlas.width * atlas.height * 4,
+    guidanceFieldCount: Object.keys(GUIDANCE_FIELD_TYPES).length,
+    estimatedRawBytes: atlas.width * atlas.height * 44,
   });
 }
 
 export function createAzgaarMacroWorldSource(document, config, options = {}) {
   const summary = buildAzgaarImportSummary(document, config, options);
   const length = summary.atlasWidth * summary.atlasHeight;
-  const heights = new Uint8Array(length);
-  const biomes = new Uint8Array(length);
-  const features = new Uint16Array(length);
+  const raw = {
+    elevation: new Uint8Array(length),
+    temperature: new Int8Array(length),
+    precipitation: new Uint8Array(length),
+    waterDistance: new Int8Array(length),
+    biomeId: new Uint8Array(length),
+    featureId: new Uint16Array(length),
+    riverId: new Uint32Array(length),
+    riverFlux: new Uint32Array(length),
+    confluenceFlux: new Uint32Array(length),
+    population: new Uint32Array(length),
+    settlementScore: new Int16Array(length),
+    harborScore: new Uint8Array(length),
+    havenId: new Uint32Array(length),
+  };
   const observedBiomeIds = new Set();
   const lookup = buildGridCellLookup(document.grid);
   const packByGrid = buildPackByGrid(document.pack);
@@ -303,13 +276,35 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       const gridCell = sourceGridCellAt(document, lookup, normalizedX, normalizedY);
       const packCell = packByGrid.get(gridCell.i);
       const index = y * summary.atlasWidth + x;
-      heights[index] = clamp(Math.round(Number(packCell?.h ?? gridCell.h ?? 0)), 0, 100);
-      biomes[index] = clamp(Number(packCell?.biome ?? 0), 0, 255);
-      observedBiomeIds.add(biomes[index]);
-      features[index] = clamp(Number(packCell?.f ?? gridCell.f ?? 0), 0, 0xffff);
+      raw.elevation[index] = clamp(Math.round(Number(packCell?.h ?? gridCell.h ?? 0)), 0, 100);
+      raw.temperature[index] = clamp(Math.round(Number(gridCell.temp ?? 0)), -128, 127);
+      raw.precipitation[index] = clamp(Math.round(Number(gridCell.prec ?? 0)), 0, 255);
+      raw.waterDistance[index] = clamp(Math.round(Number(gridCell.t ?? 0)), -128, 127);
+      raw.biomeId[index] = clamp(Math.round(Number(packCell?.biome ?? 0)), 0, 255);
+      observedBiomeIds.add(raw.biomeId[index]);
+      raw.featureId[index] = clamp(Math.round(Number(packCell?.f ?? gridCell.f ?? 0)), 0, 0xffff);
+      raw.riverId[index] = clamp(Math.round(Number(packCell?.r ?? 0)), 0, 0xffffffff);
+      raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffffffff);
+      raw.confluenceFlux[index] = clamp(Math.round(Number(packCell?.conf ?? 0)), 0, 0xffffffff);
+      raw.population[index] = clamp(Math.round(Number(packCell?.pop ?? 0) * 100), 0, 0xffffffff);
+      raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), -0x8000, 0x7fff);
+      raw.harborScore[index] = clamp(Math.round(Number(packCell?.harbor ?? 0)), 0, 255);
+      raw.havenId[index] = clamp(Math.round(Number(packCell?.haven ?? 0)), 0, 0xffffffff);
     }
   }
 
+  const rivers = createRiverData(
+    document,
+    summary.atlasWidth,
+    summary.atlasHeight,
+    summary.physicalWidthMeters,
+  );
+  const derived = deriveAzgaarWorldGuidance({
+    raw,
+    rivers,
+    width: summary.atlasWidth,
+    height: summary.atlasHeight,
+  });
   const widthCells = Math.max(1, Math.round(summary.physicalWidthMeters / config.map.tileSize));
   const heightCells = Math.max(1, Math.round(summary.physicalHeightMeters / config.map.tileSize));
   const transitionKm = Number(config.import?.azgaarOceanTransitionKilometers ?? 50);
@@ -325,7 +320,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     atlas: {
       width: summary.atlasWidth,
       height: summary.atlasHeight,
-      ...createMacroAtlasPayload({ heights, biomes, features }),
+      fields: encodeGuidanceFields(raw, derived),
     },
     physical: {
       widthMeters: summary.physicalWidthMeters,
@@ -351,13 +346,9 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       reliefExponent: resolvePositive(config.import?.azgaarReliefExponent, 1),
     },
     biomes: createAzgaarBiomeDefinitions(document.biomesData, observedBiomeIds),
-    rivers: createRiverData(
-      document,
-      summary.atlasWidth,
-      summary.atlasHeight,
-      summary.physicalWidthMeters,
-    ),
+    rivers,
   };
 }
 
 export const AZGAAR_MACRO_SOURCE_KIND = MACRO_SOURCE_KIND;
+export const AZGAAR_LEGACY_MACRO_SOURCE_KIND = LEGACY_MACRO_SOURCE_KIND;

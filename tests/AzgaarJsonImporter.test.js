@@ -90,7 +90,7 @@ test('converts Azgaar terrain into a portable streamed macro source', () => {
   assert.equal(converted.version, 6);
   assert.equal(converted.world.chunkSize, 2);
   assert.equal(converted.chunks.length, 0);
-  assert.equal(converted.world.baseTerrain.kind, 'azgaar-macro-v1');
+  assert.equal(converted.world.baseTerrain.kind, 'azgaar-macro-v2');
   assert.equal(converted.world.baseTerrain.atlas.width, 4);
   assert.equal(converted.world.baseTerrain.atlas.height, 3);
   assert.equal(converted.objects.length, 0);
@@ -116,7 +116,7 @@ test('converts Azgaar terrain into a portable streamed macro source', () => {
 
   assert.equal(store.getStats().tileOverrideCount, 0);
   assert.equal(store.getStats().heightOverrideCount, 0);
-  assert.equal(store.toDocument().world.baseTerrain.kind, 'azgaar-macro-v1');
+  assert.equal(store.toDocument().world.baseTerrain.kind, 'azgaar-macro-v2');
 });
 
 test('rejects minimal or unrelated JSON exports', () => {
@@ -136,7 +136,7 @@ test('keeps older Full JSON imports usable when vector vertices are unavailable'
   delete document.pack.vertices;
   const converted = importAzgaarFullJson(document, createConfig());
   assert.equal(converted.campaign.cartography, undefined);
-  assert.equal(converted.world.baseTerrain.kind, 'azgaar-macro-v1');
+  assert.equal(converted.world.baseTerrain.kind, 'azgaar-macro-v2');
 });
 
 test('rejects malformed vector geometry when a Full JSON export includes it', () => {

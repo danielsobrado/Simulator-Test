@@ -90,9 +90,9 @@ test('supports an import-time physical width override without changing aspect ra
   assert.equal(summary.physicalHeightMeters, 3_600_000);
 });
 
-test('encodes a portable macro atlas with height, biome, feature, and river data', () => {
+test('encodes a portable guidance atlas with terrain, climate, and river data', () => {
   const source = createAzgaarMacroWorldSource(createDocument(), config);
-  assert.equal(source.kind, 'azgaar-macro-v1');
+  assert.equal(source.kind, 'azgaar-macro-v2');
   assert.equal(source.atlas.width, 10);
   assert.equal(source.atlas.height, 6);
   assert.equal(source.bounds.widthCells, 1_500_000);
@@ -130,4 +130,10 @@ test('encodes a portable macro atlas with height, biome, feature, and river data
   assert.ok(decoded.heights.some((height) => height >= 59));
   assert.ok(decoded.biomes.includes(6));
   assert.ok(decoded.features.includes(1));
+
+  const guidance = decodeMacroAtlas(source, { includeGuidance: true }).fields;
+  assert.equal(Object.keys(guidance).length, 25);
+  assert.equal(guidance.temperature.length, 60);
+  assert.equal(guidance.coastDistance.length, 60);
+  assert.equal(guidance.riverDistance.length, 60);
 });

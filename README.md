@@ -16,7 +16,7 @@ The editor now runs on an effectively unbounded logical world rather than one fi
 - Background chunk generation in a module worker.
 - Floating-origin rebasing for long-distance precision.
 - Sparse terrain, height, object, campaign, and voxel persistence.
-- Portable compressed Azgaar macro-atlas persistence.
+- Portable compressed Azgaar world-guidance atlas persistence.
 - Local-first chunk content with optional URL fallback.
 - Dense binary encoding for fully modified or imported chunks.
 - IndexedDB browser saves (localStorage is still read as a fallback for older browser saves).
@@ -75,7 +75,8 @@ Neighboring chunks cannot split at their boundaries because both sides request t
 Native document version 6 stores:
 
 - Generator seed and version.
-- Optional Azgaar macro base terrain, physical scale, rectangular bounds, and rivers.
+- Optional Azgaar macro base terrain, climate/hydrology guidance, physical scale,
+  rectangular bounds, and rivers.
 - Chunk and tile dimensions.
 - Modified terrain chunks only; clean generated chunks are reproducible and omitted.
 - Placed objects.
@@ -93,7 +94,8 @@ the source scale, automatically preserves the source aspect ratio, and allows
 the physical world width to be overridden.
 
 The conversion runs in a worker and writes a **version 6 infinite-world
-document** containing a compressed macro atlas. The default atlas long edge is
+document** containing a compressed `azgaar-macro-v2` guidance atlas. The default
+atlas long edge is
 `import.azgaarAtlasLongEdge: 2000`; the shorter edge follows the Azgaar map
 aspect ratio. Atlas pixels describe continent-scale geography rather than
 literal playable cells.
@@ -116,7 +118,13 @@ The macro source imports:
 - Interpolated elevation with deterministic local relief.
 - All 13 standard Azgaar biomes plus map-defined custom biomes.
 - River centerlines used to generate local water channels.
-- Feature identifiers for future overlays and simulation.
+- Temperature, precipitation, Azgaar's water-distance field, feature IDs, river
+  IDs/flux/confluence, population, settlement score, and harbor/haven data.
+- Deterministic coast and river distances plus normalized moisture, wetness,
+  continentalness, mountain, ruggedness, valley, snow, forest, agriculture, and
+  harbor-potential fields.
+- Continuous biome-weight queries for physical terrain and rendering while the
+  canonical Azgaar biome ID remains discrete for simulation.
 - Source map information.
 - States and provinces.
 - Cultures and religions.
