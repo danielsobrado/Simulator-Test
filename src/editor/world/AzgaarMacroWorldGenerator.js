@@ -144,9 +144,11 @@ export class AzgaarMacroWorldGenerator {
     this.source = source;
     this.heights = decodeGuidanceField(source, 'elevation');
     this.biomeAtlas = decodeGuidanceField(source, 'biomeId');
-    this.features = decodeGuidanceField(source, 'featureId');
-    if (!this.heights || !this.biomeAtlas || !this.features) {
-      throw new Error('Azgaar macro source is missing canonical terrain fields.');
+    this.features = hasGuidanceField(source, 'featureId')
+      ? decodeGuidanceField(source, 'featureId')
+      : null;
+    if (!this.heights || !this.biomeAtlas) {
+      throw new Error('Azgaar macro source is missing required terrain fields.');
     }
     this.guidance = null;
     this.hasMorphologyGuidance = ['mountainness', 'ruggedness', 'valleyness']
@@ -185,13 +187,12 @@ export class AzgaarMacroWorldGenerator {
   }
 
   ensureGuidance() {
-    this.guidance ??= new WorldGuidanceField(this.source, {
-      fields: {
-        elevation: this.heights,
-        biomeId: this.biomeAtlas,
-        featureId: this.features,
-      },
-    });
+    const fields = {
+      elevation: this.heights,
+      biomeId: this.biomeAtlas,
+    };
+    if (this.features) fields.featureId = this.features;
+    this.guidance ??= new WorldGuidanceField(this.source, { fields });
     return this.guidance;
   }
 
