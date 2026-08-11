@@ -46,6 +46,26 @@ const FINITE_GUIDANCE_FIELDS = Object.freeze([
   'detailValleyPenalty',
 ]);
 
+const STRING_ARRAY_GUIDANCE_FIELDS = Object.freeze([
+  'customBiomeForestKeywords',
+  'customBiomeSwampKeywords',
+  'customBiomeDesertKeywords',
+  'customBiomeSnowKeywords',
+  'customBiomeWaterKeywords',
+  'customBiomeTreeIconKeywords',
+]);
+
+function validateStringArray(value, fieldName) {
+  if (!Array.isArray(value)
+      || value.length === 0
+      || value.some((entry) => typeof entry !== 'string' || entry.trim() === '')) {
+    throw new Error(
+      `Invalid editor configuration: import.azgaarGuidance.${fieldName} `
+      + 'must be a non-empty array of strings.',
+    );
+  }
+}
+
 function validateGuidanceConfig(guidance) {
   if (!guidance || typeof guidance !== 'object' || Array.isArray(guidance)) {
     throw new Error('Invalid editor configuration: import.azgaarGuidance must be an object.');
@@ -63,6 +83,9 @@ function validateGuidanceConfig(guidance) {
         `Invalid editor configuration: import.azgaarGuidance.${name} must be finite.`,
       );
     }
+  }
+  for (const name of STRING_ARRAY_GUIDANCE_FIELDS) {
+    validateStringArray(guidance[name], name);
   }
   if (guidance.temperatureNormalizationMaxC <= guidance.temperatureNormalizationMinC) {
     throw new Error(
