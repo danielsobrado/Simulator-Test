@@ -15,6 +15,7 @@ import {
   validateWaterContentConfig,
 } from '../editor/water/WaterVisualConfig.js';
 import { validateEditorConfig } from './validateEditorConfig.js';
+import { validateImportConfig } from './validateImportConfig.js';
 import { validateStylizedLodConfig } from './validateStylizedLodConfig.js';
 
 function runtimeSearch() {
@@ -36,6 +37,7 @@ export function loadEditorConfig() {
   config.collision = createCollisionConfig(yaml.load(collisionConfigSource), runtimeSearch());
   applyRuntimeOverrides(config);
   validateEditorConfig(config);
+  validateImportConfig(config);
   validateWaterDomainConfig(config);
   validateUnderwaterConfig(config.player.water.underwater);
   validateWaterContentConfig(config);
