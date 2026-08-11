@@ -16,6 +16,7 @@ import { assertCompatibleWaterDomainMetadata } from '../water/WaterConfig.js';
 import { enrichPageWaterField } from '../water/WaterField.js';
 import { sampleWorldStoreWater } from '../water/TerrainWaterQueries.js';
 import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
+import { INFINITE_WORLD_FORMAT_VERSION } from './worldConstants.js';
 
 const MAX_TILE_ID = 255;
 
@@ -282,18 +283,38 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   loadDocument(document) {
     this.pendingChunks.clear();
     const previousBaseTerrain = this.baseTerrain;
+    const previousTileOverrides = this.tileOverrides;
+    const previousHeightOverrides = this.heightOverrides;
+    const previousForestEdits = this.forestEdits;
+
     try {
-      super.loadDocument(document);
+      if (document?.version !== INFINITE_WORLD_FORMAT_VERSION) {
+        throw new Error(
+          'This file uses an older dense map format that is no longer supported. '
+          + 'Use a current infinite-world save, or import Azgaar Full JSON.',
+        );
+      }
+      this.loadInfiniteDocument(document);
+      this.cache.clear();
+      this.emit({ kind: 'reset' });
     } catch (error) {
+      let rollbackError = null;
       if (this.baseTerrain !== previousBaseTerrain) {
         try {
           this.setBaseTerrain(previousBaseTerrain);
-        } catch (rollbackError) {
-          throw new AggregateError(
-            [error, rollbackError],
-            'World load failed and the previous base terrain could not be restored.',
-          );
+        } catch (caught) {
+          rollbackError = caught;
         }
+      }
+      this.tileOverrides = previousTileOverrides;
+      this.heightOverrides = previousHeightOverrides;
+      this.forestEdits = previousForestEdits;
+      this.cache.clear();
+      if (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'World load failed and the previous base terrain could not be restored.',
+        );
       }
       throw error;
     }
