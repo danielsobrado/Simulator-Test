@@ -58,6 +58,7 @@ const COMPATIBLE_FIELD_TYPES = Object.freeze({
 });
 
 const BASIC_FIELDS = Object.freeze(['elevation', 'biomeId', 'featureId']);
+const TERRAIN_WORKER_REQUIRED_FIELDS = Object.freeze(['elevation', 'biomeId']);
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -276,12 +277,16 @@ function validateCurrentField(source, name, expected) {
 function currentProfileFieldNames(source) {
   if (source.profile !== TERRAIN_WORKER_PROFILE) return Object.keys(GUIDANCE_FIELD_TYPES);
   const names = Object.keys(source.atlas?.fields ?? {});
-  for (const required of BASIC_FIELDS) {
+  for (const required of TERRAIN_WORKER_REQUIRED_FIELDS) {
     if (!names.includes(required)) {
       throw new Error(`Azgaar terrain worker profile is missing field ${required}.`);
     }
   }
   return names;
+}
+
+function basicFieldNames(source) {
+  return source.profile === TERRAIN_WORKER_PROFILE ? TERRAIN_WORKER_REQUIRED_FIELDS : BASIC_FIELDS;
 }
 
 export function hasGuidanceField(source, name) {
@@ -342,7 +347,7 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
   }
 
   const names = source.kind === MACRO_SOURCE_KIND
-    ? (includeGuidance ? currentProfileFieldNames(source) : BASIC_FIELDS)
+    ? (includeGuidance ? currentProfileFieldNames(source) : basicFieldNames(source))
     : [...BASIC_FIELDS, ...Object.keys(source.terrainGuidance?.fields ?? {})];
   const fields = {};
   for (const name of names) {
@@ -353,7 +358,10 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
   const heights = fields.elevation;
   const biomes = fields.biomeId;
   const features = fields.featureId;
-  if (heights?.length !== expected || biomes?.length !== expected || features?.length !== expected) {
+  const requiresFeatures = source.profile !== TERRAIN_WORKER_PROFILE;
+  if (heights?.length !== expected
+      || biomes?.length !== expected
+      || (requiresFeatures && features?.length !== expected)) {
     throw new Error('Macro atlas dimensions do not match its payloads.');
   }
   if (Object.values(fields).some((values) => values.length !== expected)) {
