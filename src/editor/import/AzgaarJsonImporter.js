@@ -64,10 +64,14 @@ function assertRivers(document, packedCellIds) {
     }
     if (river.cells !== undefined) {
       if (!Array.isArray(river.cells)
-          || river.cells.some((cellId) => !Number.isSafeInteger(cellId) || cellId < 0)) {
-        throw new Error(`Azgaar river ${river.i} cells must contain non-negative safe-integer ids.`);
+          || river.cells.some((cellId) => !Number.isSafeInteger(cellId) || cellId < -1)) {
+        throw new Error(
+          `Azgaar river ${river.i} cells must contain packed cell ids or the -1 off-canvas sentinel.`,
+        );
       }
-      const missingCellId = river.cells.find((cellId) => !packedCellIds.has(cellId));
+      const missingCellId = river.cells.find(
+        (cellId) => cellId >= 0 && !packedCellIds.has(cellId),
+      );
       if (missingCellId !== undefined) {
         throw new Error(`Azgaar river ${river.i} references missing packed cell ${missingCellId}.`);
       }
