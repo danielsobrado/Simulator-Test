@@ -32,9 +32,9 @@ const GUIDANCE_FIELD_TYPES = Object.freeze({
   waterDistance: 'i8',
   biomeId: 'u8',
   featureId: 'u32',
-  riverId: 'u32',
-  riverFlux: 'u32',
-  confluenceFlux: 'u32',
+  riverId: 'u16',
+  riverFlux: 'u16',
+  confluenceFlux: 'u16',
   population: 'u32',
   settlementScore: 'i16',
   harborScore: 'u8',
@@ -55,6 +55,9 @@ const GUIDANCE_FIELD_TYPES = Object.freeze({
 
 const COMPATIBLE_FIELD_TYPES = Object.freeze({
   featureId: Object.freeze(['u32', 'u16']),
+  riverId: Object.freeze(['u16', 'u32']),
+  riverFlux: Object.freeze(['u16', 'u32']),
+  confluenceFlux: Object.freeze(['u16', 'u32']),
   settlementScore: Object.freeze(['i16', 'u16']),
 });
 
@@ -417,7 +420,7 @@ export function buildAzgaarImportSummary(document, config, options = {}) {
     standardBiomeCount: biomeDefinitions.filter((biome) => biome.standard).length,
     customBiomeCount: biomeDefinitions.filter((biome) => !biome.standard).length,
     guidanceFieldCount: Object.keys(GUIDANCE_FIELD_TYPES).length,
-    estimatedRawBytes: atlas.width * atlas.height * 46,
+    estimatedRawBytes: atlas.width * atlas.height * 40,
   });
 }
 
@@ -431,9 +434,9 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     waterDistance: new Int8Array(length),
     biomeId: new Uint8Array(length),
     featureId: new Uint32Array(length),
-    riverId: new Uint32Array(length),
-    riverFlux: new Uint32Array(length),
-    confluenceFlux: new Uint32Array(length),
+    riverId: new Uint16Array(length),
+    riverFlux: new Uint16Array(length),
+    confluenceFlux: new Uint16Array(length),
     population: new Uint32Array(length),
     settlementScore: new Int16Array(length),
     harborScore: new Uint8Array(length),
@@ -457,12 +460,12 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       raw.elevation[index] = clamp(Math.round(Number(packCell?.h ?? gridCell.h ?? 0)), 0, 100);
       raw.temperature[index] = clamp(Math.round(Number(gridCell.temp ?? 0)), -128, 127);
       raw.precipitation[index] = clamp(Math.round(Number(gridCell.prec ?? 0)), 0, 255);
-      raw.waterDistance[index] = clamp(Math.round(Number(gridCell.t ?? 0)), -128, 127);
+      raw.waterDistance[index] = clamp(Math.round(Number(packCell?.t ?? gridCell.t ?? 0)), -128, 127);
       raw.biomeId[index] = clamp(Math.round(Number(packCell?.biome ?? 0)), 0, 255);
       raw.featureId[index] = clamp(Math.round(Number(packCell?.f ?? gridCell.f ?? 0)), 0, 0xffffffff);
-      raw.riverId[index] = clamp(Math.round(Number(packCell?.r ?? 0)), 0, 0xffffffff);
-      raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffffffff);
-      raw.confluenceFlux[index] = clamp(Math.round(Number(packCell?.conf ?? 0)), 0, 0xffffffff);
+      raw.riverId[index] = clamp(Math.round(Number(packCell?.r ?? 0)), 0, 0xffff);
+      raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffff);
+      raw.confluenceFlux[index] = clamp(Math.round(Number(packCell?.conf ?? 0)), 0, 0xffff);
       raw.population[index] = clamp(Math.round(Number(packCell?.pop ?? 0) * 100), 0, 0xffffffff);
       raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), -0x8000, 0x7fff);
       raw.harborScore[index] = clamp(Math.round(Number(packCell?.harbor ?? 0)), 0, 255);
