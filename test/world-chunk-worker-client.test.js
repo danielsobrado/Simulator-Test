@@ -57,13 +57,18 @@ function createClient({ workerCount = 2, chunkSize = 16 } = {}) {
   });
 }
 
-test('healthy workers do not allocate a main-thread fallback generator', () => {
+test('healthy workers do not allocate a main-thread fallback generator', async () => {
   const restoreWorker = installFakeWorker();
   const client = createClient();
 
   try {
     assert.equal(client.worldGenerator, null);
-    client.request(0, 0);
+    const request = client.request(0, 0);
+    assert.equal(client.worldGenerator, null);
+    FakeWorker.instances[0].emit('message', {
+      data: { id: 1, page: { chunkX: 0, chunkZ: 0 } },
+    });
+    await request;
     assert.equal(client.worldGenerator, null);
   } finally {
     client.dispose();
