@@ -40,7 +40,7 @@ export class WorldChunkWorkerClient {
     this.chunkSize = chunkSize;
     this.generator = generator.toMetadata();
     this.baseTerrain = null;
-    this.worldGenerator = createWorldGenerator(this.generator);
+    this.worldGenerator = null;
     this.surfaceMaskConfig = surfaceMaskConfig;
     this.vegetationScatterConfig = vegetationScatterConfig;
     this.maxInFlightPerWorker = Math.max(1, maxInFlightPerWorker);
@@ -99,13 +99,27 @@ export class WorldChunkWorkerClient {
     return this.workers.reduce((count, worker) => count + Number(Boolean(worker)), 0);
   }
 
+  ensureWorldGenerator() {
+    this.worldGenerator ??= createWorldGenerator(this.generator, this.baseTerrain);
+    return this.worldGenerator;
+  }
+
   setBaseTerrain(baseTerrain) {
-    const nextWorldGenerator = createWorldGenerator(this.generator, baseTerrain ?? null);
     const nextWorkerBaseTerrain = createTerrainWorkerBaseTerrain(baseTerrain);
-    this.worldGenerator = nextWorldGenerator;
     this.baseTerrain = nextWorkerBaseTerrain;
-    for (const worker of this.workers) {
-      worker?.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+    this.worldGenerator = null;
+    for (let index = 0; index < this.workers.length; index += 1) {
+      const worker = this.workers[index];
+      if (!worker) continue;
+      try {
+        worker.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
+      } catch (error) {
+        this.handleWorkerFailure(
+          index,
+          worker,
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
     }
   }
 
@@ -125,7 +139,7 @@ export class WorldChunkWorkerClient {
     if (this.workers.length === 0) {
       return Promise.resolve().then(() => generateBaseWorldChunk({
         ...request,
-        worldGenerator: this.worldGenerator,
+        worldGenerator: this.ensureWorldGenerator(),
       }));
     }
 
@@ -207,12 +221,15 @@ export class WorldChunkWorkerClient {
         requestedAt: job.requestedAt,
         dispatchedAt: performance.now(),
       });
+      const worker = this.workers[workerIndex];
       try {
-        this.workers[workerIndex].postMessage({ id: job.id, request: job.request });
+        worker.postMessage({ id: job.id, request: job.request });
       } catch (error) {
         this.pending.delete(job.id);
         this.inFlight[workerIndex] = Math.max(0, this.inFlight[workerIndex] - 1);
-        job.reject(error instanceof Error ? error : new Error(String(error)));
+        const failure = error instanceof Error ? error : new Error(String(error));
+        job.reject(failure);
+        this.handleWorkerFailure(workerIndex, worker, failure);
       }
     }
   }
@@ -247,8 +264,16 @@ export class WorldChunkWorkerClient {
 
     event.preventDefault?.();
     if (this.workers[workerIndex] !== sourceWorker) return;
+    this.handleWorkerFailure(
+      workerIndex,
+      sourceWorker,
+      new Error(event.message || 'World chunk worker failed.'),
+    );
+  }
 
-    const error = new Error(event.message || 'World chunk worker failed.');
+  handleWorkerFailure(workerIndex, sourceWorker, error) {
+    if (this.disposed || this.workers[workerIndex] !== sourceWorker) return;
+
     sourceWorker?.terminate();
     this.workers[workerIndex] = null;
 
@@ -265,9 +290,7 @@ export class WorldChunkWorkerClient {
       let replacement = null;
       try {
         replacement = this.createWorker(workerIndex);
-        if (this.baseTerrain) {
-          replacement.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
-        }
+        replacement.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
         this.workers[workerIndex] = replacement;
       } catch (replacementError) {
         replacement?.terminate();
@@ -283,9 +306,15 @@ export class WorldChunkWorkerClient {
       const queued = this.queue;
       this.queue = [];
       this.queuedByKey.clear();
-      for (const job of queued) job.reject(error);
       console.warn('World chunk worker pool is unavailable; falling back to main-thread generation.');
       this.useMainThreadFallback();
+      const worldGenerator = this.ensureWorldGenerator();
+      for (const job of queued) {
+        Promise.resolve().then(() => generateBaseWorldChunk({
+          ...job.request,
+          worldGenerator,
+        })).then(job.resolve, job.reject);
+      }
       return;
     }
 
@@ -303,6 +332,7 @@ export class WorldChunkWorkerClient {
     this.workers = [];
     this.inFlight = [];
     this.workerRestartCounts = [];
+    this.worldGenerator = null;
     const error = new Error('World chunk worker was disposed.');
     for (const pending of this.pending.values()) {
       pending.reject(error);
