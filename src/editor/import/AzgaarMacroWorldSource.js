@@ -69,6 +69,19 @@ function resolvePositive(value, fallback) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
+function sourceBiomeMetadata(document) {
+  return Array.isArray(document.pack?.biomes) ? document.pack.biomes : document.biomesData;
+}
+
+function observedBiomeIds(document) {
+  const result = new Set();
+  for (const cell of document.pack?.cells ?? []) {
+    const biomeId = Number(cell?.biome);
+    if (Number.isInteger(biomeId) && biomeId >= 0) result.add(biomeId);
+  }
+  return result;
+}
+
 function validateAtlasDimensions(atlas) {
   const width = atlas?.width;
   const height = atlas?.height;
@@ -120,6 +133,9 @@ function resolvePhysicalDimensions(document, options = {}) {
   const sourceWidth = Number(document.info.width);
   const sourceHeight = Number(document.info.height);
   const distanceScale = Number(document.settings?.distanceScale ?? 1);
+  if (!Number.isFinite(distanceScale) || distanceScale <= 0) {
+    throw new Error('Azgaar distance scale must be positive.');
+  }
   const distanceUnit = String(document.settings?.distanceUnit ?? 'km');
   const unitMeters = UNIT_METERS[distanceUnit] ?? 1000;
   const defaultWidthMeters = sourceWidth * distanceScale * unitMeters;
@@ -144,7 +160,9 @@ function sourceGridCellAt(document, lookup, normalizedX, normalizedY) {
   const column = clamp(Math.floor(normalizedX * document.grid.cellsX), 0, document.grid.cellsX - 1);
   const row = clamp(Math.floor(normalizedY * document.grid.cellsY), 0, document.grid.cellsY - 1);
   const id = row * document.grid.cellsX + column;
-  return lookup.get(id) ?? document.grid.cells[clamp(id, 0, document.grid.cells.length - 1)];
+  const cell = lookup.get(id);
+  if (!cell) throw new Error(`Azgaar grid is missing row-major cell id ${id}.`);
+  return cell;
 }
 
 function buildPackByGrid(pack) {
@@ -385,8 +403,8 @@ export function buildAzgaarImportSummary(document, config, options = {}) {
   const atlas = resolveAtlasDimensions(document, config);
   const physical = resolvePhysicalDimensions(document, options);
   const biomeDefinitions = createAzgaarBiomeDefinitions(
-    document.biomesData,
-    [],
+    sourceBiomeMetadata(document),
+    observedBiomeIds(document),
     config.import?.azgaarGuidance,
   );
   return Object.freeze({
@@ -422,7 +440,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     harborScore: new Uint8Array(length),
     havenId: new Uint32Array(length),
   };
-  const observedBiomeIds = new Set();
+  const sourceBiomeIds = observedBiomeIds(document);
   const lookup = buildGridCellLookup(document.grid);
   const packByGrid = buildPackByGrid(document.pack);
 
@@ -442,7 +460,6 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       raw.precipitation[index] = clamp(Math.round(Number(gridCell.prec ?? 0)), 0, 255);
       raw.waterDistance[index] = clamp(Math.round(Number(gridCell.t ?? 0)), -128, 127);
       raw.biomeId[index] = clamp(Math.round(Number(packCell?.biome ?? 0)), 0, 255);
-      observedBiomeIds.add(raw.biomeId[index]);
       raw.featureId[index] = clamp(Math.round(Number(packCell?.f ?? gridCell.f ?? 0)), 0, 0xffffffff);
       raw.riverId[index] = clamp(Math.round(Number(packCell?.r ?? 0)), 0, 0xffffffff);
       raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffffffff);
@@ -456,8 +473,8 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
 
   const guidanceConfig = config.import.azgaarGuidance;
   const biomeDefinitions = createAzgaarBiomeDefinitions(
-    document.biomesData,
-    observedBiomeIds,
+    sourceBiomeMetadata(document),
+    sourceBiomeIds,
     guidanceConfig,
   );
   const rivers = createRiverData(
