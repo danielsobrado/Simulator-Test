@@ -1,4 +1,5 @@
 import yaml from 'js-yaml';
+import azgaarGuidanceConfigSource from '../../config/azgaar-guidance.yaml?raw';
 import collisionConfigSource from '../../config/collision.yaml?raw';
 import configSource from '../../editor.config.yaml?raw';
 import waterConfigSource from '../../config/water-domain.yaml?raw';
@@ -32,6 +33,7 @@ function applyRuntimeOverrides(config) {
 
 export function loadEditorConfig() {
   const config = yaml.load(configSource);
+  config.import.azgaarGuidance = yaml.load(azgaarGuidanceConfigSource);
   applyWaterDomainConfig(config, yaml.load(waterConfigSource));
   applyWaterVisualConfig(config, yaml.load(waterVisualConfigSource));
   config.collision = createCollisionConfig(yaml.load(collisionConfigSource), runtimeSearch());
