@@ -1,4 +1,5 @@
 import { generateBaseWorldChunk } from './generateWorldChunk.js';
+import { createTerrainWorkerBaseTerrain } from './TerrainWorkerBaseTerrain.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import { chunkKey } from './WorldCoordinates.js';
 
@@ -99,8 +100,10 @@ export class WorldChunkWorkerClient {
   }
 
   setBaseTerrain(baseTerrain) {
-    this.baseTerrain = baseTerrain ? structuredClone(baseTerrain) : null;
-    this.worldGenerator = createWorldGenerator(this.generator, this.baseTerrain);
+    const nextWorldGenerator = createWorldGenerator(this.generator, baseTerrain ?? null);
+    const nextWorkerBaseTerrain = createTerrainWorkerBaseTerrain(baseTerrain);
+    this.worldGenerator = nextWorldGenerator;
+    this.baseTerrain = nextWorkerBaseTerrain;
     for (const worker of this.workers) {
       worker?.postMessage({ type: 'configure', baseTerrain: this.baseTerrain });
     }
