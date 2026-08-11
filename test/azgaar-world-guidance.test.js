@@ -348,12 +348,12 @@ test('terrain worker source carries only canonical and morphology guidance', () 
   const expectedFields = [
     'biomeId',
     'elevation',
-    'featureId',
     'mountainness',
     'ruggedness',
     'valleyness',
   ];
   assert.deepEqual(Object.keys(workerSource.atlas.fields).sort(), expectedFields);
+  assert.equal(workerSource.atlas.fields.featureId, undefined);
   assert.equal(workerSource.atlas.fields.population, undefined);
   assert.deepEqual(
     Object.keys(decodeMacroAtlas(workerSource, { includeGuidance: true }).fields).sort(),
@@ -371,7 +371,7 @@ test('terrain worker source carries only canonical and morphology guidance', () 
   assert.ok(Number.isFinite(generator.morphologyScale(position.x, position.z)));
   assert.deepEqual(
     generator.guidance.decodedFieldNames(),
-    ['biomeId', 'elevation', 'featureId', 'mountainness', 'ruggedness', 'valleyness'],
+    ['biomeId', 'elevation', 'mountainness', 'ruggedness', 'valleyness'],
   );
 });
 
