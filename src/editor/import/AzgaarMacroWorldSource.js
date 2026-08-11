@@ -8,6 +8,7 @@ const LEGACY_MACRO_SOURCE_KIND = 'azgaar-macro-v1';
 const LEGACY_MACRO_SOURCE_VERSION = 1;
 const TERRAIN_WORKER_PROFILE = 'terrain-worker';
 const MAX_MACRO_ATLAS_CELLS = 4_000_000;
+const METERS_PER_KILOMETER = 1000;
 
 const UNIT_METERS = Object.freeze({
   km: 1000,
@@ -201,8 +202,6 @@ function createRiverData(document, atlasWidth, atlasHeight, physicalWidthMeters)
   const sourceWidth = document.info.width;
   const sourceHeight = document.info.height;
   const packById = new Map((document.pack?.cells ?? []).map((cell) => [cell.i, cell]));
-  const distanceScale = Number(document.settings?.distanceScale ?? 1);
-  const unitMeters = UNIT_METERS[document.settings?.distanceUnit] ?? 1000;
   const metersPerAtlasPixel = physicalWidthMeters / atlasWidth;
   return (document.pack?.rivers ?? []).flatMap((river) => {
     const points = Array.isArray(river.points) && river.points.length > 1
@@ -216,7 +215,7 @@ function createRiverData(document, atlasWidth, atlasHeight, physicalWidthMeters)
       id: river.i,
       widthAtlas: Math.max(
         1 / 256,
-        Number(river.width ?? 0.1) * distanceScale * unitMeters / metersPerAtlasPixel,
+        Number(river.width ?? 0.1) * METERS_PER_KILOMETER / metersPerAtlasPixel,
       ),
       points: points.map(([x, y]) => [
         x / sourceWidth * atlasWidth,
