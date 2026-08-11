@@ -35,9 +35,10 @@ function assertPackedCells(document, gridIds) {
       assertFinitePoint(cell.p, `packed cell ${cell.i} position`);
     }
   }
+  return ids;
 }
 
-function assertRivers(document) {
+function assertRivers(document, packedCellIds) {
   const rivers = document?.pack?.rivers;
   if (rivers === undefined) return;
   if (!Array.isArray(rivers)) {
@@ -49,6 +50,10 @@ function assertRivers(document) {
       throw new Error('Azgaar Full JSON rivers must have unique non-negative safe-integer ids.');
     }
     ids.add(river.i);
+    if (river.width !== undefined
+        && (!Number.isFinite(Number(river.width)) || Number(river.width) < 0)) {
+      throw new Error(`Azgaar river ${river.i} width must be a non-negative finite number.`);
+    }
     if (river.points !== undefined) {
       if (!Array.isArray(river.points)) {
         throw new Error(`Azgaar river ${river.i} points must be an array.`);
@@ -57,10 +62,15 @@ function assertRivers(document) {
         assertFinitePoint(point, `river ${river.i} point ${index}`);
       });
     }
-    if (river.cells !== undefined
-        && (!Array.isArray(river.cells)
-          || river.cells.some((cellId) => !Number.isSafeInteger(cellId) || cellId < 0))) {
-      throw new Error(`Azgaar river ${river.i} cells must contain non-negative safe-integer ids.`);
+    if (river.cells !== undefined) {
+      if (!Array.isArray(river.cells)
+          || river.cells.some((cellId) => !Number.isSafeInteger(cellId) || cellId < 0)) {
+        throw new Error(`Azgaar river ${river.i} cells must contain non-negative safe-integer ids.`);
+      }
+      const missingCellId = river.cells.find((cellId) => !packedCellIds.has(cellId));
+      if (missingCellId !== undefined) {
+        throw new Error(`Azgaar river ${river.i} references missing packed cell ${missingCellId}.`);
+      }
     }
   }
 }
@@ -78,11 +88,15 @@ function assertAzgaarDocument(document) {
   const cells = document?.grid?.cells;
   const cellsX = document?.grid?.cellsX;
   const cellsY = document?.grid?.cellsY;
+  const expectedCellCount = cellsX * cellsY;
   if (!Array.isArray(cells) || cells.length === 0
       || !Number.isInteger(cellsX) || cellsX < 1
       || !Number.isInteger(cellsY) || cellsY < 1
-      || !Number.isSafeInteger(cellsX * cellsY)) {
+      || !Number.isSafeInteger(expectedCellCount)) {
     throw new Error('Azgaar Full JSON must include non-empty grid cells and positive grid dimensions.');
+  }
+  if (cells.length !== expectedCellCount) {
+    throw new Error('Azgaar Full JSON grid dimensions must match its cell count.');
   }
 
   const ids = new Set();
@@ -95,8 +109,14 @@ function assertAzgaarDocument(document) {
     }
     ids.add(cell.i);
   }
-  assertPackedCells(document, ids);
-  assertRivers(document);
+  for (let cellId = 0; cellId < expectedCellCount; cellId += 1) {
+    if (!ids.has(cellId)) {
+      throw new Error(`Azgaar Full JSON grid is missing row-major cell id ${cellId}.`);
+    }
+  }
+
+  const packedCellIds = assertPackedCells(document, ids);
+  assertRivers(document, packedCellIds);
 }
 
 function cloneCampaignArray(value) {
