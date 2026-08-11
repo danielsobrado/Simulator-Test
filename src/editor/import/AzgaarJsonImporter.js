@@ -123,6 +123,28 @@ function assertAzgaarDocument(document) {
   assertRivers(document, packedCellIds);
 }
 
+function normalizeBiomeSource(document) {
+  if (Array.isArray(document.pack?.biomes)
+      && document.pack.biomes.length === 0
+      && document.biomesData !== undefined) {
+    return {
+      ...document,
+      pack: { ...document.pack, biomes: undefined },
+    };
+  }
+  return document;
+}
+
+function assertSafeWorldBounds(summary, config) {
+  const tileSize = Number(config.map?.tileSize);
+  const widthCells = Math.round(summary.physicalWidthMeters / tileSize);
+  const heightCells = Math.round(summary.physicalHeightMeters / tileSize);
+  if (!Number.isSafeInteger(widthCells) || widthCells < 1
+      || !Number.isSafeInteger(heightCells) || heightCells < 1) {
+    throw new Error('Azgaar imported world dimensions exceed safe streamed-world coordinates.');
+  }
+}
+
 function cloneCampaignArray(value) {
   return Array.isArray(value) ? structuredClone(value) : [];
 }
@@ -175,9 +197,11 @@ export function isAzgaarFullJson(document) {
 
 export function importAzgaarFullJson(document, config, options = {}) {
   assertAzgaarDocument(document);
+  const sourceDocument = normalizeBiomeSource(document);
   const chunkSize = config.world.chunkSize;
-  const summary = buildAzgaarImportSummary(document, config, options);
-  const baseTerrain = createAzgaarMacroWorldSource(document, config, options);
+  const summary = buildAzgaarImportSummary(sourceDocument, config, options);
+  assertSafeWorldBounds(summary, config);
+  const baseTerrain = createAzgaarMacroWorldSource(sourceDocument, config, options);
   const cartography = Array.isArray(document.pack?.vertices)
     ? createAzgaarCartographySource(document)
     : null;
