@@ -38,3 +38,37 @@ detailRuggednessWeight: 0.35
 detailValleyPenalty: 0.25
 detailMinimumScale: 0.45
 detailMaximumScale: 1.5
+customBiomeForestKeywords:
+  - forest
+  - rainforest
+  - woodland
+  - jungle
+  - taiga
+customBiomeSwampKeywords:
+  - wetland
+  - swamp
+  - marsh
+  - mangrove
+  - bog
+customBiomeDesertKeywords:
+  - desert
+  - dunes
+  - badlands
+customBiomeSnowKeywords:
+  - tundra
+  - glacier
+  - snow
+  - icefield
+  - polar
+customBiomeWaterKeywords:
+  - marine
+  - ocean
+  - sea
+  - lake
+customBiomeTreeIconKeywords:
+  - deciduous
+  - conifer
+  - acacia
+  - palm
+  - swamp
+  - tree
