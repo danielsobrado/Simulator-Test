@@ -149,6 +149,64 @@ function biomeForestAffinity(biomes) {
   return result;
 }
 
+function resolveTuning(config, metersPerAtlasPixel) {
+  const temperatureMin = requireFinite(config, 'temperatureNormalizationMinC');
+  const temperatureMax = requireFinite(config, 'temperatureNormalizationMaxC');
+  const mountainReliefStart = requireFinite(config, 'mountainReliefStart');
+  const mountainReliefEnd = requireFinite(config, 'mountainReliefEnd');
+  if (temperatureMax <= temperatureMin) {
+    throw new Error('Azgaar guidance temperature normalization range is invalid.');
+  }
+  if (mountainReliefEnd <= mountainReliefStart) {
+    throw new Error('Azgaar guidance mountain relief range is invalid.');
+  }
+  return Object.freeze({
+    coastInfluencePixels: pixelRadius(
+      requirePositive(config, 'coastInfluenceKilometers'),
+      metersPerAtlasPixel,
+    ),
+    riverInfluencePixels: pixelRadius(
+      requirePositive(config, 'riverInfluenceKilometers'),
+      metersPerAtlasPixel,
+    ),
+    ruggednessOffset: pixelRadius(
+      requirePositive(config, 'ruggednessSampleKilometers'),
+      metersPerAtlasPixel,
+    ),
+    ruggednessElevationDelta: requirePositive(config, 'ruggednessElevationDelta'),
+    valleyElevationDelta: requirePositive(config, 'valleyElevationDelta'),
+    valleyRuggednessSuppression: requireFinite(config, 'valleyRuggednessSuppression'),
+    precipitationScale: requirePositive(config, 'precipitationNormalization'),
+    temperatureMin,
+    temperatureRange: temperatureMax - temperatureMin,
+    mountainReliefStart,
+    mountainReliefEnd,
+    mountainReliefWeight: requireFinite(config, 'mountainReliefWeight'),
+    mountainRuggednessWeight: requireFinite(config, 'mountainRuggednessWeight'),
+    snowTemperatureWeight: requireFinite(config, 'snowTemperatureWeight'),
+    snowReliefWeight: requireFinite(config, 'snowReliefWeight'),
+    snowBias: requireFinite(config, 'snowBias'),
+    temperateCenter: requireFinite(config, 'temperateCenter'),
+    temperateRange: requirePositive(config, 'temperateRange'),
+    forestMoistureWeight: requireFinite(config, 'forestMoistureWeight'),
+    forestTemperatureWeight: requireFinite(config, 'forestTemperatureWeight'),
+    forestBiomeWeight: requireFinite(config, 'forestBiomeWeight'),
+    forestSnowPenalty: requireFinite(config, 'forestSnowPenalty'),
+    agricultureMoistureCenter: requireFinite(config, 'agricultureMoistureCenter'),
+    agricultureMoistureRange: requirePositive(config, 'agricultureMoistureRange'),
+    agricultureMoistureWeight: requireFinite(config, 'agricultureMoistureWeight'),
+    agricultureTemperatureWeight: requireFinite(config, 'agricultureTemperatureWeight'),
+    agricultureFlatnessWeight: requireFinite(config, 'agricultureFlatnessWeight'),
+    agricultureLowlandWeight: requireFinite(config, 'agricultureLowlandWeight'),
+    agricultureSettlementWeight: requireFinite(config, 'agricultureSettlementWeight'),
+    wetnessMoistureWeight: requireFinite(config, 'wetnessMoistureWeight'),
+    wetnessRiverWeight: requireFinite(config, 'wetnessRiverWeight'),
+    wetnessCoastWeight: requireFinite(config, 'wetnessCoastWeight'),
+    wetnessReliefPenalty: requireFinite(config, 'wetnessReliefPenalty'),
+    harborScoreNormalization: requirePositive(config, 'harborScoreNormalization'),
+  });
+}
+
 export function deriveAzgaarWorldGuidance({
   raw,
   rivers,
@@ -162,25 +220,7 @@ export function deriveAzgaarWorldGuidance({
     throw new Error('Azgaar guidance requires a positive physical world width.');
   }
   const metersPerAtlasPixel = physicalWidthMeters / width;
-  const coastInfluencePixels = pixelRadius(
-    requirePositive(config, 'coastInfluenceKilometers'),
-    metersPerAtlasPixel,
-  );
-  const riverInfluencePixels = pixelRadius(
-    requirePositive(config, 'riverInfluenceKilometers'),
-    metersPerAtlasPixel,
-  );
-  const ruggednessOffset = pixelRadius(
-    requirePositive(config, 'ruggednessSampleKilometers'),
-    metersPerAtlasPixel,
-  );
-  const precipitationScale = requirePositive(config, 'precipitationNormalization');
-  const temperatureMin = requireFinite(config, 'temperatureNormalizationMinC');
-  const temperatureMax = requireFinite(config, 'temperatureNormalizationMaxC');
-  if (temperatureMax <= temperatureMin) {
-    throw new Error('Azgaar guidance temperature normalization range is invalid.');
-  }
-
+  const tuning = resolveTuning(config, metersPerAtlasPixel);
   const coastDistance = createCoastDistances(raw.elevation, width, height);
   const riverDistance = createRiverDistances(raw.riverId, rivers, width, height);
   const length = width * height;
@@ -203,108 +243,102 @@ export function deriveAzgaarWorldGuidance({
       const land = elevation >= LAND_HEIGHT;
       const relief = land ? clamp((elevation - LAND_HEIGHT) / (100 - LAND_HEIGHT), 0, 1) : 0;
       const temperature = clamp(
-        (raw.temperature[index] - temperatureMin) / (temperatureMax - temperatureMin),
+        (raw.temperature[index] - tuning.temperatureMin) / tuning.temperatureRange,
         0,
         1,
       );
-      const localMoisture = clamp(raw.precipitation[index] / precipitationScale, 0, 1);
-      const coast = land ? clamp(coastDistance[index] / coastInfluencePixels, 0, 1) : 0;
+      const localMoisture = clamp(raw.precipitation[index] / tuning.precipitationScale, 0, 1);
+      const coast = land
+        ? clamp(coastDistance[index] / tuning.coastInfluencePixels, 0, 1)
+        : 0;
       const river = riverDistance[index] === NO_DISTANCE
         ? 0
-        : 1 - clamp(riverDistance[index] / riverInfluencePixels, 0, 1);
+        : 1 - clamp(riverDistance[index] / tuning.riverInfluencePixels, 0, 1);
       const left = terrainNeighborElevation(
         raw.elevation,
-        indexAt(x - ruggednessOffset, y, width, height),
+        indexAt(x - tuning.ruggednessOffset, y, width, height),
         elevation,
         land,
       );
       const right = terrainNeighborElevation(
         raw.elevation,
-        indexAt(x + ruggednessOffset, y, width, height),
+        indexAt(x + tuning.ruggednessOffset, y, width, height),
         elevation,
         land,
       );
       const north = terrainNeighborElevation(
         raw.elevation,
-        indexAt(x, y - ruggednessOffset, width, height),
+        indexAt(x, y - tuning.ruggednessOffset, width, height),
         elevation,
         land,
       );
       const south = terrainNeighborElevation(
         raw.elevation,
-        indexAt(x, y + ruggednessOffset, width, height),
+        indexAt(x, y + tuning.ruggednessOffset, width, height),
         elevation,
         land,
       );
       const localRuggedness = land
         ? clamp(
           Math.max(Math.abs(right - left), Math.abs(south - north))
-            / requirePositive(config, 'ruggednessElevationDelta'),
+            / tuning.ruggednessElevationDelta,
           0,
           1,
         )
         : 0;
       const surrounding = (left + right + north + south) / 4;
       const localValleyness = land
-        ? clamp(
-          (surrounding - elevation) / requirePositive(config, 'valleyElevationDelta'),
-          0,
-          1,
-        ) * (1 - localRuggedness * requireFinite(config, 'valleyRuggednessSuppression'))
+        ? clamp((surrounding - elevation) / tuning.valleyElevationDelta, 0, 1)
+          * (1 - localRuggedness * tuning.valleyRuggednessSuppression)
         : 0;
       const mountain = land
         ? clamp(
-          smoothstep(
-            requireFinite(config, 'mountainReliefStart'),
-            requireFinite(config, 'mountainReliefEnd'),
-            relief,
-          ) * requireFinite(config, 'mountainReliefWeight')
-            + localRuggedness * requireFinite(config, 'mountainRuggednessWeight'),
+          smoothstep(tuning.mountainReliefStart, tuning.mountainReliefEnd, relief)
+            * tuning.mountainReliefWeight
+            + localRuggedness * tuning.mountainRuggednessWeight,
           0,
           1,
         )
         : 0;
       const snow = land
         ? clamp(
-          (1 - temperature) * requireFinite(config, 'snowTemperatureWeight')
-            + relief * requireFinite(config, 'snowReliefWeight')
-            - requireFinite(config, 'snowBias'),
+          (1 - temperature) * tuning.snowTemperatureWeight
+            + relief * tuning.snowReliefWeight
+            - tuning.snowBias,
           0,
           1,
         )
         : 0;
-      const temperateCenter = requireFinite(config, 'temperateCenter');
       const temperate = 1 - clamp(
-        Math.abs(temperature - temperateCenter) / requirePositive(config, 'temperateRange'),
+        Math.abs(temperature - tuning.temperateCenter) / tuning.temperateRange,
         0,
         1,
       );
       const forestBiome = forestAffinity.get(raw.biomeId[index]) ?? 0;
       const forest = land
         ? clamp(
-          localMoisture * requireFinite(config, 'forestMoistureWeight')
-            + temperate * requireFinite(config, 'forestTemperatureWeight')
-            + forestBiome * requireFinite(config, 'forestBiomeWeight')
-            - snow * requireFinite(config, 'forestSnowPenalty'),
+          localMoisture * tuning.forestMoistureWeight
+            + temperate * tuning.forestTemperatureWeight
+            + forestBiome * tuning.forestBiomeWeight
+            - snow * tuning.forestSnowPenalty,
           0,
           1,
         )
         : 0;
-      const moistureCenter = requireFinite(config, 'agricultureMoistureCenter');
       const moistureBalance = 1 - clamp(
-        Math.abs(localMoisture - moistureCenter)
-          / requirePositive(config, 'agricultureMoistureRange'),
+        Math.abs(localMoisture - tuning.agricultureMoistureCenter)
+          / tuning.agricultureMoistureRange,
         0,
         1,
       );
       const settlement = clamp(raw.settlementScore[index] / 0xffff, 0, 1);
       const agriculture = land
         ? clamp(
-          moistureBalance * requireFinite(config, 'agricultureMoistureWeight')
-            + temperate * requireFinite(config, 'agricultureTemperatureWeight')
-            + (1 - localRuggedness) * requireFinite(config, 'agricultureFlatnessWeight')
-            + (1 - mountain) * requireFinite(config, 'agricultureLowlandWeight')
-            + settlement * requireFinite(config, 'agricultureSettlementWeight'),
+          moistureBalance * tuning.agricultureMoistureWeight
+            + temperate * tuning.agricultureTemperatureWeight
+            + (1 - localRuggedness) * tuning.agricultureFlatnessWeight
+            + (1 - mountain) * tuning.agricultureLowlandWeight
+            + settlement * tuning.agricultureSettlementWeight,
           0,
           1,
         )
@@ -313,10 +347,10 @@ export function deriveAzgaarWorldGuidance({
       moisture[index] = byte(localMoisture);
       continentalness[index] = byte(coast);
       wetness[index] = byte(land
-        ? localMoisture * requireFinite(config, 'wetnessMoistureWeight')
-          + river * requireFinite(config, 'wetnessRiverWeight')
-          + (1 - coast) * requireFinite(config, 'wetnessCoastWeight')
-          - relief * requireFinite(config, 'wetnessReliefPenalty')
+        ? localMoisture * tuning.wetnessMoistureWeight
+          + river * tuning.wetnessRiverWeight
+          + (1 - coast) * tuning.wetnessCoastWeight
+          - relief * tuning.wetnessReliefPenalty
         : 1);
       ruggedness[index] = byte(localRuggedness);
       valleyness[index] = byte(localValleyness);
@@ -325,7 +359,7 @@ export function deriveAzgaarWorldGuidance({
       forestPotential[index] = byte(forest);
       agriculturalPotential[index] = byte(agriculture);
       harborPotential[index] = raw.harborScore[index] > 0
-        ? byte(raw.harborScore[index] / requirePositive(config, 'harborScoreNormalization'))
+        ? byte(raw.harborScore[index] / tuning.harborScoreNormalization)
         : 0;
     }
   }
