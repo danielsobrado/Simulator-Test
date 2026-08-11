@@ -97,6 +97,28 @@ export const AZGAAR_STANDARD_BIOMES = Object.freeze(
   })),
 );
 
+function normalizeBiomeMetadata(source) {
+  if (!Array.isArray(source)) return source ?? {};
+  const result = {
+    name: [],
+    color: [],
+    habitability: [],
+    cost: [],
+    iconsDensity: [],
+    icons: [],
+  };
+  for (const biome of source) {
+    if (!Number.isInteger(biome?.i) || biome.i < 0) continue;
+    result.name[biome.i] = biome.name;
+    result.color[biome.i] = biome.color;
+    result.habitability[biome.i] = biome.habitability;
+    result.cost[biome.i] = biome.cost;
+    result.iconsDensity[biome.i] = biome.iconsDensity;
+    result.icons[biome.i] = biome.icons;
+  }
+  return result;
+}
+
 function customSourceIds(biomesData, observedSourceIds) {
   const ids = new Set();
   const names = Array.isArray(biomesData?.name) ? biomesData.name : [];
@@ -159,10 +181,11 @@ function inferCustomSemantics(name, reliefIcons, config) {
 }
 
 export function createAzgaarBiomeDefinitions(
-  biomesData = {},
+  sourceBiomeMetadata = {},
   observedSourceIds = [],
   semanticConfig = null,
 ) {
+  const biomesData = normalizeBiomeMetadata(sourceBiomeMetadata);
   const names = Array.isArray(biomesData?.name) ? biomesData.name : [];
   const colors = Array.isArray(biomesData?.color) ? biomesData.color : [];
   const habitability = Array.isArray(biomesData?.habitability) ? biomesData.habitability : [];
