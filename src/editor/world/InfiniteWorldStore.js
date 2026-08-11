@@ -16,6 +16,7 @@ import {
 
 const VALID_SCULPT_OPERATIONS = new Set(['raise', 'lower', 'smooth']);
 const VALID_SCULPT_SHAPES = new Set(['sphere', 'cube']);
+const MAX_TILE_ID = 255;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -288,7 +289,7 @@ export class InfiniteWorldStore {
   }
 
   setTile(cellX, cellZ, tileId, { silent = false } = {}) {
-    if (!Number.isInteger(tileId) || tileId < 0 || tileId > 255) {
+    if (!Number.isInteger(tileId) || tileId < 0 || tileId > MAX_TILE_ID) {
       throw new Error('Tile id must be an unsigned byte integer.');
     }
     const key = cellKey(cellX, cellZ);
@@ -628,30 +629,54 @@ export class InfiniteWorldStore {
     if (!Array.isArray(document.chunks)) {
       throw new Error('Infinite world chunks must be an array.');
     }
-    this.setBaseTerrain(document.world?.baseTerrain ?? null);
+
     const tileOverrides = new Map();
     const heightOverrides = new Map();
     for (const chunk of document.chunks) {
       if (!Number.isSafeInteger(chunk?.x) || !Number.isSafeInteger(chunk?.z)) {
         throw new Error('Infinite world chunk coordinates must be safe integers.');
       }
-      for (const [index, value] of chunk.tiles ?? []) {
+      const tileEntries = chunk.tiles ?? [];
+      const heightEntries = chunk.heights ?? [];
+      if (!Array.isArray(tileEntries) || !Array.isArray(heightEntries)) {
+        throw new Error('Infinite world chunk overrides must be arrays.');
+      }
+      for (const entry of tileEntries) {
+        if (!Array.isArray(entry) || entry.length < 2) {
+          throw new Error('Infinite world tile override must be an [index, value] pair.');
+        }
+        const [index, value] = entry;
         if (!Number.isInteger(index) || index < 0 || index >= this.chunkSize ** 2) {
           throw new Error('Infinite world tile override index is invalid.');
         }
+        if (!Number.isInteger(value) || value < 0 || value > MAX_TILE_ID) {
+          throw new Error('Infinite world tile override value must be an unsigned byte.');
+        }
         const localX = index % this.chunkSize;
         const localZ = Math.floor(index / this.chunkSize);
-        tileOverrides.set(cellKey(chunk.x * this.chunkSize + localX, chunk.z * this.chunkSize + localZ), value);
+        tileOverrides.set(
+          cellKey(chunk.x * this.chunkSize + localX, chunk.z * this.chunkSize + localZ),
+          value,
+        );
       }
-      for (const [index, value] of chunk.heights ?? []) {
+      for (const entry of heightEntries) {
+        if (!Array.isArray(entry) || entry.length < 2) {
+          throw new Error('Infinite world height override must be an [index, value] pair.');
+        }
+        const [index, value] = entry;
         if (!Number.isInteger(index) || index < 0 || index >= this.vertexSize ** 2 || !Number.isFinite(value)) {
           throw new Error('Infinite world height override is invalid.');
         }
         const localX = index % this.vertexSize;
         const localZ = Math.floor(index / this.vertexSize);
-        heightOverrides.set(cellKey(chunk.x * this.chunkSize + localX, chunk.z * this.chunkSize + localZ), value);
+        heightOverrides.set(
+          cellKey(chunk.x * this.chunkSize + localX, chunk.z * this.chunkSize + localZ),
+          value,
+        );
       }
     }
+
+    this.setBaseTerrain(document.world?.baseTerrain ?? null);
     this.tileOverrides = tileOverrides;
     this.heightOverrides = heightOverrides;
     this.forestEdits = structuredClone(
