@@ -1,7 +1,12 @@
 const CONTENT_RETRY_DELAY_MS = 30_000;
+const CONTENT_REQUEST_TIMEOUT_MS = 8_000;
 
 function contentKey(worldId, chunkX, chunkZ) {
   return `${worldId}:${chunkX}:${chunkZ}`;
+}
+
+function timeoutError(timeoutMs) {
+  return new Error(`World content request timed out after ${timeoutMs} ms.`);
 }
 
 export class MemoryWorldContentProvider {
@@ -123,9 +128,16 @@ export class IndexedDbWorldContentProvider {
 }
 
 export class UrlWorldContentProvider {
-  constructor({ baseUrl, fetchImpl = null } = {}) {
+  constructor({
+    baseUrl,
+    fetchImpl = null,
+    requestTimeoutMs = CONTENT_REQUEST_TIMEOUT_MS,
+  } = {}) {
     if (typeof baseUrl !== 'string' || !baseUrl.trim()) {
       throw new Error('World content URL provider requires a base URL.');
+    }
+    if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
+      throw new Error('World content request timeout must be a positive number.');
     }
     // Bound to the global: called as `this.fetchImpl(...)`, an unbound `fetch`
     // would get this provider as its receiver and throw "Illegal invocation".
@@ -135,16 +147,50 @@ export class UrlWorldContentProvider {
     }
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.fetchImpl = resolved;
+    this.requestTimeoutMs = requestTimeoutMs;
+    this.controllers = new Set();
+    this.disposed = false;
   }
 
   async getChunk(worldId, chunkX, chunkZ) {
-    const url = `${this.baseUrl}/${encodeURIComponent(worldId)}/chunks/${chunkX}/${chunkZ}.json`;
-    const response = await this.fetchImpl(url);
-    if (response.status === 404) return null;
-    if (!response.ok) {
-      throw new Error(`World content request failed with status ${response.status}.`);
+    if (this.disposed) {
+      throw new Error('World content URL provider is disposed.');
     }
-    return response.json();
+    const url = `${this.baseUrl}/${encodeURIComponent(worldId)}/chunks/${chunkX}/${chunkZ}.json`;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    if (controller) this.controllers.add(controller);
+    let timeoutId = null;
+
+    try {
+      const fetchPromise = Promise.resolve().then(() => this.fetchImpl(
+        url,
+        controller ? { signal: controller.signal } : undefined,
+      ));
+      const response = await Promise.race([
+        fetchPromise,
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            controller?.abort();
+            reject(timeoutError(this.requestTimeoutMs));
+          }, this.requestTimeoutMs);
+        }),
+      ]);
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        throw new Error(`World content request failed with status ${response.status}.`);
+      }
+      return response.json();
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      if (controller) this.controllers.delete(controller);
+    }
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const controller of this.controllers) controller.abort();
+    this.controllers.clear();
   }
 }
 
@@ -233,3 +279,5 @@ export class LocalFirstWorldContentProvider {
     this.remote?.dispose?.();
   }
 }
+
+export const WORLD_CONTENT_DEFAULT_REQUEST_TIMEOUT_MS = CONTENT_REQUEST_TIMEOUT_MS;
