@@ -203,7 +203,6 @@ function resolveTuning(config, metersPerAtlasPixel) {
     wetnessRiverWeight: requireFinite(config, 'wetnessRiverWeight'),
     wetnessCoastWeight: requireFinite(config, 'wetnessCoastWeight'),
     wetnessReliefPenalty: requireFinite(config, 'wetnessReliefPenalty'),
-    harborScoreNormalization: requirePositive(config, 'harborScoreNormalization'),
   });
 }
 
@@ -331,7 +330,7 @@ export function deriveAzgaarWorldGuidance({
         0,
         1,
       );
-      const settlement = clamp(raw.settlementScore[index] / 0xffff, 0, 1);
+      const settlement = clamp(raw.settlementScore[index] / 100, 0, 1);
       const agriculture = land
         ? clamp(
           moistureBalance * tuning.agricultureMoistureWeight
@@ -359,7 +358,7 @@ export function deriveAzgaarWorldGuidance({
       forestPotential[index] = byte(forest);
       agriculturalPotential[index] = byte(agriculture);
       harborPotential[index] = raw.harborScore[index] > 0
-        ? byte(raw.harborScore[index] / tuning.harborScoreNormalization)
+        ? byte(1 / raw.harborScore[index])
         : 0;
     }
   }
