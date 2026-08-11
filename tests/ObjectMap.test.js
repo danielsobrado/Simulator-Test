@@ -29,6 +29,37 @@ test('rotating an object swaps a non-square footprint', () => {
   assert.deepEqual(objectMap.getFootprint('house', 1), { width: 3, depth: 2 });
 });
 
+test('object rotations remain integer quarter-turns', () => {
+  const { objectMap } = createMaps();
+  assert.equal(
+    objectMap.place({ definitionKey: 'tree', x: 1, z: 1, rotation: -1 }).rotation,
+    3,
+  );
+  for (const rotation of [0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(
+      () => objectMap.place({ definitionKey: 'tree', x: 6, z: 6, rotation }),
+      /integer quarter-turn/,
+    );
+  }
+});
+
+test('malformed object rotations roll back document replacement', () => {
+  const { objectMap } = createMaps();
+  const original = objectMap.place({ definitionKey: 'tree', x: 2, z: 2, rotation: 0 });
+
+  assert.throws(
+    () => objectMap.loadDocument([{
+      id: 99,
+      definitionKey: 'tree',
+      x: 5,
+      z: 5,
+      rotation: 0.5,
+    }]),
+    /integer quarter-turn/,
+  );
+  assert.deepEqual(objectMap.toDocument(), [original]);
+});
+
 test('placement rejects occupied and unsupported terrain cells', () => {
   const { tileMap, objectMap } = createMaps();
   const house = objectMap.place({ definitionKey: 'house', x: 3, z: 3, rotation: 0 });
