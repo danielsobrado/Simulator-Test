@@ -1,11 +1,20 @@
-import { decodeMacroAtlas } from '../import/AzgaarMacroWorldSource.js';
+import {
+  decodeGuidanceField,
+  hasGuidanceField,
+} from '../import/AzgaarMacroWorldSource.js';
 import { WorldGuidanceField } from './WorldGuidanceField.js';
 
 const WATER_TILE_ID = 0;
 const LAND_HEIGHT = 20;
-// Fraction of the vertical exaggeration that also drives high-frequency
-// ruggedness. Keeps peaks jagged without turning them into unwalkable spikes.
 const MOUNTAIN_RUGGEDNESS = 0.25;
+const LEGACY_DETAIL_GUIDANCE = Object.freeze({
+  baseScale: 0.75,
+  mountainWeight: 0.35,
+  ruggednessWeight: 0.35,
+  valleyPenalty: 0.25,
+  minimumScale: 0.45,
+  maximumScale: 1.5,
+});
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -131,13 +140,17 @@ function validateBiomeDefinitions(definitions) {
 
 export class AzgaarMacroWorldGenerator {
   constructor(source, proceduralMetadata) {
-    const decoded = decodeMacroAtlas(source);
     validateBiomeDefinitions(source.biomes);
     this.source = source;
-    this.heights = decoded.heights;
-    this.biomeAtlas = decoded.biomes;
-    this.features = decoded.features;
+    this.heights = decodeGuidanceField(source, 'elevation');
+    this.biomeAtlas = decodeGuidanceField(source, 'biomeId');
+    this.features = decodeGuidanceField(source, 'featureId');
+    if (!this.heights || !this.biomeAtlas || !this.features) {
+      throw new Error('Azgaar macro source is missing canonical terrain fields.');
+    }
     this.guidance = null;
+    this.hasMorphologyGuidance = ['mountainness', 'ruggedness', 'valleyness']
+      .every((name) => hasGuidanceField(source, name));
     this.biomeBySourceId = new Map(
       source.biomes.map((definition) => [definition.sourceId, definition]),
     );
@@ -171,6 +184,17 @@ export class AzgaarMacroWorldGenerator {
     );
   }
 
+  ensureGuidance() {
+    this.guidance ??= new WorldGuidanceField(this.source, {
+      fields: {
+        elevation: this.heights,
+        biomeId: this.biomeAtlas,
+        featureId: this.features,
+      },
+    });
+    return this.guidance;
+  }
+
   toMetadata() {
     return Object.freeze({
       seed: this.seed,
@@ -189,13 +213,11 @@ export class AzgaarMacroWorldGenerator {
   }
 
   sampleGuidance(cellX, cellZ) {
-    this.guidance ??= new WorldGuidanceField(this.source);
-    return this.guidance.sample(cellX, cellZ);
+    return this.ensureGuidance().sample(cellX, cellZ);
   }
 
   sampleBiomeBlend(cellX, cellZ) {
-    this.guidance ??= new WorldGuidanceField(this.source);
-    return this.guidance.sampleBiomeBlend(cellX, cellZ);
+    return this.ensureGuidance().sampleBiomeBlend(cellX, cellZ);
   }
 
   getSurfaceMaskConfig(maskConfig) {
@@ -263,6 +285,23 @@ export class AzgaarMacroWorldGenerator {
     );
   }
 
+  morphologyScale(vertexX, vertexZ) {
+    if (!this.hasMorphologyGuidance) return 1;
+    const guidance = this.ensureGuidance();
+    const mountainness = guidance.sampleContinuous('mountainness', vertexX - 0.5, vertexZ - 0.5) ?? 0;
+    const ruggedness = guidance.sampleContinuous('ruggedness', vertexX - 0.5, vertexZ - 0.5) ?? 0;
+    const valleyness = guidance.sampleContinuous('valleyness', vertexX - 0.5, vertexZ - 0.5) ?? 0;
+    const tuning = this.source.terrain.guidanceDetail ?? LEGACY_DETAIL_GUIDANCE;
+    return clamp(
+      tuning.baseScale
+        + mountainness * tuning.mountainWeight
+        + ruggedness * tuning.ruggednessWeight
+        - valleyness * tuning.valleyPenalty,
+      tuning.minimumScale,
+      tuning.maximumScale,
+    );
+  }
+
   sampleHeight(vertexX, vertexZ) {
     const rawHeight = this.sampleRawHeight(vertexX, vertexZ);
     const base = convertHeight(rawHeight, this.source.terrain);
@@ -274,9 +313,6 @@ export class AzgaarMacroWorldGenerator {
     }
     if (rawHeight < LAND_HEIGHT) return base;
     const coastFade = clamp((rawHeight - LAND_HEIGHT) / 10, 0, 1);
-    // Rugged high country: extra relief grows with elevation and exaggeration
-    // so peaks stay jagged while plains stay smooth. ruggedness === 1 when
-    // verticalExaggeration === 1, keeping unscaled imports bit-identical.
     const exaggeration = this.source.terrain.verticalExaggeration ?? 1;
     const elevationFraction = landReliefFraction(rawHeight, this.source.terrain);
     const ruggedness = 1 + (exaggeration - 1) * elevationFraction * MOUNTAIN_RUGGEDNESS;
@@ -284,11 +320,9 @@ export class AzgaarMacroWorldGenerator {
       valueNoise(vertexX / 96, vertexZ / 96, this.seed + 1709) * 1.4
       + valueNoise(vertexX / 24, vertexZ / 24, this.seed + 1877) * 0.35
     );
-    return base + detail * coastFade * ruggedness;
+    return base + detail * coastFade * ruggedness * this.morphologyScale(vertexX, vertexZ);
   }
 
-  // Coarse macro sample (base height without the high-frequency detail noise,
-  // plus the biome tile) for distant-terrain backdrops and overview rendering.
   sampleMacroColumn(cellX, cellZ) {
     const rawHeight = this.sampleRawHeight(cellX, cellZ);
     let height = convertHeight(rawHeight, this.source.terrain);
