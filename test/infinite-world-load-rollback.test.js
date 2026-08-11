@@ -85,3 +85,20 @@ test('late load failure restores the previous base terrain and generator', () =>
   assert.equal(store.getHeight(0, 0), heightBefore);
   assert.equal(store.revision, revisionBefore);
 });
+
+test('internal reset snapshots retain base terrain by reference while public snapshots clone it', () => {
+  const store = createStore();
+  store.setBaseTerrain(createBaseTerrain('large-source', 40));
+  const internalBaseTerrain = store.baseTerrain;
+
+  const publicSnapshot = store.createSnapshot();
+  assert.notEqual(publicSnapshot.baseTerrain, internalBaseTerrain);
+
+  store.setTile(0, 0, 3);
+  const resetSnapshot = store.clearOverrides();
+  assert.equal(resetSnapshot.baseTerrain, internalBaseTerrain);
+
+  store.restoreSnapshot(resetSnapshot);
+  assert.equal(store.baseTerrain.source.mapName, 'large-source');
+  assert.equal(store.getTile(0, 0), 3);
+});
