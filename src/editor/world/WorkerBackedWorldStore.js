@@ -281,7 +281,22 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
 
   loadDocument(document) {
     this.pendingChunks.clear();
-    super.loadDocument(document);
+    const previousBaseTerrain = this.baseTerrain;
+    try {
+      super.loadDocument(document);
+    } catch (error) {
+      if (this.baseTerrain !== previousBaseTerrain) {
+        try {
+          this.setBaseTerrain(previousBaseTerrain);
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'World load failed and the previous base terrain could not be restored.',
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   dispose() {
