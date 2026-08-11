@@ -162,12 +162,19 @@ export class UrlWorldContentProvider {
     let timeoutId = null;
 
     try {
-      const fetchPromise = Promise.resolve().then(() => this.fetchImpl(
-        url,
-        controller ? { signal: controller.signal } : undefined,
-      ));
-      const response = await Promise.race([
-        fetchPromise,
+      const requestPromise = Promise.resolve().then(async () => {
+        const response = await this.fetchImpl(
+          url,
+          controller ? { signal: controller.signal } : undefined,
+        );
+        if (response.status === 404) return null;
+        if (!response.ok) {
+          throw new Error(`World content request failed with status ${response.status}.`);
+        }
+        return response.json();
+      });
+      return await Promise.race([
+        requestPromise,
         new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
             controller?.abort();
@@ -175,11 +182,6 @@ export class UrlWorldContentProvider {
           }, this.requestTimeoutMs);
         }),
       ]);
-      if (response.status === 404) return null;
-      if (!response.ok) {
-        throw new Error(`World content request failed with status ${response.status}.`);
-      }
-      return response.json();
     } finally {
       if (timeoutId !== null) clearTimeout(timeoutId);
       if (controller) this.controllers.delete(controller);
