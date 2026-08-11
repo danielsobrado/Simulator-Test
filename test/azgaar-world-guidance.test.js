@@ -106,7 +106,7 @@ function createFlatRaw(width, height) {
     temperature: new Int8Array(length).fill(10),
     precipitation: new Uint8Array(length).fill(50),
     biomeId: new Uint8Array(length).fill(4),
-    riverId: new Uint32Array(length),
+    riverId: new Uint16Array(length),
     settlementScore: new Int16Array(length),
     harborScore: new Uint8Array(length),
   };
@@ -185,7 +185,7 @@ test('macro sampling preserves multiple packed cells inside one Azgaar grid cell
   const fields = decodeMacroAtlas(source, { includeGuidance: true }).fields;
   assert.deepEqual(fields.elevation, Uint8Array.from([30, 30, 80, 80]));
   assert.deepEqual(fields.biomeId, Uint8Array.from([4, 4, 6, 6]));
-  assert.deepEqual(fields.riverId, Uint32Array.from([0, 0, 9, 9]));
+  assert.deepEqual(fields.riverId, Uint16Array.from([0, 0, 9, 9]));
 });
 
 test('macro atlas validation rejects corrupt optional fields before decoding', () => {
@@ -207,7 +207,7 @@ test('macro source detection preserves v1 and v2 runtime support', () => {
   assert.equal(isAzgaarMacroWorldSource({ kind: 'azgaar-macro-v1', version: 2 }), false);
 });
 
-test('compatible v2 feature and settlement encodings remain readable', () => {
+test('compatible v2 field encodings remain readable', () => {
   const source = createAzgaarMacroWorldSource(createDocument(), config);
   const decoded = decodeMacroAtlas(source, { includeGuidance: true }).fields;
   const compatibleSource = structuredClone(source);
@@ -215,12 +215,27 @@ test('compatible v2 feature and settlement encodings remain readable', () => {
     Uint16Array.from(decoded.featureId),
     'u16',
   );
+  compatibleSource.atlas.fields.riverId = encodeMacroField(
+    Uint32Array.from(decoded.riverId),
+    'u32',
+  );
+  compatibleSource.atlas.fields.riverFlux = encodeMacroField(
+    Uint32Array.from(decoded.riverFlux),
+    'u32',
+  );
+  compatibleSource.atlas.fields.confluenceFlux = encodeMacroField(
+    Uint32Array.from(decoded.confluenceFlux),
+    'u32',
+  );
   compatibleSource.atlas.fields.settlementScore = encodeMacroField(
     Uint16Array.from(decoded.settlementScore),
     'u16',
   );
   const compatible = decodeMacroAtlas(compatibleSource, { includeGuidance: true }).fields;
   assert.deepEqual(compatible.featureId, Uint16Array.from(decoded.featureId));
+  assert.deepEqual(compatible.riverId, Uint32Array.from(decoded.riverId));
+  assert.deepEqual(compatible.riverFlux, Uint32Array.from(decoded.riverFlux));
+  assert.deepEqual(compatible.confluenceFlux, Uint32Array.from(decoded.confluenceFlux));
   assert.deepEqual(compatible.settlementScore, Uint16Array.from(decoded.settlementScore));
 });
 
