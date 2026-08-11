@@ -35,14 +35,17 @@ function createBaseTerrain(mapName, height) {
   };
 }
 
-test('failed infinite-world load restores the previous base terrain and generator', () => {
-  const store = new InfiniteWorldStore({
+function createStore(Store = InfiniteWorldStore) {
+  return new Store({
     chunkSize: 2,
     tileSize: 2,
     generator: new ProceduralWorldGenerator(),
   });
+}
+
+test('invalid tile values are rejected before replacing base terrain', () => {
+  const store = createStore();
   store.setBaseTerrain(createBaseTerrain('before', 40));
-  const heightBefore = store.getHeight(0, 0);
   const revisionBefore = store.revision;
 
   assert.throws(() => store.loadDocument({
@@ -52,8 +55,31 @@ test('failed infinite-world load restores the previous base terrain and generato
       tileSize: 2,
       baseTerrain: createBaseTerrain('replacement', 80),
     },
-    chunks: [{ x: 0, z: 0, tiles: [[999, 4]], heights: [] }],
-  }), /tile override index is invalid/);
+    chunks: [{ x: 0, z: 0, tiles: [[0, 999]], heights: [] }],
+  }), /tile override value must be an unsigned byte/);
+
+  assert.equal(store.baseTerrain.source.mapName, 'before');
+  assert.equal(store.revision, revisionBefore);
+});
+
+test('late load failure restores the previous base terrain and generator', () => {
+  class LateFailingStore extends InfiniteWorldStore {
+    loadInfiniteDocument(document) {
+      this.setBaseTerrain(document.world.baseTerrain);
+      throw new Error('late load failure');
+    }
+  }
+
+  const store = createStore(LateFailingStore);
+  store.setBaseTerrain(createBaseTerrain('before', 40));
+  const heightBefore = store.getHeight(0, 0);
+  const revisionBefore = store.revision;
+
+  assert.throws(() => store.loadDocument({
+    version: INFINITE_WORLD_FORMAT_VERSION,
+    world: { baseTerrain: createBaseTerrain('replacement', 80) },
+    chunks: [],
+  }), /late load failure/);
 
   assert.equal(store.baseTerrain.source.mapName, 'before');
   assert.equal(store.getHeight(0, 0), heightBefore);
