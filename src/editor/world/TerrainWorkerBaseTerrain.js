@@ -5,7 +5,6 @@ const AZGAAR_MACRO_SOURCE_VERSION = 2;
 const TERRAIN_FIELD_NAMES = Object.freeze([
   'elevation',
   'biomeId',
-  'featureId',
   'mountainness',
   'ruggedness',
   'valleyness',
@@ -30,8 +29,8 @@ function terrainFields(baseTerrain) {
 
 /**
  * Terrain workers receive only the guidance required by chunk morphology.
- * Simulation-only climate, hydrology and population fields remain on the main
- * world source, keeping worker clones and decoded resident memory bounded.
+ * Climate, hydrology, population and feature ids remain on the authoritative
+ * main-world source, keeping worker clones and decoded resident memory bounded.
  */
 export function createTerrainWorkerBaseTerrain(baseTerrain) {
   if (!baseTerrain) return null;
