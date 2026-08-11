@@ -1,10 +1,17 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import yaml from 'js-yaml';
 import {
   buildAzgaarImportSummary,
   createAzgaarMacroWorldSource,
   decodeMacroAtlas,
 } from '../src/editor/import/AzgaarMacroWorldSource.js';
+
+const guidanceConfig = yaml.load(readFileSync(
+  new URL('../config/azgaar-guidance.yaml', import.meta.url),
+  'utf8',
+));
 
 function createDocument() {
   const cells = [];
@@ -65,6 +72,7 @@ const config = {
   import: {
     azgaarAtlasLongEdge: 10,
     azgaarOceanTransitionKilometers: 50,
+    azgaarGuidance: guidanceConfig,
   },
   terrain: { minHeight: -16, maxHeight: 48 },
   world: { seaLevel: -1.5 },
@@ -136,4 +144,17 @@ test('encodes a portable guidance atlas with terrain, climate, and river data', 
   assert.equal(guidance.temperature.length, 60);
   assert.equal(guidance.coastDistance.length, 60);
   assert.equal(guidance.riverDistance.length, 60);
+});
+
+test('preserves wide feature ids and unsigned settlement scores', () => {
+  const document = createDocument();
+  document.pack.cells[6].f = 70_000;
+  document.pack.cells[6].s = 50_000;
+  const source = createAzgaarMacroWorldSource(document, config);
+  const fields = decodeMacroAtlas(source, { includeGuidance: true }).fields;
+
+  assert.ok(fields.featureId instanceof Uint32Array);
+  assert.ok(fields.featureId.includes(70_000));
+  assert.ok(fields.settlementScore instanceof Uint16Array);
+  assert.ok(fields.settlementScore.includes(50_000));
 });
