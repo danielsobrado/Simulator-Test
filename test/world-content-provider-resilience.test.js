@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   IndexedDbWorldContentProvider,
   LocalFirstWorldContentProvider,
+  UrlWorldContentProvider,
 } from '../src/editor/world/WorldContentProvider.js';
 
 async function withCapturedWarnings(run) {
@@ -58,6 +59,32 @@ test('remote content failures fall back to generated terrain and back off repeat
     assert.equal(remoteCalls, 1);
     assert.equal(warnings.length, 1);
   });
+});
+
+test('URL content requests time out across fetch and body parsing', async () => {
+  let aborted = false;
+  const provider = new UrlWorldContentProvider({
+    baseUrl: 'https://content.example',
+    requestTimeoutMs: 10,
+    fetchImpl: async (_url, { signal } = {}) => ({
+      status: 200,
+      ok: true,
+      json: () => new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          aborted = true;
+          reject(new Error('aborted'));
+        }, { once: true });
+      }),
+    }),
+  });
+
+  try {
+    await assert.rejects(provider.getChunk('world', 0, 0), /timed out after 10 ms/);
+    assert.equal(aborted, true);
+    assert.equal(provider.controllers.size, 0);
+  } finally {
+    provider.dispose();
+  }
 });
 
 test('failed local cache writes back off without discarding remote content', async () => {
