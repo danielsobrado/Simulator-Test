@@ -57,6 +57,20 @@ function createClient({ workerCount = 2, chunkSize = 16 } = {}) {
   });
 }
 
+test('healthy workers do not allocate a main-thread fallback generator', () => {
+  const restoreWorker = installFakeWorker();
+  const client = createClient();
+
+  try {
+    assert.equal(client.worldGenerator, null);
+    client.request(0, 0);
+    assert.equal(client.worldGenerator, null);
+  } finally {
+    client.dispose();
+    restoreWorker();
+  }
+});
+
 test('a failed chunk worker is replaced without rejecting healthy worker requests', async () => {
   const restoreWorker = installFakeWorker();
   const client = createClient();
@@ -120,7 +134,7 @@ test('a stale error from a terminated worker cannot kill its replacement', () =>
   }
 });
 
-test('a synchronous postMessage failure releases the worker slot', async () => {
+test('a synchronous postMessage failure replaces the poisoned worker slot', async () => {
   const restoreWorker = installFakeWorker();
   const client = createClient();
 
@@ -130,12 +144,13 @@ test('a synchronous postMessage failure releases the worker slot', async () => {
 
     await assert.rejects(client.request(0, 0), /clone failed/);
     assert.equal(client.pending.size, 0);
-    assert.equal(client.inFlight[0], 0);
+    assert.equal(worker.terminated, true);
 
-    worker.postMessage = FakeWorker.prototype.postMessage.bind(worker);
+    const replacement = FakeWorker.instances[2];
+    assert.equal(client.workers[0], replacement);
     const recoveredRequest = client.request(1, 0);
-    assert.equal(worker.messages.at(-1).id, 2);
-    worker.emit('message', {
+    assert.equal(replacement.messages.at(-1).id, 2);
+    replacement.emit('message', {
       data: { id: 2, page: { chunkX: 1, chunkZ: 0 } },
     });
     assert.equal((await recoveredRequest).chunkX, 1);
@@ -155,9 +170,11 @@ test('worker construction failure falls back to main-thread chunk generation', a
   try {
     assert.equal(client.workers.length, 0);
     assert.equal(client.workerCount, 0);
+    assert.equal(client.worldGenerator, null);
     const page = await client.request(4, -3);
     assert.equal(page.chunkX, 4);
     assert.equal(page.chunkZ, -3);
+    assert.ok(client.worldGenerator);
   } finally {
     client.dispose();
     console.warn = originalConsoleWarn;
