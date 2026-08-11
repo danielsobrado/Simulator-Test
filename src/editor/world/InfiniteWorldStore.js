@@ -558,7 +558,7 @@ export class InfiniteWorldStore {
     });
   }
 
-  restoreSnapshot(snapshot) {
+  restoreSnapshot(snapshot, { emit = true } = {}) {
     this.setBaseTerrain(snapshot?.baseTerrain ?? null);
     this.tileOverrides = new Map(snapshot?.tileOverrides ?? []);
     this.heightOverrides = new Map(snapshot?.heightOverrides ?? []);
@@ -566,7 +566,7 @@ export class InfiniteWorldStore {
       snapshot?.forestEdits ?? { version: 1, felled: [], planted: [], patches: [] },
     );
     this.cache.clear();
-    this.emit({ kind: 'reset' });
+    if (emit) this.emit({ kind: 'reset' });
   }
 
   toDocument() {
@@ -609,10 +609,14 @@ export class InfiniteWorldStore {
       this.cache.clear();
       this.emit({ kind: 'reset' });
     } catch (error) {
-      this.tileOverrides = new Map(previous.tileOverrides);
-      this.heightOverrides = new Map(previous.heightOverrides);
-      this.forestEdits = structuredClone(previous.forestEdits);
-      this.cache.clear();
+      try {
+        this.restoreSnapshot(previous, { emit: false });
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'World load failed and the previous world could not be restored.',
+        );
+      }
       throw error;
     }
   }
