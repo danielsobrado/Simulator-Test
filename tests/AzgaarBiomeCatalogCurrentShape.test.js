@@ -22,3 +22,17 @@ test('an observed removed biome still gets a safe fallback definition', () => {
   assert.equal(fallback.name, 'Custom biome 13');
   assert.equal(fallback.standard, false);
 });
+
+test('current pack.biomes rejects duplicate and out-of-range source ids immediately', () => {
+  assert.throws(
+    () => createAzgaarBiomeDefinitions([
+      { i: 13, name: 'First' },
+      { i: 13, name: 'Duplicate' },
+    ]),
+    /duplicate source id 13/,
+  );
+  assert.throws(
+    () => createAzgaarBiomeDefinitions([{ i: 1_000_000_000, name: 'Invalid' }]),
+    /unsigned byte/,
+  );
+});
