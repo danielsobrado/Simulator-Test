@@ -108,7 +108,7 @@ function normalizeBiomeMetadata(source) {
     icons: [],
   };
   for (const biome of source) {
-    if (!Number.isInteger(biome?.i) || biome.i < 0) continue;
+    if (!Number.isInteger(biome?.i) || biome.i < 0 || biome.removed === true) continue;
     result.name[biome.i] = biome.name;
     result.color[biome.i] = biome.color;
     result.habitability[biome.i] = biome.habitability;
