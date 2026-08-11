@@ -6,6 +6,7 @@ const MACRO_SOURCE_KIND = 'azgaar-macro-v2';
 const MACRO_SOURCE_VERSION = 2;
 const LEGACY_MACRO_SOURCE_KIND = 'azgaar-macro-v1';
 const LEGACY_MACRO_SOURCE_VERSION = 1;
+const TERRAIN_WORKER_PROFILE = 'terrain-worker';
 const MAX_MACRO_ATLAS_CELLS = 4_000_000;
 
 const UNIT_METERS = Object.freeze({
@@ -258,10 +259,29 @@ function fieldPayload(source, name) {
     return null;
   }
   const legacyName = LEGACY_FIELD_NAMES[name];
-  if (legacyName && source.atlas?.[legacyName]) {
-    return source.atlas[legacyName];
-  }
+  if (legacyName && source.atlas?.[legacyName]) return source.atlas[legacyName];
   return source.terrainGuidance?.fields?.[name] ?? null;
+}
+
+function validateCurrentField(source, name, expected) {
+  const payload = source.atlas?.fields?.[name];
+  assertPayloadLength(payload, expected, name);
+  if (!acceptedFieldTypes(name).includes(payload.type)) {
+    throw new Error(
+      `Macro atlas field ${name} must use ${acceptedFieldTypes(name).join(' or ')} values.`,
+    );
+  }
+}
+
+function currentProfileFieldNames(source) {
+  if (source.profile !== TERRAIN_WORKER_PROFILE) return Object.keys(GUIDANCE_FIELD_TYPES);
+  const names = Object.keys(source.atlas?.fields ?? {});
+  for (const required of BASIC_FIELDS) {
+    if (!names.includes(required)) {
+      throw new Error(`Azgaar terrain worker profile is missing field ${required}.`);
+    }
+  }
+  return names;
 }
 
 export function hasGuidanceField(source, name) {
@@ -309,14 +329,11 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
   }
   const { length: expected } = validateAtlasDimensions(source.atlas);
   if (source.kind === MACRO_SOURCE_KIND) {
-    for (const name of Object.keys(GUIDANCE_FIELD_TYPES)) {
-      const payload = source.atlas.fields?.[name];
-      assertPayloadLength(payload, expected, name);
-      if (!acceptedFieldTypes(name).includes(payload.type)) {
-        throw new Error(
-          `Macro atlas field ${name} must use ${acceptedFieldTypes(name).join(' or ')} values.`,
-        );
+    for (const name of currentProfileFieldNames(source)) {
+      if (!GUIDANCE_FIELD_TYPES[name]) {
+        throw new Error(`Azgaar macro source contains unknown field ${name}.`);
       }
+      validateCurrentField(source, name, expected);
     }
   }
 
@@ -325,7 +342,7 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
   }
 
   const names = source.kind === MACRO_SOURCE_KIND
-    ? (includeGuidance ? Object.keys(GUIDANCE_FIELD_TYPES) : BASIC_FIELDS)
+    ? (includeGuidance ? currentProfileFieldNames(source) : BASIC_FIELDS)
     : [...BASIC_FIELDS, ...Object.keys(source.terrainGuidance?.fields ?? {})];
   const fields = {};
   for (const name of names) {
@@ -343,6 +360,17 @@ export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
     throw new Error('World guidance fields do not match the macro atlas dimensions.');
   }
   return { heights, biomes, features, fields };
+}
+
+function terrainGuidanceDetail(config) {
+  return {
+    baseScale: config.detailBaseScale,
+    mountainWeight: config.detailMountainWeight,
+    ruggednessWeight: config.detailRuggednessWeight,
+    valleyPenalty: config.detailValleyPenalty,
+    minimumScale: config.detailMinimumScale,
+    maximumScale: config.detailMaximumScale,
+  };
 }
 
 export function buildAzgaarImportSummary(document, config, options = {}) {
@@ -421,6 +449,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     summary.atlasHeight,
     summary.physicalWidthMeters,
   );
+  const guidanceConfig = config.import.azgaarGuidance;
   const derived = deriveAzgaarWorldGuidance({
     raw,
     rivers,
@@ -428,7 +457,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     height: summary.atlasHeight,
     physicalWidthMeters: summary.physicalWidthMeters,
     biomes: biomeDefinitions,
-    config: config.import.azgaarGuidance,
+    config: guidanceConfig,
   });
   const widthCells = Math.max(1, Math.round(summary.physicalWidthMeters / config.map.tileSize));
   const heightCells = Math.max(1, Math.round(summary.physicalHeightMeters / config.map.tileSize));
@@ -469,6 +498,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       seaLevel: config.world.seaLevel,
       verticalExaggeration: resolvePositive(config.import?.azgaarVerticalExaggeration, 1),
       reliefExponent: resolvePositive(config.import?.azgaarReliefExponent, 1),
+      guidanceDetail: terrainGuidanceDetail(guidanceConfig),
     },
     biomes: biomeDefinitions,
     rivers,
