@@ -9,7 +9,6 @@ const POSITIVE_GUIDANCE_FIELDS = Object.freeze([
   'precipitationNormalization',
   'temperateRange',
   'agricultureMoistureRange',
-  'harborScoreNormalization',
   'detailBaseScale',
   'detailMinimumScale',
   'detailMaximumScale',
