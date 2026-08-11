@@ -127,7 +127,23 @@ test('rejects minimal or unrelated JSON exports', () => {
       },
       pack: {},
     }, createConfig()),
-    /must include grid cells and grid dimensions/,
+    /non-empty grid cells and positive grid dimensions/,
+  );
+});
+
+test('rejects malformed grid dimensions and duplicate cell ids before import allocation', () => {
+  const invalidDimensions = createAzgaarDocument();
+  invalidDimensions.grid.cellsX = 0;
+  assert.throws(
+    () => importAzgaarFullJson(invalidDimensions, createConfig()),
+    /positive grid dimensions/,
+  );
+
+  const duplicateIds = createAzgaarDocument();
+  duplicateIds.grid.cells[1].i = duplicateIds.grid.cells[0].i;
+  assert.throws(
+    () => importAzgaarFullJson(duplicateIds, createConfig()),
+    /duplicate grid cell id 0/,
   );
 });
 
