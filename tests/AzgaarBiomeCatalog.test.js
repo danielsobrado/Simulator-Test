@@ -1,10 +1,17 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import yaml from 'js-yaml';
 import {
   AZGAAR_STANDARD_BIOMES,
   createAzgaarBiomeDefinitions,
 } from '../src/editor/AzgaarBiomeCatalog.js';
 import { TILE_BY_KEY, TILE_CATALOG } from '../src/editor/tileCatalog.js';
+
+const guidanceConfig = yaml.load(readFileSync(
+  new URL('../config/azgaar-guidance.yaml', import.meta.url),
+  'utf8',
+));
 
 const STANDARD_NAMES = [
   'Marine',
@@ -72,6 +79,25 @@ test('preserves exported standard colors and allocates deterministic custom biom
       },
     ],
   );
+});
+
+test('infers custom biome terrain semantics from configured names and relief icons', () => {
+  const definitions = createAzgaarBiomeDefinitions({
+    name: [...STANDARD_NAMES, 'Ancient forest', 'Crystal barrens'],
+    icons: [
+      ...Array.from({ length: 13 }, () => []),
+      [],
+      ['conifer'],
+    ],
+  }, [], guidanceConfig);
+  const forest = definitions.find((definition) => definition.sourceId === 13);
+  const barrens = definitions.find((definition) => definition.sourceId === 14);
+
+  assert.equal(forest.terrainClass, 'forest');
+  assert.equal(forest.supportsTrees, true);
+  assert.equal(forest.supportsGrass, true);
+  assert.equal(barrens.terrainClass, 'plains');
+  assert.equal(barrens.supportsTrees, true);
 });
 
 test('creates definitions for custom biome ids used by cells even when metadata is sparse', () => {
