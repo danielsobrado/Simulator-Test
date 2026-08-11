@@ -10,9 +10,26 @@ function assertAzgaarDocument(document) {
   if (!description.includes("azgaar's fantasy map generator")) {
     throw new Error('The selected JSON is not an Azgaar Full JSON export.');
   }
-  if (!Array.isArray(document?.grid?.cells) || !Number.isInteger(document.grid.cellsX)
-      || !Number.isInteger(document.grid.cellsY)) {
-    throw new Error('Azgaar Full JSON must include grid cells and grid dimensions.');
+
+  const cells = document?.grid?.cells;
+  const cellsX = document?.grid?.cellsX;
+  const cellsY = document?.grid?.cellsY;
+  if (!Array.isArray(cells) || cells.length === 0
+      || !Number.isInteger(cellsX) || cellsX < 1
+      || !Number.isInteger(cellsY) || cellsY < 1
+      || !Number.isSafeInteger(cellsX * cellsY)) {
+    throw new Error('Azgaar Full JSON must include non-empty grid cells and positive grid dimensions.');
+  }
+
+  const ids = new Set();
+  for (const cell of cells) {
+    if (!Number.isSafeInteger(cell?.i) || cell.i < 0) {
+      throw new Error('Azgaar Full JSON grid cells must have non-negative safe-integer ids.');
+    }
+    if (ids.has(cell.i)) {
+      throw new Error(`Azgaar Full JSON contains duplicate grid cell id ${cell.i}.`);
+    }
+    ids.add(cell.i);
   }
 }
 
