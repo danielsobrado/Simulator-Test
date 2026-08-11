@@ -280,12 +280,35 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     super.restoreSnapshot(snapshot);
   }
 
+  /**
+   * Internal synchronous load transaction snapshot. The referenced maps/source
+   * are replaced, never mutated, by loadDocument, so retaining references avoids
+   * cloning a potentially very large Azgaar guidance atlas solely for rollback.
+   */
+  createTransactionSnapshot() {
+    return Object.freeze({
+      tileOverrides: this.tileOverrides,
+      heightOverrides: this.heightOverrides,
+      baseTerrain: this.baseTerrain,
+      forestEdits: this.forestEdits,
+    });
+  }
+
+  restoreTransactionSnapshot(snapshot, { emit = true } = {}) {
+    this.pendingChunks.clear();
+    if (this.baseTerrain !== snapshot.baseTerrain) {
+      this.setBaseTerrain(snapshot.baseTerrain);
+    }
+    this.tileOverrides = snapshot.tileOverrides;
+    this.heightOverrides = snapshot.heightOverrides;
+    this.forestEdits = snapshot.forestEdits;
+    this.cache.clear();
+    if (emit) this.emit({ kind: 'reset' });
+  }
+
   loadDocument(document) {
     this.pendingChunks.clear();
-    const previousBaseTerrain = this.baseTerrain;
-    const previousTileOverrides = this.tileOverrides;
-    const previousHeightOverrides = this.heightOverrides;
-    const previousForestEdits = this.forestEdits;
+    const previous = this.createTransactionSnapshot();
 
     try {
       if (document?.version !== INFINITE_WORLD_FORMAT_VERSION) {
@@ -298,19 +321,9 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
       this.cache.clear();
       this.emit({ kind: 'reset' });
     } catch (error) {
-      let rollbackError = null;
-      if (this.baseTerrain !== previousBaseTerrain) {
-        try {
-          this.setBaseTerrain(previousBaseTerrain);
-        } catch (caught) {
-          rollbackError = caught;
-        }
-      }
-      this.tileOverrides = previousTileOverrides;
-      this.heightOverrides = previousHeightOverrides;
-      this.forestEdits = previousForestEdits;
-      this.cache.clear();
-      if (rollbackError) {
+      try {
+        this.restoreTransactionSnapshot(previous, { emit: false });
+      } catch (rollbackError) {
         throw new AggregateError(
           [error, rollbackError],
           'World load failed and the previous base terrain could not be restored.',
