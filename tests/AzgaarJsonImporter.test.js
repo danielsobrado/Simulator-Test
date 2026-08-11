@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import yaml from 'js-yaml';
 import {
   importAzgaarFullJson,
   isAzgaarFullJson,
@@ -8,12 +10,18 @@ import { decodeAzgaarCartographySource } from '../src/editor/import/AzgaarCartog
 import { InfiniteWorldStore } from '../src/editor/world/InfiniteWorldStore.js';
 import { ProceduralWorldGenerator } from '../src/editor/world/ProceduralWorldGenerator.js';
 
+const guidanceConfig = yaml.load(readFileSync(
+  new URL('../config/azgaar-guidance.yaml', import.meta.url),
+  'utf8',
+));
+
 function createConfig() {
   return {
     map: { tileSize: 2 },
     import: {
       azgaarAtlasLongEdge: 4,
       azgaarOceanTransitionKilometers: 50,
+      azgaarGuidance: guidanceConfig,
     },
     world: {
       seed: 918273,
@@ -127,7 +135,7 @@ test('rejects minimal or unrelated JSON exports', () => {
       },
       pack: {},
     }, createConfig()),
-    /non-empty grid cells and positive grid dimensions/,
+    /positive map dimensions/,
   );
 });
 
@@ -144,6 +152,38 @@ test('rejects malformed grid dimensions and duplicate cell ids before import all
   assert.throws(
     () => importAzgaarFullJson(duplicateIds, createConfig()),
     /duplicate grid cell id 0/,
+  );
+});
+
+test('rejects malformed packed topology before import allocation', () => {
+  const missingPack = createAzgaarDocument();
+  missingPack.pack.cells = [];
+  assert.throws(
+    () => importAzgaarFullJson(missingPack, createConfig()),
+    /non-empty packed cells/,
+  );
+
+  const invalidGridReference = createAzgaarDocument();
+  invalidGridReference.pack.cells[1].g = 999;
+  assert.throws(
+    () => importAzgaarFullJson(invalidGridReference, createConfig()),
+    /references an invalid grid cell/,
+  );
+
+  const invalidPosition = createAzgaarDocument();
+  invalidPosition.pack.cells[1].p = [Number.NaN, 20];
+  assert.throws(
+    () => importAzgaarFullJson(invalidPosition, createConfig()),
+    /finite x\/y coordinates/,
+  );
+});
+
+test('rejects malformed river geometry before import allocation', () => {
+  const invalidRiver = createAzgaarDocument();
+  invalidRiver.pack.rivers[0].points = [[0, 0], [Number.NaN, 1]];
+  assert.throws(
+    () => importAzgaarFullJson(invalidRiver, createConfig()),
+    /finite x\/y coordinates/,
   );
 });
 
