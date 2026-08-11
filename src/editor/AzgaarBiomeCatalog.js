@@ -118,9 +118,19 @@ function customSourceIds(biomesData, observedSourceIds) {
   return [...ids].sort((left, right) => left - right);
 }
 
+function normalizedTokens(text) {
+  return new Set(String(text).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+}
+
 function includesConfiguredKeyword(text, values) {
   if (!Array.isArray(values)) return false;
-  return values.some((value) => text.includes(String(value).trim().toLowerCase()));
+  const tokens = normalizedTokens(text);
+  return values.some((value) => {
+    const keyword = String(value).trim().toLowerCase();
+    if (!keyword) return false;
+    if (/[^a-z0-9]/.test(keyword)) return String(text).toLowerCase().includes(keyword);
+    return tokens.has(keyword);
+  });
 }
 
 function inferCustomSemantics(name, reliefIcons, config) {
