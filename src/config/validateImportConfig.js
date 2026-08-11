@@ -10,6 +10,9 @@ const POSITIVE_GUIDANCE_FIELDS = Object.freeze([
   'temperateRange',
   'agricultureMoistureRange',
   'harborScoreNormalization',
+  'detailBaseScale',
+  'detailMinimumScale',
+  'detailMaximumScale',
 ]);
 
 const FINITE_GUIDANCE_FIELDS = Object.freeze([
@@ -38,6 +41,9 @@ const FINITE_GUIDANCE_FIELDS = Object.freeze([
   'wetnessRiverWeight',
   'wetnessCoastWeight',
   'wetnessReliefPenalty',
+  'detailMountainWeight',
+  'detailRuggednessWeight',
+  'detailValleyPenalty',
 ]);
 
 function validateGuidanceConfig(guidance) {
@@ -66,6 +72,11 @@ function validateGuidanceConfig(guidance) {
   if (guidance.mountainReliefEnd <= guidance.mountainReliefStart) {
     throw new Error(
       'Invalid editor configuration: Azgaar guidance mountain relief end must exceed start.',
+    );
+  }
+  if (guidance.detailMaximumScale < guidance.detailMinimumScale) {
+    throw new Error(
+      'Invalid editor configuration: Azgaar detail maximum scale must cover minimum scale.',
     );
   }
 }
