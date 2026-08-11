@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import yaml from 'js-yaml';
 import {
   createAzgaarMacroWorldSource,
   decodeMacroAtlas,
@@ -8,7 +10,13 @@ import {
 import { deriveAzgaarWorldGuidance } from '../src/editor/import/AzgaarWorldGuidance.js';
 import { decodeMacroField, encodeMacroField } from '../src/editor/import/MacroAtlasCodec.js';
 import { AzgaarMacroWorldGenerator } from '../src/editor/world/AzgaarMacroWorldGenerator.js';
+import { createTerrainWorkerBaseTerrain } from '../src/editor/world/TerrainWorkerBaseTerrain.js';
 import { WorldGuidanceField } from '../src/editor/world/WorldGuidanceField.js';
+
+const guidanceConfig = yaml.load(readFileSync(
+  new URL('../config/azgaar-guidance.yaml', import.meta.url),
+  'utf8',
+));
 
 const config = Object.freeze({
   import: Object.freeze({
@@ -16,6 +24,7 @@ const config = Object.freeze({
     azgaarOceanTransitionKilometers: 1,
     azgaarVerticalExaggeration: 2,
     azgaarReliefExponent: 1.2,
+    azgaarGuidance: guidanceConfig,
   }),
   map: Object.freeze({ tileSize: 1000 }),
   terrain: Object.freeze({ minHeight: -20, maxHeight: 80 }),
@@ -185,6 +194,23 @@ test('macro source detection preserves v1 and v2 runtime support', () => {
   assert.equal(isAzgaarMacroWorldSource({ kind: 'azgaar-macro-v1', version: 2 }), false);
 });
 
+test('original v2 feature and settlement encodings remain readable', () => {
+  const source = createAzgaarMacroWorldSource(createDocument(), config);
+  const decoded = decodeMacroAtlas(source, { includeGuidance: true }).fields;
+  const legacy = structuredClone(source);
+  legacy.atlas.fields.featureId = encodeMacroField(
+    Uint16Array.from(decoded.featureId),
+    'u16',
+  );
+  legacy.atlas.fields.settlementScore = encodeMacroField(
+    Int16Array.from(decoded.settlementScore),
+    'i16',
+  );
+  const compatible = decodeMacroAtlas(legacy, { includeGuidance: true }).fields;
+  assert.deepEqual(compatible.featureId, Uint16Array.from(decoded.featureId));
+  assert.deepEqual(compatible.settlementScore, Int16Array.from(decoded.settlementScore));
+});
+
 test('coast water does not make flat coastal land rugged or mountainous', () => {
   const width = 5;
   const height = 5;
@@ -197,13 +223,34 @@ test('coast water does not make flat coastal land rugged or mountainous', () => 
     precipitation: new Uint8Array(length).fill(50),
     biomeId: new Uint8Array(length).fill(4),
     riverId: new Uint32Array(length),
-    settlementScore: new Int16Array(length),
+    settlementScore: new Uint16Array(length),
     harborScore: new Uint8Array(length),
   };
-  const derived = deriveAzgaarWorldGuidance({ raw, rivers: [], width, height });
+  const derived = deriveAzgaarWorldGuidance({
+    raw,
+    rivers: [],
+    width,
+    height,
+    physicalWidthMeters: 5_000,
+    biomes: [],
+    config: guidanceConfig,
+  });
   const coastalLand = 2 * width + 2;
   assert.equal(derived.ruggedness[coastalLand], 0);
   assert.equal(derived.mountainness[coastalLand], 0);
+});
+
+test('world guidance decodes individual fields only when requested', () => {
+  const source = createAzgaarMacroWorldSource(createDocument(), config);
+  const guidance = new WorldGuidanceField(source);
+  assert.deepEqual(guidance.decodedFieldNames(), []);
+
+  const boundary = cellAtAtlas(source, 1.5, 2);
+  guidance.sampleBiomeBlend(boundary.x, boundary.z);
+  assert.deepEqual(guidance.decodedFieldNames(), ['biomeId']);
+
+  guidance.sampleContinuous('mountainness', boundary.x, boundary.z);
+  assert.deepEqual(guidance.decodedFieldNames(), ['biomeId', 'mountainness']);
 });
 
 test('world guidance exposes scaled samples and continuous biome weights', () => {
@@ -229,6 +276,44 @@ test('world guidance exposes scaled samples and continuous biome weights', () =>
   assert.deepEqual(
     guidance.sampleBiomeBlend(source.bounds.minCellX - 1, source.bounds.minCellZ).weights,
     [{ sourceId: 0, tileId: 0, weight: 1 }],
+  );
+});
+
+test('outside-world guidance returns explicit ocean defaults instead of edge values', () => {
+  const source = createAzgaarMacroWorldSource(createDocument(), config);
+  const guidance = new WorldGuidanceField(source);
+  const sample = guidance.sample(source.bounds.minCellX - 100, source.bounds.minCellZ - 100);
+  assert.equal(sample.inside, false);
+  assert.equal(sample.biomeId, 0);
+  assert.equal(sample.population, 0);
+  assert.equal(sample.wetness, 1);
+  assert.equal(sample.temperature, null);
+  assert.equal(sample.coastDistanceMeters, null);
+});
+
+test('terrain worker source carries only canonical and morphology guidance', () => {
+  const source = createAzgaarMacroWorldSource(createDocument(), config);
+  const workerSource = createTerrainWorkerBaseTerrain(source);
+  assert.equal(workerSource.kind, 'azgaar-macro-v2');
+  assert.equal(workerSource.profile, 'terrain-worker');
+  assert.deepEqual(
+    Object.keys(workerSource.atlas.fields).sort(),
+    ['biomeId', 'elevation', 'featureId', 'mountainness', 'ruggedness', 'valleyness'],
+  );
+  assert.equal(workerSource.atlas.fields.population, undefined);
+
+  const generator = new AzgaarMacroWorldGenerator(workerSource, {
+    seed: 42,
+    version: 1,
+    heightScale: 12,
+    seaLevel: 0,
+  });
+  assert.equal(generator.hasMorphologyGuidance, true);
+  const position = cellAtAtlas(workerSource, 0, 2);
+  assert.ok(Number.isFinite(generator.morphologyScale(position.x, position.z)));
+  assert.deepEqual(
+    generator.guidance.decodedFieldNames(),
+    ['biomeId', 'elevation', 'featureId', 'mountainness', 'ruggedness', 'valleyness'],
   );
 });
 
