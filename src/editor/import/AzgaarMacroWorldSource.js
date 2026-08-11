@@ -17,6 +17,47 @@ const UNIT_METERS = Object.freeze({
   nlg: 5556,
 });
 
+const LEGACY_FIELD_NAMES = Object.freeze({
+  elevation: 'heightData',
+  biomeId: 'biomeData',
+  featureId: 'featureData',
+});
+
+const GUIDANCE_FIELD_TYPES = Object.freeze({
+  elevation: 'u8',
+  temperature: 'i8',
+  precipitation: 'u8',
+  waterDistance: 'i8',
+  biomeId: 'u8',
+  featureId: 'u32',
+  riverId: 'u32',
+  riverFlux: 'u32',
+  confluenceFlux: 'u32',
+  population: 'u32',
+  settlementScore: 'u16',
+  harborScore: 'u8',
+  havenId: 'u32',
+  coastDistance: 'i16',
+  riverDistance: 'u16',
+  moisture: 'u8',
+  continentalness: 'u8',
+  wetness: 'u8',
+  mountainness: 'u8',
+  ruggedness: 'u8',
+  valleyness: 'u8',
+  snowPotential: 'u8',
+  forestPotential: 'u8',
+  agriculturalPotential: 'u8',
+  harborPotential: 'u8',
+});
+
+const COMPATIBLE_FIELD_TYPES = Object.freeze({
+  featureId: Object.freeze(['u32', 'u16']),
+  settlementScore: Object.freeze(['u16', 'i16']),
+});
+
+const BASIC_FIELDS = Object.freeze(['elevation', 'biomeId', 'featureId']);
+
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -178,35 +219,6 @@ export function createMacroAtlasPayload({ heights, biomes, features }) {
   };
 }
 
-const BASIC_V2_FIELDS = Object.freeze(['elevation', 'biomeId', 'featureId']);
-const GUIDANCE_FIELD_TYPES = Object.freeze({
-  elevation: 'u8',
-  temperature: 'i8',
-  precipitation: 'u8',
-  waterDistance: 'i8',
-  biomeId: 'u8',
-  featureId: 'u16',
-  riverId: 'u32',
-  riverFlux: 'u32',
-  confluenceFlux: 'u32',
-  population: 'u32',
-  settlementScore: 'i16',
-  harborScore: 'u8',
-  havenId: 'u32',
-  coastDistance: 'i16',
-  riverDistance: 'u16',
-  moisture: 'u8',
-  continentalness: 'u8',
-  wetness: 'u8',
-  mountainness: 'u8',
-  ruggedness: 'u8',
-  valleyness: 'u8',
-  snowPotential: 'u8',
-  forestPotential: 'u8',
-  agriculturalPotential: 'u8',
-  harborPotential: 'u8',
-});
-
 function encodeGuidanceFields(raw, derived) {
   const values = { ...raw, ...derived };
   return Object.fromEntries(Object.entries(GUIDANCE_FIELD_TYPES).map(([name, type]) => {
@@ -234,57 +246,103 @@ function assertPayloadLength(payload, expected, name) {
   }
 }
 
-function decodeLegacyMacroAtlas(source, expected) {
-  assertPayloadLength(source.atlas.heightData, expected, 'heightData');
-  assertPayloadLength(source.atlas.biomeData, expected, 'biomeData');
-  assertPayloadLength(source.atlas.featureData, expected, 'featureData');
-  const heights = decodeMacroField(source.atlas.heightData, 'u8');
-  const biomes = decodeMacroField(source.atlas.biomeData, 'u8');
-  const features = decodeMacroField(source.atlas.featureData, 'u16');
-  return { heights, biomes, features, fields: { elevation: heights, biomeId: biomes, featureId: features } };
+function acceptedFieldTypes(name) {
+  return COMPATIBLE_FIELD_TYPES[name] ?? [GUIDANCE_FIELD_TYPES[name]];
+}
+
+function fieldPayload(source, name) {
+  if (source?.kind === MACRO_SOURCE_KIND && source.version === MACRO_SOURCE_VERSION) {
+    return source.atlas?.fields?.[name] ?? null;
+  }
+  if (source?.kind !== LEGACY_MACRO_SOURCE_KIND || source.version !== LEGACY_MACRO_SOURCE_VERSION) {
+    return null;
+  }
+  const legacyName = LEGACY_FIELD_NAMES[name];
+  if (legacyName && source.atlas?.[legacyName]) {
+    return source.atlas[legacyName];
+  }
+  return source.terrainGuidance?.fields?.[name] ?? null;
+}
+
+export function hasGuidanceField(source, name) {
+  return Boolean(fieldPayload(source, name));
+}
+
+export function decodeGuidanceField(source, name) {
+  const preferredType = GUIDANCE_FIELD_TYPES[name];
+  if (!preferredType) throw new Error(`Unknown Azgaar guidance field ${name}.`);
+  const payload = fieldPayload(source, name);
+  if (!payload) return null;
+  const { length } = validateAtlasDimensions(source.atlas);
+  assertPayloadLength(payload, length, name);
+
+  const legacyName = LEGACY_FIELD_NAMES[name];
+  const legacyCanonical = source.kind === LEGACY_MACRO_SOURCE_KIND
+    && legacyName
+    && payload === source.atlas?.[legacyName];
+  const encodedType = payload.type ?? (legacyCanonical
+    ? (name === 'featureId' ? 'u16' : preferredType)
+    : preferredType);
+  if (!acceptedFieldTypes(name).includes(encodedType)) {
+    throw new Error(
+      `Macro atlas field ${name} must use ${acceptedFieldTypes(name).join(' or ')} values.`,
+    );
+  }
+  return decodeMacroField(payload, encodedType);
+}
+
+function decodeLegacyMacroAtlas(source) {
+  const heights = decodeGuidanceField(source, 'elevation');
+  const biomes = decodeGuidanceField(source, 'biomeId');
+  const features = decodeGuidanceField(source, 'featureId');
+  return {
+    heights,
+    biomes,
+    features,
+    fields: { elevation: heights, biomeId: biomes, featureId: features },
+  };
 }
 
 export function decodeMacroAtlas(source, { includeGuidance = false } = {}) {
-  const legacy = source?.kind === LEGACY_MACRO_SOURCE_KIND
-    && source.version === LEGACY_MACRO_SOURCE_VERSION;
-  const current = source?.kind === MACRO_SOURCE_KIND && source.version === MACRO_SOURCE_VERSION;
-  if (!legacy && !current) {
+  if (!isAzgaarMacroWorldSource(source)) {
     throw new Error(`Unsupported base terrain source: ${source?.kind ?? 'unknown'}.`);
   }
   const { length: expected } = validateAtlasDimensions(source.atlas);
-  if (current) {
-    for (const [name, type] of Object.entries(GUIDANCE_FIELD_TYPES)) {
+  if (source.kind === MACRO_SOURCE_KIND) {
+    for (const name of Object.keys(GUIDANCE_FIELD_TYPES)) {
       const payload = source.atlas.fields?.[name];
       assertPayloadLength(payload, expected, name);
-      if (payload.type !== type) {
-        throw new Error(`Macro atlas field ${name} must use ${type} values.`);
+      if (!acceptedFieldTypes(name).includes(payload.type)) {
+        throw new Error(
+          `Macro atlas field ${name} must use ${acceptedFieldTypes(name).join(' or ')} values.`,
+        );
       }
     }
   }
-  const decoded = legacy
-    ? decodeLegacyMacroAtlas(source, expected)
-    : (() => {
-      const names = includeGuidance ? Object.keys(GUIDANCE_FIELD_TYPES) : BASIC_V2_FIELDS;
-      const fields = Object.fromEntries(names.map((name) => {
-        const payload = source.atlas.fields?.[name];
-        if (!payload) throw new Error(`Azgaar macro v2 atlas is missing field ${name}.`);
-        return [name, decodeMacroField(payload, GUIDANCE_FIELD_TYPES[name])];
-      }));
-      return {
-        heights: fields.elevation,
-        biomes: fields.biomeId,
-        features: fields.featureId,
-        fields,
-      };
-    })();
-  const { heights, biomes, features } = decoded;
-  if (heights.length !== expected || biomes.length !== expected || features.length !== expected) {
+
+  if (source.kind === LEGACY_MACRO_SOURCE_KIND && !includeGuidance) {
+    return decodeLegacyMacroAtlas(source);
+  }
+
+  const names = source.kind === MACRO_SOURCE_KIND
+    ? (includeGuidance ? Object.keys(GUIDANCE_FIELD_TYPES) : BASIC_FIELDS)
+    : [...BASIC_FIELDS, ...Object.keys(source.terrainGuidance?.fields ?? {})];
+  const fields = {};
+  for (const name of names) {
+    if (fields[name] !== undefined) continue;
+    const values = decodeGuidanceField(source, name);
+    if (values) fields[name] = values;
+  }
+  const heights = fields.elevation;
+  const biomes = fields.biomeId;
+  const features = fields.featureId;
+  if (heights?.length !== expected || biomes?.length !== expected || features?.length !== expected) {
     throw new Error('Macro atlas dimensions do not match its payloads.');
   }
-  if (Object.values(decoded.fields).some((values) => values.length !== expected)) {
+  if (Object.values(fields).some((values) => values.length !== expected)) {
     throw new Error('World guidance fields do not match the macro atlas dimensions.');
   }
-  return decoded;
+  return { heights, biomes, features, fields };
 }
 
 export function buildAzgaarImportSummary(document, config, options = {}) {
@@ -302,7 +360,7 @@ export function buildAzgaarImportSummary(document, config, options = {}) {
     standardBiomeCount: biomeDefinitions.filter((biome) => biome.standard).length,
     customBiomeCount: biomeDefinitions.filter((biome) => !biome.standard).length,
     guidanceFieldCount: Object.keys(GUIDANCE_FIELD_TYPES).length,
-    estimatedRawBytes: atlas.width * atlas.height * 44,
+    estimatedRawBytes: atlas.width * atlas.height * 46,
   });
 }
 
@@ -315,12 +373,12 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     precipitation: new Uint8Array(length),
     waterDistance: new Int8Array(length),
     biomeId: new Uint8Array(length),
-    featureId: new Uint16Array(length),
+    featureId: new Uint32Array(length),
     riverId: new Uint32Array(length),
     riverFlux: new Uint32Array(length),
     confluenceFlux: new Uint32Array(length),
     population: new Uint32Array(length),
-    settlementScore: new Int16Array(length),
+    settlementScore: new Uint16Array(length),
     harborScore: new Uint8Array(length),
     havenId: new Uint32Array(length),
   };
@@ -345,17 +403,18 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       raw.waterDistance[index] = clamp(Math.round(Number(gridCell.t ?? 0)), -128, 127);
       raw.biomeId[index] = clamp(Math.round(Number(packCell?.biome ?? 0)), 0, 255);
       observedBiomeIds.add(raw.biomeId[index]);
-      raw.featureId[index] = clamp(Math.round(Number(packCell?.f ?? gridCell.f ?? 0)), 0, 0xffff);
+      raw.featureId[index] = clamp(Math.round(Number(packCell?.f ?? gridCell.f ?? 0)), 0, 0xffffffff);
       raw.riverId[index] = clamp(Math.round(Number(packCell?.r ?? 0)), 0, 0xffffffff);
       raw.riverFlux[index] = clamp(Math.round(Number(packCell?.fl ?? 0)), 0, 0xffffffff);
       raw.confluenceFlux[index] = clamp(Math.round(Number(packCell?.conf ?? 0)), 0, 0xffffffff);
       raw.population[index] = clamp(Math.round(Number(packCell?.pop ?? 0) * 100), 0, 0xffffffff);
-      raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), -0x8000, 0x7fff);
+      raw.settlementScore[index] = clamp(Math.round(Number(packCell?.s ?? 0)), 0, 0xffff);
       raw.harborScore[index] = clamp(Math.round(Number(packCell?.harbor ?? 0)), 0, 255);
       raw.havenId[index] = clamp(Math.round(Number(packCell?.haven ?? 0)), 0, 0xffffffff);
     }
   }
 
+  const biomeDefinitions = createAzgaarBiomeDefinitions(document.biomesData, observedBiomeIds);
   const rivers = createRiverData(
     document,
     summary.atlasWidth,
@@ -367,6 +426,9 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     rivers,
     width: summary.atlasWidth,
     height: summary.atlasHeight,
+    physicalWidthMeters: summary.physicalWidthMeters,
+    biomes: biomeDefinitions,
+    config: config.import.azgaarGuidance,
   });
   const widthCells = Math.max(1, Math.round(summary.physicalWidthMeters / config.map.tileSize));
   const heightCells = Math.max(1, Math.round(summary.physicalHeightMeters / config.map.tileSize));
@@ -408,13 +470,14 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       verticalExaggeration: resolvePositive(config.import?.azgaarVerticalExaggeration, 1),
       reliefExponent: resolvePositive(config.import?.azgaarReliefExponent, 1),
     },
-    biomes: createAzgaarBiomeDefinitions(document.biomesData, observedBiomeIds),
+    biomes: biomeDefinitions,
     rivers,
   };
 }
 
 export const AZGAAR_MACRO_SOURCE_KIND = MACRO_SOURCE_KIND;
 export const AZGAAR_LEGACY_MACRO_SOURCE_KIND = LEGACY_MACRO_SOURCE_KIND;
+export const AZGAAR_GUIDANCE_FIELD_NAMES = Object.freeze(Object.keys(GUIDANCE_FIELD_TYPES));
 export function isAzgaarMacroWorldSource(source) {
   return (source?.kind === MACRO_SOURCE_KIND && source.version === MACRO_SOURCE_VERSION)
     || (source?.kind === LEGACY_MACRO_SOURCE_KIND
