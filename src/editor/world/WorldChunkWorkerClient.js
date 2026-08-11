@@ -3,19 +3,20 @@ import { createTerrainWorkerBaseTerrain } from './TerrainWorkerBaseTerrain.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import { chunkKey } from './WorldCoordinates.js';
 
+const MAX_WORKER_COUNT = 8;
 const MAX_WORKER_RESTARTS = 2;
 
 /** Resolve the worker pool size from an explicit override or CPU cores. */
 export function resolveWorkerCount(requested) {
   if (Number.isFinite(requested) && requested > 0) {
-    return Math.max(1, Math.floor(requested));
+    return Math.min(MAX_WORKER_COUNT, Math.max(1, Math.floor(requested)));
   }
   const cores = (typeof navigator !== 'undefined'
     && Number.isFinite(navigator.hardwareConcurrency))
     ? navigator.hardwareConcurrency
     : 4;
   // Leave one core for the main thread; clamp to a sane range.
-  return Math.min(8, Math.max(2, cores - 1));
+  return Math.min(MAX_WORKER_COUNT, Math.max(2, cores - 1));
 }
 
 /**
