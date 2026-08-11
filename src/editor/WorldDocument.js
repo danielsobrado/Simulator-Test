@@ -40,6 +40,28 @@ function assertCollisionSchema(document) {
   }
 }
 
+function createLoadSnapshot(worldStore) {
+  if (typeof worldStore.createTransactionSnapshot === 'function'
+      && typeof worldStore.restoreTransactionSnapshot === 'function') {
+    return Object.freeze({
+      kind: 'transaction',
+      value: worldStore.createTransactionSnapshot(),
+    });
+  }
+  return Object.freeze({
+    kind: 'snapshot',
+    value: worldStore.createSnapshot(),
+  });
+}
+
+function restoreLoadSnapshot(worldStore, snapshot) {
+  if (snapshot.kind === 'transaction') {
+    worldStore.restoreTransactionSnapshot(snapshot.value);
+    return;
+  }
+  worldStore.restoreSnapshot(snapshot.value);
+}
+
 export function createWorldDocument(
   tileMap,
   heightFieldOrObjectMap,
@@ -79,7 +101,7 @@ export function loadWorldDocument(
   if (!worldStore) {
     throw new Error('World documents require an infinite world store.');
   }
-  const previousWorld = worldStore.createSnapshot();
+  const previousWorld = createLoadSnapshot(worldStore);
   const previousObjects = models.objectMap.toDocument();
   const previousVoxelStamps = models.voxelStampStore?.toDocument() ?? null;
 
@@ -92,7 +114,7 @@ export function loadWorldDocument(
     });
     validate?.();
   } catch (error) {
-    worldStore.restoreSnapshot(previousWorld);
+    restoreLoadSnapshot(worldStore, previousWorld);
     models.objectMap.replaceAll(previousObjects);
     if (models.voxelStampStore && previousVoxelStamps) {
       models.voxelStampStore.replaceAll(previousVoxelStamps);
