@@ -376,7 +376,11 @@ function terrainGuidanceDetail(config) {
 export function buildAzgaarImportSummary(document, config, options = {}) {
   const atlas = resolveAtlasDimensions(document, config);
   const physical = resolvePhysicalDimensions(document, options);
-  const biomeDefinitions = createAzgaarBiomeDefinitions(document.biomesData);
+  const biomeDefinitions = createAzgaarBiomeDefinitions(
+    document.biomesData,
+    [],
+    config.import?.azgaarGuidance,
+  );
   return Object.freeze({
     atlasWidth: atlas.width,
     atlasHeight: atlas.height,
@@ -442,14 +446,18 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
     }
   }
 
-  const biomeDefinitions = createAzgaarBiomeDefinitions(document.biomesData, observedBiomeIds);
+  const guidanceConfig = config.import.azgaarGuidance;
+  const biomeDefinitions = createAzgaarBiomeDefinitions(
+    document.biomesData,
+    observedBiomeIds,
+    guidanceConfig,
+  );
   const rivers = createRiverData(
     document,
     summary.atlasWidth,
     summary.atlasHeight,
     summary.physicalWidthMeters,
   );
-  const guidanceConfig = config.import.azgaarGuidance;
   const derived = deriveAzgaarWorldGuidance({
     raw,
     rivers,
