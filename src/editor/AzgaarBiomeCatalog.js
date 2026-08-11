@@ -1,5 +1,6 @@
 const CUSTOM_TILE_ID_START = 32;
 const CUSTOM_TILE_ID_END = 254;
+const MAX_SOURCE_BIOME_ID = 255;
 
 const STANDARD_DEFINITIONS = [
   ['Marine', '#466eab', '🌊', 'water', false, false],
@@ -97,6 +98,12 @@ export const AZGAAR_STANDARD_BIOMES = Object.freeze(
   })),
 );
 
+function assertSourceBiomeId(value) {
+  if (!Number.isInteger(value) || value < 0 || value > MAX_SOURCE_BIOME_ID) {
+    throw new Error('Azgaar biome source ids must fit in an unsigned byte (0–255).');
+  }
+}
+
 function normalizeBiomeMetadata(source) {
   if (!Array.isArray(source)) return source ?? {};
   const result = {
@@ -107,8 +114,14 @@ function normalizeBiomeMetadata(source) {
     iconsDensity: [],
     icons: [],
   };
+  const sourceIds = new Set();
   for (const biome of source) {
-    if (!Number.isInteger(biome?.i) || biome.i < 0 || biome.removed === true) continue;
+    assertSourceBiomeId(biome?.i);
+    if (sourceIds.has(biome.i)) {
+      throw new Error(`Azgaar biome metadata contains duplicate source id ${biome.i}.`);
+    }
+    sourceIds.add(biome.i);
+    if (biome.removed === true) continue;
     result.name[biome.i] = biome.name;
     result.color[biome.i] = biome.color;
     result.habitability[biome.i] = biome.habitability;
@@ -124,6 +137,9 @@ function customSourceIds(biomesData, observedSourceIds) {
   const names = Array.isArray(biomesData?.name) ? biomesData.name : [];
   const colors = Array.isArray(biomesData?.color) ? biomesData.color : [];
   const metadataLength = Math.max(names.length, colors.length);
+  if (metadataLength > MAX_SOURCE_BIOME_ID + 1) {
+    throw new Error('Azgaar biome source ids must fit in an unsigned byte (0–255).');
+  }
   for (let sourceId = AZGAAR_STANDARD_BIOMES.length; sourceId < metadataLength; sourceId += 1) {
     if (
       (typeof names[sourceId] === 'string' && names[sourceId].trim() !== '')
@@ -133,9 +149,8 @@ function customSourceIds(biomesData, observedSourceIds) {
     }
   }
   for (const sourceId of observedSourceIds ?? []) {
-    if (Number.isInteger(sourceId) && sourceId >= AZGAAR_STANDARD_BIOMES.length) {
-      ids.add(sourceId);
-    }
+    assertSourceBiomeId(sourceId);
+    if (sourceId >= AZGAAR_STANDARD_BIOMES.length) ids.add(sourceId);
   }
   return [...ids].sort((left, right) => left - right);
 }
@@ -212,9 +227,6 @@ export function createAzgaarBiomeDefinitions(
       : definition.reliefIcons,
   }));
   const customIds = customSourceIds(biomesData, observedSourceIds);
-  if (customIds.some((sourceId) => sourceId > 255)) {
-    throw new Error('Azgaar biome source ids must fit in an unsigned byte (0–255).');
-  }
   if (customIds.length > CUSTOM_TILE_ID_END - CUSTOM_TILE_ID_START + 1) {
     throw new Error(
       `Azgaar map defines ${customIds.length} custom biomes; at most `
