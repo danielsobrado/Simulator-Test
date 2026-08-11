@@ -1,7 +1,11 @@
 import { ObjectSpatialIndex } from './ObjectSpatialIndex.js';
 
 function normalizeRotation(rotation) {
-  return ((Number(rotation) % 4) + 4) % 4;
+  const numeric = Number(rotation ?? 0);
+  if (!Number.isInteger(numeric)) {
+    throw new Error('Object rotation must be an integer quarter-turn.');
+  }
+  return ((numeric % 4) + 4) % 4;
 }
 
 function cloneObject(object) {
