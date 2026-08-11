@@ -146,15 +146,15 @@ test('encodes a portable guidance atlas with terrain, climate, and river data', 
   assert.equal(guidance.riverDistance.length, 60);
 });
 
-test('preserves wide feature ids and unsigned settlement scores', () => {
+test('preserves wide feature ids and signed settlement scores', () => {
   const document = createDocument();
   document.pack.cells[6].f = 70_000;
-  document.pack.cells[6].s = 50_000;
+  document.pack.cells[6].s = -120;
   const source = createAzgaarMacroWorldSource(document, config);
   const fields = decodeMacroAtlas(source, { includeGuidance: true }).fields;
 
   assert.ok(fields.featureId instanceof Uint32Array);
   assert.ok(fields.featureId.includes(70_000));
-  assert.ok(fields.settlementScore instanceof Uint16Array);
-  assert.ok(fields.settlementScore.includes(50_000));
+  assert.ok(fields.settlementScore instanceof Int16Array);
+  assert.ok(fields.settlementScore.includes(-120));
 });
