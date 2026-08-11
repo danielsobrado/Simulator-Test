@@ -539,7 +539,7 @@ export class InfiniteWorldStore {
   }
 
   clearOverrides() {
-    const snapshot = this.createSnapshot();
+    const snapshot = this.createSnapshot({ cloneBaseTerrain: false });
     if (this.tileOverrides.size === 0 && this.heightOverrides.size === 0) {
       return snapshot;
     }
@@ -550,11 +550,13 @@ export class InfiniteWorldStore {
     return snapshot;
   }
 
-  createSnapshot() {
+  createSnapshot({ cloneBaseTerrain = true } = {}) {
     return Object.freeze({
       tileOverrides: Object.freeze([...this.tileOverrides.entries()]),
       heightOverrides: Object.freeze([...this.heightOverrides.entries()]),
-      baseTerrain: this.baseTerrain ? structuredClone(this.baseTerrain) : null,
+      baseTerrain: this.baseTerrain
+        ? (cloneBaseTerrain ? structuredClone(this.baseTerrain) : this.baseTerrain)
+        : null,
       forestEdits: structuredClone(this.forestEdits),
     });
   }
@@ -598,7 +600,7 @@ export class InfiniteWorldStore {
   }
 
   loadDocument(document) {
-    const previous = this.createSnapshot();
+    const previous = this.createSnapshot({ cloneBaseTerrain: false });
     try {
       if (document?.version !== INFINITE_WORLD_FORMAT_VERSION) {
         throw new Error(
