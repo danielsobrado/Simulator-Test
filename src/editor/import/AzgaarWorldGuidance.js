@@ -105,15 +105,12 @@ function markLine(seeds, width, height, start, end) {
 
 function createRiverDistances(riverId, rivers, width, height) {
   const seeds = new Uint8Array(width * height);
-  if (rivers?.length) {
-    for (const river of rivers) {
-      for (let index = 1; index < river.points.length; index += 1) {
-        markLine(seeds, width, height, river.points[index - 1], river.points[index]);
-      }
-    }
-  } else {
-    for (let index = 0; index < riverId.length; index += 1) {
-      seeds[index] = riverId[index] > 0 ? 1 : 0;
+  for (let index = 0; index < riverId.length; index += 1) {
+    seeds[index] = riverId[index] > 0 ? 1 : 0;
+  }
+  for (const river of rivers ?? []) {
+    for (let index = 1; index < river.points.length; index += 1) {
+      markLine(seeds, width, height, river.points[index - 1], river.points[index]);
     }
   }
   return distanceToSeeds(seeds, width, height);
