@@ -31,7 +31,6 @@ wetnessMoistureWeight: 0.7
 wetnessRiverWeight: 0.25
 wetnessCoastWeight: 0.1
 wetnessReliefPenalty: 0.15
-harborScoreNormalization: 4
 detailBaseScale: 0.75
 detailMountainWeight: 0.35
 detailRuggednessWeight: 0.35
