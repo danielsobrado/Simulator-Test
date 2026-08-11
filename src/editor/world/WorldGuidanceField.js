@@ -1,4 +1,7 @@
-import { decodeMacroAtlas } from '../import/AzgaarMacroWorldSource.js';
+import {
+  decodeGuidanceField,
+  hasGuidanceField,
+} from '../import/AzgaarMacroWorldSource.js';
 import { WORLD_GUIDANCE_NO_DISTANCE } from '../import/AzgaarWorldGuidance.js';
 
 const NORMALIZED_FIELDS = Object.freeze([
@@ -14,6 +17,12 @@ const NORMALIZED_FIELDS = Object.freeze([
   'harborPotential',
 ]);
 
+const LEGACY_FIELD_NAMES = Object.freeze({
+  elevation: 'heightData',
+  biomeId: 'biomeData',
+  featureId: 'featureData',
+});
+
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -22,14 +31,69 @@ function lerp(left, right, amount) {
   return left + (right - left) * amount;
 }
 
+function fieldPayload(source, name) {
+  return source.atlas?.fields?.[name]
+    ?? source.terrainGuidance?.fields?.[name]
+    ?? source.atlas?.[LEGACY_FIELD_NAMES[name]]
+    ?? null;
+}
+
+function outsideSample() {
+  return {
+    inside: false,
+    elevation: 0,
+    temperature: null,
+    precipitation: null,
+    waterDistance: null,
+    biomeId: 0,
+    featureId: 0,
+    riverId: 0,
+    riverFlux: 0,
+    confluenceFlux: 0,
+    population: 0,
+    settlementScore: 0,
+    harborScore: 0,
+    havenId: 0,
+    coastDistance: null,
+    coastDistanceMeters: null,
+    riverDistance: null,
+    riverDistanceMeters: null,
+    moisture: 0,
+    continentalness: 0,
+    wetness: 1,
+    mountainness: 0,
+    ruggedness: 0,
+    valleyness: 0,
+    snowPotential: 0,
+    forestPotential: 0,
+    agriculturalPotential: 0,
+    harborPotential: 0,
+  };
+}
+
 export class WorldGuidanceField {
-  constructor(source, decoded = decodeMacroAtlas(source, { includeGuidance: true })) {
+  constructor(source, decoded = null) {
     this.source = source;
-    this.fields = decoded.fields;
+    this.fields = Object.create(null);
+    for (const [name, values] of Object.entries(decoded?.fields ?? {})) {
+      this.fields[name] = values;
+    }
     this.biomeBySourceId = new Map(
       (source.biomes ?? []).map((definition) => [definition.sourceId, definition]),
     );
     this.metersPerAtlasPixel = source.physical.widthMeters / source.atlas.width;
+  }
+
+  decodedFieldNames() {
+    return Object.freeze(Object.keys(this.fields).sort());
+  }
+
+  field(name) {
+    if (this.fields[name]) return this.fields[name];
+    if (!hasGuidanceField(this.source, name)) return null;
+    const values = decodeGuidanceField(this.source, name);
+    if (values) this.fields[name] = values;
+    return values;
   }
 
   isInside(cellX, cellZ) {
@@ -54,11 +118,11 @@ export class WorldGuidanceField {
   }
 
   fieldScale(name) {
-    return Number(this.source.atlas.fields?.[name]?.scale ?? 1);
+    return Number(fieldPayload(this.source, name)?.scale ?? 1);
   }
 
   sampleNearest(name, cellX, cellZ) {
-    const values = this.fields[name];
+    const values = this.field(name);
     if (!values) return null;
     const position = this.toAtlasPosition(cellX + 0.5, cellZ + 0.5);
     const index = this.atlasIndex(Math.floor(position.x), Math.floor(position.y));
@@ -66,7 +130,7 @@ export class WorldGuidanceField {
   }
 
   sampleContinuous(name, cellX, cellZ) {
-    const values = this.fields[name];
+    const values = this.field(name);
     if (!values) return null;
     const { width, height } = this.source.atlas;
     const position = this.toAtlasPosition(cellX + 0.5, cellZ + 0.5);
@@ -90,10 +154,11 @@ export class WorldGuidanceField {
   }
 
   sample(cellX, cellZ) {
+    if (!this.isInside(cellX + 0.5, cellZ + 0.5)) return outsideSample();
     const coastDistance = this.sampleContinuous('coastDistance', cellX, cellZ);
     const riverDistance = this.sampleContinuous('riverDistance', cellX, cellZ);
     const result = {
-      inside: this.isInside(cellX + 0.5, cellZ + 0.5),
+      inside: true,
       elevation: this.sampleContinuous('elevation', cellX, cellZ),
       temperature: this.sampleContinuous('temperature', cellX, cellZ),
       precipitation: this.sampleContinuous('precipitation', cellX, cellZ),
@@ -131,7 +196,10 @@ export class WorldGuidanceField {
         weights: [{ sourceId: 0, tileId: marine?.tileId ?? 0, weight: 1 }],
       };
     }
-    const values = this.fields.biomeId;
+    const values = this.field('biomeId');
+    if (!values) {
+      throw new Error('Azgaar guidance is missing biomeId.');
+    }
     const { width, height } = this.source.atlas;
     const position = this.toAtlasPosition(cellX + 0.5, cellZ + 0.5);
     const fx = clamp(position.x - 0.5, 0, width - 1);
