@@ -19,16 +19,21 @@ const OBJECT_TO_SOURCE_BAND = Object.freeze({
   shell: 'impostor',
 });
 
+const OBJECT_BANDS = Object.freeze(['near', 'coarse', 'shell']);
+
 function cameraSignature(camera, viewportHeight) {
-  const values = [
-    camera.position.x, camera.position.y, camera.position.z,
-    camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w,
-    camera.zoom ?? 1, camera.fov ?? 0, viewportHeight,
-  ];
-  return values.map((value, index) => {
-    const scale = index < 3 ? 2 : index < 7 ? 1000 : 10;
-    return Math.round(value * scale);
-  }).join(':');
+  return [
+    Math.round(camera.position.x * 2),
+    Math.round(camera.position.y * 2),
+    Math.round(camera.position.z * 2),
+    Math.round(camera.quaternion.x * 1000),
+    Math.round(camera.quaternion.y * 1000),
+    Math.round(camera.quaternion.z * 1000),
+    Math.round(camera.quaternion.w * 1000),
+    Math.round((camera.zoom ?? 1) * 10),
+    Math.round((camera.fov ?? 0) * 10),
+    Math.round(viewportHeight * 10),
+  ].join(':');
 }
 
 function stableSeed(id) {
@@ -55,6 +60,7 @@ export class ObjectLodController {
     this.transitionMs = transitionMs;
     this.fadeSteps = fadeSteps;
     this.states = new Map();
+    this.seeds = new Map();
     this.lastCameraSignature = null;
     this.lastSelectedObjectId = null;
     this.lastPlan = null;
@@ -63,6 +69,7 @@ export class ObjectLodController {
 
   clear() {
     this.states.clear();
+    this.seeds.clear();
     this.lastCameraSignature = null;
     this.lastSelectedObjectId = null;
     this.lastPlan = null;
@@ -106,8 +113,9 @@ export class ObjectLodController {
     const activeIds = new Set();
     let transitions = 0;
     for (const placement of placements) {
-      activeIds.add(placement.object.id);
-      const previousState = this.states.get(placement.object.id) ?? null;
+      const objectId = placement.object.id;
+      activeIds.add(objectId);
+      const previousState = this.states.get(objectId) ?? null;
       const previousObjectBand = SOURCE_TO_OBJECT_BAND[previousState?.target] ?? null;
       const pixels = projectedPixelHeight({
         camera,
@@ -115,7 +123,7 @@ export class ObjectLodController {
         worldHeight: placement.worldHeight,
         viewportHeight,
       });
-      const targetObjectBand = placement.object.id === selectedObjectId
+      const targetObjectBand = objectId === selectedObjectId
         ? 'near'
         : SOURCE_TO_OBJECT_BAND[selectProjectedLod({
           pixels,
@@ -129,8 +137,13 @@ export class ObjectLodController {
         timestamp,
         durationMs: this.transitionMs,
       });
-      this.states.set(placement.object.id, state);
+      this.states.set(objectId, state);
       if (!state.complete) transitions += 1;
+      let seed = this.seeds.get(objectId);
+      if (seed === undefined) {
+        seed = stableSeed(objectId);
+        this.seeds.set(objectId, seed);
+      }
       for (const representation of state.representations) {
         const band = SOURCE_TO_OBJECT_BAND[representation.band];
         if (!buckets[band]) continue;
@@ -139,18 +152,20 @@ export class ObjectLodController {
           fade: representation.fade,
           ditherDirection: representation.ditherDirection ?? 1,
           quantizedFade: quantizeFade(representation.fade, this.fadeSteps),
-          seed: stableSeed(placement.object.id),
-          objectId: placement.object.id,
+          seed,
+          objectId,
         });
       }
     }
     for (const id of this.states.keys()) {
-      if (!activeIds.has(id)) this.states.delete(id);
+      if (activeIds.has(id)) continue;
+      this.states.delete(id);
+      this.seeds.delete(id);
     }
 
     const signatures = {};
-    for (const [band, instances] of Object.entries(buckets)) {
-      signatures[band] = instances.map((instance) => (
+    for (const band of OBJECT_BANDS) {
+      signatures[band] = buckets[band].map((instance) => (
         `${instance.objectId}:${instance.quantizedFade}:${instance.ditherDirection}`
       )).join('|');
     }
