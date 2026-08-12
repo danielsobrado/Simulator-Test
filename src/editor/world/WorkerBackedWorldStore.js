@@ -1,4 +1,5 @@
 import { InfiniteWorldStore } from './InfiniteWorldStore.js';
+import { normalizeForestEditDocument } from '../forest/ForestEditDocument.js';
 import {
   PERF_COUNTER_WATER_GENERATION_MS,
   PerfCounters,
@@ -321,7 +322,8 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   loadInfiniteDocument(document) {
     assertGeneratorMetadata(document.world?.generator, this.generator.toMetadata());
     const chunks = decodeAndValidateChunks(document.chunks, this.chunkSize, this.vertexSize);
-    super.loadInfiniteDocument({ ...document, chunks });
+    const forestEdits = normalizeForestEditDocument(document.forestEdits ?? {});
+    super.loadInfiniteDocument({ ...document, chunks, forestEdits });
   }
 
   clearOverrides() {
