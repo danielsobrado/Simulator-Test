@@ -7,6 +7,58 @@ function cloneCampaign(campaign) {
   return campaign ? structuredClone(campaign) : null;
 }
 
+function restoreAuxiliaryLoadState({
+  proceduralAssetManager,
+  previousProceduralAssets,
+  constructionMaterialStore,
+  previousConstructionMaterials,
+  constructionStore,
+  previousConstructions,
+  biomeAssetPalette,
+  previousBiomeAssets,
+  sceneSettingsConsumer,
+  previousSceneSettings,
+  inventoryStore,
+  previousInventory,
+  inventoryCommitted,
+}) {
+  const errors = [];
+  const restore = (enabled, operation) => {
+    if (!enabled) return;
+    try {
+      operation();
+    } catch (error) {
+      errors.push(error);
+    }
+  };
+
+  restore(
+    proceduralAssetManager && previousProceduralAssets !== null,
+    () => proceduralAssetManager.replaceAll(previousProceduralAssets),
+  );
+  restore(
+    constructionMaterialStore && previousConstructionMaterials !== null,
+    () => constructionMaterialStore.loadDocument(previousConstructionMaterials),
+  );
+  restore(
+    constructionStore && previousConstructions !== null,
+    () => constructionStore.replaceAll(previousConstructions),
+  );
+  restore(
+    biomeAssetPalette && previousBiomeAssets !== null,
+    () => biomeAssetPalette.replaceDocument(previousBiomeAssets),
+  );
+  restore(
+    sceneSettingsConsumer && previousSceneSettings !== null,
+    () => sceneSettingsConsumer(previousSceneSettings),
+  );
+  restore(
+    inventoryCommitted && inventoryStore && previousInventory !== null,
+    () => inventoryStore.replaceDocument(previousInventory, { emit: false }),
+  );
+  return errors;
+}
+
 export class TerrainAwareEditorController extends EditorController {
   constructor(options) {
     super(options);
@@ -298,33 +350,36 @@ export class TerrainAwareEditorController extends EditorController {
         this.voxelStampStore,
         () => this.validateLoadedObjectSurfaces(),
       );
-      if (inventoryCommitted) {
-        this.inventoryStore.emit({
-          kind: 'replace',
-          before: previousInventory,
-          after: this.inventoryStore.toDocument(),
-        });
-      }
     } catch (error) {
-      if (previousProceduralAssets) {
-        this.proceduralAssetManager.replaceAll(previousProceduralAssets);
-      }
-      if (previousConstructions) {
-        this.constructionStore.replaceAll(previousConstructions);
-      }
-      if (previousConstructionMaterials) {
-        this.constructionMaterialStore.loadDocument(previousConstructionMaterials);
-      }
-      if (previousBiomeAssets) {
-        this.biomeAssetPalette.replaceDocument(previousBiomeAssets);
-      }
-      if (previousSceneSettings && this.sceneSettingsConsumer) {
-        this.sceneSettingsConsumer(previousSceneSettings);
-      }
-      if (inventoryCommitted && previousInventory && this.inventoryStore) {
-        this.inventoryStore.replaceDocument(previousInventory, { emit: false });
+      const rollbackErrors = restoreAuxiliaryLoadState({
+        proceduralAssetManager: this.proceduralAssetManager,
+        previousProceduralAssets,
+        constructionMaterialStore: this.constructionMaterialStore,
+        previousConstructionMaterials,
+        constructionStore: this.constructionStore,
+        previousConstructions,
+        biomeAssetPalette: this.biomeAssetPalette,
+        previousBiomeAssets,
+        sceneSettingsConsumer: this.sceneSettingsConsumer,
+        previousSceneSettings,
+        inventoryStore: this.inventoryStore,
+        previousInventory,
+        inventoryCommitted,
+      });
+      if (rollbackErrors.length > 0) {
+        throw new AggregateError(
+          [error, ...rollbackErrors],
+          'World load failed and auxiliary editor state could not be fully restored.',
+        );
       }
       throw error;
+    }
+    if (inventoryCommitted) {
+      this.inventoryStore.emit({
+        kind: 'replace',
+        before: previousInventory,
+        after: this.inventoryStore.toDocument(),
+      });
     }
     this.campaign = cloneCampaign(document.campaign);
     this.importWarnings = Array.isArray(document.importWarnings)
