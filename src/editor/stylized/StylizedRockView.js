@@ -5,6 +5,7 @@ import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { instanceCapacity } from './scatterMath.js';
 import {
   buildStableChunkManifest,
+  createStableChunkManifestBuilder,
   placementSignature,
 } from './StableScatterManifest.js';
 import {
@@ -111,6 +112,7 @@ export class StylizedRockView {
     this.clusterField = null;
     this.signature = '';
     this.manifestCache = new Map();
+    this.pendingManifestBuild = null;
     this.manifestBuildsThisFrame = 0;
     this.manifestBuildBudgetMs = config.streaming?.rockManifestBuildBudgetMs
       ?? config.streaming?.heavyBuildBudgetMs
@@ -296,10 +298,8 @@ export class StylizedRockView {
         chunkX <= job.focus.chunkX + job.placementRadius;
         chunkX += 1) {
         if (this.cachedManifestForChunk(chunkX, chunkZ) !== null) continue;
-        // Manifest generation samples terrain and the regional scatter field.
-        // Preparing at most one cold chunk per frame makes the configured
-        // budget apply inside a residency-ring rebuild rather than only around
-        // the otherwise uninterruptible whole-ring operation.
+        // One cold manifest is resumed under the frame budget instead of
+        // running its terrain/cluster candidate loop as one monolithic task.
         this.prepareManifestForChunk(chunkX, chunkZ);
         return true;
       }
@@ -368,20 +368,15 @@ export class StylizedRockView {
     const cacheKey = `${chunkX}:${chunkZ}`;
     const cached = this.manifestCache.get(cacheKey);
     if (cached?.key === key) {
+      if (this.pendingManifestBuild?.cacheKey === cacheKey) this.pendingManifestBuild = null;
       this.placementsByChunk.set(cacheKey, cached.placements);
       return cached.placements;
     }
     return null;
   }
 
-  manifestForChunk(chunkX, chunkZ) {
-    const cached = this.cachedManifestForChunk(chunkX, chunkZ);
-    if (cached !== null) return cached;
-    const key = this.manifestKey(chunkX, chunkZ);
-    const cacheKey = `${chunkX}:${chunkZ}`;
-    const startedAt = performance.now();
-
-    const placements = buildStableChunkManifest({
+  manifestOptions(chunkX, chunkZ) {
+    return {
       kind: 'rock',
       chunkX,
       chunkZ,
@@ -406,14 +401,33 @@ export class StylizedRockView {
       maxScale: this.config.rocks.maxScale,
       radiusForScale: (scale) => this.config.rocks.radius * scale,
       candidateEvaluator: this.createCandidateEvaluator(),
-    });
+    };
+  }
+
+  storeManifest(cacheKey, key, placements) {
     this.manifestCache.set(cacheKey, { key, placements });
     this.placementsByChunk.set(cacheKey, placements);
+    return placements;
+  }
+
+  manifestForChunk(chunkX, chunkZ) {
+    const cached = this.cachedManifestForChunk(chunkX, chunkZ);
+    if (cached !== null) return cached;
+    const key = this.manifestKey(chunkX, chunkZ);
+    const cacheKey = `${chunkX}:${chunkZ}`;
+    const startedAt = performance.now();
+    const pending = this.pendingManifestBuild;
+    const placements = pending?.key === key && pending.cacheKey === cacheKey
+      ? pending.builder.step()
+      : buildStableChunkManifest(this.manifestOptions(chunkX, chunkZ));
+    if (pending?.key === key && pending.cacheKey === cacheKey) {
+      this.pendingManifestBuild = null;
+    }
     const elapsed = performance.now() - startedAt;
     PerfCounters.inc('rockManifestBuilds');
     PerfCounters.inc('rockManifestBuildMs', elapsed);
     PerfCounters.set('rockManifestBuild', elapsed);
-    return placements;
+    return this.storeManifest(cacheKey, key, placements);
   }
 
   prepareManifestForChunk(chunkX, chunkZ) {
@@ -427,7 +441,35 @@ export class StylizedRockView {
       return null;
     }
     this.manifestBuildsThisFrame += 1;
-    return this.manifestForChunk(chunkX, chunkZ);
+
+    const key = this.manifestKey(chunkX, chunkZ);
+    const cacheKey = `${chunkX}:${chunkZ}`;
+    let pending = this.pendingManifestBuild;
+    if (pending?.key !== key || pending.cacheKey !== cacheKey) {
+      pending = {
+        key,
+        cacheKey,
+        builder: createStableChunkManifestBuilder(this.manifestOptions(chunkX, chunkZ)),
+      };
+      this.pendingManifestBuild = pending;
+    }
+
+    const startedAt = performance.now();
+    const placements = pending.builder.step({
+      shouldYield: () => (
+        this.manifestFrameStartedAt > 0
+        && performance.now() - this.manifestFrameStartedAt >= this.manifestBuildBudgetMs
+      ),
+    });
+    const sliceElapsed = performance.now() - startedAt;
+    PerfCounters.inc('rockManifestBuildSlices');
+    PerfCounters.inc('rockManifestBuildMs', sliceElapsed);
+    PerfCounters.set('rockManifestBuild', sliceElapsed);
+    if (placements === null) return null;
+
+    this.pendingManifestBuild = null;
+    PerfCounters.inc('rockManifestBuilds');
+    return this.storeManifest(cacheKey, key, placements);
   }
 
   rebuild(focus, placementRadius, plan) {
@@ -532,8 +574,8 @@ export class StylizedRockView {
 
   /**
    * Returns a complete blocker halo only after its cold manifests have been
-   * prepared. A caller may retry next frame; each retry advances at most one
-   * cold rock chunk through `prepareManifestForChunk`.
+   * prepared. A caller may retry next frame; each retry advances one bounded
+   * slice of the first cold rock manifest.
    */
   getPreparedBlockersForChunk(chunkX, chunkZ, halo = 1) {
     const placements = [];
@@ -572,6 +614,7 @@ export class StylizedRockView {
     this.prototypeIndicesByAsset.clear();
     this.placements.length = 0;
     this.manifestCache.clear();
+    this.pendingManifestBuild = null;
     this.placementsByChunk.clear();
     this.chunkLodStates.clear();
   }

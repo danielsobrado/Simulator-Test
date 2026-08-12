@@ -516,16 +516,19 @@ export class StylizedSurfaceView {
       void job;
       return this.treeView?.applyPendingRebuild() ?? false;
     });
-    // Bushes run after rocks and trees so boulder blockers and the forest field
-    // are already current for this frame.
+    // Bush blockers cover the complete local rock ring. Keep the previous bush
+    // publication until that ring is ready so bush rebuilds cannot force a cold
+    // rock manifest to finish synchronously and reintroduce the boundary hitch.
     this.bushView?.update(timestamp, camera, this.rockView);
     if (this.bushView?.pendingRebuild) {
       this.bushBuildQueue.enqueue(this.bushView.pendingRebuild);
     }
-    this.bushBuildQueue.flush((job) => {
-      void job;
-      return this.bushView?.applyPendingRebuild() ?? false;
-    });
+    if (!this.rockView?.pendingRebuild) {
+      this.bushBuildQueue.flush((job) => {
+        void job;
+        return this.bushView?.applyPendingRebuild() ?? false;
+      });
+    }
     this.groundDetailView?.update();
     this.aquaticPlantView?.update();
     for (const view of [this.groundDetailView, this.aquaticPlantView]) {

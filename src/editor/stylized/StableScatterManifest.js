@@ -3,6 +3,7 @@ import { hash32, overlaps, scatterRandom01 } from './scatterMath.js';
 
 const DEFAULT_PRIORITY_CHANNEL = 23;
 const SIGNATURE_SCALE = 1000;
+const EMPTY_MANIFEST = Object.freeze([]);
 const CANDIDATE_AUTHORITY_FIELDS = new Set([
   'stableId',
   'ownerChunkX',
@@ -42,7 +43,6 @@ function createSpacingIndex(candidates) {
   for (const candidate of candidates) {
     if (candidate.radius > maximumRadius) maximumRadius = candidate.radius;
   }
-  // Zero-radius candidates never overlap, so the bucket size is irrelevant.
   const cellSize = maximumRadius > 0 ? maximumRadius * 2 : 1;
   const buckets = new Map();
   for (const candidate of candidates) {
@@ -82,12 +82,6 @@ function mixHash(seed, value) {
 /**
  * Order-independent digest of a placement set, used purely as an in-memory
  * change-detection key.
- *
- * Each placement is hashed on its own and the hashes are summed, so the result
- * cannot depend on iteration order. The previous version got that property by
- * sorting on `stableId` with `localeCompare` on every call; blocker sets span a
- * 3x3 chunk halo, so that sort ran tens of thousands of slow locale comparisons
- * per manifest rebuild. This is O(n) with no copy and no comparisons.
  */
 export function placementSignature(placements) {
   let accumulator = 0;
@@ -209,9 +203,6 @@ function createCandidate({
   const x = center.x + (random01(2) - 0.5) * tileSize;
   const z = center.z + (random01(3) - 0.5) * tileSize;
   const prototypeRoll = random01(4);
-  // World coordinates go to the selector as well as the biome: prototype choice
-  // varies within a biome by regional character and forest canopy, both of which
-  // are sampled from position.
   const prototypeIndex = prototypeIndexForRoll
     ? prototypeIndexForRoll(prototypeRoll, tileId, x, z)
     : Math.floor(prototypeRoll * prototypeCount) % prototypeCount;
@@ -243,18 +234,25 @@ function createCandidate({
   return evaluateCandidate(candidate, candidateEvaluator);
 }
 
+function completedBuilder(result) {
+  return Object.freeze({
+    get done() {
+      return true;
+    },
+    step() {
+      return result;
+    },
+  });
+}
+
 /**
- * Builds one chunk's accepted placements using a Matérn-II rule: a candidate
- * survives only when no overlapping candidate has a lower stable priority.
- * Acceptance is independent of focus-window size and traversal order.
+ * Incremental form of buildStableChunkManifest.
  *
- * candidateEvaluator may reject a candidate or attach immutable domain metadata.
- * maxAccepted limits every owner chunk's authoritative candidates before spacing,
- * so candidates that cannot render never create invisible blockers.
- * randomChannelOffset gives independent scatter layers distinct deterministic
- * candidate streams without making either layer depend on the other's residency.
+ * A step always completes at least one candidate when work remains, then checks
+ * shouldYield between candidates. This bounds expensive terrain/habitat/cluster
+ * sampling without changing candidate order, RNG channels, spacing, or output.
  */
-export function buildStableChunkManifest({
+export function createStableChunkManifestBuilder({
   kind,
   chunkX,
   chunkZ,
@@ -276,26 +274,58 @@ export function buildStableChunkManifest({
   candidateEvaluator = null,
   maxAccepted = Number.POSITIVE_INFINITY,
 }) {
-  if (!Number.isInteger(prototypeCount) || prototypeCount < 1) return Object.freeze([]);
+  if (!Number.isInteger(prototypeCount) || prototypeCount < 1) {
+    return completedBuilder(EMPTY_MANIFEST);
+  }
   if (!Number.isSafeInteger(randomChannelOffset) || randomChannelOffset < 0) {
     throw new Error('randomChannelOffset must be a non-negative safe integer.');
   }
+
   const acceptedLimit = normalizeAcceptedLimit(maxAccepted);
   const eligibleTileIds = tileIds instanceof Set ? tileIds : new Set(tileIds);
-  const candidates = [];
+  const minimumChunkX = chunkX - haloChunks;
+  const maximumChunkX = chunkX + haloChunks;
+  const maximumChunkZ = chunkZ + haloChunks;
+  let candidateChunkX = minimumChunkX;
+  let candidateChunkZ = chunkZ - haloChunks;
+  let candidateIndex = 0;
+  let candidates = [];
+  let authoritativeCandidates = null;
+  let spacingIndex = null;
+  let acceptanceIndex = 0;
+  const owned = [];
+  let result = null;
 
-  for (let candidateChunkZ = chunkZ - haloChunks;
-    candidateChunkZ <= chunkZ + haloChunks;
-    candidateChunkZ += 1) {
-    for (let candidateChunkX = chunkX - haloChunks;
-      candidateChunkX <= chunkX + haloChunks;
-      candidateChunkX += 1) {
-      for (let index = 0; index < perChunk; index += 1) {
+  function advanceCandidate() {
+    candidateIndex += 1;
+    if (candidateIndex < perChunk) return;
+    candidateIndex = 0;
+    candidateChunkX += 1;
+    if (candidateChunkX <= maximumChunkX) return;
+    candidateChunkX = minimumChunkX;
+    candidateChunkZ += 1;
+  }
+
+  return Object.freeze({
+    get done() {
+      return result !== null;
+    },
+
+    step({ shouldYield = null } = {}) {
+      if (result !== null) return result;
+      const yieldRequested = typeof shouldYield === 'function' ? shouldYield : null;
+      let workUnits = 0;
+
+      while (candidateChunkZ <= maximumChunkZ) {
+        if (candidateIndex >= perChunk) {
+          advanceCandidate();
+          continue;
+        }
         const candidate = createCandidate({
           kind,
           chunkX: candidateChunkX,
           chunkZ: candidateChunkZ,
-          index,
+          index: candidateIndex,
           chunkSize,
           tileSize,
           tileIds: eligibleTileIds,
@@ -311,23 +341,57 @@ export function buildStableChunkManifest({
           candidateEvaluator,
         });
         if (candidate) candidates.push(candidate);
+        advanceCandidate();
+        workUnits += 1;
+        if (workUnits > 0 && yieldRequested?.()) return null;
       }
-    }
-  }
 
-  const authoritativeCandidates = limitCandidatesByOwner(candidates, acceptedLimit);
-  const spacingIndex = createSpacingIndex(authoritativeCandidates);
-  const accepted = authoritativeCandidates.filter((candidate) => {
-    if (overlaps(candidate.x, candidate.z, blockers, candidate.radius)) return false;
-    for (const other of spacingIndex.neighbours(candidate)) {
-      if (other === candidate || !candidateWins(other, candidate)) continue;
-      if (candidateOverlaps(candidate, other)) return false;
-    }
-    return true;
+      if (authoritativeCandidates === null) {
+        authoritativeCandidates = limitCandidatesByOwner(candidates, acceptedLimit);
+        spacingIndex = createSpacingIndex(authoritativeCandidates);
+        candidates = null;
+      }
+
+      while (acceptanceIndex < authoritativeCandidates.length) {
+        const candidate = authoritativeCandidates[acceptanceIndex];
+        acceptanceIndex += 1;
+        let accepted = !overlaps(candidate.x, candidate.z, blockers, candidate.radius);
+        if (accepted) {
+          for (const other of spacingIndex.neighbours(candidate)) {
+            if (other === candidate || !candidateWins(other, candidate)) continue;
+            if (candidateOverlaps(candidate, other)) {
+              accepted = false;
+              break;
+            }
+          }
+        }
+        if (accepted
+            && candidate.ownerChunkX === chunkX
+            && candidate.ownerChunkZ === chunkZ) {
+          owned.push(candidate);
+        }
+        workUnits += 1;
+        if (workUnits > 0 && yieldRequested?.()) return null;
+      }
+
+      result = Object.freeze(owned.sort((left, right) => left.index - right.index));
+      return result;
+    },
   });
-  const owned = accepted.filter((candidate) => (
-    candidate.ownerChunkX === chunkX && candidate.ownerChunkZ === chunkZ
-  ));
+}
 
-  return Object.freeze(owned.sort((left, right) => left.index - right.index));
+/**
+ * Builds one chunk's accepted placements using a Matérn-II rule: a candidate
+ * survives only when no overlapping candidate has a lower stable priority.
+ * Acceptance is independent of focus-window size and traversal order.
+ *
+ * candidateEvaluator may reject a candidate or attach immutable domain metadata.
+ * maxAccepted limits every owner chunk's authoritative candidates before spacing,
+ * so candidates that cannot render never create invisible blockers.
+ * randomChannelOffset gives independent scatter layers distinct deterministic
+ * candidate streams without making either layer depend on the other's residency.
+ */
+export function buildStableChunkManifest(options) {
+  const builder = createStableChunkManifestBuilder(options);
+  return builder.step();
 }
