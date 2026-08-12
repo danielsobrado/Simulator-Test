@@ -195,11 +195,31 @@ function validateTerrainMetadata(terrain, oceanTransitionCells) {
   }
 }
 
+function validateRiverMetadata(rivers) {
+  if (rivers == null) return;
+  if (!Array.isArray(rivers)) {
+    throw new Error('Azgaar macro source rivers must be an array.');
+  }
+  for (const river of rivers) {
+    if (!Number.isFinite(river?.widthAtlas) || river.widthAtlas <= 0
+        || !Array.isArray(river.points) || river.points.length < 2) {
+      throw new Error('Azgaar macro source contains invalid river metadata.');
+    }
+    for (const point of river.points) {
+      if (!Array.isArray(point) || point.length < 2
+          || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) {
+        throw new Error('Azgaar macro source contains invalid river coordinates.');
+      }
+    }
+  }
+}
+
 export class AzgaarMacroWorldGenerator {
   constructor(source, proceduralMetadata) {
     validateBounds(source.bounds);
     validateTerrainMetadata(source.terrain, source.oceanTransitionCells);
     validateBiomeDefinitions(source.biomes);
+    validateRiverMetadata(source.rivers);
     this.source = source;
     this.heights = decodeGuidanceField(source, 'elevation');
     this.biomeAtlas = decodeGuidanceField(source, 'biomeId');
