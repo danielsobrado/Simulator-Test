@@ -22,18 +22,13 @@ const OBJECT_TO_SOURCE_BAND = Object.freeze({
 const OBJECT_BANDS = Object.freeze(['near', 'coarse', 'shell']);
 
 function cameraSignature(camera, viewportHeight) {
-  return [
-    Math.round(camera.position.x * 2),
-    Math.round(camera.position.y * 2),
-    Math.round(camera.position.z * 2),
-    Math.round(camera.quaternion.x * 1000),
-    Math.round(camera.quaternion.y * 1000),
-    Math.round(camera.quaternion.z * 1000),
-    Math.round(camera.quaternion.w * 1000),
-    Math.round((camera.zoom ?? 1) * 10),
-    Math.round((camera.fov ?? 0) * 10),
-    Math.round(viewportHeight * 10),
-  ].join(':');
+  const position = camera.position;
+  const quaternion = camera.quaternion;
+  return `${Math.round(position.x * 2)}:${Math.round(position.y * 2)}:${Math.round(position.z * 2)}`
+    + `:${Math.round(quaternion.x * 1000)}:${Math.round(quaternion.y * 1000)}`
+    + `:${Math.round(quaternion.z * 1000)}:${Math.round(quaternion.w * 1000)}`
+    + `:${Math.round((camera.zoom ?? 1) * 10)}:${Math.round((camera.fov ?? 0) * 10)}`
+    + `:${Math.round(viewportHeight * 10)}`;
 }
 
 function stableSeed(id) {
@@ -139,6 +134,7 @@ export class ObjectLodController {
       });
       this.states.set(objectId, state);
       if (!state.complete) transitions += 1;
+
       let seed = this.seeds.get(objectId);
       if (seed === undefined) {
         seed = stableSeed(objectId);
@@ -165,7 +161,8 @@ export class ObjectLodController {
 
     const signatures = {};
     for (const band of OBJECT_BANDS) {
-      signatures[band] = buckets[band].map((instance) => (
+      const instances = buckets[band];
+      signatures[band] = instances.map((instance) => (
         `${instance.objectId}:${instance.quantizedFade}:${instance.ditherDirection}`
       )).join('|');
     }
