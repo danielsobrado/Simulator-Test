@@ -90,6 +90,7 @@ export class WorldChunkWorkerClient {
       { type: 'module' },
     );
     worker.addEventListener('message', (event) => this.onMessage(event));
+    worker.addEventListener('messageerror', (event) => this.onMessageError(event, workerIndex, worker));
     worker.addEventListener('error', (event) => this.onError(event, workerIndex, worker));
     return worker;
   }
@@ -274,6 +275,16 @@ export class WorldChunkWorkerClient {
       pending.resolve(page);
     }
     this.pump();
+  }
+
+  onMessageError(event, workerIndex, sourceWorker) {
+    if (this.disposed || this.workers[workerIndex] !== sourceWorker) return;
+    event.preventDefault?.();
+    this.handleWorkerFailure(
+      workerIndex,
+      sourceWorker,
+      new Error('World chunk worker response could not be deserialized.'),
+    );
   }
 
   onError(event, workerIndex, sourceWorker) {
