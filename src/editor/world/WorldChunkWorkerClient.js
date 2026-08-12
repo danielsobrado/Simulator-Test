@@ -10,6 +10,12 @@ function disposedError() {
   return new Error('World chunk worker was disposed.');
 }
 
+function retryableWorkerError(message) {
+  const error = new Error(message);
+  error.retryable = true;
+  return error;
+}
+
 /** Resolve the worker pool size from an explicit override or CPU cores. */
 export function resolveWorkerCount(requested) {
   if (Number.isFinite(requested) && requested > 0) {
@@ -283,7 +289,7 @@ export class WorldChunkWorkerClient {
     this.handleWorkerFailure(
       workerIndex,
       sourceWorker,
-      new Error('World chunk worker response could not be deserialized.'),
+      retryableWorkerError('World chunk worker response could not be deserialized.'),
     );
   }
 
@@ -295,7 +301,7 @@ export class WorldChunkWorkerClient {
     this.handleWorkerFailure(
       workerIndex,
       sourceWorker,
-      new Error(event.message || 'World chunk worker failed.'),
+      retryableWorkerError(event.message || 'World chunk worker failed.'),
     );
   }
 
