@@ -42,3 +42,26 @@ test('malformed planted forest edits fail inside the world load transaction', ()
     store.dispose();
   }
 });
+
+test('legacy forest edits with a null version still load as version one', () => {
+  const store = createStore();
+  try {
+    const document = store.toDocument();
+    document.forestEdits = {
+      version: null,
+      felled: ['tree-1'],
+      planted: [],
+      patches: [],
+    };
+
+    store.loadDocument(document);
+    assert.deepEqual(store.forestEdits, {
+      version: 1,
+      felled: ['tree-1'],
+      planted: [],
+      patches: [],
+    });
+  } finally {
+    store.dispose();
+  }
+});
