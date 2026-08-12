@@ -1,21 +1,7 @@
-const VALID_PATCH_STATES = new Set(['burned', 'regrowing', 'cleared']);
-
-function normalizePlant(record) {
-  if (!record || typeof record.stableId !== 'string' || record.stableId.length === 0) {
-    throw new Error('Planted forests require a stableId.');
-  }
-  if (!Number.isFinite(record.x) || !Number.isFinite(record.z)) {
-    throw new Error('Planted forest coordinates must be finite.');
-  }
-  return Object.freeze({
-    stableId: record.stableId,
-    x: record.x,
-    z: record.z,
-    speciesId: String(record.speciesId ?? 'broadleaf_round'),
-    ageClass: String(record.ageClass ?? 'sapling'),
-    plantedAt: Number.isFinite(record.plantedAt) ? record.plantedAt : 0,
-  });
-}
+import {
+  VALID_PATCH_STATES,
+  normalizeForestEditDocument,
+} from '../../forest/ForestEditDocument.js';
 
 export class ForestEditStore {
   constructor(document = null) {
@@ -41,10 +27,10 @@ export class ForestEditStore {
   }
 
   plant(record) {
-    const planted = normalizePlant(record);
-    this.planted.set(planted.stableId, planted);
+    const normalized = normalizeForestEditDocument({ planted: [record] }).planted[0];
+    this.planted.set(normalized.stableId, normalized);
     this.revision += 1;
-    return planted;
+    return normalized;
   }
 
   removePlant(stableId) {
@@ -87,37 +73,22 @@ export class ForestEditStore {
   }
 
   toDocument() {
-    return {
+    return normalizeForestEditDocument({
       version: 1,
-      felled: [...this.felled].sort(),
-      planted: [...this.planted.values()].sort((a, b) => a.stableId.localeCompare(b.stableId)),
-      patches: [...this.patchStates.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([patchId, value]) => ({ patchId, ...value })),
-    };
+      felled: [...this.felled],
+      planted: [...this.planted.values()],
+      patches: [...this.patchStates.entries()].map(([patchId, value]) => ({ patchId, ...value })),
+    });
   }
 
   loadDocument(document = {}) {
-    const felled = new Set();
-    for (const stableId of document.felled ?? []) {
-      if (typeof stableId === 'string' && stableId.length > 0) felled.add(stableId);
-    }
-    const planted = new Map();
-    for (const record of document.planted ?? []) {
-      const normalized = normalizePlant(record);
-      planted.set(normalized.stableId, normalized);
-    }
-    const patchStates = new Map();
-    for (const patch of document.patches ?? []) {
-      if (typeof patch?.patchId !== 'string' || !VALID_PATCH_STATES.has(patch.state)) continue;
-      patchStates.set(patch.patchId, Object.freeze({
-        state: patch.state,
-        progress: Math.min(1, Math.max(0, Number(patch.progress) || 0)),
-      }));
-    }
-    this.felled = felled;
-    this.planted = planted;
-    this.patchStates = patchStates;
+    const normalized = normalizeForestEditDocument(document);
+    this.felled = new Set(normalized.felled);
+    this.planted = new Map(normalized.planted.map((record) => [record.stableId, record]));
+    this.patchStates = new Map(normalized.patches.map((patch) => [
+      patch.patchId,
+      Object.freeze({ state: patch.state, progress: patch.progress }),
+    ]));
     this.revision += 1;
   }
 }
