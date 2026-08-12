@@ -3,6 +3,7 @@ import {
   hasGuidanceField,
 } from '../import/AzgaarMacroWorldSource.js';
 import { WorldGuidanceField } from './WorldGuidanceField.js';
+import { WORLD_MAX_SAFE_CELL_COORDINATE } from './worldConstants.js';
 
 const WATER_TILE_ID = 0;
 const LAND_HEIGHT = 20;
@@ -15,6 +16,14 @@ const LEGACY_DETAIL_GUIDANCE = Object.freeze({
   minimumScale: 0.45,
   maximumScale: 1.5,
 });
+const GUIDANCE_DETAIL_FIELDS = Object.freeze([
+  'baseScale',
+  'mountainWeight',
+  'ruggednessWeight',
+  'valleyPenalty',
+  'minimumScale',
+  'maximumScale',
+]);
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -138,8 +147,58 @@ function validateBiomeDefinitions(definitions) {
   }
 }
 
+function validateBounds(bounds) {
+  const minCellX = bounds?.minCellX;
+  const minCellZ = bounds?.minCellZ;
+  const widthCells = bounds?.widthCells;
+  const heightCells = bounds?.heightCells;
+  if (!Number.isSafeInteger(minCellX) || !Number.isSafeInteger(minCellZ)
+      || !Number.isSafeInteger(widthCells) || widthCells < 1
+      || !Number.isSafeInteger(heightCells) || heightCells < 1) {
+    throw new Error('Azgaar macro source has invalid world bounds.');
+  }
+  const maxCellX = minCellX + widthCells - 1;
+  const maxCellZ = minCellZ + heightCells - 1;
+  if (!Number.isSafeInteger(maxCellX) || !Number.isSafeInteger(maxCellZ)
+      || Math.abs(minCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(minCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE) {
+    throw new Error('Azgaar macro source world bounds exceed the engine coordinate limit.');
+  }
+}
+
+function validateTerrainMetadata(terrain, oceanTransitionCells) {
+  if (!terrain
+      || !Number.isFinite(terrain.minHeight)
+      || !Number.isFinite(terrain.maxHeight)
+      || !Number.isFinite(terrain.seaLevel)
+      || terrain.maxHeight <= terrain.minHeight) {
+    throw new Error('Azgaar macro source has invalid terrain height metadata.');
+  }
+  for (const name of ['verticalExaggeration', 'reliefExponent']) {
+    if (terrain[name] !== undefined
+        && (!Number.isFinite(terrain[name]) || terrain[name] <= 0)) {
+      throw new Error(`Azgaar macro source terrain ${name} must be positive.`);
+    }
+  }
+  if (!Number.isFinite(oceanTransitionCells) || oceanTransitionCells <= 0) {
+    throw new Error('Azgaar macro source ocean transition must be positive.');
+  }
+  const detail = terrain.guidanceDetail;
+  if (detail === undefined) return;
+  if (!detail || GUIDANCE_DETAIL_FIELDS.some((name) => !Number.isFinite(detail[name]))) {
+    throw new Error('Azgaar macro source has invalid terrain guidance detail metadata.');
+  }
+  if (detail.minimumScale <= 0 || detail.maximumScale < detail.minimumScale) {
+    throw new Error('Azgaar macro source terrain guidance detail scale range is invalid.');
+  }
+}
+
 export class AzgaarMacroWorldGenerator {
   constructor(source, proceduralMetadata) {
+    validateBounds(source.bounds);
+    validateTerrainMetadata(source.terrain, source.oceanTransitionCells);
     validateBiomeDefinitions(source.biomes);
     this.source = source;
     this.heights = decodeGuidanceField(source, 'elevation');
