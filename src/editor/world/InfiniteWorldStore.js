@@ -134,7 +134,11 @@ export class InfiniteWorldStore {
     this.revision += 1;
     const snapshot = Object.freeze({ revision: this.revision, ...change });
     for (const listener of this.listeners) {
-      listener(snapshot);
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.error('Infinite-world change listener failed.', error);
+      }
     }
   }
 
