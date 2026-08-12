@@ -81,7 +81,11 @@ export class WorldGuidanceField {
     this.biomeBySourceId = new Map(
       (source.biomes ?? []).map((definition) => [definition.sourceId, definition]),
     );
-    this.metersPerAtlasPixel = source.physical.widthMeters / source.atlas.width;
+    const physicalWidthMeters = Number(source.physical?.widthMeters);
+    if (!Number.isFinite(physicalWidthMeters) || physicalWidthMeters <= 0) {
+      throw new Error('Azgaar guidance physical width must be a positive finite number.');
+    }
+    this.metersPerAtlasPixel = physicalWidthMeters / source.atlas.width;
   }
 
   decodedFieldNames() {
