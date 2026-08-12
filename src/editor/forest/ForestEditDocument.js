@@ -21,7 +21,7 @@ export function normalizeForestEditDocument(document = {}) {
   if (!document || typeof document !== 'object' || Array.isArray(document)) {
     throw new Error('Forest edits must be an object.');
   }
-  if (document.version !== undefined && document.version !== 1) {
+  if (document.version != null && document.version !== 1) {
     throw new Error(`Unsupported forest edit version: ${document.version}.`);
   }
   if (document.felled !== undefined && !Array.isArray(document.felled)) {
