@@ -71,7 +71,13 @@ export class InventoryStore {
   }
 
   emit(change) {
-    for (const listener of this.listeners) listener(change);
+    for (const listener of this.listeners) {
+      try {
+        listener(change);
+      } catch (error) {
+        console.error('Inventory change listener failed.', error);
+      }
+    }
   }
 
   getState() {
