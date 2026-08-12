@@ -62,6 +62,35 @@ function restoreLoadSnapshot(worldStore, snapshot) {
   worldStore.restoreSnapshot(snapshot.value);
 }
 
+function restoreAfterFailedLoad({
+  worldStore,
+  previousWorld,
+  objectMap,
+  previousObjects,
+  voxelStampStore,
+  previousVoxelStamps,
+}) {
+  const errors = [];
+  try {
+    restoreLoadSnapshot(worldStore, previousWorld);
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    objectMap.replaceAll(previousObjects);
+  } catch (error) {
+    errors.push(error);
+  }
+  if (voxelStampStore && previousVoxelStamps !== null) {
+    try {
+      voxelStampStore.replaceAll(previousVoxelStamps);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  return errors;
+}
+
 export function createWorldDocument(
   tileMap,
   heightFieldOrObjectMap,
@@ -114,10 +143,19 @@ export function loadWorldDocument(
     });
     validate?.();
   } catch (error) {
-    restoreLoadSnapshot(worldStore, previousWorld);
-    models.objectMap.replaceAll(previousObjects);
-    if (models.voxelStampStore && previousVoxelStamps) {
-      models.voxelStampStore.replaceAll(previousVoxelStamps);
+    const rollbackErrors = restoreAfterFailedLoad({
+      worldStore,
+      previousWorld,
+      objectMap: models.objectMap,
+      previousObjects,
+      voxelStampStore: models.voxelStampStore,
+      previousVoxelStamps,
+    });
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        'World document load failed and rollback was incomplete.',
+      );
     }
     throw error;
   }
