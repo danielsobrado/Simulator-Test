@@ -66,24 +66,24 @@ test('hybrid exports fall back to legacy biome metadata when pack.biomes is empt
   assert.equal(custom.terrainClass, 'forest');
 });
 
-test('import accepts the largest centered world that fits the engine cell limit', () => {
+test('import accepts centered bounds whose edge chunks remain inside the engine limit', () => {
   const config = createConfig();
-  const maximumWidthCells = WORLD_MAX_SAFE_CELL_COORDINATE * 2 + 1;
+  const safeHalfWidthCells = WORLD_MAX_SAFE_CELL_COORDINATE - config.world.chunkSize * 2;
+  const safeWidthCells = safeHalfWidthCells * 2 + 1;
   const converted = importAzgaarFullJson(createDocument(), config, {
-    physicalWidthMeters: maximumWidthCells * config.map.tileSize,
+    physicalWidthMeters: safeWidthCells * config.map.tileSize,
   });
 
-  assert.equal(converted.world.baseTerrain.bounds.widthCells, maximumWidthCells);
-  assert.equal(converted.world.baseTerrain.bounds.minCellX, -WORLD_MAX_SAFE_CELL_COORDINATE);
+  assert.equal(converted.world.baseTerrain.bounds.widthCells, safeWidthCells);
 });
 
-test('import rejects a world one cell beyond the engine coordinate ceiling', () => {
+test('import rejects cell-valid bounds whose edge chunk vertex exceeds the engine limit', () => {
   const config = createConfig();
-  const excessiveWidthCells = WORLD_MAX_SAFE_CELL_COORDINATE * 2 + 2;
+  const cellValidButChunkInvalidWidth = WORLD_MAX_SAFE_CELL_COORDINATE * 2 + 1;
 
   assert.throws(
     () => importAzgaarFullJson(createDocument(), config, {
-      physicalWidthMeters: excessiveWidthCells * config.map.tileSize,
+      physicalWidthMeters: cellValidButChunkInvalidWidth * config.map.tileSize,
     }),
     /exceed safe streamed-world coordinates/,
   );
