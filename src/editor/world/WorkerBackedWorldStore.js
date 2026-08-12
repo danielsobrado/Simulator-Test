@@ -106,9 +106,28 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   }
 
   setBaseTerrain(baseTerrain) {
+    const previousBaseTerrain = this.baseTerrain;
+    const previousRevision = this.baseTerrainRevision ?? 0;
     super.setBaseTerrain(baseTerrain);
-    this.baseTerrainRevision = (this.baseTerrainRevision ?? 0) + 1;
-    this.chunkWorker.setBaseTerrain?.(this.baseTerrain);
+    try {
+      this.chunkWorker.setBaseTerrain?.(this.baseTerrain);
+    } catch (error) {
+      try {
+        super.setBaseTerrain(previousBaseTerrain);
+        this.chunkWorker.setBaseTerrain?.(this.baseTerrain);
+        this.baseTerrainRevision = previousRevision;
+      } catch (rollbackError) {
+        this.baseTerrainRevision = previousRevision + 1;
+        this.pendingChunks.clear();
+        throw new AggregateError(
+          [error, rollbackError],
+          'World base terrain configuration failed and worker rollback was incomplete.',
+        );
+      }
+      throw error;
+    }
+    this.baseTerrainRevision = previousRevision + 1;
+    this.pendingChunks.clear();
   }
 
   requestChunk(chunkX, chunkZ, { priority = 0 } = {}) {
