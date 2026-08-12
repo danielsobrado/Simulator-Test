@@ -2,6 +2,7 @@ import { enrichPageVegetationScatter } from '../stylized/vegetationScatter.js';
 import { enrichPageWaterField } from '../water/WaterField.js';
 import { chunkKey } from './WorldCoordinates.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
+import { WORLD_MAX_SAFE_CELL_COORDINATE } from './worldConstants.js';
 import {
   createSurfaceMaskConfig,
   enrichPageRenderPixels,
@@ -13,6 +14,19 @@ function assertChunkRequest(request) {
   }
   if (!Number.isInteger(request.chunkSize) || request.chunkSize < 1) {
     throw new Error('World chunk size must be a positive integer.');
+  }
+
+  const originX = request.chunkX * request.chunkSize;
+  const originZ = request.chunkZ * request.chunkSize;
+  const maxVertexX = originX + request.chunkSize;
+  const maxVertexZ = originZ + request.chunkSize;
+  if (!Number.isSafeInteger(originX) || !Number.isSafeInteger(originZ)
+      || !Number.isSafeInteger(maxVertexX) || !Number.isSafeInteger(maxVertexZ)
+      || Math.abs(originX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(originZ) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxVertexX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxVertexZ) > WORLD_MAX_SAFE_CELL_COORDINATE) {
+    throw new Error('World chunk exceeds the engine cell coordinate limit.');
   }
 }
 
