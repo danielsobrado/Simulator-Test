@@ -13,6 +13,16 @@ function createObjectMap() {
   };
 }
 
+function createVoxelStore() {
+  let stamps = [{ id: 'old-stamp' }];
+  return {
+    toDocument: () => structuredClone(stamps),
+    loadDocument(next) { stamps = structuredClone(next); },
+    replaceAll(next) { stamps = structuredClone(next); },
+    list: () => structuredClone(stamps),
+  };
+}
+
 test('world document rollback prefers lightweight transaction snapshots', () => {
   const marker = { id: 'old-world' };
   let restored = null;
@@ -55,4 +65,46 @@ test('world document rollback retains the generic snapshot fallback', () => {
     /load failed/,
   );
   assert.equal(restored, marker);
+});
+
+test('object and voxel rollback still run when world rollback fails', () => {
+  const objectMap = createObjectMap();
+  const voxelStore = createVoxelStore();
+  let worldRestoreAttempts = 0;
+  const worldStore = {
+    createTransactionSnapshot() { return { id: 'old-world' }; },
+    restoreTransactionSnapshot() {
+      worldRestoreAttempts += 1;
+      throw new Error('world restore failed');
+    },
+    loadDocument() {},
+  };
+
+  let thrown = null;
+  try {
+    loadWorldDocument(
+      {
+        version: 6,
+        objects: [{ id: 'new-object' }],
+        voxelStamps: [{ id: 'new-stamp' }],
+      },
+      { worldStore },
+      null,
+      objectMap,
+      voxelStore,
+      () => { throw new Error('validation failed'); },
+    );
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.ok(thrown instanceof AggregateError);
+  assert.match(thrown.message, /rollback was incomplete/);
+  assert.deepEqual(thrown.errors.map((error) => error.message), [
+    'validation failed',
+    'world restore failed',
+  ]);
+  assert.equal(worldRestoreAttempts, 1);
+  assert.deepEqual(objectMap.list(), [{ id: 'old-object' }]);
+  assert.deepEqual(voxelStore.list(), [{ id: 'old-stamp' }]);
 });
