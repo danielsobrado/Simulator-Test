@@ -180,6 +180,7 @@ export class GpuVoxelChunk {
     this.computeSmooth = null;
     this.computeClassify = null;
     this.computeEmit = null;
+    this.activeComputePromise = null;
     this.regenerationPromise = null;
     this.regenerationRequested = false;
     this.rebuilding = false;
@@ -217,12 +218,15 @@ export class GpuVoxelChunk {
       this.createGpuResources();
       this.uploadStamps();
       await this.regeneratePasses();
+      if (this.disposed) return this.getStatus();
       this.statusCode = STATUS_READY;
       this.group.visible = this.layout.visible;
       this.update();
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : String(error);
-      this.statusCode = STATUS_FAILED;
+      if (!this.disposed) {
+        this.errorMessage = error instanceof Error ? error.message : String(error);
+        this.statusCode = STATUS_FAILED;
+      }
       this.disposeGpuResources();
     }
     return this.getStatus();
@@ -237,11 +241,31 @@ export class GpuVoxelChunk {
       throw new Error('GPU marching-cubes resources are not initialized.');
     }
 
-    await this.renderer.computeAsync(this.computeInit);
-    await this.renderer.computeAsync(this.computeDensity);
-    await this.renderer.computeAsync(this.computeSmooth);
-    await this.renderer.computeAsync(this.computeClassify);
-    await this.renderer.computeAsync(this.computeEmit);
+    const computeNodes = [
+      this.computeInit,
+      this.computeDensity,
+      this.computeSmooth,
+      this.computeClassify,
+      this.computeEmit,
+    ];
+    const computePromise = (async () => {
+      for (const node of computeNodes) {
+        if (this.disposed) return;
+        await this.renderer.computeAsync(node);
+      }
+    })();
+    this.activeComputePromise = computePromise;
+
+    try {
+      await computePromise;
+    } finally {
+      if (this.activeComputePromise === computePromise) {
+        this.activeComputePromise = null;
+      }
+      if (this.disposed) {
+        this.disposeGpuResources();
+      }
+    }
   }
 
   requestRegeneration() {
@@ -262,6 +286,7 @@ export class GpuVoxelChunk {
         await this.regeneratePasses();
       }
     })().catch((error) => {
+      if (this.disposed) return;
       this.errorMessage = error instanceof Error ? error.message : String(error);
       this.statusCode = STATUS_FAILED;
       console.error(`GPU chunk ${this.descriptor.key} regeneration failed.`, error);
@@ -638,6 +663,12 @@ export class GpuVoxelChunk {
       return;
     }
     this.disposed = true;
-    this.disposeGpuResources();
+    this.regenerationRequested = false;
+    if (this.group) {
+      this.group.visible = false;
+    }
+    if (!this.activeComputePromise) {
+      this.disposeGpuResources();
+    }
   }
 }
