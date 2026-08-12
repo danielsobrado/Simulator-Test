@@ -113,12 +113,16 @@ export class GpuVoxelWorld {
   }
 
   async initialize(focusWorld = { x: 0, z: 0 }) {
+    if (this.disposed) return this.getStatus();
     this.updateAssignments(focusWorld, false);
     for (const slot of this.slots) {
+      if (this.disposed) return this.getStatus();
       await slot.chunk.initialize();
+      if (this.disposed) return this.getStatus();
       this.positionSlot(slot);
       slot.chunk.setVisible(this.visible && Boolean(slot.key));
     }
+    if (this.disposed) return this.getStatus();
     this.initialized = true;
     this.unsubscribeStamps = this.stampStore?.subscribe((stamps) => {
       this.applyStampSnapshot(stamps);
