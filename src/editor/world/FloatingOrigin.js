@@ -18,6 +18,16 @@ export class FloatingOrigin {
     return () => this.listeners.delete(listener);
   }
 
+  notify(event) {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error('Floating-origin listener failed.', error);
+      }
+    }
+  }
+
   toCanonical(renderX, renderZ) {
     return Object.freeze({
       x: renderX + this.originX,
@@ -49,9 +59,7 @@ export class FloatingOrigin {
       originX: this.originX,
       originZ: this.originZ,
     });
-    for (const listener of this.listeners) {
-      listener(event);
-    }
+    this.notify(event);
     return event;
   }
 
