@@ -10,6 +10,7 @@ export class ObjectSpatialIndex {
     this.bucketSize = Math.max(1, Math.trunc(bucketSize) || 1);
     this.boundsForObject = boundsForObject;
     this.objects = new Map();
+    this.boundsByObjectId = new Map();
     this.bucketIds = new Map();
     this.objectBuckets = new Map();
     this.bucketRevisions = new Map();
@@ -36,8 +37,10 @@ export class ObjectSpatialIndex {
   }
 
   add(object) {
-    const keys = this.keysForBounds(this.boundsForObject(object));
+    const bounds = this.boundsForObject(object);
+    const keys = this.keysForBounds(bounds);
     this.objects.set(object.id, object);
+    this.boundsByObjectId.set(object.id, bounds);
     this.objectBuckets.set(object.id, keys);
     for (const key of keys) {
       const ids = this.bucketIds.get(key) ?? new Set();
@@ -57,6 +60,7 @@ export class ObjectSpatialIndex {
       if (ids.size === 0) this.bucketIds.delete(key);
     }
     this.objects.delete(object.id);
+    this.boundsByObjectId.delete(object.id);
     this.objectBuckets.delete(object.id);
     this.mark(keys);
   }
@@ -64,6 +68,7 @@ export class ObjectSpatialIndex {
   replace(objects) {
     const previousKeys = [...this.bucketIds.keys()];
     this.objects.clear();
+    this.boundsByObjectId.clear();
     this.bucketIds.clear();
     this.objectBuckets.clear();
     for (const object of objects) this.add(object);
@@ -73,6 +78,7 @@ export class ObjectSpatialIndex {
   clear() {
     const keys = [...this.bucketIds.keys()];
     this.objects.clear();
+    this.boundsByObjectId.clear();
     this.bucketIds.clear();
     this.objectBuckets.clear();
     this.mark(keys);
@@ -81,12 +87,15 @@ export class ObjectSpatialIndex {
   query(bounds) {
     const ids = new Set();
     for (const key of this.keysForBounds(bounds)) {
-      for (const id of this.bucketIds.get(key) ?? []) ids.add(id);
+      const bucket = this.bucketIds.get(key);
+      if (!bucket) continue;
+      for (const id of bucket) ids.add(id);
     }
     const objects = [];
     for (const id of ids) {
       const object = this.objects.get(id);
-      if (object && intersects(this.boundsForObject(object), bounds)) objects.push(object);
+      const objectBounds = this.boundsByObjectId.get(id);
+      if (object && objectBounds && intersects(objectBounds, bounds)) objects.push(object);
     }
     return objects;
   }
