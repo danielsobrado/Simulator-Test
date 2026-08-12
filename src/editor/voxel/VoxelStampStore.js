@@ -223,7 +223,11 @@ export class VoxelStampStore {
   emit() {
     const snapshot = this.list();
     for (const listener of this.listeners) {
-      listener(snapshot);
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.error('Voxel stamp listener failed.', error);
+      }
     }
   }
 }
