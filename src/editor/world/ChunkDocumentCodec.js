@@ -1,3 +1,5 @@
+import { WORLD_MAX_SAFE_CELL_COORDINATE } from './worldConstants.js';
+
 const TILE_SENTINEL = 255;
 const DENSE_ENCODING = 'base64-le-v1';
 
@@ -26,6 +28,24 @@ function base64ToBytes(value) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function assertChunkCoordinateRange(chunk, chunkSize) {
+  if (!Number.isSafeInteger(chunk?.x) || !Number.isSafeInteger(chunk?.z)) {
+    throw new Error('Infinite world chunk coordinates must be safe integers.');
+  }
+  const originX = chunk.x * chunkSize;
+  const originZ = chunk.z * chunkSize;
+  const maxVertexX = originX + chunkSize;
+  const maxVertexZ = originZ + chunkSize;
+  if (!Number.isSafeInteger(originX) || !Number.isSafeInteger(originZ)
+      || !Number.isSafeInteger(maxVertexX) || !Number.isSafeInteger(maxVertexZ)
+      || Math.abs(originX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(originZ) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxVertexX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxVertexZ) > WORLD_MAX_SAFE_CELL_COORDINATE) {
+    throw new Error('Infinite world chunk exceeds the engine cell coordinate limit.');
+  }
 }
 
 function encodeTiles(entries, cellCount) {
@@ -99,6 +119,7 @@ export function encodeChunkDocument(chunk, chunkSize) {
 }
 
 export function decodeChunkDocument(chunk, chunkSize) {
+  assertChunkCoordinateRange(chunk, chunkSize);
   if (chunk.encoding && chunk.encoding !== DENSE_ENCODING) {
     throw new Error(`Unsupported chunk encoding: ${chunk.encoding}.`);
   }
