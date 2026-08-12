@@ -138,12 +138,24 @@ function normalizeBiomeSource(document) {
   return document;
 }
 
+function chunkAxisFits(minCell, maxCell, chunkSize) {
+  const firstChunkOrigin = Math.floor(minCell / chunkSize) * chunkSize;
+  const lastChunkOrigin = Math.floor(maxCell / chunkSize) * chunkSize;
+  const lastChunkVertex = lastChunkOrigin + chunkSize;
+  return Number.isSafeInteger(firstChunkOrigin)
+    && Number.isSafeInteger(lastChunkVertex)
+    && Math.abs(firstChunkOrigin) <= WORLD_MAX_SAFE_CELL_COORDINATE
+    && Math.abs(lastChunkVertex) <= WORLD_MAX_SAFE_CELL_COORDINATE;
+}
+
 function assertSafeWorldBounds(summary, config) {
   const tileSize = Number(config.map?.tileSize);
+  const chunkSize = Number(config.world?.chunkSize);
   const widthCells = Math.round(summary.physicalWidthMeters / tileSize);
   const heightCells = Math.round(summary.physicalHeightMeters / tileSize);
   if (!Number.isSafeInteger(widthCells) || widthCells < 1
-      || !Number.isSafeInteger(heightCells) || heightCells < 1) {
+      || !Number.isSafeInteger(heightCells) || heightCells < 1
+      || !Number.isInteger(chunkSize) || chunkSize < 1) {
     throw new Error('Azgaar imported world dimensions exceed safe streamed-world coordinates.');
   }
 
@@ -151,10 +163,8 @@ function assertSafeWorldBounds(summary, config) {
   const minCellZ = -Math.floor(heightCells / 2);
   const maxCellX = minCellX + widthCells - 1;
   const maxCellZ = minCellZ + heightCells - 1;
-  if (Math.abs(minCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
-      || Math.abs(maxCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
-      || Math.abs(minCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE
-      || Math.abs(maxCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE) {
+  if (!chunkAxisFits(minCellX, maxCellX, chunkSize)
+      || !chunkAxisFits(minCellZ, maxCellZ, chunkSize)) {
     throw new Error('Azgaar imported world dimensions exceed safe streamed-world coordinates.');
   }
 }
