@@ -347,7 +347,13 @@ export class InfiniteTerrainView {
   }
 
   emitStreaming(event) {
-    for (const listener of this.streamingListeners) listener(event);
+    for (const listener of this.streamingListeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error('Terrain streaming listener failed.', error);
+      }
+    }
   }
 
   render(camera) {
