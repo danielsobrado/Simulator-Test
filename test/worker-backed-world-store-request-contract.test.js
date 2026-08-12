@@ -33,6 +33,12 @@ function createPage(chunkX, chunkZ) {
   };
 }
 
+function retryableError(message) {
+  const error = new Error(message);
+  error.retryable = true;
+  return error;
+}
+
 test('synchronous worker failures are returned as rejected chunk promises', async () => {
   const store = createStore({
     chunkWorker: {
@@ -45,6 +51,50 @@ test('synchronous worker failures are returned as rejected chunk promises', asyn
     assert.ok(request instanceof Promise);
     await assert.rejects(request, /worker unavailable/);
     assert.equal(store.pendingChunks.size, 0);
+  } finally {
+    store.dispose();
+  }
+});
+
+test('transient worker channel failures retry once and populate the cache', async () => {
+  let calls = 0;
+  const store = createStore({
+    chunkWorker: {
+      request() {
+        calls += 1;
+        if (calls === 1) return Promise.reject(retryableError('worker crashed'));
+        return Promise.resolve(createPage(0, 0));
+      },
+    },
+  });
+
+  try {
+    const page = await store.requestChunk(0, 0);
+    assert.equal(calls, 2);
+    assert.equal(page.key, '0:0');
+    assert.equal(store.cache.get('0:0'), page);
+    assert.equal(store.pendingChunks.size, 0);
+  } finally {
+    store.dispose();
+  }
+});
+
+test('worker channel retries are bounded to one retry', async () => {
+  let calls = 0;
+  const store = createStore({
+    chunkWorker: {
+      request() {
+        calls += 1;
+        return Promise.reject(retryableError('worker keeps crashing'));
+      },
+    },
+  });
+
+  try {
+    await assert.rejects(store.requestChunk(0, 0), /worker keeps crashing/);
+    assert.equal(calls, 2);
+    assert.equal(store.pendingChunks.size, 0);
+    assert.equal(store.cache.size, 0);
   } finally {
     store.dispose();
   }
