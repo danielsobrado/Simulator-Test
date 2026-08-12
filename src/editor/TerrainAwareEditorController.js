@@ -7,6 +7,16 @@ function cloneCampaign(campaign) {
   return campaign ? structuredClone(campaign) : null;
 }
 
+function notifyListeners(listeners, payload, label) {
+  for (const listener of listeners) {
+    try {
+      listener(payload);
+    } catch (error) {
+      console.error(`${label} listener failed.`, error);
+    }
+  }
+}
+
 function restoreAuxiliaryLoadState({
   proceduralAssetManager,
   previousProceduralAssets,
@@ -81,6 +91,33 @@ export class TerrainAwareEditorController extends EditorController {
       worldStats: this.worldStore?.getStats() ?? null,
       campaignSource: this.campaign?.source ?? null,
     };
+  }
+
+  emitState() {
+    notifyListeners(this.listeners, this.getState(), 'Editor state');
+  }
+
+  emitMap(final = true) {
+    notifyListeners(this.mapListeners, { final }, 'Editor map');
+  }
+
+  emitHover(cell) {
+    const tileId = cell ? this.tileMap.get(cell.x, cell.z) : null;
+    const tile = tileId === null ? null : this.tileMap.getTileDefinition?.(tileId);
+    const object = cell ? this.objectMap.findAt(cell.x, cell.z) : null;
+    const objectDefinition = object
+      ? this.objectMap.getDefinition(object.definitionKey)
+      : null;
+    const height = cell ? this.heightField.getCellHeight(cell.x, cell.z) : null;
+    notifyListeners(
+      this.hoverListeners,
+      cell ? { ...cell, height, tile, object, objectDefinition } : null,
+      'Editor hover',
+    );
+  }
+
+  emitNotice(message, isError = false) {
+    notifyListeners(this.noticeListeners, { message, isError }, 'Editor notice');
   }
 
   getFocusCell() {
