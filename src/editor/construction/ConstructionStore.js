@@ -40,7 +40,13 @@ export class ConstructionStore {
   }
 
   emit(change) {
-    for (const listener of this.listeners) listener(change);
+    for (const listener of this.listeners) {
+      try {
+        listener(change);
+      } catch (error) {
+        console.error('Construction change listener failed.', error);
+      }
+    }
   }
 
   nextConstructionId() {
