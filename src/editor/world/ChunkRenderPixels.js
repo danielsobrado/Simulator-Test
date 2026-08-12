@@ -48,6 +48,13 @@ export function getSurfaceMaskSearchRadius(blendCells) {
   return Math.ceil(Math.max(0.5, blendCells) + 1);
 }
 
+export function getSurfaceMaskChunkRadius(blendCells, chunkSize) {
+  if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+    throw new Error('Surface mask chunk size must be a positive integer.');
+  }
+  return Math.ceil(getSurfaceMaskSearchRadius(blendCells) / chunkSize);
+}
+
 export function createSurfaceMaskConfig(stylizedConfig) {
   return {
     blendCells: Math.max(0.5, stylizedConfig?.path?.blendCells ?? 2.5),
