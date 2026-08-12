@@ -187,6 +187,23 @@ test('worker construction failure falls back to main-thread chunk generation', a
   }
 });
 
+test('main-thread fallback rejects a request disposed before generation starts', async () => {
+  const originalWorker = globalThis.Worker;
+  delete globalThis.Worker;
+  const client = createClient({ workerCount: 1, chunkSize: 2 });
+
+  try {
+    const request = client.request(0, 0);
+    client.dispose();
+    await assert.rejects(request, /disposed/);
+    assert.equal(client.worldGenerator, null);
+  } finally {
+    client.dispose();
+    if (originalWorker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = originalWorker;
+  }
+});
+
 test('a permanently failing worker slot is disabled without taking down healthy workers', () => {
   const restoreWorker = installFakeWorker();
   const originalConsoleError = console.error;
