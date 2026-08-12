@@ -126,14 +126,16 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     }
 
     const sourceRevision = this.baseTerrainRevision;
-    const contentRequest = this.contentProvider
-      ? this.contentProvider.getChunk(this.getContentWorldId(), chunkX, chunkZ)
-      : Promise.resolve(null);
+    const workerRequest = Promise.resolve().then(
+      () => this.chunkWorker.request(chunkX, chunkZ, { priority }),
+    );
+    const contentRequest = Promise.resolve().then(
+      () => (this.contentProvider
+        ? this.contentProvider.getChunk(this.getContentWorldId(), chunkX, chunkZ)
+        : null),
+    );
     let request;
-    request = Promise.all([
-      this.chunkWorker.request(chunkX, chunkZ, { priority }),
-      contentRequest,
-    ])
+    request = Promise.all([workerRequest, contentRequest])
       .then(([page, content]) => {
         if (sourceRevision !== this.baseTerrainRevision) {
           const error = new Error('World chunk request superseded by a base terrain change.');
