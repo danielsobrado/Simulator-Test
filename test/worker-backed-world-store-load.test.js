@@ -95,6 +95,35 @@ test('the full unsigned-byte tile range remains valid for sparse saves', () => {
   }
 });
 
+test('direct worker reconfiguration failure restores exact previous terrain state', () => {
+  let failProceduralConfigure = false;
+  const configuredKinds = [];
+  const { store } = createStore({
+    onSetBaseTerrain(baseTerrain) {
+      configuredKinds.push(baseTerrain?.kind ?? null);
+      if (failProceduralConfigure && baseTerrain === null) {
+        throw new Error('configure failed');
+      }
+    },
+  });
+
+  try {
+    store.setBaseTerrain(legacyBaseTerrain());
+    const previousBaseTerrain = store.baseTerrain;
+    const previousGenerator = store.generator;
+    const previousRevision = store.baseTerrainRevision;
+    failProceduralConfigure = true;
+
+    assert.throws(() => store.setBaseTerrain(null), /configure failed/);
+    assert.equal(store.baseTerrain, previousBaseTerrain);
+    assert.equal(store.generator, previousGenerator);
+    assert.equal(store.baseTerrainRevision, previousRevision);
+    assert.deepEqual(configuredKinds.slice(-2), [null, 'azgaar-macro-v1']);
+  } finally {
+    store.dispose();
+  }
+});
+
 test('failed worker reconfiguration restores the previous base terrain', () => {
   let failProceduralConfigure = false;
   const configuredKinds = [];
