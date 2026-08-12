@@ -1,4 +1,7 @@
-import { INFINITE_WORLD_FORMAT_VERSION } from '../world/worldConstants.js';
+import {
+  INFINITE_WORLD_FORMAT_VERSION,
+  WORLD_MAX_SAFE_CELL_COORDINATE,
+} from '../world/worldConstants.js';
 import { createAzgaarCartographySource } from './AzgaarCartographySource.js';
 import {
   buildAzgaarImportSummary,
@@ -141,6 +144,17 @@ function assertSafeWorldBounds(summary, config) {
   const heightCells = Math.round(summary.physicalHeightMeters / tileSize);
   if (!Number.isSafeInteger(widthCells) || widthCells < 1
       || !Number.isSafeInteger(heightCells) || heightCells < 1) {
+    throw new Error('Azgaar imported world dimensions exceed safe streamed-world coordinates.');
+  }
+
+  const minCellX = -Math.floor(widthCells / 2);
+  const minCellZ = -Math.floor(heightCells / 2);
+  const maxCellX = minCellX + widthCells - 1;
+  const maxCellZ = minCellZ + heightCells - 1;
+  if (Math.abs(minCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxCellX) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(minCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE
+      || Math.abs(maxCellZ) > WORLD_MAX_SAFE_CELL_COORDINATE) {
     throw new Error('Azgaar imported world dimensions exceed safe streamed-world coordinates.');
   }
 }
