@@ -105,16 +105,27 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     this.baseTerrainRevision = 0;
   }
 
+  restoreBaseTerrainState(baseTerrain, generator) {
+    this.baseTerrain = baseTerrain;
+    this.generator = generator;
+    this.cache.clear();
+    this.generatedTileBlocks.clear();
+    this.generatedHeightBlocks.clear();
+    this.lastTileBlock = null;
+    this.lastHeightBlock = null;
+  }
+
   setBaseTerrain(baseTerrain) {
     const previousBaseTerrain = this.baseTerrain;
+    const previousGenerator = this.generator;
     const previousRevision = this.baseTerrainRevision ?? 0;
     super.setBaseTerrain(baseTerrain);
     try {
       this.chunkWorker.setBaseTerrain?.(this.baseTerrain);
     } catch (error) {
+      this.restoreBaseTerrainState(previousBaseTerrain, previousGenerator);
       try {
-        super.setBaseTerrain(previousBaseTerrain);
-        this.chunkWorker.setBaseTerrain?.(this.baseTerrain);
+        this.chunkWorker.setBaseTerrain?.(previousBaseTerrain);
         this.baseTerrainRevision = previousRevision;
       } catch (rollbackError) {
         this.baseTerrainRevision = previousRevision + 1;
