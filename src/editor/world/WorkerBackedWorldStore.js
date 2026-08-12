@@ -90,6 +90,27 @@ function decodeAndValidateChunks(chunks, chunkSize, vertexSize) {
   });
 }
 
+function assertWorkerPage(page, chunkX, chunkZ, chunkSize) {
+  const expectedKey = chunkKey(chunkX, chunkZ);
+  const expectedOriginX = chunkX * chunkSize;
+  const expectedOriginZ = chunkZ * chunkSize;
+  const vertexSize = chunkSize + 1;
+  if (!page || typeof page !== 'object'
+      || page.key !== expectedKey
+      || page.chunkX !== chunkX
+      || page.chunkZ !== chunkZ
+      || page.originX !== expectedOriginX
+      || page.originZ !== expectedOriginZ) {
+    throw new Error(`World chunk worker returned mismatched page metadata for ${expectedKey}.`);
+  }
+  if (!(page.tiles instanceof Uint8Array) || page.tiles.length !== chunkSize ** 2) {
+    throw new Error(`World chunk worker returned invalid tile data for ${expectedKey}.`);
+  }
+  if (!(page.heights instanceof Float32Array) || page.heights.length !== vertexSize ** 2) {
+    throw new Error(`World chunk worker returned invalid height data for ${expectedKey}.`);
+  }
+}
+
 export class WorkerBackedWorldStore extends InfiniteWorldStore {
   constructor({
     chunkWorker,
@@ -172,6 +193,7 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
           error.cancelled = true;
           throw error;
         }
+        assertWorkerPage(page, chunkX, chunkZ, this.chunkSize);
         return this.completeWorkerPage({
           ...page,
           ...(content ? { content } : {}),
