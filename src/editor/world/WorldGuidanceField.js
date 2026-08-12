@@ -118,7 +118,11 @@ export class WorldGuidanceField {
   }
 
   fieldScale(name) {
-    return Number(fieldPayload(this.source, name)?.scale ?? 1);
+    const scale = Number(fieldPayload(this.source, name)?.scale ?? 1);
+    if (!Number.isFinite(scale) || scale <= 0) {
+      throw new Error(`Azgaar guidance field ${name} scale must be a positive finite number.`);
+    }
+    return scale;
   }
 
   sampleNearest(name, cellX, cellZ) {
