@@ -139,6 +139,26 @@ test('a stale error from a terminated worker cannot kill its replacement', () =>
   }
 });
 
+test('a worker response decode failure rejects pending work and replaces the worker', async () => {
+  const restoreWorker = installFakeWorker();
+  const client = createClient();
+
+  try {
+    const request = client.request(0, 0);
+    const failedWorker = FakeWorker.instances[0];
+    failedWorker.emit('messageerror', { preventDefault() {} });
+
+    await assert.rejects(request, /could not be deserialized/);
+    assert.equal(failedWorker.terminated, true);
+    assert.equal(client.pending.size, 0);
+    assert.equal(client.workerCount, 2);
+    assert.equal(FakeWorker.instances.length, 3);
+  } finally {
+    client.dispose();
+    restoreWorker();
+  }
+});
+
 test('a synchronous postMessage failure replaces the poisoned worker slot', async () => {
   const restoreWorker = installFakeWorker();
   const client = createClient();
