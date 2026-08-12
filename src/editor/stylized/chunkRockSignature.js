@@ -2,31 +2,60 @@
  * Per-chunk rock influence signatures so grass rebuilds only when local rocks change.
  */
 
-function rockIntersectsChunk({
-  rockX,
-  rockZ,
-  rockRadius,
-  falloff,
-  descriptor,
-  chunkWorldSize,
-}) {
-  const half = chunkWorldSize / 2;
-  const expand = rockRadius + falloff;
-  return rockX >= descriptor.centerWorldX - half - expand
-    && rockX <= descriptor.centerWorldX + half + expand
-    && rockZ >= descriptor.centerWorldZ - half - expand
-    && rockZ <= descriptor.centerWorldZ + half + expand;
+const MAX_INFLUENCE_CACHE_ENTRIES = 256;
+const objectBoulderCache = new WeakMap();
+const influenceCache = new WeakMap();
+
+function influenceKey(descriptor, chunkWorldSize, radius, falloff) {
+  return `${descriptor.centerWorldX}:${descriptor.centerWorldZ}:${chunkWorldSize}:${radius}:${falloff}`;
+}
+
+function getInfluenceEntry(rockPlacements, key) {
+  if (!Array.isArray(rockPlacements)) return null;
+  return influenceCache.get(rockPlacements)?.get(key) ?? null;
+}
+
+function cacheInfluence(rockPlacements, key, local) {
+  if (!Array.isArray(rockPlacements)) return null;
+  let cache = influenceCache.get(rockPlacements);
+  if (!cache) {
+    cache = new Map();
+    influenceCache.set(rockPlacements, cache);
+  }
+  if (cache.size >= MAX_INFLUENCE_CACHE_ENTRIES && !cache.has(key)) {
+    cache.delete(cache.keys().next().value);
+  }
+  const entry = { local, signature: undefined };
+  cache.set(key, entry);
+  return entry;
 }
 
 export function collectObjectBoulderPlacements({ objectMap, tileSize, radius }) {
-  return objectMap.list()
-    .filter((object) => object.definitionKey === 'boulder')
-    .map((object) => ({
+  const revision = Number.isInteger(objectMap?.revision) ? objectMap.revision : null;
+  if (revision !== null) {
+    const cached = objectBoulderCache.get(objectMap);
+    if (cached
+      && cached.revision === revision
+      && cached.tileSize === tileSize
+      && cached.radius === radius) {
+      return cached.placements;
+    }
+  }
+
+  const placements = [];
+  for (const object of objectMap.list()) {
+    if (object.definitionKey !== 'boulder') continue;
+    placements.push({
       stableId: `object:${object.id}`,
       x: (object.x + 0.5) * tileSize,
       z: -(object.z + 0.5) * tileSize,
       radius,
-    }));
+    });
+  }
+  if (revision !== null) {
+    objectBoulderCache.set(objectMap, { revision, tileSize, radius, placements });
+  }
+  return placements;
 }
 
 export function rocksInfluencingChunk({
@@ -36,21 +65,28 @@ export function rocksInfluencingChunk({
   radius,
   falloff,
 }) {
+  const key = influenceKey(descriptor, chunkWorldSize, radius, falloff);
+  const cached = getInfluenceEntry(rockPlacements, key);
+  if (cached) return cached.local;
+
+  const half = chunkWorldSize / 2;
+  const minimumX = descriptor.centerWorldX - half;
+  const maximumX = descriptor.centerWorldX + half;
+  const minimumZ = descriptor.centerWorldZ - half;
+  const maximumZ = descriptor.centerWorldZ + half;
   const local = [];
   for (const rock of rockPlacements) {
     const rockRadius = rock.radius ?? radius;
-    if (!rockIntersectsChunk({
-      rockX: rock.x,
-      rockZ: rock.z,
-      rockRadius,
-      falloff,
-      descriptor,
-      chunkWorldSize,
-    })) {
+    const expand = rockRadius + falloff;
+    if (rock.x < minimumX - expand
+      || rock.x > maximumX + expand
+      || rock.z < minimumZ - expand
+      || rock.z > maximumZ + expand) {
       continue;
     }
     local.push(rock);
   }
+  cacheInfluence(rockPlacements, key, local);
   return local;
 }
 
@@ -61,21 +97,29 @@ export function rockSignatureForChunk({
   radius,
   falloff,
 }) {
-  const local = rocksInfluencingChunk({
+  const key = influenceKey(descriptor, chunkWorldSize, radius, falloff);
+  const cached = getInfluenceEntry(rockPlacements, key);
+  if (cached?.signature !== undefined) return cached.signature;
+
+  const local = cached?.local ?? rocksInfluencingChunk({
     descriptor,
     rockPlacements,
     chunkWorldSize,
     radius,
     falloff,
   });
-  if (local.length === 0) return '';
-  return local
-    .map((rock) => {
-      const rockRadius = rock.radius ?? radius;
-      return `${rock.stableId ?? ''}:${rock.x.toFixed(2)}:${rock.z.toFixed(2)}:${rockRadius.toFixed(2)}`;
-    })
-    .sort()
-    .join('|');
+  const signature = local.length === 0
+    ? ''
+    : local
+      .map((rock) => {
+        const rockRadius = rock.radius ?? radius;
+        return `${rock.stableId ?? ''}:${rock.x.toFixed(2)}:${rock.z.toFixed(2)}:${rockRadius.toFixed(2)}`;
+      })
+      .sort()
+      .join('|');
+  const entry = cached ?? getInfluenceEntry(rockPlacements, key);
+  if (entry) entry.signature = signature;
+  return signature;
 }
 
 export function objectBoulderSignatureForChunk({
