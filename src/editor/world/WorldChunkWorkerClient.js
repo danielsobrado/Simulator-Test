@@ -6,6 +6,10 @@ import { chunkKey } from './WorldCoordinates.js';
 const MAX_WORKER_COUNT = 8;
 const MAX_WORKER_RESTARTS = 2;
 
+function disposedError() {
+  return new Error('World chunk worker was disposed.');
+}
+
 /** Resolve the worker pool size from an explicit override or CPU cores. */
 export function resolveWorkerCount(requested) {
   if (Number.isFinite(requested) && requested > 0) {
@@ -105,6 +109,21 @@ export class WorldChunkWorkerClient {
     return this.worldGenerator;
   }
 
+  generateOnMainThread(request) {
+    return Promise.resolve()
+      .then(() => {
+        if (this.disposed) throw disposedError();
+        return generateBaseWorldChunk({
+          ...request,
+          worldGenerator: this.ensureWorldGenerator(),
+        });
+      })
+      .then((page) => {
+        if (this.disposed) throw disposedError();
+        return page;
+      });
+  }
+
   setBaseTerrain(baseTerrain) {
     const nextWorkerBaseTerrain = createTerrainWorkerBaseTerrain(baseTerrain);
     this.baseTerrain = nextWorkerBaseTerrain;
@@ -126,7 +145,7 @@ export class WorldChunkWorkerClient {
 
   request(chunkX, chunkZ, { priority = 0 } = {}) {
     if (this.disposed) {
-      return Promise.reject(new Error('World chunk worker is disposed.'));
+      return Promise.reject(disposedError());
     }
     const request = {
       chunkX,
@@ -138,10 +157,7 @@ export class WorldChunkWorkerClient {
     };
     // No workers available (Node/tests or degraded browser): preserve the async contract.
     if (this.workers.length === 0) {
-      return Promise.resolve().then(() => generateBaseWorldChunk({
-        ...request,
-        worldGenerator: this.ensureWorldGenerator(),
-      }));
+      return this.generateOnMainThread(request);
     }
 
     const id = this.nextId;
@@ -309,12 +325,8 @@ export class WorldChunkWorkerClient {
       this.queuedByKey.clear();
       console.warn('World chunk worker pool is unavailable; falling back to main-thread generation.');
       this.useMainThreadFallback();
-      const worldGenerator = this.ensureWorldGenerator();
       for (const job of queued) {
-        Promise.resolve().then(() => generateBaseWorldChunk({
-          ...job.request,
-          worldGenerator,
-        })).then(job.resolve, job.reject);
+        this.generateOnMainThread(job.request).then(job.resolve, job.reject);
       }
       return;
     }
@@ -334,7 +346,7 @@ export class WorldChunkWorkerClient {
     this.inFlight = [];
     this.workerRestartCounts = [];
     this.worldGenerator = null;
-    const error = new Error('World chunk worker was disposed.');
+    const error = disposedError();
     for (const pending of this.pending.values()) {
       pending.reject(error);
     }
