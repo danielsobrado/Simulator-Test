@@ -64,6 +64,16 @@ test('guidance sampling rejects zero persisted field scales', () => {
   );
 });
 
+test('guidance construction rejects invalid persisted physical width', () => {
+  const source = createSource();
+  source.physical.widthMeters = Number.POSITIVE_INFINITY;
+
+  assert.throws(
+    () => new WorldGuidanceField(source),
+    /physical width must be a positive finite number/,
+  );
+});
+
 test('macro generator rejects persisted bounds beyond the engine coordinate limit', () => {
   const source = createSource();
   source.bounds = {
@@ -86,5 +96,19 @@ test('macro generator rejects invalid persisted terrain metadata', () => {
   assert.throws(
     () => new AzgaarMacroWorldGenerator(source, generatorMetadata),
     /reliefExponent must be positive/,
+  );
+});
+
+test('macro generator rejects malformed persisted river vectors', () => {
+  const source = createSource();
+  source.rivers = [{
+    id: 1,
+    widthAtlas: 0.5,
+    points: [[0, 0], [Number.NaN, 1]],
+  }];
+
+  assert.throws(
+    () => new AzgaarMacroWorldGenerator(source, generatorMetadata),
+    /invalid river coordinates/,
   );
 });
