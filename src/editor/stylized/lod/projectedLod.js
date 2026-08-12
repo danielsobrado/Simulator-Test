@@ -1,7 +1,70 @@
-const LOD_ORDER = Object.freeze(['near', 'proxy', 'impostor', 'cluster', 'culled']);
+let cachedProjectionCamera = null;
+let cachedProjectionOrthographic = false;
+let cachedProjectionFov = null;
+let cachedProjectionTop = null;
+let cachedProjectionBottom = null;
+let cachedProjectionZoom = null;
+let cachedProjectionValue = null;
 
 function distance3(left, right) {
   return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+function lodIndex(band) {
+  switch (band) {
+    case 'near': return 0;
+    case 'proxy': return 1;
+    case 'impostor': return 2;
+    case 'cluster': return 3;
+    case 'culled': return 4;
+    default: return -1;
+  }
+}
+
+function cameraProjection(camera) {
+  const orthographic = Boolean(camera.isOrthographicCamera);
+  if (orthographic) {
+    const top = camera.top;
+    const bottom = camera.bottom;
+    const zoom = camera.zoom ?? 1;
+    if (
+      camera === cachedProjectionCamera
+      && cachedProjectionOrthographic
+      && cachedProjectionTop === top
+      && cachedProjectionBottom === bottom
+      && cachedProjectionZoom === zoom
+    ) {
+      return cachedProjectionValue;
+    }
+
+    cachedProjectionCamera = camera;
+    cachedProjectionOrthographic = true;
+    cachedProjectionTop = top;
+    cachedProjectionBottom = bottom;
+    cachedProjectionZoom = zoom;
+    cachedProjectionFov = null;
+    cachedProjectionValue = Math.abs(top - bottom) / Math.max(0.0001, zoom);
+    return cachedProjectionValue;
+  }
+
+  const fov = camera.fov ?? 60;
+  if (
+    camera === cachedProjectionCamera
+    && !cachedProjectionOrthographic
+    && cachedProjectionFov === fov
+  ) {
+    return cachedProjectionValue;
+  }
+
+  cachedProjectionCamera = camera;
+  cachedProjectionOrthographic = false;
+  cachedProjectionFov = fov;
+  cachedProjectionTop = null;
+  cachedProjectionBottom = null;
+  cachedProjectionZoom = null;
+  const fovRadians = fov * Math.PI / 180;
+  cachedProjectionValue = 2 * Math.tan(fovRadians / 2);
+  return cachedProjectionValue;
 }
 
 function thresholdForBand(band, thresholds) {
@@ -32,14 +95,13 @@ export function projectedPixelHeight({ camera, worldPosition, worldHeight, viewp
     return 0;
   }
 
+  const projection = cameraProjection(camera);
   if (camera.isOrthographicCamera) {
-    const verticalSpan = Math.abs(camera.top - camera.bottom) / Math.max(0.0001, camera.zoom ?? 1);
-    return verticalSpan > 0 ? worldHeight * viewportHeight / verticalSpan : 0;
+    return projection > 0 ? worldHeight * viewportHeight / projection : 0;
   }
 
   const distance = Math.max(0.001, distance3(camera.position, worldPosition));
-  const fovRadians = (camera.fov ?? 60) * Math.PI / 180;
-  const pixelsPerWorldUnit = viewportHeight / (2 * Math.tan(fovRadians / 2) * distance);
+  const pixelsPerWorldUnit = viewportHeight / (projection * distance);
   return worldHeight * pixelsPerWorldUnit;
 }
 
@@ -50,10 +112,11 @@ export function selectProjectedLod({
   ...thresholds
 }) {
   const next = baseBand(pixels, thresholds);
-  if (!previous || previous === next || !LOD_ORDER.includes(previous)) return next;
+  if (!previous || previous === next) return next;
 
-  const previousIndex = LOD_ORDER.indexOf(previous);
-  const nextIndex = LOD_ORDER.indexOf(next);
+  const previousIndex = lodIndex(previous);
+  if (previousIndex < 0) return next;
+  const nextIndex = lodIndex(next);
   if (nextIndex > previousIndex) {
     const threshold = thresholdForBand(previous, thresholds);
     return pixels >= threshold * (1 - hysteresisRatio) ? previous : next;
@@ -124,6 +187,10 @@ export function updateLodTransition({
   timestamp,
   durationMs,
 }) {
+  if (state?.complete && state.from === target && state.target === target) {
+    return state;
+  }
+
   const safeDuration = Math.max(1, durationMs);
   if (!state) {
     if (target === 'culled') {
