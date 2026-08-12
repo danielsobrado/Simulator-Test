@@ -20,6 +20,7 @@ import {
 import {
   createSurfaceMaskConfig,
   enrichPageRenderPixels,
+  getSurfaceMaskChunkRadius,
 } from './world/ChunkRenderPixels.js';
 import { TileDistanceField } from './stylized/forest/TileDistanceField.js';
 import {
@@ -197,6 +198,10 @@ export class InfiniteTerrainView {
     });
     this.surfaceMaskConfig = createSurfaceMaskConfig(stylizedConfig);
     this.chunkSize = worldStore.chunkSize;
+    this.surfaceMaskChunkRadius = getSurfaceMaskChunkRadius(
+      this.surfaceMaskConfig.blendCells,
+      this.chunkSize,
+    );
     this.chunkWorldSize = this.chunkSize * worldStore.tileSize;
     this.waterDistanceField = createWaterDistanceField(this, stylizedConfig);
     this.raycaster = new THREE.Raycaster();
@@ -702,8 +707,8 @@ export class InfiniteTerrainView {
     for (const coordinate of coordinates) {
       const chunkX = Math.floor(coordinate.x / this.chunkSize);
       const chunkZ = Math.floor(coordinate.z / this.chunkSize);
-      const minimumOffset = -1;
-      const maximumOffset = change.kind === 'tile' ? 1 : 0;
+      const minimumOffset = change.kind === 'tile' ? -this.surfaceMaskChunkRadius : -1;
+      const maximumOffset = change.kind === 'tile' ? this.surfaceMaskChunkRadius : 0;
       for (let offsetZ = minimumOffset; offsetZ <= maximumOffset; offsetZ += 1) {
         for (let offsetX = minimumOffset; offsetX <= maximumOffset; offsetX += 1) {
           affected.add(`${chunkX + offsetX}:${chunkZ + offsetZ}`);
