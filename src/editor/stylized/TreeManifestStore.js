@@ -3,7 +3,7 @@ import { cellCenterToWorld } from '../world/WorldCoordinates.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import {
   blockersForChunk,
-  buildStableChunkManifest,
+  createStableChunkManifestBuilder,
   placementSignature,
 } from './StableScatterManifest.js';
 import {
@@ -18,6 +18,25 @@ import { aggregateCanopyClusters } from './lod/canopyCluster.js';
 import { ForestSpeciesRegistry } from './forest/ForestSpeciesRegistry.js';
 import { ForestEditStore } from './forest/ForestEditStore.js';
 import { PathClearanceField } from './forest/PathClearanceField.js';
+
+const FOREST_STAT_KEYS = Object.freeze([
+  'builds',
+  'cacheHits',
+  'patchBuilds',
+  'patchCacheHits',
+]);
+
+function forestStats(field) {
+  const stats = {};
+  for (const key of FOREST_STAT_KEYS) stats[key] = field?.stats?.[key] ?? 0;
+  return stats;
+}
+
+function addForestStatsDelta(target, before, after) {
+  for (const key of FOREST_STAT_KEYS) {
+    target[key] += Math.max(0, (after[key] ?? 0) - (before[key] ?? 0));
+  }
+}
 
 export function createPathClearanceField(terrainView, config) {
   return new PathClearanceField({
@@ -86,6 +105,7 @@ export class TreeManifestStore {
     this.editDocumentRef = terrainView.worldStore.forestEdits ?? null;
     this.cache = new Map();
     this.contextCache = new Map();
+    this.pendingBuilds = new Map();
     this.pendingKeys = new Set();
     this.activeKeys = new Set();
     this.queue = new StylizedBuildQueue({
@@ -254,9 +274,7 @@ export class TreeManifestStore {
     return entry.canopy;
   }
 
-  build(chunkX, chunkZ, rockSource) {
-    const context = this.context(chunkX, chunkZ, rockSource);
-    if (!context) return null;
+  createBuildState(chunkX, chunkZ, context) {
     const perChunk = this.config.trees.perChunk;
     const maxAccepted = Math.max(
       1,
@@ -269,35 +287,60 @@ export class TreeManifestStore {
       )
       : perChunk;
     const counters = { evaluated: 0, rejectedHabitat: 0, rejectedEdits: 0 };
-    const fieldStatsBefore = {
-      builds: 0,
-      cacheHits: 0,
-      patchBuilds: 0,
-      patchCacheHits: 0,
-      ...(this.forestField?.stats ?? {}),
-    };
-    const generated = buildStableChunkManifest({
-      kind: 'tree',
-      chunkX,
-      chunkZ,
-      chunkSize: this.terrainView.worldStore.chunkSize,
-      tileSize: this.terrainView.worldStore.tileSize,
-      perChunk: candidateBudget,
-      maxAccepted,
-      tileIds: this.config.trees.tileIds,
-      tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
-      heightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z),
-      prototypeCount: this.prototypeCount,
-      minScale: this.config.trees.minScale,
-      maxScale: this.config.trees.maxScale,
-      radiusForScale: (scale) => context.clearRadius * scale,
-      blockers: context.blockers,
-      candidateEvaluator: createForestPlacementEvaluator(this.forestField, counters, {
-        speciesRegistry: this.speciesRegistry,
-        editStore: this.editStore,
-        exclusionAt: this.pathClearance.exclusion(),
+    const accumulatedFieldStats = Object.fromEntries(FOREST_STAT_KEYS.map((key) => [key, 0]));
+    return {
+      signature: context.signature,
+      context,
+      candidateBudget,
+      counters,
+      accumulatedFieldStats,
+      builder: createStableChunkManifestBuilder({
+        kind: 'tree',
+        chunkX,
+        chunkZ,
+        chunkSize: this.terrainView.worldStore.chunkSize,
+        tileSize: this.terrainView.worldStore.tileSize,
+        perChunk: candidateBudget,
+        maxAccepted,
+        tileIds: this.config.trees.tileIds,
+        tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
+        heightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z),
+        prototypeCount: this.prototypeCount,
+        minScale: this.config.trees.minScale,
+        maxScale: this.config.trees.maxScale,
+        radiusForScale: (scale) => context.clearRadius * scale,
+        blockers: context.blockers,
+        candidateEvaluator: createForestPlacementEvaluator(this.forestField, counters, {
+          speciesRegistry: this.speciesRegistry,
+          editStore: this.editStore,
+          exclusionAt: this.pathClearance.exclusion(),
+        }),
       }),
-    });
+    };
+  }
+
+  build(chunkX, chunkZ, rockSource, shouldYield = null) {
+    const context = this.context(chunkX, chunkZ, rockSource);
+    if (!context) return null;
+    const key = `${chunkX}:${chunkZ}`;
+    let state = this.pendingBuilds.get(key);
+    if (!state || state.signature !== context.signature) {
+      state = this.createBuildState(chunkX, chunkZ, context);
+      this.pendingBuilds.set(key, state);
+    }
+
+    const statsBefore = forestStats(this.forestField);
+    const generated = state.builder.step({ shouldYield });
+    addForestStatsDelta(
+      state.accumulatedFieldStats,
+      statsBefore,
+      forestStats(this.forestField),
+    );
+    PerfCounters.inc('treeManifestBuildSlices');
+    if (generated === null) return null;
+
+    this.pendingBuilds.delete(key);
+    const plantedStatsBefore = forestStats(this.forestField);
     const planted = this.editStore.plantedForChunk(
       chunkX,
       chunkZ,
@@ -318,7 +361,7 @@ export class TreeManifestStore {
         stableId: plant.stableId,
         ownerChunkX: chunkX,
         ownerChunkZ: chunkZ,
-        index: candidateBudget + index,
+        index: state.candidateBudget + index,
         x: plant.x,
         z: plant.z,
         height: this.terrainView.getCanonicalHeight(plant.x, plant.z),
@@ -348,37 +391,34 @@ export class TreeManifestStore {
         planted: true,
       });
     });
+    addForestStatsDelta(
+      state.accumulatedFieldStats,
+      plantedStatsBefore,
+      forestStats(this.forestField),
+    );
+
     const placements = Object.freeze([...generated, ...planted]);
     const rejectedSpacing = Math.max(
       0,
-      counters.evaluated - counters.rejectedHabitat - counters.rejectedEdits - generated.length,
+      state.counters.evaluated
+        - state.counters.rejectedHabitat
+        - state.counters.rejectedEdits
+        - generated.length,
     );
-    this.cache.set(`${chunkX}:${chunkZ}`, {
+    this.cache.set(key, {
       signature: context.signature,
       placements,
     });
     PerfCounters.inc('treeManifestBuilds');
-    PerfCounters.set('forestLastChunkCandidatesEvaluated', counters.evaluated);
-    PerfCounters.set('forestLastChunkCandidatesRejectedHabitat', counters.rejectedHabitat);
-    PerfCounters.set('forestLastChunkCandidatesRejectedEdits', counters.rejectedEdits);
+    PerfCounters.set('forestLastChunkCandidatesEvaluated', state.counters.evaluated);
+    PerfCounters.set('forestLastChunkCandidatesRejectedHabitat', state.counters.rejectedHabitat);
+    PerfCounters.set('forestLastChunkCandidatesRejectedEdits', state.counters.rejectedEdits);
     PerfCounters.set('forestLastChunkCandidatesRejectedSpacing', rejectedSpacing);
     PerfCounters.set('forestLastChunkTreesAccepted', placements.length);
-    PerfCounters.inc(
-      'forestFieldBuilds',
-      (this.forestField?.stats.builds ?? 0) - fieldStatsBefore.builds,
-    );
-    PerfCounters.inc(
-      'forestFieldCacheHits',
-      (this.forestField?.stats.cacheHits ?? 0) - fieldStatsBefore.cacheHits,
-    );
-    PerfCounters.inc(
-      'forestPatchGridBuilds',
-      (this.forestField?.stats.patchBuilds ?? 0) - fieldStatsBefore.patchBuilds,
-    );
-    PerfCounters.inc(
-      'forestPatchGridCacheHits',
-      (this.forestField?.stats.patchCacheHits ?? 0) - fieldStatsBefore.patchCacheHits,
-    );
+    PerfCounters.inc('forestFieldBuilds', state.accumulatedFieldStats.builds);
+    PerfCounters.inc('forestFieldCacheHits', state.accumulatedFieldStats.cacheHits);
+    PerfCounters.inc('forestPatchGridBuilds', state.accumulatedFieldStats.patchBuilds);
+    PerfCounters.inc('forestPatchGridCacheHits', state.accumulatedFieldStats.patchCacheHits);
     PerfCounters.set('forestLastChunkPatchCount', new Set(
       placements.map((placement) => placement.patchId).filter(Boolean),
     ).size);
@@ -394,6 +434,7 @@ export class TreeManifestStore {
   invalidateAll() {
     this.cache.clear();
     this.contextCache.clear();
+    this.pendingBuilds.clear();
   }
 
   fell(stableId) {
@@ -445,18 +486,22 @@ export class TreeManifestStore {
     for (const key of this.contextCache.keys()) {
       if (!keys.has(key)) this.contextCache.delete(key);
     }
+    for (const key of this.pendingBuilds.keys()) {
+      if (!keys.has(key)) this.pendingBuilds.delete(key);
+    }
   }
 
   flush() {
-    const result = this.queue.flush((job) => {
+    const result = this.queue.flush((job, shouldYield) => {
       if (!this.activeKeys.has(job.key)) {
         this.pendingKeys.delete(job.key);
+        this.pendingBuilds.delete(job.key);
         return false;
       }
-      const placements = this.build(job.chunkX, job.chunkZ, job.rockSource);
+      const placements = this.build(job.chunkX, job.chunkZ, job.rockSource, shouldYield);
       if (!placements) {
-        // The rock source prepared one blocker manifest this frame. Preserve
-        // this tree job until the complete deterministic halo is available.
+        // Rock blocker preparation and tree candidate generation are both
+        // resumable; keep this job until the complete deterministic result exists.
         this.queue.enqueue(job);
         return true;
       }
@@ -470,6 +515,7 @@ export class TreeManifestStore {
 
   dispose() {
     this.queue.clear();
+    this.pendingBuilds.clear();
     this.pendingKeys.clear();
     this.activeKeys.clear();
     this.cache.clear();
