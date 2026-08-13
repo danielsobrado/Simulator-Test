@@ -20,6 +20,9 @@ const scratchPosition = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 const scratchScale = new THREE.Vector3();
 const scratchEuler = new THREE.Euler();
+const treeMatrixCache = new WeakMap();
+const understoryMatrixCache = new WeakMap();
+const clusterMatrixCache = new WeakMap();
 
 function createMatrix({
   x,
@@ -37,6 +40,56 @@ function createMatrix({
     scratchQuaternion.setFromEuler(scratchEuler.set(rotationX, rotationY, rotationZ)),
     scratchScale.set(scaleX, scaleY, scaleZ),
   );
+}
+
+function treeMatrix(placement) {
+  const cached = treeMatrixCache.get(placement);
+  if (cached) return cached;
+  const heightScale = placement.heightScale ?? placement.scale;
+  const lean = treeLeanAngles(placement);
+  const matrix = createMatrix({
+    x: placement.x,
+    y: placement.height,
+    z: placement.z,
+    rotationX: lean.rotationX,
+    rotationY: placement.rotationY,
+    rotationZ: lean.rotationZ,
+    scaleX: heightScale,
+    scaleY: heightScale,
+    scaleZ: heightScale,
+  });
+  treeMatrixCache.set(placement, matrix);
+  return matrix;
+}
+
+function understoryMatrix(placement) {
+  const cached = understoryMatrixCache.get(placement);
+  if (cached) return cached;
+  const matrix = createMatrix({
+    x: placement.x,
+    y: placement.height,
+    z: placement.z,
+    rotationY: placement.rotationY,
+    scaleX: 0.8 + placement.scale * 0.2,
+  });
+  understoryMatrixCache.set(placement, matrix);
+  return matrix;
+}
+
+function clusterMatrix(cluster) {
+  const cached = clusterMatrixCache.get(cluster);
+  if (cached) return cached;
+  const matrix = createMatrix({
+    x: cluster.x,
+    y: cluster.y,
+    z: cluster.z,
+    rotationY: cluster.seed * Math.PI * 2,
+    scaleX: cluster.width,
+    scaleY: cluster.height,
+    scaleZ: cluster.depth,
+  });
+  clusterMatrixCache.set(cluster, matrix);
+  return matrix;
 }
 
 function recordBatchStats(statsByMode, stats) {
@@ -71,21 +124,9 @@ function geometryInstance(
   resolveLeafTint,
   proxyReadable = false,
 ) {
-  const heightScale = placement.heightScale ?? placement.scale;
   const appearance = leafAppearance(placement, resolveLeafTint, proxyReadable);
-  const lean = treeLeanAngles(placement);
   return {
-    matrix: createMatrix({
-      x: placement.x,
-      y: placement.height,
-      z: placement.z,
-      rotationX: lean.rotationX,
-      rotationY: placement.rotationY,
-      rotationZ: lean.rotationZ,
-      scaleX: heightScale,
-      scaleY: heightScale,
-      scaleZ: heightScale,
-    }),
+    matrix: treeMatrix(placement),
     fade,
     ditherDirection,
     seed: treeRenderSeed(placement),
@@ -205,15 +246,7 @@ export function rebuildTreeLod({
         });
         for (const cluster of patchClusters) {
           clusters[0].push({
-            matrix: createMatrix({
-              x: cluster.x,
-              y: cluster.y,
-              z: cluster.z,
-              rotationY: cluster.seed * Math.PI * 2,
-              scaleX: cluster.width,
-              scaleY: cluster.height,
-              scaleZ: cluster.depth,
-            }),
+            matrix: clusterMatrix(cluster),
             fade: representation.fade,
             ditherDirection,
             seed: cluster.seed,
@@ -262,13 +295,7 @@ export function rebuildTreeLod({
         const seed = treeRenderSeed(placement);
         if (representation.band === 'near' && placement.ageClass === 'dead') {
           understory[0].push({
-            matrix: createMatrix({
-              x: placement.x,
-              y: placement.height,
-              z: placement.z,
-              rotationY: placement.rotationY,
-              scaleX: 0.8 + placement.scale * 0.2,
-            }),
+            matrix: understoryMatrix(placement),
             fade: representation.fade,
             ditherDirection,
             seed,
