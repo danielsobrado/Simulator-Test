@@ -107,10 +107,14 @@ export class MacroFarTerrainView {
     const vertexCount = this.radialResolution * this.angularResolution;
     this.positions = new Float32Array(vertexCount * 3);
     this.colors = new Float32Array(vertexCount * 3);
-    // Back buffers: a sliced rebuild fills these and swaps in when finished, so
-    // the visible mesh never shows half-old, half-new terrain.
+    // Back buffers are retained between rebuilds to avoid an allocation burst on
+    // every floating-origin snap. X/Z never change, so only height is rewritten.
     this.pendingPositions = new Float32Array(vertexCount * 3);
     this.pendingColors = new Float32Array(vertexCount * 3);
+    this.pendingHeights = new Float32Array(vertexCount);
+    this.pendingTileIds = new Int32Array(vertexCount);
+    this.pendingForest = new Float32Array(vertexCount);
+    this.buildPlanarCoordinates();
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
@@ -178,6 +182,19 @@ export class MacroFarTerrainView {
     return radii;
   }
 
+  buildPlanarCoordinates() {
+    const spokes = this.angularResolution;
+    for (let ring = 0; ring < this.radialResolution; ring += 1) {
+      const radius = this.radii[ring];
+      for (let spoke = 0; spoke < spokes; spoke += 1) {
+        const angle = (spoke / spokes) * Math.PI * 2;
+        const offset = (ring * spokes + spoke) * 3;
+        this.pendingPositions[offset] = Math.cos(angle) * radius;
+        this.pendingPositions[offset + 2] = Math.sin(angle) * radius;
+      }
+    }
+  }
+
   buildIndices() {
     const rings = this.radialResolution;
     const spokes = this.angularResolution;
@@ -240,40 +257,36 @@ export class MacroFarTerrainView {
     this.job = {
       originX,
       originZ,
-      ring: 0,
+      sampleRing: 0,
+      shadeRing: 0,
       field,
       forestSignature: field?.signature ?? null,
-      // Heights are needed by the shading pass, which reads ring neighbours.
-      heights: new Float32Array(this.radialResolution * this.angularResolution),
-      tileIds: new Int32Array(this.radialResolution * this.angularResolution),
-      forest: new Float32Array(this.radialResolution * this.angularResolution),
+      heights: this.pendingHeights,
+      tileIds: this.pendingTileIds,
+      forest: this.pendingForest,
     };
   }
 
-  /** Fills one ring of positions and the raw samples the shading pass needs. */
+  /** Fills one ring of height and raw samples used by the shading pass. */
   sampleRing(job, ring) {
     const spokes = this.angularResolution;
     const tileSize = this.worldStore.tileSize;
-    const radius = this.radii[ring];
     for (let spoke = 0; spoke < spokes; spoke += 1) {
-      const angle = (spoke / spokes) * Math.PI * 2;
-      const renderX = Math.cos(angle) * radius;
-      const renderZ = Math.sin(angle) * radius;
+      const index = ring * spokes + spoke;
+      const offset = index * 3;
+      const renderX = this.pendingPositions[offset];
+      const renderZ = this.pendingPositions[offset + 2];
       const canonicalX = renderX + job.originX;
       const canonicalZ = renderZ + job.originZ;
       const cellX = Math.floor(canonicalX / tileSize);
       const cellZ = Math.floor(-canonicalZ / tileSize);
       const { height, tileId } = this.generator.sampleMacroColumn(cellX, cellZ);
-      const index = ring * spokes + spoke;
       const forestSignal = this.forestSignalAt(job.field, canonicalX, canonicalZ);
       const canopyRelief = forestSignal * (0.32 + ((ring * 17 + spoke * 31) % 7) / 35);
       job.heights[index] = height;
       job.tileIds[index] = tileId;
       job.forest[index] = forestSignal;
-      const offset = index * 3;
-      this.pendingPositions[offset] = renderX;
       this.pendingPositions[offset + 1] = height - this.heightBias + canopyRelief;
-      this.pendingPositions[offset + 2] = renderZ;
     }
   }
 
@@ -339,26 +352,34 @@ export class MacroFarTerrainView {
     }
   }
 
-  /** Advances a sliced rebuild; returns true when the job completed this call. */
+  /** Advances one bounded phase of a sliced rebuild. */
   advanceJob() {
     const job = this.job;
     const rings = this.radialResolution;
-    const limit = Math.min(rings, job.ring + this.rowsPerFrame);
-    for (let ring = job.ring; ring < limit; ring += 1) {
-      this.sampleRing(job, ring);
+    if (job.sampleRing < rings) {
+      const limit = Math.min(rings, job.sampleRing + this.rowsPerFrame);
+      for (let ring = job.sampleRing; ring < limit; ring += 1) {
+        this.sampleRing(job, ring);
+      }
+      job.sampleRing = limit;
+      return false;
     }
-    job.ring = limit;
-    if (job.ring < rings) return false;
 
-    // Shading needs every ring's heights, so it runs once sampling completes.
-    for (let ring = 0; ring < rings; ring += 1) {
-      this.shadeRing(job, ring);
+    if (job.shadeRing < rings) {
+      const limit = Math.min(rings, job.shadeRing + this.rowsPerFrame);
+      for (let ring = job.shadeRing; ring < limit; ring += 1) {
+        this.shadeRing(job, ring);
+      }
+      job.shadeRing = limit;
+      if (job.shadeRing < rings) return false;
     }
+
     this.positions.set(this.pendingPositions);
     this.colors.set(this.pendingColors);
     this.geometry.getAttribute('position').needsUpdate = true;
     this.geometry.getAttribute('color').needsUpdate = true;
-    this.geometry.computeBoundingSphere();
+    // The backdrop is never frustum-culled, so recomputing bounds here only
+    // adds a full-vertex pass to the origin-snap publication frame.
     this.builtOriginX = job.originX;
     this.builtOriginZ = job.originZ;
     this.builtForestSignature = job.forestSignature;
