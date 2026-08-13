@@ -70,17 +70,21 @@ export class StylizedBuildQueue {
   flush(run) {
     const startedAt = this.now();
     let built = 0;
-    if (this.shouldYield?.()) return { built: 0, remaining: this.queue.length };
+    const shouldYield = () => (
+      this.now() - startedAt >= this.budgetMs
+      || Boolean(this.shouldYield?.())
+    );
+    if (shouldYield()) return { built: 0, remaining: this.queue.length };
     this.sortQueue();
     while (
       this.queue.length > 0
       && built < this.buildsPerFrame
-      && this.now() - startedAt < this.budgetMs
+      && !shouldYield()
     ) {
       const job = this.queue.shift();
       this.entriesByKey.delete(job.key);
       // Only count successful work so stale/no-op jobs cannot starve real rebuilds.
-      if (run(job)) {
+      if (run(job, shouldYield)) {
         built += 1;
       }
     }
