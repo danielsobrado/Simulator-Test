@@ -277,21 +277,25 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     const { originX, originZ } = page;
     let appliedTileOverrides = false;
     let appliedHeightOverrides = false;
-    for (let localZ = 0; localZ < this.chunkSize; localZ += 1) {
-      for (let localX = 0; localX < this.chunkSize; localX += 1) {
-        const override = this.tileOverrides.get(cellKey(originX + localX, originZ + localZ));
-        if (override !== undefined) {
-          page.tiles[tileIndex(localX, localZ, this.chunkSize)] = override;
-          appliedTileOverrides = true;
+    if (this.tileOverrides.size > 0) {
+      for (let localZ = 0; localZ < this.chunkSize; localZ += 1) {
+        for (let localX = 0; localX < this.chunkSize; localX += 1) {
+          const override = this.tileOverrides.get(cellKey(originX + localX, originZ + localZ));
+          if (override !== undefined) {
+            page.tiles[tileIndex(localX, localZ, this.chunkSize)] = override;
+            appliedTileOverrides = true;
+          }
         }
       }
     }
-    for (let localZ = 0; localZ <= this.chunkSize; localZ += 1) {
-      for (let localX = 0; localX <= this.chunkSize; localX += 1) {
-        const override = this.heightOverrides.get(cellKey(originX + localX, originZ + localZ));
-        if (override !== undefined) {
-          page.heights[heightIndex(localX, localZ, this.vertexSize)] = override;
-          appliedHeightOverrides = true;
+    if (this.heightOverrides.size > 0) {
+      for (let localZ = 0; localZ <= this.chunkSize; localZ += 1) {
+        for (let localX = 0; localX <= this.chunkSize; localX += 1) {
+          const override = this.heightOverrides.get(cellKey(originX + localX, originZ + localZ));
+          if (override !== undefined) {
+            page.heights[heightIndex(localX, localZ, this.vertexSize)] = override;
+            appliedHeightOverrides = true;
+          }
         }
       }
     }
