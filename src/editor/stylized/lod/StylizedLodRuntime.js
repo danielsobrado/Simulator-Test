@@ -13,6 +13,7 @@ import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 const WAITING_FADE = Number.EPSILON;
 const UNTINTED = Object.freeze([1, 1, 1]);
 const IDENTITY_MORPHOLOGY = Object.freeze([1, 1, 1]);
+const LOD_WORLD_POSITION = { x: 0, y: 0, z: 0 };
 
 /**
  * WebGPU allows a pipeline only 8 vertex buffers, and every non-interleaved attribute
@@ -267,7 +268,7 @@ export function buildChunkLodPlan({
   onTransition = null,
 }) {
   const entries = [];
-  const signature = [];
+  let signature = '';
   const origin = floatingOrigin.getState();
   const needsReadyAnchor = typeof positionForChunk === 'function';
 
@@ -279,14 +280,12 @@ export function buildChunkLodPlan({
       const canonicalX = anchor?.x ?? (chunkX + 0.5) * chunkWorldSize;
       const canonicalZ = anchor?.z ?? -(chunkZ + 0.5) * chunkWorldSize;
       const worldHeight = objectHeight * Math.max(0.05, anchor?.heightScale ?? 1);
-      const worldPosition = {
-        x: canonicalX - origin.x,
-        y: (anchor?.y ?? 0) + worldHeight * 0.5,
-        z: canonicalZ - origin.z,
-      };
+      LOD_WORLD_POSITION.x = canonicalX - origin.x;
+      LOD_WORLD_POSITION.y = (anchor?.y ?? 0) + worldHeight * 0.5;
+      LOD_WORLD_POSITION.z = canonicalZ - origin.z;
       const pixels = projectedPixelHeight({
         camera,
-        worldPosition,
+        worldPosition: LOD_WORLD_POSITION,
         worldHeight,
         viewportHeight,
       });
@@ -306,7 +305,9 @@ export function buildChunkLodPlan({
       }
       let state;
       if (!ready && target !== 'culled') {
-        state = waitingState(target, timestamp);
+        state = storedState?.waitingForData && storedState.target === target
+          ? storedState
+          : waitingState(target, timestamp);
       } else {
         state = updateLodTransition({
           state: storedState?.waitingForData ? null : storedState,
@@ -325,22 +326,23 @@ export function buildChunkLodPlan({
         representations: state.representations,
         lodAnchor: Object.freeze({ x: canonicalX, y: anchor?.y ?? 0, z: canonicalZ }),
       });
-      signature.push([
-        key,
-        target,
-        ready ? 'ready' : 'waiting',
-        ...state.representations.map((representation) => (
-          `${representation.band}:${quantizeFade(representation.fade, fadeSteps)}:${representation.ditherDirection}`
-        )),
-      ].join(':'));
+
+      let entrySignature = `${key}:${target}:${ready ? 'ready' : 'waiting'}`;
+      for (const representation of state.representations) {
+        entrySignature += `:${representation.band}:${
+          quantizeFade(representation.fade, fadeSteps)
+        }:${representation.ditherDirection}`;
+      }
+      signature += signature.length === 0 ? entrySignature : `|${entrySignature}`;
     }
   }
 
-  return { entries, signature: signature.join('|') };
+  return { entries, signature };
 }
 
 export function pruneStateMap(states, entries) {
-  const active = new Set(entries.map((entry) => `${entry.chunkX}:${entry.chunkZ}`));
+  const active = new Set();
+  for (const entry of entries) active.add(`${entry.chunkX}:${entry.chunkZ}`);
   for (const key of states.keys()) {
     if (!active.has(key)) states.delete(key);
   }
