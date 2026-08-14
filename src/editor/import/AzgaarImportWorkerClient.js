@@ -1,5 +1,9 @@
 import { importAzgaarFullJson } from './AzgaarJsonImporter.js';
 
+function disposedError() {
+  return new Error('Azgaar import worker was disposed.');
+}
+
 export class AzgaarImportWorkerClient {
   constructor() {
     this.nextId = 1;
@@ -28,10 +32,18 @@ export class AzgaarImportWorkerClient {
 
   convert(document, config, options = {}) {
     if (this.disposed) {
-      return Promise.reject(new Error('Azgaar import worker was disposed.'));
+      return Promise.reject(disposedError());
     }
     if (!this.worker) {
-      return Promise.resolve().then(() => importAzgaarFullJson(document, config, options));
+      return Promise.resolve()
+        .then(() => {
+          if (this.disposed) throw disposedError();
+          return importAzgaarFullJson(document, config, options);
+        })
+        .then((world) => {
+          if (this.disposed) throw disposedError();
+          return world;
+        });
     }
 
     const id = this.nextId;
@@ -79,7 +91,7 @@ export class AzgaarImportWorkerClient {
     this.disposed = true;
     this.worker?.terminate();
     this.worker = null;
-    const error = new Error('Azgaar import worker was disposed.');
+    const error = disposedError();
     for (const pending of this.pending.values()) {
       pending.reject(error);
     }
