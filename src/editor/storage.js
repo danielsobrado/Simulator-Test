@@ -124,6 +124,12 @@ async function listLocalStorageDocuments(prefix) {
   return matches;
 }
 
+function mergeDocumentLists(primary, legacy) {
+  const byKey = new Map(legacy.map((entry) => [entry.key, entry]));
+  for (const entry of primary) byKey.set(entry.key, entry);
+  return [...byKey.values()].sort((left, right) => left.key.localeCompare(right.key));
+}
+
 export async function saveToBrowser(storageKey, document) {
   let indexedDbError = null;
   if (typeof indexedDB !== 'undefined') {
@@ -182,7 +188,13 @@ export async function listBrowserDocuments(prefix) {
   if (typeof indexedDB !== 'undefined') {
     try {
       const documents = await listIndexedDbDocuments(prefix);
-      if (documents) return documents;
+      if (documents) {
+        try {
+          return mergeDocumentLists(documents, await listLocalStorageDocuments(prefix));
+        } catch {
+          return documents;
+        }
+      }
     } catch (error) {
       indexedDbError = error;
       warnIndexedDbFallback('listing', error);
