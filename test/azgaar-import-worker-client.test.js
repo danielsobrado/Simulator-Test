@@ -61,6 +61,25 @@ test('worker failure rejects the active import and disables the failed worker', 
   }
 });
 
+test('worker response deserialization failure rejects pending imports', async () => {
+  const restoreWorker = installFakeWorker();
+  const client = new AzgaarImportWorkerClient();
+
+  try {
+    const request = client.convert({}, {});
+    const worker = FakeWorker.instances[0];
+    worker.emit('messageerror', { preventDefault() {} });
+
+    await assert.rejects(request, /could not be deserialized/);
+    assert.equal(worker.terminated, true);
+    assert.equal(client.worker, null);
+    assert.equal(client.pending.size, 0);
+  } finally {
+    client.dispose();
+    restoreWorker();
+  }
+});
+
 test('synchronous worker dispatch failure does not leak a pending import', async () => {
   const restoreWorker = installFakeWorker();
   const client = new AzgaarImportWorkerClient();
