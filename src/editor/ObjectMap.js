@@ -12,6 +12,12 @@ function cloneObject(object) {
   return object ? { ...object } : null;
 }
 
+function supportsTerrain(tileMap, definition, tileId) {
+  if (definition.allowedTileIds.includes(tileId)) return true;
+  const terrainClass = tileMap.getTileDefinition?.(tileId)?.terrainClass;
+  return Boolean(terrainClass && definition.allowedTerrainClasses?.includes(terrainClass));
+}
+
 export class ObjectMap {
   constructor({ tileMap, objectCatalog }) {
     this.tileMap = tileMap;
@@ -123,13 +129,7 @@ export class ObjectMap {
         return { valid: false, reason: 'Footprint overlaps another object.', cells };
       }
       const tileId = this.tileMap.get(cell.x, cell.z);
-      const tileDefinition = this.tileMap.getTileDefinition?.(tileId);
-      const supportsTerrain = definition.allowedTileIds.includes(tileId)
-        || (
-          tileDefinition?.terrainClass
-          && definition.allowedTerrainClasses?.includes(tileDefinition.terrainClass)
-        );
-      if (!supportsTerrain) {
+      if (!supportsTerrain(this.tileMap, definition, tileId)) {
         return { valid: false, reason: 'The terrain does not support this object.', cells };
       }
     }
@@ -237,7 +237,7 @@ export class ObjectMap {
     if (!object) {
       return true;
     }
-    return this.getDefinition(object.definitionKey).allowedTileIds.includes(tileId);
+    return supportsTerrain(this.tileMap, this.getDefinition(object.definitionKey), tileId);
   }
 
   clear() {
