@@ -79,7 +79,7 @@ export function createLodController(config = {}) {
         cohortIds: cohorts.map((c) => c.id).sort(),
         actorBindings: [],
       };
-      manifests.set(entityId, manifest);
+      manifests.set(entityId, structuredClone(manifest));
       return {
         events: [{
           type: 'entity.patched',
@@ -140,19 +140,24 @@ export function createLodController(config = {}) {
       };
     },
     getManifest(settlementId) {
-      return manifests.get(settlementId) ?? null;
+      const manifest = manifests.get(settlementId);
+      return manifest ? structuredClone(manifest) : null;
     },
     serialize() {
       return {
         ownership: [...ownership.entries()].sort(([a], [b]) => a.localeCompare(b)),
-        manifests: [...manifests.entries()].sort(([a], [b]) => a.localeCompare(b)),
+        manifests: [...manifests.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([id, manifest]) => [id, structuredClone(manifest)]),
       };
     },
     restore(snapshot) {
       ownership.clear();
       manifests.clear();
       for (const [id, tier] of snapshot.ownership ?? []) ownership.set(id, tier);
-      for (const [id, manifest] of snapshot.manifests ?? []) manifests.set(id, manifest);
+      for (const [id, manifest] of snapshot.manifests ?? []) {
+        manifests.set(id, structuredClone(manifest));
+      }
     },
   };
 }
