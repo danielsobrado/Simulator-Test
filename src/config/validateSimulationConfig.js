@@ -1,13 +1,25 @@
 import { DEFAULT_SIMULATION_CONFIG } from '../sim/config/defaultSimulationConfig.js';
 
+function assertObject(value, path) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid simulation configuration: ${path} must be an object.`);
+  }
+}
+
 function assertPositive(value, path) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid simulation configuration: ${path} must be positive.`);
   }
 }
 
+function assertPositiveSafeInt(value, path) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`Invalid simulation configuration: ${path} must be a positive integer.`);
+  }
+}
+
 function assertNonNegInt(value, path) {
-  if (!Number.isInteger(value) || value < 0) {
+  if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`Invalid simulation configuration: ${path} must be a non-negative integer.`);
   }
 }
@@ -20,9 +32,7 @@ function assertBoolean(value, path) {
 
 export function validateSimulationConfig(simulation) {
   if (simulation == null) return simulation;
-  if (typeof simulation !== 'object' || Array.isArray(simulation)) {
-    throw new Error('Invalid simulation configuration: simulation must be an object.');
-  }
+  assertObject(simulation, 'simulation');
 
   assertNonNegInt(simulation.schemaVersion ?? DEFAULT_SIMULATION_CONFIG.schemaVersion, 'simulation.schemaVersion');
   assertNonNegInt(simulation.projectionVersion ?? DEFAULT_SIMULATION_CONFIG.projectionVersion, 'simulation.projectionVersion');
@@ -32,18 +42,33 @@ export function validateSimulationConfig(simulation) {
   if (simulation.retainDestroyedEntities !== undefined) {
     assertBoolean(simulation.retainDestroyedEntities, 'simulation.retainDestroyedEntities');
   }
-  assertPositive(simulation.maxEventsPerTick ?? DEFAULT_SIMULATION_CONFIG.maxEventsPerTick, 'simulation.maxEventsPerTick');
+  assertPositiveSafeInt(
+    simulation.maxEventsPerTick ?? DEFAULT_SIMULATION_CONFIG.maxEventsPerTick,
+    'simulation.maxEventsPerTick',
+  );
 
   const time = simulation.time ?? {};
+  assertObject(time, 'simulation.time');
+  const resolvedTime = { ...DEFAULT_SIMULATION_CONFIG.time, ...time };
   for (const key of [
     'ticksPerHour', 'hoursPerDay', 'daysPerWeek', 'daysPerMonth', 'monthsPerYear',
     'initialYear', 'initialMonth', 'initialDay',
   ]) {
-    if (time[key] !== undefined) assertPositive(time[key], `simulation.time.${key}`);
+    assertPositiveSafeInt(resolvedTime[key], `simulation.time.${key}`);
   }
-  if (time.initialHour !== undefined) assertNonNegInt(time.initialHour, 'simulation.time.initialHour');
+  assertNonNegInt(resolvedTime.initialHour, 'simulation.time.initialHour');
+  if (resolvedTime.initialMonth > resolvedTime.monthsPerYear) {
+    throw new Error('Invalid simulation configuration: simulation.time.initialMonth must not exceed monthsPerYear.');
+  }
+  if (resolvedTime.initialDay > resolvedTime.daysPerMonth) {
+    throw new Error('Invalid simulation configuration: simulation.time.initialDay must not exceed daysPerMonth.');
+  }
+  if (resolvedTime.initialHour >= resolvedTime.hoursPerDay) {
+    throw new Error('Invalid simulation configuration: simulation.time.initialHour must be less than hoursPerDay.');
+  }
 
   const geography = simulation.geography ?? {};
+  assertObject(geography, 'simulation.geography');
   for (const key of [
     'roadSpeedKmPerHour', 'trailSpeedKmPerHour', 'riverDownstreamSpeedKmPerHour',
     'riverUpstreamSpeedKmPerHour', 'seaSpeedKmPerHour', 'maxGeneratedSeaLaneKm',
@@ -51,11 +76,10 @@ export function validateSimulationConfig(simulation) {
     if (geography[key] !== undefined) assertPositive(geography[key], `simulation.geography.${key}`);
   }
 
-  if (simulation.commodities) {
-    if (typeof simulation.commodities !== 'object' || Array.isArray(simulation.commodities)) {
-      throw new Error('Invalid simulation configuration: simulation.commodities must be an object.');
-    }
+  if (simulation.commodities !== undefined) {
+    assertObject(simulation.commodities, 'simulation.commodities');
     for (const [id, def] of Object.entries(simulation.commodities)) {
+      assertObject(def, `simulation.commodities.${id}`);
       assertPositive(def.unitMassKg, `simulation.commodities.${id}.unitMassKg`);
       assertPositive(def.baseValue, `simulation.commodities.${id}.baseValue`);
       if (def.spoilagePerDay !== undefined && (!Number.isFinite(def.spoilagePerDay) || def.spoilagePerDay < 0)) {
