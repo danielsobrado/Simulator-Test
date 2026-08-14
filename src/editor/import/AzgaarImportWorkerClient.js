@@ -26,6 +26,7 @@ export class AzgaarImportWorkerClient {
       { type: 'module' },
     );
     worker.addEventListener('message', (event) => this.onMessage(event, worker));
+    worker.addEventListener('messageerror', (event) => this.onMessageError(event, worker));
     worker.addEventListener('error', (event) => this.onError(event, worker));
     return worker;
   }
@@ -74,10 +75,24 @@ export class AzgaarImportWorkerClient {
     }
   }
 
-  onError(event, sourceWorker) {
-    if (this.disposed || this.worker !== sourceWorker) return;
+  onMessageError(event, sourceWorker) {
     event.preventDefault?.();
-    const error = new Error(event.message || 'Azgaar import worker failed.');
+    this.failWorker(
+      sourceWorker,
+      new Error('Azgaar import worker response could not be deserialized.'),
+    );
+  }
+
+  onError(event, sourceWorker) {
+    event.preventDefault?.();
+    this.failWorker(
+      sourceWorker,
+      new Error(event.message || 'Azgaar import worker failed.'),
+    );
+  }
+
+  failWorker(sourceWorker, error) {
+    if (this.disposed || this.worker !== sourceWorker) return;
     sourceWorker.terminate();
     this.worker = null;
     for (const pending of this.pending.values()) {
