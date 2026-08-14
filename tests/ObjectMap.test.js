@@ -97,11 +97,12 @@ test('terrain changes are rejected beneath incompatible objects', () => {
   assert.equal(objectMap.canSetTerrain(0, 0, 2), true);
 });
 
-test('custom Azgaar biomes use their semantic terrain class for placement', () => {
+test('custom Azgaar biomes use their semantic terrain class for placement and terrain edits', () => {
   const tileMap = new TileMap({ width: 8, height: 8, tileSize: 2, defaultTileId: 32 });
-  tileMap.getTileDefinition = (tileId) => (
-    tileId === 32 ? { id: 32, terrainClass: 'plains' } : null
-  );
+  tileMap.getTileDefinition = (tileId) => {
+    if (tileId === 32 || tileId === 33) return { id: tileId, terrainClass: 'plains' };
+    return { id: tileId, terrainClass: 'forest' };
+  };
   const objectCatalog = [{
     ...catalog[0],
     allowedTileIds: Object.freeze([4]),
@@ -112,6 +113,10 @@ test('custom Azgaar biomes use their semantic terrain class for placement', () =
     objectMap.validatePlacement({ definitionKey: 'house', x: 3, z: 3, rotation: 0 }).valid,
     true,
   );
+
+  objectMap.place({ definitionKey: 'house', x: 3, z: 3, rotation: 0 });
+  assert.equal(objectMap.canSetTerrain(3, 3, 33), true);
+  assert.equal(objectMap.canSetTerrain(3, 3, 34), false);
 });
 
 test('object documents round-trip without overlaps', () => {
