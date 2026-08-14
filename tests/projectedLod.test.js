@@ -51,6 +51,29 @@ test('orthographic projected size responds to zoom', () => {
   assert.equal(zoomed, 100);
 });
 
+test('perspective projected size responds to zoom', () => {
+  const camera = {
+    isOrthographicCamera: false,
+    fov: 60,
+    zoom: 1,
+    position: { x: 0, y: 0, z: 0 },
+  };
+  const normal = projectedPixelHeight({
+    camera,
+    worldPosition: { x: 0, y: 0, z: 10 },
+    worldHeight: 5,
+    viewportHeight: 1000,
+  });
+  camera.zoom = 2;
+  const zoomed = projectedPixelHeight({
+    camera,
+    worldPosition: { x: 0, y: 0, z: 10 },
+    worldHeight: 5,
+    viewportHeight: 1000,
+  });
+  assert.ok(Math.abs(zoomed - normal * 2) < 1e-9);
+});
+
 test('perspective projected size falls with distance', () => {
   const camera = {
     isOrthographicCamera: false,
