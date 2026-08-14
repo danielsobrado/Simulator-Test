@@ -18,6 +18,10 @@ function supportsTerrain(tileMap, definition, tileId) {
   return Boolean(terrainClass && definition.allowedTerrainClasses?.includes(terrainClass));
 }
 
+function validCellCoordinate(value) {
+  return Number.isSafeInteger(value);
+}
+
 export class ObjectMap {
   constructor({ tileMap, objectCatalog }) {
     this.tileMap = tileMap;
@@ -117,6 +121,13 @@ export class ObjectMap {
   }
 
   validatePlacement({ definitionKey, x, z, rotation = 0, ignoreObjectId = null }) {
+    if (!validCellCoordinate(x) || !validCellCoordinate(z)) {
+      return {
+        valid: false,
+        reason: 'Object coordinates must be safe integer cells.',
+        cells: [],
+      };
+    }
     const definition = this.getDefinition(definitionKey);
     const cells = this.getCells(x, z, definitionKey, rotation);
 
