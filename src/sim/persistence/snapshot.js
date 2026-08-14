@@ -142,26 +142,56 @@ export function createEventHistory({ maxImportant = 10000 } = {}) {
 export function createInMemorySaveStore() {
   const saves = new Map();
   const pending = new Map();
+  let transactionSeq = 0;
+
+  function pendingQueue(slot) {
+    const queue = pending.get(slot) ?? [];
+    if (!pending.has(slot)) pending.set(slot, queue);
+    return queue;
+  }
+
+  function takePending(slot, transactionId = null) {
+    const queue = pending.get(slot);
+    if (!queue?.length) return null;
+    const index = transactionId == null
+      ? 0
+      : queue.findIndex((entry) => entry.transactionId === transactionId);
+    if (index < 0) return null;
+    const [entry] = queue.splice(index, 1);
+    if (queue.length === 0) pending.delete(slot);
+    return entry;
+  }
+
   return {
     async beginSave(slot, payload) {
-      pending.set(slot, structuredClone(payload));
-      return { ok: true, slot, pending: true };
+      transactionSeq += 1;
+      const transactionId = `save:${transactionSeq}`;
+      pendingQueue(slot).push({
+        transactionId,
+        payload: structuredClone(payload),
+      });
+      return { ok: true, slot, pending: true, transactionId };
     },
-    async commitSave(slot) {
-      if (!pending.has(slot)) {
+    async commitSave(slot, transactionId = null) {
+      const entry = takePending(slot, transactionId);
+      if (!entry) {
         return { ok: false, code: 'missing_pending_save' };
       }
-      saves.set(slot, pending.get(slot));
-      pending.delete(slot);
-      return { ok: true, slot };
+      saves.set(slot, entry.payload);
+      return { ok: true, slot, transactionId: entry.transactionId };
     },
-    async abortSave(slot) {
-      pending.delete(slot);
-      return { ok: true, slot };
+    async abortSave(slot, transactionId = null) {
+      const entry = takePending(slot, transactionId);
+      return {
+        ok: true,
+        slot,
+        aborted: Boolean(entry),
+        transactionId: entry?.transactionId ?? transactionId,
+      };
     },
     async save(slot, payload) {
-      await this.beginSave(slot, payload);
-      return this.commitSave(slot);
+      const pendingSave = await this.beginSave(slot, payload);
+      return this.commitSave(slot, pendingSave.transactionId);
     },
     async load(slot) {
       if (!saves.has(slot)) {
