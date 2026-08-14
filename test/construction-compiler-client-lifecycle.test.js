@@ -99,3 +99,14 @@ test('disposed construction compiler rejects new work', async () => {
     (error) => error?.name === 'AbortError' && /disposed/.test(error.message),
   );
 });
+
+test('main-thread construction fallback rejects work disposed before compilation starts', async () => {
+  const client = new ConstructionCompilerClient({ workerFactory: () => null });
+  const request = client.compile({ id: 'wall-1', revision: 0 });
+  client.dispose();
+
+  await assert.rejects(
+    request,
+    (error) => error?.name === 'AbortError' && /disposed/.test(error.message),
+  );
+});
