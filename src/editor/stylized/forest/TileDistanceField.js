@@ -41,6 +41,9 @@ export class TileDistanceField {
     this.cacheRevision = this.revisionProvider?.() ?? 0;
     this.maxCachedChunks = maxCachedChunks;
     this.cache = new Map();
+    this.lastChunkX = null;
+    this.lastChunkZ = null;
+    this.lastField = null;
     this.stats = { builds: 0, cacheHits: 0, cacheEvictions: 0 };
     this.signature = `${label}:${this.targetTileId}:${this.maxCells}`;
   }
@@ -54,12 +57,23 @@ export class TileDistanceField {
     if (revision !== this.cacheRevision) {
       this.cache.clear();
       this.cacheRevision = revision;
+      this.lastChunkX = null;
+      this.lastChunkZ = null;
+      this.lastField = null;
     }
+    if (this.lastField && chunkX === this.lastChunkX && chunkZ === this.lastChunkZ) {
+      this.stats.cacheHits += 1;
+      return this.lastField;
+    }
+
     const key = `${chunkX}:${chunkZ}`;
     const cached = this.cache.get(key);
     if (cached) {
       this.cache.delete(key);
       this.cache.set(key, cached);
+      this.lastChunkX = chunkX;
+      this.lastChunkZ = chunkZ;
+      this.lastField = cached;
       this.stats.cacheHits += 1;
       return cached;
     }
@@ -83,6 +97,9 @@ export class TileDistanceField {
       distances: computeRoadDistanceField(tiles, size, size, this.targetTileId),
     };
     this.cache.set(key, field);
+    this.lastChunkX = chunkX;
+    this.lastChunkZ = chunkZ;
+    this.lastField = field;
     while (this.cache.size > this.maxCachedChunks) {
       this.cache.delete(this.cache.keys().next().value);
       this.stats.cacheEvictions += 1;
