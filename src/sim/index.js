@@ -68,7 +68,6 @@ import {
   createCommandJournal,
   createEventHistory,
   createInMemorySaveStore,
-  createReplayRunner,
   createMigrationRegistry,
   buildDiagnosticReport,
   detectCorruption,
@@ -92,6 +91,13 @@ import { createEntityEnvelope } from './model/entityEnvelope.js';
 import { generatedEntityId } from './model/ids.js';
 
 const handlerFlag = { registered: false };
+
+function eventsAffectPathfinding(events = []) {
+  return events.some((event) => {
+    const kind = event?.payload?.kind;
+    return kind === 'graphEdge' || kind === 'graphNode';
+  });
+}
 
 function ensureHandlersRegistered() {
   if (handlerFlag.registered) return;
@@ -362,7 +368,7 @@ export function createSimulationWorld({
       }
     },
   });
-  const replayRunner = createReplayRunner({ dispatcher });
+  const replayDispatcher = createCommandDispatcher();
 
   scheduler.registerSystem({
     id: 'economy.daily',
@@ -398,6 +404,9 @@ export function createSimulationWorld({
     if (result.ok) {
       state = result.state;
       state.calendar = calendarFromTick(clock.getTick(), clock.getConfig());
+      if (eventsAffectPathfinding(result.events)) {
+        pathCache.clear();
+      }
       if (result.result?.reasonCodes) {
         reasonLog.push(...result.result.reasonCodes);
       }
@@ -455,6 +464,7 @@ export function createSimulationWorld({
       });
       working.revision = state.revision + 1;
       state = working;
+      pathCache.clear();
       return { ok: true, ...summary };
     },
 
@@ -551,7 +561,6 @@ export function createSimulationWorld({
 
     setEdgeAccess(edgeId, accessPolicy) {
       const result = setEdgeAccessPolicy(state, edgeId, accessPolicy);
-      pathCache.clear();
       const dispatched = dispatch('sim.patchEntity', result.events[0].payload);
       if (dispatched.ok) reasonLog.push(...result.reasonCodes);
       return { ...dispatched, reasonCodes: result.reasonCodes };
@@ -699,12 +708,12 @@ export function createSimulationWorld({
       const to = findSettlementNodeId(state, toSettlementId);
       if (!from || !to) return { ok: false, code: 'missing_nodes' };
       const cached = pathCache.get(from, to);
-      if (cached) return cached;
+      if (cached) return structuredClone(cached);
       const path = shortestPath(state, from, to, {
         dangerWeight: config.geography.dangerWeight,
         tollWeight: config.geography.tollWeight,
       });
-      pathCache.set(from, to, path);
+      pathCache.set(from, to, structuredClone(path));
       return path;
     },
 
@@ -721,7 +730,11 @@ export function createSimulationWorld({
       const payload = {
         snapshot: snap,
         journal: journal.list(),
+        eventHistory: eventHistory.list(),
+        ledger: ledger.list(),
         lod: lod.serialize(),
+        reasonLog: structuredClone(reasonLog),
+        commandSeq,
         clockTick: clock.getTick(),
         scheduler: scheduler.serialize(),
       };
@@ -742,29 +755,52 @@ export function createSimulationWorld({
       if (loaded.payload.scheduler) scheduler.restore(loaded.payload.scheduler);
       journal.clear();
       for (const cmd of loaded.payload.journal ?? []) journal.append(cmd);
+      eventHistory.clear();
+      for (const savedEvent of loaded.payload.eventHistory ?? []) {
+        const { important = false, ...event } = savedEvent;
+        eventHistory.append(event, { important });
+      }
+      ledger.clear();
+      for (const entry of loaded.payload.ledger ?? []) ledger.record(entry);
+      reasonLog.length = 0;
+      reasonLog.push(...structuredClone(loaded.payload.reasonLog ?? []));
+      commandSeq = Number.isInteger(loaded.payload.commandSeq)
+        ? loaded.payload.commandSeq
+        : commandSeq;
+      pathCache.clear();
       return { ok: true, checksum: restored.checksum };
     },
 
     replayFromSnapshot(snapshot, commands) {
       const restored = restoreWorldSnapshot(snapshot);
+      const replayLedger = createLedger();
+      const replayLod = createLodController(config);
+      replayLod.restore(lod.serialize());
       let current = restored.state;
       const applied = [];
+      const replayEvents = [];
       for (const command of commands) {
-        const result = dispatcher.dispatch(current, command, {
+        const result = replayDispatcher.dispatch(current, command, {
           definition: restored.definition,
           config,
-          ledger,
-          lod,
+          ledger: replayLedger,
+          lod: replayLod,
         });
         if (!result.ok) {
           return { ok: false, code: result.code, applied, state: current };
         }
         current = result.state;
         applied.push(command.id);
+        replayEvents.push(...result.events);
       }
       definition = restored.definition;
       state = current;
       clock.setTick(state.calendar.tick);
+      lod.restore(replayLod.serialize());
+      for (const entry of replayLedger.list()) ledger.record(entry);
+      for (const command of commands) journal.append(command);
+      for (const event of replayEvents) eventHistory.append(event, { important: true });
+      pathCache.clear();
       return { ok: true, code: 'ok', applied, state, definition };
     },
 
