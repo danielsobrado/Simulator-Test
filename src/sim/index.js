@@ -1,6 +1,5 @@
 import { createCommandEnvelope } from './commands/commandEnvelope.js';
 import { createCommandDispatcher, registerCommandHandler } from './commands/dispatcher.js';
-import { applyEvent } from './events/reducers.js';
 import { mergeSimulationConfig } from './config/defaultSimulationConfig.js';
 import { projectAzgaarWorld } from './import/projectAzgaarWorld.js';
 import { createWorldQueries, checksumWorldState } from './queries/worldQueries.js';
@@ -163,6 +162,19 @@ function ensureHandlersRegistered() {
     });
     command.payload.__result = {
       shipmentId: result.shipmentId,
+      reasonCodes: result.reasonCodes,
+    };
+    return result.events;
+  });
+
+  registerCommandHandler('sim.matchTrades', (state, command) => {
+    const { definition, config } = command.payload.__ctx;
+    const result = matchTradeOffers(state, definition, {
+      commandId: command.id,
+      config,
+    });
+    command.payload.__result = {
+      shipments: result.shipments,
       reasonCodes: result.reasonCodes,
     };
     return result.events;
@@ -360,15 +372,16 @@ export function createSimulationWorld({
 
   const clock = createWorldClock(config.time, state.calendar.tick);
   const scheduler = createScheduler(clock);
-  const dispatcher = createCommandDispatcher({
-    onAccepted(command, events) {
-      journal.append(command);
-      for (const event of events) {
-        eventHistory.append(event, { important: true });
-      }
-    },
-  });
-  const replayDispatcher = createCommandDispatcher();
+
+  function recordAccepted(command, events) {
+    journal.append(command);
+    for (const event of events) {
+      eventHistory.append(event, { important: true });
+    }
+  }
+
+  const dispatcher = createCommandDispatcher({ onAccepted: recordAccepted });
+  const isolatedDispatcher = createCommandDispatcher();
 
   scheduler.registerSystem({
     id: 'economy.daily',
@@ -415,6 +428,30 @@ export function createSimulationWorld({
       ...result,
       command: envelope,
     };
+  }
+
+  function dispatchBatch(envelopes) {
+    let current = state;
+    const accepted = [];
+    const events = [];
+    for (const envelope of envelopes) {
+      const result = isolatedDispatcher.dispatch(current, envelope, ctx());
+      if (!result.ok) {
+        return { ...result, command: envelope };
+      }
+      current = result.state;
+      accepted.push({ command: envelope, events: result.events });
+      events.push(...result.events);
+    }
+    state = current;
+    state.calendar = calendarFromTick(clock.getTick(), clock.getConfig());
+    for (const entry of accepted) {
+      recordAccepted(entry.command, entry.events);
+    }
+    if (eventsAffectPathfinding(events)) {
+      pathCache.clear();
+    }
+    return { ok: true, code: 'accepted', events, state };
   }
 
   const runner = createFixedStepRunner({
@@ -542,19 +579,14 @@ export function createSimulationWorld({
 
     setBorderAccess(regionAId, regionBId, accessPolicy) {
       const result = setBorderAccessByRegions(state, regionAId, regionBId, accessPolicy);
-      let current = state;
-      for (const ev of result.events) {
-        const r = dispatcher.dispatch(current, createCommandEnvelope({
-          id: nextCommandId('border'),
-          type: 'sim.patchEntity',
-          issuedAtTick: clock.getTick(),
-          payload: ev.payload,
-        }), ctx());
-        if (!r.ok) return r;
-        current = r.state;
-      }
-      state = current;
-      pathCache.clear();
+      const envelopes = result.events.map((event) => createCommandEnvelope({
+        id: nextCommandId('border'),
+        type: 'sim.patchEntity',
+        issuedAtTick: clock.getTick(),
+        payload: event.payload,
+      }));
+      const dispatched = dispatchBatch(envelopes);
+      if (!dispatched.ok) return dispatched;
       reasonLog.push(...result.reasonCodes);
       return { ok: true, reasonCodes: result.reasonCodes };
     },
@@ -571,58 +603,36 @@ export function createSimulationWorld({
         commandId: nextCommandId('offer'),
         ...payload,
       });
-      let current = state;
-      for (const ev of result.events) {
-        const r = dispatcher.dispatch(current, createCommandEnvelope({
-          id: nextCommandId('offer'),
-          type: 'sim.upsertEntity',
-          issuedAtTick: clock.getTick(),
-          payload: ev.payload,
-        }), ctx());
-        if (!r.ok) return r;
-        current = r.state;
-      }
-      state = current;
+      const envelopes = result.events.map((event) => createCommandEnvelope({
+        id: nextCommandId('offer'),
+        type: 'sim.upsertEntity',
+        issuedAtTick: clock.getTick(),
+        payload: event.payload,
+      }));
+      const dispatched = dispatchBatch(envelopes);
+      if (!dispatched.ok) return dispatched;
       reasonLog.push(...result.reasonCodes);
       return { ok: true, result: { offerId: result.offerId }, reasonCodes: result.reasonCodes };
     },
 
     matchTrades() {
-      const result = matchTradeOffers(state, definition, {
-        commandId: nextCommandId('match'),
-        config,
-      });
-      const current = cloneWorldState(state);
-      for (const [index, ev] of result.events.entries()) {
-        applyEvent(current, {
-          id: `${nextCommandId('match-ev')}:${index}`,
-          type: ev.type,
-          tick: clock.getTick(),
-          causedByCommandId: 'match',
-          entityIds: ev.entityIds ?? [],
-          payload: ev.payload,
-          schemaVersion: 1,
-        });
-      }
-      state = current;
-      reasonLog.push(...result.reasonCodes);
-      return { ok: true, result: { shipments: result.shipments }, reasonCodes: result.reasonCodes };
+      const dispatched = dispatch('sim.matchTrades', {});
+      return {
+        ...dispatched,
+        reasonCodes: dispatched.result?.reasonCodes ?? [],
+      };
     },
 
     loseShipment(shipmentId, options = {}) {
       const result = loseShipment(state, shipmentId, options);
-      let current = state;
-      for (const ev of result.events) {
-        const r = dispatcher.dispatch(current, createCommandEnvelope({
-          id: nextCommandId('lose'),
-          type: 'sim.patchEntity',
-          issuedAtTick: clock.getTick(),
-          payload: ev.payload,
-        }), ctx());
-        if (!r.ok) return r;
-        current = r.state;
-      }
-      state = current;
+      const envelopes = result.events.map((event) => createCommandEnvelope({
+        id: nextCommandId('lose'),
+        type: 'sim.patchEntity',
+        issuedAtTick: clock.getTick(),
+        payload: event.payload,
+      }));
+      const dispatched = dispatchBatch(envelopes);
+      if (!dispatched.ok) return dispatched;
       reasonLog.push(...result.reasonCodes);
       return { ok: true, reasonCodes: result.reasonCodes };
     },
@@ -637,19 +647,14 @@ export function createSimulationWorld({
         commandId: nextCommandId('succession'),
         factionId,
       });
-      let current = state;
-      for (const ev of result.events) {
-        const type = ev.type === 'entity.upserted' ? 'sim.upsertEntity' : 'sim.patchEntity';
-        const r = dispatcher.dispatch(current, createCommandEnvelope({
-          id: nextCommandId('succession'),
-          type,
-          issuedAtTick: clock.getTick(),
-          payload: ev.payload,
-        }), ctx());
-        if (!r.ok) return r;
-        current = r.state;
-      }
-      state = current;
+      const envelopes = result.events.map((event) => createCommandEnvelope({
+        id: nextCommandId('succession'),
+        type: event.type === 'entity.upserted' ? 'sim.upsertEntity' : 'sim.patchEntity',
+        issuedAtTick: clock.getTick(),
+        payload: event.payload,
+      }));
+      const dispatched = dispatchBatch(envelopes);
+      if (!dispatched.ok) return dispatched;
       reasonLog.push(...result.reasonCodes);
       return { ok: true, result: { successorId: result.successorId }, reasonCodes: result.reasonCodes };
     },
@@ -778,9 +783,9 @@ export function createSimulationWorld({
       replayLod.restore(lod.serialize());
       let current = restored.state;
       const applied = [];
-      const replayEvents = [];
+      const accepted = [];
       for (const command of commands) {
-        const result = replayDispatcher.dispatch(current, command, {
+        const result = isolatedDispatcher.dispatch(current, command, {
           definition: restored.definition,
           config,
           ledger: replayLedger,
@@ -791,15 +796,14 @@ export function createSimulationWorld({
         }
         current = result.state;
         applied.push(command.id);
-        replayEvents.push(...result.events);
+        accepted.push({ command, events: result.events });
       }
       definition = restored.definition;
       state = current;
       clock.setTick(state.calendar.tick);
       lod.restore(replayLod.serialize());
       for (const entry of replayLedger.list()) ledger.record(entry);
-      for (const command of commands) journal.append(command);
-      for (const event of replayEvents) eventHistory.append(event, { important: true });
+      for (const entry of accepted) recordAccepted(entry.command, entry.events);
       pathCache.clear();
       return { ok: true, code: 'ok', applied, state, definition };
     },
