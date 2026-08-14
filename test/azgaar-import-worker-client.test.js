@@ -102,3 +102,19 @@ test('disposed importer rejects new work instead of falling back to the main thr
     restoreWorker();
   }
 });
+
+test('main-thread import fallback rejects work disposed before conversion starts', async () => {
+  const originalWorker = globalThis.Worker;
+  delete globalThis.Worker;
+  const client = new AzgaarImportWorkerClient();
+
+  try {
+    const request = client.convert({}, {});
+    client.dispose();
+    await assert.rejects(request, /disposed/);
+  } finally {
+    client.dispose();
+    if (originalWorker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = originalWorker;
+  }
+});
