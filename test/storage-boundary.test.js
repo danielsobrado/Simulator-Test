@@ -107,3 +107,17 @@ test('URL loading binds the ambient browser fetch receiver', async () => {
     else globalThis.fetch = originalFetch;
   }
 });
+
+test('browser listing skips corrupt legacy entries without hiding valid saves', async () => {
+  const storage = installBrowserStorage({ indexedDbOpenError: new Error('blocked') });
+  try {
+    storage.values.set('world:broken', '{broken');
+    storage.values.set('world:good', JSON.stringify({ version: 6, name: 'Good' }));
+
+    assert.deepEqual(await listBrowserDocuments('world:'), [
+      { key: 'world:good', document: { version: 6, name: 'Good' } },
+    ]);
+  } finally {
+    storage.restore();
+  }
+});
