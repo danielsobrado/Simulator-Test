@@ -16,7 +16,7 @@ import {
 import { assertCompatibleWaterDomainMetadata } from '../water/WaterConfig.js';
 import { enrichPageWaterField } from '../water/WaterField.js';
 import { sampleWorldStoreWater } from '../water/TerrainWaterQueries.js';
-import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
+import { cellKey, chunkKey } from './WorldCoordinates.js';
 import { INFINITE_WORLD_FORMAT_VERSION } from './worldConstants.js';
 
 const MAX_TILE_ID = 255;
@@ -27,6 +27,16 @@ function tileIndex(localX, localZ, chunkSize) {
 
 function heightIndex(localX, localZ, vertexSize) {
   return localZ * vertexSize + localX;
+}
+
+function hasOverrideInRect(overrides, minX, maxX, minZ, maxZ) {
+  if (minX > maxX || minZ > maxZ) return false;
+  for (let cellZ = minZ; cellZ <= maxZ; cellZ += 1) {
+    for (let cellX = minX; cellX <= maxX; cellX += 1) {
+      if (overrides.has(cellKey(cellX, cellZ))) return true;
+    }
+  }
+  return false;
 }
 
 function recordWaterGeneration(page, durationMs) {
@@ -252,21 +262,26 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   }
 
   hasHaloTileOverrides(originX, originZ) {
-    if (this.tileOverrides.size === 0) {
+    const overrides = this.tileOverrides;
+    if (overrides.size === 0) {
       return false;
     }
     const searchRadius = getSurfaceMaskSearchRadius(this.surfaceMaskConfig.blendCells);
-    const minX = originX - searchRadius;
-    const maxX = originX + this.chunkSize - 1 + searchRadius;
-    const minZ = originZ - searchRadius;
-    const maxZ = originZ + this.chunkSize - 1 + searchRadius;
-    for (const key of this.tileOverrides.keys()) {
-      const { chunkX: cellX, chunkZ: cellZ } = parseCellKey(key);
-      if (cellX >= minX && cellX <= maxX && cellZ >= minZ && cellZ <= maxZ) {
-        return true;
-      }
-    }
-    return false;
+    if (searchRadius <= 0) return false;
+
+    const chunkMinX = originX;
+    const chunkMaxX = originX + this.chunkSize - 1;
+    const chunkMinZ = originZ;
+    const chunkMaxZ = originZ + this.chunkSize - 1;
+    const haloMinX = chunkMinX - searchRadius;
+    const haloMaxX = chunkMaxX + searchRadius;
+    const haloMinZ = chunkMinZ - searchRadius;
+    const haloMaxZ = chunkMaxZ + searchRadius;
+
+    return hasOverrideInRect(overrides, haloMinX, haloMaxX, haloMinZ, chunkMinZ - 1)
+      || hasOverrideInRect(overrides, haloMinX, haloMaxX, chunkMaxZ + 1, haloMaxZ)
+      || hasOverrideInRect(overrides, haloMinX, chunkMinX - 1, chunkMinZ, chunkMaxZ)
+      || hasOverrideInRect(overrides, chunkMaxX + 1, haloMaxX, chunkMinZ, chunkMaxZ);
   }
 
   completeWorkerPage(page) {
