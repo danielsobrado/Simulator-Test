@@ -16,7 +16,7 @@ import {
 import { assertCompatibleWaterDomainMetadata } from '../water/WaterConfig.js';
 import { enrichPageWaterField } from '../water/WaterField.js';
 import { sampleWorldStoreWater } from '../water/TerrainWaterQueries.js';
-import { cellKey, chunkKey } from './WorldCoordinates.js';
+import { cellKey, chunkKey, parseCellKey } from './WorldCoordinates.js';
 import { INFINITE_WORLD_FORMAT_VERSION } from './worldConstants.js';
 
 const MAX_TILE_ID = 255;
@@ -277,6 +277,20 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     const haloMaxX = chunkMaxX + searchRadius;
     const haloMinZ = chunkMinZ - searchRadius;
     const haloMaxZ = chunkMaxZ + searchRadius;
+    const haloWidth = this.chunkSize + searchRadius * 2;
+    const haloCellCount = haloWidth ** 2 - this.chunkSize ** 2;
+
+    if (overrides.size <= haloCellCount) {
+      for (const key of overrides.keys()) {
+        const { chunkX: cellX, chunkZ: cellZ } = parseCellKey(key);
+        const inHaloBounds = cellX >= haloMinX && cellX <= haloMaxX
+          && cellZ >= haloMinZ && cellZ <= haloMaxZ;
+        const inChunk = cellX >= chunkMinX && cellX <= chunkMaxX
+          && cellZ >= chunkMinZ && cellZ <= chunkMaxZ;
+        if (inHaloBounds && !inChunk) return true;
+      }
+      return false;
+    }
 
     return hasOverrideInRect(overrides, haloMinX, haloMaxX, haloMinZ, chunkMinZ - 1)
       || hasOverrideInRect(overrides, haloMinX, haloMaxX, chunkMaxZ + 1, haloMaxZ)
