@@ -20,15 +20,38 @@ const OBJECT_TO_SOURCE_BAND = Object.freeze({
 });
 
 const OBJECT_BANDS = Object.freeze(['near', 'coarse', 'shell']);
+const CAMERA_STATE_SIZE = 10;
 
-function cameraSignature(camera, viewportHeight) {
+function writeCameraState(camera, viewportHeight, target) {
   const position = camera.position;
   const quaternion = camera.quaternion;
-  return `${Math.round(position.x * 2)}:${Math.round(position.y * 2)}:${Math.round(position.z * 2)}`
-    + `:${Math.round(quaternion.x * 1000)}:${Math.round(quaternion.y * 1000)}`
-    + `:${Math.round(quaternion.z * 1000)}:${Math.round(quaternion.w * 1000)}`
-    + `:${Math.round((camera.zoom ?? 1) * 10)}:${Math.round((camera.fov ?? 0) * 10)}`
-    + `:${Math.round(viewportHeight * 10)}`;
+  target[0] = Math.round(position.x * 2);
+  target[1] = Math.round(position.y * 2);
+  target[2] = Math.round(position.z * 2);
+  target[3] = Math.round(quaternion.x * 1000);
+  target[4] = Math.round(quaternion.y * 1000);
+  target[5] = Math.round(quaternion.z * 1000);
+  target[6] = Math.round(quaternion.w * 1000);
+  target[7] = Math.round((camera.zoom ?? 1) * 10);
+  target[8] = Math.round((camera.fov ?? 0) * 10);
+  target[9] = Math.round(viewportHeight * 10);
+}
+
+function cameraStatesEqual(left, right) {
+  for (let index = 0; index < CAMERA_STATE_SIZE; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+function bandSignature(instances) {
+  let signature = '';
+  for (let index = 0; index < instances.length; index += 1) {
+    const instance = instances[index];
+    if (index > 0) signature += '|';
+    signature += `${instance.objectId}:${instance.quantizedFade}:${instance.ditherDirection}`;
+  }
+  return signature;
 }
 
 function stableSeed(id) {
@@ -56,7 +79,10 @@ export class ObjectLodController {
     this.fadeSteps = fadeSteps;
     this.states = new Map();
     this.seeds = new Map();
-    this.lastCameraSignature = null;
+    this.activeIds = new Set();
+    this.cameraState = new Float64Array(CAMERA_STATE_SIZE);
+    this.lastCameraState = new Float64Array(CAMERA_STATE_SIZE);
+    this.hasLastCameraState = false;
     this.lastSelectedObjectId = null;
     this.lastPlan = null;
     this.transitioning = false;
@@ -65,7 +91,8 @@ export class ObjectLodController {
   clear() {
     this.states.clear();
     this.seeds.clear();
-    this.lastCameraSignature = null;
+    this.activeIds.clear();
+    this.hasLastCameraState = false;
     this.lastSelectedObjectId = null;
     this.lastPlan = null;
     this.transitioning = false;
@@ -96,16 +123,19 @@ export class ObjectLodController {
     selectedObjectId = null,
     force = false,
   }) {
-    const nextCameraSignature = cameraSignature(camera, viewportHeight);
+    writeCameraState(camera, viewportHeight, this.cameraState);
+    const cameraUnchanged = this.hasLastCameraState
+      && cameraStatesEqual(this.cameraState, this.lastCameraState);
     if (!force && !this.transitioning
-      && nextCameraSignature === this.lastCameraSignature
+      && cameraUnchanged
       && selectedObjectId === this.lastSelectedObjectId
       && this.lastPlan) {
       return this.lastPlan;
     }
 
     const buckets = { near: [], coarse: [], shell: [] };
-    const activeIds = new Set();
+    const activeIds = this.activeIds;
+    activeIds.clear();
     let transitions = 0;
     for (const placement of placements) {
       const objectId = placement.object.id;
@@ -161,13 +191,11 @@ export class ObjectLodController {
 
     const signatures = {};
     for (const band of OBJECT_BANDS) {
-      const instances = buckets[band];
-      signatures[band] = instances.map((instance) => (
-        `${instance.objectId}:${instance.quantizedFade}:${instance.ditherDirection}`
-      )).join('|');
+      signatures[band] = bandSignature(buckets[band]);
     }
     this.transitioning = transitions > 0;
-    this.lastCameraSignature = nextCameraSignature;
+    this.lastCameraState.set(this.cameraState);
+    this.hasLastCameraState = true;
     this.lastSelectedObjectId = selectedObjectId;
     this.lastPlan = Object.freeze({
       buckets,
