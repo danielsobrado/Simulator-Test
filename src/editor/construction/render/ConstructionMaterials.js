@@ -12,25 +12,7 @@ import { constructionStyle } from '../masonry/ConstructionStyleCatalog.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { mortarProfile } from './ConstructionMortarConfig.js';
 
-/**
- * Stone materials for live constructions.
- *
- * Mirrors the stone slot of `createWorkshopMaterials`
- * (`ProceduralWorkshopMaterials.js:510-527`) so a wall and a workshop building
- * made of nominally the same stone actually match. Tone mapping is deliberately
- * untouched — the world renderer and the workshop preview are both already
- * ACESFilmic at exposure 1.12 and must stay in agreement.
- *
- * When `record.style.materials.stone` names a workshop preset, that preset's
- * colour / roughness / optional albedo are applied on top of the procedural
- * base so the radial palette paint is visible, not only persisted.
- *
- * Materials are cached and shared across modules. A 200 m wall is ~17 modules,
- * and giving each its own material would mean 17 identical pipelines.
- */
-
 const cache = new Map();
-/** @type {Map<string, { texture: THREE.Texture, users: number }>} */
 const PRESET_TEXTURE_CACHE = new Map();
 const MAX_PRESET_TEXTURE_CACHE = 64;
 const PRESET_TEXTURE_SLOTS = Object.freeze([
@@ -118,10 +100,6 @@ function createStoneMaterial(record, style) {
     color: '#ffffff',
     roughness: 1,
     metalness: 0,
-    // Every stone carries baked crevice occlusion and a per-unit palette colour
-    // in its vertex colours. Dropping this throws away every joint line, so any
-    // geometry merged into this material must carry the attribute — see
-    // `harmonizeVertexColors(..., { required: true })` in the masonry builder.
     vertexColors: true,
   });
   material.bumpMap = surfaceBumpTexture(seed, config.bumpTextureScale);
@@ -159,10 +137,6 @@ function createStoneMaterial(record, style) {
   return material;
 }
 
-/**
- * Recessed joint / core material. Kept deliberately flat: mortar is seen through
- * narrow gaps, so maps and vertex colours add cost with little readable value.
- */
 function createMortarMaterial(record, style) {
   const profile = mortarProfile(style.key);
   const material = new THREE.MeshStandardNodeMaterial({
@@ -201,10 +175,6 @@ function presetTextureKey(document, preset, kind) {
   ].join('|');
 }
 
-/**
- * Drop unused preset textures (users === 0) in LRU order until there is room.
- * In-use textures stay — disposing them would blank live painted walls.
- */
 function evictUnusedPresetTextures() {
   while (PRESET_TEXTURE_CACHE.size >= MAX_PRESET_TEXTURE_CACHE) {
     let removed = false;
@@ -220,16 +190,10 @@ function evictUnusedPresetTextures() {
 }
 
 function touchPresetTextureEntry(key, entry) {
-  // Refresh LRU order: Map iterates in insertion order.
   PRESET_TEXTURE_CACHE.delete(key);
   PRESET_TEXTURE_CACHE.set(key, entry);
 }
 
-/**
- * Look up or create a shared preset texture without retaining it.
- * Live material bundles must call `acquirePresetTexture` so LRU cannot dispose
- * maps still referenced by painted walls.
- */
 function getPresetTexture(document, preset, kind) {
   if (typeof Image === 'undefined') return null;
   const key = presetTextureKey(document, preset, kind);
@@ -260,10 +224,6 @@ function getPresetTexture(document, preset, kind) {
   return entry.texture;
 }
 
-/**
- * Retain a shared preset texture for a material bundle's lifetime.
- * Each unique key is retained once per acquire list.
- */
 function acquirePresetTexture(document, preset, kind, acquiredKeys) {
   const key = presetTextureKey(document, preset, kind);
   if (!key) return null;
@@ -289,7 +249,6 @@ function releasePresetTextureKeys(keys) {
   }
 }
 
-/** Detach shared preset maps so `material.dispose()` cannot free live refs. */
 function detachPresetTextures(material, presetTextures) {
   if (!presetTextures?.size) return;
   for (const slot of PRESET_TEXTURE_SLOTS) {
@@ -302,10 +261,6 @@ function collectMaterialLease(materials) {
   activeLeaseCollector?.push(materials);
 }
 
-/**
- * Capture every construction-material acquisition made synchronously by an
- * operation and return an idempotent release function for that temporary scope.
- */
 export function captureConstructionMaterialLease(operation) {
   if (typeof operation !== 'function') {
     throw new Error('Construction material lease requires an operation.');
@@ -334,12 +289,6 @@ export function captureConstructionMaterialLease(operation) {
   };
 }
 
-/**
- * Apply a workshop material preset onto a construction stone material.
- *
- * Same colour / map rules as the workshop component painter so a granite petal
- * on a live wall matches granite in the workshop.
- */
 export function applyConstructionMaterialPreset(
   material,
   preset,
@@ -375,6 +324,19 @@ export function applyConstructionMaterialPreset(
   return result;
 }
 
+function applyPresetAndDisposeBase(material, preset, materialDocument, acquiredKeys) {
+  try {
+    return applyConstructionMaterialPreset(
+      material,
+      preset,
+      materialDocument,
+      acquiredKeys,
+    );
+  } finally {
+    material.dispose();
+  }
+}
+
 export function createConstructionMaterials(record, materialDocument = null) {
   const key = materialKey(record, materialDocument);
   const found = cache.get(key);
@@ -391,29 +353,26 @@ export function createConstructionMaterials(record, materialDocument = null) {
     ? getWorkshopMaterialPreset(materialDocument, stonePresetId)
     : null;
   if (stonePreset) {
-    stone = applyConstructionMaterialPreset(
+    stone = applyPresetAndDisposeBase(
       stone,
       stonePreset,
       materialDocument,
       acquiredKeys,
     );
   }
-  // Selection tints rather than replaces. Swapping to a flat gold material
-  // would drop `vertexColors` and take every baked joint line with it, so a
-  // selected wall would read as a smooth blob.
+
   const stoneSelected = stone.clone();
   stoneSelected.emissive = new THREE.Color('#6a4f12');
   stoneSelected.emissiveIntensity = 0.55;
   stoneSelected.userData.constructionSlot = CONSTRUCTION_MATERIAL_SLOT.STONE;
 
-  // Mortar stays dark when selected — gold would erase joint contrast.
   let mortar = createMortarMaterial(record, style);
   const mortarPresetId = record.style?.materials?.mortar ?? null;
   const mortarPreset = mortarPresetId
     ? getWorkshopMaterialPreset(materialDocument, mortarPresetId)
     : null;
   if (mortarPreset) {
-    mortar = applyConstructionMaterialPreset(
+    mortar = applyPresetAndDisposeBase(
       mortar,
       mortarPreset,
       materialDocument,
@@ -438,10 +397,6 @@ export function createConstructionMaterials(record, materialDocument = null) {
   return materials;
 }
 
-/**
- * Drop one user of a materials bundle. When the last user goes, dispose the
- * GPU objects so style/preset/seed edits cannot retain pipelines forever.
- */
 export function releaseConstructionMaterials(materials) {
   if (!materials) return;
   for (const [key, entry] of cache.entries()) {
@@ -458,7 +413,6 @@ export function releaseConstructionMaterials(materials) {
   }
 }
 
-/** Test seam and teardown hook; materials are otherwise shared for the session. */
 export function disposeConstructionMaterials() {
   for (const entry of cache.values()) {
     for (const material of Object.values(entry.materials)) {
@@ -473,12 +427,10 @@ export function disposeConstructionMaterials() {
   activeLeaseCollector = null;
 }
 
-/** Test seam: how many construction material bundles are currently cached. */
 export function constructionMaterialCacheSize() {
   return cache.size;
 }
 
-/** Test seam: how many preset textures are currently cached. */
 export function presetTextureCacheSize() {
   return PRESET_TEXTURE_CACHE.size;
 }
