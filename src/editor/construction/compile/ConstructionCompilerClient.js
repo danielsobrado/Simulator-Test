@@ -74,8 +74,12 @@ export class ConstructionCompilerClient {
     });
     if (!this.worker) {
       return Promise.resolve().then(() => {
+        if (this.disposed) throw disposedError();
         if ((this.revisions.get(record.id) ?? 0) !== record.revision) throw staleError();
-        return publishCollision(record, compileConstructionPlan(record, compileOptions));
+        const plan = compileConstructionPlan(record, compileOptions);
+        if (this.disposed) throw disposedError();
+        if ((this.revisions.get(record.id) ?? 0) !== record.revision) throw staleError();
+        return publishCollision(record, plan);
       });
     }
     return new Promise((resolve, reject) => {
