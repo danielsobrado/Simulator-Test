@@ -208,7 +208,7 @@ export class ObjectMap {
   }
 
   restore(object) {
-    if (!object || !Number.isInteger(object.id) || object.id < 1) {
+    if (!object || !Number.isSafeInteger(object.id) || object.id < 1) {
       throw new Error('Object snapshot has an invalid id.');
     }
     if (this.objectsById.has(object.id)) {
