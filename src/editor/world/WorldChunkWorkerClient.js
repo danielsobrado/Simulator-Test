@@ -3,6 +3,7 @@ import { createTerrainWorkerBaseTerrain } from './TerrainWorkerBaseTerrain.js';
 import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import { chunkKey } from './WorldCoordinates.js';
 
+const DEFAULT_MAX_IN_FLIGHT_PER_WORKER = 1;
 const MAX_WORKER_COUNT = 8;
 const MAX_WORKER_RESTARTS = 2;
 
@@ -29,6 +30,13 @@ export function resolveWorkerCount(requested) {
   return Math.min(MAX_WORKER_COUNT, Math.max(2, cores - 1));
 }
 
+export function resolveMaxInFlightPerWorker(requested) {
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return DEFAULT_MAX_IN_FLIGHT_PER_WORKER;
+  }
+  return Math.max(1, Math.floor(requested));
+}
+
 /**
  * Pool of chunk-generation workers.
  *
@@ -46,7 +54,7 @@ export class WorldChunkWorkerClient {
     surfaceMaskConfig = null,
     vegetationScatterConfig = null,
     workerCount = null,
-    maxInFlightPerWorker = 1,
+    maxInFlightPerWorker = DEFAULT_MAX_IN_FLIGHT_PER_WORKER,
   }) {
     this.chunkSize = chunkSize;
     this.generator = generator.toMetadata();
@@ -54,7 +62,7 @@ export class WorldChunkWorkerClient {
     this.worldGenerator = null;
     this.surfaceMaskConfig = surfaceMaskConfig;
     this.vegetationScatterConfig = vegetationScatterConfig;
-    this.maxInFlightPerWorker = Math.max(1, maxInFlightPerWorker);
+    this.maxInFlightPerWorker = resolveMaxInFlightPerWorker(maxInFlightPerWorker);
     this.nextId = 1;
     this.pending = new Map();      // id -> { resolve, reject, workerIndex }
     this.queue = [];               // waiting jobs (not yet dispatched)
