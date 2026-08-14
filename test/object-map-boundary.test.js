@@ -53,3 +53,19 @@ test('object document restore cannot retain string coordinates', () => {
   );
   assert.equal(objectMap.size, 0);
 });
+
+test('object document restore rejects unsafe integer ids', () => {
+  const objectMap = createObjectMap();
+
+  assert.throws(
+    () => objectMap.loadDocument([{
+      id: Number.MAX_SAFE_INTEGER + 1,
+      definitionKey: 'test-object',
+      x: 5,
+      z: 2,
+      rotation: 0,
+    }]),
+    /invalid id/,
+  );
+  assert.equal(objectMap.size, 0);
+});
