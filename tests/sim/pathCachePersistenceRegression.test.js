@@ -181,3 +181,21 @@ test('regression: trade matching is journaled as one atomic command', () => {
   assert.equal(journal.at(-1).type, 'sim.matchTrades');
   assert.equal(journal.at(-1).id, matched.command.id);
 });
+
+test('regression: LOD manifests are defensive copies', () => {
+  const world = boot();
+  const settlementId = importedSettlementId(1);
+  const promoted = world.promoteSettlement(settlementId, 'C');
+  assert.equal(promoted.ok, true);
+
+  promoted.result.manifest.populationTotal = -1;
+  assert.notEqual(world.lod.getManifest(settlementId).populationTotal, -1);
+
+  const serialized = world.lod.serialize();
+  serialized.manifests[0][1].populationTotal = -2;
+  assert.notEqual(world.lod.getManifest(settlementId).populationTotal, -2);
+
+  const manifest = world.lod.getManifest(settlementId);
+  manifest.populationTotal = -3;
+  assert.notEqual(world.lod.getManifest(settlementId).populationTotal, -3);
+});
