@@ -6,9 +6,23 @@ const DATABASE_NAME = 'simcity-dnd-worlds';
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'worlds';
 
+function storageFailure(message, primaryError, fallbackError) {
+  const error = typeof AggregateError === 'function'
+    ? new AggregateError([primaryError, fallbackError].filter(Boolean), message)
+    : new Error(message);
+  if (!(error instanceof Error)) return error;
+  error.cause ??= fallbackError ?? primaryError;
+  error.storageFailure = true;
+  return error;
+}
+
+function warnIndexedDbFallback(operation, error) {
+  console.warn(`IndexedDB ${operation} failed; using localStorage fallback.`, error);
+}
+
 export function parseDocument(serialized) {
   const document = JSON.parse(serialized);
-  if (!document || typeof document !== 'object') {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) {
     throw new Error('The selected file is not a valid map document.');
   }
   return document;
@@ -19,7 +33,13 @@ function openDatabase() {
     return Promise.resolve(null);
   }
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    let request;
+    try {
+      request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    } catch (error) {
+      reject(error);
+      return;
+    }
     request.addEventListener('upgradeneeded', () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME);
@@ -55,54 +75,130 @@ async function withStore(mode, action) {
   }
 }
 
-export async function saveToBrowser(storageKey, document) {
-  if (typeof indexedDB !== 'undefined') {
-    await withStore('readwrite', (store) => store.put(document, storageKey));
-    try {
-      localStorage.removeItem(storageKey);
-    } catch {
-      // IndexedDB is authoritative; stale localStorage cleanup is best effort.
-    }
-    return;
+async function listIndexedDbDocuments(prefix) {
+  const database = await openDatabase();
+  if (!database) return null;
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`, false, false);
+      const matches = [];
+      const request = store.openCursor(range);
+      request.addEventListener('success', () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (typeof cursor.key === 'string' && cursor.key.startsWith(prefix)) {
+          matches.push({ key: cursor.key, document: cursor.value });
+        }
+        cursor.continue();
+      });
+      request.addEventListener('error', () => {
+        reject(request.error ?? new Error('IndexedDB document listing failed.'));
+      });
+      transaction.addEventListener('complete', () => resolve(matches));
+      transaction.addEventListener('abort', () => reject(transaction.error ?? new Error('IndexedDB transaction aborted.')));
+      transaction.addEventListener('error', () => reject(transaction.error ?? new Error('IndexedDB transaction failed.')));
+    });
+  } finally {
+    database.close();
   }
+}
+
+function saveToLocalStorage(storageKey, document) {
   localStorage.setItem(storageKey, JSON.stringify(document));
 }
 
-export async function loadFromBrowser(storageKey) {
-  if (typeof indexedDB !== 'undefined') {
-    const document = await withStore('readonly', (store) => store.get(storageKey));
-    if (document) {
-      return document;
-    }
-  }
+function loadFromLocalStorage(storageKey) {
   const serialized = localStorage.getItem(storageKey);
   return serialized ? parseDocument(serialized) : null;
+}
+
+async function listLocalStorageDocuments(prefix) {
+  const matches = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(prefix)) continue;
+    matches.push({ key, document: loadFromLocalStorage(key) });
+  }
+  return matches;
+}
+
+export async function saveToBrowser(storageKey, document) {
+  let indexedDbError = null;
+  if (typeof indexedDB !== 'undefined') {
+    try {
+      await withStore('readwrite', (store) => store.put(document, storageKey));
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // IndexedDB is authoritative; stale localStorage cleanup is best effort.
+      }
+      return;
+    } catch (error) {
+      indexedDbError = error;
+      warnIndexedDbFallback('save', error);
+    }
+  }
+  try {
+    saveToLocalStorage(storageKey, document);
+  } catch (fallbackError) {
+    if (indexedDbError) {
+      throw storageFailure('Unable to save the browser document.', indexedDbError, fallbackError);
+    }
+    throw fallbackError;
+  }
+}
+
+export async function loadFromBrowser(storageKey) {
+  let indexedDbError = null;
+  if (typeof indexedDB !== 'undefined') {
+    try {
+      const document = await withStore('readonly', (store) => store.get(storageKey));
+      if (document) return document;
+    } catch (error) {
+      indexedDbError = error;
+      warnIndexedDbFallback('load', error);
+    }
+  }
+  try {
+    const document = loadFromLocalStorage(storageKey);
+    if (document !== null || !indexedDbError) return document;
+    throw storageFailure('Unable to load the browser document.', indexedDbError, null);
+  } catch (fallbackError) {
+    if (fallbackError?.storageFailure && indexedDbError) throw fallbackError;
+    if (indexedDbError) {
+      throw storageFailure('Unable to load the browser document.', indexedDbError, fallbackError);
+    }
+    throw fallbackError;
+  }
 }
 
 export async function listBrowserDocuments(prefix) {
   if (typeof prefix !== 'string') {
     throw new Error('Browser document prefixes must be strings.');
   }
+  let indexedDbError = null;
   if (typeof indexedDB !== 'undefined') {
-    const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`, false, false);
-    const keys = await withStore('readonly', (store) => store.getAllKeys(range));
-    const matches = [];
-    for (const key of keys ?? []) {
-      if (typeof key !== 'string' || !key.startsWith(prefix)) continue;
-      matches.push({
-        key,
-        document: await loadFromBrowser(key),
-      });
+    try {
+      const documents = await listIndexedDbDocuments(prefix);
+      if (documents) return documents;
+    } catch (error) {
+      indexedDbError = error;
+      warnIndexedDbFallback('listing', error);
     }
-    return matches;
   }
-  const matches = [];
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (!key?.startsWith(prefix)) continue;
-    matches.push({ key, document: await loadFromBrowser(key) });
+  try {
+    const documents = await listLocalStorageDocuments(prefix);
+    if (documents.length > 0 || !indexedDbError) return documents;
+    throw storageFailure('Unable to list browser documents.', indexedDbError, null);
+  } catch (fallbackError) {
+    if (fallbackError?.storageFailure && indexedDbError) throw fallbackError;
+    if (indexedDbError) {
+      throw storageFailure('Unable to list browser documents.', indexedDbError, fallbackError);
+    }
+    throw fallbackError;
   }
-  return matches;
 }
 
 export async function loadJsonFromUrl(url, { fetchImpl = globalThis.fetch } = {}) {
@@ -155,10 +251,6 @@ export async function importMapDocument(document, {
   if (!isAzgaarFullJson(document)) {
     return document;
   }
-  // The caller owns the config. Loading it here would pull editor.config.yaml
-  // onto this module's graph, which only resolves under Vite and would make
-  // storage.js — and the scene settings runtime layered on it — untestable
-  // under plain Node.
   if (!config) {
     throw new Error('Importing an Azgaar map requires the editor configuration.');
   }
