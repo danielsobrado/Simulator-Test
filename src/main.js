@@ -103,9 +103,6 @@ import {
 
 const TERRAIN_PREFETCH_REFRESH_MS = 200;
 
-// Boot is a fixed sequence, so its steps are declared up front and the bar has a
-// real denominator. Ids are stable strings because `LoadingSession.start` throws on
-// an unknown one — a renamed phase fails loudly rather than silently never lighting.
 const BOOT_STEPS = Object.freeze([
   { id: 'settings', label: 'Scene settings' },
   { id: 'terrain', label: 'Terrain view and GPU device' },
@@ -116,19 +113,12 @@ const BOOT_STEPS = Object.freeze([
 ]);
 
 async function startEditor() {
-  // Set when a scene look stages a page reload. Everything after the map step is
-  // expensive setup for a document that is about to be thrown away — the shader
-  // pre-warm alone is the longest phase in boot — so this lets the rest be skipped.
   let sceneReloadPending = false;
   const loading = new LoadingTracker();
   const loadingOverlay = new LoadingOverlay(document.body);
   loadingOverlay.attach(loading);
   const boot = loading.begin({ title: 'Starting Drusniel World', steps: BOOT_STEPS });
   boot.start('settings');
-  // A `?settings=` reference is user-supplied and can go stale — the session
-  // handoff is gone in a duplicated tab, a preset URL can 404, a hand-edited
-  // document can be invalid. None of that should stop the editor from booting,
-  // so it degrades to the built-in look and reports why once the UI exists.
   let bootSceneSettings = null;
   let bootSceneSettingsError = null;
   try {
@@ -166,10 +156,6 @@ async function startEditor() {
     throw new Error(`Unknown default tile: ${config.map.defaultTile}.`);
   }
 
-  // View distance is near by default so procedural worlds keep their cozy fog.
-  // The imported macro backdrop switches to a far view at runtime — the sky
-  // sphere, fog, and camera far plane grow to its radius so far continents read
-  // through the haze (see applyViewDistance below).
   const NEAR_FAR_PLANE = 5000;
   const farTerrainRadius = config.world.farTerrain?.enabled !== false
     ? (config.world.farTerrain?.radiusMeters ?? 0)
@@ -182,9 +168,6 @@ async function startEditor() {
   const farView = farTerrainRadius > 0
     ? (() => {
       const skyRadius = farTerrainRadius + config.world.floatingOriginThreshold + 8000;
-      // FogExp2 ~10% visibility at the backdrop radius, so its far edge fades.
-      // farDensityScale tunes how hard that far edge goes; the far-terrain
-      // material layers its own aerial perspective on top of this.
       const densityScale = config.stylizedSurface?.sky?.aerial?.farDensityScale ?? 1.5;
       return { farPlane: skyRadius + 4000, skyRadius, fogDensity: densityScale / farTerrainRadius };
     })()
@@ -236,9 +219,6 @@ async function startEditor() {
       document: bootSceneSettings?.document.biomeAssets ?? null,
     });
   } catch (error) {
-    // Biome selections name assets by key, so a preset written against a
-    // different asset set can reference keys this build has no variant for.
-    // Fall back to the automatic mix rather than refusing to start.
     bootSceneSettingsError = error;
     biomeAssetPalette = new BiomeAssetPalette({ stylizedConfig: config.stylizedSurface });
   }
@@ -391,16 +371,12 @@ async function startEditor() {
     biomeAssetPalette,
   });
   boot.start('assets');
-  // Every stylized GLB already reports through the startup telemetry, so the
-  // overlay can name the file it is on without instrumenting each loader.
   const releaseAssetProgress = bindAssetProgress(boot);
   ui.attachPostProcessing(postProcessingStore);
   ui.attachGodRays(terrainView.godRays);
   ui.attachGrassTuning(stylizedSurface.grassTuning);
   ui.attachLoading(loading);
   ui.attachGrassBladeProfiles(stylizedSurface.bladeProfiles);
-  // The list has to be redrawn once the manifest lands: before that every set
-  // resolves to the generated taper and would be labelled as unbaked.
   stylizedSurface.bladeProfiles.ready.then(() => ui.renderGrassBladeProfiles());
   boot.start('blades');
   await stylizedSurface.bladeProfiles.ready;
@@ -427,12 +403,6 @@ async function startEditor() {
     farPlane: nearView.farPlane,
   });
 
-  // Overlay shortcuts are owned by GameplayOverlayController so inventory and
-  // the world map no longer depend on listener registration order versus the
-  // player controller's capture-phase key handling. Spell digits (1–6) need the
-  // same early capture slot — PlayerController swallows every other key while
-  // walking — but must register *after* overlays so an open inventory still
-  // claims 1/2 for weapon sets.
   let playerController;
   let viewModeController;
   let controller;
@@ -465,9 +435,6 @@ async function startEditor() {
   });
   const worldMapUi = new WorldMapUi({ root, controller: worldMapController });
 
-  // The view toggle has to outrank PlayerController's capture-phase key handler,
-  // which stops immediate propagation on every non-Escape key while walking. Same
-  // reason and same mechanism as the spell digits above.
   let cameraViewKeyHandler = null;
   const detachCameraViewHotkey = attachCaptureHotkey(() => cameraViewKeyHandler);
 
@@ -477,8 +444,6 @@ async function startEditor() {
     config: config.player,
     farPlane: nearView.farPlane,
   });
-  // Both the boom and the drow's feet read the ground through the player
-  // controller, so all three agree about wall tops and construction decks.
   const characterGround = {
     heightAt: (x, z) => playerController.getGroundHeight(x, z),
   };
@@ -525,9 +490,6 @@ async function startEditor() {
     }),
   );
 
-  // Walk mode is not an awaitable call — dropping in re-centres residency and the
-  // world fills in over the following frames. So readiness is observed from the
-  // streaming status rather than awaited, and the overlay closes when it settles.
   const streamingFrameListeners = new Set();
   const streamingProbe = {
     getStatus: () => terrainView.getStreamingStatus(),
@@ -536,9 +498,6 @@ async function startEditor() {
       return () => streamingFrameListeners.delete(listener);
     },
   };
-  // Map loads finish with the document applied and residency re-centred, but the
-  // chunks themselves arrive over the next few seconds. Without this the overlay
-  // closed on the import and the world kept assembling behind it.
   ui.attachStreamingProbe(streamingProbe);
   watchWalkModeEntry({
     viewModeController,
@@ -587,34 +546,24 @@ async function startEditor() {
     const renderFocus = viewModeController.getFocusWorld();
     return floatingOrigin.toCanonical(renderFocus.x, renderFocus.z);
   };
-  // Pickers follow whichever camera is actually rendering, so construction
-  // editing works from the player's first-person view as well as the orbit one.
   controller.cameraProvider = () => viewModeController.camera;
   controller.playerEditingProvider = () => viewModeController.paused;
-  // Terrain/object brush ghosts are orbit-only; keep the tool selected so
-  // returning from player mode restores raise/paint, but hide the preview
-  // during spawn pick and walk (paused editing uses construction only).
   controller.editPreviewsAllowedProvider = () => (
     viewModeController.mode === PLAYER_MODE_EDIT && !viewModeController.awaitingSpawn
   );
   viewModeController.onPausedEditing = () => controller.selectTool('construction');
   viewModeController.onLeaveOrbitEditing = () => controller.clearHoverPreviews();
-  // Flat wall tops become walkable: the provider composes into the same ground
-  // height function the player physics already samples.
   playerController.constructionGround = new ConstructionGroundProvider({
     store: constructionStore,
     spatialIndex: constructionSpatialIndex,
     terrainView,
   });
-  // Right-tapping a wall opens the same circular palette the workshop uses.
   controller.constructionPalette = new ConstructionPaletteController({
     host: ui.viewport,
     controller,
     materialStore: constructionMaterialStore,
     onStatus: (message) => controller.emitNotice(message),
   });
-  // The palette covers how a wall looks; the gizmo covers what you do to it.
-  // It borrows the palette's inspector rather than opening a second one.
   controller.constructionGizmo = new ConstructionGizmoController({
     host: ui.viewport,
     controller,
@@ -622,13 +571,7 @@ async function startEditor() {
     onStatus: (message) => controller.emitNotice(message),
   });
 
-  // One owner for Escape. Each handler backs out exactly one level and the
-  // first to claim the press consumes it, so the layers compose instead of
-  // four independent listeners racing on the capture phase.
   const escapeStack = new EscapeStack();
-  // The grid opens from the cluster, so it must back out first. Registering it
-  // ahead of the cluster at the same level is what makes one press close one
-  // layer rather than both.
   escapeStack.register(ESCAPE_PRIORITY.palette, () => {
     if (!controller.constructionGizmo?.isGridOpen) return false;
     controller.constructionGizmo.closeGrid();
@@ -691,9 +634,6 @@ async function startEditor() {
       ui.updateMinimap();
     },
   });
-  // A map carrying its own saved look reloads the page from inside `loadMap`, which
-  // otherwise reads as boot spontaneously restarting: the sequence runs to the end,
-  // the browser swaps the page, and every step replays with nothing said about why.
   sceneSettingsRuntime.onSceneReload = (document, url) => {
     sceneReloadPending = true;
     ui.showSceneReload(
@@ -720,22 +660,9 @@ async function startEditor() {
   try {
     await sceneSettingsRuntime.applyInitialRuntime();
   } catch (error) {
-    // The preset's map may be unreachable. The generated world is already live,
-    // so keep it and say the map did not load. The step is marked failed rather
-    // than the session, because boot continues and the rest still has to report.
     boot.fail(error);
     ui.showToast(`Preset map not loaded: ${error.message}`, true);
   }
-  // A map that carries its own look has, by this point, staged the handoff and
-  // asked the browser to navigate. `location.assign` does not stop execution, so
-  // without this the rest of boot runs to completion — voxel init, the wait on
-  // stylized assets, and the shader pre-warm — building a scene that is discarded
-  // milliseconds later, and the whole sequence then replays on the new page.
-  //
-  // The staging is already complete (`activate` awaits its own save before
-  // navigating), so there is nothing left to finish. Nothing needs disposing
-  // either: the document is going away. The only loose end is promises already in
-  // flight, whose rejections would otherwise surface as unhandled.
   if (sceneReloadPending) {
     stylizedSurface.ready?.catch?.(() => {});
     stylizedSurface.bakeRequest?.catch?.(() => {});
@@ -753,8 +680,6 @@ async function startEditor() {
   ui.attachWorkshop(proceduralWorkshop);
   const viewModeUi = new ViewModeUi({ root, controller: viewModeController });
 
-  // Switch between near and far view distance depending on whether the imported
-  // macro backdrop is active, so procedural worlds keep their original near fog.
   let farViewActive = false;
   const applyViewDistance = (active) => {
     const view = active && farView ? farView : nearView;
@@ -811,8 +736,6 @@ async function startEditor() {
     );
   }
 
-  // The drow. Created after the weather settings exist, because the garments feel
-  // the same wind everything else does.
   const characterView = characterEnabled
     ? new CharacterView({
       scene: terrainView.scene,
@@ -820,9 +743,6 @@ async function startEditor() {
       sunDirection: terrainView.godRays.sunDirection,
       config: {
         ...(config.character ?? {}),
-        // The pose blends saturate at the game's own run speed, not at a
-        // human's. Left at the source's 5.4 m/s the drow would be pinned in a
-        // full sprint pose from the first step.
         runSpeed: config.player.walkSpeed * config.player.runMultiplier,
       },
       getWeatherSettings: () => ({
@@ -833,13 +753,7 @@ async function startEditor() {
       }),
     })
     : null;
-  // Hidden outside walk mode: there is no player to hang it off, and the orbit
-  // camera has no use for a figure standing at the last spawn point.
   characterView?.setVisible(false);
-  // Visible in first person too, by default. The near plane clips the cowl and
-  // the shoulders away, so what is left is your own robe, boots and hands
-  // looking down — plus the shadow, which is what actually sells standing in the
-  // world rather than floating over it.
   const characterInFirstPerson = config.character?.visibleInFirstPerson !== false;
   const weatherUi = weatherEnabled
     ? createWeatherUi({
@@ -872,23 +786,18 @@ async function startEditor() {
         postProcessingController.notifyReactive(
           POST_PROCESSING_REACTIVE_EVENTS.SPELL_STARTED,
         );
-        // Raise the drow's arms along the aim. Pushed on the cast rather than
-        // polled, so the pose and the effect start on the same frame.
         characterView?.beginCastAlongCamera(
           SPELL_CAST_POSE_MS,
           viewModeController.camera,
           performance.now(),
         );
       },
-      // Keys are claimed by attachSpellHotkeys() above, before PlayerController.
       registerKeys: false,
     })
     : null;
   spellKeyHandler = spellRuntime
     ? (event) => spellRuntime.handleKeyDown(event)
     : null;
-  // Dev-only test hook: lets the perf/screenshot harness import a world and
-  // drive the player without the file picker + prompt. Never exposed in builds.
   if (import.meta.env.DEV) {
     window.__editor = {
       controller,
@@ -952,11 +861,6 @@ async function startEditor() {
     });
   }
 
-  // Warm render pipelines before the first frame. WebGPU compiles a pipeline the
-  // first time a material/geometry pair is actually drawn, and that compile blocks
-  // in the GPU process — it shows up as a ~90 ms hitch on whichever frame a new
-  // LOD band first becomes visible, with every phase timer on that frame cheap.
-  // Doing it here moves the cost into load, where a stall is not a stutter.
   releaseAssetProgress();
   boot.start('prewarm', 'Compiling shaders — this is the long one');
   let finishWaterPrewarm = null;
@@ -1027,9 +931,6 @@ async function startEditor() {
     const averageFps = frameRateMeter.record(frameTimestamp);
     if (frameTimestamp >= nextFrameRateDisplayAt) {
       frameRateDisplay.update(averageFps);
-      // Same cadence as the FPS display: the grass readout is there to be compared
-      // against a profile switch, and both numbers have to come from the same
-      // window or the comparison is between a settled figure and an instant one.
       ui.updateGrassBladeReadout({
         clumps: PerfCounters.get('grassLastChunkClumps'),
         blades: PerfCounters.get('grassLastChunkEffectiveBlades'),
@@ -1040,8 +941,6 @@ async function startEditor() {
     }
 
     terrainView.flushUploadQueue();
-    // Drains the construction module build queue under its own frame budget,
-    // so committing a long wall cannot stall a frame.
     constructionView.update(frameTimestamp);
     constructionView.updateLod(viewModeController.camera, terrainView.renderer.domElement.clientHeight);
     PerfCounters.set('constructionModulesResident', constructionView.stats.modulesResident);
@@ -1066,12 +965,7 @@ async function startEditor() {
       PerfCounters.inc('floatingOriginSnaps');
       viewModeController.shiftWorld(rebase.shiftX, rebase.shiftZ);
       controller.refreshObjects();
-      // Construction geometry is origin-local, so a rebase only moves each
-      // record's group — no dispose, no rebuild, no hitch.
       constructionView.rebase();
-      // Planted feet, simulated garment nodes and the camera boom are all
-      // absolute render-space positions held across frames, so they rebase with
-      // everything else or the drow is left a chunk behind.
       characterView?.shiftWorld(rebase.shiftX, rebase.shiftZ);
       renderFocus = viewModeController.getFocusWorld();
     }
@@ -1147,9 +1041,6 @@ async function startEditor() {
       ui.renderStreamingStatus(terrainView.getStreamingStatus());
       nextStreamingStatusAt = frameTimestamp + 250;
     }
-    // Per frame, not on the 250 ms status cadence: the settle test counts
-    // consecutive quiet frames, and sampling four times a second would make it
-    // wait seconds after the world was already still.
     for (const listener of streamingFrameListeners) listener();
     terrainView.render(viewModeController.camera);
     assetStartupTelemetry.markFirstFrame();
@@ -1214,12 +1105,24 @@ async function startEditor() {
 
 function showStartupError(error) {
   console.error('Failed to start the Drusniel World editor.', error);
-  document.querySelector('#app').innerHTML = `
-    <main style="padding:24px;font-family:system-ui;color:#f4e6e6;background:#211414;min-height:100vh">
-      <h1>Editor failed to start</h1>
-      <p>${error instanceof Error ? error.message : String(error)}</p>
-    </main>
-  `;
+  document.querySelectorAll('.loading-overlay').forEach((element) => element.remove());
+  const root = document.querySelector('#app');
+  if (!root) return;
+
+  const container = document.createElement('main');
+  Object.assign(container.style, {
+    padding: '24px',
+    fontFamily: 'system-ui',
+    color: '#f4e6e6',
+    background: '#211414',
+    minHeight: '100vh',
+  });
+  const title = document.createElement('h1');
+  title.textContent = 'Editor failed to start';
+  const message = document.createElement('p');
+  message.textContent = error instanceof Error ? error.message : String(error);
+  container.append(title, message);
+  root.replaceChildren(container);
 }
 
 startEditor().catch(showStartupError);
