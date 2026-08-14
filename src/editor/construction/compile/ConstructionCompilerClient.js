@@ -35,6 +35,7 @@ export class ConstructionCompilerClient {
           worker.addEventListener('message', ({ data }) => {
             if (!this.disposed && this.worker === worker) this.receive(data);
           });
+          worker.addEventListener('messageerror', (event) => this.onWorkerMessageError(event, worker));
           worker.addEventListener('error', (event) => this.onWorkerError(event, worker));
         }
       } catch (error) {
@@ -115,10 +116,24 @@ export class ConstructionCompilerClient {
     }
   }
 
-  onWorkerError(event, sourceWorker) {
-    if (this.disposed || this.worker !== sourceWorker) return;
+  onWorkerMessageError(event, sourceWorker) {
     event.preventDefault?.();
-    const error = event.error ?? new Error(event.message || 'Construction compiler worker failed.');
+    this.failWorker(
+      sourceWorker,
+      new Error('Construction compiler worker response could not be deserialized.'),
+    );
+  }
+
+  onWorkerError(event, sourceWorker) {
+    event.preventDefault?.();
+    this.failWorker(
+      sourceWorker,
+      event.error ?? new Error(event.message || 'Construction compiler worker failed.'),
+    );
+  }
+
+  failWorker(sourceWorker, error) {
+    if (this.disposed || this.worker !== sourceWorker) return;
     sourceWorker.terminate();
     this.worker = null;
     this.failAll(error);
