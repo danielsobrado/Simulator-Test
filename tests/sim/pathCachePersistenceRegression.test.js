@@ -150,3 +150,34 @@ test('regression: replay state replacement cannot reuse a stale cached path', ()
   assert.equal(replay.ok, true);
   assert.equal(mainPath(world).cost, baselinePath.cost);
 });
+
+test('regression: trade matching is journaled as one atomic command', () => {
+  const world = boot();
+  world.stepDays(2);
+  const origin = importedSettlementId(1);
+  const destination = importedSettlementId(2);
+
+  assert.equal(world.createTradeOffer({
+    settlementId: origin,
+    commodityId: 'grain',
+    kind: 'sell',
+    quantity: 3,
+    limitPrice: 1,
+  }).ok, true);
+  assert.equal(world.createTradeOffer({
+    settlementId: destination,
+    commodityId: 'grain',
+    kind: 'buy',
+    quantity: 3,
+    limitPrice: 5,
+  }).ok, true);
+
+  const beforeCount = world.getJournal().length;
+  const matched = world.matchTrades();
+  assert.equal(matched.ok, true);
+
+  const journal = world.getJournal();
+  assert.equal(journal.length, beforeCount + 1);
+  assert.equal(journal.at(-1).type, 'sim.matchTrades');
+  assert.equal(journal.at(-1).id, matched.command.id);
+});
