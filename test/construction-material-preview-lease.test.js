@@ -28,7 +28,7 @@ test('temporary construction material leases release preview bundles', () => {
     assert.equal(constructionMaterialCacheSize(), 1);
 
     const releasePreview = captureConstructionMaterialLease(() => {
-      createConstructionMaterials(record('temporary-preview'));
+      createConstructionMaterials(record('granite-masonry'));
     });
     assert.equal(constructionMaterialCacheSize(), 2);
 
