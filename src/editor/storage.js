@@ -213,11 +213,12 @@ export async function listBrowserDocuments(prefix) {
   }
 }
 
-export async function loadJsonFromUrl(url, { fetchImpl = globalThis.fetch } = {}) {
-  if (typeof fetchImpl !== 'function') {
+export async function loadJsonFromUrl(url, { fetchImpl = null } = {}) {
+  const resolvedFetch = fetchImpl ?? globalThis.fetch?.bind(globalThis);
+  if (typeof resolvedFetch !== 'function') {
     throw new Error('URL loading is unavailable in this browser.');
   }
-  const response = await fetchImpl(url);
+  const response = await resolvedFetch(url);
   if (!response.ok) {
     throw new Error(`Unable to load ${url}: HTTP ${response.status}.`);
   }
