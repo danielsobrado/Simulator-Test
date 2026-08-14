@@ -87,6 +87,10 @@ function configureBarkTexture(texture, colorSpace) {
   return texture;
 }
 
+function disposeTextures(textures) {
+  for (const texture of textures) texture?.dispose();
+}
+
 function lodSettings(config) {
   const tree = config.lod?.tree ?? {};
   const meshRadius = tree.meshRadius ?? config.trees.residentRadius;
@@ -196,11 +200,22 @@ export class StylizedTreeView {
   }
 
   async loadBarkTextures() {
-    const [color, ao, height] = await Promise.all([
+    const results = await Promise.allSettled([
       this.textureLoader.loadAsync(this.resolveUrl(this.config.assets.barkColor)),
       this.textureLoader.loadAsync(this.resolveUrl(this.config.assets.barkAo)),
       this.textureLoader.loadAsync(this.resolveUrl(this.config.assets.barkHeight)),
     ]);
+    const loaded = results
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value);
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure || this.disposed) {
+      disposeTextures(loaded);
+      if (failure) throw failure.reason;
+      return null;
+    }
+
+    const [color, ao, height] = loaded;
     configureBarkTexture(color, THREE.SRGBColorSpace);
     configureBarkTexture(ao, THREE.NoColorSpace);
     configureBarkTexture(height, THREE.NoColorSpace);
@@ -217,6 +232,10 @@ export class StylizedTreeView {
     const path = this.config.assets.foliageCard;
     if (!path || !(this.config.trees.cardsPerLobe > 0)) return null;
     const card = await this.textureLoader.loadAsync(this.resolveUrl(path));
+    if (this.disposed) {
+      card.dispose();
+      return null;
+    }
     card.wrapS = THREE.ClampToEdgeWrapping;
     card.wrapT = THREE.ClampToEdgeWrapping;
     card.colorSpace = THREE.NoColorSpace;
@@ -227,11 +246,23 @@ export class StylizedTreeView {
 
   async buildFromScene(scene, authoredVariants = []) {
     if (!this.config.trees.enabled || !scene || this.disposed) return;
-    const [barkTextures, foliageCard] = await Promise.all([
+    const textureStart = this.textures.length;
+    const [barkResult, foliageResult] = await Promise.allSettled([
       this.loadBarkTextures(),
       this.loadFoliageCard(),
     ]);
-    if (this.disposed) return;
+    const failure = barkResult.status === 'rejected'
+      ? barkResult.reason
+      : foliageResult.status === 'rejected'
+        ? foliageResult.reason
+        : null;
+    if (failure) {
+      disposeTextures(this.textures.splice(textureStart));
+      throw failure;
+    }
+    const barkTextures = barkResult.value;
+    const foliageCard = foliageResult.value;
+    if (this.disposed || !barkTextures) return;
     const primaryCount = this.appendScenePrototypes(scene, this.config, barkTextures);
     if (primaryCount === 0) {
       throw new Error('No pine prototype contains both configured trunk and leaf materials.');
