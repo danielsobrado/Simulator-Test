@@ -23,10 +23,10 @@ function lodIndex(band) {
 
 function cameraProjection(camera) {
   const orthographic = Boolean(camera.isOrthographicCamera);
+  const zoom = camera.zoom ?? 1;
   if (orthographic) {
     const top = camera.top;
     const bottom = camera.bottom;
-    const zoom = camera.zoom ?? 1;
     if (
       camera === cachedProjectionCamera
       && cachedProjectionOrthographic
@@ -52,6 +52,7 @@ function cameraProjection(camera) {
     camera === cachedProjectionCamera
     && !cachedProjectionOrthographic
     && cachedProjectionFov === fov
+    && cachedProjectionZoom === zoom
   ) {
     return cachedProjectionValue;
   }
@@ -61,9 +62,9 @@ function cameraProjection(camera) {
   cachedProjectionFov = fov;
   cachedProjectionTop = null;
   cachedProjectionBottom = null;
-  cachedProjectionZoom = null;
+  cachedProjectionZoom = zoom;
   const fovRadians = fov * Math.PI / 180;
-  cachedProjectionValue = 2 * Math.tan(fovRadians / 2);
+  cachedProjectionValue = 2 * Math.tan(fovRadians / 2) / Math.max(0.0001, zoom);
   return cachedProjectionValue;
 }
 
