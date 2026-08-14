@@ -93,6 +93,7 @@ export class StylizedSceneAssetCache {
       this.ktx2Loader = configured.ktx2Loader;
     }
     this.entries = new Map();
+    this.disposed = false;
   }
 
   resolveUrl(path) {
@@ -100,6 +101,10 @@ export class StylizedSceneAssetCache {
   }
 
   async acquire(path) {
+    if (this.disposed) {
+      throw new Error('Cannot acquire a scene asset after cache disposal.');
+    }
+
     let entry = this.entries.get(path);
     if (!entry) {
       entry = {
@@ -111,10 +116,14 @@ export class StylizedSceneAssetCache {
         if (!gltf?.scene) {
           throw new Error(`GLB ${path} contains no default scene.`);
         }
+        if (this.disposed || entry.refs <= 0 || this.entries.get(path) !== entry) {
+          disposeScene(gltf.scene);
+          throw new Error(`Scene asset ${path} was released before loading completed.`);
+        }
         entry.scene = gltf.scene;
         return gltf.scene;
       }).catch((error) => {
-        this.entries.delete(path);
+        if (this.entries.get(path) === entry) this.entries.delete(path);
         throw error;
       });
       this.entries.set(path, entry);
@@ -122,10 +131,18 @@ export class StylizedSceneAssetCache {
 
     entry.refs += 1;
     try {
-      return await entry.promise;
+      const scene = await entry.promise;
+      if (this.disposed || entry.refs <= 0 || this.entries.get(path) !== entry) {
+        throw new Error(`Scene asset ${path} is no longer acquired.`);
+      }
+      return scene;
     } catch (error) {
-      entry.refs -= 1;
-      if (entry.refs <= 0) this.entries.delete(path);
+      entry.refs = Math.max(0, entry.refs - 1);
+      if (entry.refs <= 0 && this.entries.get(path) === entry) {
+        this.entries.delete(path);
+        if (entry.scene) disposeScene(entry.scene);
+        entry.scene = null;
+      }
       throw error;
     }
   }
@@ -133,16 +150,21 @@ export class StylizedSceneAssetCache {
   release(path) {
     const entry = this.entries.get(path);
     if (!entry) return;
-    entry.refs -= 1;
+    entry.refs = Math.max(0, entry.refs - 1);
     if (entry.refs > 0) return;
+    if (!entry.scene) return;
     this.entries.delete(path);
-    if (entry.scene) disposeScene(entry.scene);
+    disposeScene(entry.scene);
     entry.scene = null;
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     for (const entry of this.entries.values()) {
+      entry.refs = 0;
       if (entry.scene) disposeScene(entry.scene);
+      entry.scene = null;
     }
     this.entries.clear();
     this.ktx2Loader?.dispose();
