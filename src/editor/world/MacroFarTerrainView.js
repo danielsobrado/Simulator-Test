@@ -252,8 +252,7 @@ export class MacroFarTerrainView {
     return habitat.patchCoverage * Math.min(1, habitat.suitability * 1.4);
   }
 
-  startJob(originX, originZ) {
-    const field = this.forestFieldProvider?.();
+  startJob(originX, originZ, field = this.forestFieldProvider?.() ?? null) {
     this.job = {
       originX,
       originZ,
@@ -399,16 +398,26 @@ export class MacroFarTerrainView {
       this.mesh.visible = false;
       return;
     }
+
+    const origin = this.floatingOrigin.getState();
+    const field = this.forestFieldProvider?.() ?? null;
+    const forestSignature = field?.signature ?? null;
     if (this.job) {
+      if (
+        this.job.originX !== origin.x
+        || this.job.originZ !== origin.z
+        || this.job.forestSignature !== forestSignature
+      ) {
+        this.startJob(origin.x, origin.z, field);
+      }
       this.advanceJob();
       return;
     }
-    const origin = this.floatingOrigin.getState();
-    const forestSignature = this.forestFieldProvider?.()?.signature ?? null;
+
     if (this.builtOriginX === origin.x && this.builtOriginZ === origin.z) {
       if (this.builtForestSignature === forestSignature) return;
     }
-    this.startJob(origin.x, origin.z);
+    this.startJob(origin.x, origin.z, field);
     this.advanceJob();
   }
 
