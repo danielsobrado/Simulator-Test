@@ -41,6 +41,7 @@ const PRESET_TEXTURE_SLOTS = Object.freeze([
   'bumpMap',
 ]);
 let sourceSignatureCache = new WeakMap();
+let activeLeaseCollector = null;
 
 function hashText(value) {
   let hash = 0x811c9dc5;
@@ -297,6 +298,42 @@ function detachPresetTextures(material, presetTextures) {
   }
 }
 
+function collectMaterialLease(materials) {
+  activeLeaseCollector?.push(materials);
+}
+
+/**
+ * Capture every construction-material acquisition made synchronously by an
+ * operation and return an idempotent release function for that temporary scope.
+ */
+export function captureConstructionMaterialLease(operation) {
+  if (typeof operation !== 'function') {
+    throw new Error('Construction material lease requires an operation.');
+  }
+  const acquired = [];
+  const previousCollector = activeLeaseCollector;
+  activeLeaseCollector = acquired;
+  try {
+    operation();
+  } catch (error) {
+    for (let index = acquired.length - 1; index >= 0; index -= 1) {
+      releaseConstructionMaterials(acquired[index]);
+    }
+    throw error;
+  } finally {
+    activeLeaseCollector = previousCollector;
+  }
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    for (let index = acquired.length - 1; index >= 0; index -= 1) {
+      releaseConstructionMaterials(acquired[index]);
+    }
+  };
+}
+
 /**
  * Apply a workshop material preset onto a construction stone material.
  *
@@ -343,6 +380,7 @@ export function createConstructionMaterials(record, materialDocument = null) {
   const found = cache.get(key);
   if (found) {
     found.users += 1;
+    collectMaterialLease(found.materials);
     return found.materials;
   }
   const acquiredKeys = [];
@@ -396,6 +434,7 @@ export function createConstructionMaterials(record, materialDocument = null) {
     presetKeys: Object.freeze([...acquiredKeys]),
     presetTextures,
   });
+  collectMaterialLease(materials);
   return materials;
 }
 
@@ -431,6 +470,12 @@ export function disposeConstructionMaterials() {
   for (const entry of PRESET_TEXTURE_CACHE.values()) entry.texture.dispose?.();
   PRESET_TEXTURE_CACHE.clear();
   sourceSignatureCache = new WeakMap();
+  activeLeaseCollector = null;
+}
+
+/** Test seam: how many construction material bundles are currently cached. */
+export function constructionMaterialCacheSize() {
+  return cache.size;
 }
 
 /** Test seam: how many preset textures are currently cached. */
