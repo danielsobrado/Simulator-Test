@@ -18,10 +18,18 @@ function composition() {
   });
 }
 
+function notify(listener, value) {
+  try {
+    listener(value);
+  } catch (error) {
+    console.error('Collision composition listener failed.', error);
+  }
+}
+
 function publish() {
   const value = composition();
   if (!value) return;
-  for (const listener of listeners) listener(value);
+  for (const listener of listeners) notify(listener, value);
 }
 
 export function registerCollisionConfig(config) {
@@ -99,6 +107,6 @@ export function subscribeCollisionComposition(listener) {
   }
   listeners.add(listener);
   const value = composition();
-  if (value) listener(value);
+  if (value) notify(listener, value);
   return () => listeners.delete(listener);
 }
