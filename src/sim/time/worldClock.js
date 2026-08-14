@@ -186,8 +186,6 @@ export const CADENCES = Object.freeze({
   year: 'year',
 });
 
-const VALID_CADENCES = new Set(Object.values(CADENCES));
-
 export function createScheduler(clock) {
   const jobs = new Map();
   const systems = new Map();
@@ -224,7 +222,7 @@ export function createScheduler(clock) {
         throw invalidSchedulerValue('system');
       }
       assertNonEmptyString(system.id, 'system.id');
-      if (!VALID_CADENCES.has(system.cadence)) throw invalidSchedulerValue('system.cadence');
+      assertNonEmptyString(system.cadence, 'system.cadence');
       if (systems.has(system.id)) throw new Error(`duplicate_system:${system.id}`);
       systems.set(system.id, structuredClone(system));
     },
