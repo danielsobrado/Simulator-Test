@@ -5,6 +5,13 @@ function invalidCalendarConfig(field) {
   });
 }
 
+function invalidSchedulerValue(field) {
+  return Object.assign(new Error(`invalid_scheduler_value:${field}`), {
+    code: 'invalid_scheduler_value',
+    field,
+  });
+}
+
 function assertPositiveSafeInteger(value, field) {
   if (!Number.isSafeInteger(value) || value <= 0) throw invalidCalendarConfig(field);
 }
@@ -13,10 +20,22 @@ function assertNonNegativeSafeInteger(value, field) {
   if (!Number.isSafeInteger(value) || value < 0) throw invalidCalendarConfig(field);
 }
 
+function assertDerivedTickCount(value, field) {
+  if (!Number.isSafeInteger(value) || value <= 0) throw invalidCalendarConfig(field);
+}
+
 function assertTick(value, code) {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw Object.assign(new Error(code), { code });
   }
+}
+
+function assertSchedulerTick(value, field) {
+  if (!Number.isSafeInteger(value) || value < 0) throw invalidSchedulerValue(field);
+}
+
+function assertNonEmptyString(value, field) {
+  if (typeof value !== 'string' || value.length === 0) throw invalidSchedulerValue(field);
 }
 
 export function createCalendarConfig(partial = {}) {
@@ -49,6 +68,15 @@ export function createCalendarConfig(partial = {}) {
   if (config.initialMonth > config.monthsPerYear) throw invalidCalendarConfig('initialMonth');
   if (config.initialDay > config.daysPerMonth) throw invalidCalendarConfig('initialDay');
   if (config.initialHour >= config.hoursPerDay) throw invalidCalendarConfig('initialHour');
+
+  const dayTicks = config.ticksPerHour * config.hoursPerDay;
+  const weekTicks = dayTicks * config.daysPerWeek;
+  const monthTicks = dayTicks * config.daysPerMonth;
+  const yearTicks = monthTicks * config.monthsPerYear;
+  assertDerivedTickCount(dayTicks, 'ticksPerDay');
+  assertDerivedTickCount(weekTicks, 'ticksPerWeek');
+  assertDerivedTickCount(monthTicks, 'ticksPerMonth');
+  assertDerivedTickCount(yearTicks, 'ticksPerYear');
 
   return config;
 }
@@ -98,10 +126,14 @@ export function calendarFromTick(tick, config) {
   remaining -= dayOffset * ticksPerDayValue;
   const hour = Math.floor(remaining / tph);
   const minute = remaining % tph;
+  const year = config.initialYear + yearOffset;
+  if (!Number.isSafeInteger(year)) {
+    throw Object.assign(new Error('tick_overflow'), { code: 'tick_overflow' });
+  }
 
   return {
     tick,
-    year: config.initialYear + yearOffset,
+    year,
     month: monthOffset + 1,
     day: dayOffset + 1,
     hour,
@@ -154,10 +186,27 @@ export const CADENCES = Object.freeze({
   year: 'year',
 });
 
+const VALID_CADENCES = new Set(Object.values(CADENCES));
+
 export function createScheduler(clock) {
   const jobs = new Map();
   const systems = new Map();
   let jobSeq = 0;
+
+  function validateJob(job, { requireCreatedAtTick = false } = {}) {
+    if (!job || typeof job !== 'object' || Array.isArray(job)) {
+      throw invalidSchedulerValue('job');
+    }
+    assertNonEmptyString(job.id, 'job.id');
+    assertNonEmptyString(job.type, 'job.type');
+    assertSchedulerTick(job.dueTick, 'job.dueTick');
+    if (!Number.isFinite(job.priority)) throw invalidSchedulerValue('job.priority');
+    if (requireCreatedAtTick) assertSchedulerTick(job.createdAtTick, 'job.createdAtTick');
+    if (job.cancelledAtTick != null) assertSchedulerTick(job.cancelledAtTick, 'job.cancelledAtTick');
+    if (!Number.isSafeInteger(job.schemaVersion) || job.schemaVersion < 1) {
+      throw invalidSchedulerValue('job.schemaVersion');
+    }
+  }
 
   function sortJobs(list) {
     return [...list].sort((a, b) => (
@@ -171,34 +220,43 @@ export function createScheduler(clock) {
 
   return {
     registerSystem(system) {
+      if (!system || typeof system !== 'object' || Array.isArray(system)) {
+        throw invalidSchedulerValue('system');
+      }
+      assertNonEmptyString(system.id, 'system.id');
+      if (!VALID_CADENCES.has(system.cadence)) throw invalidSchedulerValue('system.cadence');
       if (systems.has(system.id)) throw new Error(`duplicate_system:${system.id}`);
       systems.set(system.id, structuredClone(system));
     },
     scheduleJob(job) {
-      const id = job.id ?? `job:${jobSeq}`;
-      jobSeq += 1;
+      const id = job?.id ?? `job:${jobSeq}`;
       const record = {
         id,
-        type: job.type,
-        dueTick: job.dueTick,
-        priority: job.priority ?? 100,
-        ownerEntityId: job.ownerEntityId ?? null,
-        payload: structuredClone(job.payload ?? {}),
-        recurrence: structuredClone(job.recurrence ?? null),
+        type: job?.type,
+        dueTick: job?.dueTick,
+        priority: job?.priority ?? 100,
+        ownerEntityId: job?.ownerEntityId ?? null,
+        payload: structuredClone(job?.payload ?? {}),
+        recurrence: structuredClone(job?.recurrence ?? null),
         createdAtTick: clock.getTick(),
         cancelledAtTick: null,
-        schemaVersion: job.schemaVersion ?? 1,
+        schemaVersion: job?.schemaVersion ?? 1,
       };
+      validateJob(record, { requireCreatedAtTick: true });
+      if (jobs.has(id)) throw Object.assign(new Error(`duplicate_job:${id}`), { code: 'duplicate_job' });
+      jobSeq += 1;
       jobs.set(id, record);
       return structuredClone(record);
     },
     cancelJob(id, tick = clock.getTick()) {
+      assertSchedulerTick(tick, 'cancelledAtTick');
       const job = jobs.get(id);
       if (!job) return false;
       job.cancelledAtTick = tick;
       return true;
     },
     listDueJobs(atTick = clock.getTick()) {
+      assertSchedulerTick(atTick, 'atTick');
       return sortJobs([...jobs.values()].filter(
         (job) => job.cancelledAtTick == null && job.dueTick <= atTick,
       )).map((job) => structuredClone(job));
@@ -219,11 +277,23 @@ export function createScheduler(clock) {
       };
     },
     restore(snapshot) {
-      jobs.clear();
-      jobSeq = snapshot.jobSeq ?? 0;
-      for (const job of snapshot.jobs ?? []) {
-        jobs.set(job.id, structuredClone(job));
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        throw invalidSchedulerValue('snapshot');
       }
+      const nextJobSeq = snapshot.jobSeq ?? 0;
+      if (!Number.isSafeInteger(nextJobSeq) || nextJobSeq < 0) {
+        throw invalidSchedulerValue('jobSeq');
+      }
+      if (!Array.isArray(snapshot.jobs ?? [])) throw invalidSchedulerValue('jobs');
+      const restoredJobs = new Map();
+      for (const job of snapshot.jobs ?? []) {
+        validateJob(job, { requireCreatedAtTick: true });
+        if (restoredJobs.has(job.id)) throw invalidSchedulerValue('duplicateJobId');
+        restoredJobs.set(job.id, structuredClone(job));
+      }
+      jobs.clear();
+      for (const [id, job] of restoredJobs) jobs.set(id, job);
+      jobSeq = nextJobSeq;
     },
   };
 }
