@@ -80,6 +80,21 @@ test('construction worker failure disables the worker and rejects active compile
   }
 });
 
+test('construction worker response deserialization failure rejects active compiles', async () => {
+  const { client, worker } = createClient();
+  try {
+    const request = client.compile({ id: 'wall-1', revision: 1 });
+    worker.emit('messageerror', { preventDefault() {} });
+
+    await assert.rejects(request, /could not be deserialized/);
+    assert.equal(worker.terminated, true);
+    assert.equal(client.worker, null);
+    assert.equal(client.pending.size, 0);
+  } finally {
+    client.dispose();
+  }
+});
+
 test('invalid construction worker plans are rejected', async () => {
   const { client, worker } = createClient();
   try {
