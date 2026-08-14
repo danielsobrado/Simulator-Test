@@ -119,7 +119,12 @@ async function listLocalStorageDocuments(prefix) {
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
     if (!key?.startsWith(prefix)) continue;
-    matches.push({ key, document: loadFromLocalStorage(key) });
+    try {
+      const document = loadFromLocalStorage(key);
+      if (document !== null) matches.push({ key, document });
+    } catch (error) {
+      console.warn(`Ignoring invalid legacy browser document "${key}".`, error);
+    }
   }
   return matches;
 }
