@@ -1,5 +1,26 @@
+function invalidCalendarConfig(field) {
+  return Object.assign(new Error(`invalid_calendar_config:${field}`), {
+    code: 'invalid_calendar_config',
+    field,
+  });
+}
+
+function assertPositiveSafeInteger(value, field) {
+  if (!Number.isSafeInteger(value) || value <= 0) throw invalidCalendarConfig(field);
+}
+
+function assertNonNegativeSafeInteger(value, field) {
+  if (!Number.isSafeInteger(value) || value < 0) throw invalidCalendarConfig(field);
+}
+
+function assertTick(value, code) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw Object.assign(new Error(code), { code });
+  }
+}
+
 export function createCalendarConfig(partial = {}) {
-  return {
+  const config = {
     ticksPerHour: partial.ticksPerHour ?? 60,
     hoursPerDay: partial.hoursPerDay ?? 24,
     daysPerWeek: partial.daysPerWeek ?? 7,
@@ -10,6 +31,26 @@ export function createCalendarConfig(partial = {}) {
     initialDay: partial.initialDay ?? 1,
     initialHour: partial.initialHour ?? 8,
   };
+
+  for (const field of [
+    'ticksPerHour',
+    'hoursPerDay',
+    'daysPerWeek',
+    'daysPerMonth',
+    'monthsPerYear',
+    'initialYear',
+    'initialMonth',
+    'initialDay',
+  ]) {
+    assertPositiveSafeInteger(config[field], field);
+  }
+  assertNonNegativeSafeInteger(config.initialHour, 'initialHour');
+
+  if (config.initialMonth > config.monthsPerYear) throw invalidCalendarConfig('initialMonth');
+  if (config.initialDay > config.daysPerMonth) throw invalidCalendarConfig('initialDay');
+  if (config.initialHour >= config.hoursPerDay) throw invalidCalendarConfig('initialHour');
+
+  return config;
 }
 
 export function ticksPerDay(config) {
@@ -29,6 +70,7 @@ export function ticksPerYear(config) {
 }
 
 export function calendarFromTick(tick, config) {
+  assertTick(tick, 'invalid_tick');
   const tph = config.ticksPerHour;
   const hpd = config.hoursPerDay;
   const dpm = config.daysPerMonth;
@@ -36,8 +78,18 @@ export function calendarFromTick(tick, config) {
   const ticksPerDayValue = tph * hpd;
   const ticksPerMonthValue = ticksPerDayValue * dpm;
   const ticksPerYearValue = ticksPerMonthValue * mpy;
+  const initialTickOffset = (
+    ((config.initialMonth - 1) * ticksPerMonthValue)
+    + ((config.initialDay - 1) * ticksPerDayValue)
+    + (config.initialHour * tph)
+  );
 
-  let remaining = tick;
+  const absoluteTick = initialTickOffset + tick;
+  if (!Number.isSafeInteger(absoluteTick)) {
+    throw Object.assign(new Error('tick_overflow'), { code: 'tick_overflow' });
+  }
+
+  let remaining = absoluteTick;
   const yearOffset = Math.floor(remaining / ticksPerYearValue);
   remaining -= yearOffset * ticksPerYearValue;
   const monthOffset = Math.floor(remaining / ticksPerMonthValue);
@@ -50,15 +102,16 @@ export function calendarFromTick(tick, config) {
   return {
     tick,
     year: config.initialYear + yearOffset,
-    month: config.initialMonth + monthOffset,
-    day: config.initialDay + dayOffset,
-    hour: hour,
+    month: monthOffset + 1,
+    day: dayOffset + 1,
+    hour,
     minute,
   };
 }
 
 export function createWorldClock(calendarConfig, initialTick = 0) {
   const config = createCalendarConfig(calendarConfig);
+  assertTick(initialTick, 'invalid_tick');
   let tick = initialTick;
   let paused = false;
   let speed = 1;
@@ -76,13 +129,17 @@ export function createWorldClock(calendarConfig, initialTick = 0) {
       speed = next;
     },
     setTick(next) {
-      if (!Number.isInteger(next) || next < 0) throw new Error('invalid_tick');
+      assertTick(next, 'invalid_tick');
       tick = next;
     },
     advance(ticks = 1) {
       if (paused) return tick;
-      if (!Number.isInteger(ticks) || ticks < 0) throw new Error('invalid_advance');
-      tick += ticks;
+      assertTick(ticks, 'invalid_advance');
+      const next = tick + ticks;
+      if (!Number.isSafeInteger(next)) {
+        throw Object.assign(new Error('tick_overflow'), { code: 'tick_overflow' });
+      }
+      tick = next;
       return tick;
     },
   };
@@ -115,7 +172,7 @@ export function createScheduler(clock) {
   return {
     registerSystem(system) {
       if (systems.has(system.id)) throw new Error(`duplicate_system:${system.id}`);
-      systems.set(system.id, system);
+      systems.set(system.id, structuredClone(system));
     },
     scheduleJob(job) {
       const id = job.id ?? `job:${jobSeq}`;
@@ -126,14 +183,14 @@ export function createScheduler(clock) {
         dueTick: job.dueTick,
         priority: job.priority ?? 100,
         ownerEntityId: job.ownerEntityId ?? null,
-        payload: job.payload ?? {},
-        recurrence: job.recurrence ?? null,
+        payload: structuredClone(job.payload ?? {}),
+        recurrence: structuredClone(job.recurrence ?? null),
         createdAtTick: clock.getTick(),
         cancelledAtTick: null,
         schemaVersion: job.schemaVersion ?? 1,
       };
       jobs.set(id, record);
-      return record;
+      return structuredClone(record);
     },
     cancelJob(id, tick = clock.getTick()) {
       const job = jobs.get(id);
@@ -143,20 +200,22 @@ export function createScheduler(clock) {
     },
     listDueJobs(atTick = clock.getTick()) {
       return sortJobs([...jobs.values()].filter(
-        (j) => j.cancelledAtTick == null && j.dueTick <= atTick,
-      ));
+        (job) => job.cancelledAtTick == null && job.dueTick <= atTick,
+      )).map((job) => structuredClone(job));
     },
     listSystems() {
-      return [...systems.values()].sort((a, b) => a.id.localeCompare(b.id));
+      return [...systems.values()]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((system) => structuredClone(system));
     },
     systemsForCadence(cadence) {
-      return this.listSystems().filter((s) => s.cadence === cadence);
+      return this.listSystems().filter((system) => system.cadence === cadence);
     },
     serialize() {
       return {
         jobSeq,
-        jobs: sortJobs([...jobs.values()]),
-        systemIds: this.listSystems().map((s) => s.id),
+        jobs: sortJobs([...jobs.values()]).map((job) => structuredClone(job)),
+        systemIds: this.listSystems().map((system) => system.id),
       };
     },
     restore(snapshot) {
@@ -184,13 +243,13 @@ export function createFixedStepRunner({
 
   function emitCadence(fromTick, toTick) {
     const fired = [];
-    for (let t = fromTick + 1; t <= toTick; t += 1) {
-      fired.push({ cadence: CADENCES.tick, tick: t });
-      if (t % hourTicks === 0) fired.push({ cadence: CADENCES.hour, tick: t });
-      if (t % dayTicks === 0) fired.push({ cadence: CADENCES.day, tick: t });
-      if (t % weekTicks === 0) fired.push({ cadence: CADENCES.week, tick: t });
-      if (t % monthTicks === 0) fired.push({ cadence: CADENCES.month, tick: t });
-      if (t % yearTicks === 0) fired.push({ cadence: CADENCES.year, tick: t });
+    for (let tick = fromTick + 1; tick <= toTick; tick += 1) {
+      fired.push({ cadence: CADENCES.tick, tick });
+      if (tick % hourTicks === 0) fired.push({ cadence: CADENCES.hour, tick });
+      if (tick % dayTicks === 0) fired.push({ cadence: CADENCES.day, tick });
+      if (tick % weekTicks === 0) fired.push({ cadence: CADENCES.week, tick });
+      if (tick % monthTicks === 0) fired.push({ cadence: CADENCES.month, tick });
+      if (tick % yearTicks === 0) fired.push({ cadence: CADENCES.year, tick });
     }
     return fired;
   }
@@ -199,7 +258,7 @@ export function createFixedStepRunner({
     stepTicks(count, context) {
       if (clock.isPaused()) return { advanced: 0, cadenceEvents: [], dueJobs: [] };
       const from = clock.getTick();
-      const advanced = clock.advance(count);
+      clock.advance(count);
       const to = clock.getTick();
       const cadenceEvents = emitCadence(from, to);
       if (onCadence) {

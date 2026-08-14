@@ -5,10 +5,33 @@ import { createWorldDefinition } from '../model/worldDefinition.js';
 
 export const SIMULATION_SCHEMA_VERSION = 1;
 
+function invalidSnapshot(path = null) {
+  return Object.assign(new Error(path ? `invalid_snapshot:${path}` : 'invalid_snapshot'), {
+    code: 'invalid_snapshot',
+    path,
+  });
+}
+
+function assertSnapshotShape(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw invalidSnapshot();
+  }
+  for (const key of ['definition', 'calendar', 'diagnostics', 'entities']) {
+    const value = snapshot[key];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw invalidSnapshot(key);
+    }
+  }
+}
+
 export function serializeWorldSnapshot({ definition, state, commandRange = null, eventRange = null }) {
   const entities = {};
   for (const kind of ENTITY_KINDS) {
-    entities[collectionNameForKind(kind)] = listEntities(state, kind, { includeDestroyed: true });
+    entities[collectionNameForKind(kind)] = listEntities(
+      state,
+      kind,
+      { includeDestroyed: true },
+    ).map((entity) => structuredClone(entity));
   }
   const snapshot = {
     documentVersion: 1,
@@ -24,17 +47,17 @@ export function serializeWorldSnapshot({ definition, state, commandRange = null,
       sourceFingerprint: definition.sourceFingerprint,
       projectionVersion: definition.projectionVersion,
       schemaVersion: definition.schemaVersion,
-      physicalScale: definition.physicalScale,
-      cultures: definition.cultures,
-      religions: definition.religions,
-      biomes: definition.biomes,
-      sourceMeta: definition.sourceMeta,
+      physicalScale: structuredClone(definition.physicalScale),
+      cultures: structuredClone(definition.cultures),
+      religions: structuredClone(definition.religions),
+      biomes: structuredClone(definition.biomes),
+      sourceMeta: structuredClone(definition.sourceMeta),
     },
-    calendar: state.calendar,
-    diagnostics: state.diagnostics,
+    calendar: structuredClone(state.calendar),
+    diagnostics: structuredClone(state.diagnostics),
     entities,
-    commandRange,
-    eventRange,
+    commandRange: commandRange == null ? null : structuredClone(commandRange),
+    eventRange: eventRange == null ? null : structuredClone(eventRange),
   };
   const checksum = checksumCanonical(snapshot);
   return {
@@ -44,17 +67,13 @@ export function serializeWorldSnapshot({ definition, state, commandRange = null,
 }
 
 export function restoreWorldSnapshot(snapshot) {
+  assertSnapshotShape(snapshot);
   if (snapshot.simulationSchemaVersion !== SIMULATION_SCHEMA_VERSION) {
     throw Object.assign(
       new Error(`unsupported_schema_version:${snapshot.simulationSchemaVersion}`),
       { code: 'unsupported_schema_version' },
     );
   }
-  const expected = checksumCanonical({
-    ...snapshot,
-    snapshotChecksum: undefined,
-  });
-  // Recompute without checksum field
   const forCheck = { ...snapshot };
   delete forCheck.snapshotChecksum;
   const actual = checksumCanonical(forCheck);
@@ -70,7 +89,9 @@ export function restoreWorldSnapshot(snapshot) {
   state.diagnostics = structuredClone(snapshot.diagnostics);
   for (const kind of ENTITY_KINDS) {
     const key = collectionNameForKind(kind);
-    for (const entity of snapshot.entities[key] ?? []) {
+    const serializedEntities = snapshot.entities[key] ?? [];
+    if (!Array.isArray(serializedEntities)) throw invalidSnapshot(`entities.${key}`);
+    for (const entity of serializedEntities) {
       state[key].set(entity.id, structuredClone(entity));
     }
   }
@@ -104,7 +125,6 @@ export function createEventHistory({ maxImportant = 10000 } = {}) {
     append(event, { important = false } = {}) {
       events.push({ ...structuredClone(event), important: !!important });
       if (events.length > maxImportant) {
-        // Drop oldest non-important first
         const idx = events.findIndex((e) => !e.important);
         if (idx >= 0) events.splice(idx, 1);
         else events.shift();
@@ -140,7 +160,6 @@ export function createInMemorySaveStore() {
       return { ok: true, slot };
     },
     async save(slot, payload) {
-      // Transactional: write pending then commit. Crash between leaves prior save.
       await this.beginSave(slot, payload);
       return this.commitSave(slot);
     },
