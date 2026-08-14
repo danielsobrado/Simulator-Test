@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   listBrowserDocuments,
   loadFromBrowser,
+  loadJsonFromUrl,
   parseDocument,
   saveToBrowser,
 } from '../src/editor/storage.js';
@@ -81,5 +82,28 @@ test('browser reads do not report missing data when IndexedDB itself failed', as
     );
   } finally {
     storage.restore();
+  }
+});
+
+test('URL loading binds the ambient browser fetch receiver', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = function fetchWithReceiver(url) {
+    assert.equal(this, globalThis);
+    assert.equal(url, '/world.json');
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ version: 6, name: 'Remote' }),
+    });
+  };
+
+  try {
+    assert.deepEqual(await loadJsonFromUrl('/world.json'), {
+      version: 6,
+      name: 'Remote',
+    });
+  } finally {
+    if (originalFetch === undefined) delete globalThis.fetch;
+    else globalThis.fetch = originalFetch;
   }
 });
