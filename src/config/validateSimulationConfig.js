@@ -30,6 +30,12 @@ function assertBoolean(value, path) {
   }
 }
 
+function assertSafeTickProduct(value, path) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`Invalid simulation configuration: ${path} exceeds the safe integer range.`);
+  }
+}
+
 export function validateSimulationConfig(simulation) {
   if (simulation == null) return simulation;
   assertObject(simulation, 'simulation');
@@ -66,6 +72,14 @@ export function validateSimulationConfig(simulation) {
   if (resolvedTime.initialHour >= resolvedTime.hoursPerDay) {
     throw new Error('Invalid simulation configuration: simulation.time.initialHour must be less than hoursPerDay.');
   }
+  const ticksPerDay = resolvedTime.ticksPerHour * resolvedTime.hoursPerDay;
+  const ticksPerWeek = ticksPerDay * resolvedTime.daysPerWeek;
+  const ticksPerMonth = ticksPerDay * resolvedTime.daysPerMonth;
+  const ticksPerYear = ticksPerMonth * resolvedTime.monthsPerYear;
+  assertSafeTickProduct(ticksPerDay, 'simulation.time.ticksPerDay');
+  assertSafeTickProduct(ticksPerWeek, 'simulation.time.ticksPerWeek');
+  assertSafeTickProduct(ticksPerMonth, 'simulation.time.ticksPerMonth');
+  assertSafeTickProduct(ticksPerYear, 'simulation.time.ticksPerYear');
 
   const geography = simulation.geography ?? {};
   assertObject(geography, 'simulation.geography');
