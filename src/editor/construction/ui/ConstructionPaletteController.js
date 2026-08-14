@@ -3,6 +3,7 @@ import {
   BUILTIN_WORKSHOP_MATERIAL_PRESETS,
   getWorkshopMaterialPreset,
 } from '../../workshop/ProceduralWorkshopMaterialConfig.js';
+import { captureConstructionMaterialLease } from '../render/ConstructionMaterials.js';
 import { CONSTRUCTION_STYLES } from '../masonry/ConstructionStyleCatalog.js';
 import { icon } from '../../ui/icons.js';
 import { ConstructionInspector } from './ConstructionInspector.js';
@@ -74,6 +75,7 @@ export class ConstructionPaletteController {
     this.materialStore = materialStore;
     this.onStatus = onStatus;
     this.constructionId = null;
+    this.releaseMaterialPreviewLease = null;
     this.palette = new RadialPalette({
       host,
       modifier: 'radial-palette--construction',
@@ -204,11 +206,16 @@ export class ConstructionPaletteController {
    */
   preview(id) {
     if (!this.constructionId || !id.startsWith('material:')) return;
-    this.controller.previewConstructionMaterial?.(this.constructionId, id.slice(9));
+    this.clearPreview();
+    this.releaseMaterialPreviewLease = captureConstructionMaterialLease(() => {
+      this.controller.previewConstructionMaterial?.(this.constructionId, id.slice(9));
+    });
   }
 
   clearPreview() {
     this.controller.previewConstructionMaterial?.(this.constructionId, null);
+    this.releaseMaterialPreviewLease?.();
+    this.releaseMaterialPreviewLease = null;
   }
 
   action(action) {
@@ -234,6 +241,7 @@ export class ConstructionPaletteController {
   }
 
   dispose() {
+    this.clearPreview();
     this.palette.dispose();
     this.inspector.dispose();
   }
