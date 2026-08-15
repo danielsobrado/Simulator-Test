@@ -12,6 +12,15 @@ export const CAMERA_VIEW_THIRD = 'third';
 /** The key that flips between them. Claimed on the capture phase — see below. */
 export const CAMERA_VIEW_TOGGLE_CODE = 'KeyV';
 
+function invokeOptional(callback, label, ...args) {
+  if (typeof callback !== 'function') return;
+  try {
+    callback(...args);
+  } catch (error) {
+    console.error(`View mode ${label} callback failed.`, error);
+  }
+}
+
 export class ViewModeController {
   constructor({
     editorCamera, playerController, terrainView, thirdPersonCamera = null,
@@ -99,7 +108,7 @@ export class ViewModeController {
       this.thirdPersonCamera.reset();
       this.thirdPersonCamera.update(0, this.playerController.getStatus());
     }
-    this.onCameraViewChange?.(this.cameraView);
+    invokeOptional(this.onCameraViewChange, 'camera view', this.cameraView);
     this.emit();
     return true;
   }
@@ -128,7 +137,7 @@ export class ViewModeController {
     this.playerController.setPaused(true);
     // Only wall building is offered while paused; force the construction tool
     // so a leftover terrain/object tool cannot still paint from first person.
-    this.onPausedEditing?.();
+    invokeOptional(this.onPausedEditing, 'paused editing');
     this.emit();
     return true;
   }
@@ -197,7 +206,7 @@ export class ViewModeController {
     this.spacePressed = false;
     // Drop orbit brush/object ghosts immediately — spawn hover must not keep
     // a raise/paint preview pinned to the ground under the cursor.
-    this.onLeaveOrbitEditing?.();
+    invokeOptional(this.onLeaveOrbitEditing, 'leave orbit editing');
     this.emit();
   }
 
@@ -225,7 +234,7 @@ export class ViewModeController {
     }
     // Direct spawn (world map / harness) skips beginSpawnSelection, so clear
     // here too — otherwise the last orbit brush stays rendered while walking.
-    this.onLeaveOrbitEditing?.();
+    invokeOptional(this.onLeaveOrbitEditing, 'leave orbit editing');
     emitAudio('camera.mode.player');
     this.emit();
   }
@@ -314,7 +323,11 @@ export class ViewModeController {
   emit() {
     const state = this.getState();
     for (const listener of this.listeners) {
-      listener(state);
+      try {
+        listener(state);
+      } catch (error) {
+        console.error('View mode listener failed.', error);
+      }
     }
   }
 
