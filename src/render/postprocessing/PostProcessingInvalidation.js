@@ -45,6 +45,10 @@ export const POST_PROCESSING_REACTIVE_LIFETIMES = Object.freeze({
   SPELL_STARTED: 3,
 });
 
+function normalizeTransitionFrames(value) {
+  return Number.isFinite(value) ? Math.max(0, Math.ceil(value)) : 0;
+}
+
 export class PostProcessingInvalidation {
   constructor({ history, diagnostics = null, debug = console.debug } = {}) {
     if (!history || typeof history.invalidate !== 'function') {
@@ -73,7 +77,7 @@ export class PostProcessingInvalidation {
     const extraFrames = event === POST_PROCESSING_REACTIVE_EVENTS.CHUNK_LOD_CHANGED
       || event === POST_PROCESSING_REACTIVE_EVENTS.VEGETATION_LOD_CHANGED
       || event === POST_PROCESSING_REACTIVE_EVENTS.IMPOSTOR_TRANSITION
-      ? Math.max(0, Math.ceil(transitionFrames))
+      ? normalizeTransitionFrames(transitionFrames)
       : 0;
     const lifetime = baseLifetime + extraFrames;
     this.reactiveFrames.set(
