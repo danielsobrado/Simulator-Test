@@ -9,6 +9,20 @@ export const TERRAIN_COMMIT_BUDGET_MS = 2;
 // Focus speed (world units/sec) below which the player counts as stationary.
 export const TERRAIN_MOVING_SPEED_EPSILON = 0.5;
 
+function assertMaxCommits(value, { allowInfinity = false } = {}) {
+  if (allowInfinity && value === Number.POSITIVE_INFINITY) return;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Terrain commit limit must be a non-negative safe integer.');
+  }
+}
+
+function assertBudgetMs(value, { allowInfinity = false } = {}) {
+  if (allowInfinity && value === Number.POSITIVE_INFINITY) return;
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Terrain commit budget must be a non-negative finite number.');
+  }
+}
+
 export function createTerrainCommitJob({
   slot,
   page,
@@ -52,6 +66,11 @@ export class TerrainCommitQueue {
     commitBudgetMs = TERRAIN_COMMIT_BUDGET_MS,
     now = () => performance.now(),
   } = {}) {
+    assertMaxCommits(maxCommitsPerFrame);
+    assertBudgetMs(commitBudgetMs);
+    if (typeof now !== 'function') {
+      throw new Error('Terrain commit clock must be a function.');
+    }
     this.maxCommitsPerFrame = maxCommitsPerFrame;
     this.commitBudgetMs = commitBudgetMs;
     this.now = now;
@@ -83,6 +102,8 @@ export class TerrainCommitQueue {
     maxCommits = this.maxCommitsPerFrame,
     budgetMs = this.commitBudgetMs,
   } = {}) {
+    assertMaxCommits(maxCommits, { allowInfinity: true });
+    assertBudgetMs(budgetMs, { allowInfinity: true });
     const startedAt = this.now();
     let committed = 0;
 
