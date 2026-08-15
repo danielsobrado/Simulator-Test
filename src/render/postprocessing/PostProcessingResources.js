@@ -1,3 +1,15 @@
+const MIN_RENDER_DIMENSION = 1;
+const DEFAULT_PIXEL_RATIO = 1;
+
+function normalizeDimension(value) {
+  if (!Number.isFinite(value) || value <= 0) return MIN_RENDER_DIMENSION;
+  return Math.max(MIN_RENDER_DIMENSION, value);
+}
+
+function normalizePixelRatio(value) {
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_PIXEL_RATIO;
+}
+
 /**
  * Owns graph resources across topology switches. Disabled effects retain their
  * last allocation so toggling them does not thrash render targets. A display
@@ -8,28 +20,29 @@
 export class PostProcessingResources {
   constructor(renderer) {
     this.renderer = renderer;
-    this.width = 1;
-    this.height = 1;
-    this.pixelRatio = renderer.getPixelRatio();
+    this.width = MIN_RENDER_DIMENSION;
+    this.height = MIN_RENDER_DIMENSION;
+    this.pixelRatio = normalizePixelRatio(renderer.getPixelRatio());
     this.graphs = new Map();
     this.activeSignature = null;
     this.warmupTarget = null;
   }
 
   resize(width, height, pixelRatio = this.renderer.getPixelRatio()) {
-    const nextWidth = Math.max(1, width);
-    const nextHeight = Math.max(1, height);
+    const nextWidth = normalizeDimension(width);
+    const nextHeight = normalizeDimension(height);
+    const nextPixelRatio = normalizePixelRatio(pixelRatio);
     const changed = nextWidth !== this.width
       || nextHeight !== this.height
-      || pixelRatio !== this.pixelRatio;
+      || nextPixelRatio !== this.pixelRatio;
     if (!changed) return false;
 
     this.width = nextWidth;
     this.height = nextHeight;
-    this.pixelRatio = pixelRatio;
+    this.pixelRatio = nextPixelRatio;
     for (const [signature, record] of this.graphs) {
       if (signature === this.activeSignature) {
-        this.resizeRecord(record, nextWidth, nextHeight, pixelRatio);
+        this.resizeRecord(record, nextWidth, nextHeight, nextPixelRatio);
       } else {
         record.graph.dispose();
         this.graphs.delete(signature);
@@ -73,10 +86,15 @@ export class PostProcessingResources {
     return true;
   }
 
-  resizeGraph(signature, width, height, pixelRatio = 1) {
+  resizeGraph(signature, width, height, pixelRatio = DEFAULT_PIXEL_RATIO) {
     const record = this.graphs.get(signature);
     if (!record) return;
-    this.resizeRecord(record, width, height, pixelRatio);
+    this.resizeRecord(
+      record,
+      normalizeDimension(width),
+      normalizeDimension(height),
+      normalizePixelRatio(pixelRatio),
+    );
   }
 
   resizeRecord(record, width, height, pixelRatio) {
