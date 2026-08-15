@@ -185,6 +185,33 @@ export async function loadFromBrowser(storageKey) {
   }
 }
 
+export async function deleteFromBrowser(storageKey) {
+  let indexedDbError = null;
+  if (typeof indexedDB !== 'undefined') {
+    try {
+      await withStore('readwrite', (store) => store.delete(storageKey));
+    } catch (error) {
+      indexedDbError = error;
+      console.warn('IndexedDB delete failed; attempting localStorage cleanup.', error);
+    }
+  }
+
+  let localStorageError = null;
+  try {
+    localStorage.removeItem(storageKey);
+  } catch (error) {
+    localStorageError = error;
+  }
+
+  if (indexedDbError || localStorageError) {
+    throw storageFailure(
+      'Unable to delete the browser document.',
+      indexedDbError,
+      localStorageError,
+    );
+  }
+}
+
 export async function listBrowserDocuments(prefix) {
   if (typeof prefix !== 'string') {
     throw new Error('Browser document prefixes must be strings.');
