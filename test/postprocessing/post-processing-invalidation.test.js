@@ -89,3 +89,19 @@ test('LOD reactive events include transition frames plus two', () => {
     7,
   );
 });
+
+test('malformed LOD transition frames cannot pin reactive state forever', () => {
+  for (const transitionFrames of [Number.NaN, Infinity, -Infinity]) {
+    const { invalidation } = createSystem();
+    assert.equal(
+      invalidation.notifyReactive(
+        POST_PROCESSING_REACTIVE_EVENTS.VEGETATION_LOD_CHANGED,
+        transitionFrames,
+      ),
+      POST_PROCESSING_REACTIVE_LIFETIMES.VEGETATION_LOD_CHANGED,
+    );
+    invalidation.beginFrame();
+    invalidation.beginFrame();
+    assert.equal(invalidation.isReactive(), false);
+  }
+});
