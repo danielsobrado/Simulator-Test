@@ -12,6 +12,19 @@ function invalidSnapshot(path = null) {
   });
 }
 
+function invalidMigration(field, code = 'invalid_migration') {
+  return Object.assign(new Error(`${code}:${field}`), {
+    code,
+    field,
+  });
+}
+
+function assertSchemaVersion(value, field) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw invalidMigration(field);
+  }
+}
+
 function assertSnapshotShape(snapshot) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     throw invalidSnapshot();
@@ -298,12 +311,36 @@ export function createMigrationRegistry() {
   const migrations = new Map();
   return {
     register(fromVersion, toVersion, fn) {
-      migrations.set(`${fromVersion}->${toVersion}`, fn);
+      assertSchemaVersion(fromVersion, 'fromVersion');
+      assertSchemaVersion(toVersion, 'toVersion');
+      if (toVersion !== fromVersion + 1) {
+        throw invalidMigration(`${fromVersion}->${toVersion}`);
+      }
+      if (typeof fn !== 'function') {
+        throw invalidMigration('migrationFn');
+      }
+      const key = `${fromVersion}->${toVersion}`;
+      if (migrations.has(key)) {
+        throw invalidMigration(key, 'duplicate_migration');
+      }
+      migrations.set(key, fn);
     },
     migrate(snapshot) {
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        throw invalidMigration('snapshot');
+      }
       let current = structuredClone(snapshot);
-      while (current.simulationSchemaVersion !== SIMULATION_SCHEMA_VERSION) {
-        const key = `${current.simulationSchemaVersion}->${current.simulationSchemaVersion + 1}`;
+      assertSchemaVersion(current.simulationSchemaVersion, 'simulationSchemaVersion');
+      if (current.simulationSchemaVersion > SIMULATION_SCHEMA_VERSION) {
+        throw Object.assign(
+          new Error(`unsupported_schema_version:${current.simulationSchemaVersion}`),
+          { code: 'unsupported_schema_version' },
+        );
+      }
+      while (current.simulationSchemaVersion < SIMULATION_SCHEMA_VERSION) {
+        const fromVersion = current.simulationSchemaVersion;
+        const toVersion = fromVersion + 1;
+        const key = `${fromVersion}->${toVersion}`;
         const fn = migrations.get(key);
         if (!fn) {
           throw Object.assign(
@@ -311,7 +348,14 @@ export function createMigrationRegistry() {
             { code: 'missing_migration' },
           );
         }
-        current = fn(current);
+        const migrated = fn(structuredClone(current));
+        if (!migrated || typeof migrated !== 'object' || Array.isArray(migrated)) {
+          throw invalidMigration(key);
+        }
+        if (migrated.simulationSchemaVersion !== toVersion) {
+          throw invalidMigration(key);
+        }
+        current = structuredClone(migrated);
       }
       return current;
     },
