@@ -56,7 +56,16 @@ export class EscapeStack {
     const tag = event.target?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     for (const entry of [...this.handlers]) {
-      if (entry.handler(event) === true) {
+      let consumed = false;
+      try {
+        consumed = entry.handler(event) === true;
+      } catch (error) {
+        console.error(
+          `Escape handler${entry.label ? ` "${entry.label}"` : ''} failed.`,
+          error,
+        );
+      }
+      if (consumed) {
         event.preventDefault();
         event.stopImmediatePropagation();
         return;
