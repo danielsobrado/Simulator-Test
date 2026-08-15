@@ -18,16 +18,19 @@ function retryableWorkerError(message) {
 }
 
 /** Resolve the worker pool size from an explicit override or CPU cores. */
-export function resolveWorkerCount(requested) {
+export function resolveWorkerCount(requested, hardwareConcurrency = null) {
   if (Number.isFinite(requested) && requested > 0) {
     return Math.min(MAX_WORKER_COUNT, Math.max(1, Math.floor(requested)));
   }
-  const cores = (typeof navigator !== 'undefined'
-    && Number.isFinite(navigator.hardwareConcurrency))
-    ? navigator.hardwareConcurrency
+  const detectedCores = hardwareConcurrency
+    ?? ((typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency))
+      ? navigator.hardwareConcurrency
+      : 4);
+  const cores = Number.isFinite(detectedCores) && detectedCores > 0
+    ? Math.max(1, Math.floor(detectedCores))
     : 4;
-  // Leave one core for the main thread; clamp to a sane range.
-  return Math.min(MAX_WORKER_COUNT, Math.max(2, cores - 1));
+  // Leave one core for the main thread when possible.
+  return Math.min(MAX_WORKER_COUNT, Math.max(1, cores - 1));
 }
 
 export function resolveMaxInFlightPerWorker(requested) {
