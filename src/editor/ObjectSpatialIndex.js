@@ -1,3 +1,5 @@
+const MAX_BUCKETS_PER_OPERATION = 262_144;
+
 function intersects(left, right) {
   return left.minX <= right.maxX
     && left.maxX >= right.minX
@@ -5,9 +7,54 @@ function intersects(left, right) {
     && left.maxZ >= right.minZ;
 }
 
+function assertBounds(bounds) {
+  if (!bounds || typeof bounds !== 'object') {
+    throw new Error('Object spatial bounds are required.');
+  }
+  for (const key of ['minX', 'maxX', 'minZ', 'maxZ']) {
+    if (!Number.isFinite(bounds[key])) {
+      throw new Error(`Object spatial bound ${key} must be finite.`);
+    }
+  }
+  if (bounds.minX > bounds.maxX || bounds.minZ > bounds.maxZ) {
+    throw new Error('Object spatial bounds must have ordered minimum and maximum coordinates.');
+  }
+}
+
+function bucketRange(bounds, bucketSize) {
+  assertBounds(bounds);
+  const range = {
+    minX: Math.floor(bounds.minX / bucketSize),
+    maxX: Math.floor(bounds.maxX / bucketSize),
+    minZ: Math.floor(bounds.minZ / bucketSize),
+    maxZ: Math.floor(bounds.maxZ / bucketSize),
+  };
+  for (const [key, value] of Object.entries(range)) {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(`Object spatial bucket ${key} must be a safe integer.`);
+    }
+  }
+
+  const width = range.maxX - range.minX + 1;
+  const depth = range.maxZ - range.minZ + 1;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(depth)
+    || width > MAX_BUCKETS_PER_OPERATION
+    || depth > MAX_BUCKETS_PER_OPERATION
+    || width * depth > MAX_BUCKETS_PER_OPERATION) {
+    throw new Error(`Object spatial operation exceeds ${MAX_BUCKETS_PER_OPERATION} buckets.`);
+  }
+  return range;
+}
+
 export class ObjectSpatialIndex {
   constructor({ bucketSize, boundsForObject }) {
-    this.bucketSize = Math.max(1, Math.trunc(bucketSize) || 1);
+    if (!Number.isSafeInteger(bucketSize) || bucketSize < 1) {
+      throw new Error('Object spatial bucket size must be a positive safe integer.');
+    }
+    if (typeof boundsForObject !== 'function') {
+      throw new Error('Object spatial bounds resolver is required.');
+    }
+    this.bucketSize = bucketSize;
     this.boundsForObject = boundsForObject;
     this.objects = new Map();
     this.boundsByObjectId = new Map();
@@ -18,13 +65,10 @@ export class ObjectSpatialIndex {
   }
 
   keysForBounds(bounds) {
-    const minX = Math.floor(bounds.minX / this.bucketSize);
-    const maxX = Math.floor(bounds.maxX / this.bucketSize);
-    const minZ = Math.floor(bounds.minZ / this.bucketSize);
-    const maxZ = Math.floor(bounds.maxZ / this.bucketSize);
+    const range = bucketRange(bounds, this.bucketSize);
     const keys = [];
-    for (let z = minZ; z <= maxZ; z += 1) {
-      for (let x = minX; x <= maxX; x += 1) keys.push(`${x}:${z}`);
+    for (let z = range.minZ; z <= range.maxZ; z += 1) {
+      for (let x = range.minX; x <= range.maxX; x += 1) keys.push(`${x}:${z}`);
     }
     return keys;
   }
