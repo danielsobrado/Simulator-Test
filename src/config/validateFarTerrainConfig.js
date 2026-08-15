@@ -2,13 +2,17 @@ const MAX_RADIAL_RESOLUTION = 2048;
 const MAX_ANGULAR_RESOLUTION = 4096;
 const MAX_VERTEX_COUNT = 1_000_000;
 
-function optionalFinite(value, field, { minimum = -Infinity, exclusiveMinimum = false } = {}) {
+function optionalFinite(value, field, { minimum = null, exclusiveMinimum = false } = {}) {
   if (value === undefined) return;
-  if (!Number.isFinite(value)
-      || (exclusiveMinimum ? value <= minimum : value < minimum)) {
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `Invalid editor configuration: world.farTerrain.${field} must be finite.`,
+    );
+  }
+  if (minimum !== null && (exclusiveMinimum ? value <= minimum : value < minimum)) {
     const relation = exclusiveMinimum ? 'greater than' : 'at least';
     throw new Error(
-      `Invalid editor configuration: world.farTerrain.${field} must be finite and ${relation} ${minimum}.`,
+      `Invalid editor configuration: world.farTerrain.${field} must be ${relation} ${minimum}.`,
     );
   }
 }
