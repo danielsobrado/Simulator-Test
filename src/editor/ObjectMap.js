@@ -1,5 +1,7 @@
 import { ObjectSpatialIndex } from './ObjectSpatialIndex.js';
 
+const MAX_OBJECT_FOOTPRINT_CELLS = 65_536;
+
 function normalizeRotation(rotation) {
   const numeric = Number(rotation ?? 0);
   if (!Number.isInteger(numeric)) {
@@ -22,10 +24,29 @@ function validCellCoordinate(value) {
   return Number.isSafeInteger(value);
 }
 
+function assertValidDefinition(definition) {
+  if (!definition || typeof definition !== 'object'
+    || typeof definition.key !== 'string' || definition.key.length === 0
+    || !definition.footprint || typeof definition.footprint !== 'object') {
+    throw new Error('Cannot register an invalid object definition.');
+  }
+  const { width, depth } = definition.footprint;
+  if (!Number.isSafeInteger(width) || width < 1
+    || !Number.isSafeInteger(depth) || depth < 1) {
+    throw new Error(`Object definition "${definition.key}" footprint must use positive safe integer dimensions.`);
+  }
+  if (width > MAX_OBJECT_FOOTPRINT_CELLS
+    || depth > MAX_OBJECT_FOOTPRINT_CELLS
+    || width * depth > MAX_OBJECT_FOOTPRINT_CELLS) {
+    throw new Error(`Object definition "${definition.key}" footprint exceeds ${MAX_OBJECT_FOOTPRINT_CELLS} cells.`);
+  }
+}
+
 export class ObjectMap {
   constructor({ tileMap, objectCatalog }) {
     this.tileMap = tileMap;
     this.catalog = objectCatalog;
+    for (const definition of objectCatalog) assertValidDefinition(definition);
     this.definitionByKey = new Map(objectCatalog.map((definition) => [definition.key, definition]));
     this.objectsById = new Map();
     this.occupancy = new Map();
@@ -68,15 +89,14 @@ export class ObjectMap {
   }
 
   registerDefinition(definition) {
-    if (!definition || typeof definition.key !== 'string' || !definition.footprint) {
-      throw new Error('Cannot register an invalid object definition.');
-    }
+    assertValidDefinition(definition);
     this.definitionByKey.set(definition.key, definition);
     return definition;
   }
 
   getFootprint(definitionKey, rotation) {
     const definition = this.getDefinition(definitionKey);
+    assertValidDefinition(definition);
     const normalized = normalizeRotation(rotation);
     return normalized % 2 === 0
       ? definition.footprint
