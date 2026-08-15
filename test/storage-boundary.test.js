@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  deleteFromBrowser,
   listBrowserDocuments,
   loadFromBrowser,
   loadJsonFromUrl,
@@ -118,6 +119,20 @@ test('browser listing skips corrupt legacy entries without hiding valid saves', 
       { key: 'world:good', document: { version: 6, name: 'Good' } },
     ]);
   } finally {
+    storage.restore();
+  }
+});
+
+test('browser document deletion removes legacy storage when IndexedDB is unavailable', async () => {
+  const storage = installBrowserStorage();
+  const configuredIndexedDb = globalThis.indexedDB;
+  delete globalThis.indexedDB;
+  try {
+    storage.values.set('world:temporary', JSON.stringify({ version: 6 }));
+    await deleteFromBrowser('world:temporary');
+    assert.equal(storage.values.has('world:temporary'), false);
+  } finally {
+    globalThis.indexedDB = configuredIndexedDb;
     storage.restore();
   }
 });
