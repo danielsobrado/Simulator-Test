@@ -356,11 +356,15 @@ export class SceneSettingsRuntime {
     sourceUrl = globalThis.location?.href,
   } = {}) {
     await invokeRuntimeCallback(this.onSceneReload, 'reload', document);
-    return activateSceneSettings(document, { worldDocument, sourceUrl });
+    return activateSceneSettings(document, {
+      worldDocument,
+      sourceUrl,
+      deleteBrowserDocument: this.deleteBrowserDocument,
+    });
   }
 
-  async activateUrl(url) {
-    await invokeRuntimeCallback(this.onSceneReload, 'reload', null, url);
+  activateUrl(url) {
+    void invokeRuntimeCallback(this.onSceneReload, 'reload', null, url);
     const next = new URL(globalThis.location.href);
     next.searchParams.set('settings', url);
     globalThis.location.assign(next.href);
