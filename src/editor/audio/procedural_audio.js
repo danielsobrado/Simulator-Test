@@ -22,13 +22,21 @@ class ProceduralAudio {
       for (let i = 0; i < len; i++) {
         data[i] = Math.random() * 2 - 1;
       }
-      if (this.ctx.state === "suspended") {
-        void this.ctx.resume();
-      }
+      this.resumeContext();
     } catch {
       this.ctx = null;
       this.master = null;
       this.noiseBuf = null;
+    }
+  }
+  resumeContext() {
+    if (!this.ctx || this.ctx.state !== "suspended" || typeof this.ctx.resume !== "function") return;
+    try {
+      const pending = this.ctx.resume();
+      if (pending && typeof pending.catch === "function") {
+        void pending.catch(() => {});
+      }
+    } catch {
     }
   }
   setMasterVolume(v) {
@@ -128,9 +136,7 @@ class ProceduralAudio {
   }
   playSynth(synthName, config, optionsVolume, optionsPitch, optionsVariant, optionsDurationMs) {
     if (!this.ctx) return;
-    if (this.ctx.state === "suspended") {
-      void this.ctx.resume();
-    }
+    this.resumeContext();
     const vol = Math.min(1, Math.max(0, optionsVolume !== void 0 ? optionsVolume : config.volume));
     const pitch = optionsPitch !== void 0 ? optionsPitch : config.pitch;
     const duration = (optionsDurationMs !== void 0 ? optionsDurationMs : config.duration_ms) / 1e3;
