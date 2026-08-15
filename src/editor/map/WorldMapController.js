@@ -68,7 +68,11 @@ export class WorldMapController {
   emit() {
     const state = this.getState();
     for (const listener of this.listeners) {
-      listener(state);
+      try {
+        listener(state);
+      } catch (error) {
+        console.error('World map listener failed.', error);
+      }
     }
   }
 
