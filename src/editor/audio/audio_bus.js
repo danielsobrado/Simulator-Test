@@ -1,6 +1,13 @@
 import { defaultAudioConfig } from "./audio_config.js";
 import { ProceduralAudio } from "./procedural_audio.js";
 import { AudioThrottle } from "./audio_throttle.js";
+
+function normalizedVolume(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(1, Math.max(0, numeric));
+}
+
 class AudioBus {
   synthManager = new ProceduralAudio();
   throttle = new AudioThrottle();
@@ -19,11 +26,11 @@ class AudioBus {
         this.synthManager.setEnabled(this.config.global.enabled);
       }
       const savedVol = localStorage.getItem("drusniel_audio_master_volume");
-      if (savedVol !== null) {
-        this.synthManager.setMasterVolume(parseFloat(savedVol));
-      } else {
-        this.synthManager.setMasterVolume(this.config.global.master_volume);
-      }
+      this.synthManager.setMasterVolume(
+        savedVol === null
+          ? this.config.global.master_volume
+          : normalizedVolume(savedVol, this.config.global.master_volume)
+      );
     } catch {
     }
   }
@@ -92,8 +99,11 @@ class AudioBus {
     this.savePersistence();
   }
   setMasterVolume(volume) {
-    this.synthManager.setMasterVolume(volume);
+    const normalized = normalizedVolume(volume, null);
+    if (normalized === null) return false;
+    this.synthManager.setMasterVolume(normalized);
     this.savePersistence();
+    return true;
   }
   getAudioState() {
     return {
