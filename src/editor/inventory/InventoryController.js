@@ -72,7 +72,13 @@ export class InventoryController {
 
   emit() {
     const state = this.getViewState();
-    for (const listener of this.listeners) listener(state);
+    for (const listener of this.listeners) {
+      try {
+        listener(state);
+      } catch (error) {
+        console.error('Inventory controller listener failed.', error);
+      }
+    }
   }
 
   open() {
