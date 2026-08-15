@@ -14,8 +14,12 @@
  */
 export function attachCaptureHotkey(getHandler, target = window) {
   const onKeyDown = (event) => {
-    if (getHandler()?.(event) === true) {
-      event.stopImmediatePropagation();
+    try {
+      if (getHandler()?.(event) === true) {
+        event.stopImmediatePropagation();
+      }
+    } catch (error) {
+      console.error('Capture hotkey handler failed.', error);
     }
   };
   target.addEventListener('keydown', onKeyDown, true);
