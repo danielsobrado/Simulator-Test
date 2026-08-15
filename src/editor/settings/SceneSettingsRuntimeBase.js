@@ -1,4 +1,5 @@
 import {
+  deleteFromBrowser,
   importMapDocument,
   importMapUrl,
   listBrowserDocuments,
@@ -59,6 +60,26 @@ function stageWorldSettings(worldDocument, settings) {
   return staged;
 }
 
+async function cleanupStagedWorld(deleteBrowserDocument, key) {
+  try {
+    await deleteBrowserDocument(key);
+  } catch (error) {
+    console.warn(`Unable to clean staged scene-settings world "${key}".`, error);
+  }
+}
+
+function invokeRuntimeCallback(callback, label, ...args) {
+  if (typeof callback !== 'function') return Promise.resolve();
+  try {
+    return Promise.resolve(callback(...args)).catch((error) => {
+      console.error(`Scene settings ${label} callback failed.`, error);
+    });
+  } catch (error) {
+    console.error(`Scene settings ${label} callback failed.`, error);
+    return Promise.resolve();
+  }
+}
+
 export async function loadBootSceneSettings({
   locationValue = globalThis.location,
   session = globalThis.sessionStorage,
@@ -90,6 +111,7 @@ export async function activateSceneSettings(document, {
   session = globalThis.sessionStorage,
   worldDocument = null,
   saveBrowserDocument = saveToBrowser,
+  deleteBrowserDocument = deleteFromBrowser,
   sourceUrl = locationValue?.href,
 } = {}) {
   const normalized = normalizeSceneSettings(document);
@@ -114,6 +136,9 @@ export async function activateSceneSettings(document, {
       session.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
     }
   } catch (error) {
+    if (worldDocument) {
+      await cleanupStagedWorld(deleteBrowserDocument, SCENE_SETTINGS_RELOAD_WORLD_KEY);
+    }
     throw new Error(
       normalized.map?.document
         ? 'These settings inline a full map export, which is too large for the session handoff.'
@@ -146,6 +171,7 @@ export class SceneSettingsRuntime {
     resolveAzgaarOptions = null,
     afterMapLoad = null,
     loadBrowserDocument = loadFromBrowser,
+    deleteBrowserDocument = deleteFromBrowser,
     session = globalThis.sessionStorage,
   }) {
     this.controller = controller;
@@ -156,6 +182,7 @@ export class SceneSettingsRuntime {
     this.resolveAzgaarOptions = resolveAzgaarOptions;
     this.afterMapLoad = afterMapLoad;
     this.loadBrowserDocument = loadBrowserDocument;
+    this.deleteBrowserDocument = deleteBrowserDocument;
     this.session = session;
     this.pendingWorldKey = boot?.pendingWorldKey ?? null;
     this.document = boot?.document
@@ -199,13 +226,15 @@ export class SceneSettingsRuntime {
   async applyInitialRuntime() {
     this.applyVisualSettings(this.document);
     if (this.pendingWorldKey) {
-      const worldDocument = await this.loadBrowserDocument(this.pendingWorldKey);
+      const pendingWorldKey = this.pendingWorldKey;
+      const worldDocument = await this.loadBrowserDocument(pendingWorldKey);
       if (!worldDocument) {
         throw new Error('The pending world reload document has expired.');
       }
       this.controller.loadDocument(worldDocument, { loadReason: 'SAVE_RESTORED' });
       this.mapSource = this.document.map;
-      await this.afterMapLoad?.(worldDocument);
+      await invokeRuntimeCallback(this.afterMapLoad, 'after-map-load', worldDocument);
+      await cleanupStagedWorld(this.deleteBrowserDocument, pendingWorldKey);
       this.session?.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
       this.pendingWorldKey = null;
       return;
@@ -271,7 +300,7 @@ export class SceneSettingsRuntime {
     // was live before the import restored over the controller's reset.
     if (!worldDocument?.visualConfig) this.applyVisualSettings(visualSettings);
     this.mapSource = resolvedMap;
-    await this.afterMapLoad?.(worldDocument);
+    await invokeRuntimeCallback(this.afterMapLoad, 'after-map-load', worldDocument);
     return worldDocument;
   }
 
@@ -326,12 +355,12 @@ export class SceneSettingsRuntime {
     worldDocument = null,
     sourceUrl = globalThis.location?.href,
   } = {}) {
-    this.onSceneReload?.(document);
+    await invokeRuntimeCallback(this.onSceneReload, 'reload', document);
     return activateSceneSettings(document, { worldDocument, sourceUrl });
   }
 
-  activateUrl(url) {
-    this.onSceneReload?.(null, url);
+  async activateUrl(url) {
+    await invokeRuntimeCallback(this.onSceneReload, 'reload', null, url);
     const next = new URL(globalThis.location.href);
     next.searchParams.set('settings', url);
     globalThis.location.assign(next.href);
