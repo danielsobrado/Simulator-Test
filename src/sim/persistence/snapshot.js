@@ -2,6 +2,7 @@ import { canonicalSerialize, checksumCanonical } from './canonicalSerialize.js';
 import { ENTITY_KINDS } from '../model/entityKinds.js';
 import { collectionNameForKind, createEmptyWorldState, listEntities } from '../model/worldState.js';
 import { createWorldDefinition } from '../model/worldDefinition.js';
+import { validateWorldState } from '../model/validation/validateWorldState.js';
 
 export const SIMULATION_SCHEMA_VERSION = 1;
 
@@ -34,6 +35,15 @@ function assertSnapshotShape(snapshot) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw invalidSnapshot(key);
     }
+  }
+}
+
+function assertPositiveSafeInteger(value, field) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw Object.assign(new Error(`invalid_limit:${field}`), {
+      code: 'invalid_limit',
+      field,
+    });
   }
 }
 
@@ -87,10 +97,13 @@ export function restoreWorldSnapshot(snapshot) {
       { code: 'unsupported_schema_version' },
     );
   }
+  if (typeof snapshot.snapshotChecksum !== 'string' || snapshot.snapshotChecksum.length === 0) {
+    throw Object.assign(new Error('missing_checksum'), { code: 'missing_checksum' });
+  }
   const forCheck = { ...snapshot };
   delete forCheck.snapshotChecksum;
   const actual = checksumCanonical(forCheck);
-  if (snapshot.snapshotChecksum && snapshot.snapshotChecksum !== actual) {
+  if (snapshot.snapshotChecksum !== actual) {
     throw Object.assign(new Error('checksum_mismatch'), { code: 'checksum_mismatch' });
   }
 
@@ -107,6 +120,13 @@ export function restoreWorldSnapshot(snapshot) {
     for (const entity of serializedEntities) {
       state[key].set(entity.id, structuredClone(entity));
     }
+  }
+  const validation = validateWorldState(state);
+  if (!validation.ok) {
+    throw Object.assign(new Error('invalid_world_state'), {
+      code: 'invalid_world_state',
+      failures: validation.failures,
+    });
   }
   return { definition, state, checksum: actual };
 }
@@ -133,6 +153,7 @@ export function createCommandJournal() {
 }
 
 export function createEventHistory({ maxImportant = 10000 } = {}) {
+  assertPositiveSafeInteger(maxImportant, 'maxImportant');
   const events = [];
   return {
     append(event, { important = false } = {}) {
