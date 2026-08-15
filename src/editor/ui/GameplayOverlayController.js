@@ -4,6 +4,16 @@ import {
   isTypingTarget,
 } from './gameplayOverlayConstants.js';
 
+function invokeHandler(handler, label, ...args) {
+  if (typeof handler !== 'function') return { ok: true, value: undefined };
+  try {
+    return { ok: true, value: handler(...args) };
+  } catch (error) {
+    console.error(`Gameplay overlay ${label} failed.`, error);
+    return { ok: false, value: undefined };
+  }
+}
+
 /**
  * Single authority for large gameplay overlays (inventory, world map, …).
  * Owns shortcut precedence so overlays do not depend on listener registration order.
@@ -79,7 +89,9 @@ export class GameplayOverlayController {
 
   emit() {
     const state = this.getState();
-    for (const listener of this.listeners) listener(state);
+    for (const listener of this.listeners) {
+      invokeHandler(listener, 'listener', state);
+    }
   }
 
   isOpen(id) {
@@ -113,7 +125,16 @@ export class GameplayOverlayController {
     }
 
     this.activeOverlay = id;
-    this.overlays.get(id)?.onOpen?.();
+    const opened = invokeHandler(this.overlays.get(id)?.onOpen, `${id} open`);
+    if (!opened.ok) {
+      this.previousOverlay = id;
+      this.activeOverlay = null;
+      player?.setUiBlocked?.(false);
+      if (this.restorePointerLock) {
+        player?.requestPointerLock?.();
+      }
+      this.restorePointerLock = false;
+    }
     this.emit();
   }
 
@@ -137,7 +158,7 @@ export class GameplayOverlayController {
   }
 
   closeOverlayInternal(id, { restorePointerLock }) {
-    this.overlays.get(id)?.onClose?.();
+    invokeHandler(this.overlays.get(id)?.onClose, `${id} close`);
     this.previousOverlay = id;
     this.activeOverlay = null;
 
@@ -168,7 +189,10 @@ export class GameplayOverlayController {
 
     if (event.code === 'Escape' || event.key === 'Escape') {
       const handlers = this.overlays.get(this.activeOverlay);
-      const cancelledLocal = handlers?.onEscape?.() === true;
+      const cancelledLocal = invokeHandler(
+        handlers?.onEscape,
+        `${this.activeOverlay} escape`,
+      ).value === true;
       if (!cancelledLocal) {
         this.closeActive();
       }
@@ -177,7 +201,11 @@ export class GameplayOverlayController {
       return;
     }
 
-    const handled = this.overlays.get(this.activeOverlay)?.onKeyDown?.(event);
+    const handled = invokeHandler(
+      this.overlays.get(this.activeOverlay)?.onKeyDown,
+      `${this.activeOverlay} keydown`,
+      event,
+    ).value;
     event.stopImmediatePropagation?.();
     if (handled === true) {
       event.preventDefault?.();
@@ -187,7 +215,11 @@ export class GameplayOverlayController {
   onKeyUp(event) {
     if (this.activeOverlay == null) return;
     if (isTypingTarget(event.target)) return;
-    this.overlays.get(this.activeOverlay)?.onKeyUp?.(event);
+    invokeHandler(
+      this.overlays.get(this.activeOverlay)?.onKeyUp,
+      `${this.activeOverlay} keyup`,
+      event,
+    );
     event.stopImmediatePropagation?.();
   }
 
