@@ -456,7 +456,22 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     if (this.disposed) return;
     this.disposed = true;
     this.pendingChunks.clear();
-    this.contentProvider?.dispose?.();
-    this.chunkWorker.dispose();
+
+    const errors = [];
+    try {
+      this.contentProvider?.dispose?.();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      this.chunkWorker.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'World store disposal failed.');
+    }
   }
 }
