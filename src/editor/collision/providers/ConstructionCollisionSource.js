@@ -14,10 +14,30 @@ const BOX_FIELDS = Object.freeze([
 
 function normalizeConfig(config = {}) {
   const curveSegmentLength = config.curveSegmentLength ?? DEFAULT_CONFIG.curveSegmentLength;
-  if (!(curveSegmentLength > 0)) {
-    throw new Error('Construction collision curve segment length must be positive.');
+  if (!Number.isFinite(curveSegmentLength) || curveSegmentLength <= 0) {
+    throw new Error('Construction collision curve segment length must be positive and finite.');
   }
   return Object.freeze({ curveSegmentLength });
+}
+
+function validateActiveRecord(record) {
+  if (!record?.id || !Number.isSafeInteger(record.revision)) {
+    throw new Error('Construction collision source requires an active record revision.');
+  }
+}
+
+function validatePlanBounds(bounds) {
+  if (!bounds || typeof bounds !== 'object') {
+    throw new Error('Construction collision plan requires bounds.');
+  }
+  for (const field of BOUNDS_FIELDS) {
+    if (!Number.isFinite(bounds[field])) {
+      throw new Error(`Construction collision plan bounds ${field} must be finite.`);
+    }
+  }
+  if (bounds.maxX < bounds.minX || bounds.maxZ < bounds.minZ) {
+    throw new Error('Construction collision plan bounds maximums must cover their minimums.');
+  }
 }
 
 function sameBounds(left, right) {
@@ -69,8 +89,8 @@ export class ConstructionCollisionSource {
   }
 
   configure(chunkWorldSize) {
-    if (!(chunkWorldSize > 0)) {
-      throw new Error('Construction collision source requires a positive chunk size.');
+    if (!Number.isFinite(chunkWorldSize) || chunkWorldSize <= 0) {
+      throw new Error('Construction collision source requires a positive finite chunk size.');
     }
     if (this.spatialIndex) {
       if (this.chunkWorldSize !== chunkWorldSize) {
@@ -78,16 +98,16 @@ export class ConstructionCollisionSource {
       }
       return this;
     }
+
+    const spatialIndex = new ConstructionSpatialIndex({ chunkWorldSize });
+    for (const [id, plan] of this.plans) spatialIndex.updateBounds(id, plan.bounds);
     this.chunkWorldSize = chunkWorldSize;
-    this.spatialIndex = new ConstructionSpatialIndex({ chunkWorldSize });
-    for (const [id, plan] of this.plans) this.spatialIndex.updateBounds(id, plan.bounds);
+    this.spatialIndex = spatialIndex;
     return this;
   }
 
   setActive(record) {
-    if (!record?.id || !Number.isSafeInteger(record.revision)) {
-      throw new Error('Construction collision source requires an active record revision.');
-    }
+    validateActiveRecord(record);
     this.activeRevisions.set(record.id, record.revision);
   }
 
@@ -95,8 +115,17 @@ export class ConstructionCollisionSource {
     if (!Array.isArray(records)) {
       throw new Error('Construction collision active records must be an array.');
     }
-    this.activeRevisions.clear();
-    for (const record of records) this.setActive(record);
+
+    const nextActiveRevisions = new Map();
+    for (const record of records) {
+      validateActiveRecord(record);
+      if (nextActiveRevisions.has(record.id)) {
+        throw new Error(`Construction collision active records duplicate "${record.id}".`);
+      }
+      nextActiveRevisions.set(record.id, record.revision);
+    }
+
+    this.activeRevisions = nextActiveRevisions;
     this.plans.clear();
     this.spatialIndex?.clear();
   }
@@ -108,18 +137,19 @@ export class ConstructionCollisionSource {
     if (record.id !== plan.constructionId || record.revision !== plan.constructionRevision) {
       throw new Error('Construction collision plan does not match its source record.');
     }
+    validatePlanBounds(plan.bounds);
     if (this.activeRevisions.get(record.id) !== record.revision) {
       this.rejectedPlans += 1;
       return false;
     }
 
     const previous = this.plans.get(record.id);
-    this.plans.set(record.id, plan);
-    if (sameGeometry(previous, plan)) {
-      this.unchangedPlans += 1;
-    } else {
+    const unchanged = sameGeometry(previous, plan);
+    if (!unchanged) {
       this.spatialIndex?.updateBounds(record.id, plan.bounds);
     }
+    this.plans.set(record.id, plan);
+    if (unchanged) this.unchangedPlans += 1;
     this.appliedPlans += 1;
     return true;
   }
