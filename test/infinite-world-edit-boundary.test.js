@@ -84,13 +84,13 @@ test('sculpt brushes crossing the world limit fail before partial mutation', () 
   assert.equal(store.revision, 0);
 });
 
-test('synchronous chunk generation rejects chunks outside engine cell bounds', () => {
+test('synchronous chunk generation rejects chunks whose border vertex exceeds the engine limit', () => {
   const store = createStore();
-  const overflowingChunk = Math.floor(WORLD_MAX_SAFE_CELL_COORDINATE / CHUNK_SIZE) + 1;
+  const firstOverflowingChunk = Math.floor(WORLD_MAX_SAFE_CELL_COORDINATE / CHUNK_SIZE);
 
   assert.throws(
-    () => store.getChunk(overflowingChunk, 0),
-    /safe world-cell integer/,
+    () => store.getChunk(firstOverflowingChunk, 0),
+    /maxVertexX must be a safe world-cell integer/,
   );
   assert.equal(store.cache.size, 0);
 });
