@@ -330,8 +330,13 @@ export function createFixedStepRunner({
       const to = clock.getTick();
       const cadenceEvents = emitCadence(from, to);
       if (onCadence) {
-        for (const event of cadenceEvents) {
-          onCadence(event, context);
+        try {
+          for (const event of cadenceEvents) {
+            clock.setTick(event.tick);
+            onCadence(event, context);
+          }
+        } finally {
+          clock.setTick(to);
         }
       }
       const dueJobs = scheduler.listDueJobs(to);
