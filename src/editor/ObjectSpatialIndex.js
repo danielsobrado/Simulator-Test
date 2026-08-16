@@ -110,13 +110,30 @@ export class ObjectSpatialIndex {
   }
 
   replace(objects) {
-    const previousKeys = [...this.bucketIds.keys()];
-    this.objects.clear();
-    this.boundsByObjectId.clear();
-    this.bucketIds.clear();
-    this.objectBuckets.clear();
-    for (const object of objects) this.add(object);
-    this.mark(previousKeys);
+    const stagedObjects = new Map();
+    const stagedBoundsByObjectId = new Map();
+    const stagedBucketIds = new Map();
+    const stagedObjectBuckets = new Map();
+
+    for (const object of objects) {
+      const bounds = this.boundsForObject(object);
+      const keys = this.keysForBounds(bounds);
+      stagedObjects.set(object.id, object);
+      stagedBoundsByObjectId.set(object.id, bounds);
+      stagedObjectBuckets.set(object.id, keys);
+      for (const key of keys) {
+        const ids = stagedBucketIds.get(key) ?? new Set();
+        ids.add(object.id);
+        stagedBucketIds.set(key, ids);
+      }
+    }
+
+    const affectedKeys = new Set([...this.bucketIds.keys(), ...stagedBucketIds.keys()]);
+    this.objects = stagedObjects;
+    this.boundsByObjectId = stagedBoundsByObjectId;
+    this.bucketIds = stagedBucketIds;
+    this.objectBuckets = stagedObjectBuckets;
+    this.mark(affectedKeys);
   }
 
   clear() {
