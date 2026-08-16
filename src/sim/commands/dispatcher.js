@@ -7,9 +7,11 @@ import { calendarFromTick } from '../time/worldClock.js';
 const handlers = new Map();
 
 function snapshotRuntimeState(runtimeCtx) {
+  const ledger = runtimeCtx?.ledger;
+  const lod = runtimeCtx?.lod;
   return {
-    ledger: runtimeCtx?.ledger?.list ? runtimeCtx.ledger.list() : null,
-    lod: runtimeCtx?.lod?.serialize ? runtimeCtx.lod.serialize() : null,
+    ledger: ledger?.list && ledger?.clear && ledger?.record ? ledger.list() : null,
+    lod: lod?.serialize && lod?.restore ? lod.serialize() : null,
   };
 }
 
