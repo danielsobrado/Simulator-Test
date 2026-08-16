@@ -44,6 +44,8 @@ export class ObjectPlacementResolver {
     this.tileSize = tileSize;
     this.floatingOrigin = floatingOrigin;
     this.releaseCollisionObjectSource = null;
+    this.pagehideTarget = null;
+    this.pagehideListener = null;
     if (typeof window !== 'undefined') {
       ensureCollisionP6QaFixture(objectMap, window.location.search);
       this.releaseCollisionObjectSource = registerCollisionObjectSource({
@@ -52,11 +54,27 @@ export class ObjectPlacementResolver {
         objectCatalog: [...definitionByKey.values()],
         tileSize,
       });
-      window.addEventListener('pagehide', () => {
-        this.releaseCollisionObjectSource?.();
-        this.releaseCollisionObjectSource = null;
-      }, { once: true });
+      this.pagehideTarget = window;
+      this.pagehideListener = () => {
+        this.releaseCollisionRegistration();
+        this.pagehideTarget = null;
+      };
+      window.addEventListener('pagehide', this.pagehideListener, { once: true });
     }
+  }
+
+  releaseCollisionRegistration() {
+    this.releaseCollisionObjectSource?.();
+    this.releaseCollisionObjectSource = null;
+  }
+
+  dispose() {
+    if (this.pagehideTarget && this.pagehideListener) {
+      this.pagehideTarget.removeEventListener('pagehide', this.pagehideListener);
+    }
+    this.pagehideTarget = null;
+    this.pagehideListener = null;
+    this.releaseCollisionRegistration();
   }
 
   resolve(object) {
