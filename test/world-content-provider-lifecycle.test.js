@@ -54,6 +54,48 @@ test('local-first provider disposal is idempotent and blocks new work', async ()
   assert.equal(remoteDisposals, 1);
 });
 
+test('local-first provider disposes remote resources when local disposal fails', () => {
+  const localError = new Error('local cleanup failed');
+  let remoteDisposals = 0;
+  const provider = new LocalFirstWorldContentProvider({
+    local: {
+      async getChunk() { return null; },
+      dispose() { throw localError; },
+    },
+    remote: {
+      async getChunk() { return null; },
+      dispose() { remoteDisposals += 1; },
+    },
+  });
+
+  assert.throws(() => provider.dispose(), (error) => error === localError);
+  assert.equal(remoteDisposals, 1);
+  assert.equal(provider.disposed, true);
+});
+
+test('local-first provider reports multiple disposal failures together', () => {
+  const localError = new Error('local cleanup failed');
+  const remoteError = new Error('remote cleanup failed');
+  const provider = new LocalFirstWorldContentProvider({
+    local: {
+      async getChunk() { return null; },
+      dispose() { throw localError; },
+    },
+    remote: {
+      async getChunk() { return null; },
+      dispose() { throw remoteError; },
+    },
+  });
+
+  assert.throws(
+    () => provider.dispose(),
+    (error) => error instanceof AggregateError
+      && error.errors[0] === localError
+      && error.errors[1] === remoteError,
+  );
+  assert.equal(provider.disposed, true);
+});
+
 test('local-first provider does not cache a remote result after disposal', async () => {
   const remoteResult = deferred();
   const remoteStarted = deferred();
