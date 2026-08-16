@@ -6,6 +6,44 @@ import { calendarFromTick } from '../time/worldClock.js';
 
 const handlers = new Map();
 
+function snapshotRuntimeState(runtimeCtx) {
+  return {
+    ledger: runtimeCtx?.ledger?.list ? runtimeCtx.ledger.list() : null,
+    lod: runtimeCtx?.lod?.serialize ? runtimeCtx.lod.serialize() : null,
+  };
+}
+
+function restoreRuntimeState(runtimeCtx, snapshot) {
+  if (snapshot.ledger !== null) {
+    runtimeCtx.ledger.clear();
+    for (const entry of snapshot.ledger) runtimeCtx.ledger.record(entry);
+  }
+  if (snapshot.lod !== null) {
+    runtimeCtx.lod.restore(snapshot.lod);
+  }
+}
+
+function rejectCommand(state, error, runtimeCtx, runtimeSnapshot, fallbackCode) {
+  try {
+    restoreRuntimeState(runtimeCtx, runtimeSnapshot);
+  } catch (rollbackError) {
+    throw new AggregateError(
+      [error, rollbackError],
+      'Simulation command failed and runtime rollback was incomplete.',
+    );
+  }
+  state.diagnostics.commandsRejected += 1;
+  const code = error.code ?? fallbackCode;
+  recordValidationFailure(state, code);
+  return {
+    ok: false,
+    code,
+    message: error.message,
+    events: [],
+    state,
+  };
+}
+
 export function registerCommandHandler(type, handler) {
   if (handlers.has(type)) {
     throw new Error(`duplicate_handler:${type}`);
@@ -44,6 +82,8 @@ export function createCommandDispatcher({ onAccepted = null } = {}) {
       const commandWithCtx = runtimeCtx
         ? { ...command, payload: { ...command.payload, __ctx: runtimeCtx, __result: null } }
         : { ...command, payload: { ...command.payload, __result: null } };
+      const runtimeSnapshot = snapshotRuntimeState(runtimeCtx);
+
       let emitted;
       try {
         if (runtimeCtx?.config?.time) {
@@ -51,44 +91,26 @@ export function createCommandDispatcher({ onAccepted = null } = {}) {
         }
         emitted = handler(working, commandWithCtx) ?? [];
       } catch (error) {
-        state.diagnostics.commandsRejected += 1;
-        const code = error.code ?? 'command_failed';
-        recordValidationFailure(state, code);
-        return {
-          ok: false,
-          code,
-          message: error.message,
-          events: [],
-          state,
-        };
+        return rejectCommand(state, error, runtimeCtx, runtimeSnapshot, 'command_failed');
       }
 
-      const events = emitted.map((partial, index) => createDomainEvent({
-        id: `${command.id}:event:${index}`,
-        type: partial.type,
-        tick: command.issuedAtTick,
-        causedByCommandId: command.id,
-        entityIds: partial.entityIds ?? [],
-        payload: partial.payload ?? {},
-        schemaVersion: partial.schemaVersion ?? 1,
-      }));
-
+      let events;
       try {
+        events = emitted.map((partial, index) => createDomainEvent({
+          id: `${command.id}:event:${index}`,
+          type: partial.type,
+          tick: command.issuedAtTick,
+          causedByCommandId: command.id,
+          entityIds: partial.entityIds ?? [],
+          payload: partial.payload ?? {},
+          schemaVersion: partial.schemaVersion ?? 1,
+        }));
         for (const event of events) {
           applyEvent(working, event);
           working.diagnostics.eventsEmitted += 1;
         }
       } catch (error) {
-        state.diagnostics.commandsRejected += 1;
-        const code = error.code ?? 'event_apply_failed';
-        recordValidationFailure(state, code);
-        return {
-          ok: false,
-          code,
-          message: error.message,
-          events: [],
-          state,
-        };
+        return rejectCommand(state, error, runtimeCtx, runtimeSnapshot, 'event_apply_failed');
       }
 
       working.diagnostics.commandsAccepted += 1;
