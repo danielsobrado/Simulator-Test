@@ -743,8 +743,8 @@ export function createSimulationWorld({
         clockTick: clock.getTick(),
         scheduler: scheduler.serialize(),
       };
-      await saveStore.beginSave(slot, payload);
-      return saveStore.commitSave(slot);
+      const pendingSave = await saveStore.beginSave(slot, payload);
+      return saveStore.commitSave(slot, pendingSave.transactionId);
     },
 
     async load(slot = 'default') {
