@@ -68,6 +68,16 @@ async function cleanupStagedWorld(deleteBrowserDocument, key) {
   }
 }
 
+function cleanupStagedSession(session, keys) {
+  for (const key of keys) {
+    try {
+      session.removeItem(key);
+    } catch (error) {
+      console.warn(`Unable to clean staged scene-settings session key "${key}".`, error);
+    }
+  }
+}
+
 function invokeRuntimeCallback(callback, label, ...args) {
   if (typeof callback !== 'function') return Promise.resolve();
   try {
@@ -124,18 +134,24 @@ export async function activateSceneSettings(document, {
       stageWorldSettings(worldDocument, normalized),
     );
   }
+
+  const stagedSessionKeys = [];
   try {
     session.setItem(SCENE_SETTINGS_SESSION_KEY, JSON.stringify(normalized));
+    stagedSessionKeys.push(SCENE_SETTINGS_SESSION_KEY);
     session.setItem(SCENE_SETTINGS_SOURCE_URL_SESSION_KEY, sourceUrl ?? locationValue.href);
+    stagedSessionKeys.push(SCENE_SETTINGS_SOURCE_URL_SESSION_KEY);
     if (worldDocument) {
       session.setItem(
         SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY,
         SCENE_SETTINGS_RELOAD_WORLD_KEY,
       );
+      stagedSessionKeys.push(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
     } else {
       session.removeItem(SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY);
     }
   } catch (error) {
+    cleanupStagedSession(session, stagedSessionKeys);
     if (worldDocument) {
       await cleanupStagedWorld(deleteBrowserDocument, SCENE_SETTINGS_RELOAD_WORLD_KEY);
     }
@@ -146,9 +162,18 @@ export async function activateSceneSettings(document, {
         : `Unable to stage these settings for reload: ${error.message}`,
     );
   }
+
   const next = new URL(locationValue.href);
   next.searchParams.set('settings', 'session');
-  locationValue.assign(next.href);
+  try {
+    locationValue.assign(next.href);
+  } catch (error) {
+    cleanupStagedSession(session, stagedSessionKeys);
+    if (worldDocument) {
+      await cleanupStagedWorld(deleteBrowserDocument, SCENE_SETTINGS_RELOAD_WORLD_KEY);
+    }
+    throw new Error(`Unable to reload with the staged scene settings: ${error.message}`);
+  }
 }
 
 export async function resolveLocalGlb(assetId) {
@@ -170,6 +195,7 @@ export class SceneSettingsRuntime {
     boot = null,
     resolveAzgaarOptions = null,
     afterMapLoad = null,
+    onSceneReload = null,
     loadBrowserDocument = loadFromBrowser,
     deleteBrowserDocument = deleteFromBrowser,
     session = globalThis.sessionStorage,
@@ -181,6 +207,7 @@ export class SceneSettingsRuntime {
     this.config = config;
     this.resolveAzgaarOptions = resolveAzgaarOptions;
     this.afterMapLoad = afterMapLoad;
+    this.onSceneReload = onSceneReload;
     this.loadBrowserDocument = loadBrowserDocument;
     this.deleteBrowserDocument = deleteBrowserDocument;
     this.session = session;
@@ -359,6 +386,7 @@ export class SceneSettingsRuntime {
     return activateSceneSettings(document, {
       worldDocument,
       sourceUrl,
+      session: this.session,
       deleteBrowserDocument: this.deleteBrowserDocument,
     });
   }
