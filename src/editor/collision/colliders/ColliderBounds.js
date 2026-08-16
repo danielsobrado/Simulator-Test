@@ -13,6 +13,12 @@ function assertFinite(value, name) {
   if (!Number.isFinite(value)) throw new Error(`${name} must be finite.`);
 }
 
+function assertPositiveFinite(value, name) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be positive and finite.`);
+  }
+}
+
 function assertSafeChunkCoordinate(value) {
   if (!Number.isSafeInteger(value)) {
     throw new Error('Collision chunk coordinate is outside the safe integer range.');
@@ -46,7 +52,7 @@ export function canonicalAabbsIntersect(left, right) {
 export function collisionChunkForCanonical(canonicalX, canonicalZ, chunkWorldSize) {
   assertFinite(canonicalX, 'canonicalX');
   assertFinite(canonicalZ, 'canonicalZ');
-  if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
+  assertPositiveFinite(chunkWorldSize, 'chunkWorldSize');
   return Object.freeze({
     chunkX: assertSafeChunkCoordinate(Math.floor(canonicalX / chunkWorldSize) + 0),
     // `+ 0` clears the negative zero the mirroring produces at z 0. A chunk
@@ -61,7 +67,7 @@ export function collisionChunkCanonicalBounds(chunkX, chunkZ, chunkWorldSize) {
   if (!Number.isSafeInteger(chunkX) || !Number.isSafeInteger(chunkZ)) {
     throw new Error('Collision chunk coordinates must be safe integers.');
   }
-  if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
+  assertPositiveFinite(chunkWorldSize, 'chunkWorldSize');
   return createCanonicalAabb({
     minX: chunkX * chunkWorldSize,
     maxX: (chunkX + 1) * chunkWorldSize,
@@ -76,7 +82,7 @@ export function collisionChunkCanonicalBounds(chunkX, chunkZ, chunkWorldSize) {
 }
 
 export function collisionChunkRangeForAabb(aabb, chunkWorldSize) {
-  if (!(chunkWorldSize > 0)) throw new Error('chunkWorldSize must be positive.');
+  assertPositiveFinite(chunkWorldSize, 'chunkWorldSize');
   return Object.freeze({
     minChunkX: assertSafeChunkCoordinate(Math.floor(aabb.minX / chunkWorldSize)),
     maxChunkX: assertSafeChunkCoordinate(
