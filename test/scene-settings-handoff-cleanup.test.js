@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createSceneSettingsDocument } from '../src/editor/settings/SceneSettings.js';
+import {
+  createSceneSettingsDocument,
+  SCENE_SETTINGS_SESSION_KEY,
+} from '../src/editor/settings/SceneSettings.js';
 import {
   activateSceneSettings,
   SceneSettingsRuntime,
   SCENE_SETTINGS_RELOAD_WORLD_KEY,
   SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY,
+  SCENE_SETTINGS_SOURCE_URL_SESSION_KEY,
 } from '../src/editor/settings/SceneSettingsRuntimeBase.js';
 
 function settingsDocument() {
@@ -38,6 +42,52 @@ test('failed session staging removes the temporary world document', async () => 
 
   assert.deepEqual(saved, [SCENE_SETTINGS_RELOAD_WORLD_KEY]);
   assert.deepEqual(deleted, [SCENE_SETTINGS_RELOAD_WORLD_KEY]);
+});
+
+test('failed partial session staging removes keys written by the attempt', async () => {
+  const removed = [];
+  let writes = 0;
+  const session = {
+    setItem() {
+      writes += 1;
+      if (writes === 2) throw new Error('quota exceeded');
+    },
+    removeItem(key) { removed.push(key); },
+  };
+  const locationValue = {
+    href: 'https://example.test/editor',
+    assign() {},
+  };
+
+  await assert.rejects(
+    activateSceneSettings(settingsDocument(), { locationValue, session }),
+    /Unable to stage these settings for reload/,
+  );
+
+  assert.deepEqual(removed, [SCENE_SETTINGS_SESSION_KEY]);
+});
+
+test('navigation failure cleans staged session handoff state', async () => {
+  const removed = [];
+  const session = {
+    setItem() {},
+    removeItem(key) { removed.push(key); },
+  };
+  const locationValue = {
+    href: 'https://example.test/editor',
+    assign() { throw new Error('navigation blocked'); },
+  };
+
+  await assert.rejects(
+    activateSceneSettings(settingsDocument(), { locationValue, session }),
+    /Unable to reload with the staged scene settings/,
+  );
+
+  assert.deepEqual(removed, [
+    SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY,
+    SCENE_SETTINGS_SESSION_KEY,
+    SCENE_SETTINGS_SOURCE_URL_SESSION_KEY,
+  ]);
 });
 
 test('restored scene-settings world is deleted after successful handoff', async () => {
@@ -86,4 +136,23 @@ test('restored scene-settings world is deleted after successful handoff', async 
   assert.deepEqual(deleted, [SCENE_SETTINGS_RELOAD_WORLD_KEY]);
   assert.deepEqual(removedSessionKeys, [SCENE_SETTINGS_RELOAD_WORLD_SESSION_KEY]);
   assert.equal(runtime.pendingWorldKey, null);
+});
+
+test('scene settings runtime retains the reload callback', () => {
+  const document = settingsDocument();
+  const callback = () => {};
+  const runtime = new SceneSettingsRuntime({
+    controller: {},
+    biomeAssetPalette: { toDocument: () => document.biomeAssets },
+    godRays: { getSettings: () => ({}) },
+    config: {
+      stylizedSurface: {
+        postProcessing: {},
+        regionalPlacement: {},
+      },
+    },
+    onSceneReload: callback,
+  });
+
+  assert.equal(runtime.onSceneReload, callback);
 });
