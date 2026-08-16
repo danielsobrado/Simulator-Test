@@ -485,7 +485,10 @@ export function createSimulationWorld({
   }
 
   function stageLoadedPayload(payload, restored) {
-    const nextClockTick = payload.clockTick ?? restored.state.calendar.tick;
+    if (payload.clockTick !== undefined && payload.clockTick !== restored.state.calendar.tick) {
+      throw new Error('invalid_save_payload:clockTick_mismatch');
+    }
+    const nextClockTick = restored.state.calendar.tick;
     const validationClock = createWorldClock(config.time, nextClockTick);
     const stagedScheduler = createScheduler(validationClock);
     if (payload.scheduler !== undefined) {
@@ -839,13 +842,19 @@ export function createSimulationWorld({
     },
 
     replayFromSnapshot(snapshot, commands) {
+      if (!Array.isArray(commands)) {
+        throw new Error('invalid_replay_commands');
+      }
       const restored = restoreWorldSnapshot(snapshot);
       const replayLedger = createLedger();
       const replayLod = createLodController(config);
-      replayLod.restore(lod.serialize());
+      for (const settlement of listEntities(restored.state, 'settlement', { includeDestroyed: true })) {
+        replayLod.setTier(settlement.id, settlement.data.simTier ?? 'A');
+      }
       let current = restored.state;
       const applied = [];
       const accepted = [];
+      const replayReasonLog = [];
       for (const command of commands) {
         const result = isolatedDispatcher.dispatch(current, command, {
           definition: restored.definition,
@@ -859,13 +868,22 @@ export function createSimulationWorld({
         current = result.state;
         applied.push(command.id);
         accepted.push({ command, events: result.events });
+        if (result.result?.reasonCodes) replayReasonLog.push(...result.result.reasonCodes);
       }
+
       definition = restored.definition;
       state = current;
       clock.setTick(state.calendar.tick);
+      state.calendar = calendarFromTick(clock.getTick(), clock.getConfig());
       lod.restore(replayLod.serialize());
+      scheduler.restore({ jobSeq: 0, jobs: [] });
+      ledger.clear();
       for (const entry of replayLedger.list()) ledger.record(entry);
+      journal.clear();
+      eventHistory.clear();
       for (const entry of accepted) recordAccepted(entry.command, entry.events);
+      reasonLog.length = 0;
+      reasonLog.push(...replayReasonLog);
       pathCache.clear();
       return { ok: true, code: 'ok', applied, state, definition };
     },
