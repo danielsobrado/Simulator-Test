@@ -85,10 +85,14 @@ export function chunkCellBounds(chunkX, chunkZ, chunkSize) {
   const minZ = chunkZ * chunkSize;
   const maxX = minX + chunkSize - 1;
   const maxZ = minZ + chunkSize - 1;
+  const maxVertexX = minX + chunkSize;
+  const maxVertexZ = minZ + chunkSize;
   assertSafeCellCoordinate(minX, 'minX');
   assertSafeCellCoordinate(minZ, 'minZ');
   assertSafeCellCoordinate(maxX, 'maxX');
   assertSafeCellCoordinate(maxZ, 'maxZ');
+  assertSafeCellCoordinate(maxVertexX, 'maxVertexX');
+  assertSafeCellCoordinate(maxVertexZ, 'maxVertexZ');
   return Object.freeze({ minX, minZ, maxX, maxZ });
 }
 
