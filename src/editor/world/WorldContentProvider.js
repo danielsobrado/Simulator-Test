@@ -279,7 +279,7 @@ export class LocalFirstWorldContentProvider {
         this.assertActive();
         this.localRetryAfter = 0;
       } catch (error) {
-        if (this.disposed) throw error;
+        if (this.disposed) this.assertActive();
         this.localRetryAfter = Date.now() + this.retryDelayMs;
         this.warnOnce(
           'local-write',
@@ -298,7 +298,7 @@ export class LocalFirstWorldContentProvider {
       this.assertActive();
       this.localRetryAfter = 0;
     } catch (error) {
-      if (this.disposed) throw error;
+      if (this.disposed) this.assertActive();
       this.localRetryAfter = Date.now() + this.retryDelayMs;
       throw error;
     }
@@ -312,4 +312,4 @@ export class LocalFirstWorldContentProvider {
   }
 }
 
-export const WORLD_CONTENT_DEFAULT_REQUEST_TIMEOUT_MS = CONTENT_REQUEST_REQUEST_TIMEOUT_MS;
+export const WORLD_CONTENT_DEFAULT_REQUEST_TIMEOUT_MS = CONTENT_REQUEST_TIMEOUT_MS;
