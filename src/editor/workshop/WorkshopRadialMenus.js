@@ -133,7 +133,13 @@ class WorkshopRadialMenus {
 
   suppressLegacyPalette() {
     const palette = this.materialUi.querySelector(SELECTORS.legacyMaterialPalette);
-    if (palette && !palette.hidden) palette.hidden = true;
+    if (!palette || palette.hidden) return;
+    const hadFocus = palette.contains(document.activeElement);
+    palette.hidden = true;
+    if (hadFocus) {
+      this.host.querySelector(`[data-radial-mode="${CSS.escape(this.modeId)}"]`)
+        ?.focus({ preventScroll: true });
+    }
   }
 
   fieldElement(field) {
@@ -210,7 +216,7 @@ class WorkshopRadialMenus {
         + `${content}</button>`;
     }).join('');
     return `<div class="workshop-radial-menus__lane" data-radial-lane-host="${escapeAttribute(lane.id)}"`
-      + ` data-side="${lane.side}" style="--radial-lane:${laneIndex}" role="group"`
+      + ` data-side="${lane.side}" style="--radial-lane-offset:${laneIndex * 30}px;--radial-lane-offset-mobile:${laneIndex * 24}px" role="group"`
       + ` aria-label="${escapeAttribute(lane.label)}">`
       + `<span class="workshop-radial-menus__lane-label">${escapeAttribute(lane.label)}</span>${buttons}</div>`;
   }
