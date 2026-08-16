@@ -122,6 +122,12 @@ function assertWorkerPage(page, chunkX, chunkZ, chunkSize) {
   }
 }
 
+function createCancelledRequestError(message) {
+  const error = new Error(message);
+  error.cancelled = true;
+  return error;
+}
+
 export class WorkerBackedWorldStore extends InfiniteWorldStore {
   constructor({
     chunkWorker,
@@ -135,6 +141,7 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     this.surfaceMaskConfig = surfaceMaskConfig ?? createSurfaceMaskConfig(null);
     this.pendingChunks = new Map();
     this.baseTerrainRevision = 0;
+    this.disposed = false;
   }
 
   restoreBaseTerrainState(baseTerrain, generator) {
@@ -183,6 +190,10 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   }
 
   requestChunk(chunkX, chunkZ, { priority = 0 } = {}) {
+    if (this.disposed) {
+      return Promise.reject(createCancelledRequestError('World chunk request rejected after store disposal.'));
+    }
+
     const key = chunkKey(chunkX, chunkZ);
     const cached = this.cache.get(key);
     if (cached) {
@@ -206,10 +217,11 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
     let request;
     request = Promise.all([workerRequest, contentRequest])
       .then(([page, content]) => {
+        if (this.disposed) {
+          throw createCancelledRequestError('World chunk request cancelled by store disposal.');
+        }
         if (sourceRevision !== this.baseTerrainRevision) {
-          const error = new Error('World chunk request superseded by a base terrain change.');
-          error.cancelled = true;
-          throw error;
+          throw createCancelledRequestError('World chunk request superseded by a base terrain change.');
         }
         assertWorkerPage(page, chunkX, chunkZ, this.chunkSize);
         return this.completeWorkerPage({
@@ -430,6 +442,8 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.pendingChunks.clear();
     this.contentProvider?.dispose?.();
     this.chunkWorker.dispose();
