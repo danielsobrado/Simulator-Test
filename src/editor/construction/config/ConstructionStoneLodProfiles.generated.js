@@ -31,6 +31,36 @@ export const CONSTRUCTION_STONE_LOD_PROFILES = Object.freeze({
       }),
     }),
   }),
+  "coursed-rubble": Object.freeze({
+    near: Object.freeze({
+      mode: "soft",
+      faceGrid: Object.freeze({ columns: 2, rows: 2 }),
+      bevelRings: 2,
+      edgeMidpoints: false,
+      cornerFlattening: true,
+      reliefAmplitudeScale: 0.88,
+      edgeVariationScale: 0.92,
+    }),
+    coarse: Object.freeze({
+      mode: "soft-coarse",
+      faceGrid: Object.freeze({ columns: 1, rows: 1 }),
+      bevelRings: 1,
+      edgeMidpoints: false,
+      cornerFlattening: false,
+      reliefAmplitudeScale: 0.42,
+      edgeVariationScale: 0.24,
+    }),
+    transition: Object.freeze({
+      hysteresisMetres: 7,
+      minimumResidenceMs: 600,
+      crossfade: Object.freeze({
+        enabled: false,
+        durationMs: 230,
+        ditherScale: 1,
+        maximumConcurrentModules: 3,
+      }),
+    }),
+  }),
   "soft-limestone-rubble": Object.freeze({
     near: Object.freeze({
       mode: "soft",

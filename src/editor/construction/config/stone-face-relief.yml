@@ -34,6 +34,23 @@ defaults:
     recess: 0.0
 
 styles:
+  coursed-rubble:
+    enabled: true
+
+    grid:
+      columns: 2
+      rows: 2
+
+    recession:
+      ratioMin: 0.016
+      ratioMax: 0.034
+      minimum: 0.005
+      maximum: 0.017
+
+    edgeFalloffPower: 1.45
+    asymmetry: 0.22
+    saddleStrength: 0.08
+
   soft-limestone-rubble:
     enabled: true
 

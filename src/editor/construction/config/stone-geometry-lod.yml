@@ -33,6 +33,38 @@ defaults:
       maximumConcurrentModules: 4
 
 styles:
+  coursed-rubble:
+    near:
+      mode: soft
+      faceGrid:
+        columns: 2
+        rows: 2
+      bevelRings: 2
+      edgeMidpoints: false
+      cornerFlattening: true
+      reliefAmplitudeScale: 0.88
+      edgeVariationScale: 0.92
+
+    coarse:
+      mode: soft-coarse
+      faceGrid:
+        columns: 1
+        rows: 1
+      bevelRings: 1
+      edgeMidpoints: false
+      cornerFlattening: false
+      reliefAmplitudeScale: 0.42
+      edgeVariationScale: 0.24
+
+    transition:
+      hysteresisMetres: 7
+      minimumResidenceMs: 600
+      crossfade:
+        enabled: false
+        durationMs: 230
+        ditherScale: 1
+        maximumConcurrentModules: 3
+
   soft-limestone-rubble:
     near:
       mode: soft

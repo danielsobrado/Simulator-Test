@@ -58,6 +58,38 @@ defaults:
     recess: 0.0
 
 styles:
+  coursed-rubble:
+    enabled: true
+
+    bevel:
+      widthRatio:
+        min: 0.075
+        max: 0.120
+
+      depthRatio:
+        min: 0.060
+        max: 0.105
+
+      absoluteMinimum: 0.013
+      absoluteMaximum: 0.058
+
+    cornerVariation:
+      amount: 0.26
+      correlation: 0.58
+
+    edgeVariation:
+      amount: 0.14
+      midpointBias: 0.28
+
+    verticalBias:
+      top: 1.18
+      bottom: 0.88
+
+    cornerFlattening:
+      chance: 0.20
+      strengthMin: 0.08
+      strengthMax: 0.19
+
   soft-limestone-rubble:
     enabled: true
 

@@ -19,6 +19,17 @@ defaults:
   minimumRenderedHeight: 0.08
 
 styles:
+  coursed-rubble:
+    headJoint:
+      min: 0.024
+      max: 0.040
+
+    bedJoint:
+      min: 0.018
+      max: 0.030
+
+    coarseLodMultiplier: 1.15
+
   soft-limestone-rubble:
     headJoint:
       min: 0.026
