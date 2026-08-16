@@ -3,6 +3,7 @@ import { createWorldGenerator } from './WorldGeneratorFactory.js';
 import {
   cellKey,
   cellToChunk,
+  chunkCellBounds,
   chunkKey,
   floorDiv,
   parseCellKey,
@@ -51,6 +52,17 @@ function assertFiniteNumber(value, fieldName) {
   if (!Number.isFinite(value)) {
     throw new Error(`${fieldName} must be finite.`);
   }
+}
+
+function assertPositiveFiniteNumber(value, fieldName) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${fieldName} must be a positive finite number.`);
+  }
+}
+
+function assertWorldRect(minX, maxX, minZ, maxZ) {
+  cellKey(minX, minZ);
+  cellKey(maxX, maxZ);
 }
 
 function tileIndex(localX, localZ, chunkSize) {
@@ -329,11 +341,19 @@ export class InfiniteWorldStore {
   }
 
   paintSquare(centerX, centerZ, brushSize, tileId, canPaint = null) {
+    assertWorldRect(centerX, centerX, centerZ, centerZ);
+    assertPositiveFiniteNumber(brushSize, 'Paint brush size');
     const radius = Math.floor(brushSize / 2);
+    const minimumX = centerX - radius;
+    const maximumX = centerX + radius;
+    const minimumZ = centerZ - radius;
+    const maximumZ = centerZ + radius;
+    assertWorldRect(minimumX, maximumX, minimumZ, maximumZ);
+
     const patch = { indices: [], before: [], after: [] };
     const changedCells = [];
-    for (let z = centerZ - radius; z <= centerZ + radius; z += 1) {
-      for (let x = centerX - radius; x <= centerX + radius; x += 1) {
+    for (let z = minimumZ; z <= maximumZ; z += 1) {
+      for (let x = minimumX; x <= maximumX; x += 1) {
         if (canPaint && !canPaint(x, z, null, tileId)) {
           continue;
         }
@@ -372,6 +392,16 @@ export class InfiniteWorldStore {
     if (!VALID_SCULPT_SHAPES.has(shape)) {
       throw new Error(`Unknown heightfield brush shape: ${shape}.`);
     }
+    assertWorldRect(centerX, centerX, centerZ, centerZ);
+    assertPositiveFiniteNumber(brushSize, 'Heightfield brush size');
+    assertFiniteNumber(strength, 'Heightfield strength');
+    assertFiniteNumber(smoothFactor, 'Heightfield smooth factor');
+    assertFiniteNumber(minHeight, 'Heightfield minimum height');
+    assertFiniteNumber(maxHeight, 'Heightfield maximum height');
+    if (minHeight > maxHeight) {
+      throw new Error('Heightfield minimum height must not exceed maximum height.');
+    }
+
     const radius = Math.max(1, (brushSize + 1) / 2);
     const centerVertexX = centerX + 0.5;
     const centerVertexZ = centerZ + 0.5;
@@ -379,6 +409,14 @@ export class InfiniteWorldStore {
     const maximumX = Math.ceil(centerVertexX + radius);
     const minimumZ = Math.floor(centerVertexZ - radius);
     const maximumZ = Math.ceil(centerVertexZ + radius);
+    const halo = operation === 'smooth' ? 1 : 0;
+    assertWorldRect(
+      minimumX - halo,
+      maximumX + halo,
+      minimumZ - halo,
+      maximumZ + halo,
+    );
+
     const source = new Map();
     if (operation === 'smooth') {
       for (let z = minimumZ - 1; z <= maximumZ + 1; z += 1) {
@@ -474,10 +512,13 @@ export class InfiniteWorldStore {
   }
 
   generateChunk(chunkX, chunkZ) {
+    const { minX: originX, minZ: originZ } = chunkCellBounds(
+      chunkX,
+      chunkZ,
+      this.chunkSize,
+    );
     const tiles = new Uint8Array(this.chunkSize * this.chunkSize);
     const heights = new Float32Array(this.vertexSize * this.vertexSize);
-    const originX = chunkX * this.chunkSize;
-    const originZ = chunkZ * this.chunkSize;
     for (let localZ = 0; localZ < this.chunkSize; localZ += 1) {
       for (let localX = 0; localX < this.chunkSize; localX += 1) {
         tiles[tileIndex(localX, localZ, this.chunkSize)] = this.getTile(originX + localX, originZ + localZ);
