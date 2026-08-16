@@ -219,9 +219,9 @@ export function constructionPathSegmentIds(path) {
  * Wall-top intent. Control points are anchored per segment exactly like
  * features, so an unrelated anchor edit cannot slide them along the wall.
  */
-function normalizeTop(input, validSegmentIds, fallbackBase) {
+function normalizeTop(input, validSegmentIds, fallbackBase, fallbackStyle = 'flat') {
   const source = requireObject(input ?? {}, 'Construction top');
-  const style = source.style ?? 'flat';
+  const style = source.style ?? fallbackStyle;
   if (!TOP_STYLES.has(style)) throw new Error(`Unsupported construction top style ${style}.`);
   const profileInput = source.profile ?? [];
   if (!Array.isArray(profileInput)) throw new Error('Construction top profile must be an array.');
@@ -283,12 +283,13 @@ export function normalizeConstructionRecord(input) {
   if (!isConstructionStyleKey(styleKey)) {
     throw new Error(`Unknown construction style ${styleKey}.`);
   }
+  const kind = source.kind === 'building' ? 'building' : 'wall';
   return Object.freeze({
     version: CONSTRUCTION_RECORD_VERSION,
     id: requireId(source.id, 'Construction'),
     revision: integer(source.revision, 'Construction revision', 1),
     seed: integer(source.seed, 'Construction seed'),
-    kind: source.kind === 'building' ? 'building' : 'wall',
+    kind,
     label: typeof source.label === 'string' && source.label.trim()
       ? source.label.trim().slice(0, 80)
       : 'Curved wall',
@@ -301,7 +302,12 @@ export function normalizeConstructionRecord(input) {
       height: dimensionHeight,
       thickness: finite(dimensions.thickness ?? 0.8, 'Construction thickness', 0.1, 10),
     }),
-    top: normalizeTop(source.top, constructionPathSegmentIds(path), dimensionHeight),
+    top: normalizeTop(
+      source.top,
+      constructionPathSegmentIds(path),
+      dimensionHeight,
+      kind === 'wall' ? 'irregular' : 'flat',
+    ),
     path,
     features: path.features,
   });

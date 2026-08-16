@@ -1,0 +1,21 @@
+handleGroundOffset: 0.28
+height:
+  lift: 0.95
+  coneRadius: 0.12
+  coneHeight: 0.28
+  pickRadius: 0.18
+  pickLength: 1.2
+  precisionMultiplier: 0.2
+  snapStep: 0.1
+  minUnitsPerPixel: 0.002
+  maxUnitsPerPixel: 0.08
+move:
+  lift: 1.15
+  radius: 0.28
+  ringRadius: 0.42
+  ringTube: 0.035
+render:
+  radialSegments: 12
+  renderOrder: 120
+  heightColor: '#f5f0df'
+  moveColor: '#83e0b5'

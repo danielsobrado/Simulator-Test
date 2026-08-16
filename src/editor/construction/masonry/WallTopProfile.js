@@ -1,5 +1,6 @@
 import { mixSeed } from '../../workshop/ProceduralRandom.js';
 import { constructionRuinProfile } from '../config/ConstructionRuinConfig.generated.js';
+import { CONSTRUCTION_WALL_TOP_CONFIG } from '../config/ConstructionWallTopConfig.generated.js';
 
 /**
  * The wall-top height function, in arc length.
@@ -21,8 +22,6 @@ import { constructionRuinProfile } from '../config/ConstructionRuinConfig.genera
 
 const MERLON_DUTY = 0.55;
 const DEFAULT_MERLON_HEIGHT = 0.72;
-const IRREGULAR_AMPLITUDE = 0.16;
-const IRREGULAR_WAVELENGTH = 4.7;
 const EPSILON = 1e-9;
 
 function hashUnit(seed, value) {
@@ -90,6 +89,7 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
   const seed = record.seed >>> 0;
   const merlonSpacing = style?.merlonSpacing ?? 1.18;
   const ruinProfile = constructionRuinProfile(record.style?.key);
+  const irregularConfig = CONSTRUCTION_WALL_TOP_CONFIG.irregular;
 
   const resolved = top.profile
     .map((entry) => ({
@@ -150,16 +150,39 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
     return ruinStateAt(s).factor;
   }
 
+  function irregularHeight(s, height) {
+    const macro = valueNoise(
+      mixSeed(seed, 0x70),
+      s,
+      irregularConfig.macroWavelength,
+    ) - 0.5;
+    const macroFine = valueNoise(
+      mixSeed(seed, 0x71),
+      s,
+      irregularConfig.macroWavelength * 0.37,
+    ) - 0.5;
+    const stone = valueNoise(
+      mixSeed(seed, 0x74),
+      s,
+      irregularConfig.stoneWavelength,
+    ) - 0.5;
+    const stoneFine = valueNoise(
+      mixSeed(seed, 0x75),
+      s,
+      irregularConfig.stoneWavelength * irregularConfig.fineWavelengthRatio,
+    ) - 0.5;
+    return Math.max(
+      0.2,
+      height
+        + (macro * 1.4 + macroFine * 0.6) * irregularConfig.macroAmplitude
+        + (stone * 1.55 + stoneFine * 0.45) * irregularConfig.stoneAmplitude,
+    );
+  }
+
   function heightAt(s) {
     const height = profileHeight(s);
-    if (top.style === 'irregular') {
-      const wobble = valueNoise(mixSeed(seed, 0x70), s, IRREGULAR_WAVELENGTH) - 0.5;
-      const fine = valueNoise(mixSeed(seed, 0x71), s, IRREGULAR_WAVELENGTH * 0.37) - 0.5;
-      return Math.max(0.2, height + (wobble * 1.4 + fine * 0.6) * IRREGULAR_AMPLITUDE);
-    }
-    if (top.style === 'ruined') {
-      return ruinStateAt(s).collapsedHeight;
-    }
+    if (top.style === 'irregular') return irregularHeight(s, height);
+    if (top.style === 'ruined') return ruinStateAt(s).collapsedHeight;
     return Math.max(0.2, height);
   }
 
@@ -169,7 +192,12 @@ export function createWallTopProfile(record, arcTable, { style = null } = {}) {
     const after = Math.min(arcTable.totalLength, s + half);
     const measured = after - before;
     if (measured <= EPSILON) return 0;
-    return Math.atan2(heightAt(after) - heightAt(before), measured);
+    const slope = Math.atan2(heightAt(after) - heightAt(before), measured);
+    if (top.style !== 'irregular') return slope;
+    return Math.max(
+      -irregularConfig.maxCopingSlopeRadians,
+      Math.min(irregularConfig.maxCopingSlopeRadians, slope),
+    );
   }
 
   /**
