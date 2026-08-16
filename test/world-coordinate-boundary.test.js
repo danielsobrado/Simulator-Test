@@ -24,12 +24,12 @@ test('worldToCell rejects positions that resolve beyond the engine cell limit', 
   );
 });
 
-test('chunkCellBounds rejects bounds that overflow the engine cell limit', () => {
-  const overflowingChunk = Math.floor(WORLD_MAX_SAFE_CELL_COORDINATE / 8) + 1;
+test('chunkCellBounds rejects chunks whose border vertex exceeds the engine limit', () => {
+  const firstOverflowingChunk = Math.floor(WORLD_MAX_SAFE_CELL_COORDINATE / 8);
 
   assert.throws(
-    () => chunkCellBounds(overflowingChunk, 0, 8),
-    /minX must be a safe world-cell integer/,
+    () => chunkCellBounds(firstOverflowingChunk, 0, 8),
+    /maxVertexX must be a safe world-cell integer/,
   );
 });
 
