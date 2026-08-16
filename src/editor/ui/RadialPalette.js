@@ -34,6 +34,14 @@ export function petalAngle(index, count) {
   return -90 + index * (360 / Math.max(1, count));
 }
 
+export function clampPaletteCoordinate(value, extent, radius) {
+  const safeExtent = Math.max(0, Number.isFinite(extent) ? extent : 0);
+  const safeRadius = Math.max(0, Number.isFinite(radius) ? radius : 0);
+  const local = Number.isFinite(value) ? value : safeExtent / 2;
+  if (safeExtent <= safeRadius * 2) return safeExtent / 2;
+  return Math.min(safeExtent - safeRadius, Math.max(safeRadius, local));
+}
+
 /**
  * Build the palette's markup.
  *
@@ -134,8 +142,8 @@ export class RadialPalette {
 
     // Clamp inside the host so a palette opened near an edge stays reachable.
     const bounds = this.host.getBoundingClientRect();
-    const x = Math.min(bounds.width - radius, Math.max(radius, clientX - bounds.left));
-    const y = Math.min(bounds.height - radius, Math.max(radius, clientY - bounds.top));
+    const x = clampPaletteCoordinate(clientX - bounds.left, bounds.width, radius);
+    const y = clampPaletteCoordinate(clientY - bounds.top, bounds.height, radius);
     this.element.style.left = `${x}px`;
     this.element.style.top = `${y}px`;
     this.buttons[0]?.focus();
