@@ -40,6 +40,39 @@ function validatePlanBounds(bounds) {
   }
 }
 
+function validateVector(value, field, boxId) {
+  if (!Array.isArray(value) || value.length !== 2 || value.some((entry) => !Number.isFinite(entry))) {
+    throw new Error(`Construction collision box "${boxId}" ${field} must contain two finite values.`);
+  }
+}
+
+function validatePlanBoxes(boxes) {
+  if (!Array.isArray(boxes)) {
+    throw new Error('Construction collision plan boxes must be an array.');
+  }
+  for (const [index, box] of boxes.entries()) {
+    const boxId = typeof box?.id === 'string' && box.id ? box.id : `#${index}`;
+    if (!box || typeof box !== 'object' || typeof box.id !== 'string' || !box.id) {
+      throw new Error(`Construction collision box ${boxId} requires an id.`);
+    }
+    validateVector(box.center, 'center', boxId);
+    validateVector(box.tangent, 'tangent', boxId);
+    if (!Number.isFinite(box.length) || box.length <= 0) {
+      throw new Error(`Construction collision box "${boxId}" length must be positive and finite.`);
+    }
+    if (!Number.isFinite(box.thickness) || box.thickness <= 0) {
+      throw new Error(`Construction collision box "${boxId}" thickness must be positive and finite.`);
+    }
+    if (!Number.isFinite(box.bottom) || !Number.isFinite(box.top) || box.top <= box.bottom) {
+      throw new Error(`Construction collision box "${boxId}" vertical range must be finite and positive.`);
+    }
+    if (!Number.isFinite(box.foundationOverlap) || box.foundationOverlap < 0) {
+      throw new Error(`Construction collision box "${boxId}" foundation overlap must be finite and non-negative.`);
+    }
+    validatePlanBounds(box.bounds);
+  }
+}
+
 function sameBounds(left, right) {
   return BOUNDS_FIELDS.every((field) => left?.[field] === right?.[field]);
 }
@@ -138,6 +171,7 @@ export class ConstructionCollisionSource {
       throw new Error('Construction collision plan does not match its source record.');
     }
     validatePlanBounds(plan.bounds);
+    validatePlanBoxes(plan.boxes);
     if (this.activeRevisions.get(record.id) !== record.revision) {
       this.rejectedPlans += 1;
       return false;
