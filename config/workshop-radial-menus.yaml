@@ -1,0 +1,186 @@
+version: 1
+defaultMode: structure
+visibleSlots: 5
+wheelCooldownMs: 90
+swipeThresholdPx: 28
+materialPresetColors:
+  granite-masonry: '#827e79'
+  limestone-masonry: '#c8bea4'
+  sandstone-masonry: '#b98d5f'
+  ochre-plaster: '#b7793f'
+  lime-plaster: '#d5d1bd'
+  terracotta-tile: '#a75535'
+  slate-roof: '#48535a'
+  aged-timber: '#6d462c'
+modes:
+  - id: structure
+    label: Structure
+    glyph: '⌂'
+    lanes:
+      - id: archetype
+        side: left
+        label: Build
+        field: archetype
+        items:
+          - { value: manor, label: Tower house, glyph: '⌂' }
+          - { value: wall, label: Wall, glyph: '▥' }
+          - { value: gatehouse, label: Gatehouse, glyph: '▣' }
+          - { value: tower, label: Round tower, glyph: '◉' }
+          - { value: square-tower, label: Square keep, glyph: '▰' }
+      - id: silhouette
+        side: right
+        label: Silhouette
+        field: shape
+        items:
+          - { value: classic, label: Classic, glyph: '◇' }
+          - { value: stepped, label: Stepped gables, glyph: '⌃' }
+          - { value: tapered, label: Tapered tower, glyph: '△' }
+      - id: tower-wing
+        side: right
+        label: Tower wing
+        field: towerSide
+        items:
+          - { value: left, label: Left wing, glyph: '◁' }
+          - { value: right, label: Right wing, glyph: '▷' }
+          - { value: none, label: No wing, glyph: '○' }
+
+  - id: surfaces
+    label: Surfaces
+    glyph: '◫'
+    lanes:
+      - id: wall-finish
+        side: left
+        label: Wall finish
+        field: finish
+        items:
+          - { value: masonry, label: Exposed masonry, color: '#827e79' }
+          - { value: ochre, label: Sun-washed ochre, color: '#b7793f' }
+          - { value: limewash, label: Warm limewash, color: '#d5d1bd' }
+          - { value: rose, label: Faded rose plaster, color: '#b68178' }
+      - id: trim-stone
+        side: right
+        label: Trim stone
+        field: style
+        items:
+          - { value: granite, label: Grey granite, color: '#827e79' }
+          - { value: limestone, label: Warm limestone, color: '#c8bea4' }
+          - { value: sandstone, label: Red sandstone, color: '#b98d5f' }
+
+  - id: roof
+    label: Roof
+    glyph: '⌃'
+    lanes:
+      - id: roof-style
+        side: left
+        label: Roof / top
+        field: topStyle
+        items:
+          - { value: battlements, label: Battlements, glyph: '▥' }
+          - { value: slate, label: Mossy slate, color: '#48535a' }
+          - { value: terracotta, label: Terracotta tile, color: '#a75535' }
+      - id: roof-height
+        side: right
+        label: Roof height
+        field: roofScale
+        event: input
+        items:
+          - { value: '0.70', label: Low, glyph: '▁' }
+          - { value: '0.95', label: Modest, glyph: '▂' }
+          - { value: '1.15', label: Standard, glyph: '▃' }
+          - { value: '1.45', label: Tall, glyph: '▅' }
+          - { value: '1.80', label: Grand, glyph: '▇' }
+      - id: roof-overhang
+        side: right
+        label: Overhang
+        field: roofOverhang
+        event: input
+        items:
+          - { value: '0.20', label: Tight, glyph: '·' }
+          - { value: '0.35', label: Short, glyph: '—' }
+          - { value: '0.45', label: Standard, glyph: '━' }
+          - { value: '0.65', label: Wide, glyph: '═' }
+          - { value: '0.85', label: Deep, glyph: '▰' }
+
+  - id: textures
+    label: Textures
+    glyph: '▦'
+    materialMode: true
+    lanes:
+      - id: material-presets
+        side: left
+        label: Material preset
+        source: materialPresets
+        fallbackItems:
+          - { value: granite-masonry, label: Granite }
+          - { value: limestone-masonry, label: Limestone }
+          - { value: sandstone-masonry, label: Sandstone }
+          - { value: ochre-plaster, label: Ochre }
+          - { value: lime-plaster, label: Limewash }
+          - { value: terracotta-tile, label: Terracotta }
+          - { value: slate-roof, label: Slate }
+          - { value: aged-timber, label: Timber }
+      - id: pbr-maps
+        side: right
+        label: PBR map
+        source: materialMaps
+        items:
+          - { value: albedo, label: Albedo, glyph: 'A' }
+          - { value: normal, label: Normal, glyph: 'N' }
+          - { value: orm, label: ORM, glyph: 'O' }
+          - { value: height, label: Height, glyph: 'H' }
+
+  - id: colors
+    label: Colors
+    glyph: '●'
+    materialMode: true
+    lanes:
+      - id: base-color
+        side: left
+        label: Base color
+        source: colorField
+        target: baseColor
+        items:
+          - { value: '#2e3231', label: Charcoal }
+          - { value: '#48535a', label: Slate }
+          - { value: '#827e79', label: Granite }
+          - { value: '#c8bea4', label: Limestone }
+          - { value: '#d5d1bd', label: Lime }
+          - { value: '#b98d5f', label: Sandstone }
+          - { value: '#b7793f', label: Ochre }
+          - { value: '#a75535', label: Terracotta }
+          - { value: '#6d462c', label: Timber }
+          - { value: '#71846a', label: Moss }
+      - id: tint-color
+        side: right
+        label: Tint
+        source: colorField
+        target: tint
+        items:
+          - { value: '#ffffff', label: Neutral }
+          - { value: '#fffaf0', label: Warm white }
+          - { value: '#ffe0ad', label: Sun warm }
+          - { value: '#dce8ed', label: Cool stone }
+          - { value: '#ffd9b0', label: Warm timber }
+          - { value: '#d6dfc0', label: Moss wash }
+
+  - id: details
+    label: Details
+    glyph: '✦'
+    lanes:
+      - id: detail-level
+        side: left
+        label: Detail
+        field: detail
+        items:
+          - { value: '1', label: Draft, glyph: '1' }
+          - { value: '2', label: High, glyph: '2' }
+          - { value: '3', label: Ultra, glyph: '3' }
+      - id: feature-toggles
+        side: right
+        label: Features
+        source: toggles
+        items:
+          - { value: windows, label: Doors and windows, glyph: '▦' }
+          - { value: ivy, label: Procedural ivy, glyph: '❧' }
+          - { value: remesh, label: Efficient remesh, glyph: '⬡' }
+          - { value: albedo, label: Procedural albedo, glyph: '◐' }
