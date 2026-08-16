@@ -2,6 +2,7 @@ import { createDomainEvent } from '../events/domainEvent.js';
 import { applyEvent } from '../events/reducers.js';
 import { cloneWorldState } from '../model/worldState.js';
 import { recordValidationFailure } from '../model/validation/validateWorldState.js';
+import { calendarFromTick } from '../time/worldClock.js';
 
 const handlers = new Map();
 
@@ -45,6 +46,9 @@ export function createCommandDispatcher({ onAccepted = null } = {}) {
         : { ...command, payload: { ...command.payload, __result: null } };
       let emitted;
       try {
+        if (runtimeCtx?.config?.time) {
+          working.calendar = calendarFromTick(command.issuedAtTick, runtimeCtx.config.time);
+        }
         emitted = handler(working, commandWithCtx) ?? [];
       } catch (error) {
         state.diagnostics.commandsRejected += 1;
