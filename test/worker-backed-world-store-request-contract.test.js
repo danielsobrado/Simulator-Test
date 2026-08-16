@@ -154,3 +154,52 @@ test('worker pages with invalid typed-array sizes never enter the cache', async 
     store.dispose();
   }
 });
+
+test('in-flight chunk completions cannot repopulate a disposed store', async () => {
+  let releaseContent;
+  const content = new Promise((resolve) => {
+    releaseContent = resolve;
+  });
+  const store = createStore({
+    chunkWorker: {
+      request() { return Promise.resolve(createPage(0, 0)); },
+    },
+    contentProvider: {
+      getChunk() { return content; },
+      dispose() {},
+    },
+  });
+
+  const request = store.requestChunk(0, 0);
+  await Promise.resolve();
+  store.dispose();
+  releaseContent({ entities: [] });
+
+  await assert.rejects(
+    request,
+    (error) => error?.cancelled === true && /store disposal/.test(error.message),
+  );
+  assert.equal(store.pendingChunks.size, 0);
+  assert.equal(store.cache.size, 0);
+});
+
+test('chunk requests after disposal are rejected without touching the worker', async () => {
+  let calls = 0;
+  const store = createStore({
+    chunkWorker: {
+      request() {
+        calls += 1;
+        return Promise.resolve(createPage(0, 0));
+      },
+    },
+  });
+
+  store.dispose();
+
+  await assert.rejects(
+    store.requestChunk(0, 0),
+    (error) => error?.cancelled === true && /after store disposal/.test(error.message),
+  );
+  assert.equal(calls, 0);
+  assert.equal(store.cache.size, 0);
+});
