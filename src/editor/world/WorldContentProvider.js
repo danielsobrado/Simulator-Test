@@ -307,8 +307,23 @@ export class LocalFirstWorldContentProvider {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    this.local.dispose?.();
-    this.remote?.dispose?.();
+
+    const errors = [];
+    try {
+      this.local.dispose?.();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      this.remote?.dispose?.();
+    } catch (error) {
+      errors.push(error);
+    }
+
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw new AggregateError(errors, 'World content provider disposal failed.');
+    }
   }
 }
 
