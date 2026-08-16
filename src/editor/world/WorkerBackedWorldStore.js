@@ -182,8 +182,16 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
 
   requestWorkerPage(chunkX, chunkZ, priority, retriesRemaining = 1) {
     return Promise.resolve()
-      .then(() => this.chunkWorker.request(chunkX, chunkZ, { priority }))
+      .then(() => {
+        if (this.disposed) {
+          throw createCancelledRequestError('World chunk request cancelled by store disposal.');
+        }
+        return this.chunkWorker.request(chunkX, chunkZ, { priority });
+      })
       .catch((error) => {
+        if (this.disposed) {
+          throw createCancelledRequestError('World chunk request cancelled by store disposal.');
+        }
         if (!error?.retryable || retriesRemaining <= 0) throw error;
         return this.requestWorkerPage(chunkX, chunkZ, priority, retriesRemaining - 1);
       });
@@ -209,11 +217,14 @@ export class WorkerBackedWorldStore extends InfiniteWorldStore {
 
     const sourceRevision = this.baseTerrainRevision;
     const workerRequest = this.requestWorkerPage(chunkX, chunkZ, priority);
-    const contentRequest = Promise.resolve().then(
-      () => (this.contentProvider
+    const contentRequest = Promise.resolve().then(() => {
+      if (this.disposed) {
+        throw createCancelledRequestError('World chunk request cancelled by store disposal.');
+      }
+      return this.contentProvider
         ? this.contentProvider.getChunk(this.getContentWorldId(), chunkX, chunkZ)
-        : null),
-    );
+        : null;
+    });
     let request;
     request = Promise.all([workerRequest, contentRequest])
       .then(([page, content]) => {
