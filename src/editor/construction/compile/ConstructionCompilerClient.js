@@ -112,7 +112,13 @@ export class ConstructionCompilerClient {
     } else if (!plan || typeof plan !== 'object') {
       pending.reject(new Error('Construction compiler worker returned an invalid plan.'));
     } else {
-      pending.resolve(publishCollision(pending.record, plan));
+      try {
+        pending.resolve(publishCollision(pending.record, plan));
+      } catch (publishError) {
+        pending.reject(
+          publishError instanceof Error ? publishError : new Error(String(publishError)),
+        );
+      }
     }
   }
 
