@@ -161,7 +161,7 @@ export const CONSTRUCTION_STYLES = Object.freeze({
     stonePalette: 'soft-limestone',
     bedAmplitude: 0.14,
     jointTilt: 0.16,
-    splitChance: 0.36,
+    splitChance: 0.42,
     depthScaleMin: 0.93,
     depthScaleMax: 1.01,
     faceOffsetAmplitude: 0.015,
