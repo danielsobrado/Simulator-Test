@@ -66,8 +66,10 @@ export class GameplayOverlayController {
     if (typeof id !== 'string' || id.length === 0) {
       throw new Error('Overlay id must be a non-empty string.');
     }
-    this.overlays.set(id, handlers);
+    const registration = { ...handlers };
+    this.overlays.set(id, registration);
     return () => {
+      if (this.overlays.get(id) !== registration) return;
       if (this.activeOverlay === id) this.close(id);
       this.overlays.delete(id);
     };
