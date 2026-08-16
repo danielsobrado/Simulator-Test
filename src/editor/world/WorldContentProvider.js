@@ -152,10 +152,14 @@ export class UrlWorldContentProvider {
     this.disposed = false;
   }
 
-  async getChunk(worldId, chunkX, chunkZ) {
+  assertActive() {
     if (this.disposed) {
       throw new Error('World content URL provider is disposed.');
     }
+  }
+
+  async getChunk(worldId, chunkX, chunkZ) {
+    this.assertActive();
     const url = `${this.baseUrl}/${encodeURIComponent(worldId)}/chunks/${chunkX}/${chunkZ}.json`;
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     if (controller) this.controllers.add(controller);
@@ -167,11 +171,14 @@ export class UrlWorldContentProvider {
           url,
           controller ? { signal: controller.signal } : undefined,
         );
+        this.assertActive();
         if (response.status === 404) return null;
         if (!response.ok) {
           throw new Error(`World content request failed with status ${response.status}.`);
         }
-        return response.json();
+        const content = await response.json();
+        this.assertActive();
+        return content;
       });
       return await Promise.race([
         requestPromise,
@@ -201,6 +208,9 @@ export class LocalFirstWorldContentProvider {
     if (!local || typeof local.getChunk !== 'function') {
       throw new Error('Local-first world content requires a local provider.');
     }
+    if (remote !== null && typeof remote?.getChunk !== 'function') {
+      throw new Error('Local-first world content remote provider must support getChunk.');
+    }
     if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
       throw new Error('World content retry delay must be a non-negative number.');
     }
@@ -210,6 +220,13 @@ export class LocalFirstWorldContentProvider {
     this.warnedFailures = new Set();
     this.localRetryAfter = 0;
     this.remoteRetryAfter = 0;
+    this.disposed = false;
+  }
+
+  assertActive() {
+    if (this.disposed) {
+      throw new Error('Local-first world content provider is disposed.');
+    }
   }
 
   warnOnce(kind, message, error) {
@@ -219,6 +236,7 @@ export class LocalFirstWorldContentProvider {
   }
 
   async getChunk(worldId, chunkX, chunkZ) {
+    this.assertActive();
     let local = null;
     if (Date.now() >= this.localRetryAfter) {
       try {
@@ -232,29 +250,36 @@ export class LocalFirstWorldContentProvider {
           error,
         );
       }
+      this.assertActive();
     }
     if (local !== null && local !== undefined) return local;
     if (!this.remote || Date.now() < this.remoteRetryAfter) return null;
 
     let remote = null;
+    let remoteFailed = false;
     try {
       remote = await this.remote.getChunk(worldId, chunkX, chunkZ);
       this.remoteRetryAfter = 0;
     } catch (error) {
+      remoteFailed = true;
       this.remoteRetryAfter = Date.now() + this.retryDelayMs;
       this.warnOnce(
         'remote-read',
         'Remote world content is unavailable; continuing with generated terrain.',
         error,
       );
-      return null;
     }
+    this.assertActive();
+    if (remoteFailed) return null;
 
     if (remote !== null && remote !== undefined && Date.now() >= this.localRetryAfter) {
+      this.assertActive();
       try {
         await this.local.putChunk?.(worldId, chunkX, chunkZ, remote);
+        this.assertActive();
         this.localRetryAfter = 0;
       } catch (error) {
+        if (this.disposed) throw error;
         this.localRetryAfter = Date.now() + this.retryDelayMs;
         this.warnOnce(
           'local-write',
@@ -267,19 +292,24 @@ export class LocalFirstWorldContentProvider {
   }
 
   async putChunk(worldId, chunkX, chunkZ, content) {
+    this.assertActive();
     try {
       await this.local.putChunk?.(worldId, chunkX, chunkZ, content);
+      this.assertActive();
       this.localRetryAfter = 0;
     } catch (error) {
+      if (this.disposed) throw error;
       this.localRetryAfter = Date.now() + this.retryDelayMs;
       throw error;
     }
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.local.dispose?.();
     this.remote?.dispose?.();
   }
 }
 
-export const WORLD_CONTENT_DEFAULT_REQUEST_TIMEOUT_MS = CONTENT_REQUEST_TIMEOUT_MS;
+export const WORLD_CONTENT_DEFAULT_REQUEST_TIMEOUT_MS = CONTENT_REQUEST_REQUEST_TIMEOUT_MS;
