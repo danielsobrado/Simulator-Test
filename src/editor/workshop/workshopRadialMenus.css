@@ -38,12 +38,12 @@
 }
 
 .workshop-radial-menus__lane[data-side="left"]::before {
-  left: calc(-105px + var(--radial-lane) * 30px);
+  left: calc(-105px + var(--radial-lane-offset));
   border-left-color: transparent;
 }
 
 .workshop-radial-menus__lane[data-side="right"]::before {
-  right: calc(-105px + var(--radial-lane) * 30px);
+  right: calc(-105px + var(--radial-lane-offset));
   border-right-color: transparent;
 }
 
@@ -72,11 +72,11 @@
 .workshop-radial-menus__lane:focus-within .workshop-radial-menus__lane-label { opacity: 1; }
 
 .workshop-radial-menus__lane[data-side="left"] .workshop-radial-menus__lane-label {
-  left: calc(56px + var(--radial-lane) * 30px);
+  left: calc(56px + var(--radial-lane-offset));
 }
 
 .workshop-radial-menus__lane[data-side="right"] .workshop-radial-menus__lane-label {
-  right: calc(56px + var(--radial-lane) * 30px);
+  right: calc(56px + var(--radial-lane-offset));
 }
 
 .workshop-radial-menus__item {
@@ -105,11 +105,11 @@
 }
 
 .workshop-radial-menus__lane[data-side="left"] .workshop-radial-menus__item {
-  left: calc(var(--radial-depth) + var(--radial-lane) * 30px);
+  left: calc(var(--radial-depth) + var(--radial-lane-offset));
 }
 
 .workshop-radial-menus__lane[data-side="right"] .workshop-radial-menus__item {
-  right: calc(var(--radial-depth) + var(--radial-lane) * 30px - 19px);
+  right: calc(var(--radial-depth) + var(--radial-lane-offset) - 19px);
   transform: translate(50%, -50%) scale(var(--radial-scale));
 }
 
@@ -219,13 +219,13 @@
 @media (max-width: 900px) {
   .workshop-radial-menus__lanes { inset: 48px 4px 74px; }
   .workshop-radial-menus__lane { width: 150px; }
-  .workshop-radial-menus__lane[data-side="left"]::before { left: calc(-116px + var(--radial-lane) * 24px); }
-  .workshop-radial-menus__lane[data-side="right"]::before { right: calc(-116px + var(--radial-lane) * 24px); }
+  .workshop-radial-menus__lane[data-side="left"]::before { left: calc(-116px + var(--radial-lane-offset-mobile)); }
+  .workshop-radial-menus__lane[data-side="right"]::before { right: calc(-116px + var(--radial-lane-offset-mobile)); }
   .workshop-radial-menus__lane[data-side="left"] .workshop-radial-menus__item {
-    left: calc(var(--radial-depth) + var(--radial-lane) * 24px - 18px);
+    left: calc(var(--radial-depth) + var(--radial-lane-offset-mobile) - 18px);
   }
   .workshop-radial-menus__lane[data-side="right"] .workshop-radial-menus__item {
-    right: calc(var(--radial-depth) + var(--radial-lane) * 24px - 35px);
+    right: calc(var(--radial-depth) + var(--radial-lane-offset-mobile) - 35px);
   }
   .workshop-radial-menus__lane-label { display: none; }
 }
@@ -233,3 +233,6 @@
 @media (prefers-reduced-motion: reduce) {
   .workshop-radial-menus__item { transition: none; }
 }
+
+.has-workshop-radial-menus .workshop-component-editor,
+.has-workshop-radial-menus .workshop-gizmo-tools { z-index: 8; }
