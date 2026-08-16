@@ -10,6 +10,12 @@ function assertSafeCellCoordinate(value, fieldName) {
   }
 }
 
+function assertPositiveFiniteTileSize(tileSize) {
+  if (!Number.isFinite(tileSize) || tileSize <= 0) {
+    throw new Error('World tile size must be a positive finite number.');
+  }
+}
+
 export function floorDiv(value, divisor) {
   if (!Number.isInteger(divisor) || divisor <= 0) {
     throw new Error('World coordinate divisor must be a positive integer.');
@@ -69,31 +75,43 @@ export function vertexToChunk(vertexX, vertexZ, chunkSize) {
 }
 
 export function chunkCellBounds(chunkX, chunkZ, chunkSize) {
+  assertSafeCellCoordinate(chunkX, 'chunkX');
+  assertSafeCellCoordinate(chunkZ, 'chunkZ');
+  if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0) {
+    throw new Error('World chunk size must be a positive safe integer.');
+  }
+
   const minX = chunkX * chunkSize;
   const minZ = chunkZ * chunkSize;
-  return Object.freeze({
-    minX,
-    minZ,
-    maxX: minX + chunkSize - 1,
-    maxZ: minZ + chunkSize - 1,
-  });
+  const maxX = minX + chunkSize - 1;
+  const maxZ = minZ + chunkSize - 1;
+  assertSafeCellCoordinate(minX, 'minX');
+  assertSafeCellCoordinate(minZ, 'minZ');
+  assertSafeCellCoordinate(maxX, 'maxX');
+  assertSafeCellCoordinate(maxZ, 'maxZ');
+  return Object.freeze({ minX, minZ, maxX, maxZ });
 }
 
 export function worldToCell(worldX, worldZ, tileSize) {
   if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) {
     throw new Error('World position must be finite.');
   }
-  return Object.freeze({
-    x: Math.floor(worldX / tileSize),
-    z: Math.floor(-worldZ / tileSize),
-  });
+  assertPositiveFiniteTileSize(tileSize);
+  const x = Math.floor(worldX / tileSize);
+  const z = Math.floor(-worldZ / tileSize);
+  assertSafeCellCoordinate(x, 'cellX');
+  assertSafeCellCoordinate(z, 'cellZ');
+  return Object.freeze({ x, z });
 }
 
 export function cellCenterToWorld(cellX, cellZ, tileSize) {
   assertSafeCellCoordinate(cellX, 'cellX');
   assertSafeCellCoordinate(cellZ, 'cellZ');
-  return Object.freeze({
-    x: (cellX + 0.5) * tileSize,
-    z: -(cellZ + 0.5) * tileSize,
-  });
+  assertPositiveFiniteTileSize(tileSize);
+  const x = (cellX + 0.5) * tileSize;
+  const z = -(cellZ + 0.5) * tileSize;
+  if (!Number.isFinite(x) || !Number.isFinite(z)) {
+    throw new Error('World cell center must resolve to a finite position.');
+  }
+  return Object.freeze({ x, z });
 }
