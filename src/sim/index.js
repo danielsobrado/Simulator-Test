@@ -468,6 +468,67 @@ export function createSimulationWorld({
     },
   });
 
+  function stepSimulationTicks(ticks) {
+    try {
+      return runner.stepTicks(ticks, {});
+    } finally {
+      state.calendar = calendarFromTick(clock.getTick(), clock.getConfig());
+    }
+  }
+
+  function requireSavedArray(value, field) {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) {
+      throw new Error(`invalid_save_payload:${field}`);
+    }
+    return value;
+  }
+
+  function stageLoadedPayload(payload, restored) {
+    const nextClockTick = payload.clockTick ?? restored.state.calendar.tick;
+    const validationClock = createWorldClock(config.time, nextClockTick);
+    const stagedScheduler = createScheduler(validationClock);
+    if (payload.scheduler !== undefined) {
+      stagedScheduler.restore(payload.scheduler);
+    }
+
+    const stagedLod = createLodController(config);
+    stagedLod.restore(payload.lod ?? { ownership: [], manifests: [] });
+
+    const stagedJournal = createCommandJournal();
+    for (const command of requireSavedArray(payload.journal, 'journal')) {
+      stagedJournal.append(command);
+    }
+
+    const stagedEventHistory = createEventHistory();
+    for (const savedEvent of requireSavedArray(payload.eventHistory, 'eventHistory')) {
+      const { important = false, ...event } = savedEvent;
+      stagedEventHistory.append(event, { important });
+    }
+
+    const stagedLedger = createLedger();
+    for (const entry of requireSavedArray(payload.ledger, 'ledger')) {
+      stagedLedger.record(entry);
+    }
+
+    const stagedReasonLog = structuredClone(requireSavedArray(payload.reasonLog, 'reasonLog'));
+    const stagedCommandSeq = payload.commandSeq ?? commandSeq;
+    if (!Number.isSafeInteger(stagedCommandSeq) || stagedCommandSeq < 0) {
+      throw new Error('invalid_save_payload:commandSeq');
+    }
+
+    return {
+      clockTick: validationClock.getTick(),
+      scheduler: stagedScheduler.serialize(),
+      lod: stagedLod.serialize(),
+      journal: stagedJournal.list(),
+      eventHistory: stagedEventHistory.list(),
+      ledger: stagedLedger.list(),
+      reasonLog: stagedReasonLog,
+      commandSeq: stagedCommandSeq,
+    };
+  }
+
   return {
     get definition() { return definition; },
     get state() { return state; },
@@ -511,7 +572,7 @@ export function createSimulationWorld({
 
     stepDays(days = 1) {
       const dayTicks = ticksPerDay(clock.getConfig());
-      return runner.stepTicks(dayTicks * days, {});
+      return stepSimulationTicks(dayTicks * days);
     },
 
     stepMonths(months = 1) {
@@ -519,7 +580,7 @@ export function createSimulationWorld({
     },
 
     stepTicks(ticks = 1) {
-      return runner.stepTicks(ticks, {});
+      return stepSimulationTicks(ticks);
     },
 
     pause() { clock.pause(); },
@@ -753,25 +814,26 @@ export function createSimulationWorld({
       const corruption = detectCorruption(loaded.payload.snapshot);
       if (!corruption.ok) return corruption;
       const restored = restoreWorldSnapshot(loaded.payload.snapshot);
+      const staged = stageLoadedPayload(loaded.payload, restored);
+
       definition = restored.definition;
       state = restored.state;
-      clock.setTick(loaded.payload.clockTick ?? state.calendar.tick);
-      lod.restore(loaded.payload.lod ?? { ownership: [], manifests: [] });
-      if (loaded.payload.scheduler) scheduler.restore(loaded.payload.scheduler);
+      clock.setTick(staged.clockTick);
+      state.calendar = calendarFromTick(clock.getTick(), clock.getConfig());
+      lod.restore(staged.lod);
+      scheduler.restore(staged.scheduler);
       journal.clear();
-      for (const cmd of loaded.payload.journal ?? []) journal.append(cmd);
+      for (const command of staged.journal) journal.append(command);
       eventHistory.clear();
-      for (const savedEvent of loaded.payload.eventHistory ?? []) {
+      for (const savedEvent of staged.eventHistory) {
         const { important = false, ...event } = savedEvent;
         eventHistory.append(event, { important });
       }
       ledger.clear();
-      for (const entry of loaded.payload.ledger ?? []) ledger.record(entry);
+      for (const entry of staged.ledger) ledger.record(entry);
       reasonLog.length = 0;
-      reasonLog.push(...structuredClone(loaded.payload.reasonLog ?? []));
-      commandSeq = Number.isInteger(loaded.payload.commandSeq)
-        ? loaded.payload.commandSeq
-        : commandSeq;
+      reasonLog.push(...staged.reasonLog);
+      commandSeq = staged.commandSeq;
       pathCache.clear();
       return { ok: true, checksum: restored.checksum };
     },
