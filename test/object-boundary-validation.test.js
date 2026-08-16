@@ -95,3 +95,32 @@ test('object spatial index rejects unsafe or pathological bucket ranges', () => 
     /exceeds 262144 buckets/,
   );
 });
+
+test('object spatial index keeps its previous contents when replacement validation fails', () => {
+  const index = new ObjectSpatialIndex({
+    bucketSize: 16,
+    boundsForObject: (object) => object.bounds,
+  });
+  const original = {
+    id: 1,
+    bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1 },
+  };
+  index.add(original);
+
+  assert.throws(
+    () => index.replace([
+      { id: 2, bounds: { minX: 16, maxX: 17, minZ: 0, maxZ: 1 } },
+      { id: 3, bounds: { minX: 32, maxX: Number.POSITIVE_INFINITY, minZ: 0, maxZ: 1 } },
+    ]),
+    /must be finite/,
+  );
+
+  assert.deepEqual(
+    index.query({ minX: 0, maxX: 1, minZ: 0, maxZ: 1 }).map((object) => object.id),
+    [1],
+  );
+  assert.deepEqual(
+    index.query({ minX: 16, maxX: 17, minZ: 0, maxZ: 1 }),
+    [],
+  );
+});
