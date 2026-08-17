@@ -20,6 +20,35 @@ function boundsForObjects(objectMap, objects) {
   return { width: maxX - minX + 1, depth: maxZ - minZ + 1 };
 }
 
+function assertGroupFootprintsDoNotOverlap(objectMap, objects) {
+  const occupied = new Set();
+  for (const object of objects) {
+    for (const cell of objectMap.getCells(
+      object.x,
+      object.z,
+      object.definitionKey,
+      object.rotation,
+    )) {
+      const key = `${cell.x}:${cell.z}`;
+      if (occupied.has(key)) throw new Error('Selection members would overlap each other.');
+      occupied.add(key);
+    }
+  }
+}
+
+function removeExisting(objectMap, objects) {
+  for (const object of objects) objectMap.remove(object.id);
+}
+
+function restoreAll(objectMap, objects) {
+  for (const object of objects) objectMap.restore(object);
+}
+
+function rollbackReplacement(objectMap, targets, originals) {
+  removeExisting(objectMap, targets);
+  restoreAll(objectMap, originals);
+}
+
 export function rotateObjectAroundPrimary(object, primary) {
   const deltaX = object.x - primary.x;
   const deltaZ = object.z - primary.z;
@@ -40,24 +69,28 @@ export class ObjectBatchEditor {
     this.controller = controller;
   }
 
+  validateTargets(targets) {
+    assertGroupFootprintsDoNotOverlap(this.controller.objectMap, targets);
+    for (const target of targets) {
+      const validation = this.controller.validateObjectPlacement(target);
+      if (!validation.valid) throw new Error(validation.reason);
+    }
+  }
+
   transform(originals, createTarget) {
     if (originals.length === 0) return { ok: false, error: null, changes: [] };
-    const snapshot = this.controller.objectMap.list();
     const targets = originals.map(createTarget);
+    removeExisting(this.controller.objectMap, originals);
     try {
-      for (const object of originals) this.controller.objectMap.remove(object.id);
-      for (const target of targets) {
-        const validation = this.controller.validateObjectPlacement(target);
-        if (!validation.valid) throw new Error(validation.reason);
-        this.controller.objectMap.restore(target);
-      }
+      this.validateTargets(targets);
+      restoreAll(this.controller.objectMap, targets);
       return {
         ok: true,
         error: null,
         changes: originals.map((before, index) => objectChange(before, targets[index])),
       };
     } catch (error) {
-      this.controller.objectMap.replaceAll(snapshot);
+      rollbackReplacement(this.controller.objectMap, targets, originals);
       return { ok: false, error, changes: [] };
     }
   }
@@ -81,21 +114,25 @@ export class ObjectBatchEditor {
       [-(bounds.width + gap), 0],
       [0, -(bounds.depth + gap)],
     ];
-    const snapshot = this.controller.objectMap.list();
     let lastError = null;
 
     for (const [deltaX, deltaZ] of offsets) {
+      const candidates = originals.map((source) => ({
+        definitionKey: source.definitionKey,
+        x: source.x + deltaX,
+        z: source.z + deltaZ,
+        rotation: source.rotation,
+      }));
+      try {
+        this.validateTargets(candidates);
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+
       const created = [];
       try {
-        for (const source of originals) {
-          const candidate = {
-            definitionKey: source.definitionKey,
-            x: source.x + deltaX,
-            z: source.z + deltaZ,
-            rotation: source.rotation,
-          };
-          const validation = this.controller.validateObjectPlacement(candidate);
-          if (!validation.valid) throw new Error(validation.reason);
+        for (const candidate of candidates) {
           created.push(this.controller.objectMap.place(candidate));
         }
         return {
@@ -106,7 +143,7 @@ export class ObjectBatchEditor {
         };
       } catch (error) {
         lastError = error;
-        this.controller.objectMap.replaceAll(snapshot);
+        removeExisting(this.controller.objectMap, created);
       }
     }
 
@@ -114,22 +151,19 @@ export class ObjectBatchEditor {
   }
 
   applyHistory(entry, direction) {
-    const snapshot = this.controller.objectMap.list();
     const changes = entry.changes;
+    const sources = changes
+      .map((change) => direction === 'undo' ? change.after : change.before)
+      .filter(Boolean);
+    const targets = changes
+      .map((change) => direction === 'undo' ? change.before : change.after)
+      .filter(Boolean);
+    removeExisting(this.controller.objectMap, sources);
     try {
-      for (const change of changes) {
-        const source = direction === 'undo' ? change.after : change.before;
-        if (source) this.controller.objectMap.remove(source.id);
-      }
-      for (const change of changes) {
-        const target = direction === 'undo' ? change.before : change.after;
-        if (target) this.controller.objectMap.restore(target);
-      }
-      return changes
-        .map((change) => direction === 'undo' ? change.before : change.after)
-        .filter(Boolean);
+      restoreAll(this.controller.objectMap, targets);
+      return targets;
     } catch (error) {
-      this.controller.objectMap.replaceAll(snapshot);
+      rollbackReplacement(this.controller.objectMap, targets, sources);
       throw error;
     }
   }
