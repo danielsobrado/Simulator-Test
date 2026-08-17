@@ -44,6 +44,11 @@ export class ConstructionDirectGizmoView {
       depthTest: false,
       depthWrite: false,
     });
+    this.thicknessMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.render.thicknessColor,
+      depthTest: false,
+      depthWrite: false,
+    });
     this.moveMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.render.moveColor,
       depthTest: false,
@@ -52,8 +57,9 @@ export class ConstructionDirectGizmoView {
     this.pickMaterial = invisiblePickMaterial();
 
     this.heightGroup = this.createHeightHandle();
+    this.thicknessGroup = this.createThicknessHandle();
     this.moveGroup = this.createMoveHandle();
-    this.root.add(this.moveGroup, this.heightGroup);
+    this.root.add(this.moveGroup, this.thicknessGroup, this.heightGroup);
     this.moveVisual.onBeforeRender = () => this.syncRenderPositions();
     this.hide();
   }
@@ -95,6 +101,43 @@ export class ConstructionDirectGizmoView {
     this.heightPick.position.y = CONFIG.height.pickLength * 0.5;
     this.heightPick.userData.directGizmoKind = 'height';
     group.add(this.heightPick);
+    return group;
+  }
+
+  createThicknessHandle() {
+    const group = new THREE.Group();
+    group.name = 'construction-thickness-gizmo';
+
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1, 0, 0),
+      new THREE.Vector3(1, 0, 0),
+    ]);
+    this.thicknessLine = new THREE.Line(lineGeometry, this.thicknessMaterial);
+    this.thicknessLine.renderOrder = CONFIG.render.renderOrder;
+    this.thicknessLine.frustumCulled = false;
+    group.add(this.thicknessLine);
+
+    this.thicknessHandles = [-1, 1].map((direction) => {
+      const visual = new THREE.Mesh(
+        new THREE.OctahedronGeometry(CONFIG.thickness.radius),
+        this.thicknessMaterial,
+      );
+      visual.renderOrder = CONFIG.render.renderOrder + 1;
+      group.add(visual);
+
+      const pick = new THREE.Mesh(
+        new THREE.SphereGeometry(
+          CONFIG.thickness.pickRadius,
+          CONFIG.render.radialSegments,
+          8,
+        ),
+        this.pickMaterial,
+      );
+      pick.userData.directGizmoKind = 'thickness';
+      pick.userData.directGizmoDirection = direction;
+      group.add(pick);
+      return { direction, visual, pick };
+    });
     return group;
   }
 
@@ -147,11 +190,53 @@ export class ConstructionDirectGizmoView {
     this.dirty = true;
     this.root.visible = false;
     this.heightGroup.visible = false;
+    this.thicknessGroup.visible = false;
     this.moveGroup.visible = false;
   }
 
   groundHeight(x, z) {
     return this.terrainView.getCanonicalHeight(x, z) ?? 0;
+  }
+
+  thicknessFrame(record = this.record, arcTable = this.arcTable, topProfile = null) {
+    if (!record || !arcTable || !(arcTable.totalLength > 0)) return null;
+    const s = arcTable.totalLength * 0.5;
+    const frame = arcTable.frameAt(s);
+    if (!frame) return null;
+    const profile = topProfile ?? createWallTopProfile(record, arcTable);
+    const height = profile.heightAt(s);
+    const y = this.groundHeight(frame.x, frame.z)
+      + Math.max(CONFIG.thickness.minimumHeight, height * CONFIG.thickness.heightRatio);
+    return {
+      x: frame.x,
+      z: frame.z,
+      y,
+      normalX: frame.normalX,
+      normalZ: frame.normalZ,
+    };
+  }
+
+  syncThicknessHandle(record, arcTable, topProfile) {
+    const frame = this.thicknessFrame(record, arcTable, topProfile);
+    if (!frame) {
+      this.thicknessGroup.visible = false;
+      return;
+    }
+    const render = this.floatingOrigin.toRender(frame.x, frame.z);
+    const span = record.dimensions.thickness * 0.5 + CONFIG.thickness.lift;
+    this.thicknessGroup.position.set(render.x, frame.y, render.z);
+    this.thicknessGroup.rotation.y = Math.atan2(-frame.normalZ, frame.normalX);
+
+    const position = this.thicknessLine.geometry.getAttribute('position');
+    position.setXYZ(0, -span, 0, 0);
+    position.setXYZ(1, span, 0, 0);
+    position.needsUpdate = true;
+    for (const handle of this.thicknessHandles) {
+      const x = handle.direction * span;
+      handle.visual.position.set(x, 0, 0);
+      handle.pick.position.set(x, 0, 0);
+    }
+    this.thicknessGroup.visible = true;
   }
 
   syncRenderPositions() {
@@ -166,6 +251,7 @@ export class ConstructionDirectGizmoView {
     this.root.visible = true;
     const topProfile = createWallTopProfile(record, arcTable);
     this.syncLegacyHandles(record, arcTable, topProfile);
+    this.syncThicknessHandle(record, arcTable, topProfile);
 
     const centre = constructionCentroid(record);
     if (centre) {
@@ -265,12 +351,16 @@ export class ConstructionDirectGizmoView {
     this.raycaster.setFromCamera(this.pointer, camera);
     const targets = [];
     if (this.heightGroup.visible) targets.push(this.heightPick);
+    if (this.thicknessGroup.visible) {
+      for (const handle of this.thicknessHandles) targets.push(handle.pick);
+    }
     if (this.moveGroup.visible) targets.push(this.movePick);
     const hit = this.raycaster.intersectObjects(targets, false)[0];
     if (!hit) return null;
     return {
       kind: hit.object.userData.directGizmoKind,
       anchorId: hit.object.userData.anchorId ?? null,
+      direction: hit.object.userData.directGizmoDirection ?? null,
     };
   }
 
@@ -311,10 +401,16 @@ export class ConstructionDirectGizmoView {
     this.heightLine.geometry.dispose();
     this.heightCone.geometry.dispose();
     this.heightPick.geometry.dispose();
+    this.thicknessLine.geometry.dispose();
+    for (const handle of this.thicknessHandles) {
+      handle.visual.geometry.dispose();
+      handle.pick.geometry.dispose();
+    }
     this.moveVisual.geometry.dispose();
     this.moveRing.geometry.dispose();
     this.movePick.geometry.dispose();
     this.heightMaterial.dispose();
+    this.thicknessMaterial.dispose();
     this.moveMaterial.dispose();
     this.pickMaterial.dispose();
   }
