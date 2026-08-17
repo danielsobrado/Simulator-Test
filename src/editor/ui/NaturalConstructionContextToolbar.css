@@ -1,0 +1,95 @@
+.natural-wall-context-toolbar {
+  position: absolute;
+  z-index: 59;
+  bottom: 82px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 14px;
+  background: rgb(17 24 20 / 86%);
+  box-shadow: 0 12px 38px rgb(0 0 0 / 26%);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+}
+
+.natural-wall-context-toolbar__label {
+  padding: 0 7px;
+  color: #93a197;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.natural-wall-context-action {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  outline: none;
+  background: transparent;
+  color: #cbd4cd;
+  cursor: pointer;
+  font-size: 10px;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.natural-wall-context-action:hover {
+  background: rgb(255 255 255 / 7%);
+  color: #f2f5f3;
+}
+
+.natural-wall-context-action:active {
+  transform: scale(0.97);
+}
+
+.natural-wall-context-action:focus-visible {
+  outline: 2px solid #d9bd66;
+  outline-offset: 2px;
+}
+
+.natural-wall-context-action svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.natural-wall-context-action__glyph {
+  min-width: 15px;
+  color: #d7c88f;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+
+.natural-wall-context-action--danger {
+  color: #d9a0a0;
+}
+
+@media (max-width: 560px) {
+  .natural-wall-context-toolbar {
+    bottom: 72px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .natural-wall-context-toolbar__label,
+  .natural-wall-context-action > span:last-child {
+    display: none;
+  }
+
+  .natural-wall-context-action {
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+}
