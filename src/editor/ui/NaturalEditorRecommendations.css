@@ -1,0 +1,65 @@
+.natural-recommendations {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.natural-recommendations__label {
+  color: #9eab9f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.natural-recommendations > div {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.natural-recommendations > div::-webkit-scrollbar {
+  display: none;
+}
+
+.natural-recommendations button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 4px 9px 4px 5px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 999px;
+  outline: none;
+  background: rgb(255 255 255 / 4%);
+  color: #c6d0c8;
+  cursor: pointer;
+  font-size: 9px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.natural-recommendations button:hover {
+  border-color: rgb(217 189 102 / 26%);
+  background: rgb(217 189 102 / 9%);
+  color: #f0e4bb;
+}
+
+.natural-recommendations button:focus-visible {
+  outline: 2px solid #d9bd66;
+  outline-offset: 2px;
+}
+
+.natural-recommendations__icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--object-color) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--object-color) 42%, transparent);
+  font-size: 13px;
+}
