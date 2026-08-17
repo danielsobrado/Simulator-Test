@@ -4,6 +4,15 @@ import { OBJECT_CATALOG } from '../objectCatalog.js';
 const HOVER_EVENT = 'drusniel:natural-editor-hover';
 const MAX_RECOMMENDATIONS = 6;
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function activeCategory(root) {
   return root.querySelector('[data-role="object-categories"] .chip.is-active')?.dataset.objectCategory
     ?? 'all';
@@ -68,12 +77,12 @@ class NaturalEditorRecommendations {
     this.host.querySelector('div').innerHTML = definitions.map((definition) => `
       <button
         type="button"
-        data-natural-recommendation="${definition.key}"
-        data-natural-recommendation-category="${definition.category}"
+        data-natural-recommendation="${escapeHtml(definition.key)}"
+        data-natural-recommendation-category="${escapeHtml(definition.category)}"
         title="Fits this terrain"
       >
-        <span class="natural-recommendations__icon" style="--object-color:${definition.color}">${definition.icon}</span>
-        <span>${definition.label}</span>
+        <span class="natural-recommendations__icon" style="--object-color:${escapeHtml(definition.color)}">${escapeHtml(definition.icon)}</span>
+        <span>${escapeHtml(definition.label)}</span>
       </button>
     `).join('');
   }
