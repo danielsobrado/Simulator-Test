@@ -17,10 +17,23 @@ function restoreSelectionTool(controller) {
   controller.emitState();
 }
 
+function restoreConstructionTool(controller) {
+  const returnTool = controller.naturalConstructionReturnTool;
+  if (!returnTool) return false;
+  controller.naturalConstructionReturnTool = null;
+  controller.setSelectedConstruction(null);
+  controller.constructionGizmo?.close();
+  controller.tool = returnTool;
+  controller.updatePreviews();
+  controller.emitState();
+  return true;
+}
+
 function selectObjectDirectly(controller, objectId, event) {
   controller.naturalReturnTool = controller.tool === 'select'
     ? controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL
     : controller.tool;
+  controller.naturalConstructionReturnTool = null;
   if (controller.tool === 'construction') {
     controller.cancelConstructionGesture();
     controller.setSelectedConstruction(null);
@@ -28,6 +41,19 @@ function selectObjectDirectly(controller, objectId, event) {
   }
   controller.tool = 'select';
   controller.setSelectedObject(objectId);
+  controller.updatePreviews();
+  controller.emitState();
+  event.preventDefault();
+}
+
+function selectConstructionDirectly(controller, constructionId, event) {
+  controller.naturalConstructionReturnTool = controller.tool;
+  controller.cancelConstructionGesture();
+  controller.setSelectedObject(null);
+  controller.tool = 'construction';
+  controller.constructionMode = 'edit';
+  controller.setSelectedConstruction(constructionId);
+  controller.constructionGizmo?.open(constructionId, event);
   controller.updatePreviews();
   controller.emitState();
   event.preventDefault();
@@ -41,6 +67,7 @@ function installNaturalEditorInteractions() {
   const selectTool = prototype.selectTool;
   prototype.selectTool = function naturalSelectTool(tool) {
     if (tool !== 'select') this.naturalReturnTool = tool;
+    this.naturalConstructionReturnTool = null;
     return selectTool.call(this, tool);
   };
 
@@ -59,6 +86,11 @@ function installNaturalEditorInteractions() {
           event.clientY,
           this.activeCamera,
         );
+      if (!handle && !constructionId && this.naturalConstructionReturnTool) {
+        restoreConstructionTool(this);
+        event.preventDefault();
+        return;
+      }
       this.constructionMode = handle || constructionId ? 'edit' : 'draw';
     }
     return constructionPointerDown.call(this, event);
@@ -80,6 +112,18 @@ function installNaturalEditorInteractions() {
       if (objectId) {
         selectObjectDirectly(this, objectId, event);
         return;
+      }
+
+      if (this.tool !== 'construction' && this.constructionView && this.constructionStore) {
+        const constructionId = this.constructionView.pickConstruction(
+          event.clientX,
+          event.clientY,
+          this.activeCamera,
+        );
+        if (constructionId) {
+          selectConstructionDirectly(this, constructionId, event);
+          return;
+        }
       }
     }
 
@@ -162,6 +206,14 @@ function installNaturalEditorInteractions() {
     return result;
   };
 
+  const deleteSelectedConstruction = prototype.deleteSelectedConstruction;
+  prototype.deleteSelectedConstruction = function naturalDeleteSelectedConstruction() {
+    const shouldReturn = Boolean(this.naturalConstructionReturnTool);
+    const result = deleteSelectedConstruction.call(this);
+    if (shouldReturn && !this.selectedConstructionId) restoreConstructionTool(this);
+    return result;
+  };
+
   const keyDown = prototype.onKeyDown;
   prototype.onKeyDown = function naturalKeyDown(event) {
     if (
@@ -173,8 +225,11 @@ function installNaturalEditorInteractions() {
       this.duplicateSelected();
       return;
     }
+    const escapeConstructionReturn = event.key.toLowerCase() === 'escape'
+      && Boolean(this.naturalConstructionReturnTool);
     const result = keyDown.call(this, event);
     if (event.key.toLowerCase() === 'escape') restoreSelectionTool(this);
+    if (escapeConstructionReturn) restoreConstructionTool(this);
     return result;
   };
 }
