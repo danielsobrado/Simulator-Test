@@ -89,6 +89,7 @@ function installNaturalEditorInteractions() {
     if (tool !== 'select') selection.returnTool = tool;
     this.naturalConstructionReturnTool = null;
     selection.drag = null;
+    selection.marquee.cancel();
     return selectTool.call(this, tool);
   };
 
@@ -152,6 +153,14 @@ function installNaturalEditorInteractions() {
         return;
       }
 
+      const additive = event.shiftKey || additivePointerMode;
+      if (
+        additive
+        && this.tool === 'select'
+        && !this.playerEditingProvider?.()
+        && selection.marquee.begin(event)
+      ) return;
+
       if (this.tool !== 'construction' && this.constructionView && this.constructionStore) {
         const constructionId = this.constructionView.pickConstruction(
           event.clientX,
@@ -197,7 +206,9 @@ function installNaturalEditorInteractions() {
 
   const pointerMove = prototype.onPointerMove;
   prototype.onPointerMove = function naturalPointerMove(event) {
-    selectionFor(this).updateDirectDrag(event);
+    const selection = selectionFor(this);
+    if (selection.marquee.update(event)) return;
+    selection.updateDirectDrag(event);
     if (!this.naturalTerrainGestureMode) return pointerMove.call(this, event);
     const savedMode = this.terrainMode;
     this.terrainMode = this.naturalTerrainGestureMode;
@@ -244,7 +255,9 @@ function installNaturalEditorInteractions() {
 
   const pointerUp = prototype.onPointerUp;
   prototype.onPointerUp = function naturalPointerUp(event) {
-    if (selectionFor(this).finishDirectDrag(event)) {
+    const selection = selectionFor(this);
+    if (selection.marquee.finish(event)) return;
+    if (selection.finishDirectDrag(event)) {
       this.naturalTerrainGestureMode = null;
       return;
     }
@@ -342,6 +355,7 @@ function installNaturalEditorInteractions() {
     const result = keyDown.call(this, event);
     if (event.key.toLowerCase() === 'escape') {
       selection.drag = null;
+      selection.marquee.cancel();
       restoreSelectionTool(this);
     }
     if (escapeConstructionReturn) restoreConstructionTool(this);
