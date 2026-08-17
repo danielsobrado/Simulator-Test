@@ -55,7 +55,7 @@ const WIDTH_SAFETY = 1.75;
 export const MAX_MODULE_STONES = 280;
 export const MAX_CONSTRUCTION_STONES = 6000;
 
-/** Depth of the coping course that finishes a wall top. */
+/** Depth of the coping course that finishes a formal wall top. */
 const COPING_HEIGHT = 0.16;
 /** How far coping oversails the wall face, as a fraction of thickness. */
 const COPING_OVERSAIL = 1.14;
@@ -135,6 +135,17 @@ export function chordSagitta(width, curvature) {
   const half = width / 2;
   if (half >= radius) return radius;
   return radius - Math.sqrt(radius * radius - half * half);
+}
+
+/**
+ * Only formal flat crowns get a separate coping course.
+ *
+ * An irregular wall needs its actual field stones to form the skyline. A thin
+ * cap following the same noise reads as a wavy trim strip, whereas trimming the
+ * full-height top course gives the broken block silhouette of hand-laid walls.
+ */
+export function usesCopingCourse(topStyle) {
+  return topStyle === 'flat';
 }
 
 /**
@@ -247,11 +258,11 @@ export function packCurvedWall({
     return { stones, stats: Object.freeze(stats) };
   }
 
-  // A coping course finishes the wall, so the field masonry stops short of the
-  // crown by exactly its depth and the finished height still matches `top.base`.
-  // A ruin has no coping — its top is a break, not a finish — and a crenellated
-  // wall's crown carries merlons instead.
-  const coped = topStyle === 'flat' || topStyle === 'irregular';
+  // Flat walls carry a distinct coping course. Irregular walls deliberately do
+  // not: their full-size field stones are trimmed by the authored top profile so
+  // the silhouette is made of blocks rather than a thin wavy cap. Ruined and
+  // crenellated crowns likewise own their own endings.
+  const coped = usesCopingCourse(topStyle);
   const copingHeight = coped ? COPING_HEIGHT : 0;
   const bodyHeightAt = (s) => Math.max(0.12, topHeightAt(s) - copingHeight);
 
@@ -596,8 +607,7 @@ export function packCurvedWall({
   };
 
   if (coped) {
-    // One course finishing the wall, rolled to follow the top's own slope so a
-    // ramped or irregular wall reads as capped rather than stepped.
+    // One course finishing a formal wall, rolled to follow the top's own slope.
     let copingIndex = baseIndex + INDEX_COPING;
     // The cap is a course too, so it takes the next course index's offset —
     // otherwise the coping joint would be the one seam still stacking on the

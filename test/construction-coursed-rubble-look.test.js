@@ -7,6 +7,7 @@ import { constructionStoneEdgeWearProfile } from '../src/editor/construction/con
 import { constructionStoneLodProfile } from '../src/editor/construction/config/ConstructionStoneLodProfiles.generated.js';
 import { constructionStoneReliefProfile } from '../src/editor/construction/config/ConstructionStoneReliefProfiles.generated.js';
 import { constructionStyle } from '../src/editor/construction/masonry/ConstructionStyleCatalog.js';
+import { usesCopingCourse } from '../src/editor/construction/masonry/CurvedCoursePacker.js';
 import {
   CONSTRUCTION_MORTAR_CONFIG,
   mortarProfile,
@@ -62,6 +63,13 @@ test('coursed rubble keeps readable recessed joints and contact shadow', () => {
   assert.ok(joints.bedJoint.max <= 0.04);
   assert.ok(CONSTRUCTION_MORTAR_CONFIG.faceRecess >= 0.04);
   assert.equal(mortar.color, '#66645d');
+});
+
+test('irregular wall crowns are made from field stones instead of thin coping', () => {
+  assert.equal(usesCopingCourse('flat'), true);
+  assert.equal(usesCopingCourse('irregular'), false);
+  assert.equal(usesCopingCourse('ruined'), false);
+  assert.equal(usesCopingCourse('crenellated'), false);
 });
 
 test('soft stone topology adds inward-only hand-cut edge cuts', () => {
