@@ -1,6 +1,3 @@
-import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
-
-const PATCH_MARK = Symbol.for('drusniel.natural-construction-context');
 const OPEN_STYLE_EVENT = 'drusniel:natural-construction-style';
 const OPEN_DETAILS_EVENT = 'drusniel:natural-construction-details';
 
@@ -15,16 +12,20 @@ function palettePoint(controller, detail) {
   };
 }
 
-function ensureContextBridge(controller) {
-  if (controller.naturalConstructionContextAbort) return;
+export function installNaturalConstructionContextBridge(controller) {
+  if (controller.naturalConstructionContextBridge) {
+    return controller.naturalConstructionContextBridge;
+  }
   const abort = new AbortController();
-  controller.naturalConstructionContextAbort = abort;
 
   window.addEventListener(OPEN_STYLE_EVENT, (event) => {
     const constructionId = controller.selectedConstructionId;
     if (!constructionId || !controller.constructionPalette) return;
     controller.constructionGizmo?.close();
-    controller.constructionPalette.open(constructionId, palettePoint(controller, event.detail));
+    controller.constructionPalette.open(
+      constructionId,
+      palettePoint(controller, event.detail),
+    );
     controller.emitState();
   }, { signal: abort.signal });
 
@@ -36,25 +37,13 @@ function ensureContextBridge(controller) {
     controller.constructionPalette.openInspector(constructionId);
     controller.emitState();
   }, { signal: abort.signal });
-}
 
-function installBridge() {
-  const prototype = TerrainAwareEditorController.prototype;
-  if (prototype[PATCH_MARK]) return;
-  Object.defineProperty(prototype, PATCH_MARK, { value: true });
-
-  const setSelectedConstruction = prototype.setSelectedConstruction;
-  prototype.setSelectedConstruction = function naturalSetSelectedConstruction(...args) {
-    ensureContextBridge(this);
-    return setSelectedConstruction.apply(this, args);
+  const integration = {
+    dispose() {
+      abort.abort();
+      controller.naturalConstructionContextBridge = null;
+    },
   };
-
-  const dispose = prototype.dispose;
-  prototype.dispose = function naturalDispose(...args) {
-    this.naturalConstructionContextAbort?.abort();
-    this.naturalConstructionContextAbort = null;
-    return dispose.apply(this, args);
-  };
+  controller.naturalConstructionContextBridge = integration;
+  return integration;
 }
-
-installBridge();
