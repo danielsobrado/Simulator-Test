@@ -8,6 +8,8 @@
   display: grid;
   min-width: 0;
   contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 132px;
 }
 
 .natural-object-card-wrap > .object-card {
