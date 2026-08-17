@@ -2,16 +2,14 @@ import './NaturalObjectThumbnails.css';
 import * as THREE from 'three';
 import { OBJECT_BY_KEY } from '../objectCatalog.js';
 import { createObjectModelParts } from '../ObjectModelLibrary.js';
+import { NATURAL_EDITOR_UI_CONFIG } from './NaturalEditorUiConfig.generated.js';
 
-const PREVIEW_WIDTH = 128;
-const PREVIEW_HEIGHT = 92;
+const CONFIG = NATURAL_EDITOR_UI_CONFIG.thumbnails;
 const PREVIEW_TILE_SIZE = 1;
-const CAMERA_FOV = 28;
-const CAMERA_PADDING = 1.34;
 
 function idle(callback) {
   if (typeof globalThis.requestIdleCallback === 'function') {
-    globalThis.requestIdleCallback(callback, { timeout: 160 });
+    globalThis.requestIdleCallback(callback, { timeout: CONFIG.idleTimeoutMs });
     return;
   }
   setTimeout(() => callback({ timeRemaining: () => 8 }), 16);
@@ -25,7 +23,7 @@ function createPreviewRenderer() {
     powerPreference: 'low-power',
   });
   renderer.setPixelRatio(Math.min(1.5, globalThis.devicePixelRatio ?? 1));
-  renderer.setSize(PREVIEW_WIDTH, PREVIEW_HEIGHT, false);
+  renderer.setSize(CONFIG.width, CONFIG.height, false);
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -66,7 +64,9 @@ function createPreviewGroup(definition) {
 function frameCamera(camera, bounds) {
   const size = bounds.getSize(new THREE.Vector3());
   const radius = Math.max(size.x, size.y, size.z, 0.25) * 0.5;
-  const distance = radius / Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV * 0.5)) * CAMERA_PADDING;
+  const distance = radius
+    / Math.tan(THREE.MathUtils.degToRad(CONFIG.cameraFov * 0.5))
+    * CONFIG.cameraPadding;
   camera.position.set(distance * 0.82, distance * 0.62, distance);
   camera.near = Math.max(0.01, distance * 0.02);
   camera.far = distance * 6;
@@ -93,27 +93,89 @@ class NaturalObjectThumbnails {
     this.panel = root.querySelector('[data-panel="object"]');
     this.palette = root.querySelector('[data-role="object-palette"]');
     this.cache = new Map();
-    this.pending = [...OBJECT_BY_KEY.keys()];
+    this.queue = [];
+    this.queued = new Set();
+    this.observedCards = new WeakSet();
     this.renderer = null;
     this.scene = null;
-    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, PREVIEW_WIDTH / PREVIEW_HEIGHT, 0.01, 100);
-    this.started = false;
+    this.camera = new THREE.PerspectiveCamera(
+      CONFIG.cameraFov,
+      CONFIG.width / CONFIG.height,
+      0.01,
+      100,
+    );
+    this.renderScheduled = false;
+    this.disposeTimer = null;
     this.failed = false;
     this.disposed = false;
 
-    this.paletteObserver = new MutationObserver(() => this.applyCached());
+    this.intersectionObserver = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver(
+        (entries) => this.onIntersection(entries),
+        { rootMargin: `${CONFIG.rootMarginPx}px 0px` },
+      )
+      : null;
+    this.paletteObserver = new MutationObserver(() => this.observeCards());
     this.paletteObserver.observe(this.palette, { childList: true, subtree: true });
-    this.panelObserver = new MutationObserver(() => this.startIfVisible());
+    this.panelObserver = new MutationObserver(() => this.onPanelVisibility());
     this.panelObserver.observe(this.panel, { attributes: true, attributeFilter: ['hidden'] });
     this.pagehideHandler = () => this.dispose();
     globalThis.addEventListener?.('pagehide', this.pagehideHandler, { once: true });
-    this.startIfVisible();
+    this.observeCards();
+    this.onPanelVisibility();
   }
 
-  startIfVisible() {
-    if (this.started || this.failed || this.disposed || this.panel.hidden) return;
-    this.started = true;
-    idle(() => this.renderNext());
+  onPanelVisibility() {
+    if (this.disposed || this.panel.hidden) return;
+    this.observeCards();
+    if (!this.intersectionObserver) {
+      const cards = [...this.palette.querySelectorAll('.object-card[data-object-key]')]
+        .slice(0, CONFIG.fallbackVisibleCards);
+      for (const card of cards) this.enqueue(card.dataset.objectKey);
+    }
+  }
+
+  observeCards() {
+    if (this.disposed) return;
+    for (const card of this.palette.querySelectorAll('.object-card[data-object-key]')) {
+      const key = card.dataset.objectKey;
+      const cached = this.cache.get(key);
+      if (cached) this.applyToCard(card, key, cached);
+      if (this.observedCards.has(card)) continue;
+      this.observedCards.add(card);
+      this.intersectionObserver?.observe(card);
+    }
+  }
+
+  onIntersection(entries) {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const key = entry.target.dataset.objectKey;
+      if (key) this.enqueue(key);
+    }
+  }
+
+  enqueue(key) {
+    if (this.disposed || this.failed || !OBJECT_BY_KEY.has(key)) return;
+    const cached = this.cache.get(key);
+    if (cached) {
+      this.touchCache(key, cached);
+      this.applyCachedKey(key);
+      return;
+    }
+    if (this.queued.has(key)) return;
+    this.queued.add(key);
+    this.queue.push(key);
+    this.scheduleRender();
+  }
+
+  scheduleRender() {
+    if (this.renderScheduled || this.disposed || this.failed) return;
+    this.renderScheduled = true;
+    idle(() => {
+      this.renderScheduled = false;
+      this.renderNext();
+    });
   }
 
   ensureRenderer() {
@@ -122,9 +184,8 @@ class NaturalObjectThumbnails {
     let renderer = null;
     try {
       renderer = createPreviewRenderer();
-      const scene = createPreviewScene();
       this.renderer = renderer;
-      this.scene = scene;
+      this.scene = createPreviewScene();
       return true;
     } catch (error) {
       renderer?.dispose();
@@ -136,46 +197,75 @@ class NaturalObjectThumbnails {
   }
 
   renderNext() {
-    if (this.disposed || !this.ensureRenderer()) return;
-    const key = this.pending.shift();
-    if (!key) {
-      this.disposeRenderer();
+    if (this.disposed || this.queue.length === 0) {
+      this.scheduleRendererDisposal();
       return;
     }
+    if (!this.ensureRenderer()) return;
+    const key = this.queue.shift();
+    this.queued.delete(key);
     const definition = OBJECT_BY_KEY.get(key);
-    if (definition) {
+    if (definition && !this.cache.has(key)) {
       try {
-        this.cache.set(key, previewDataUrl(this.renderer, this.scene, this.camera, definition));
+        const url = previewDataUrl(this.renderer, this.scene, this.camera, definition);
+        this.setCache(key, url);
         this.applyCachedKey(key);
       } catch (error) {
         console.warn(`Object thumbnail failed for ${key}.`, error);
       }
     }
-    idle(() => this.renderNext());
+    if (this.queue.length > 0) this.scheduleRender();
+    else this.scheduleRendererDisposal();
   }
 
-  applyCached() {
-    if (this.disposed) return;
-    for (const key of this.cache.keys()) this.applyCachedKey(key);
+  setCache(key, url) {
+    this.cache.delete(key);
+    this.cache.set(key, url);
+    while (this.cache.size > CONFIG.maxMemoryEntries) {
+      const oldest = this.cache.keys().next().value;
+      this.cache.delete(oldest);
+    }
+  }
+
+  touchCache(key, url) {
+    this.cache.delete(key);
+    this.cache.set(key, url);
   }
 
   applyCachedKey(key) {
     const url = this.cache.get(key);
     if (!url) return;
-    for (const card of this.palette.querySelectorAll(`.object-card[data-object-key="${CSS.escape(key)}"]`)) {
-      if (card.querySelector('.natural-object-thumbnail')) continue;
-      const image = document.createElement('img');
+    for (const card of this.palette.querySelectorAll(
+      `.object-card[data-object-key="${CSS.escape(key)}"]`,
+    )) {
+      this.applyToCard(card, key, url);
+    }
+  }
+
+  applyToCard(card, key, url) {
+    let image = card.querySelector('.natural-object-thumbnail');
+    if (!image) {
+      image = document.createElement('img');
       image.className = 'natural-object-thumbnail';
       image.alt = '';
       image.decoding = 'async';
       image.draggable = false;
-      image.src = url;
       card.prepend(image);
-      card.classList.add('has-natural-thumbnail');
     }
+    if (image.src !== url) image.src = url;
+    card.classList.add('has-natural-thumbnail');
+    this.touchCache(key, url);
+  }
+
+  scheduleRendererDisposal() {
+    clearTimeout(this.disposeTimer);
+    if (!this.renderer) return;
+    this.disposeTimer = setTimeout(() => this.disposeRenderer(), CONFIG.idleDisposeMs);
   }
 
   disposeRenderer() {
+    clearTimeout(this.disposeTimer);
+    this.disposeTimer = null;
     this.renderer?.dispose();
     this.renderer?.forceContextLoss?.();
     this.renderer = null;
@@ -187,7 +277,10 @@ class NaturalObjectThumbnails {
     this.disposed = true;
     this.paletteObserver.disconnect();
     this.panelObserver.disconnect();
-    this.pending.length = 0;
+    this.intersectionObserver?.disconnect();
+    this.queue.length = 0;
+    this.queued.clear();
+    this.cache.clear();
     this.disposeRenderer();
   }
 }
