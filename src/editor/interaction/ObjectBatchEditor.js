@@ -20,6 +20,17 @@ function boundsForObjects(objectMap, objects) {
   return { width: maxX - minX + 1, depth: maxZ - minZ + 1 };
 }
 
+export function rotateObjectAroundPrimary(object, primary) {
+  const deltaX = object.x - primary.x;
+  const deltaZ = object.z - primary.z;
+  return {
+    ...object,
+    x: primary.x - deltaZ,
+    z: primary.z + deltaX,
+    rotation: (object.rotation + 1) % 4,
+  };
+}
+
 export function createObjectBatchHistory(changes) {
   return Object.freeze({ kind: 'object-batch', changes: Object.freeze(changes) });
 }
