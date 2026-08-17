@@ -91,12 +91,8 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
       "label": "Load"
     },
     {
-      "id": "export",
-      "label": "Export"
-    },
-    {
-      "id": "import",
-      "label": "Import"
+      "id": "new",
+      "label": "New world"
     }
   ],
   "hints": {
