@@ -1,6 +1,7 @@
 import './editor/lifecycle/installBfcacheRecovery.js';
 import './editor/ui/NaturalEditorInteractions.js';
 import './editor/ui/NaturalEditorHoverBridge.js';
+import './editor/ui/NaturalConstructionContextBridge.js';
 import './editor/construction/ui/ConstructionThicknessGizmoInteraction.js';
 import './main.js';
 import './editor/workshop/WorkshopRadialMenus.js';
@@ -9,5 +10,6 @@ import './editor/ui/NaturalEditorRecommendations.js';
 import './editor/ui/NaturalEditorProgressiveDisclosure.js';
 import './editor/ui/NaturalEditorUiBridge.js';
 import './editor/ui/NaturalEditorDrawerBehavior.js';
+import './editor/ui/NaturalConstructionContextToolbar.js';
 import './editor/ui/NaturalPlayerSettings.js';
 import './editor/ui/NaturalEditorAudio.js';
