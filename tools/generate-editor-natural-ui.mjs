@@ -13,6 +13,8 @@ const ROOT_KEYS = new Set([
   'limits',
   'motion',
   'playerSettings',
+  'selection',
+  'thumbnails',
   'primaryTools',
   'buildActions',
   'worldActions',
@@ -35,6 +37,11 @@ function nonEmptyString(value, label) {
 
 function positiveInteger(value, label) {
   if (!Number.isInteger(value) || value <= 0) fail(`${label} must be a positive integer.`);
+  return value;
+}
+
+function positiveNumber(value, label) {
+  if (!Number.isFinite(value) || value <= 0) fail(`${label} must be a positive number.`);
   return value;
 }
 
@@ -71,6 +78,24 @@ function validate(source) {
 
   const playerSettings = plainObject(source.playerSettings, 'playerSettings');
   nonEmptyString(playerSettings.reducedMotionClass, 'playerSettings.reducedMotionClass');
+
+  const selection = plainObject(source.selection, 'selection');
+  for (const key of ['dragThresholdPx', 'maxVisibleOverlays', 'duplicateGapCells']) {
+    positiveInteger(selection[key], `selection.${key}`);
+  }
+
+  const thumbnails = plainObject(source.thumbnails, 'thumbnails');
+  for (const key of [
+    'width',
+    'height',
+    'maxMemoryEntries',
+    'rootMarginPx',
+    'idleTimeoutMs',
+    'idleDisposeMs',
+    'fallbackVisibleCards',
+  ]) positiveInteger(thumbnails[key], `thumbnails.${key}`);
+  positiveNumber(thumbnails.cameraFov, 'thumbnails.cameraFov');
+  positiveNumber(thumbnails.cameraPadding, 'thumbnails.cameraPadding');
 
   validateUniqueItems(source.primaryTools, 'primaryTools');
   validateUniqueItems(source.buildActions, 'buildActions');
