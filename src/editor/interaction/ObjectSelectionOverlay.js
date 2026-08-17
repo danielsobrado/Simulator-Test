@@ -82,22 +82,27 @@ export class ObjectSelectionOverlay {
   }
 
   sync(ids, primaryId) {
-    const objects = ids
-      .filter((id) => id !== primaryId)
-      .map((id) => this.objectView.objectMap.getById(id))
-      .filter(Boolean);
+    const objects = [];
+    for (const id of ids) {
+      if (id === primaryId) continue;
+      const object = this.objectView.objectMap.getById(id);
+      if (object) objects.push(object);
+      if (objects.length >= MAX_OVERLAYS) break;
+    }
     this.write(this.selection, objects);
   }
 
   previewTranslation(objects, deltaX, deltaZ) {
-    this.write(
-      this.preview,
-      objects.map((object) => ({
+    const translated = [];
+    for (const object of objects) {
+      translated.push({
         ...object,
         x: object.x + deltaX,
         z: object.z + deltaZ,
-      })),
-    );
+      });
+      if (translated.length >= MAX_OVERLAYS) break;
+    }
+    this.write(this.preview, translated);
   }
 
   clearPreview() {
