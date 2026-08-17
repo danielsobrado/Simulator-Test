@@ -1,4 +1,4 @@
-import { EditorController } from '../EditorController.js';
+import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 
 const PATCH_MARK = Symbol.for('drusniel.natural-construction-context');
 const OPEN_STYLE_EVENT = 'drusniel:natural-construction-style';
@@ -39,7 +39,7 @@ function ensureContextBridge(controller) {
 }
 
 function installBridge() {
-  const prototype = EditorController.prototype;
+  const prototype = TerrainAwareEditorController.prototype;
   if (prototype[PATCH_MARK]) return;
   Object.defineProperty(prototype, PATCH_MARK, { value: true });
 
@@ -49,14 +49,12 @@ function installBridge() {
     return setSelectedConstruction.apply(this, args);
   };
 
-  if (typeof prototype.dispose === 'function') {
-    const dispose = prototype.dispose;
-    prototype.dispose = function naturalDispose(...args) {
-      this.naturalConstructionContextAbort?.abort();
-      this.naturalConstructionContextAbort = null;
-      return dispose.apply(this, args);
-    };
-  }
+  const dispose = prototype.dispose;
+  prototype.dispose = function naturalDispose(...args) {
+    this.naturalConstructionContextAbort?.abort();
+    this.naturalConstructionContextAbort = null;
+    return dispose.apply(this, args);
+  };
 }
 
 installBridge();
