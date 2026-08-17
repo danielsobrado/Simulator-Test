@@ -1,5 +1,9 @@
 import { NATURAL_EDITOR_UI_CONFIG } from '../ui/NaturalEditorUiConfig.generated.js';
-import { ObjectBatchEditor, createObjectBatchHistory } from './ObjectBatchEditor.js';
+import {
+  ObjectBatchEditor,
+  createObjectBatchHistory,
+  rotateObjectAroundPrimary,
+} from './ObjectBatchEditor.js';
 import { OBJECT_SELECTION_CHANGED_EVENT } from './ObjectSelectionEvents.js';
 import { ObjectSelectionModel } from './ObjectSelectionModel.js';
 import { ObjectSelectionOverlay } from './ObjectSelectionOverlay.js';
@@ -184,16 +188,10 @@ export class ObjectSelectionController {
   rotate() {
     const primary = this.primaryId ? this.controller.objectMap.getById(this.primaryId) : null;
     if (!primary) return false;
-    return this.commitTransform((object) => {
-      const deltaX = object.x - primary.x;
-      const deltaZ = object.z - primary.z;
-      return {
-        ...object,
-        x: primary.x - deltaZ,
-        z: primary.z + deltaX,
-        rotation: (object.rotation + 1) % 4,
-      };
-    }, 'Rotated');
+    return this.commitTransform(
+      (object) => rotateObjectAroundPrimary(object, primary),
+      'Rotated',
+    );
   }
 
   delete() {
