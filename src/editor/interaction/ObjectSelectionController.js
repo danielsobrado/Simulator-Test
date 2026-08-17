@@ -1,31 +1,8 @@
 import { NATURAL_EDITOR_UI_CONFIG } from '../ui/NaturalEditorUiConfig.generated.js';
+import { ObjectBatchEditor, createObjectBatchHistory } from './ObjectBatchEditor.js';
 import { OBJECT_SELECTION_CHANGED_EVENT } from './ObjectSelectionEvents.js';
 import { ObjectSelectionModel } from './ObjectSelectionModel.js';
 import { ObjectSelectionOverlay } from './ObjectSelectionOverlay.js';
-
-function objectChange(before, after) {
-  return Object.freeze({ kind: 'object', before, after });
-}
-
-function batchChange(changes) {
-  return Object.freeze({ kind: 'object-batch', changes: Object.freeze(changes) });
-}
-
-function boundsForObjects(objectMap, objects) {
-  if (objects.length === 0) return null;
-  let minX = Infinity;
-  let minZ = Infinity;
-  let maxX = -Infinity;
-  let maxZ = -Infinity;
-  for (const object of objects) {
-    const bounds = objectMap.getBounds(object.x, object.z, object.definitionKey, object.rotation);
-    minX = Math.min(minX, bounds.minX);
-    minZ = Math.min(minZ, bounds.minZ);
-    maxX = Math.max(maxX, bounds.maxX);
-    maxZ = Math.max(maxZ, bounds.maxZ);
-  }
-  return { minX, minZ, maxX, maxZ, width: maxX - minX + 1, depth: maxZ - minZ + 1 };
-}
 
 export class ObjectSelectionController {
   constructor(controller, applyPrimarySelection) {
@@ -33,6 +10,7 @@ export class ObjectSelectionController {
     this.applyPrimarySelection = applyPrimarySelection;
     this.model = new ObjectSelectionModel();
     this.overlay = new ObjectSelectionOverlay(controller.objectView);
+    this.batchEditor = new ObjectBatchEditor(controller);
     this.drag = null;
     this.returnTool = 'terrain';
   }
@@ -168,31 +146,20 @@ export class ObjectSelectionController {
     this.controller.emitState();
   }
 
-  transformSelected(createTarget, label) {
-    const originals = this.objects();
-    if (originals.length === 0) return false;
-    const snapshot = this.controller.objectMap.list();
-    const targets = originals.map(createTarget);
-    try {
-      for (const object of originals) this.controller.objectMap.remove(object.id);
-      for (const target of targets) {
-        const validation = this.controller.validateObjectPlacement(target);
-        if (!validation.valid) throw new Error(validation.reason);
-        this.controller.objectMap.restore(target);
-      }
-    } catch (error) {
-      this.controller.objectMap.replaceAll(snapshot);
+  commitTransform(createTarget, label) {
+    const result = this.batchEditor.transform(this.objects(), createTarget);
+    if (!result.ok) {
       this.cancelMove();
-      this.controller.emitNotice(error.message, true);
+      if (result.error) this.controller.emitNotice(result.error.message, true);
       return false;
     }
-
-    const changes = originals.map((before, index) => objectChange(before, targets[index]));
-    this.controller.commitHistory(batchChange(changes));
+    this.controller.commitHistory(createObjectBatchHistory(result.changes));
     this.controller.movingObjectId = null;
     this.controller.refreshObjects();
     this.controller.emitMap();
-    this.controller.emitNotice(`${label} ${changes.length} object${changes.length === 1 ? '' : 's'}.`);
+    this.controller.emitNotice(
+      `${label} ${result.changes.length} object${result.changes.length === 1 ? '' : 's'}.`,
+    );
     return true;
   }
 
@@ -208,14 +175,14 @@ export class ObjectSelectionController {
       this.cancelMove();
       return false;
     }
-    return this.transformSelected(
+    return this.commitTransform(
       (object) => ({ ...object, x: object.x + deltaX, z: object.z + deltaZ }),
       'Moved',
     );
   }
 
   rotate() {
-    return this.transformSelected(
+    return this.commitTransform(
       (object) => ({ ...object, rotation: (object.rotation + 1) % 4 }),
       'Rotated',
     );
@@ -224,81 +191,39 @@ export class ObjectSelectionController {
   delete() {
     const originals = this.objects();
     if (originals.length === 0) return false;
-    for (const object of originals) this.controller.objectMap.remove(object.id);
+    const changes = this.batchEditor.delete(originals);
+    if (changes.length === 0) return false;
     this.model.clear();
     this.drag = null;
     this.controller.movingObjectId = null;
-    this.controller.commitHistory(batchChange(originals.map((before) => objectChange(before, null))));
+    this.controller.commitHistory(createObjectBatchHistory(changes));
     this.controller.refreshObjects();
     this.syncVisuals();
     this.controller.emitMap();
-    this.controller.emitNotice(`Deleted ${originals.length} object${originals.length === 1 ? '' : 's'}.`);
+    this.controller.emitNotice(`Deleted ${changes.length} object${changes.length === 1 ? '' : 's'}.`);
     return true;
   }
 
   duplicate() {
-    const originals = this.objects();
-    if (originals.length === 0) return false;
-    const bounds = boundsForObjects(this.controller.objectMap, originals);
-    const gap = NATURAL_EDITOR_UI_CONFIG.selection.duplicateGapCells;
-    const offsets = [
-      [bounds.width + gap, 0],
-      [0, bounds.depth + gap],
-      [-(bounds.width + gap), 0],
-      [0, -(bounds.depth + gap)],
-    ];
-    const snapshot = this.controller.objectMap.list();
-
-    for (const [deltaX, deltaZ] of offsets) {
-      const created = [];
-      try {
-        for (const source of originals) {
-          const candidate = {
-            definitionKey: source.definitionKey,
-            x: source.x + deltaX,
-            z: source.z + deltaZ,
-            rotation: source.rotation,
-          };
-          const validation = this.controller.validateObjectPlacement(candidate);
-          if (!validation.valid) throw new Error(validation.reason);
-          created.push(this.controller.objectMap.place(candidate));
-        }
-        this.model.clear();
-        for (const object of created) this.model.add(object.id);
-        this.controller.commitHistory(batchChange(created.map((after) => objectChange(null, after))));
-        this.controller.refreshObjects();
-        this.syncVisuals();
-        this.controller.emitMap();
-        this.controller.emitNotice(`Duplicated ${created.length} object${created.length === 1 ? '' : 's'}.`);
-        return true;
-      } catch {
-        this.controller.objectMap.replaceAll(snapshot);
-      }
+    const result = this.batchEditor.duplicate(this.objects());
+    if (!result.ok) {
+      this.controller.emitNotice('No nearby space is available for this duplicate.', true);
+      return false;
     }
-
-    this.controller.emitNotice('No nearby space is available for this duplicate.', true);
-    return false;
+    this.model.clear();
+    for (const object of result.created) this.model.add(object.id);
+    this.controller.commitHistory(createObjectBatchHistory(result.changes));
+    this.controller.refreshObjects();
+    this.syncVisuals();
+    this.controller.emitMap();
+    this.controller.emitNotice(
+      `Duplicated ${result.created.length} object${result.created.length === 1 ? '' : 's'}.`,
+    );
+    return true;
   }
 
   applyHistory(entry, direction) {
-    const snapshot = this.controller.objectMap.list();
-    const changes = direction === 'undo' ? [...entry.changes].reverse() : entry.changes;
-    try {
-      for (const change of changes) {
-        const source = direction === 'undo' ? change.after : change.before;
-        if (source) this.controller.objectMap.remove(source.id);
-      }
-      for (const change of changes) {
-        const target = direction === 'undo' ? change.before : change.after;
-        if (target) this.controller.objectMap.restore(target);
-      }
-    } catch (error) {
-      this.controller.objectMap.replaceAll(snapshot);
-      throw error;
-    }
-    const targets = changes
-      .map((change) => direction === 'undo' ? change.before : change.after)
-      .filter(Boolean);
+    const targets = this.batchEditor.applyHistory(entry, direction);
     this.model.clear();
     for (const target of targets) this.model.add(target.id);
     this.controller.refreshObjects();
