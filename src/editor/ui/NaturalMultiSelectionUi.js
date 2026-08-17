@@ -1,4 +1,4 @@
-import { SELECTION_EVENT } from '../interaction/ObjectSelectionController.js';
+import { OBJECT_SELECTION_CHANGED_EVENT } from '../interaction/ObjectSelectionEvents.js';
 
 function applySelectionState(root, detail) {
   const toolbar = root.querySelector('.natural-context-toolbar');
@@ -22,7 +22,10 @@ function applySelectionState(root, detail) {
 function installWhenReady() {
   const root = document.querySelector('#app');
   if (!root?.querySelector('.natural-context-toolbar')) return false;
-  window.addEventListener(SELECTION_EVENT, (event) => applySelectionState(root, event.detail));
+  window.addEventListener(
+    OBJECT_SELECTION_CHANGED_EVENT,
+    (event) => applySelectionState(root, event.detail),
+  );
   return true;
 }
 
