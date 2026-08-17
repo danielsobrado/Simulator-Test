@@ -10,6 +10,18 @@ function effectiveTerrainGestureMode(event) {
   return null;
 }
 
+function historyLabel(entry) {
+  switch (entry?.kind) {
+    case 'terrain': return 'terrain paint';
+    case 'height': return 'terrain sculpt';
+    case 'object': return 'object edit';
+    case 'construction':
+    case 'construction-batch': return 'construction edit';
+    case 'world': return 'world edit';
+    default: return 'edit';
+  }
+}
+
 function restoreSelectionTool(controller) {
   if (controller.tool !== 'select' || controller.selectedObjectId || controller.movingObjectId) return;
   controller.tool = controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL;
@@ -30,9 +42,11 @@ function restoreConstructionTool(controller) {
 }
 
 function selectObjectDirectly(controller, objectId, event) {
-  controller.naturalReturnTool = controller.tool === 'select'
-    ? controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL
-    : controller.tool;
+  const returnTool = controller.naturalConstructionReturnTool
+    ?? (controller.tool === 'select'
+      ? controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL
+      : controller.tool);
+  controller.naturalReturnTool = returnTool;
   controller.naturalConstructionReturnTool = null;
   if (controller.tool === 'construction') {
     controller.cancelConstructionGesture();
@@ -47,7 +61,9 @@ function selectObjectDirectly(controller, objectId, event) {
 }
 
 function selectConstructionDirectly(controller, constructionId, event) {
-  controller.naturalConstructionReturnTool = controller.tool;
+  controller.naturalConstructionReturnTool = controller.tool === 'select'
+    ? controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL
+    : controller.tool;
   controller.cancelConstructionGesture();
   controller.setSelectedObject(null);
   controller.tool = 'construction';
@@ -104,14 +120,16 @@ function installNaturalEditorInteractions() {
       && !this.spacePressed
       && !this.movingObjectId
     ) {
-      const objectId = this.objectView.pickObject(
-        event.clientX,
-        event.clientY,
-        this.activeCamera,
-      );
-      if (objectId) {
-        selectObjectDirectly(this, objectId, event);
-        return;
+      if (!this.playerEditingProvider?.()) {
+        const objectId = this.objectView.pickObject(
+          event.clientX,
+          event.clientY,
+          this.activeCamera,
+        );
+        if (objectId) {
+          selectObjectDirectly(this, objectId, event);
+          return;
+        }
       }
 
       if (this.tool !== 'construction' && this.constructionView && this.constructionStore) {
@@ -211,6 +229,24 @@ function installNaturalEditorInteractions() {
     const shouldReturn = Boolean(this.naturalConstructionReturnTool);
     const result = deleteSelectedConstruction.call(this);
     if (shouldReturn && !this.selectedConstructionId) restoreConstructionTool(this);
+    return result;
+  };
+
+  const undo = prototype.undo;
+  prototype.undo = function naturalUndo() {
+    const entry = this.undoStack.at(-1);
+    const before = this.undoStack.length;
+    const result = undo.call(this);
+    if (entry && this.undoStack.length < before) this.emitNotice(`Undo ${historyLabel(entry)}.`);
+    return result;
+  };
+
+  const redo = prototype.redo;
+  prototype.redo = function naturalRedo() {
+    const entry = this.redoStack.at(-1);
+    const before = this.redoStack.length;
+    const result = redo.call(this);
+    if (entry && this.redoStack.length < before) this.emitNotice(`Redo ${historyLabel(entry)}.`);
     return result;
   };
 
