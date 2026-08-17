@@ -5,9 +5,7 @@ const emitAudio = (eventId, options) => {
 const setAudioEnabled = (enabled) => {
   audioBus.setAudioEnabled(enabled);
 };
-const setMasterVolume = (volume) => {
-  audioBus.setMasterVolume(volume);
-};
+const setMasterVolume = (volume) => audioBus.setMasterVolume(volume);
 const getAudioState = () => {
   return audioBus.getAudioState();
 };
