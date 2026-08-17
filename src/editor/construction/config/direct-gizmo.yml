@@ -9,6 +9,16 @@ height:
   snapStep: 0.1
   minUnitsPerPixel: 0.002
   maxUnitsPerPixel: 0.08
+thickness:
+  lift: 0.34
+  radius: 0.11
+  pickRadius: 0.2
+  heightRatio: 0.52
+  minimumHeight: 0.55
+  precisionMultiplier: 0.25
+  snapStep: 0.1
+  minimum: 0.1
+  maximum: 10
 move:
   lift: 1.15
   radius: 0.28
@@ -18,4 +28,5 @@ render:
   radialSegments: 12
   renderOrder: 120
   heightColor: '#f5f0df'
+  thicknessColor: '#e5bf78'
   moveColor: '#83e0b5'
