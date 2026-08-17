@@ -1,10 +1,7 @@
 const TOOL_SHORTCUTS = Object.freeze({
   t: 'terrain',
-  n: 'nature',
-  b: 'build',
   c: 'build',
   o: 'decor',
-  d: 'decor',
 });
 
 function isTypingTarget(target) {
