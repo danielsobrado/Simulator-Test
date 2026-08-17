@@ -1,14 +1,15 @@
 import { EditorController } from '../EditorController.js';
+import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 
 const PATCH_MARK = Symbol.for('drusniel.natural-editor-hover-bridge');
 const HOVER_EVENT = 'drusniel:natural-editor-hover';
 
-function installHoverBridge() {
-  const prototype = EditorController.prototype;
-  if (prototype[PATCH_MARK]) return;
+function patchHoverEmitter(prototype) {
+  if (Object.prototype.hasOwnProperty.call(prototype, PATCH_MARK)) return;
   Object.defineProperty(prototype, PATCH_MARK, { value: true });
 
   const emitHover = prototype.emitHover;
+  if (typeof emitHover !== 'function') return;
   prototype.emitHover = function naturalEmitHover(cell) {
     const result = emitHover.call(this, cell);
     const tileId = cell ? this.tileMap.get(cell.x, cell.z) : null;
@@ -22,4 +23,5 @@ function installHoverBridge() {
   };
 }
 
-installHoverBridge();
+patchHoverEmitter(EditorController.prototype);
+patchHoverEmitter(TerrainAwareEditorController.prototype);
