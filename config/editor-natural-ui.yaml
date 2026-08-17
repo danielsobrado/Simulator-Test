@@ -61,7 +61,7 @@ buildActions:
 worldActions:
   - { id: save, label: Save }
   - { id: load, label: Load }
-  - { id: new, label: New world }
+  - { id: new, label: Reset edits }
 
 hints:
   firstRun: 'Drag the world directly. Click an object to select it. Shift lowers terrain; Ctrl smooths.'
