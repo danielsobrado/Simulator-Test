@@ -5,6 +5,7 @@ const INTERACTIVE_SELECTOR = [
   '.natural-tool-button',
   '.natural-build-action',
   '.natural-context-action',
+  '.natural-wall-context-action',
   '.natural-menu-action',
   '.natural-recommendations button',
   '.natural-quick-group button',
