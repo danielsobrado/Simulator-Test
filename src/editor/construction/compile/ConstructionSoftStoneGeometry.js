@@ -1,10 +1,12 @@
 import * as THREE from 'three/webgpu';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   applyWorkshopProjectedUv,
   beveledQuadPrism,
   normalizeGeometry,
   transformGeometry,
 } from '../../workshop/ProceduralWorkshopGeometry.js';
+import { CONSTRUCTION_STONE_SHADING_CONFIG } from '../config/ConstructionStoneShadingConfig.generated.js';
 import { faceRecessionAt } from '../masonry/StoneFaceReliefField.js';
 import { pointOnQuad } from './ConstructionReliefQuadPrism.js';
 
@@ -369,6 +371,22 @@ function flatFallback(stoneShape) {
   };
 }
 
+function creaseAngleForTier(geometryTier) {
+  const config = CONSTRUCTION_STONE_SHADING_CONFIG.softStoneNormals;
+  if (!config.enabled) return null;
+  return geometryTier === 'coarse'
+    ? config.coarseCreaseAngleRadians
+    : config.nearCreaseAngleRadians;
+}
+
+function applySoftStoneNormals(geometry, geometryTier) {
+  const creaseAngle = creaseAngleForTier(geometryTier);
+  if (!(creaseAngle > 0)) return geometry;
+  const creased = toCreasedNormals(geometry, creaseAngle);
+  if (creased !== geometry) geometry.dispose();
+  return creased;
+}
+
 /**
  * Soft limestone writer for near and coarse geometry tiers.
  */
@@ -394,7 +412,8 @@ export function buildSoftStoneGeometry({
       default:
         throw new Error(`Unknown soft-stone geometry tier ${geometryTier}.`);
     }
-    const nonIndexed = normalizeGeometry(built.geometry);
+    const creased = applySoftStoneNormals(built.geometry, geometryTier);
+    const nonIndexed = normalizeGeometry(creased);
     transformGeometry(nonIndexed, { position, rotation });
     applyWorkshopProjectedUv(nonIndexed);
     nonIndexed.computeBoundingBox();

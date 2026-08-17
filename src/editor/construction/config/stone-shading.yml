@@ -1,0 +1,6 @@
+version: 1
+
+softStoneNormals:
+  enabled: true
+  nearCreaseAngleRadians: 0.62
+  coarseCreaseAngleRadians: 0.72
