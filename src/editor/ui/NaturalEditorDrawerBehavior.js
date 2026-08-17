@@ -4,6 +4,7 @@ const DISMISS_AFTER_SELECTORS = Object.freeze([
   '[data-natural-object-key]',
   '[data-natural-recommendation]',
 ]);
+const BUILD_ACTIONS_WITHOUT_DRAWER = new Set(['wall', 'workshop']);
 
 function scheduleDrawerState(sidebar, dismissed) {
   requestAnimationFrame(() => sidebar.classList.toggle('is-dismissed', dismissed));
@@ -44,7 +45,7 @@ function installDrawerBehavior() {
       return;
     }
     const buildAction = event.target.closest('[data-natural-build-action]');
-    if (buildAction?.dataset.naturalBuildAction === 'wall') {
+    if (BUILD_ACTIONS_WITHOUT_DRAWER.has(buildAction?.dataset.naturalBuildAction)) {
       scheduleDrawerState(sidebar, true);
     }
   });
