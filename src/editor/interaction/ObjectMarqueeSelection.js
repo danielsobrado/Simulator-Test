@@ -44,7 +44,13 @@ function objectClientPoint(controller, object, canvasBounds) {
       placement.surface.baseHeight + controller.tileMap.tileSize * 0.5,
       center.z,
     ).project(controller.activeCamera);
-    if (!Number.isFinite(PROJECTED.x) || !Number.isFinite(PROJECTED.y)) return null;
+    if (
+      !Number.isFinite(PROJECTED.x)
+      || !Number.isFinite(PROJECTED.y)
+      || !Number.isFinite(PROJECTED.z)
+      || PROJECTED.z < -1
+      || PROJECTED.z > 1
+    ) return null;
     return {
       x: canvasBounds.left + (PROJECTED.x + 1) * 0.5 * canvasBounds.width,
       y: canvasBounds.top + (1 - PROJECTED.y) * 0.5 * canvasBounds.height,
