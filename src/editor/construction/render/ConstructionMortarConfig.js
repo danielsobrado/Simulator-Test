@@ -19,7 +19,7 @@ const DEFAULT_JOINT_PROFILE = constructionJointProfile('default');
 
 export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
   /** Metres between the visible stone face and the mortar core face. */
-  faceRecess: 0.045,
+  faceRecess: 0.055,
   /** Minimum backing prism thickness (m). */
   minimumDepth: 0.08,
   /** UV scale for future imported mortar textures. */
@@ -49,12 +49,12 @@ export const CONSTRUCTION_MORTAR_CONFIG = Object.freeze({
  */
 export const CONSTRUCTION_MORTAR_PROFILES = Object.freeze({
   'coursed-rubble': Object.freeze({
-    color: '#66645d',
+    color: '#5d5a53',
     roughness: 1,
     metalness: 0,
   }),
   'soft-limestone-rubble': Object.freeze({
-    color: '#74746d',
+    color: '#68675f',
     roughness: 1,
     metalness: 0,
   }),

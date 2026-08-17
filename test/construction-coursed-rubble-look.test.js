@@ -62,8 +62,8 @@ test('coursed rubble keeps readable recessed joints and contact shadow', () => {
   assert.ok(joints.bedJoint.min >= 0.015);
   assert.ok(joints.headJoint.max <= 0.05);
   assert.ok(joints.bedJoint.max <= 0.04);
-  assert.ok(CONSTRUCTION_MORTAR_CONFIG.faceRecess >= 0.04);
-  assert.equal(mortar.color, '#66645d');
+  assert.ok(CONSTRUCTION_MORTAR_CONFIG.faceRecess >= 0.05);
+  assert.equal(mortar.color, '#5d5a53');
 });
 
 test('irregular wall crowns are made from field stones instead of thin coping', () => {
