@@ -64,6 +64,13 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
       "icon": "structures"
     },
     {
+      "id": "defenses",
+      "label": "Defenses",
+      "controllerTool": "object",
+      "objectCategory": "defense",
+      "icon": "defense"
+    },
+    {
       "id": "workshop",
       "label": "Procedural",
       "action": "workshop",
