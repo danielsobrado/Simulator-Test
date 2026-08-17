@@ -35,7 +35,7 @@ primaryTools:
   - id: decor
     label: Decor
     controllerTool: object
-    objectCategory: all
+    objectCategory: civic
     icon: decor
 
 buildActions:
