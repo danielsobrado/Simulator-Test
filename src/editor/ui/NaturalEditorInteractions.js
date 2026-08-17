@@ -1,11 +1,13 @@
 import { EditorController } from '../EditorController.js';
 import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 import { ObjectSelectionController } from '../interaction/ObjectSelectionController.js';
+import { OBJECT_SELECTION_ADDITIVE_MODE_EVENT } from '../interaction/ObjectSelectionEvents.js';
 
 const PATCH_MARK = Symbol.for('drusniel.natural-editor-interactions');
 const SELECTION = Symbol.for('drusniel.natural-editor-selection');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
+let additivePointerMode = false;
 
 function effectiveTerrainGestureMode(event) {
   if (event.ctrlKey || event.metaKey) return 'smooth';
@@ -31,6 +33,9 @@ function installNaturalEditorInteractions() {
   const prototype = EditorController.prototype;
   if (prototype[PATCH_MARK]) return;
   Object.defineProperty(prototype, PATCH_MARK, { value: true });
+  globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
+    additivePointerMode = event.detail?.enabled === true;
+  });
 
   const baseSetSelectedObject = prototype.setSelectedObject;
   const selectionFor = (controller) => {
@@ -137,12 +142,13 @@ function installNaturalEditorInteractions() {
           this.constructionGizmo?.close();
         }
         this.tool = 'select';
-        const selected = selection.selectDirect(objectId, { additive: event.shiftKey });
-        if (!event.shiftKey && selected) selection.beginDirectDrag(objectId, event);
+        const additive = event.shiftKey || additivePointerMode;
+        const selected = selection.selectDirect(objectId, { additive });
+        if (!additive && selected) selection.beginDirectDrag(objectId, event);
         this.updatePreviews();
         this.emitState();
         event.preventDefault();
-        if (event.shiftKey && selection.size === 0) restoreSelectionTool(this);
+        if (additive && selection.size === 0) restoreSelectionTool(this);
         return;
       }
 
