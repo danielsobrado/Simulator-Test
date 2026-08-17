@@ -1,12 +1,8 @@
-import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 import { ObjectSelectionController } from '../interaction/ObjectSelectionController.js';
 import { OBJECT_SELECTION_ADDITIVE_MODE_EVENT } from '../interaction/ObjectSelectionEvents.js';
 
-const PATCH_MARK = Symbol.for('drusniel.natural-editor-interactions');
-const SELECTION = Symbol.for('drusniel.natural-editor-selection');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
-let additivePointerMode = false;
 
 function isTextControl(target) {
   return target instanceof HTMLInputElement
@@ -35,34 +31,53 @@ function historyLabel(entry) {
   }
 }
 
-function installNaturalEditorInteractions() {
-  const prototype = TerrainAwareEditorController.prototype;
-  if (prototype[PATCH_MARK]) return;
-  Object.defineProperty(prototype, PATCH_MARK, { value: true });
+function captureMethods(controller, names) {
+  return Object.fromEntries(names.map((name) => [
+    name,
+    typeof controller[name] === 'function' ? controller[name].bind(controller) : null,
+  ]));
+}
+
+export function installNaturalEditorInteractions(controller) {
+  if (controller.naturalEditorInteractions) return controller.naturalEditorInteractions;
+
+  const original = captureMethods(controller, [
+    'setSelectedObject',
+    'getState',
+    'selectTool',
+    'onConstructionPointerDown',
+    'onPointerDown',
+    'onPointerMove',
+    'editTerrainFromPointer',
+    'updatePreviews',
+    'onPointerUp',
+    'startMoveSelected',
+    'moveSelectedTo',
+    'rotateSelected',
+    'deleteSelected',
+    'deleteSelectedConstruction',
+    'applyHistory',
+    'refreshObjects',
+    'undo',
+    'redo',
+    'onKeyDown',
+  ]);
+  const abort = new AbortController();
+  const selection = new ObjectSelectionController(controller, original.setSelectedObject);
+  let additivePointerMode = false;
+
   globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
     additivePointerMode = event.detail?.enabled === true;
-  });
+  }, { signal: abort.signal });
 
-  const baseSetSelectedObject = prototype.setSelectedObject;
-  const selectionFor = (controller) => {
-    if (!controller[SELECTION]) {
-      controller[SELECTION] = new ObjectSelectionController(
-        controller,
-        (id) => baseSetSelectedObject.call(controller, id),
-      );
-    }
-    return controller[SELECTION];
-  };
-
-  const restoreSelectionTool = (controller) => {
-    const selection = selectionFor(controller);
+  const restoreSelectionTool = () => {
     if (controller.tool !== 'select' || selection.size > 0 || controller.movingObjectId) return;
     controller.tool = selection.returnTool ?? DEFAULT_RETURN_TOOL;
     controller.updatePreviews();
     controller.emitState();
   };
 
-  const restoreConstructionTool = (controller) => {
+  const restoreConstructionTool = () => {
     const returnTool = controller.naturalConstructionReturnTool;
     if (!returnTool) return false;
     controller.naturalConstructionReturnTool = null;
@@ -74,278 +89,250 @@ function installNaturalEditorInteractions() {
     return true;
   };
 
-  prototype.setSelectedObject = function naturalSetSelectedObject(objectId) {
-    selectionFor(this).replace(objectId);
-  };
+  controller.setSelectedObject = (objectId) => selection.replace(objectId);
 
-  const getState = prototype.getState;
-  prototype.getState = function naturalGetState() {
-    const state = getState.call(this);
-    const selection = selectionFor(this);
-    return {
-      ...state,
-      selectedObjects: selection.objects(),
-      selectedObjectCount: selection.size,
-    };
-  };
+  controller.getState = () => ({
+    ...original.getState(),
+    selectedObjects: selection.objects(),
+    selectedObjectCount: selection.size,
+  });
 
-  const selectTool = prototype.selectTool;
-  prototype.selectTool = function naturalSelectTool(tool) {
-    const selection = selectionFor(this);
+  controller.selectTool = (tool) => {
     if (tool !== 'select') selection.returnTool = tool;
-    this.naturalConstructionReturnTool = null;
+    controller.naturalConstructionReturnTool = null;
     selection.drag = null;
     selection.marquee.cancel();
-    return selectTool.call(this, tool);
+    return original.selectTool(tool);
   };
 
-  const constructionPointerDown = prototype.onConstructionPointerDown;
-  prototype.onConstructionPointerDown = function naturalConstructionPointerDown(event) {
-    if (this.constructionStore && this.constructionView) {
-      const handle = this.constructionView.pickHandle(
+  controller.onConstructionPointerDown = (event) => {
+    if (controller.constructionStore && controller.constructionView) {
+      const handle = controller.constructionView.pickHandle(
         event.clientX,
         event.clientY,
-        this.activeCamera,
+        controller.activeCamera,
       );
       const constructionId = handle
         ? handle.constructionId
-        : this.constructionView.pickConstruction(
+        : controller.constructionView.pickConstruction(
           event.clientX,
           event.clientY,
-          this.activeCamera,
+          controller.activeCamera,
         );
-      if (!handle && !constructionId && this.naturalConstructionReturnTool) {
-        restoreConstructionTool(this);
+      if (!handle && !constructionId && controller.naturalConstructionReturnTool) {
+        restoreConstructionTool();
         event.preventDefault();
         return;
       }
-      this.constructionMode = handle || constructionId ? 'edit' : 'draw';
+      controller.constructionMode = handle || constructionId ? 'edit' : 'draw';
     }
-    return constructionPointerDown.call(this, event);
+    return original.onConstructionPointerDown(event);
   };
 
-  const pointerDown = prototype.onPointerDown;
-  prototype.onPointerDown = function naturalPointerDown(event) {
-    const selection = selectionFor(this);
+  controller.onPointerDown = (event) => {
     if (
-      !this.isWorldInputBlocked()
+      !controller.isWorldInputBlocked()
       && event.button === PRIMARY_POINTER_BUTTON
-      && !this.spacePressed
-      && !this.movingObjectId
+      && !controller.spacePressed
+      && !controller.movingObjectId
     ) {
-      const objectId = this.objectView.pickObject(
+      const objectId = controller.objectView.pickObject(
         event.clientX,
         event.clientY,
-        this.activeCamera,
+        controller.activeCamera,
       );
       if (objectId) {
-        selection.returnTool = this.tool === 'select'
+        selection.returnTool = controller.tool === 'select'
           ? selection.returnTool ?? DEFAULT_RETURN_TOOL
-          : this.tool;
-        this.naturalConstructionReturnTool = null;
-        if (this.tool === 'construction') {
-          this.cancelConstructionGesture();
-          this.setSelectedConstruction(null);
-          this.constructionGizmo?.close();
+          : controller.tool;
+        controller.naturalConstructionReturnTool = null;
+        if (controller.tool === 'construction') {
+          controller.cancelConstructionGesture();
+          controller.setSelectedConstruction(null);
+          controller.constructionGizmo?.close();
         }
-        this.tool = 'select';
+        controller.tool = 'select';
         const additive = event.shiftKey || additivePointerMode;
         const selected = selection.selectDirect(objectId, { additive });
         if (!additive && selected) selection.beginDirectDrag(objectId, event);
-        this.updatePreviews();
-        this.emitState();
+        controller.updatePreviews();
+        controller.emitState();
         event.preventDefault();
-        if (additive && selection.size === 0) restoreSelectionTool(this);
+        if (additive && selection.size === 0) restoreSelectionTool();
         return;
       }
 
       const additive = event.shiftKey || additivePointerMode;
       if (
         additive
-        && this.tool === 'select'
-        && !this.playerEditingProvider?.()
+        && controller.tool === 'select'
+        && !controller.playerEditingProvider?.()
         && selection.marquee.begin(event)
       ) return;
 
-      if (this.tool !== 'construction' && this.constructionView && this.constructionStore) {
-        const constructionId = this.constructionView.pickConstruction(
+      if (
+        controller.tool !== 'construction'
+        && controller.constructionView
+        && controller.constructionStore
+      ) {
+        const constructionId = controller.constructionView.pickConstruction(
           event.clientX,
           event.clientY,
-          this.activeCamera,
+          controller.activeCamera,
         );
         if (constructionId) {
-          this.naturalConstructionReturnTool = this.tool === 'select'
+          controller.naturalConstructionReturnTool = controller.tool === 'select'
             ? selection.returnTool ?? DEFAULT_RETURN_TOOL
-            : this.tool;
-          this.cancelConstructionGesture();
+            : controller.tool;
+          controller.cancelConstructionGesture();
           selection.clear();
-          this.tool = 'construction';
-          this.constructionMode = 'edit';
-          this.setSelectedConstruction(constructionId);
-          this.constructionGizmo?.open(constructionId, event);
-          this.updatePreviews();
-          this.emitState();
+          controller.tool = 'construction';
+          controller.constructionMode = 'edit';
+          controller.setSelectedConstruction(constructionId);
+          controller.constructionGizmo?.open(constructionId, event);
+          controller.updatePreviews();
+          controller.emitState();
           event.preventDefault();
           return;
         }
       }
     }
 
-    const wasSelect = this.tool === 'select';
+    const wasSelect = controller.tool === 'select';
     const terrainGesture = (
-      this.tool === 'terrain'
+      controller.tool === 'terrain'
       && event.button === PRIMARY_POINTER_BUTTON
-      && !this.spacePressed
+      && !controller.spacePressed
     ) ? effectiveTerrainGestureMode(event) : null;
-    const savedMode = this.terrainMode;
+    const savedMode = controller.terrainMode;
     if (terrainGesture) {
-      this.naturalTerrainGestureMode = terrainGesture;
-      this.terrainMode = terrainGesture;
+      controller.naturalTerrainGestureMode = terrainGesture;
+      controller.terrainMode = terrainGesture;
     }
     try {
-      return pointerDown.call(this, event);
+      return original.onPointerDown(event);
     } finally {
-      if (terrainGesture) this.terrainMode = savedMode;
-      if (wasSelect) restoreSelectionTool(this);
+      if (terrainGesture) controller.terrainMode = savedMode;
+      if (wasSelect) restoreSelectionTool();
     }
   };
 
-  const pointerMove = prototype.onPointerMove;
-  prototype.onPointerMove = function naturalPointerMove(event) {
-    const selection = selectionFor(this);
+  controller.onPointerMove = (event) => {
     if (selection.marquee.update(event)) return;
     selection.updateDirectDrag(event);
-    if (!this.naturalTerrainGestureMode) return pointerMove.call(this, event);
-    const savedMode = this.terrainMode;
-    this.terrainMode = this.naturalTerrainGestureMode;
+    if (!controller.naturalTerrainGestureMode) return original.onPointerMove(event);
+    const savedMode = controller.terrainMode;
+    controller.terrainMode = controller.naturalTerrainGestureMode;
     try {
-      return pointerMove.call(this, event);
+      return original.onPointerMove(event);
     } finally {
-      this.terrainMode = savedMode;
+      controller.terrainMode = savedMode;
     }
   };
 
-  const editTerrainFromPointer = prototype.editTerrainFromPointer;
-  prototype.editTerrainFromPointer = function naturalEditTerrainFromPointer(event, force) {
-    if (!this.naturalTerrainGestureMode) return editTerrainFromPointer.call(this, event, force);
-    const savedMode = this.terrainMode;
-    this.terrainMode = this.naturalTerrainGestureMode;
+  controller.editTerrainFromPointer = (event, force) => {
+    if (!controller.naturalTerrainGestureMode) {
+      return original.editTerrainFromPointer(event, force);
+    }
+    const savedMode = controller.terrainMode;
+    controller.terrainMode = controller.naturalTerrainGestureMode;
     try {
-      return editTerrainFromPointer.call(this, event, force);
+      return original.editTerrainFromPointer(event, force);
     } finally {
-      this.terrainMode = savedMode;
+      controller.terrainMode = savedMode;
     }
   };
 
-  const updatePreviews = prototype.updatePreviews;
-  prototype.updatePreviews = function naturalUpdatePreviews() {
-    const selection = selectionFor(this);
+  controller.updatePreviews = () => {
     selection.overlay.clearPreview();
-    if (this.tool === 'select' && this.movingObjectId && selection.size > 1) {
-      this.terrainView.setPreview(null);
-      this.objectView.setPreview(null);
+    if (controller.tool === 'select' && controller.movingObjectId && selection.size > 1) {
+      controller.terrainView.setPreview(null);
+      controller.objectView.setPreview(null);
       const primary = selection.primaryId
-        ? this.objectMap.getById(selection.primaryId)
+        ? controller.objectMap.getById(selection.primaryId)
         : null;
-      if (primary && this.hoveredCell) {
+      if (primary && controller.hoveredCell) {
         selection.overlay.previewTranslation(
           selection.objects(),
-          this.hoveredCell.x - primary.x,
-          this.hoveredCell.z - primary.z,
+          controller.hoveredCell.x - primary.x,
+          controller.hoveredCell.z - primary.z,
         );
       }
       return;
     }
-    return updatePreviews.call(this);
+    return original.updatePreviews();
   };
 
-  const pointerUp = prototype.onPointerUp;
-  prototype.onPointerUp = function naturalPointerUp(event) {
-    const selection = selectionFor(this);
+  controller.onPointerUp = (event) => {
     if (selection.marquee.finish(event)) return;
     if (selection.finishDirectDrag(event)) {
-      this.naturalTerrainGestureMode = null;
+      controller.naturalTerrainGestureMode = null;
       return;
     }
     try {
-      return pointerUp.call(this, event);
+      return original.onPointerUp(event);
     } finally {
-      if (event.button === PRIMARY_POINTER_BUTTON && !this.painting) {
-        this.naturalTerrainGestureMode = null;
+      if (event.button === PRIMARY_POINTER_BUTTON && !controller.painting) {
+        controller.naturalTerrainGestureMode = null;
       }
     }
   };
 
-  prototype.startMoveSelected = function naturalStartMoveSelected() {
-    selectionFor(this).startMove();
-  };
+  controller.startMoveSelected = () => selection.startMove();
+  controller.moveSelectedTo = (cell) => selection.moveTo(cell);
+  controller.rotateSelected = () => selection.rotate();
+  controller.duplicateSelected = () => selection.duplicate();
 
-  prototype.moveSelectedTo = function naturalMoveSelectedTo(cell) {
-    return selectionFor(this).moveTo(cell);
-  };
-
-  prototype.rotateSelected = function naturalRotateSelected() {
-    return selectionFor(this).rotate();
-  };
-
-  prototype.duplicateSelected = function naturalDuplicateSelected() {
-    return selectionFor(this).duplicate();
-  };
-
-  prototype.deleteSelected = function naturalDeleteSelected() {
-    const selection = selectionFor(this);
+  controller.deleteSelected = () => {
     const hadSelection = selection.size > 0;
     const result = selection.delete();
-    if (hadSelection) restoreSelectionTool(this);
+    if (hadSelection) restoreSelectionTool();
     return result;
   };
 
-  const deleteSelectedConstruction = prototype.deleteSelectedConstruction;
-  prototype.deleteSelectedConstruction = function naturalDeleteSelectedConstruction() {
-    const shouldReturn = Boolean(this.naturalConstructionReturnTool);
-    const result = deleteSelectedConstruction.call(this);
-    if (shouldReturn && !this.selectedConstructionId) restoreConstructionTool(this);
+  controller.deleteSelectedConstruction = () => {
+    const shouldReturn = Boolean(controller.naturalConstructionReturnTool);
+    const result = original.deleteSelectedConstruction();
+    if (shouldReturn && !controller.selectedConstructionId) restoreConstructionTool();
     return result;
   };
 
-  const applyHistory = prototype.applyHistory;
-  prototype.applyHistory = function naturalApplyHistory(entry, direction) {
+  controller.applyHistory = (entry, direction) => {
     if (entry?.kind === 'object-batch') {
-      selectionFor(this).applyHistory(entry, direction);
+      selection.applyHistory(entry, direction);
       return;
     }
-    return applyHistory.call(this, entry, direction);
+    return original.applyHistory(entry, direction);
   };
 
-  const refreshObjects = prototype.refreshObjects;
-  prototype.refreshObjects = function naturalRefreshObjects() {
-    const result = refreshObjects.call(this);
-    selectionFor(this).retainExisting();
+  controller.refreshObjects = () => {
+    const result = original.refreshObjects();
+    selection.retainExisting();
     return result;
   };
 
-  const undo = prototype.undo;
-  prototype.undo = function naturalUndo() {
-    const entry = this.undoStack.at(-1);
-    const before = this.undoStack.length;
-    const result = undo.call(this);
-    if (entry && this.undoStack.length < before) this.emitNotice(`Undo ${historyLabel(entry)}.`);
+  controller.undo = () => {
+    const entry = controller.undoStack.at(-1);
+    const before = controller.undoStack.length;
+    const result = original.undo();
+    if (entry && controller.undoStack.length < before) {
+      controller.emitNotice(`Undo ${historyLabel(entry)}.`);
+    }
     return result;
   };
 
-  const redo = prototype.redo;
-  prototype.redo = function naturalRedo() {
-    const entry = this.redoStack.at(-1);
-    const before = this.redoStack.length;
-    const result = redo.call(this);
-    if (entry && this.redoStack.length < before) this.emitNotice(`Redo ${historyLabel(entry)}.`);
+  controller.redo = () => {
+    const entry = controller.redoStack.at(-1);
+    const before = controller.redoStack.length;
+    const result = original.redo();
+    if (entry && controller.redoStack.length < before) {
+      controller.emitNotice(`Redo ${historyLabel(entry)}.`);
+    }
     return result;
   };
 
-  const keyDown = prototype.onKeyDown;
-  prototype.onKeyDown = function naturalKeyDown(event) {
+  controller.onKeyDown = (event) => {
     if (isTextControl(event.target)) return;
-    const selection = selectionFor(this);
     if (
       (event.ctrlKey || event.metaKey)
       && event.key.toLowerCase() === 'd'
@@ -356,23 +343,25 @@ function installNaturalEditorInteractions() {
       return;
     }
     const escapeConstructionReturn = event.key.toLowerCase() === 'escape'
-      && Boolean(this.naturalConstructionReturnTool);
-    const result = keyDown.call(this, event);
+      && Boolean(controller.naturalConstructionReturnTool);
+    const result = original.onKeyDown(event);
     if (event.key.toLowerCase() === 'escape') {
       selection.drag = null;
       selection.marquee.cancel();
-      restoreSelectionTool(this);
+      restoreSelectionTool();
     }
-    if (escapeConstructionReturn) restoreConstructionTool(this);
+    if (escapeConstructionReturn) restoreConstructionTool();
     return result;
   };
 
-  const dispose = prototype.dispose;
-  prototype.dispose = function naturalDispose() {
-    this[SELECTION]?.dispose();
-    this[SELECTION] = null;
-    return dispose.call(this);
+  const integration = {
+    selection,
+    dispose() {
+      abort.abort();
+      selection.dispose();
+      controller.naturalEditorInteractions = null;
+    },
   };
+  controller.naturalEditorInteractions = integration;
+  return integration;
 }
-
-installNaturalEditorInteractions();
