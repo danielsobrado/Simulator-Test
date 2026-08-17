@@ -221,8 +221,11 @@ export function splitCell(cell, {
  * evaluates the same function.
  *
  * Top corners are clamped to the wall body's own height so a wave near the crown
- * cannot push field masonry up through the coping. `ceilingAt` comes from
+ * cannot push field masonry above the wall. `ceilingAt` comes from
  * `WallTopProfile`, which is wall-global, so both modules at a seam clamp alike.
+ * Leaves that actually touch the ceiling get a horizontal top arris by default.
+ * Adjacent crown stones may therefore end at different heights, producing real
+ * block steps instead of one smooth cut line.
  *
  * The returned corners are anchored on the cell's *arc* centre in X — not on the
  * face bounding box — so `anchorS` remains the exact midpoint of the cell's
@@ -240,6 +243,7 @@ export function resolveCellCorners(cell, {
   tiltLeft = 0,
   tiltRight = 0,
   ceilingAt = null,
+  flattenCeiling = true,
   minHeight = 0.08,
 }) {
   const bedAt = (course, s) => course * courseHeight + bedOffset(course, s);
@@ -275,6 +279,23 @@ export function resolveCellCorners(cell, {
   const topRight = corner(cell.v1, cell.s1, tiltRight);
   const topLeft = corner(cell.v1, cell.s0, tiltLeft);
 
+  if (flattenCeiling && ceilingAt) {
+    const ceilingRight = ceilingAt(topRight[0]);
+    const ceilingLeft = ceilingAt(topLeft[0]);
+    const touchesCeiling = (
+      Math.abs(topRight[1] - ceilingRight) < 1e-6
+      || Math.abs(topLeft[1] - ceilingLeft) < 1e-6
+    );
+    if (touchesCeiling) {
+      const plateau = Math.min(topRight[1], topLeft[1]);
+      const safeMinimum = Math.max(bottomLeft[1], bottomRight[1]) + minHeight;
+      if (plateau > safeMinimum) {
+        topRight[1] = plateau;
+        topLeft[1] = plateau;
+      }
+    }
+  }
+
   const points = [bottomLeft, bottomRight, topRight, topLeft];
 
   let minS = Infinity;
@@ -309,7 +330,7 @@ export function resolveCellCorners(cell, {
  * `resolveCellCorners` returns null when the wall-top clamp flattens a leaf
  * below `minHeight`. Dropping it outright leaves a **hole**: the leaf beneath
  * still stops at its own split line while the unsplit neighbour beside it runs
- * all the way to the ceiling, so the wall shows a notch under the coping. Give
+ * all the way to the ceiling, so the wall shows a notch under the crown. Give
  * the collapsed band to the leaf directly below it in the same column instead
  * and the column reaches the ceiling either way.
  *

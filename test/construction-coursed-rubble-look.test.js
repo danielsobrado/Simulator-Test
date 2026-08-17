@@ -7,6 +7,7 @@ import { constructionStoneEdgeWearProfile } from '../src/editor/construction/con
 import { constructionStoneLodProfile } from '../src/editor/construction/config/ConstructionStoneLodProfiles.generated.js';
 import { constructionStoneReliefProfile } from '../src/editor/construction/config/ConstructionStoneReliefProfiles.generated.js';
 import { constructionStyle } from '../src/editor/construction/masonry/ConstructionStyleCatalog.js';
+import { resolveCellCorners } from '../src/editor/construction/masonry/CourseLattice.js';
 import { usesCopingCourse } from '../src/editor/construction/masonry/CurvedCoursePacker.js';
 import {
   CONSTRUCTION_MORTAR_CONFIG,
@@ -70,6 +71,23 @@ test('irregular wall crowns are made from field stones instead of thin coping', 
   assert.equal(usesCopingCourse('irregular'), false);
   assert.equal(usesCopingCourse('ruined'), false);
   assert.equal(usesCopingCourse('crenellated'), false);
+});
+
+test('ceiling-clipped crown stones keep a block-like horizontal top edge', () => {
+  const face = resolveCellCorners(
+    { courseIndex: 0, s0: 0, s1: 1, v0: 0, v1: 1 },
+    {
+      bedOffset: () => 0,
+      courseHeight: 1,
+      ceilingAt: (s) => 0.8 + s * 0.4,
+    },
+  );
+
+  assert.ok(face);
+  const topRight = face.anchorY + face.corners[2][1];
+  const topLeft = face.anchorY + face.corners[3][1];
+  assert.ok(Math.abs(topRight - topLeft) < 1e-9);
+  assert.ok(Math.abs(topLeft - 0.8) < 1e-9);
 });
 
 test('soft stone topology adds inward-only hand-cut edge cuts', () => {
