@@ -95,6 +95,7 @@ class NaturalObjectThumbnails {
     this.cache = new Map();
     this.queue = [];
     this.queued = new Set();
+    this.wanted = new Set();
     this.observedCards = new WeakSet();
     this.renderer = null;
     this.scene = null;
@@ -136,7 +137,10 @@ class NaturalObjectThumbnails {
     if (!this.intersectionObserver) {
       const cards = [...this.palette.querySelectorAll('.object-card[data-object-key]')]
         .slice(0, CONFIG.fallbackVisibleCards);
-      for (const card of cards) this.enqueue(card.dataset.objectKey);
+      for (const card of cards) {
+        this.wanted.add(card.dataset.objectKey);
+        this.enqueue(card.dataset.objectKey);
+      }
     }
   }
 
@@ -153,11 +157,15 @@ class NaturalObjectThumbnails {
   }
 
   onIntersection(entries) {
-    if (this.panel.hidden) return;
     for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
       const key = entry.target.dataset.objectKey;
-      if (key) this.enqueue(key);
+      if (!key) continue;
+      if (!entry.isIntersecting || this.panel.hidden) {
+        this.wanted.delete(key);
+        continue;
+      }
+      this.wanted.add(key);
+      this.enqueue(key);
     }
   }
 
@@ -184,6 +192,15 @@ class NaturalObjectThumbnails {
     });
   }
 
+  nextWantedKey() {
+    while (this.queue.length > 0) {
+      const key = this.queue.shift();
+      this.queued.delete(key);
+      if (!this.intersectionObserver || this.wanted.has(key)) return key;
+    }
+    return null;
+  }
+
   ensureRenderer() {
     if (this.renderer) return true;
     if (this.failed || this.disposed) return false;
@@ -203,13 +220,16 @@ class NaturalObjectThumbnails {
   }
 
   renderNext() {
-    if (this.disposed || this.panel.hidden || this.queue.length === 0) {
+    if (this.disposed || this.panel.hidden) {
+      this.scheduleRendererDisposal();
+      return;
+    }
+    const key = this.nextWantedKey();
+    if (!key) {
       this.scheduleRendererDisposal();
       return;
     }
     if (!this.ensureRenderer()) return;
-    const key = this.queue.shift();
-    this.queued.delete(key);
     const definition = OBJECT_BY_KEY.get(key);
     if (definition && !this.cache.has(key)) {
       try {
@@ -286,6 +306,7 @@ class NaturalObjectThumbnails {
     this.intersectionObserver?.disconnect();
     this.queue.length = 0;
     this.queued.clear();
+    this.wanted.clear();
     this.cache.clear();
     this.disposeRenderer();
   }
