@@ -184,16 +184,14 @@ function installNaturalEditorInteractions() {
       && !this.spacePressed
       && !this.movingObjectId
     ) {
-      if (!this.playerEditingProvider?.()) {
-        const objectId = this.objectView.pickObject(
-          event.clientX,
-          event.clientY,
-          this.activeCamera,
-        );
-        if (objectId) {
-          selectObjectDirectly(this, objectId, event);
-          return;
-        }
+      const objectId = this.objectView.pickObject(
+        event.clientX,
+        event.clientY,
+        this.activeCamera,
+      );
+      if (objectId) {
+        selectObjectDirectly(this, objectId, event);
+        return;
       }
 
       if (this.tool !== 'construction' && this.constructionView && this.constructionStore) {
