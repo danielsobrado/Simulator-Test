@@ -1,32 +1,3 @@
-const TOOL_SHORTCUTS = Object.freeze({
-  t: 'terrain',
-  c: 'build',
-  o: 'decor',
-});
-
-function isTypingTarget(target) {
-  return target instanceof HTMLInputElement
-    || target instanceof HTMLTextAreaElement
-    || target instanceof HTMLSelectElement
-    || target?.isContentEditable === true;
-}
-
-function naturalToolButton(id) {
-  return document.querySelector(`[data-natural-tool="${id}"]`);
-}
-
-function installShortcutBridge() {
-  window.addEventListener('keydown', (event) => {
-    if (event.ctrlKey || event.metaKey || event.altKey || isTypingTarget(event.target)) return;
-    const tool = TOOL_SHORTCUTS[event.key.toLowerCase()];
-    const button = tool ? naturalToolButton(tool) : null;
-    if (!button) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    button.click();
-  }, true);
-}
-
 function mirrorButtonState(root, action) {
   const source = root.querySelector(`.sidebar [data-action="${action}"]`);
   if (!source) return null;
@@ -49,8 +20,6 @@ function installStateBridge() {
   mirrorButtonState(root, 'redo');
   return true;
 }
-
-installShortcutBridge();
 
 if (!installStateBridge()) {
   const observer = new MutationObserver(() => {
