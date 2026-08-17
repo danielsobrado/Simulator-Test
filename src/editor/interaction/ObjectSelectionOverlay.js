@@ -6,9 +6,14 @@ const SECONDARY_SELECTION_OPACITY = 0.14;
 const MOVE_PREVIEW_COLOR = '#e8d38a';
 const MOVE_PREVIEW_OPACITY = 0.16;
 const OVERLAY_HEIGHT_OFFSET = 0.095;
+const MAX_OVERLAYS = NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays;
+const ROTATION = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+const POSITION = new THREE.Vector3();
+const SCALE = new THREE.Vector3();
+const MATRIX = new THREE.Matrix4();
 
-function createOverlay(color, opacity) {
-  const overlay = new THREE.Mesh(
+function createOverlay(color, opacity, name) {
+  const overlay = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({
       color,
@@ -17,95 +22,97 @@ function createOverlay(color, opacity) {
       depthWrite: false,
       side: THREE.DoubleSide,
     }),
+    MAX_OVERLAYS,
   );
-  overlay.rotation.x = -Math.PI / 2;
-  overlay.visible = false;
+  overlay.name = name;
+  overlay.count = 0;
+  overlay.frustumCulled = false;
+  overlay.renderOrder = 18;
   return overlay;
 }
 
 export class ObjectSelectionOverlay {
   constructor(objectView) {
     this.objectView = objectView;
-    this.selectionPool = [];
-    this.previewPool = [];
+    this.selection = createOverlay(
+      SECONDARY_SELECTION_COLOR,
+      SECONDARY_SELECTION_OPACITY,
+      'object-multi-selection',
+    );
+    this.preview = createOverlay(
+      MOVE_PREVIEW_COLOR,
+      MOVE_PREVIEW_OPACITY,
+      'object-multi-selection-preview',
+    );
+    this.objectView.terrainView.scene.add(this.selection, this.preview);
   }
 
-  ensure(pool, count, color, opacity) {
-    while (pool.length < count) {
-      const overlay = createOverlay(color, opacity);
-      this.objectView.terrainView.scene.add(overlay);
-      pool.push(overlay);
-    }
-  }
-
-  position(overlay, object) {
+  matrixFor(object) {
     try {
       const placement = this.objectView.resolvePlacement(object);
       const center = this.objectView.placementResolver.renderCenter(placement.bounds);
-      overlay.position.set(
+      POSITION.set(
         center.x,
         placement.surface.baseHeight + OVERLAY_HEIGHT_OFFSET,
         center.z,
       );
-      overlay.scale.set(
+      SCALE.set(
         placement.bounds.width * this.objectView.tileMap.tileSize,
         placement.bounds.depth * this.objectView.tileMap.tileSize,
         1,
       );
-      overlay.visible = true;
-      return true;
+      return MATRIX.compose(POSITION, ROTATION, SCALE);
     } catch {
-      overlay.visible = false;
-      return false;
+      return null;
     }
+  }
+
+  write(mesh, objects) {
+    let count = 0;
+    for (const object of objects) {
+      if (count >= MAX_OVERLAYS) break;
+      const matrix = this.matrixFor(object);
+      if (!matrix) continue;
+      mesh.setMatrixAt(count, matrix);
+      count += 1;
+    }
+    mesh.count = count;
+    mesh.instanceMatrix.needsUpdate = count > 0;
+    mesh.visible = count > 0;
   }
 
   sync(ids, primaryId) {
-    const secondary = ids
+    const objects = ids
       .filter((id) => id !== primaryId)
-      .slice(0, NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays);
-    this.ensure(
-      this.selectionPool,
-      secondary.length,
-      SECONDARY_SELECTION_COLOR,
-      SECONDARY_SELECTION_OPACITY,
-    );
-    for (const overlay of this.selectionPool) overlay.visible = false;
-
-    secondary.forEach((id, index) => {
-      const object = this.objectView.objectMap.getById(id);
-      if (object) this.position(this.selectionPool[index], object);
-    });
+      .map((id) => this.objectView.objectMap.getById(id))
+      .filter(Boolean);
+    this.write(this.selection, objects);
   }
 
   previewTranslation(objects, deltaX, deltaZ) {
-    const visible = objects.slice(0, NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays);
-    this.ensure(this.previewPool, visible.length, MOVE_PREVIEW_COLOR, MOVE_PREVIEW_OPACITY);
-    for (const overlay of this.previewPool) overlay.visible = false;
-    visible.forEach((object, index) => {
-      this.position(this.previewPool[index], {
+    this.write(
+      this.preview,
+      objects.map((object) => ({
         ...object,
         x: object.x + deltaX,
         z: object.z + deltaZ,
-      });
-    });
+      })),
+    );
   }
 
   clearPreview() {
-    for (const overlay of this.previewPool) overlay.visible = false;
+    this.preview.count = 0;
+    this.preview.visible = false;
   }
 
-  disposePool(pool) {
-    for (const overlay of pool) {
-      this.objectView.terrainView.scene.remove(overlay);
-      overlay.geometry.dispose();
-      overlay.material.dispose();
-    }
-    pool.length = 0;
+  disposeMesh(mesh) {
+    this.objectView.terrainView.scene.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
   }
 
   dispose() {
-    this.disposePool(this.selectionPool);
-    this.disposePool(this.previewPool);
+    this.disposeMesh(this.selection);
+    this.disposeMesh(this.preview);
   }
 }
