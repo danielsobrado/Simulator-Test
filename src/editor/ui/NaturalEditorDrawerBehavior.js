@@ -60,6 +60,8 @@ function installDrawerBehavior() {
     hideForDirectSelection();
   }
 
+  const terrainTool = toolbar.querySelector('[data-natural-tool="terrain"]');
+  if (terrainTool?.classList.contains('is-active')) scheduleDrawerState(sidebar, true);
   return true;
 }
 
