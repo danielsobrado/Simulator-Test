@@ -13,25 +13,23 @@ function clientRect(startX, startY, endX, endY) {
   };
 }
 
-function queryCandidates(controller, start, end) {
-  const startCell = controller.terrainView.pickCell(
-    start.x,
-    start.y,
-    controller.activeCamera,
-  );
-  const endCell = controller.terrainView.pickCell(
-    end.x,
-    end.y,
-    controller.activeCamera,
-  );
-  if (!startCell || !endCell || typeof controller.objectMap.queryBounds !== 'function') {
-    return controller.objectMap.list();
-  }
+function queryCandidates(controller, rect) {
+  if (typeof controller.objectMap.queryBounds !== 'function') return controller.objectMap.list();
+  const corners = [
+    [rect.left, rect.top],
+    [rect.right, rect.top],
+    [rect.left, rect.bottom],
+    [rect.right, rect.bottom],
+  ];
+  const cells = corners
+    .map(([x, y]) => controller.terrainView.pickCell(x, y, controller.activeCamera))
+    .filter(Boolean);
+  if (cells.length < 2) return controller.objectMap.list();
   return controller.objectMap.queryBounds({
-    minX: Math.min(startCell.x, endCell.x),
-    maxX: Math.max(startCell.x, endCell.x),
-    minZ: Math.min(startCell.z, endCell.z),
-    maxZ: Math.max(startCell.z, endCell.z),
+    minX: Math.min(...cells.map(({ x }) => x)),
+    maxX: Math.max(...cells.map(({ x }) => x)),
+    minZ: Math.min(...cells.map(({ z }) => z)),
+    maxZ: Math.max(...cells.map(({ z }) => z)),
   });
 }
 
@@ -119,10 +117,7 @@ export class ObjectMarqueeSelection {
     const rect = clientRect(drag.start.x, drag.start.y, event.clientX, event.clientY);
     const canvasBounds = this.controller.canvas.getBoundingClientRect();
     const ids = [];
-    for (const object of queryCandidates(this.controller, drag.start, {
-      x: event.clientX,
-      y: event.clientY,
-    })) {
+    for (const object of queryCandidates(this.controller, rect)) {
       const point = objectClientPoint(this.controller, object, canvasBounds);
       if (!point) continue;
       if (
