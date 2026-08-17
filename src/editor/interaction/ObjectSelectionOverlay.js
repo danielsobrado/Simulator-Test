@@ -39,19 +39,25 @@ export class ObjectSelectionOverlay {
   }
 
   position(overlay, object) {
-    const placement = this.objectView.resolvePlacement(object);
-    const center = this.objectView.placementResolver.renderCenter(placement.bounds);
-    overlay.position.set(
-      center.x,
-      placement.surface.baseHeight + OVERLAY_HEIGHT_OFFSET,
-      center.z,
-    );
-    overlay.scale.set(
-      placement.bounds.width * this.objectView.tileMap.tileSize,
-      placement.bounds.depth * this.objectView.tileMap.tileSize,
-      1,
-    );
-    overlay.visible = true;
+    try {
+      const placement = this.objectView.resolvePlacement(object);
+      const center = this.objectView.placementResolver.renderCenter(placement.bounds);
+      overlay.position.set(
+        center.x,
+        placement.surface.baseHeight + OVERLAY_HEIGHT_OFFSET,
+        center.z,
+      );
+      overlay.scale.set(
+        placement.bounds.width * this.objectView.tileMap.tileSize,
+        placement.bounds.depth * this.objectView.tileMap.tileSize,
+        1,
+      );
+      overlay.visible = true;
+      return true;
+    } catch {
+      overlay.visible = false;
+      return false;
+    }
   }
 
   sync(ids, primaryId) {
