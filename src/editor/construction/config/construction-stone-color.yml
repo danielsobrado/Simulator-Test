@@ -1,0 +1,52 @@
+version: 1
+
+defaults:
+  enabled: false
+  strength: 0
+  warmChance: 0.5
+  neutralChance: 1
+  value:
+    min: 1
+    max: 1
+  warm: [1, 1, 1]
+  cool: [1, 1, 1]
+  outlier:
+    chance: 0
+    multiplier: [1, 1, 1]
+  categories:
+    field: 1
+    coping: 0.7
+    ashlar: 0.45
+    quoin: 0.45
+    voussoir: 0.5
+    merlon: 0.65
+    recess: 0
+
+styles:
+  coursed-rubble:
+    enabled: true
+    strength: 0.72
+    warmChance: 0.54
+    neutralChance: 0.16
+    value:
+      min: 0.965
+      max: 1.04
+    warm: [1.055, 1.018, 0.962]
+    cool: [0.972, 1.004, 1.038]
+    outlier:
+      chance: 0.045
+      multiplier: [0.91, 0.925, 0.92]
+
+  soft-limestone-rubble:
+    enabled: true
+    strength: 0.48
+    warmChance: 0.52
+    neutralChance: 0.24
+    value:
+      min: 0.98
+      max: 1.025
+    warm: [1.035, 1.014, 0.975]
+    cool: [0.982, 1.002, 1.025]
+    outlier:
+      chance: 0.03
+      multiplier: [0.94, 0.95, 0.945]

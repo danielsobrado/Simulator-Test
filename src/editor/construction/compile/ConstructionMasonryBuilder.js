@@ -31,6 +31,7 @@ import {
 } from './ConstructionMortarCoreBuilder.js';
 import { reliefQuadPrism } from './ConstructionReliefQuadPrism.js';
 import { reduceStoneAppearanceForLod } from './ConstructionStoneLodReducer.js';
+import { applyConstructionStoneColorGrade } from './ConstructionStoneColorGrade.js';
 import { resolveStoneTopology } from './ConstructionStoneTopologyResolver.js';
 import { buildSoftStoneGeometry } from './ConstructionSoftStoneGeometry.js';
 
@@ -774,7 +775,7 @@ export function buildModuleMasonry(placements, {
         edgeWearFallbackCount += 1;
       }
     }
-    stoneGeometries.push(applyUnitShading(
+    const shadedStone = applyUnitShading(
       builtStone.geometry,
       recipe,
       {
@@ -783,7 +784,14 @@ export function buildModuleMasonry(placements, {
         protrusion: stoneShape.protrusion,
         depth: stoneShape.depth,
       },
-    ));
+    );
+    stoneGeometries.push(applyConstructionStoneColorGrade(shadedStone, {
+      styleKey: record.style.key,
+      seed: record.seed,
+      stableIndex: placement.stableIndex,
+      category: placement.category ?? 'field',
+      hasCustomStoneMaterial: Boolean(record.style?.materials?.stone),
+    }));
     const mortarDescriptor = createMortarDescriptor({
       placement,
       stoneShape,
