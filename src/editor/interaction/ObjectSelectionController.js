@@ -182,10 +182,18 @@ export class ObjectSelectionController {
   }
 
   rotate() {
-    return this.commitTransform(
-      (object) => ({ ...object, rotation: (object.rotation + 1) % 4 }),
-      'Rotated',
-    );
+    const primary = this.primaryId ? this.controller.objectMap.getById(this.primaryId) : null;
+    if (!primary) return false;
+    return this.commitTransform((object) => {
+      const deltaX = object.x - primary.x;
+      const deltaZ = object.z - primary.z;
+      return {
+        ...object,
+        x: primary.x - deltaZ,
+        z: primary.z + deltaX,
+        rotation: (object.rotation + 1) % 4,
+      };
+    }, 'Rotated');
   }
 
   delete() {
@@ -205,13 +213,18 @@ export class ObjectSelectionController {
   }
 
   duplicate() {
-    const result = this.batchEditor.duplicate(this.objects());
+    const originals = this.objects();
+    const primaryIndex = originals.findIndex(({ id }) => id === this.primaryId);
+    const result = this.batchEditor.duplicate(originals);
     if (!result.ok) {
       this.controller.emitNotice('No nearby space is available for this duplicate.', true);
       return false;
     }
     this.model.clear();
     for (const object of result.created) this.model.add(object.id);
+    if (primaryIndex >= 0 && result.created[primaryIndex]) {
+      this.model.setPrimary(result.created[primaryIndex].id);
+    }
     this.controller.commitHistory(createObjectBatchHistory(result.changes));
     this.controller.refreshObjects();
     this.syncVisuals();
