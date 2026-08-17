@@ -27,3 +27,20 @@ test('generated natural editor config stays aligned with YAML', () => {
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.storage, source.storage);
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.playerSettings, source.playerSettings);
 });
+
+test('player-facing taxonomy stays focused on world intent', () => {
+  const primaryById = new Map(
+    NATURAL_EDITOR_UI_CONFIG.primaryTools.map((tool) => [tool.id, tool]),
+  );
+  assert.deepEqual([...primaryById.keys()], ['terrain', 'nature', 'build', 'decor']);
+  assert.equal(primaryById.get('nature').objectCategory, 'nature');
+  assert.equal(primaryById.get('decor').objectCategory, 'civic');
+  assert.deepEqual(
+    NATURAL_EDITOR_UI_CONFIG.buildActions.map(({ id }) => id),
+    ['wall', 'structures', 'defenses', 'workshop'],
+  );
+  assert.deepEqual(
+    NATURAL_EDITOR_UI_CONFIG.worldActions.map(({ id }) => id),
+    ['save', 'load', 'new'],
+  );
+});
