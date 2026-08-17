@@ -12,6 +12,17 @@ export const CONSTRUCTION_DIRECT_GIZMO_CONFIG = Object.freeze({
     minUnitsPerPixel: 0.002,
     maxUnitsPerPixel: 0.08,
   }),
+  thickness: Object.freeze({
+    lift: 0.34,
+    radius: 0.11,
+    pickRadius: 0.2,
+    heightRatio: 0.52,
+    minimumHeight: 0.55,
+    precisionMultiplier: 0.25,
+    snapStep: 0.1,
+    minimum: 0.1,
+    maximum: 10,
+  }),
   move: Object.freeze({
     lift: 1.15,
     radius: 0.28,
@@ -22,6 +33,7 @@ export const CONSTRUCTION_DIRECT_GIZMO_CONFIG = Object.freeze({
     radialSegments: 12,
     renderOrder: 120,
     heightColor: '#f5f0df',
+    thicknessColor: '#e5bf78',
     moveColor: '#83e0b5',
   }),
 });
