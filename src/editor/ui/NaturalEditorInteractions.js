@@ -1,4 +1,3 @@
-import { EditorController } from '../EditorController.js';
 import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 import { ObjectSelectionController } from '../interaction/ObjectSelectionController.js';
 import { OBJECT_SELECTION_ADDITIVE_MODE_EVENT } from '../interaction/ObjectSelectionEvents.js';
@@ -8,6 +7,13 @@ const SELECTION = Symbol.for('drusniel.natural-editor-selection');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
 let additivePointerMode = false;
+
+function isTextControl(target) {
+  return target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+    || target?.isContentEditable === true;
+}
 
 function effectiveTerrainGestureMode(event) {
   if (event.ctrlKey || event.metaKey) return 'smooth';
@@ -30,7 +36,7 @@ function historyLabel(entry) {
 }
 
 function installNaturalEditorInteractions() {
-  const prototype = EditorController.prototype;
+  const prototype = TerrainAwareEditorController.prototype;
   if (prototype[PATCH_MARK]) return;
   Object.defineProperty(prototype, PATCH_MARK, { value: true });
   globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
@@ -278,11 +284,9 @@ function installNaturalEditorInteractions() {
     return selectionFor(this).moveTo(cell);
   };
 
-  const rotateSelection = function naturalRotateSelected() {
+  prototype.rotateSelected = function naturalRotateSelected() {
     return selectionFor(this).rotate();
   };
-  prototype.rotateSelected = rotateSelection;
-  TerrainAwareEditorController.prototype.rotateSelected = rotateSelection;
 
   prototype.duplicateSelected = function naturalDuplicateSelected() {
     return selectionFor(this).duplicate();
@@ -340,6 +344,7 @@ function installNaturalEditorInteractions() {
 
   const keyDown = prototype.onKeyDown;
   prototype.onKeyDown = function naturalKeyDown(event) {
+    if (isTextControl(event.target)) return;
     const selection = selectionFor(this);
     if (
       (event.ctrlKey || event.metaKey)
