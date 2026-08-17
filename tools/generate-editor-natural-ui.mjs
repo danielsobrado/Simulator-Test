@@ -45,6 +45,13 @@ function positiveNumber(value, label) {
   return value;
 }
 
+function unitInterval(value, label) {
+  if (!Number.isFinite(value) || value <= 0 || value > 1) {
+    fail(`${label} must be greater than 0 and at most 1.`);
+  }
+  return value;
+}
+
 function validateUniqueItems(items, label) {
   if (!Array.isArray(items) || items.length === 0) fail(`${label} must be a non-empty array.`);
   const ids = new Set();
@@ -96,6 +103,7 @@ function validate(source) {
   ]) positiveInteger(thumbnails[key], `thumbnails.${key}`);
   positiveNumber(thumbnails.cameraFov, 'thumbnails.cameraFov');
   positiveNumber(thumbnails.cameraPadding, 'thumbnails.cameraPadding');
+  unitInterval(thumbnails.quality, 'thumbnails.quality');
 
   validateUniqueItems(source.primaryTools, 'primaryTools');
   validateUniqueItems(source.buildActions, 'buildActions');
