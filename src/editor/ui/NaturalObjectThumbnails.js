@@ -6,6 +6,7 @@ import { NATURAL_EDITOR_UI_CONFIG } from './NaturalEditorUiConfig.generated.js';
 
 const CONFIG = NATURAL_EDITOR_UI_CONFIG.thumbnails;
 const PREVIEW_TILE_SIZE = 1;
+const THUMBNAIL_MIME_TYPE = 'image/webp';
 
 function idle(callback) {
   if (typeof globalThis.requestIdleCallback === 'function') {
@@ -74,13 +75,30 @@ function frameCamera(camera, bounds) {
   camera.updateProjectionMatrix();
 }
 
-function previewDataUrl(renderer, scene, camera, definition) {
+function canvasImageUrl(canvas) {
+  if (typeof canvas.toBlob !== 'function') {
+    return Promise.resolve(canvas.toDataURL(THUMBNAIL_MIME_TYPE, CONFIG.quality));
+  }
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(blob
+        ? URL.createObjectURL(blob)
+        : canvas.toDataURL(THUMBNAIL_MIME_TYPE, CONFIG.quality));
+    }, THUMBNAIL_MIME_TYPE, CONFIG.quality);
+  });
+}
+
+function releaseImageUrl(url) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+}
+
+async function previewImageUrl(renderer, scene, camera, definition) {
   const { group, geometries, bounds } = createPreviewGroup(definition);
   scene.add(group);
   try {
     frameCamera(camera, bounds);
     renderer.render(scene, camera);
-    return renderer.domElement.toDataURL('image/webp', 0.86);
+    return await canvasImageUrl(renderer.domElement);
   } finally {
     scene.remove(group);
     for (const geometry of geometries) geometry.dispose();
@@ -106,6 +124,7 @@ class NaturalObjectThumbnails {
       100,
     );
     this.renderScheduled = false;
+    this.rendering = false;
     this.disposeTimer = null;
     this.failed = false;
     this.disposed = false;
@@ -149,7 +168,7 @@ class NaturalObjectThumbnails {
     for (const card of this.palette.querySelectorAll('.object-card[data-object-key]')) {
       const key = card.dataset.objectKey;
       const cached = this.cache.get(key);
-      if (cached) this.applyToCard(card, key, cached);
+      if (cached) this.applyToCard(card, cached);
       if (this.observedCards.has(card)) continue;
       this.observedCards.add(card);
       this.intersectionObserver?.observe(card);
@@ -184,11 +203,17 @@ class NaturalObjectThumbnails {
   }
 
   scheduleRender() {
-    if (this.renderScheduled || this.disposed || this.failed || this.panel.hidden) return;
+    if (
+      this.renderScheduled
+      || this.rendering
+      || this.disposed
+      || this.failed
+      || this.panel.hidden
+    ) return;
     this.renderScheduled = true;
     idle(() => {
       this.renderScheduled = false;
-      this.renderNext();
+      void this.renderNext();
     });
   }
 
@@ -219,8 +244,8 @@ class NaturalObjectThumbnails {
     }
   }
 
-  renderNext() {
-    if (this.disposed || this.panel.hidden) {
+  async renderNext() {
+    if (this.rendering || this.disposed || this.panel.hidden) {
       this.scheduleRendererDisposal();
       return;
     }
@@ -230,26 +255,40 @@ class NaturalObjectThumbnails {
       return;
     }
     if (!this.ensureRenderer()) return;
-    const definition = OBJECT_BY_KEY.get(key);
-    if (definition && !this.cache.has(key)) {
-      try {
-        const url = previewDataUrl(this.renderer, this.scene, this.camera, definition);
-        this.setCache(key, url);
-        this.applyCachedKey(key);
-      } catch (error) {
-        console.warn(`Object thumbnail failed for ${key}.`, error);
+
+    this.rendering = true;
+    try {
+      const definition = OBJECT_BY_KEY.get(key);
+      if (definition && !this.cache.has(key)) {
+        const url = await previewImageUrl(this.renderer, this.scene, this.camera, definition);
+        const stillWanted = !this.intersectionObserver || this.wanted.has(key);
+        if (this.disposed || this.panel.hidden || !stillWanted) {
+          releaseImageUrl(url);
+        } else {
+          this.setCache(key, url);
+          this.applyCachedKey(key);
+        }
+      }
+    } catch (error) {
+      console.warn(`Object thumbnail failed for ${key}.`, error);
+    } finally {
+      this.rendering = false;
+      if (!this.disposed && !this.panel.hidden && this.queue.length > 0) {
+        this.scheduleRender();
+      } else {
+        this.scheduleRendererDisposal();
       }
     }
-    if (this.queue.length > 0) this.scheduleRender();
-    else this.scheduleRendererDisposal();
   }
 
   setCache(key, url) {
+    const previous = this.cache.get(key);
+    if (previous && previous !== url) releaseImageUrl(previous);
     this.cache.delete(key);
     this.cache.set(key, url);
     while (this.cache.size > CONFIG.maxMemoryEntries) {
       const oldest = this.cache.keys().next().value;
-      this.cache.delete(oldest);
+      this.evict(oldest);
     }
   }
 
@@ -258,17 +297,30 @@ class NaturalObjectThumbnails {
     this.cache.set(key, url);
   }
 
+  evict(key) {
+    const url = this.cache.get(key);
+    if (!url) return;
+    this.cache.delete(key);
+    for (const card of this.palette.querySelectorAll(
+      `.object-card[data-object-key="${CSS.escape(key)}"]`,
+    )) {
+      card.querySelector('.natural-object-thumbnail')?.remove();
+      card.classList.remove('has-natural-thumbnail');
+    }
+    releaseImageUrl(url);
+  }
+
   applyCachedKey(key) {
     const url = this.cache.get(key);
     if (!url) return;
     for (const card of this.palette.querySelectorAll(
       `.object-card[data-object-key="${CSS.escape(key)}"]`,
     )) {
-      this.applyToCard(card, key, url);
+      this.applyToCard(card, url);
     }
   }
 
-  applyToCard(card, key, url) {
+  applyToCard(card, url) {
     let image = card.querySelector('.natural-object-thumbnail');
     if (!image) {
       image = document.createElement('img');
@@ -280,16 +332,16 @@ class NaturalObjectThumbnails {
     }
     if (image.src !== url) image.src = url;
     card.classList.add('has-natural-thumbnail');
-    this.touchCache(key, url);
   }
 
   scheduleRendererDisposal() {
     clearTimeout(this.disposeTimer);
-    if (!this.renderer) return;
+    if (!this.renderer || this.rendering) return;
     this.disposeTimer = setTimeout(() => this.disposeRenderer(), CONFIG.idleDisposeMs);
   }
 
   disposeRenderer() {
+    if (this.rendering) return;
     clearTimeout(this.disposeTimer);
     this.disposeTimer = null;
     this.renderer?.dispose();
@@ -307,6 +359,7 @@ class NaturalObjectThumbnails {
     this.queue.length = 0;
     this.queued.clear();
     this.wanted.clear();
+    for (const url of this.cache.values()) releaseImageUrl(url);
     this.cache.clear();
     this.disposeRenderer();
   }
