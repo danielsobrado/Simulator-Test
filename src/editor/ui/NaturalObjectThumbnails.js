@@ -126,8 +126,13 @@ class NaturalObjectThumbnails {
   }
 
   onPanelVisibility() {
-    if (this.disposed || this.panel.hidden) return;
+    if (this.disposed) return;
+    if (this.panel.hidden) {
+      this.scheduleRendererDisposal();
+      return;
+    }
     this.observeCards();
+    if (this.queue.length > 0) this.scheduleRender();
     if (!this.intersectionObserver) {
       const cards = [...this.palette.querySelectorAll('.object-card[data-object-key]')]
         .slice(0, CONFIG.fallbackVisibleCards);
@@ -148,6 +153,7 @@ class NaturalObjectThumbnails {
   }
 
   onIntersection(entries) {
+    if (this.panel.hidden) return;
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
       const key = entry.target.dataset.objectKey;
@@ -166,11 +172,11 @@ class NaturalObjectThumbnails {
     if (this.queued.has(key)) return;
     this.queued.add(key);
     this.queue.push(key);
-    this.scheduleRender();
+    if (!this.panel.hidden) this.scheduleRender();
   }
 
   scheduleRender() {
-    if (this.renderScheduled || this.disposed || this.failed) return;
+    if (this.renderScheduled || this.disposed || this.failed || this.panel.hidden) return;
     this.renderScheduled = true;
     idle(() => {
       this.renderScheduled = false;
@@ -197,7 +203,7 @@ class NaturalObjectThumbnails {
   }
 
   renderNext() {
-    if (this.disposed || this.queue.length === 0) {
+    if (this.disposed || this.panel.hidden || this.queue.length === 0) {
       this.scheduleRendererDisposal();
       return;
     }
