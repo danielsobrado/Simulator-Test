@@ -1,0 +1,5 @@
+.natural-context-action[data-natural-select-more].is-active {
+  border-color: color-mix(in srgb, #d9bd66 70%, transparent);
+  background: color-mix(in srgb, #d9bd66 18%, transparent);
+  color: #f5df94;
+}
