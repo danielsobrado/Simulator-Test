@@ -1,8 +1,7 @@
 import { NATURAL_EDITOR_UI_CONFIG } from '../ui/NaturalEditorUiConfig.generated.js';
+import { OBJECT_SELECTION_CHANGED_EVENT } from './ObjectSelectionEvents.js';
 import { ObjectSelectionModel } from './ObjectSelectionModel.js';
 import { ObjectSelectionOverlay } from './ObjectSelectionOverlay.js';
-
-const SELECTION_EVENT = 'drusniel:natural-selection-change';
 
 function objectChange(before, after) {
   return Object.freeze({ kind: 'object', before, after });
@@ -60,7 +59,9 @@ export class ObjectSelectionController {
       primaryId: this.primaryId,
       count: this.size,
     });
-    globalThis.window?.dispatchEvent?.(new CustomEvent(SELECTION_EVENT, { detail }));
+    globalThis.window?.dispatchEvent?.(
+      new CustomEvent(OBJECT_SELECTION_CHANGED_EVENT, { detail }),
+    );
   }
 
   syncVisuals() {
@@ -137,9 +138,7 @@ export class ObjectSelectionController {
     this.drag = null;
 
     if (event.type === 'pointercancel') {
-      this.controller.movingObjectId = null;
-      this.controller.updatePreviews();
-      this.controller.emitState();
+      this.cancelMove();
       return true;
     }
 
@@ -150,11 +149,7 @@ export class ObjectSelectionController {
         this.controller.activeCamera,
       );
       if (cell) this.moveTo(cell);
-      else {
-        this.controller.movingObjectId = null;
-        this.controller.updatePreviews();
-        this.controller.emitState();
-      }
+      else this.cancelMove();
       event.preventDefault();
     }
     return true;
@@ -163,6 +158,12 @@ export class ObjectSelectionController {
   startMove() {
     if (!this.primaryId) return;
     this.controller.movingObjectId = this.primaryId;
+    this.controller.updatePreviews();
+    this.controller.emitState();
+  }
+
+  cancelMove() {
+    this.controller.movingObjectId = null;
     this.controller.updatePreviews();
     this.controller.emitState();
   }
@@ -181,6 +182,7 @@ export class ObjectSelectionController {
       }
     } catch (error) {
       this.controller.objectMap.replaceAll(snapshot);
+      this.cancelMove();
       this.controller.emitNotice(error.message, true);
       return false;
     }
@@ -197,15 +199,13 @@ export class ObjectSelectionController {
   moveTo(cell) {
     const primary = this.primaryId ? this.controller.objectMap.getById(this.primaryId) : null;
     if (!primary) {
-      this.controller.movingObjectId = null;
+      this.cancelMove();
       return false;
     }
     const deltaX = cell.x - primary.x;
     const deltaZ = cell.z - primary.z;
     if (deltaX === 0 && deltaZ === 0) {
-      this.controller.movingObjectId = null;
-      this.controller.updatePreviews();
-      this.controller.emitState();
+      this.cancelMove();
       return false;
     }
     return this.transformSelected(
@@ -310,5 +310,3 @@ export class ObjectSelectionController {
     this.drag = null;
   }
 }
-
-export { SELECTION_EVENT };
