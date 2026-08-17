@@ -5,6 +5,7 @@ const ICONS = Object.freeze({
   decor: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m5.6 5.6 2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/><circle cx="12" cy="12" r="3.2"/></svg>',
   wall: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19V8h4v3h3V8h4v3h3V8h4v11H3Z"/><path d="M3 15h18"/></svg>',
   structures: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10l8-6 8 6v10H4Z"/><path d="M9 20v-6h6v6"/></svg>',
+  defense: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-2.7 8-7 10-4.3-2-7-5.4-7-10V6l7-3Z"/><path d="M9 12h6M12 9v6"/></svg>',
   workshop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 19 8.5-8.5"/><path d="m14.5 4.5 5 5-3 3-5-5 3-3Z"/><path d="m4 16 4 4-4 1 0-5Z"/></svg>',
   settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>',
   undo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"/><path d="M5 12h7.5a6 6 0 0 1 6 6"/></svg>',
