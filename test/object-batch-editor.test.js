@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   ObjectBatchEditor,
   createObjectBatchHistory,
+  rotateObjectAroundPrimary,
 } from '../src/editor/interaction/ObjectBatchEditor.js';
 
 class FakeObjectMap {
@@ -95,4 +96,20 @@ test('object batch history restores transactional changes', () => {
 
   editor.applyHistory(history, 'redo');
   assert.deepEqual(objectMap.list().map(({ id, z }) => [id, z]), [[1, 5], [2, 9]]);
+});
+
+test('group rotation keeps the primary fixed and rotates relative positions', () => {
+  const primary = { id: 1, x: 10, z: 10, rotation: 0 };
+  const east = { id: 2, x: 13, z: 10, rotation: 2 };
+  const north = { id: 3, x: 10, z: 7, rotation: 3 };
+
+  assert.deepEqual(rotateObjectAroundPrimary(primary, primary), {
+    id: 1, x: 10, z: 10, rotation: 1,
+  });
+  assert.deepEqual(rotateObjectAroundPrimary(east, primary), {
+    id: 2, x: 10, z: 13, rotation: 3,
+  });
+  assert.deepEqual(rotateObjectAroundPrimary(north, primary), {
+    id: 3, x: 13, z: 10, rotation: 0,
+  });
 });
