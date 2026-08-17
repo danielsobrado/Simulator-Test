@@ -11,6 +11,7 @@ class FakeObjectMap {
   constructor(objects) {
     this.objects = new Map(objects.map((object) => [object.id, { ...object }]));
     this.nextId = Math.max(0, ...this.objects.keys()) + 1;
+    this.replaceAllCalls = 0;
   }
 
   list() {
@@ -19,6 +20,10 @@ class FakeObjectMap {
 
   getBounds(x, z) {
     return { minX: x, maxX: x, minZ: z, maxZ: z, width: 1, depth: 1 };
+  }
+
+  getCells(x, z) {
+    return [{ x, z }];
   }
 
   remove(id) {
@@ -41,6 +46,7 @@ class FakeObjectMap {
   }
 
   replaceAll(objects) {
+    this.replaceAllCalls += 1;
     this.objects = new Map(objects.map((object) => [object.id, { ...object }]));
     this.nextId = Math.max(0, ...this.objects.keys()) + 1;
   }
@@ -69,9 +75,10 @@ test('object batch transform is atomic and keeps ids', () => {
   assert.equal(result.ok, true);
   assert.deepEqual(objectMap.list().map(({ id, x }) => [id, x]), [[1, 6], [2, 9]]);
   assert.deepEqual(result.changes.map(({ before, after }) => [before.id, after.id]), [[1, 1], [2, 2]]);
+  assert.equal(objectMap.replaceAllCalls, 0);
 });
 
-test('object batch transform rolls back every object on failure', () => {
+test('object batch transform rolls back only touched objects on failure', () => {
   const { objectMap, editor } = fixture();
   const before = objectMap.list();
   const result = editor.transform(before, (object) => ({
@@ -81,6 +88,17 @@ test('object batch transform rolls back every object on failure', () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.error.message, 'blocked');
+  assert.deepEqual(objectMap.list(), before);
+  assert.equal(objectMap.replaceAllCalls, 0);
+});
+
+test('object batch rejects group self-overlap without partial mutation', () => {
+  const { objectMap, editor } = fixture();
+  const before = objectMap.list();
+  const result = editor.transform(before, (object) => ({ ...object, x: 10, z: 10 }));
+
+  assert.equal(result.ok, false);
+  assert.match(result.error.message, /overlap/i);
   assert.deepEqual(objectMap.list(), before);
 });
 
@@ -96,6 +114,7 @@ test('object batch history restores transactional changes', () => {
 
   editor.applyHistory(history, 'redo');
   assert.deepEqual(objectMap.list().map(({ id, z }) => [id, z]), [[1, 5], [2, 9]]);
+  assert.equal(objectMap.replaceAllCalls, 0);
 });
 
 test('group rotation keeps the primary fixed and rotates relative positions', () => {
