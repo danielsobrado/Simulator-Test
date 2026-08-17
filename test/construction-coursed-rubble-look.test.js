@@ -64,13 +64,13 @@ test('coursed rubble keeps readable recessed joints and contact shadow', () => {
   assert.equal(mortar.color, '#66645d');
 });
 
-test('soft stone topology adds inward-only hand-cut edge midpoints', () => {
+test('soft stone topology adds inward-only hand-cut edge cuts', () => {
   const wearSide = Object.freeze({
     enabled: true,
     cornerWidth: Object.freeze([0.05, 0.052, 0.048, 0.051]),
     cornerDepth: Object.freeze([0.03, 0.032, 0.029, 0.031]),
     edgeMidpointScale: Object.freeze([1.18, 0.84, 1.12, 0.88]),
-    cornerFlattening: Object.freeze([0, 0, 0, 0]),
+    cornerFlattening: Object.freeze([0.18, 0, 0, 0]),
     safeguards: Object.freeze({
       minimumFaceAreaRatio: 0.58,
       minimumEdgeLength: 0.06,
@@ -96,7 +96,7 @@ test('soft stone topology adds inward-only hand-cut edge midpoints', () => {
     edgeWear: { front: wearSide, back: wearSide },
     mortarConfig: CONSTRUCTION_MORTAR_CONFIG,
     bevelRings: 2,
-    allowCornerFlattening: false,
+    allowCornerFlattening: true,
   });
 
   assert.equal(topology.valid, true);
@@ -112,4 +112,9 @@ test('soft stone topology adds inward-only hand-cut edge midpoints', () => {
   assert.ok(topology.front.sourceLoop[1][1] < topology.front.faceLoop[1][1]);
   assert.ok(topology.front.sourceLoop[1][0] >= -0.5);
   assert.ok(topology.front.sourceLoop[1][0] <= 0.5);
+
+  // A flattened corner now affects the silhouette as well as the broad face,
+  // producing a real chipped cut while remaining strictly inside the cell.
+  assert.ok(topology.front.sourceLoop[0][0] > -0.5);
+  assert.ok(topology.front.sourceLoop[0][1] > -0.25);
 });

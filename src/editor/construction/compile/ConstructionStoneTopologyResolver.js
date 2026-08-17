@@ -14,6 +14,8 @@ const MIDPOINT_VARIATION_EPSILON = 1e-4;
 const MIDPOINT_SOURCE_PULL = 0.22;
 const MIDPOINT_SHOULDER_PULL = 0.65;
 const MIDPOINT_DEPTH_RESPONSE = 0.6;
+const FLATTENED_SOURCE_CORNER_PULL = 0.8;
+const FLATTENED_SHOULDER_CORNER_PULL = 0.18;
 
 function polygonArea(ring) {
   let total = 0;
@@ -118,21 +120,36 @@ function hasMidpointVariation(scales) {
   return scales.some((value) => Math.abs(value - 1) > MIDPOINT_VARIATION_EPSILON);
 }
 
+function wornCorner(source, shoulder, face, strength) {
+  if (!(strength > 0)) return { source: [...source], shoulder: [...shoulder] };
+  const sourcePull = clamp(strength * FLATTENED_SOURCE_CORNER_PULL, 0, 0.16);
+  const shoulderPull = clamp(
+    strength * FLATTENED_SHOULDER_CORNER_PULL,
+    0,
+    0.04,
+  );
+  return {
+    source: lerpPoint(source, face, sourcePull),
+    shoulder: lerpPoint(shoulder, face, shoulderPull),
+  };
+}
+
 /**
  * Insert a midpoint on each arris so the bevel silhouette can bow independently
  * of the four solved lattice corners.
  *
- * The lattice boundary is authoritative: a midpoint may move inward but never
- * outward, so this extra hand-cut detail can expose mortar without invading a
- * neighbouring stone. The broad face remains the original four-corner quad;
- * its midpoint is therefore kept exactly on the face edge and cannot open a
- * crack between the face and bevel band.
+ * The lattice boundary is authoritative: midpoints and chipped corners may move
+ * inward but never outward, so this extra hand-cut detail can expose mortar
+ * without invading a neighbouring stone. The broad face remains the original
+ * four-corner quad; its midpoint is therefore kept exactly on the face edge and
+ * cannot open a crack between the face and bevel band.
  */
 function buildMidpointLoops({
   sourceRing,
   faceCorners,
   shoulderCorners,
   cornerDepths,
+  cornerFlattening,
   midpointScales,
 }) {
   const sourceLoop = [];
@@ -145,6 +162,12 @@ function buildMidpointLoops({
     const next = (index + 1) % 4;
     const scale = midpointScales[index];
     const variation = scale - 1;
+    const corner = wornCorner(
+      sourceRing[index],
+      shoulderCorners[index],
+      faceCorners[index],
+      cornerFlattening[index] ?? 0,
+    );
 
     const sourceMid = midpoint(sourceRing[index], sourceRing[next]);
     const faceMid = midpoint(faceCorners[index], faceCorners[next]);
@@ -175,8 +198,8 @@ function buildMidpointLoops({
       1.12,
     );
 
-    sourceLoop.push([...sourceRing[index]], wornSourceMid);
-    shoulderLoop.push([...shoulderCorners[index]], wornShoulderMid);
+    sourceLoop.push(corner.source, wornSourceMid);
+    shoulderLoop.push(corner.shoulder, wornShoulderMid);
     faceLoop.push([...faceCorners[index]], faceMid);
     outerDepths.push(cornerDepths[index], midpointDepth);
     shoulderDepths.push(cornerDepths[index] * 0.55, midpointDepth * 0.55);
@@ -207,6 +230,7 @@ function buildLoops({
       faceCorners,
       shoulderCorners,
       cornerDepths,
+      cornerFlattening: edgeWear.cornerFlattening ?? [0, 0, 0, 0],
       midpointScales,
     });
   }
@@ -267,7 +291,10 @@ function resolveSideTopology({
     sourceRing,
     faceCorners,
     shoulderCorners,
-    edgeWear,
+    edgeWear: {
+      ...edgeWear,
+      cornerFlattening: flattening,
+    },
     cornerDepths,
     variationScale,
   });
