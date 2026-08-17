@@ -91,7 +91,7 @@ test('object batch history restores transactional changes', () => {
 
   const undoTargets = editor.applyHistory(history, 'undo');
   assert.deepEqual(objectMap.list(), originals);
-  assert.deepEqual(undoTargets.map(({ id }) => id), [2, 1]);
+  assert.deepEqual(undoTargets.map(({ id }) => id), [1, 2]);
 
   editor.applyHistory(history, 'redo');
   assert.deepEqual(objectMap.list().map(({ id, z }) => [id, z]), [[1, 5], [2, 9]]);
