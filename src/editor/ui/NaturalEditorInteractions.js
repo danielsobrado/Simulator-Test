@@ -1,6 +1,10 @@
+import { TerrainAwareEditorController } from '../TerrainAwareEditorController.js';
 import { ObjectSelectionController } from '../interaction/ObjectSelectionController.js';
 import { OBJECT_SELECTION_ADDITIVE_MODE_EVENT } from '../interaction/ObjectSelectionEvents.js';
+import { installNaturalConstructionContextBridge } from './NaturalConstructionContextBridge.js';
+import { installNaturalEditorHoverBridge } from './NaturalEditorHoverBridge.js';
 
+const BOOTSTRAP_MARK = Symbol.for('drusniel.natural-editor-interactions-bootstrap');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
 
@@ -61,10 +65,14 @@ export function installNaturalEditorInteractions(controller) {
     'undo',
     'redo',
     'onKeyDown',
+    'dispose',
   ]);
   const abort = new AbortController();
   const selection = new ObjectSelectionController(controller, original.setSelectedObject);
+  const hoverBridge = installNaturalEditorHoverBridge(controller);
+  const constructionContextBridge = installNaturalConstructionContextBridge(controller);
   let additivePointerMode = false;
+  let disposed = false;
 
   globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
     additivePointerMode = event.detail?.enabled === true;
@@ -357,11 +365,32 @@ export function installNaturalEditorInteractions(controller) {
   const integration = {
     selection,
     dispose() {
+      if (disposed) return;
+      disposed = true;
       abort.abort();
+      constructionContextBridge.dispose();
+      hoverBridge.dispose();
       selection.dispose();
       controller.naturalEditorInteractions = null;
     },
   };
   controller.naturalEditorInteractions = integration;
+  controller.dispose = () => {
+    integration.dispose();
+    return original.dispose();
+  };
   return integration;
 }
+
+function installBootstrapHook() {
+  const prototype = TerrainAwareEditorController.prototype;
+  if (prototype[BOOTSTRAP_MARK]) return;
+  Object.defineProperty(prototype, BOOTSTRAP_MARK, { value: true });
+  const subscribe = prototype.subscribe;
+  prototype.subscribe = function naturalSubscribe(listener) {
+    installNaturalEditorInteractions(this);
+    return subscribe.call(this, listener);
+  };
+}
+
+installBootstrapHook();
