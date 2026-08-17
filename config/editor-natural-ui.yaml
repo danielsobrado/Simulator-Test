@@ -18,6 +18,22 @@ motion:
 playerSettings:
   reducedMotionClass: natural-reduced-motion
 
+selection:
+  dragThresholdPx: 5
+  maxVisibleOverlays: 128
+  duplicateGapCells: 1
+
+thumbnails:
+  width: 128
+  height: 92
+  cameraFov: 28
+  cameraPadding: 1.34
+  maxMemoryEntries: 96
+  rootMarginPx: 320
+  idleTimeoutMs: 160
+  idleDisposeMs: 2500
+  fallbackVisibleCards: 24
+
 primaryTools:
   - id: terrain
     label: Terrain
@@ -64,6 +80,6 @@ worldActions:
   - { id: new, label: Reset edits }
 
 hints:
-  firstRun: 'Drag the world directly. Click an object to select it. Shift lowers terrain; Ctrl smooths.'
+  firstRun: 'Drag the world directly. Click an object to select it. Shift-click selects more. Shift lowers terrain; Ctrl smooths.'
   terrain: 'Drag to paint or sculpt. Shift lowers. Ctrl smooths. Shift + wheel changes brush size.'
   build: 'Drag empty ground to draw a wall. Click a wall to edit it. Drag its handles directly.'
