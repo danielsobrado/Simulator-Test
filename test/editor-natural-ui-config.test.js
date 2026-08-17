@@ -25,4 +25,5 @@ test('generated natural editor config stays aligned with YAML', () => {
   );
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.limits, source.limits);
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.storage, source.storage);
+  assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.playerSettings, source.playerSettings);
 });
