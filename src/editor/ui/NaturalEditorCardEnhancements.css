@@ -1,7 +1,13 @@
+.object-group {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
 .natural-object-card-wrap {
   position: relative;
   display: grid;
   min-width: 0;
+  contain: layout paint style;
 }
 
 .natural-object-card-wrap > .object-card {
