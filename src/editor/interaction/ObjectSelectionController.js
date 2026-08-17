@@ -4,6 +4,7 @@ import {
   createObjectBatchHistory,
   rotateObjectAroundPrimary,
 } from './ObjectBatchEditor.js';
+import { ObjectMarqueeSelection } from './ObjectMarqueeSelection.js';
 import { OBJECT_SELECTION_CHANGED_EVENT } from './ObjectSelectionEvents.js';
 import { ObjectSelectionModel } from './ObjectSelectionModel.js';
 import { ObjectSelectionOverlay } from './ObjectSelectionOverlay.js';
@@ -15,6 +16,7 @@ export class ObjectSelectionController {
     this.model = new ObjectSelectionModel();
     this.overlay = new ObjectSelectionOverlay(controller.objectView);
     this.batchEditor = new ObjectBatchEditor(controller);
+    this.marquee = new ObjectMarqueeSelection(controller, this);
     this.drag = null;
     this.returnTool = 'terrain';
   }
@@ -69,9 +71,24 @@ export class ObjectSelectionController {
     return this.model.has(object.id);
   }
 
+  addMany(ids) {
+    const previousPrimary = this.primaryId;
+    let changed = false;
+    for (const id of ids) {
+      if (!this.controller.objectMap.getById(id)) continue;
+      changed = this.model.add(id) || changed;
+    }
+    if (previousPrimary !== null && this.model.has(previousPrimary)) {
+      this.model.setPrimary(previousPrimary);
+    }
+    if (changed) this.syncVisuals();
+    return changed;
+  }
+
   clear() {
     this.model.clear();
     this.drag = null;
+    this.marquee.cancel();
     this.syncVisuals();
   }
 
@@ -242,6 +259,7 @@ export class ObjectSelectionController {
   }
 
   dispose() {
+    this.marquee.dispose();
     this.overlay.dispose();
     this.drag = null;
   }
