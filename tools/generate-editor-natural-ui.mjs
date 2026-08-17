@@ -12,6 +12,7 @@ const ROOT_KEYS = new Set([
   'storage',
   'limits',
   'motion',
+  'playerSettings',
   'primaryTools',
   'buildActions',
   'worldActions',
@@ -57,7 +58,9 @@ function validate(source) {
   if (source.version !== 1) fail('version must be 1.');
 
   const storage = plainObject(source.storage, 'storage');
-  for (const key of ['favoritesKey', 'recentKey', 'hintKey']) nonEmptyString(storage[key], `storage.${key}`);
+  for (const key of ['favoritesKey', 'recentKey', 'hintKey', 'reducedMotionKey']) {
+    nonEmptyString(storage[key], `storage.${key}`);
+  }
 
   const limits = plainObject(source.limits, 'limits');
   positiveInteger(limits.recentObjects, 'limits.recentObjects');
@@ -65,6 +68,9 @@ function validate(source) {
 
   const motion = plainObject(source.motion, 'motion');
   for (const key of ['panelMs', 'toolbarMs', 'hintDurationMs']) positiveInteger(motion[key], `motion.${key}`);
+
+  const playerSettings = plainObject(source.playerSettings, 'playerSettings');
+  nonEmptyString(playerSettings.reducedMotionClass, 'playerSettings.reducedMotionClass');
 
   validateUniqueItems(source.primaryTools, 'primaryTools');
   validateUniqueItems(source.buildActions, 'buildActions');
