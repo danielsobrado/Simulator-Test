@@ -50,11 +50,11 @@ defaults:
 
   categories:
     field: 1.0
-    coping: 0.20
-    ashlar: 0.10
-    quoin: 0.08
-    voussoir: 0.05
-    merlon: 0.15
+    coping: 0.35
+    ashlar: 0.18
+    quoin: 0.14
+    voussoir: 0.16
+    merlon: 0.30
     recess: 0.0
 
 styles:

@@ -250,8 +250,7 @@ function createStoneGeometry(stoneShape, {
   allowCornerFlattening = true,
 } = {}) {
   if (
-    stoneShape.lattice
-    && stoneShape.relief?.enabled
+    stoneShape.relief?.enabled
     && stoneShape.edgeWear?.front?.enabled
     && stoneShape.edgeWear?.back?.enabled
   ) {
@@ -397,11 +396,13 @@ function softAppearanceAllowed({
   edgeWearProfile,
 }) {
   const category = placement.category ?? 'field';
-  if (!placement.corners || category !== 'field') return false;
+  if (category === 'recess') return false;
   const band = lodBand === 'coarse' ? lodProfile.coarse : lodProfile.near;
   if (lodBand === 'near' && band.mode !== 'soft') return false;
   if (lodBand === 'coarse' && band.mode !== 'soft-coarse') return false;
   if (!reliefProfile.enabled || !edgeWearProfile.enabled) return false;
+  if (!(reliefProfile.categories?.[category] > 0)) return false;
+  if (!(edgeWearProfile.categories?.[category] > 0)) return false;
   if (
     shaped.width < edgeWearProfile.minimumStone.width
     || shaped.height < edgeWearProfile.minimumStone.height
@@ -478,8 +479,8 @@ function resolveStoneEdgeWear({
   mortarFaceRecess,
   seed,
 }) {
-  // First integration: field stones only. Category scales remain in YAML for
-  // later dressing tuning once field QA passes.
+  // Legacy fallback path remains lattice field-only; the soft appearance path
+  // above owns worked dressings when their category profiles enable it.
   const edgeWearAllowed = (
     !coarse
     && edgeWearProfile.enabled
