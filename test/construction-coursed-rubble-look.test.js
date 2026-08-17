@@ -45,7 +45,8 @@ test('coursed rubble uses the soft hand-cut stone appearance pipeline', () => {
   assert.equal(lod.near.edgeMidpoints, true);
   assert.equal(lod.near.cornerFlattening, true);
   assert.equal(lod.coarse.mode, 'soft-coarse');
-  assert.equal(lod.coarse.edgeMidpoints, false);
+  assert.equal(lod.coarse.edgeMidpoints, true);
+  assert.ok(lod.coarse.edgeVariationScale < lod.near.edgeVariationScale);
 
   assert.ok(surface.unitShading.brightnessMin <= 0.945);
   assert.ok(surface.unitShading.brightnessMax >= 1.055);

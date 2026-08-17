@@ -51,7 +51,7 @@ styles:
         columns: 1
         rows: 1
       bevelRings: 1
-      edgeMidpoints: false
+      edgeMidpoints: true
       cornerFlattening: false
       reliefAmplitudeScale: 0.46
       edgeVariationScale: 0.26
@@ -83,7 +83,7 @@ styles:
         columns: 1
         rows: 1
       bevelRings: 1
-      edgeMidpoints: false
+      edgeMidpoints: true
       cornerFlattening: false
       reliefAmplitudeScale: 0.55
       edgeVariationScale: 0.32
