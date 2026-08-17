@@ -26,6 +26,8 @@ test('generated natural editor config stays aligned with YAML', () => {
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.limits, source.limits);
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.storage, source.storage);
   assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.playerSettings, source.playerSettings);
+  assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.selection, source.selection);
+  assert.deepEqual(NATURAL_EDITOR_UI_CONFIG.thumbnails, source.thumbnails);
 });
 
 test('player-facing taxonomy stays focused on world intent', () => {
@@ -43,4 +45,11 @@ test('player-facing taxonomy stays focused on world intent', () => {
     NATURAL_EDITOR_UI_CONFIG.worldActions.map(({ id }) => id),
     ['save', 'load', 'new'],
   );
+});
+
+test('natural editor scalability limits are bounded', () => {
+  assert.ok(NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays <= 256);
+  assert.ok(NATURAL_EDITOR_UI_CONFIG.thumbnails.maxMemoryEntries <= 256);
+  assert.ok(NATURAL_EDITOR_UI_CONFIG.thumbnails.rootMarginPx >= 100);
+  assert.ok(NATURAL_EDITOR_UI_CONFIG.thumbnails.fallbackVisibleCards > 0);
 });
