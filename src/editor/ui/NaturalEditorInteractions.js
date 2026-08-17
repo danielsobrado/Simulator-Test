@@ -3,6 +3,7 @@ import { EditorController } from '../EditorController.js';
 const PATCH_MARK = Symbol.for('drusniel.natural-editor-interactions');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
+const OBJECT_DRAG_DISTANCE_PX = 5;
 
 function effectiveTerrainGestureMode(event) {
   if (event.ctrlKey || event.metaKey) return 'smooth';
@@ -41,6 +42,13 @@ function restoreConstructionTool(controller) {
   return true;
 }
 
+function clearObjectDrag(controller, event) {
+  controller.naturalObjectDrag = null;
+  if (controller.canvas?.hasPointerCapture?.(event.pointerId)) {
+    controller.canvas.releasePointerCapture(event.pointerId);
+  }
+}
+
 function selectObjectDirectly(controller, objectId, event) {
   const returnTool = controller.naturalConstructionReturnTool
     ?? (controller.tool === 'select'
@@ -55,6 +63,14 @@ function selectObjectDirectly(controller, objectId, event) {
   }
   controller.tool = 'select';
   controller.setSelectedObject(objectId);
+  controller.naturalObjectDrag = {
+    pointerId: event.pointerId,
+    objectId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    moving: false,
+  };
+  controller.canvas?.setPointerCapture?.(event.pointerId);
   controller.updatePreviews();
   controller.emitState();
   event.preventDefault();
@@ -65,6 +81,7 @@ function selectConstructionDirectly(controller, constructionId, event) {
     ? controller.naturalReturnTool ?? DEFAULT_RETURN_TOOL
     : controller.tool;
   controller.cancelConstructionGesture();
+  controller.naturalObjectDrag = null;
   controller.setSelectedObject(null);
   controller.tool = 'construction';
   controller.constructionMode = 'edit';
@@ -73,6 +90,52 @@ function selectConstructionDirectly(controller, constructionId, event) {
   controller.updatePreviews();
   controller.emitState();
   event.preventDefault();
+}
+
+function updateObjectDrag(controller, event) {
+  const drag = controller.naturalObjectDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+  if (!drag.moving) {
+    const distance = Math.hypot(
+      event.clientX - drag.startClientX,
+      event.clientY - drag.startClientY,
+    );
+    if (distance >= OBJECT_DRAG_DISTANCE_PX) {
+      controller.startMoveSelected();
+      drag.moving = controller.movingObjectId === drag.objectId;
+    }
+  }
+  return drag.moving;
+}
+
+function finishObjectDrag(controller, event) {
+  const drag = controller.naturalObjectDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+
+  if (event.type === 'pointercancel') {
+    controller.movingObjectId = null;
+    controller.updatePreviews();
+    controller.emitState();
+    clearObjectDrag(controller, event);
+    return true;
+  }
+
+  if (drag.moving && controller.movingObjectId) {
+    const cell = controller.terrainView.pickCell(
+      event.clientX,
+      event.clientY,
+      controller.activeCamera,
+    );
+    if (cell) controller.moveSelectedTo(cell);
+    else {
+      controller.movingObjectId = null;
+      controller.updatePreviews();
+      controller.emitState();
+    }
+    event.preventDefault();
+  }
+  clearObjectDrag(controller, event);
+  return true;
 }
 
 function installNaturalEditorInteractions() {
@@ -84,6 +147,7 @@ function installNaturalEditorInteractions() {
   prototype.selectTool = function naturalSelectTool(tool) {
     if (tool !== 'select') this.naturalReturnTool = tool;
     this.naturalConstructionReturnTool = null;
+    this.naturalObjectDrag = null;
     return selectTool.call(this, tool);
   };
 
@@ -166,6 +230,7 @@ function installNaturalEditorInteractions() {
 
   const pointerMove = prototype.onPointerMove;
   prototype.onPointerMove = function naturalPointerMove(event) {
+    updateObjectDrag(this, event);
     if (!this.naturalTerrainGestureMode) return pointerMove.call(this, event);
     const savedMode = this.terrainMode;
     this.terrainMode = this.naturalTerrainGestureMode;
@@ -192,6 +257,10 @@ function installNaturalEditorInteractions() {
 
   const pointerUp = prototype.onPointerUp;
   prototype.onPointerUp = function naturalPointerUp(event) {
+    if (finishObjectDrag(this, event)) {
+      this.naturalTerrainGestureMode = null;
+      return;
+    }
     try {
       return pointerUp.call(this, event);
     } finally {
@@ -210,6 +279,7 @@ function installNaturalEditorInteractions() {
     this.objectRotation = selected.rotation;
     this.naturalReturnTool = 'object';
     this.tool = 'object';
+    this.naturalObjectDrag = null;
     this.setSelectedObject(null);
     this.updatePreviews();
     this.emitNotice('Place the duplicate where you want it.');
@@ -219,6 +289,7 @@ function installNaturalEditorInteractions() {
   const deleteSelected = prototype.deleteSelected;
   prototype.deleteSelected = function naturalDeleteSelected() {
     const hadSelection = Boolean(this.selectedObjectId);
+    this.naturalObjectDrag = null;
     const result = deleteSelected.call(this);
     if (hadSelection) restoreSelectionTool(this);
     return result;
@@ -264,7 +335,10 @@ function installNaturalEditorInteractions() {
     const escapeConstructionReturn = event.key.toLowerCase() === 'escape'
       && Boolean(this.naturalConstructionReturnTool);
     const result = keyDown.call(this, event);
-    if (event.key.toLowerCase() === 'escape') restoreSelectionTool(this);
+    if (event.key.toLowerCase() === 'escape') {
+      this.naturalObjectDrag = null;
+      restoreSelectionTool(this);
+    }
     if (escapeConstructionReturn) restoreConstructionTool(this);
     return result;
   };
