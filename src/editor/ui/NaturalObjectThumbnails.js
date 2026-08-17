@@ -273,7 +273,9 @@ class NaturalObjectThumbnails {
       console.warn(`Object thumbnail failed for ${key}.`, error);
     } finally {
       this.rendering = false;
-      if (!this.disposed && !this.panel.hidden && this.queue.length > 0) {
+      if (this.disposed) {
+        this.disposeRenderer();
+      } else if (!this.panel.hidden && this.queue.length > 0) {
         this.scheduleRender();
       } else {
         this.scheduleRendererDisposal();
