@@ -10,7 +10,8 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
   "storage": {
     "favoritesKey": "drusniel:natural-ui:favorites",
     "recentKey": "drusniel:natural-ui:recent",
-    "hintKey": "drusniel:natural-ui:hint-seen"
+    "hintKey": "drusniel:natural-ui:hint-seen",
+    "reducedMotionKey": "drusniel:natural-ui:reduced-motion"
   },
   "limits": {
     "recentObjects": 8,
@@ -20,6 +21,9 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
     "panelMs": 160,
     "toolbarMs": 140,
     "hintDurationMs": 9000
+  },
+  "playerSettings": {
+    "reducedMotionClass": "natural-reduced-motion"
   },
   "primaryTools": [
     {
