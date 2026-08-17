@@ -35,6 +35,7 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
     "height": 92,
     "cameraFov": 28,
     "cameraPadding": 1.34,
+    "quality": 0.86,
     "maxMemoryEntries": 96,
     "rootMarginPx": 320,
     "idleTimeoutMs": 160,
