@@ -37,13 +37,13 @@ styles:
     near:
       mode: soft
       faceGrid:
-        columns: 2
+        columns: 3
         rows: 2
       bevelRings: 2
-      edgeMidpoints: false
+      edgeMidpoints: true
       cornerFlattening: true
-      reliefAmplitudeScale: 0.88
-      edgeVariationScale: 0.92
+      reliefAmplitudeScale: 1
+      edgeVariationScale: 1
 
     coarse:
       mode: soft-coarse
@@ -53,8 +53,8 @@ styles:
       bevelRings: 1
       edgeMidpoints: false
       cornerFlattening: false
-      reliefAmplitudeScale: 0.42
-      edgeVariationScale: 0.24
+      reliefAmplitudeScale: 0.46
+      edgeVariationScale: 0.26
 
     transition:
       hysteresisMetres: 7
@@ -72,7 +72,7 @@ styles:
         columns: 3
         rows: 2
       bevelRings: 2
-      edgeMidpoints: false
+      edgeMidpoints: true
       cornerFlattening: true
       reliefAmplitudeScale: 1
       edgeVariationScale: 1

@@ -34,12 +34,12 @@ export const CONSTRUCTION_STONE_LOD_PROFILES = Object.freeze({
   "coursed-rubble": Object.freeze({
     near: Object.freeze({
       mode: "soft",
-      faceGrid: Object.freeze({ columns: 2, rows: 2 }),
+      faceGrid: Object.freeze({ columns: 3, rows: 2 }),
       bevelRings: 2,
-      edgeMidpoints: false,
+      edgeMidpoints: true,
       cornerFlattening: true,
-      reliefAmplitudeScale: 0.88,
-      edgeVariationScale: 0.92,
+      reliefAmplitudeScale: 1,
+      edgeVariationScale: 1,
     }),
     coarse: Object.freeze({
       mode: "soft-coarse",
@@ -47,8 +47,8 @@ export const CONSTRUCTION_STONE_LOD_PROFILES = Object.freeze({
       bevelRings: 1,
       edgeMidpoints: false,
       cornerFlattening: false,
-      reliefAmplitudeScale: 0.42,
-      edgeVariationScale: 0.24,
+      reliefAmplitudeScale: 0.46,
+      edgeVariationScale: 0.26,
     }),
     transition: Object.freeze({
       hysteresisMetres: 7,
@@ -66,7 +66,7 @@ export const CONSTRUCTION_STONE_LOD_PROFILES = Object.freeze({
       mode: "soft",
       faceGrid: Object.freeze({ columns: 3, rows: 2 }),
       bevelRings: 2,
-      edgeMidpoints: false,
+      edgeMidpoints: true,
       cornerFlattening: true,
       reliefAmplitudeScale: 1,
       edgeVariationScale: 1,

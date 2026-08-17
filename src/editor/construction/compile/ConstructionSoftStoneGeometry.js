@@ -267,6 +267,7 @@ function finalizeGeometry(buffers, topology, vertexCount, triangleCount, faceTri
       frontFaceTriangles: faceTris,
       backFaceTriangles: faceTris,
       flattenedCorners: topology.front.flattenedCorners + topology.back.flattenedCorners,
+      edgeMidpoints: Boolean(topology.diagnostics?.edgeMidpointsApplied),
       areaRatio: topology.diagnostics.areaRatio,
     }),
   };
@@ -286,13 +287,16 @@ function buildNearSoftStone(topology) {
       `ConstructionSoftStoneGeometry: near soft stone expects bevelRings=2, got ${bevelRings}.`,
     );
   }
+  const loopCount = front.sourceLoop.length;
+  if (back.sourceLoop.length !== loopCount) {
+    throw new Error('ConstructionSoftStoneGeometry: front/back loop counts differ.');
+  }
   const estimate = estimateSoftStoneTopology({
     faceGrid: { columns, rows },
     bevelRings: 2,
-    edgeMidpoints: false,
+    edgeMidpoints: loopCount > 4,
   });
   const buffers = createBuffers(estimate.vertices, estimate.triangles);
-  const loopCount = front.sourceLoop.length;
 
   writeFaceGrid(buffers, front.faceCorners, front.relief, 'front', columns, rows, half);
   writeFaceGrid(buffers, back.faceCorners, back.relief, 'back', columns, rows, half);
@@ -320,13 +324,16 @@ function buildCoarseSoftStone(topology) {
     throw new Error('ConstructionSoftStoneGeometry: relief required.');
   }
   const half = topology.depth / 2;
+  const loopCount = front.sourceLoop.length;
+  if (back.sourceLoop.length !== loopCount) {
+    throw new Error('ConstructionSoftStoneGeometry: front/back loop counts differ.');
+  }
   const estimate = estimateSoftStoneTopology({
     faceGrid: { columns: 1, rows: 1 },
     bevelRings: 1,
-    edgeMidpoints: false,
+    edgeMidpoints: loopCount > 4,
   });
   const buffers = createBuffers(estimate.vertices, estimate.triangles);
-  const loopCount = front.sourceLoop.length;
 
   writeCoarseFace(buffers, front.faceCorners, front.relief, 'front', half);
   writeCoarseFace(buffers, back.faceCorners, back.relief, 'back', half);

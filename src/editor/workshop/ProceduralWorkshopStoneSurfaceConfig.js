@@ -57,35 +57,37 @@ const VALID_NORMAL_KINDS = new Set([
 export const STONE_SURFACE_PROFILES = Object.freeze({
   'soft-limestone': Object.freeze({
     unitShading: Object.freeze({
-      brightnessMin: 0.97,
-      brightnessMax: 1.025,
-      weatheringStrength: 0.075,
+      // Wider coherent stone-to-stone value range, but less high-frequency
+      // surface noise: the block silhouette and bevel lighting do the work.
+      brightnessMin: 0.945,
+      brightnessMax: 1.055,
+      weatheringStrength: 0.065,
     }),
 
     proceduralAlbedo: Object.freeze({
-      broadCellSize: 24,
-      broadVariation: 7,
-      grainVariation: 3,
-      dampDarkening: 8,
-      dampGreenLift: 2,
+      broadCellSize: 28,
+      broadVariation: 5,
+      grainVariation: 2,
+      dampDarkening: 7,
+      dampGreenLift: 1.5,
     }),
 
     material: Object.freeze({
-      bumpTextureScale: 0.55,
-      bumpScale: 0.028,
+      bumpTextureScale: 0.42,
+      bumpScale: 0.020,
 
-      roughnessBase: 238,
+      roughnessBase: 236,
       roughnessVariation: 10,
-      roughnessBroadScale: 14,
+      roughnessBroadScale: 16,
 
       normalKind: 'stoneBlock',
-      workshopNormalScale: 0.28,
-      constructionNormalScale: 0.28,
+      workshopNormalScale: 0.22,
+      constructionNormalScale: 0.22,
 
-      workshopEnvMapIntensity: 0.58,
-      constructionEnvMapIntensity: 0.58,
+      workshopEnvMapIntensity: 0.64,
+      constructionEnvMapIntensity: 0.64,
 
-      mortarColor: '#74746d',
+      mortarColor: '#707069',
     }),
   }),
 });

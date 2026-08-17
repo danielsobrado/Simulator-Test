@@ -38,18 +38,18 @@ styles:
     enabled: true
 
     grid:
-      columns: 2
+      columns: 3
       rows: 2
 
     recession:
-      ratioMin: 0.016
-      ratioMax: 0.034
-      minimum: 0.005
-      maximum: 0.017
+      ratioMin: 0.020
+      ratioMax: 0.046
+      minimum: 0.006
+      maximum: 0.022
 
     edgeFalloffPower: 1.45
-    asymmetry: 0.22
-    saddleStrength: 0.08
+    asymmetry: 0.32
+    saddleStrength: 0.12
 
   soft-limestone-rubble:
     enabled: true

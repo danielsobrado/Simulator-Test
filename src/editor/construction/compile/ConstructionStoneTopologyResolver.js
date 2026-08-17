@@ -10,6 +10,11 @@ import {
   variableInsetSurvived,
 } from '../../workshop/ProceduralWorkshopGeometry.js';
 
+const MIDPOINT_VARIATION_EPSILON = 1e-4;
+const MIDPOINT_SOURCE_PULL = 0.22;
+const MIDPOINT_SHOULDER_PULL = 0.65;
+const MIDPOINT_DEPTH_RESPONSE = 0.6;
+
 function polygonArea(ring) {
   let total = 0;
   for (let index = 0; index < ring.length; index += 1) {
@@ -26,6 +31,14 @@ function lerp(a, b, t) {
 
 function lerpPoint(a, b, t) {
   return [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+}
+
+function midpoint(a, b) {
+  return lerpPoint(a, b, 0.5);
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function cloneRing(ring) {
@@ -96,23 +109,78 @@ function softenFlattenedCorners(faceCorners, sourceRing, flattening) {
   return { corners: result, flattened };
 }
 
-function buildLoops({
+function resolvedMidpointScales(edgeWear, variationScale) {
+  const source = edgeWear.edgeMidpointScale ?? [1, 1, 1, 1];
+  return source.map((value) => lerp(1, value, variationScale));
+}
+
+function hasMidpointVariation(scales) {
+  return scales.some((value) => Math.abs(value - 1) > MIDPOINT_VARIATION_EPSILON);
+}
+
+/**
+ * Insert a midpoint on each arris so the bevel silhouette can bow independently
+ * of the four solved lattice corners.
+ *
+ * The lattice boundary is authoritative: a midpoint may move inward but never
+ * outward, so this extra hand-cut detail can expose mortar without invading a
+ * neighbouring stone. The broad face remains the original four-corner quad;
+ * its midpoint is therefore kept exactly on the face edge and cannot open a
+ * crack between the face and bevel band.
+ */
+function buildMidpointLoops({
   sourceRing,
   faceCorners,
   shoulderCorners,
-  edgeWear,
   cornerDepths,
+  midpointScales,
 }) {
-  void edgeWear;
-  // Near LOD uses the four solved corners for both bevel bands. Midpoint bowing
-  // stays available via edgeMidpointScale in the sampler for a later denser pass
-  // once the triangle budget allows; variable corner insets already break the
-  // uniform machine-cut ring.
-  const sourceLoop = cloneRing(sourceRing);
-  const shoulderLoop = cloneRing(shoulderCorners);
-  const faceLoop = cloneRing(faceCorners);
-  const outerDepths = cornerDepths.map((value) => value);
-  const shoulderDepths = cornerDepths.map((value) => value * 0.55);
+  const sourceLoop = [];
+  const shoulderLoop = [];
+  const faceLoop = [];
+  const outerDepths = [];
+  const shoulderDepths = [];
+
+  for (let index = 0; index < 4; index += 1) {
+    const next = (index + 1) % 4;
+    const scale = midpointScales[index];
+    const variation = scale - 1;
+
+    const sourceMid = midpoint(sourceRing[index], sourceRing[next]);
+    const faceMid = midpoint(faceCorners[index], faceCorners[next]);
+    const shoulderMid = midpoint(shoulderCorners[index], shoulderCorners[next]);
+
+    // Only positive wear notches the authoritative outer footprint. Negative
+    // variation is represented by a fuller shoulder/depth instead of bulging
+    // outside the cell and overlapping the neighbour.
+    const sourcePull = clamp(
+      Math.max(0, variation) * MIDPOINT_SOURCE_PULL,
+      0,
+      0.055,
+    );
+    const wornSourceMid = lerpPoint(sourceMid, faceMid, sourcePull);
+
+    const shoulderTarget = variation >= 0 ? faceMid : wornSourceMid;
+    const shoulderPull = clamp(
+      Math.abs(variation) * MIDPOINT_SHOULDER_PULL,
+      0,
+      0.16,
+    );
+    const wornShoulderMid = lerpPoint(shoulderMid, shoulderTarget, shoulderPull);
+
+    const averageDepth = (cornerDepths[index] + cornerDepths[next]) * 0.5;
+    const midpointDepth = averageDepth * clamp(
+      1 + variation * MIDPOINT_DEPTH_RESPONSE,
+      0.88,
+      1.12,
+    );
+
+    sourceLoop.push([...sourceRing[index]], wornSourceMid);
+    shoulderLoop.push([...shoulderCorners[index]], wornShoulderMid);
+    faceLoop.push([...faceCorners[index]], faceMid);
+    outerDepths.push(cornerDepths[index], midpointDepth);
+    shoulderDepths.push(cornerDepths[index] * 0.55, midpointDepth * 0.55);
+  }
 
   return {
     sourceLoop,
@@ -120,6 +188,36 @@ function buildLoops({
     faceLoop,
     outerDepths,
     shoulderDepths,
+    edgeMidpoints: true,
+  };
+}
+
+function buildLoops({
+  sourceRing,
+  faceCorners,
+  shoulderCorners,
+  edgeWear,
+  cornerDepths,
+  variationScale,
+}) {
+  const midpointScales = resolvedMidpointScales(edgeWear, variationScale);
+  if (hasMidpointVariation(midpointScales)) {
+    return buildMidpointLoops({
+      sourceRing,
+      faceCorners,
+      shoulderCorners,
+      cornerDepths,
+      midpointScales,
+    });
+  }
+
+  return {
+    sourceLoop: cloneRing(sourceRing),
+    shoulderLoop: cloneRing(shoulderCorners),
+    faceLoop: cloneRing(faceCorners),
+    outerDepths: cornerDepths.map((value) => value),
+    shoulderDepths: cornerDepths.map((value) => value * 0.55),
+    edgeMidpoints: false,
   };
 }
 
@@ -171,10 +269,11 @@ function resolveSideTopology({
     shoulderCorners,
     edgeWear,
     cornerDepths,
+    variationScale,
   });
   if (rings === 1) {
     loops.shoulderDepths = loops.outerDepths.map((value) => value);
-    loops.shoulderLoop = cloneRing(faceCorners);
+    loops.shoulderLoop = cloneRing(loops.faceLoop);
   }
 
   const maxShoulderDepth = Math.max(...loops.shoulderDepths);
@@ -232,6 +331,7 @@ export function resolveStoneTopology({
   const diagnostics = {
     edgeWearRequested: Boolean(edgeWear?.front?.enabled || edgeWear?.back?.enabled),
     edgeWearApplied: false,
+    edgeMidpointsApplied: false,
     variableInsetClamped: false,
     flatteningDropped: false,
     fallbackReason: null,
@@ -319,6 +419,7 @@ export function resolveStoneTopology({
   }
 
   diagnostics.edgeWearApplied = true;
+  diagnostics.edgeMidpointsApplied = chosen.front.edgeMidpoints && chosen.back.edgeMidpoints;
   diagnostics.variableInsetClamped = chosen.scale < 1 || chosen.insetScale < 1;
   diagnostics.fallbackReason = null;
   diagnostics.areaRatio = Math.min(chosen.front.areaRatio, chosen.back.areaRatio);
@@ -341,6 +442,7 @@ export function resolveStoneTopology({
       faceEdgeRecession: chosen.front.faceEdgeRecession,
       relief: chosen.front.relief,
       flattenedCorners: chosen.front.flattenedCorners,
+      edgeMidpoints: chosen.front.edgeMidpoints,
       bevelRings: rings,
     }),
     back: Object.freeze({
@@ -354,6 +456,7 @@ export function resolveStoneTopology({
       faceEdgeRecession: chosen.back.faceEdgeRecession,
       relief: chosen.back.relief,
       flattenedCorners: chosen.back.flattenedCorners,
+      edgeMidpoints: chosen.back.edgeMidpoints,
       bevelRings: rings,
     }),
     diagnostics: Object.freeze(diagnostics),
