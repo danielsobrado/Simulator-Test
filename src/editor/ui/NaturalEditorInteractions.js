@@ -214,6 +214,28 @@ function installNaturalEditorInteractions() {
     }
   };
 
+  const updatePreviews = prototype.updatePreviews;
+  prototype.updatePreviews = function naturalUpdatePreviews() {
+    const selection = selectionFor(this);
+    selection.overlay.clearPreview();
+    if (this.tool === 'select' && this.movingObjectId && selection.size > 1) {
+      this.terrainView.setPreview(null);
+      this.objectView.setPreview(null);
+      const primary = selection.primaryId
+        ? this.objectMap.getById(selection.primaryId)
+        : null;
+      if (primary && this.hoveredCell) {
+        selection.overlay.previewTranslation(
+          selection.objects(),
+          this.hoveredCell.x - primary.x,
+          this.hoveredCell.z - primary.z,
+        );
+      }
+      return;
+    }
+    return updatePreviews.call(this);
+  };
+
   const pointerUp = prototype.onPointerUp;
   prototype.onPointerUp = function naturalPointerUp(event) {
     if (selectionFor(this).finishDirectDrag(event)) {
