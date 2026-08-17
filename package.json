@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "generate:natural-ui": "node tools/generate-editor-natural-ui.mjs",
+    "check:natural-ui": "node tools/generate-editor-natural-ui.mjs --check",
     "generate:forest-assets": "node scripts/generate-forest-assets.mjs",
     "extract:authored-assets": "node scripts/extract-authored-assets.mjs && npm run optimize:runtime-assets",
     "optimize:runtime-assets": "node scripts/optimize-runtime-assets.mjs",
@@ -46,7 +48,7 @@
     "qa:construction:edge-wear": "node scripts/run-construction-stone-edge-wear-qa.mjs",
     "qa:construction:lod": "node scripts/run-construction-stone-lod-qa.mjs",
     "qa:construction:ruin": "node scripts/run-construction-ruin-qa.mjs",
-    "verify": "npm run validate:assets:production && npm test && npm run build",
+    "verify": "npm run check:natural-ui && npm run validate:assets:production && npm test && npm run build",
     "extract:grass-profiles": "node scripts/extract-grass-blade-profiles.mjs"
   },
   "dependencies": {
