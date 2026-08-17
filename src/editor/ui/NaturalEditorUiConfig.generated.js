@@ -92,7 +92,7 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
     },
     {
       "id": "new",
-      "label": "New world"
+      "label": "Reset edits"
     }
   ],
   "hints": {
