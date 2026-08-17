@@ -49,7 +49,7 @@ export const NATURAL_EDITOR_UI_CONFIG = deepFreeze({
       "id": "decor",
       "label": "Decor",
       "controllerTool": "object",
-      "objectCategory": "all",
+      "objectCategory": "civic",
       "icon": "decor"
     }
   ],
