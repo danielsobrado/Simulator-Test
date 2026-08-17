@@ -18,6 +18,10 @@ function installStateBridge() {
   if (!root?.querySelector('.natural-top-chrome')) return false;
   mirrorButtonState(root, 'undo');
   mirrorButtonState(root, 'redo');
+  const worldMenuHelp = root.querySelector('.natural-world-menu p');
+  if (worldMenuHelp) {
+    worldMenuHelp.textContent = 'Save, restore or start fresh. Appearance, imports and creator tools live in Settings.';
+  }
   return true;
 }
 
