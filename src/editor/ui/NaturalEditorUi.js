@@ -6,31 +6,40 @@ import { NATURAL_EDITOR_UI_CONFIG } from './NaturalEditorUiConfig.generated.js';
 const INSTALL_MARK = 'naturalUiInstalled';
 const PANEL_SELECTOR = '.sidebar [data-panel]';
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function buttonMarkup({ id, label, icon }) {
   return `
     <button
       class="natural-tool-button"
       type="button"
-      data-natural-tool="${id}"
+      data-natural-tool="${escapeHtml(id)}"
       aria-pressed="false"
-      title="${label}"
+      title="${escapeHtml(label)}"
     >
       <span class="natural-icon">${naturalEditorIcon(icon)}</span>
-      <span>${label}</span>
+      <span>${escapeHtml(label)}</span>
     </button>
   `;
 }
 
 function actionButtonMarkup(action, icon = null) {
   return `
-    <button class="natural-icon-button" type="button" data-action="${action}" title="${action}">
+    <button class="natural-icon-button" type="button" data-action="${escapeHtml(action)}" title="${escapeHtml(action)}">
       ${icon ? naturalEditorIcon(icon) : ''}
     </button>
   `;
 }
 
 function hiddenTool(root, tool) {
-  return root.querySelector(`.panel--tools [data-tool="${tool}"]`);
+  return root.querySelector(`.panel--tools [data-tool="${CSS.escape(tool)}"]`);
 }
 
 function clickHiddenTool(root, tool) {
@@ -38,7 +47,7 @@ function clickHiddenTool(root, tool) {
 }
 
 function clickCategory(root, category) {
-  const chip = root.querySelector(`[data-object-category="${category}"]`);
+  const chip = root.querySelector(`[data-object-category="${CSS.escape(category)}"]`);
   if (chip) chip.click();
 }
 
@@ -63,6 +72,7 @@ class NaturalEditorUi {
     this.viewport = root.querySelector('[data-role="viewport"]');
     this.objectPalette = root.querySelector('[data-role="object-palette"]');
     this.objectSearch = root.querySelector('[data-role="object-search"]');
+    this.selectedObjectCard = root.querySelector('[data-role="selected-object"]');
     this.preferences = new NaturalEditorPreferences();
     this.activeTool = 'terrain';
     this.previousPrimaryTool = 'terrain';
@@ -84,7 +94,7 @@ class NaturalEditorUi {
     this.chrome.className = 'natural-top-chrome';
     this.chrome.innerHTML = `
       <div class="natural-brand">
-        <button class="natural-icon-button" type="button" data-natural-world-menu title="World menu">
+        <button class="natural-icon-button" type="button" data-natural-world-menu title="World menu" aria-expanded="false">
           ${naturalEditorIcon('menu')}
         </button>
         <div class="natural-brand__text">
@@ -113,10 +123,10 @@ class NaturalEditorUi {
       </div>
       <div class="natural-world-menu__actions">
         ${NATURAL_EDITOR_UI_CONFIG.worldActions.map((action) => `
-          <button class="natural-menu-action" type="button" data-action="${action.id}">${action.label}</button>
+          <button class="natural-menu-action" type="button" data-action="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>
         `).join('')}
       </div>
-      <p>Import, export and creator options stay here so they never compete with building.</p>
+      <p>Save, restore or reset edits. Appearance, imports and creator tools live in Settings.</p>
     `;
 
     this.toolbar = document.createElement('nav');
@@ -131,11 +141,11 @@ class NaturalEditorUi {
       <button
         class="natural-build-action"
         type="button"
-        data-natural-build-action="${action.id}"
-        title="${action.label}"
+        data-natural-build-action="${escapeHtml(action.id)}"
+        title="${escapeHtml(action.label)}"
       >
         <span class="natural-icon">${naturalEditorIcon(action.icon)}</span>
-        <span>${action.label}</span>
+        <span>${escapeHtml(action.label)}</span>
       </button>
     `).join('');
 
@@ -143,7 +153,7 @@ class NaturalEditorUi {
     this.contextToolbar.className = 'natural-context-toolbar';
     this.contextToolbar.hidden = true;
     this.contextToolbar.innerHTML = `
-      <span class="natural-context-toolbar__label">Selected</span>
+      <span class="natural-context-toolbar__label">Object</span>
       <button class="natural-context-action" type="button" data-action="move-selected" title="Move">
         ${naturalEditorIcon('move')}<span>Move</span>
       </button>
@@ -162,6 +172,7 @@ class NaturalEditorUi {
     this.drawerClose.className = 'natural-drawer-close natural-icon-button natural-icon-button--small';
     this.drawerClose.type = 'button';
     this.drawerClose.title = 'Hide panel';
+    this.drawerClose.setAttribute('aria-label', 'Hide panel');
     this.drawerClose.innerHTML = naturalEditorIcon('close');
     this.sidebar.prepend(this.drawerClose);
 
@@ -228,14 +239,6 @@ class NaturalEditorUi {
       this.renderQuickPicks();
     }, true);
 
-    this.objectPalette?.addEventListener('keydown', (event) => {
-      const favorite = event.target.closest('[data-natural-favorite]');
-      if (!favorite || !['Enter', ' '].includes(event.key)) return;
-      event.preventDefault();
-      this.preferences.toggleFavorite(favorite.dataset.naturalFavorite);
-      this.refreshObjectPaletteEnhancements();
-    });
-
     this.quickPicks.addEventListener('click', (event) => {
       const button = event.target.closest('[data-natural-object-key]');
       if (!button) return;
@@ -266,10 +269,14 @@ class NaturalEditorUi {
       this.panelObserver.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
     }
 
-    const selectedDelete = this.root.querySelector('[data-action="delete-selected"]');
+    const selectedDelete = this.root.querySelector('.sidebar [data-action="delete-selected"]');
     if (selectedDelete) {
       this.selectionObserver = new MutationObserver(() => this.syncContextToolbar());
       this.selectionObserver.observe(selectedDelete, { attributes: true, attributeFilter: ['disabled'] });
+    }
+    if (this.selectedObjectCard) {
+      this.selectedObjectObserver = new MutationObserver(() => this.syncContextToolbar());
+      this.selectedObjectObserver.observe(this.selectedObjectCard, { childList: true, subtree: true });
     }
 
     if (this.objectPalette) {
@@ -307,6 +314,8 @@ class NaturalEditorUi {
     const hasObjectSelection = sourceDelete ? !sourceDelete.disabled : false;
     this.contextToolbar.hidden = !hasObjectSelection;
     if (hasObjectSelection) this.sidebar.classList.add('is-selection-context');
+    const label = this.selectedObjectCard?.querySelector('strong')?.textContent?.trim();
+    this.contextToolbar.querySelector('.natural-context-toolbar__label').textContent = label || 'Object';
   }
 
   activatePrimaryTool(toolId) {
@@ -358,19 +367,28 @@ class NaturalEditorUi {
     });
   }
 
+  ensureObjectCardWrapper(card) {
+    if (card.parentElement?.classList.contains('natural-object-card-wrap')) return card.parentElement;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'natural-object-card-wrap';
+    card.before(wrapper);
+    wrapper.append(card);
+    return wrapper;
+  }
+
   refreshObjectPaletteEnhancements() {
     if (!this.objectPalette) return;
     for (const card of this.objectPalette.querySelectorAll('.object-card[data-object-key]')) {
       const key = card.dataset.objectKey;
-      let favorite = card.querySelector('[data-natural-favorite]');
+      const wrapper = this.ensureObjectCardWrapper(card);
+      let favorite = wrapper.querySelector(':scope > [data-natural-favorite]');
       if (!favorite) {
-        favorite = document.createElement('span');
+        favorite = document.createElement('button');
+        favorite.type = 'button';
         favorite.className = 'natural-favorite-toggle';
         favorite.dataset.naturalFavorite = key;
-        favorite.setAttribute('role', 'button');
-        favorite.tabIndex = 0;
         favorite.innerHTML = naturalEditorIcon('star');
-        card.append(favorite);
+        wrapper.append(favorite);
       }
       const active = this.preferences.isFavorite(key);
       favorite.classList.toggle('is-active', active);
@@ -408,11 +426,15 @@ class NaturalEditorUi {
     this.quickPicks.hidden = false;
     this.quickPicks.innerHTML = groups.map(({ label, items }) => `
       <div class="natural-quick-group">
-        <span>${label}</span>
+        <span>${escapeHtml(label)}</span>
         <div>
           ${items.map((item) => `
-            <button type="button" data-natural-object-key="${item.key}" title="${item.label}">
-              <span>${item.icon}</span>${item.label}
+            <button
+              type="button"
+              data-natural-object-key="${escapeHtml(item.key)}"
+              title="${escapeHtml(item.label)}"
+            >
+              <span>${escapeHtml(item.icon)}</span>${escapeHtml(item.label)}
             </button>
           `).join('')}
         </div>
@@ -436,8 +458,8 @@ class NaturalEditorUi {
   showFirstRunHint() {
     const key = NATURAL_EDITOR_UI_CONFIG.storage.hintKey;
     try {
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, '1');
+      if (globalThis.localStorage?.getItem(key)) return;
+      globalThis.localStorage?.setItem(key, '1');
     } catch {
       // Storage is optional.
     }
@@ -456,7 +478,9 @@ class NaturalEditorUi {
 function installWhenReady() {
   const root = document.querySelector('#app');
   const shell = root?.querySelector('.editor-shell');
-  if (root && shell && shell.dataset[INSTALL_MARK] !== 'true') {
+  const sidebar = root?.querySelector('.sidebar');
+  const viewport = root?.querySelector('[data-role="viewport"]');
+  if (root && shell && sidebar && viewport && shell.dataset[INSTALL_MARK] !== 'true') {
     new NaturalEditorUi(root);
     return true;
   }
