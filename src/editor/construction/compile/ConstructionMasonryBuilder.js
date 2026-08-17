@@ -196,11 +196,18 @@ function mortarFaceCorners({ placement, stoneShape, config }) {
 /**
  * Plain-data mortar prism for one resolved stone.
  *
+ * Mortar stays on the solved wall plane, not on the stone's protruded/recessed
+ * jitter plane. That distinction is what makes a proud block cast a real pocket
+ * of shadow into the joint instead of dragging its backing mortar forward with
+ * it and cancelling the depth cue.
+ *
  * @returns {object | null}
  */
 export function createMortarDescriptor({
   placement,
   stoneShape,
+  nominalPosition = null,
+  nominalRotation = null,
   config = CONSTRUCTION_MORTAR_CONFIG,
 }) {
   if (!shouldBuildMortarBacking(placement)) return null;
@@ -230,8 +237,8 @@ export function createMortarDescriptor({
   return {
     corners: mortarCorners,
     depth,
-    position: stoneShape.position,
-    rotation: stoneShape.rotation,
+    position: nominalPosition ?? stoneShape.position,
+    rotation: nominalRotation ?? stoneShape.rotation,
     uvDensity: config.uvDensity,
   };
 }
@@ -795,6 +802,8 @@ export function buildModuleMasonry(placements, {
     const mortarDescriptor = createMortarDescriptor({
       placement,
       stoneShape,
+      nominalPosition: params.position,
+      nominalRotation: params.rotation,
       config: mortarConfig,
     });
     if (mortarDescriptor) mortarDescriptors.push(mortarDescriptor);
