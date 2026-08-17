@@ -1,5 +1,6 @@
 import './editor/lifecycle/installBfcacheRecovery.js';
 import './editor/ui/NaturalEditorInteractions.js';
+import './editor/ui/NaturalEditorKeyboardSafety.js';
 import './editor/ui/NaturalEditorHoverBridge.js';
 import './editor/ui/NaturalConstructionContextBridge.js';
 import './editor/construction/ui/ConstructionThicknessGizmoInteraction.js';
