@@ -104,7 +104,7 @@ export class ObjectBatchEditor {
 
   applyHistory(entry, direction) {
     const snapshot = this.controller.objectMap.list();
-    const changes = direction === 'undo' ? [...entry.changes].reverse() : entry.changes;
+    const changes = entry.changes;
     try {
       for (const change of changes) {
         const source = direction === 'undo' ? change.after : change.before;
