@@ -1,0 +1,24 @@
+.natural-object-card-wrap {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.natural-object-card-wrap > .object-card {
+  width: 100%;
+  height: 100%;
+}
+
+.natural-object-card-wrap > .natural-favorite-toggle {
+  z-index: 3;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.natural-object-card-wrap > .natural-favorite-toggle:focus-visible {
+  outline: 2px solid #d9bd66;
+  outline-offset: 1px;
+}
