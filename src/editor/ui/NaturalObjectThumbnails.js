@@ -99,27 +99,36 @@ class NaturalObjectThumbnails {
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, PREVIEW_WIDTH / PREVIEW_HEIGHT, 0.01, 100);
     this.started = false;
     this.failed = false;
+    this.disposed = false;
 
     this.paletteObserver = new MutationObserver(() => this.applyCached());
     this.paletteObserver.observe(this.palette, { childList: true, subtree: true });
     this.panelObserver = new MutationObserver(() => this.startIfVisible());
     this.panelObserver.observe(this.panel, { attributes: true, attributeFilter: ['hidden'] });
+    this.pagehideHandler = () => this.dispose();
+    globalThis.addEventListener?.('pagehide', this.pagehideHandler, { once: true });
     this.startIfVisible();
   }
 
   startIfVisible() {
-    if (this.started || this.failed || this.panel.hidden) return;
+    if (this.started || this.failed || this.disposed || this.panel.hidden) return;
     this.started = true;
     idle(() => this.renderNext());
   }
 
   ensureRenderer() {
     if (this.renderer) return true;
+    if (this.failed || this.disposed) return false;
+    let renderer = null;
     try {
-      this.renderer = createPreviewRenderer();
-      this.scene = createPreviewScene();
+      renderer = createPreviewRenderer();
+      const scene = createPreviewScene();
+      this.renderer = renderer;
+      this.scene = scene;
       return true;
     } catch (error) {
+      renderer?.dispose();
+      renderer?.forceContextLoss?.();
       this.failed = true;
       console.warn('Object thumbnails disabled: preview renderer unavailable.', error);
       return false;
@@ -127,7 +136,7 @@ class NaturalObjectThumbnails {
   }
 
   renderNext() {
-    if (!this.ensureRenderer()) return;
+    if (this.disposed || !this.ensureRenderer()) return;
     const key = this.pending.shift();
     if (!key) {
       this.disposeRenderer();
@@ -146,6 +155,7 @@ class NaturalObjectThumbnails {
   }
 
   applyCached() {
+    if (this.disposed) return;
     for (const key of this.cache.keys()) this.applyCachedKey(key);
   }
 
@@ -170,6 +180,15 @@ class NaturalObjectThumbnails {
     this.renderer?.forceContextLoss?.();
     this.renderer = null;
     this.scene = null;
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.paletteObserver.disconnect();
+    this.panelObserver.disconnect();
+    this.pending.length = 0;
+    this.disposeRenderer();
   }
 }
 
