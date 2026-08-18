@@ -1,7 +1,29 @@
 import { NATURAL_EDITOR_UI_CONFIG } from '../ui/NaturalEditorUiConfig.generated.js';
 
+function freezeObjectSnapshot(object) {
+  return object ? Object.freeze({ ...object }) : null;
+}
+
 function objectChange(before, after) {
-  return Object.freeze({ kind: 'object', before, after });
+  return Object.freeze({
+    kind: 'object',
+    before: freezeObjectSnapshot(before),
+    after: freezeObjectSnapshot(after),
+  });
+}
+
+function freezeSelectionSnapshot(snapshot) {
+  if (!snapshot) return null;
+  const ids = [];
+  const seen = new Set();
+  for (const id of snapshot.ids ?? []) {
+    if (!Number.isSafeInteger(id) || id < 1 || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  const requestedPrimary = snapshot.primaryId;
+  const primaryId = ids.includes(requestedPrimary) ? requestedPrimary : ids[0] ?? null;
+  return Object.freeze({ ids: Object.freeze(ids), primaryId });
 }
 
 function boundsForObjects(objectMap, objects) {
@@ -60,8 +82,16 @@ export function rotateObjectAroundPrimary(object, primary) {
   };
 }
 
-export function createObjectBatchHistory(changes) {
-  return Object.freeze({ kind: 'object-batch', changes: Object.freeze(changes) });
+export function createObjectBatchHistory(
+  changes,
+  { beforeSelection = null, afterSelection = null } = {},
+) {
+  return Object.freeze({
+    kind: 'object-batch',
+    changes: Object.freeze([...changes]),
+    beforeSelection: freezeSelectionSnapshot(beforeSelection),
+    afterSelection: freezeSelectionSnapshot(afterSelection),
+  });
 }
 
 export class ObjectBatchEditor {
