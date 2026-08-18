@@ -191,7 +191,10 @@ export class WorkshopRadialMenus {
     const next = this.config.modes.find(({ id }) => id === modeId);
     if (!next) return;
     const previous = this.activeMode();
-    if (!initial) this.commitPendingSelections();
+    if (!initial) {
+      this.commitPendingSelections();
+      this.releasePointerGestures();
+    }
     this.modeId = next.id;
     this.wheelResiduals.clear();
     this.hideReadout();
@@ -748,6 +751,18 @@ export class WorkshopRadialMenus {
     }
   }
 
+  releasePointerGestures() {
+    for (const [pointerId, gesture] of this.pointerGestures) {
+      const laneElement = this.laneViews.get(gesture.laneId)?.element;
+      laneElement?.classList.remove('is-dragging');
+      laneElement?.style.removeProperty('--radial-drag-shift');
+      if (gesture.target?.hasPointerCapture?.(pointerId)) {
+        gesture.target.releasePointerCapture(pointerId);
+      }
+    }
+    this.pointerGestures.clear();
+  }
+
   handlePointerOver(event) {
     const item = event.target.closest('[data-radial-item]');
     if (!item) return;
@@ -783,6 +798,7 @@ export class WorkshopRadialMenus {
   dispose() {
     cancelAnimationFrame(this.syncFrame);
     window.clearTimeout(this.readoutTimer);
+    this.releasePointerGestures();
     for (const timer of this.pendingCommitTimers.values()) window.clearTimeout(timer);
     this.pendingCommitTimers.clear();
     this.pendingSelections.clear();
