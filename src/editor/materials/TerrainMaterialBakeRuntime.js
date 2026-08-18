@@ -32,6 +32,14 @@ function validForestFloorKey(slot) {
   return key.startsWith(`${slot.descriptor.key}:`) ? key : null;
 }
 
+function focusDistance(slot, focus) {
+  if (!focus || !slot.descriptor) return 0;
+  return Math.max(
+    Math.abs(slot.descriptor.chunkX - focus.chunkX),
+    Math.abs(slot.descriptor.chunkZ - focus.chunkZ),
+  );
+}
+
 export class TerrainMaterialBakeRuntime {
   constructor({
     terrainView,
@@ -132,6 +140,16 @@ export class TerrainMaterialBakeRuntime {
     });
   }
 
+  prepareSlot(slot, state) {
+    if (state.chunkKey !== slot.descriptor.key) this.resetStateForChunk(slot, state);
+    this.syncCanopyRevision(slot, state);
+    const descriptor = this.descriptorFor(slot);
+    if (state.lease && state.lease.descriptor.key !== descriptor.key) {
+      slot.materialBakeStale = true;
+    }
+    return descriptor;
+  }
+
   installLease(slot, state, descriptor, lease, generation) {
     if (this.disposed
         || generation !== state.generation
@@ -163,7 +181,7 @@ export class TerrainMaterialBakeRuntime {
           return;
         }
         state.pendingKey = null;
-        this.requestSlot(slot, state, clockNow());
+        state.retryAt = 0;
       })
       .catch((error) => {
         if (!this.disposed && generation === state.generation) {
@@ -172,14 +190,9 @@ export class TerrainMaterialBakeRuntime {
       });
   }
 
-  requestSlot(slot, state, now) {
-    if (!slot.descriptor || !slot.page || !slot.mesh.visible) return;
-    if (state.chunkKey !== slot.descriptor.key) this.resetStateForChunk(slot, state);
-    this.syncCanopyRevision(slot, state);
-    const descriptor = this.descriptorFor(slot);
-
-    if (state.lease?.descriptor.key === descriptor.key && !state.lease.stale) return;
-    if (state.pendingKey === descriptor.key || now < state.retryAt) return;
+  requestSlot(slot, state, descriptor, now) {
+    if (state.lease?.descriptor.key === descriptor.key && !state.lease.stale) return false;
+    if (state.pendingKey === descriptor.key || now < state.retryAt) return false;
 
     const source = this.captureSource(slot);
     const generation = state.generation + 1;
@@ -212,6 +225,7 @@ export class TerrainMaterialBakeRuntime {
           this.retryLater(state, descriptor, error);
         }
       });
+    return true;
   }
 
   publishCounters() {
@@ -229,6 +243,7 @@ export class TerrainMaterialBakeRuntime {
     if (!this.enabled || this.disposed) return;
     const now = clockNow();
     const activeSlotIndexes = new Set();
+    const candidates = [];
     for (const slot of this.terrainView.slots) {
       const state = this.stateFor(slot);
       activeSlotIndexes.add(slot.slotIndex);
@@ -236,12 +251,34 @@ export class TerrainMaterialBakeRuntime {
         if (state.chunkKey !== null || state.lease) this.resetStateForChunk(slot, state);
         continue;
       }
-      this.requestSlot(slot, state, now);
+      candidates.push({
+        slot,
+        state,
+        descriptor: this.prepareSlot(slot, state),
+      });
     }
     for (const [slotIndex, state] of this.states) {
       if (activeSlotIndexes.has(slotIndex)) continue;
       state.lease?.release();
       this.states.delete(slotIndex);
+    }
+
+    candidates.sort((left, right) => (
+      focusDistance(left.slot, this.terrainView.focusChunk)
+      - focusDistance(right.slot, this.terrainView.focusChunk)
+      || left.slot.slotIndex - right.slot.slotIndex
+    ));
+    let available = Math.max(0, this.config.build.maxConcurrent - this.cache.getStats().inFlight);
+    for (const candidate of candidates) {
+      if (available <= 0) break;
+      if (this.requestSlot(
+        candidate.slot,
+        candidate.state,
+        candidate.descriptor,
+        now,
+      )) {
+        available -= 1;
+      }
     }
     this.publishCounters();
   }
