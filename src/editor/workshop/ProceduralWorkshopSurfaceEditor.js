@@ -103,8 +103,8 @@ export class ProceduralWorkshopSurfaceEditor {
           </button>
         </div>
         <p class="workshop-surface-help">
-          Local PNG, JPEG, and WebP images are centre-cropped to 512 × 512, saved with the baked
-          object, and reused when several areas share the same source.
+          Local PNG, JPEG, and WebP images are centre-cropped, processed to at most 512 × 512,
+          saved with the baked object, and reused when several areas share the same source.
         </p>
       </fieldset>
     `;
@@ -268,6 +268,7 @@ export class ProceduralWorkshopSurfaceEditor {
     const slots = { ...this.state.slots };
     for (const slotKey of targets) {
       if (slotKey !== this.activeSlot) {
+        this.cancelPendingImport(slotKey);
         slots[slotKey] = { ...current };
       }
     }
