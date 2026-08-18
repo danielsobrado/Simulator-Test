@@ -63,20 +63,25 @@ function page(chunkSize = 4) {
   };
 }
 
+function options(source, worldSeed = 918273) {
+  return {
+    source,
+    descriptor: descriptor(),
+    config: bakeConfig(),
+    chunkSize: 4,
+    tileSize: 2,
+    worldSeed,
+    yieldControl: async () => {},
+  };
+}
+
 test('CPU terrain bake emits the seven packed channels at the configured byte budget', async () => {
   const source = captureTerrainMaterialBakeSource({
     page: page(),
     canopyPixels: new Uint8Array([64, 128, 192, 255]),
     canopySize: 2,
   });
-  const result = await bakeTerrainMaterialPage({
-    source,
-    descriptor: descriptor(),
-    config: bakeConfig(),
-    chunkSize: 4,
-    tileSize: 2,
-    yieldControl: async () => {},
-  });
+  const result = await bakeTerrainMaterialPage(options(source));
 
   assert.equal(result.byteLength, 4 * 4 * 22);
   assert.equal(result.value.resolution, 4);
@@ -100,22 +105,32 @@ test('CPU terrain bake emits the seven packed channels at the configured byte bu
   assert.ok(result.value.channels.wetnessShoreline[0] > 0);
 });
 
-test('CPU terrain bake is deterministic for identical world-space source data', async () => {
+test('CPU terrain bake is deterministic for identical source data and world seed', async () => {
   const source = captureTerrainMaterialBakeSource({ page: page() });
-  const options = {
-    source,
-    descriptor: descriptor(),
-    config: bakeConfig(),
-    chunkSize: 4,
-    tileSize: 2,
-    yieldControl: async () => {},
-  };
-  const first = await bakeTerrainMaterialPage(options);
-  const second = await bakeTerrainMaterialPage(options);
+  const first = await bakeTerrainMaterialPage(options(source));
+  const second = await bakeTerrainMaterialPage(options(source));
 
   for (const name of Object.keys(first.value.channels)) {
     assert.deepEqual(first.value.channels[name], second.value.channels[name], name);
   }
+});
+
+test('different world seeds produce different deterministic macro material fields', async () => {
+  const source = captureTerrainMaterialBakeSource({ page: page() });
+  const first = await bakeTerrainMaterialPage(options(source, 1001));
+  const second = await bakeTerrainMaterialPage(options(source, 2002));
+
+  assert.notDeepEqual(first.value.channels.macroTint, second.value.channels.macroTint);
+  assert.notDeepEqual(first.value.channels.farColor, second.value.channels.farColor);
+});
+
+test('terrain bake uses full cell gradients on the outer chunk ring', async () => {
+  const source = captureTerrainMaterialBakeSource({ page: page() });
+  const result = await bakeTerrainMaterialPage(options(source));
+  const normals = result.value.channels.farNormal;
+
+  assert.notEqual(normals[0], 0);
+  assert.equal(normals[0], normals[(4 - 1) * 2]);
 });
 
 test('terrain bake source is snapshotted before asynchronous work mutates the live page', () => {
