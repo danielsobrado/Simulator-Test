@@ -13,6 +13,10 @@ export class ObjectSelectionModel {
     return this.ids.size;
   }
 
+  [Symbol.iterator]() {
+    return this.ids.values();
+  }
+
   has(id) {
     const numeric = normalizeId(id);
     return numeric !== null && this.ids.has(numeric);
