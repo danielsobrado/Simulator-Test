@@ -83,7 +83,10 @@ export class TerrainMaterialBakeCache {
     const key = this.currentBySlot.get(slotKey);
     if (!key) return null;
     const entry = this.entries.get(key) ?? null;
-    if (!entry) this.currentBySlot.delete(slotKey);
+    if (!entry) {
+      this.currentBySlot.delete(slotKey);
+      this.cleanupDesiredSlot(slotKey);
+    }
     return entry;
   }
 
@@ -133,6 +136,7 @@ export class TerrainMaterialBakeCache {
     }
     if (evicted) this.counters.evictions += 1;
     this.disposeResource(entry);
+    this.cleanupDesiredSlot(entry.slotKey);
   }
 
   hasActiveRetiredEntry(slotKey) {
@@ -240,7 +244,7 @@ export class TerrainMaterialBakeCache {
     for (const pending of this.inFlight.values()) {
       if (pending.slotKey === slotKey) return;
     }
-    this.desiredBySlot.delete(slotKey);
+    if (!this.currentBySlot.has(slotKey)) this.desiredBySlot.delete(slotKey);
   }
 
   ensureBuild(descriptor, build) {
@@ -315,7 +319,9 @@ export class TerrainMaterialBakeCache {
     try {
       const entry = await this.ensureBuild(descriptor, build);
       this.assertOpen();
-      this.promote(entry);
+      if (this.desiredBySlot.get(descriptor.slotKey) === descriptor.key) {
+        this.promote(entry);
+      }
       const lease = this.lease(entry, false);
       fallbackLease?.release();
       this.trim();
