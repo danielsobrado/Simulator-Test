@@ -7,6 +7,30 @@ import { installNaturalEditorHoverBridge } from './NaturalEditorHoverBridge.js';
 const BOOTSTRAP_MARK = Symbol.for('drusniel.natural-editor-interactions-bootstrap');
 const PRIMARY_POINTER_BUTTON = 0;
 const DEFAULT_RETURN_TOOL = 'terrain';
+const OVERRIDDEN_METHODS = Object.freeze([
+  'setSelectedObject',
+  'getState',
+  'selectTool',
+  'cancelBlockedWorldInteraction',
+  'onConstructionPointerDown',
+  'onPointerDown',
+  'onPointerMove',
+  'editTerrainFromPointer',
+  'updatePreviews',
+  'onPointerUp',
+  'startMoveSelected',
+  'moveSelectedTo',
+  'rotateSelected',
+  'duplicateSelected',
+  'deleteSelected',
+  'deleteSelectedConstruction',
+  'applyHistory',
+  'refreshObjects',
+  'undo',
+  'redo',
+  'onKeyDown',
+  'dispose',
+]);
 
 function isTextControl(target) {
   return target instanceof HTMLInputElement
@@ -42,32 +66,17 @@ function captureMethods(controller, names) {
   ]));
 }
 
+function restoreMethods(controller, original, names) {
+  for (const name of names) {
+    if (original[name]) controller[name] = original[name];
+    else delete controller[name];
+  }
+}
+
 export function installNaturalEditorInteractions(controller) {
   if (controller.naturalEditorInteractions) return controller.naturalEditorInteractions;
 
-  const original = captureMethods(controller, [
-    'setSelectedObject',
-    'getState',
-    'selectTool',
-    'onConstructionPointerDown',
-    'onPointerDown',
-    'onPointerMove',
-    'editTerrainFromPointer',
-    'updatePreviews',
-    'onPointerUp',
-    'startMoveSelected',
-    'moveSelectedTo',
-    'rotateSelected',
-    'deleteSelected',
-    'deleteSelectedConstruction',
-    'applyHistory',
-    'refreshObjects',
-    'cancelBlockedWorldInteraction',
-    'undo',
-    'redo',
-    'onKeyDown',
-    'dispose',
-  ]);
+  const original = captureMethods(controller, OVERRIDDEN_METHODS);
   const abort = new AbortController();
   const selection = new ObjectSelectionController(controller, original.setSelectedObject);
   const hoverBridge = installNaturalEditorHoverBridge(controller);
@@ -402,6 +411,9 @@ export function installNaturalEditorInteractions(controller) {
       constructionContextBridge.dispose();
       hoverBridge.dispose();
       selection.dispose();
+      restoreMethods(controller, original, OVERRIDDEN_METHODS);
+      controller.naturalTerrainGestureMode = null;
+      controller.naturalConstructionReturnTool = null;
       controller.naturalEditorInteractions = null;
     },
   };
