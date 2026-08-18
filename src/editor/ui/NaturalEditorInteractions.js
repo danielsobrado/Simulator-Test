@@ -158,6 +158,12 @@ export function installNaturalEditorInteractions(controller) {
     return selection.cancelPointerGestures({ updateState });
   };
 
+  const cancelConstructionPointerGesture = () => {
+    const active = Boolean(controller.constructionDrawing || controller.constructionAnchorDrag);
+    if (active) controller.cancelConstructionGesture();
+    return active;
+  };
+
   const settleBeforeModeChange = (action, ...args) => {
     settleTerrainStroke();
     cancelNaturalPointerGestures();
@@ -435,28 +441,30 @@ export function installNaturalEditorInteractions(controller) {
   };
 
   controller.undo = () => {
-    const cancelled = cancelNaturalPointerGestures();
+    const cancelledSelection = cancelNaturalPointerGestures();
+    const cancelledConstruction = cancelConstructionPointerGesture();
     settleTerrainStroke();
     const entry = controller.undoStack.at(-1);
     const before = controller.undoStack.length;
     const result = original.undo();
     if (entry && controller.undoStack.length < before) {
       controller.emitNotice(`Undo ${historyLabel(entry)}.`);
-    } else if (cancelled) {
+    } else if (cancelledSelection || cancelledConstruction) {
       controller.emitState();
     }
     return result;
   };
 
   controller.redo = () => {
-    const cancelled = cancelNaturalPointerGestures();
+    const cancelledSelection = cancelNaturalPointerGestures();
+    const cancelledConstruction = cancelConstructionPointerGesture();
     settleTerrainStroke();
     const entry = controller.redoStack.at(-1);
     const before = controller.redoStack.length;
     const result = original.redo();
     if (entry && controller.redoStack.length < before) {
       controller.emitNotice(`Redo ${historyLabel(entry)}.`);
-    } else if (cancelled) {
+    } else if (cancelledSelection || cancelledConstruction) {
       controller.emitState();
     }
     return result;
