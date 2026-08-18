@@ -159,6 +159,10 @@ export class ProceduralWorkshopMaterialController {
     return cloneDocument(this.document);
   }
 
+  notifyRegionSelectionChanged() {
+    this.root.dispatchEvent(new Event('change'));
+  }
+
   setDocument(input) {
     this.document = normalizeWorkshopMaterialDocument(input);
     this.history = [];
@@ -174,7 +178,9 @@ export class ProceduralWorkshopMaterialController {
     this.regions = new Map((parts.materialRegions ?? []).map((region) => [region.id, region]));
     if (this.selectedRegionId && !this.regions.has(this.selectedRegionId)) {
       this.selectedRegionId = null;
+      this.presetSelect.replaceChildren();
       this.inspector.hidden = true;
+      this.notifyRegionSelectionChanged();
     }
     this.refreshBudget(parts.stats);
     this.updateHighlight(this.hoverRegionId ?? this.selectedRegionId);
@@ -245,7 +251,9 @@ export class ProceduralWorkshopMaterialController {
       > POINTER_SELECT_DISTANCE) return;
     const region = this.hitRegion(event);
     if (!region) return;
+    const selectionChanged = this.selectedRegionId !== region.id;
     this.selectedRegionId = region.id;
+    if (selectionChanged) this.notifyRegionSelectionChanged();
     this.openPalette(event.clientX, event.clientY);
   }
 
