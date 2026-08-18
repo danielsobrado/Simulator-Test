@@ -9,6 +9,7 @@ import {
 const MIN_RESOLUTION = 16;
 const MAX_RESOLUTION = 512;
 const MAX_CACHE_ENTRIES = 4096;
+const MAX_ROWS_PER_YIELD = 512;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -24,8 +25,26 @@ function assertBoolean(value, path) {
   if (typeof value !== 'boolean') fail(path, 'must be boolean');
 }
 
+function assertFinite(value, path) {
+  if (!Number.isFinite(value)) fail(path, 'must be finite');
+}
+
+function assertPositive(value, path) {
+  assertFinite(value, path);
+  if (value <= 0) fail(path, 'must be positive');
+}
+
 function assertPositiveInteger(value, path) {
   if (!Number.isInteger(value) || value < 1) fail(path, 'must be a positive integer');
+}
+
+function assertNonNegativeInteger(value, path) {
+  if (!Number.isSafeInteger(value) || value < 0) fail(path, 'must be a non-negative safe integer');
+}
+
+function assertUnitInterval(value, path) {
+  assertFinite(value, path);
+  if (value < 0 || value > 1) fail(path, 'must be within [0, 1]');
 }
 
 function assertKnownValue(value, allowed, path) {
@@ -89,6 +108,52 @@ function normalizeChannels(source) {
   return freezeRecord(result);
 }
 
+function normalizeBuild(source) {
+  assertObject(source, 'build');
+  assertPositiveInteger(source.rowsPerYield, 'build.rowsPerYield');
+  if (source.rowsPerYield > MAX_ROWS_PER_YIELD) {
+    fail('build.rowsPerYield', `must not exceed ${MAX_ROWS_PER_YIELD}`);
+  }
+  assertPositive(source.retryDelayMs, 'build.retryDelayMs');
+  return Object.freeze({
+    rowsPerYield: source.rowsPerYield,
+    retryDelayMs: source.retryDelayMs,
+  });
+}
+
+function normalizeClassification(source) {
+  assertObject(source, 'classification');
+  assertFinite(source.rockSlopeStart, 'classification.rockSlopeStart');
+  assertPositive(source.rockSlopeFull, 'classification.rockSlopeFull');
+  if (source.rockSlopeStart < 0 || source.rockSlopeFull <= source.rockSlopeStart) {
+    fail('classification.rockSlopeFull', 'must exceed non-negative rockSlopeStart');
+  }
+  assertFinite(source.snowLine, 'classification.snowLine');
+  assertPositive(source.snowFade, 'classification.snowFade');
+  assertPositive(source.snowSlopeMax, 'classification.snowSlopeMax');
+  assertPositive(source.shorelineRadiusCells, 'classification.shorelineRadiusCells');
+  assertPositive(source.wetnessRadiusCells, 'classification.wetnessRadiusCells');
+  if (source.wetnessRadiusCells > source.shorelineRadiusCells) {
+    fail('classification.wetnessRadiusCells', 'must not exceed shorelineRadiusCells');
+  }
+  return Object.freeze({ ...source });
+}
+
+function normalizeMacro(source) {
+  assertObject(source, 'macro');
+  assertPositive(source.scaleMeters, 'macro.scaleMeters');
+  assertUnitInterval(source.strength, 'macro.strength');
+  assertNonNegativeInteger(source.seedOffset, 'macro.seedOffset');
+  assertFinite(source.heightShadeScale, 'macro.heightShadeScale');
+  assertPositive(source.minHeightShade, 'macro.minHeightShade');
+  assertPositive(source.maxHeightShade, 'macro.maxHeightShade');
+  if (source.maxHeightShade < source.minHeightShade) {
+    fail('macro.maxHeightShade', 'must cover minHeightShade');
+  }
+  assertUnitInterval(source.wetDarkening, 'macro.wetDarkening');
+  return Object.freeze({ ...source });
+}
+
 function normalizeCache(source) {
   assertObject(source, 'cache');
   assertPositiveInteger(source.maxEntries, 'cache.maxEntries');
@@ -147,6 +212,9 @@ export function createTerrainMaterialBakeConfig(source) {
     quality: source.quality,
     qualityTiers: normalizeQualityTiers(source.qualityTiers),
     channels: normalizeChannels(source.channels),
+    build: normalizeBuild(source.build),
+    classification: normalizeClassification(source.classification),
+    macro: normalizeMacro(source.macro),
     cache: normalizeCache(source.cache),
     fallback: normalizeFallback(source.fallback),
     debug: normalizeDebug(source.debug),
