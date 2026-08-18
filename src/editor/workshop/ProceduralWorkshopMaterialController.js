@@ -6,7 +6,7 @@ import {
   normalizeWorkshopMaterialDocument,
   serializeWorkshopMaterialDocument,
 } from './ProceduralWorkshopMaterialConfig.js';
-import { prepareWorkshopAlbedo } from './ProceduralWorkshopTextureUpload.js';
+import { prepareWorkshopTexture } from './ProceduralWorkshopTextureUpload.js';
 import { RadialPalette } from '../ui/RadialPalette.js';
 
 const POINTER_SELECT_DISTANCE = 6;
@@ -61,6 +61,7 @@ export class ProceduralWorkshopMaterialController {
     this.regions = new Map();
     this.meshes = [];
     this.active = false;
+    this.disposed = false;
     this.pointerStart = null;
     this.hoverRegionId = null;
     this.selectedRegionId = null;
@@ -413,25 +414,30 @@ export class ProceduralWorkshopMaterialController {
 
   async sourceFileChange(event) {
     const kind = event.target.dataset.materialSourceFile;
-    if (!kind || !this.selectedRegionId) return;
+    const regionId = this.selectedRegionId;
+    if (!kind || !regionId) return;
     event.stopPropagation();
     const [file] = event.target.files ?? [];
     event.target.value = '';
     if (!file) return;
     this.onStatus?.(`Preparing ${file.name} as a ${kind.toUpperCase()} source…`, false);
     try {
-      const prepared = await prepareWorkshopAlbedo(file);
+      const prepared = await prepareWorkshopTexture(file, kind);
+      if (this.disposed) return;
+      const region = this.regions.get(regionId);
+      if (!region) {
+        throw new Error('The material area changed while the texture was being prepared. Select it again.');
+      }
       const sourceId = createWorkshopMaterialSourceId(kind, prepared.dataUrl);
-      const region = this.regions.get(this.selectedRegionId);
-      const presetId = this.document.materialAreaOverrides[this.selectedRegionId]
-        ?? this.document.materialDefaults[region?.family];
+      const presetId = this.document.materialAreaOverrides[regionId]
+        ?? this.document.materialDefaults[region.family];
       const base = getWorkshopMaterialPreset(this.document, presetId)
         ?? BUILTIN_WORKSHOP_MATERIAL_PRESETS['granite-masonry'];
       const descriptor = {
         ...base,
         id: undefined,
         label: `${base.label} custom`,
-        family: region?.family ?? base.family,
+        family: region.family ?? base.family,
         sources: { ...base.sources, [kind]: sourceId },
       };
       const customId = `custom-${hashDescriptor(descriptor)}`;
@@ -443,9 +449,10 @@ export class ProceduralWorkshopMaterialController {
         dataUrl: prepared.dataUrl,
       };
       next.materialLibrary.presets[customId] = descriptor;
-      next.materialAreaOverrides[this.selectedRegionId] = customId;
-      this.commit(next, `${prepared.name} assigned as ${kind.toUpperCase()} for this area.`);
+      next.materialAreaOverrides[regionId] = customId;
+      this.commit(next, `${prepared.name} assigned as ${kind.toUpperCase()} for ${region.label}.`);
     } catch (error) {
+      if (this.disposed) return;
       this.onStatus?.(error instanceof Error ? error.message : String(error), true);
     }
   }
@@ -591,6 +598,8 @@ export class ProceduralWorkshopMaterialController {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.clearMaterialPreview();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
