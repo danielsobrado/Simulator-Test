@@ -25,12 +25,12 @@ function config(overrides = {}) {
   };
 }
 
-function descriptor(chunkX = 0) {
+function descriptor(chunkX = 0, revisions = REVISIONS) {
   return createTerrainMaterialBakeDescriptor({
     chunkX,
     chunkZ: 0,
     quality: 'balanced',
-    revisions: REVISIONS,
+    revisions,
   });
 }
 
@@ -76,6 +76,43 @@ test('active leases are never evicted to satisfy a cache budget', async () => {
   first.release();
   cache.dispose();
   assert.equal(firstResource.disposeCount, 1);
+});
+
+test('tight budget keeps refreshed current bake while stale revision is leased', async () => {
+  const cache = new TerrainMaterialBakeCache({
+    config: config({ maxEntries: 1, maxBytes: 128 }),
+  });
+  const oldResource = resource('old');
+  const newResource = resource('new');
+  const oldDescriptor = descriptor();
+  const newDescriptor = descriptor(0, { ...REVISIONS, water: 2 });
+  const initial = await cache.acquire(
+    oldDescriptor,
+    async () => ({ value: oldResource, byteLength: 128 }),
+  );
+  initial.release();
+
+  const pending = deferred();
+  const stale = await cache.acquire(newDescriptor, () => pending.promise);
+  pending.resolve({ value: newResource, byteLength: 128 });
+  await cache.whenIdle();
+
+  assert.equal(cache.getStats().entries, 2);
+  assert.equal(oldResource.disposeCount, 0);
+  assert.equal(newResource.disposeCount, 0);
+
+  stale.release();
+  assert.equal(oldResource.disposeCount, 1);
+  assert.equal(newResource.disposeCount, 0);
+  assert.equal(cache.getStats().entries, 1);
+
+  const fresh = await cache.acquire(
+    newDescriptor,
+    async () => assert.fail('refreshed current bake must remain resident'),
+  );
+  assert.strictEqual(fresh.value, newResource);
+  fresh.release();
+  cache.dispose();
 });
 
 test('cache disposal defers active resource destruction until lease release', async () => {
