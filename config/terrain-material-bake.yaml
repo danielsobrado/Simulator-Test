@@ -34,6 +34,7 @@ channels:
 build:
   # Yield during CPU material analysis so a high-quality page cannot monopolize a frame.
   rowsPerYield: 16
+  maxConcurrent: 2
   retryDelayMs: 1000
 
 classification:
