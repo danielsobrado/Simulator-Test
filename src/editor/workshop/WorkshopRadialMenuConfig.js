@@ -34,12 +34,18 @@ function optionalColor(value, field) {
   return value.toLowerCase();
 }
 
+function normalizeItemValue(value, field) {
+  if (typeof value === 'string') return requireString(value, field);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  throw new Error(`Workshop radial menu ${field} must be a string or finite number.`);
+}
+
 function normalizeItem(item, field) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     throw new Error(`Workshop radial menu ${field} must be an object.`);
   }
   return Object.freeze({
-    value: requireString(String(item.value ?? ''), `${field}.value`),
+    value: normalizeItemValue(item.value, `${field}.value`),
     label: requireString(item.label, `${field}.label`),
     glyph: typeof item.glyph === 'string' ? item.glyph : '',
     color: optionalColor(item.color, `${field}.color`),
