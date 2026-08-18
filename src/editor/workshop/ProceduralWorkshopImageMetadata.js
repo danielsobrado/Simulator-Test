@@ -3,6 +3,10 @@ const MAX_SOURCE_PIXELS = 4096 * 4096;
 const PNG_IHDR_LENGTH = 13;
 const JPEG_FRAME_BASE_LENGTH = 8;
 const JPEG_COMPONENT_DESCRIPTOR_LENGTH = 3;
+const WEBP_CHUNK_HEADER_LENGTH = 20;
+const WEBP_EXTENDED_HEADER_LENGTH = 10;
+const WEBP_LOSSLESS_HEADER_LENGTH = 5;
+const WEBP_LOSSY_FRAME_HEADER_LENGTH = 10;
 const JPEG_START_OF_FRAME_MARKERS = new Set([
   0xc0, 0xc1, 0xc2, 0xc3,
   0xc5, 0xc6, 0xc7,
@@ -43,6 +47,16 @@ function readUint32BigEndian(bytes, offset, format) {
     + (bytes[offset + 1] << 16)
     + (bytes[offset + 2] << 8)
     + bytes[offset + 3]
+  );
+}
+
+function readUint32LittleEndian(bytes, offset, format) {
+  requireBytes(bytes, offset, 4, format);
+  return (
+    bytes[offset]
+    + (bytes[offset + 1] << 8)
+    + (bytes[offset + 2] << 16)
+    + bytes[offset + 3] * 0x1000000
   );
 }
 
@@ -107,21 +121,34 @@ function parseJpeg(bytes) {
   throw new Error('The selected JPEG image has no readable dimensions.');
 }
 
+function requireWebpChunk(bytes, minimumChunkLength, { exact = false } = {}) {
+  const chunkLength = readUint32LittleEndian(bytes, 16, 'WebP');
+  if (exact ? chunkLength !== minimumChunkLength : chunkLength < minimumChunkLength) {
+    throw new Error('The selected WebP image contains an invalid image chunk.');
+  }
+  requireBytes(bytes, 20, minimumChunkLength, 'WebP');
+}
+
 function parseWebp(bytes) {
-  requireBytes(bytes, 0, 30, 'WebP');
+  requireBytes(bytes, 0, WEBP_CHUNK_HEADER_LENGTH, 'WebP');
   if (ascii(bytes, 0, 4) !== 'RIFF' || ascii(bytes, 8, 4) !== 'WEBP') {
     throw new Error('The selected file is not a valid WebP image.');
+  }
+  const riffLength = readUint32LittleEndian(bytes, 4, 'WebP') + 8;
+  if (riffLength > bytes.length) {
+    throw new Error('The selected WebP image container is truncated.');
   }
 
   const chunkType = ascii(bytes, 12, 4);
   if (chunkType === 'VP8X') {
+    requireWebpChunk(bytes, WEBP_EXTENDED_HEADER_LENGTH, { exact: true });
     return {
       width: readUint24LittleEndian(bytes, 24, 'WebP') + 1,
       height: readUint24LittleEndian(bytes, 27, 'WebP') + 1,
     };
   }
   if (chunkType === 'VP8L') {
-    requireBytes(bytes, 20, 5, 'WebP');
+    requireWebpChunk(bytes, WEBP_LOSSLESS_HEADER_LENGTH);
     if (bytes[20] !== 0x2f) {
       throw new Error('The selected lossless WebP image has an invalid header.');
     }
@@ -131,7 +158,7 @@ function parseWebp(bytes) {
     };
   }
   if (chunkType === 'VP8 ') {
-    requireBytes(bytes, 20, 10, 'WebP');
+    requireWebpChunk(bytes, WEBP_LOSSY_FRAME_HEADER_LENGTH);
     if (bytes[23] !== 0x9d || bytes[24] !== 0x01 || bytes[25] !== 0x2a) {
       throw new Error('The selected WebP image has an invalid frame header.');
     }
