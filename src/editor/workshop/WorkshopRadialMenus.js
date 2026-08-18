@@ -70,6 +70,8 @@ export class WorkshopRadialMenus {
     this.wheelResiduals = new Map();
     this.lastWheelAt = new Map();
     this.pointerGestures = new Map();
+    this.pendingSelections = new Map();
+    this.pendingCommitTimers = new Map();
     this.suppressClickUntil = 0;
     this.syncFrame = 0;
     this.readoutTimer = 0;
@@ -116,7 +118,10 @@ export class WorkshopRadialMenus {
     this.onFocusIn = (event) => this.handleFocusIn(event);
     this.onFocusOut = (event) => this.handleFocusOut(event);
     this.onFormMutation = (event) => this.handleFormMutation(event);
-    this.onMaterialChange = () => this.scheduleSync();
+    this.onMaterialChange = () => {
+      this.cancelCurrentMaterialPending();
+      this.scheduleSync();
+    };
 
     this.host.addEventListener('click', this.onClick);
     this.host.addEventListener('wheel', this.onWheel, { passive: false });
@@ -178,6 +183,7 @@ export class WorkshopRadialMenus {
     const next = this.config.modes.find(({ id }) => id === modeId);
     if (!next) return;
     const previous = this.activeMode();
+    if (!initial) this.commitPendingSelections();
     this.modeId = next.id;
     this.wheelResiduals.clear();
     this.hideReadout();
@@ -237,6 +243,7 @@ export class WorkshopRadialMenus {
   }
 
   selectedValue(lane, items) {
+    if (this.pendingSelections.has(lane.id)) return this.pendingSelections.get(lane.id);
     if (lane.field) return String(this.fieldElement(lane.field)?.value ?? items[0]?.value ?? '');
     if (lane.source === 'materialPresets') {
       return String(this.materialUi.querySelector(SELECTORS.materialPreset)?.value ?? items[0]?.value ?? '');
@@ -422,6 +429,52 @@ export class WorkshopRadialMenus {
     });
   }
 
+  cancelPendingSelection(laneId) {
+    const timer = this.pendingCommitTimers.get(laneId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    this.pendingCommitTimers.delete(laneId);
+    return this.pendingSelections.delete(laneId);
+  }
+
+  cancelCurrentMaterialPending() {
+    for (const lane of this.activeMode()?.lanes ?? []) {
+      if (MATERIAL_AREA_SOURCES.has(lane.source)) this.cancelPendingSelection(lane.id);
+    }
+  }
+
+  commitPendingSelection(laneId) {
+    if (!this.pendingSelections.has(laneId)) return false;
+    const value = this.pendingSelections.get(laneId);
+    const lane = this.laneById(laneId);
+    this.cancelPendingSelection(laneId);
+    if (!lane) return false;
+    return this.applyLaneItem(lane, value);
+  }
+
+  commitPendingSelections() {
+    for (const laneId of [...this.pendingSelections.keys()]) this.commitPendingSelection(laneId);
+  }
+
+  queueLaneSelection(lane, value, { commit = true, focus = false } = {}) {
+    if (!lane || !this.laneEnabled(lane)) return false;
+    const previousTimer = this.pendingCommitTimers.get(lane.id);
+    if (previousTimer !== undefined) window.clearTimeout(previousTimer);
+    this.pendingSelections.set(lane.id, value);
+    this.scheduleSync();
+    const item = this.itemByValue(lane, value);
+    if (item) this.showReadout(lane, item, { timed: true });
+    if (focus) this.focusItem(lane.id, value);
+    if (commit) {
+      this.pendingCommitTimers.set(lane.id, window.setTimeout(
+        () => this.commitPendingSelection(lane.id),
+        this.config.commitDelayMs,
+      ));
+    } else {
+      this.pendingCommitTimers.delete(lane.id);
+    }
+    return true;
+  }
+
   finishSelection(lane, value, focus) {
     this.scheduleSync();
     const item = this.itemByValue(lane, value);
@@ -432,6 +485,7 @@ export class WorkshopRadialMenus {
 
   applyLaneItem(lane, value, { focus = false } = {}) {
     if (!lane) return false;
+    this.cancelPendingSelection(lane.id);
     if (!this.laneEnabled(lane)) {
       this.setStatus('Select a material area on the model first.');
       return false;
@@ -482,7 +536,7 @@ export class WorkshopRadialMenus {
     return false;
   }
 
-  stepLane(lane, delta, { focus = false } = {}) {
+  stepLane(lane, delta, { focus = false, deferred = false, commit = true } = {}) {
     if (!lane || ACTION_SOURCES.has(lane.source) || !this.laneEnabled(lane)) return;
     const items = this.resolveItems(lane);
     if (items.length < 2 || !Number.isFinite(delta) || delta === 0) return;
@@ -491,11 +545,22 @@ export class WorkshopRadialMenus {
     const direction = Math.sign(delta);
     const current = selectedIndex >= 0 ? selectedIndex : direction > 0 ? -1 : 0;
     const nextIndex = wrapIndex(current + Math.trunc(delta), items.length);
-    this.applyLaneItem(lane, items[nextIndex].value, { focus });
+    if (deferred) {
+      this.queueLaneSelection(lane, items[nextIndex].value, { commit, focus });
+    } else {
+      this.applyLaneItem(lane, items[nextIndex].value, { focus });
+    }
   }
 
   handleFormMutation(event) {
-    if (!this.watchedFormFields.has(event.target?.name)) return;
+    const fieldName = event.target?.name;
+    if (!this.watchedFormFields.has(fieldName)) return;
+    for (const lane of this.activeMode()?.lanes ?? []) {
+      if (lane.field === fieldName
+          || (lane.source === 'toggles' && lane.items.some(({ value }) => value === fieldName))) {
+        this.cancelPendingSelection(lane.id);
+      }
+    }
     this.scheduleSync();
   }
 
@@ -543,7 +608,7 @@ export class WorkshopRadialMenus {
     this.wheelResiduals.set(lane.id, remainder);
     if (steps === 0) return;
     this.lastWheelAt.set(lane.id, now);
-    this.stepLane(lane, steps);
+    this.stepLane(lane, steps, { deferred: true });
   }
 
   focusAdjacentAction(item, delta) {
@@ -642,7 +707,7 @@ export class WorkshopRadialMenus {
     const laneElement = this.laneViews.get(lane.id)?.element;
     const dragShift = -remainder / this.config.swipeThresholdPx * DRAG_VISUAL_RANGE_PX;
     laneElement?.style.setProperty('--radial-drag-shift', `${dragShift}px`);
-    if (steps !== 0) this.stepLane(lane, steps);
+    if (steps !== 0) this.stepLane(lane, steps, { deferred: true, commit: false });
   }
 
   finishPointerGesture(event, { cancelled = false } = {}) {
@@ -652,8 +717,14 @@ export class WorkshopRadialMenus {
     const laneElement = this.laneViews.get(gesture.laneId)?.element;
     laneElement?.classList.remove('is-dragging');
     laneElement?.style.removeProperty('--radial-drag-shift');
-    if (!cancelled && gesture.totalDistance > DRAG_CLICK_DISTANCE_PX) {
-      this.suppressClickUntil = performance.now() + CLICK_SUPPRESSION_MS;
+    if (cancelled) {
+      this.cancelPendingSelection(gesture.laneId);
+      this.scheduleSync();
+    } else {
+      this.commitPendingSelection(gesture.laneId);
+      if (gesture.totalDistance > DRAG_CLICK_DISTANCE_PX) {
+        this.suppressClickUntil = performance.now() + CLICK_SUPPRESSION_MS;
+      }
     }
     if (gesture.target?.hasPointerCapture?.(event.pointerId)) {
       gesture.target.releasePointerCapture(event.pointerId);
@@ -695,6 +766,9 @@ export class WorkshopRadialMenus {
   dispose() {
     cancelAnimationFrame(this.syncFrame);
     window.clearTimeout(this.readoutTimer);
+    for (const timer of this.pendingCommitTimers.values()) window.clearTimeout(timer);
+    this.pendingCommitTimers.clear();
+    this.pendingSelections.clear();
     this.materialObserver.disconnect();
     this.host.removeEventListener('click', this.onClick);
     this.host.removeEventListener('wheel', this.onWheel);
