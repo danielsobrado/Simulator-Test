@@ -1,8 +1,11 @@
-version: 1
+version: 2
 defaultMode: structure
 visibleSlots: 5
-wheelCooldownMs: 90
-swipeThresholdPx: 28
+wheelCooldownMs: 0
+wheelStepPx: 42
+wheelMaxStepsPerEvent: 2
+swipeThresholdPx: 30
+readoutMs: 850
 materialPresetColors:
   granite-masonry: '#827e79'
   limestone-masonry: '#c8bea4'
@@ -45,7 +48,7 @@ modes:
           - { value: none, label: No wing, glyph: '○' }
 
   - id: materials
-    label: Materials
+    label: Surfaces
     glyph: '◫'
     lanes:
       - id: wall-finish
@@ -101,6 +104,34 @@ modes:
           - { value: '0.65', label: Wide, glyph: '═' }
           - { value: '0.85', label: Deep, glyph: '▰' }
 
+  - id: textures
+    label: Textures
+    glyph: '▦'
+    materialMode: true
+    lanes:
+      - id: material-presets
+        side: left
+        label: Material
+        source: materialPresets
+        fallbackItems:
+          - { value: granite-masonry, label: Granite, color: '#827e79' }
+          - { value: limestone-masonry, label: Limestone, color: '#c8bea4' }
+          - { value: sandstone-masonry, label: Sandstone, color: '#b98d5f' }
+          - { value: ochre-plaster, label: Ochre, color: '#b7793f' }
+          - { value: lime-plaster, label: Limewash, color: '#d5d1bd' }
+          - { value: terracotta-tile, label: Terracotta, color: '#a75535' }
+          - { value: slate-roof, label: Slate, color: '#48535a' }
+          - { value: aged-timber, label: Timber, color: '#6d462c' }
+      - id: pbr-maps
+        side: right
+        label: PBR maps
+        source: materialMaps
+        items:
+          - { value: albedo, label: Load albedo, glyph: 'A' }
+          - { value: normal, label: Load normal, glyph: 'N' }
+          - { value: orm, label: Load ORM, glyph: 'O' }
+          - { value: height, label: Load height, glyph: 'H' }
+
   - id: colors
     label: Colors
     glyph: '●'
@@ -139,6 +170,14 @@ modes:
     label: Details
     glyph: '✦'
     lanes:
+      - id: detail-level
+        side: left
+        label: Detail
+        field: detail
+        items:
+          - { value: '1', label: Draft, glyph: 'Ⅰ' }
+          - { value: '2', label: High, glyph: 'Ⅱ' }
+          - { value: '3', label: Ultra, glyph: 'Ⅲ' }
       - id: feature-toggles
         side: right
         label: Features
@@ -146,3 +185,5 @@ modes:
         items:
           - { value: windows, label: Doors and windows, glyph: '▦' }
           - { value: ivy, label: Procedural ivy, glyph: '❧' }
+          - { value: remesh, label: Efficient remesh, glyph: '◆' }
+          - { value: albedo, label: Procedural albedo, glyph: '◐' }
