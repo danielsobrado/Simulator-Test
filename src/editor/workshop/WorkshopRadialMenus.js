@@ -72,7 +72,6 @@ export class WorkshopRadialMenus {
     this.pointerGestures = new Map();
     this.suppressClickUntil = 0;
     this.syncFrame = 0;
-    this.pendingLaneRebuild = false;
     this.readoutTimer = 0;
     this.watchedFormFields = new Set();
     for (const mode of config.modes) {
@@ -134,12 +133,10 @@ export class WorkshopRadialMenus {
     this.form.addEventListener('input', this.onFormMutation);
     this.materialUi.addEventListener('change', this.onMaterialChange);
 
-    this.materialObserver = new MutationObserver((mutations) => {
+    this.materialObserver = new MutationObserver(() => {
       this.suppressLegacyPalette();
       if (this.activeMode()?.materialMode) this.ensureMaterialMode(true);
-      this.scheduleSync({
-        rebuild: mutations.some(({ type }) => type === 'childList'),
-      });
+      this.scheduleSync();
     });
     this.materialObserver.observe(this.materialUi, {
       childList: true,
@@ -362,9 +359,9 @@ export class WorkshopRadialMenus {
         visible ? slotIndex : edgeSlot,
         items.length <= this.config.visibleSlots ? items.length : this.config.visibleSlots,
       );
-      const active = lane.source === 'toggles'
+      const active = enabled && (lane.source === 'toggles'
         ? this.fieldElement(item.value)?.checked === true
-        : lane.source !== 'materialMaps' && item.value.toLowerCase() === selected;
+        : lane.source !== 'materialMaps' && item.value.toLowerCase() === selected);
 
       button.style.setProperty('--radial-y', `${slot.y}%`);
       button.style.setProperty('--radial-depth', `${slot.depth}px`);
@@ -385,14 +382,11 @@ export class WorkshopRadialMenus {
     });
   }
 
-  scheduleSync({ rebuild = false } = {}) {
-    this.pendingLaneRebuild ||= rebuild;
+  scheduleSync() {
     if (this.syncFrame !== 0) return;
     this.syncFrame = requestAnimationFrame(() => {
       this.syncFrame = 0;
-      const shouldRebuild = this.pendingLaneRebuild;
-      this.pendingLaneRebuild = false;
-      for (const view of this.laneViews.values()) this.syncLane(view, { rebuild: shouldRebuild });
+      for (const view of this.laneViews.values()) this.syncLane(view);
       this.suppressLegacyPalette();
     });
   }
@@ -428,6 +422,14 @@ export class WorkshopRadialMenus {
     });
   }
 
+  finishSelection(lane, value, focus) {
+    this.scheduleSync();
+    const item = this.itemByValue(lane, value);
+    if (item) this.showReadout(lane, item, { timed: true });
+    if (focus) this.focusItem(lane.id, value);
+    return true;
+  }
+
   applyLaneItem(lane, value, { focus = false } = {}) {
     if (!lane) return false;
     if (!this.laneEnabled(lane)) {
@@ -438,41 +440,46 @@ export class WorkshopRadialMenus {
     if (lane.field) {
       const field = this.fieldElement(lane.field);
       if (!field) return false;
-      if (String(field.value) === String(value)) return true;
-      field.value = value;
-      field.dispatchEvent(eventFor(lane.event));
-    } else if (lane.source === 'materialPresets') {
+      if (String(field.value) !== String(value)) {
+        field.value = value;
+        field.dispatchEvent(eventFor(lane.event));
+      }
+      return this.finishSelection(lane, value, focus);
+    }
+    if (lane.source === 'materialPresets') {
       const select = this.materialUi.querySelector(SELECTORS.materialPreset);
       if (!select || select.options.length === 0) return false;
-      if (select.value === value) return true;
-      select.value = value;
-      select.dispatchEvent(eventFor('change'));
-    } else if (lane.source === 'colorField') {
+      if (select.value !== value) {
+        select.value = value;
+        select.dispatchEvent(eventFor('change'));
+      }
+      return this.finishSelection(lane, value, focus);
+    }
+    if (lane.source === 'colorField') {
       const field = this.materialField(lane.target);
       if (!field) return false;
-      if (field.value.toLowerCase() === value.toLowerCase()) return true;
-      field.value = value;
-      field.dispatchEvent(eventFor('change'));
-    } else if (lane.source === 'materialMaps') {
+      if (field.value.toLowerCase() !== value.toLowerCase()) {
+        field.value = value;
+        field.dispatchEvent(eventFor('change'));
+      }
+      return this.finishSelection(lane, value, focus);
+    }
+    if (lane.source === 'materialMaps') {
       const button = this.materialUi.querySelector(
         `[data-material-action="load-map"][data-source-kind="${CSS.escape(value)}"]`,
       );
       if (!button) return false;
       button.click();
-    } else if (lane.source === 'toggles') {
+      return this.finishSelection(lane, value, focus);
+    }
+    if (lane.source === 'toggles') {
       const field = this.fieldElement(value);
       if (!field) return false;
       field.checked = !field.checked;
       field.dispatchEvent(eventFor('change'));
-    } else {
-      return false;
+      return this.finishSelection(lane, value, focus);
     }
-
-    this.scheduleSync();
-    const item = this.itemByValue(lane, value);
-    if (item) this.showReadout(lane, item, { timed: true });
-    if (focus) this.focusItem(lane.id, value);
-    return true;
+    return false;
   }
 
   stepLane(lane, delta, { focus = false } = {}) {
@@ -554,7 +561,10 @@ export class WorkshopRadialMenus {
     if (modeButton && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
       const current = this.config.modes.findIndex(({ id }) => id === modeButton.dataset.radialMode);
-      const next = this.config.modes[wrapIndex(current + (event.key === 'ArrowLeft' ? -1 : 1), this.config.modes.length)];
+      const next = this.config.modes[wrapIndex(
+        current + (event.key === 'ArrowLeft' ? -1 : 1),
+        this.config.modes.length,
+      )];
       this.activateMode(next.id);
       this.modesHost.querySelector(`[data-radial-mode="${CSS.escape(next.id)}"]`)
         ?.focus({ preventScroll: true });
