@@ -5,6 +5,7 @@ wheelCooldownMs: 0
 wheelStepPx: 42
 wheelMaxStepsPerEvent: 2
 swipeThresholdPx: 30
+commitDelayMs: 90
 readoutMs: 850
 materialPresetColors:
   granite-masonry: '#827e79'
