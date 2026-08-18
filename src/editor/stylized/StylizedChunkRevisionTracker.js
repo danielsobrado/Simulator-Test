@@ -1,7 +1,13 @@
 import { floorDiv } from '../world/WorldCoordinates.js';
 
+const MATERIAL_REVISION_FIELDS = Object.freeze(['tile', 'height', 'water', 'canopy']);
+
 function keyFor(chunkX, chunkZ) {
   return `${chunkX}:${chunkZ}`;
+}
+
+function createMaterialRevisionMaps() {
+  return Object.fromEntries(MATERIAL_REVISION_FIELDS.map((field) => [field, new Map()]));
 }
 
 export class StylizedChunkRevisionTracker {
@@ -10,7 +16,9 @@ export class StylizedChunkRevisionTracker {
     this.chunkSize = worldStore.chunkSize;
     this.epoch = 0;
     this.revision = 0;
+    this.materialClock = 0;
     this.revisions = new Map();
+    this.materialRevisionMaps = createMaterialRevisionMaps();
     // Memoized all-zero signatures, one per shape, valid while no chunk is dirty.
     this.zeroSignatures = new Map();
     this.unsubscribe = worldStore.subscribe((change) => this.onWorldChange(change));
@@ -20,16 +28,20 @@ export class StylizedChunkRevisionTracker {
     if (change.kind === 'reset') {
       this.epoch += 1;
       this.revision += 1;
+      this.materialClock += 1;
       this.revisions.clear();
+      for (const revisions of Object.values(this.materialRevisionMaps)) revisions.clear();
       // The memoized strings embed the epoch, so they cannot outlive it.
       this.zeroSignatures.clear();
       return;
     }
 
+    const cellField = MATERIAL_REVISION_FIELDS.includes(change.kind) ? change.kind : null;
     for (const coordinate of change.cells ?? []) {
       this.touch(
         floorDiv(coordinate.x, this.chunkSize),
         floorDiv(coordinate.z, this.chunkSize),
+        cellField,
       );
     }
 
@@ -44,17 +56,57 @@ export class StylizedChunkRevisionTracker {
           const localZ = coordinate.z - chunkZ * this.chunkSize;
           if (localX >= 0 && localX <= this.chunkSize
               && localZ >= 0 && localZ <= this.chunkSize) {
-            this.touch(chunkX, chunkZ);
+            this.touch(chunkX, chunkZ, 'height');
           }
         }
       }
     }
   }
 
-  touch(chunkX, chunkZ) {
+  touch(chunkX, chunkZ, materialField = null) {
     const key = keyFor(chunkX, chunkZ);
     this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
     this.revision += 1;
+    if (materialField) this.touchMaterialField(chunkX, chunkZ, materialField);
+  }
+
+  touchMaterialField(chunkX, chunkZ, field) {
+    const revisions = this.materialRevisionMaps[field];
+    if (!revisions) {
+      throw new Error(`Unknown terrain material revision field: ${field}.`);
+    }
+    this.materialClock += 1;
+    revisions.set(keyFor(chunkX, chunkZ), this.materialClock);
+  }
+
+  materialRevisionAt(field, chunkX, chunkZ, halo = 0) {
+    const revisions = this.materialRevisionMaps[field];
+    if (!revisions) {
+      throw new Error(`Unknown terrain material revision field: ${field}.`);
+    }
+    let revision = 0;
+    for (let offsetZ = -halo; offsetZ <= halo; offsetZ += 1) {
+      for (let offsetX = -halo; offsetX <= halo; offsetX += 1) {
+        revision = Math.max(
+          revision,
+          revisions.get(keyFor(chunkX + offsetX, chunkZ + offsetZ)) ?? 0,
+        );
+      }
+    }
+    return revision;
+  }
+
+  materialRevisionsFor(chunkX, chunkZ, { tileHalo = 0 } = {}) {
+    const tile = this.materialRevisionAt('tile', chunkX, chunkZ, tileHalo);
+    const height = this.materialRevisionAt('height', chunkX, chunkZ);
+    const explicitWater = this.materialRevisionAt('water', chunkX, chunkZ, tileHalo);
+    return Object.freeze({
+      world: this.epoch,
+      tile,
+      height,
+      water: Math.max(tile, height, explicitWater),
+      canopy: this.materialRevisionAt('canopy', chunkX, chunkZ),
+    });
   }
 
   /**
@@ -122,5 +174,6 @@ export class StylizedChunkRevisionTracker {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.revisions.clear();
+    for (const revisions of Object.values(this.materialRevisionMaps)) revisions.clear();
   }
 }
