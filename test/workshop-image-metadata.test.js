@@ -13,13 +13,17 @@ function pngHeader({ ihdrLength = 13, width = 1, height = 1 } = {}) {
   return bytes;
 }
 
-function jpegWithFrame({ segmentLength = 7, width = 1, height = 1 } = {}) {
-  const bytes = Buffer.alloc(11);
+function jpegWithFrame({ segmentLength = 11, width = 1, height = 1, components = 1 } = {}) {
+  const bytes = Buffer.alloc(Math.max(15, 4 + segmentLength));
   bytes.set([0xff, 0xd8, 0xff, 0xc0]);
   bytes.writeUInt16BE(segmentLength, 4);
   bytes[6] = 8;
   bytes.writeUInt16BE(height, 7);
   bytes.writeUInt16BE(width, 9);
+  bytes[11] = components;
+  if (segmentLength >= 11) {
+    bytes.set([1, 0x11, 0], 12);
+  }
   return bytes;
 }
 
@@ -34,10 +38,18 @@ test('workshop PNG metadata requires a canonical IHDR chunk length', () => {
   );
 });
 
-test('workshop JPEG metadata rejects truncated frame segments', () => {
+test('workshop JPEG metadata validates complete frame component metadata', () => {
+  assert.deepEqual(
+    parseWorkshopImageDimensions(jpegWithFrame({ width: 320, height: 180 }), 'image/jpeg'),
+    { width: 320, height: 180 },
+  );
   assert.throws(
     () => parseWorkshopImageDimensions(jpegWithFrame({ segmentLength: 6 }), 'image/jpeg'),
     /invalid frame segment/i,
+  );
+  assert.throws(
+    () => parseWorkshopImageDimensions(jpegWithFrame({ segmentLength: 11, components: 2 }), 'image/jpeg'),
+    /invalid frame components/i,
   );
 });
 
