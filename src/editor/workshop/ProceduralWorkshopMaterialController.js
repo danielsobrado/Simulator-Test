@@ -68,6 +68,7 @@ export class ProceduralWorkshopMaterialController {
     this.history = [];
     this.future = [];
     this.clipboard = null;
+    this.sourceUploadRevisions = new Map();
     this.previewMaterials = new Map();
     this.previewOriginals = new Map();
     this.raycaster = new THREE.Raycaster();
@@ -142,6 +143,9 @@ export class ProceduralWorkshopMaterialController {
     this.onPointerDown = (event) => this.pointerDown(event);
     this.onPointerMove = (event) => this.pointerMove(event);
     this.onPointerUp = (event) => this.pointerUp(event);
+    this.onPointerCancel = () => {
+      this.pointerStart = null;
+    };
     this.onRootClick = (event) => this.rootClick(event);
     this.onRootChange = (event) => this.rootChange(event);
     this.onKeyDown = (event) => this.keyDown(event);
@@ -149,6 +153,7 @@ export class ProceduralWorkshopMaterialController {
     renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
     renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+    renderer.domElement.addEventListener('pointercancel', this.onPointerCancel);
     root.addEventListener('click', this.onRootClick);
     root.addEventListener('change', this.onRootChange);
     root.addEventListener('change', this.onSourceFileChange);
@@ -197,6 +202,7 @@ export class ProceduralWorkshopMaterialController {
     this.componentController.setExternalInteractionActive(this.active);
     this.canvasHost.classList.toggle('is-material-mode', this.active);
     if (!this.active) {
+      this.pointerStart = null;
       this.closePalette();
       this.hoverRegionId = null;
       this.updateHighlight(this.selectedRegionId);
@@ -434,10 +440,13 @@ export class ProceduralWorkshopMaterialController {
     const [file] = event.target.files ?? [];
     event.target.value = '';
     if (!file) return;
+    const uploadKey = `${regionId}\u0000${kind}`;
+    const uploadRevision = (this.sourceUploadRevisions.get(uploadKey) ?? 0) + 1;
+    this.sourceUploadRevisions.set(uploadKey, uploadRevision);
     this.onStatus?.(`Preparing ${file.name} as a ${kind.toUpperCase()} source…`, false);
     try {
       const prepared = await prepareWorkshopTexture(file, kind);
-      if (this.disposed) return;
+      if (this.disposed || this.sourceUploadRevisions.get(uploadKey) !== uploadRevision) return;
       const region = this.regions.get(regionId);
       if (!region) {
         throw new Error('The material area changed while the texture was being prepared. Select it again.');
@@ -466,7 +475,7 @@ export class ProceduralWorkshopMaterialController {
       next.materialAreaOverrides[regionId] = customId;
       this.commit(next, `${prepared.name} assigned as ${kind.toUpperCase()} for ${region.label}.`);
     } catch (error) {
-      if (this.disposed) return;
+      if (this.disposed || this.sourceUploadRevisions.get(uploadKey) !== uploadRevision) return;
       this.onStatus?.(error instanceof Error ? error.message : String(error), true);
     }
   }
@@ -614,10 +623,13 @@ export class ProceduralWorkshopMaterialController {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.pointerStart = null;
+    this.sourceUploadRevisions.clear();
     this.clearMaterialPreview();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+    this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
     this.root.removeEventListener('click', this.onRootClick);
     this.root.removeEventListener('change', this.onRootChange);
     this.root.removeEventListener('change', this.onSourceFileChange);
