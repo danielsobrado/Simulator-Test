@@ -117,6 +117,27 @@ test('object batch history restores transactional changes', () => {
   assert.equal(objectMap.replaceAllCalls, 0);
 });
 
+test('object batch history freezes selection and object snapshots', () => {
+  const { objectMap, editor } = fixture();
+  const originals = objectMap.list();
+  const transformed = editor.transform(originals, (object) => ({ ...object, x: object.x + 2 }));
+  const beforeSelection = { ids: [1, 2], primaryId: 1 };
+  const afterSelection = { ids: [1, 2], primaryId: 1 };
+  const history = createObjectBatchHistory(transformed.changes, {
+    beforeSelection,
+    afterSelection,
+  });
+
+  beforeSelection.ids.push(99);
+  transformed.changes[0].after.x = 500;
+
+  assert.deepEqual(history.beforeSelection, { ids: [1, 2], primaryId: 1 });
+  assert.deepEqual(history.afterSelection, { ids: [1, 2], primaryId: 1 });
+  assert.equal(history.changes[0].after.x, 4);
+  assert.equal(Object.isFrozen(history.beforeSelection.ids), true);
+  assert.equal(Object.isFrozen(history.changes[0].after), true);
+});
+
 test('group rotation keeps the primary fixed and rotates relative positions', () => {
   const primary = { id: 1, x: 10, z: 10, rotation: 0 };
   const east = { id: 2, x: 13, z: 10, rotation: 2 };
