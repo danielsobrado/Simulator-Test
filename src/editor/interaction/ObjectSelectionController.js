@@ -47,6 +47,22 @@ export class ObjectSelectionController {
     return this.objects(NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays);
   }
 
+  snapshot() {
+    return Object.freeze({ ids: Object.freeze(this.ids()), primaryId: this.primaryId });
+  }
+
+  restoreSnapshot(snapshot, fallbackObjects = []) {
+    this.model.clear();
+    if (snapshot) {
+      for (const id of snapshot.ids) {
+        if (this.controller.objectMap.getById(id)) this.model.add(id);
+      }
+      if (snapshot.primaryId !== null) this.model.setPrimary(snapshot.primaryId);
+      return;
+    }
+    for (const object of fallbackObjects) this.model.add(object.id);
+  }
+
   emit() {
     const detail = Object.freeze({
       ids: Object.freeze(this.ids()),
@@ -206,6 +222,7 @@ export class ObjectSelectionController {
   }
 
   commitTransform(createTarget, label) {
+    const selectionBefore = this.snapshot();
     const result = this.batchEditor.transform(this.objects(), createTarget);
     if (!result.ok) {
       this.cancelMove();
@@ -214,7 +231,10 @@ export class ObjectSelectionController {
     }
     this.controller.movingObjectId = null;
     this.syncVisuals();
-    this.controller.commitHistory(createObjectBatchHistory(result.changes));
+    this.controller.commitHistory(createObjectBatchHistory(result.changes, {
+      beforeSelection: selectionBefore,
+      afterSelection: selectionBefore,
+    }));
     this.controller.refreshObjects();
     this.controller.emitMap();
     this.controller.emitNotice(
@@ -253,12 +273,16 @@ export class ObjectSelectionController {
   delete() {
     const originals = this.objects();
     if (originals.length === 0) return false;
+    const selectionBefore = this.snapshot();
     const changes = this.batchEditor.delete(originals);
     if (changes.length === 0) return false;
     this.model.clear();
     this.cancelPointerGestures({ updateState: false });
     this.syncVisuals();
-    this.controller.commitHistory(createObjectBatchHistory(changes));
+    this.controller.commitHistory(createObjectBatchHistory(changes, {
+      beforeSelection: selectionBefore,
+      afterSelection: this.snapshot(),
+    }));
     this.controller.refreshObjects();
     this.controller.emitMap();
     this.controller.emitNotice(`Deleted ${changes.length} object${changes.length === 1 ? '' : 's'}.`);
@@ -267,6 +291,7 @@ export class ObjectSelectionController {
 
   duplicate() {
     const originals = this.objects();
+    const selectionBefore = this.snapshot();
     const primaryIndex = originals.findIndex(({ id }) => id === this.primaryId);
     const result = this.batchEditor.duplicate(originals);
     if (!result.ok) {
@@ -278,8 +303,12 @@ export class ObjectSelectionController {
     if (primaryIndex >= 0 && result.created[primaryIndex]) {
       this.model.setPrimary(result.created[primaryIndex].id);
     }
+    const selectionAfter = this.snapshot();
     this.syncVisuals();
-    this.controller.commitHistory(createObjectBatchHistory(result.changes));
+    this.controller.commitHistory(createObjectBatchHistory(result.changes, {
+      beforeSelection: selectionBefore,
+      afterSelection: selectionAfter,
+    }));
     this.controller.refreshObjects();
     this.controller.emitMap();
     this.controller.emitNotice(
@@ -290,8 +319,8 @@ export class ObjectSelectionController {
 
   applyHistory(entry, direction) {
     const targets = this.batchEditor.applyHistory(entry, direction);
-    this.model.clear();
-    for (const target of targets) this.model.add(target.id);
+    const snapshot = direction === 'undo' ? entry.beforeSelection : entry.afterSelection;
+    this.restoreSnapshot(snapshot, targets);
     this.syncVisuals();
     this.controller.refreshObjects();
   }
