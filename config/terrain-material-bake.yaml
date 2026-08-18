@@ -31,6 +31,29 @@ channels:
     # R = canopy coverage, G = water coverage.
     format: rg8unorm
 
+build:
+  # Yield during CPU material analysis so a high-quality page cannot monopolize a frame.
+  rowsPerYield: 16
+  retryDelayMs: 1000
+
+classification:
+  rockSlopeStart: 0.18
+  rockSlopeFull: 0.62
+  snowLine: 26
+  snowFade: 8
+  snowSlopeMax: 0.55
+  shorelineRadiusCells: 4
+  wetnessRadiusCells: 2
+
+macro:
+  scaleMeters: 120
+  strength: 0.14
+  seedOffset: 2401
+  heightShadeScale: 0.018
+  minHeightShade: 0.78
+  maxHeightShade: 1.18
+  wetDarkening: 0.18
+
 cache:
   maxEntries: 192
   maxBytes: 100663296
