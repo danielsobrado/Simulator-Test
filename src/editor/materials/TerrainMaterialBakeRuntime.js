@@ -64,6 +64,7 @@ export class TerrainMaterialBakeRuntime {
       })
       : null;
     this.states = new Map();
+    this.residentPages = new Map();
     this.disposed = false;
     if (this.enabled) {
       terrainView.materialBakeRuntime = this;
@@ -85,6 +86,17 @@ export class TerrainMaterialBakeRuntime {
   worldSeed() {
     const seed = this.terrainView.worldStore.generator?.toMetadata?.().seed;
     return Number.isSafeInteger(seed) ? seed : 0;
+  }
+
+  waterHaloRadius() {
+    return Math.ceil(Math.max(
+      Number(this.config.classification?.shorelineRadiusCells) || 0,
+      Number(this.config.classification?.wetnessRadiusCells) || 0,
+    ));
+  }
+
+  waterHaloChunkRadius() {
+    return Math.ceil(this.waterHaloRadius() / this.terrainView.chunkSize);
   }
 
   stateFor(slot) {
@@ -131,16 +143,56 @@ export class TerrainMaterialBakeRuntime {
       quality: this.config.quality,
       revisions: this.revisionTracker.materialRevisionsFor(chunkX, chunkZ, {
         tileHalo: this.terrainView.surfaceMaskChunkRadius ?? 0,
+        waterHalo: this.waterHaloChunkRadius(),
       }),
     });
   }
 
+  rebuildResidentPageIndex() {
+    this.residentPages.clear();
+    for (const slot of this.terrainView.slots) {
+      if (slot.descriptor && slot.page && slot.mesh.visible) {
+        this.residentPages.set(slot.descriptor.key, slot.page);
+      }
+    }
+  }
+
+  captureWaterHalo(slot) {
+    const radius = this.waterHaloRadius();
+    if (radius <= 0) return null;
+    const chunkSize = this.terrainView.chunkSize;
+    const size = chunkSize + radius * 2;
+    const pixels = new Uint8Array(size * size);
+
+    for (let z = 0; z < size; z += 1) {
+      const worldZ = slot.page.originZ + z - radius;
+      const chunkZ = Math.floor(worldZ / chunkSize);
+      const localZ = worldZ - chunkZ * chunkSize;
+      for (let x = 0; x < size; x += 1) {
+        const worldX = slot.page.originX + x - radius;
+        const chunkX = Math.floor(worldX / chunkSize);
+        const localX = worldX - chunkX * chunkSize;
+        const page = this.residentPages.get(`${chunkX}:${chunkZ}`);
+        if (!page?.surfaceMaskPixels) return null;
+        pixels[z * size + x] = page.surfaceMaskPixels[
+          (localZ * chunkSize + localX) * 4 + 2
+        ];
+      }
+    }
+    return { pixels, size, radius };
+  }
+
   captureSource(slot) {
+    const halo = this.captureWaterHalo(slot);
+    if (this.waterHaloRadius() > 0 && !halo) return null;
     const hasCanopy = Boolean(validForestFloorKey(slot));
     return captureTerrainMaterialBakeSource({
       page: slot.page,
       canopyPixels: hasCanopy ? slot.forestFloorPixels : null,
       canopySize: hasCanopy ? slot.forestFloorSize : 0,
+      waterHaloPixels: halo?.pixels ?? null,
+      waterHaloSize: halo?.size ?? 0,
+      waterHaloRadius: halo?.radius ?? 0,
     });
   }
 
@@ -197,6 +249,7 @@ export class TerrainMaterialBakeRuntime {
     if (state.pendingKey === descriptor.key || now < state.retryAt) return false;
 
     const source = this.captureSource(slot);
+    if (!source) return false;
     const generation = state.generation + 1;
     state.generation = generation;
     state.pendingKey = descriptor.key;
@@ -247,6 +300,7 @@ export class TerrainMaterialBakeRuntime {
     const now = clockNow();
     const activeSlotIndexes = new Set();
     const candidates = [];
+    this.rebuildResidentPageIndex();
 
     for (const slot of this.terrainView.slots) {
       const state = this.stateFor(slot);
@@ -300,6 +354,7 @@ export class TerrainMaterialBakeRuntime {
       }
     }
     this.states.clear();
+    this.residentPages.clear();
     this.cache?.dispose();
     if (this.terrainView.materialBakeRuntime === this) {
       this.terrainView.materialBakeRuntime = null;
