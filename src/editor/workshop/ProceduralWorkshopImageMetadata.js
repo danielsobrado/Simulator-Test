@@ -1,5 +1,6 @@
 const MAX_SOURCE_DIMENSION = 4096;
 const MAX_SOURCE_PIXELS = 4096 * 4096;
+const PNG_IHDR_LENGTH = 13;
 const JPEG_START_OF_FRAME_MARKERS = new Set([
   0xc0, 0xc1, 0xc2, 0xc3,
   0xc5, 0xc6, 0xc7,
@@ -48,6 +49,7 @@ function parsePng(bytes) {
   if (
     ![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
       .every((value, index) => bytes[index] === value)
+    || readUint32BigEndian(bytes, 8, 'PNG') !== PNG_IHDR_LENGTH
     || ascii(bytes, 12, 4) !== 'IHDR'
   ) {
     throw new Error('The selected file is not a valid PNG image.');
@@ -80,12 +82,16 @@ function parseJpeg(bytes) {
       throw new Error('The selected JPEG image contains an invalid segment.');
     }
     if (JPEG_START_OF_FRAME_MARKERS.has(marker)) {
-      requireBytes(bytes, offset, 7, 'JPEG');
+      if (segmentLength < 7) {
+        throw new Error('The selected JPEG image contains an invalid frame segment.');
+      }
+      requireBytes(bytes, offset, segmentLength, 'JPEG');
       return {
         height: readUint16BigEndian(bytes, offset + 3, 'JPEG'),
         width: readUint16BigEndian(bytes, offset + 5, 'JPEG'),
       };
     }
+    requireBytes(bytes, offset, segmentLength, 'JPEG');
     offset += segmentLength;
   }
   throw new Error('The selected JPEG image has no readable dimensions.');
@@ -129,14 +135,14 @@ function parseWebp(bytes) {
 
 function validateDimensions({ width, height }) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-    throw new Error('The selected albedo image has invalid dimensions.');
+    throw new Error('The selected texture image has invalid dimensions.');
   }
   if (
     width > MAX_SOURCE_DIMENSION
     || height > MAX_SOURCE_DIMENSION
     || width * height > MAX_SOURCE_PIXELS
   ) {
-    throw new Error(`The selected albedo image must be no larger than ${MAX_SOURCE_DIMENSION} × ${MAX_SOURCE_DIMENSION}.`);
+    throw new Error(`The selected texture image must be no larger than ${MAX_SOURCE_DIMENSION} × ${MAX_SOURCE_DIMENSION}.`);
   }
   return Object.freeze({ width, height });
 }
@@ -151,7 +157,7 @@ export function parseWorkshopImageDimensions(input, mimeType) {
         ? parseWebp(bytes)
         : null;
   if (!dimensions) {
-    throw new Error('Use a PNG, JPEG, or WebP image for albedo.');
+    throw new Error('Use a PNG, JPEG, or WebP texture image.');
   }
   return validateDimensions(dimensions);
 }
