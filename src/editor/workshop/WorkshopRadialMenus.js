@@ -72,6 +72,7 @@ export class WorkshopRadialMenus {
     this.pointerGestures = new Map();
     this.pendingSelections = new Map();
     this.pendingCommitTimers = new Map();
+    this.internalMaterialCommitDepth = 0;
     this.suppressClickUntil = 0;
     this.syncFrame = 0;
     this.readoutTimer = 0;
@@ -118,8 +119,13 @@ export class WorkshopRadialMenus {
     this.onFocusIn = (event) => this.handleFocusIn(event);
     this.onFocusOut = (event) => this.handleFocusOut(event);
     this.onFormMutation = (event) => this.handleFormMutation(event);
+    this.onFormSubmitCapture = () => this.commitPendingSelections();
+    this.onFormClickCapture = (event) => {
+      const action = event.target.closest('[data-workshop-action]')?.dataset.workshopAction;
+      if (action === 'preview') this.commitPendingSelections();
+    };
     this.onMaterialChange = () => {
-      this.cancelCurrentMaterialPending();
+      if (this.internalMaterialCommitDepth === 0) this.cancelCurrentMaterialPending();
       this.scheduleSync();
     };
 
@@ -134,6 +140,8 @@ export class WorkshopRadialMenus {
     this.host.addEventListener('pointerout', this.onPointerOut);
     this.host.addEventListener('focusin', this.onFocusIn);
     this.host.addEventListener('focusout', this.onFocusOut);
+    this.form.addEventListener('submit', this.onFormSubmitCapture, true);
+    this.form.addEventListener('click', this.onFormClickCapture, true);
     this.form.addEventListener('change', this.onFormMutation);
     this.form.addEventListener('input', this.onFormMutation);
     this.materialUi.addEventListener('change', this.onMaterialChange);
@@ -442,6 +450,15 @@ export class WorkshopRadialMenus {
     }
   }
 
+  runInternalMaterialCommit(callback) {
+    this.internalMaterialCommitDepth += 1;
+    try {
+      return callback();
+    } finally {
+      this.internalMaterialCommitDepth -= 1;
+    }
+  }
+
   commitPendingSelection(laneId) {
     if (!this.pendingSelections.has(laneId)) return false;
     const value = this.pendingSelections.get(laneId);
@@ -505,7 +522,7 @@ export class WorkshopRadialMenus {
       if (!select || select.options.length === 0) return false;
       if (select.value !== value) {
         select.value = value;
-        select.dispatchEvent(eventFor('change'));
+        this.runInternalMaterialCommit(() => select.dispatchEvent(eventFor('change')));
       }
       return this.finishSelection(lane, value, focus);
     }
@@ -514,7 +531,7 @@ export class WorkshopRadialMenus {
       if (!field) return false;
       if (field.value.toLowerCase() !== value.toLowerCase()) {
         field.value = value;
-        field.dispatchEvent(eventFor('change'));
+        this.runInternalMaterialCommit(() => field.dispatchEvent(eventFor('change')));
       }
       return this.finishSelection(lane, value, focus);
     }
@@ -523,7 +540,7 @@ export class WorkshopRadialMenus {
         `[data-material-action="load-map"][data-source-kind="${CSS.escape(value)}"]`,
       );
       if (!button) return false;
-      button.click();
+      this.runInternalMaterialCommit(() => button.click());
       return this.finishSelection(lane, value, focus);
     }
     if (lane.source === 'toggles') {
@@ -781,6 +798,8 @@ export class WorkshopRadialMenus {
     this.host.removeEventListener('pointerout', this.onPointerOut);
     this.host.removeEventListener('focusin', this.onFocusIn);
     this.host.removeEventListener('focusout', this.onFocusOut);
+    this.form.removeEventListener('submit', this.onFormSubmitCapture, true);
+    this.form.removeEventListener('click', this.onFormClickCapture, true);
     this.form.removeEventListener('change', this.onFormMutation);
     this.form.removeEventListener('input', this.onFormMutation);
     this.materialUi.removeEventListener('change', this.onMaterialChange);
