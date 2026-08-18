@@ -10,6 +10,15 @@ import { prepareWorkshopTexture } from './ProceduralWorkshopTextureUpload.js';
 import { RadialPalette } from '../ui/RadialPalette.js';
 
 const POINTER_SELECT_DISTANCE = 6;
+const NUMERIC_MATERIAL_FIELDS = new Set([
+  'repeat',
+  'rotation',
+  'roughness',
+  'metalness',
+  'normalStrength',
+  'heightStrength',
+  'weathering',
+]);
 
 function cloneDocument(document) {
   return serializeWorkshopMaterialDocument(document);
@@ -68,6 +77,7 @@ export class ProceduralWorkshopMaterialController {
     this.history = [];
     this.future = [];
     this.clipboard = null;
+    this.sourceUploadRevision = 0;
     this.sourceUploadRevisions = new Map();
     this.previewMaterials = new Map();
     this.previewOriginals = new Map();
@@ -172,7 +182,10 @@ export class ProceduralWorkshopMaterialController {
     this.document = normalizeWorkshopMaterialDocument(input);
     this.history = [];
     this.future = [];
+    this.sourceUploadRevision += 1;
+    this.sourceUploadRevisions.clear();
     this.refreshInspector();
+    this.notifyRegionSelectionChanged();
   }
 
   replaceParts(parts) {
@@ -405,31 +418,43 @@ export class ProceduralWorkshopMaterialController {
   rootChange(event) {
     const field = event.target.dataset.materialField;
     if (!field || !this.selectedRegionId) return;
-    if (field === 'presetId') {
-      this.commitPreset(event.target.value);
-      return;
+    try {
+      if (field === 'presetId') {
+        this.commitPreset(event.target.value);
+        return;
+      }
+      const currentRegion = this.regions.get(this.selectedRegionId);
+      const currentPresetId = this.document.materialAreaOverrides[this.selectedRegionId]
+        ?? this.document.materialDefaults[currentRegion?.family];
+      const base = getWorkshopMaterialPreset(this.document, currentPresetId)
+        ?? BUILTIN_WORKSHOP_MATERIAL_PRESETS['granite-masonry'];
+      let fieldValue = event.target.value;
+      if (NUMERIC_MATERIAL_FIELDS.has(field)) {
+        if (typeof fieldValue !== 'string' || fieldValue.trim() === '') {
+          throw new Error(`Material ${field} requires a numeric value.`);
+        }
+        fieldValue = Number(fieldValue);
+        if (!Number.isFinite(fieldValue)) {
+          throw new Error(`Material ${field} requires a finite numeric value.`);
+        }
+      }
+      const descriptor = {
+        ...base,
+        [field]: fieldValue,
+        id: undefined,
+        label: `${base.label} custom`,
+        family: currentRegion?.family ?? base.family,
+      };
+      const customId = `custom-${hashDescriptor(descriptor)}`;
+      descriptor.id = customId;
+      const next = cloneDocument(this.document);
+      next.materialLibrary.presets[customId] = descriptor;
+      next.materialAreaOverrides[this.selectedRegionId] = customId;
+      this.commit(next, 'Custom full-PBR area preset stored.');
+    } catch (error) {
+      this.refreshInspector();
+      this.onStatus?.(error instanceof Error ? error.message : String(error), true);
     }
-    const currentRegion = this.regions.get(this.selectedRegionId);
-    const currentPresetId = this.document.materialAreaOverrides[this.selectedRegionId]
-      ?? this.document.materialDefaults[currentRegion?.family];
-    const base = getWorkshopMaterialPreset(this.document, currentPresetId)
-      ?? BUILTIN_WORKSHOP_MATERIAL_PRESETS['granite-masonry'];
-    const descriptor = {
-      ...base,
-      [field]: ['repeat', 'rotation', 'roughness', 'metalness', 'normalStrength',
-        'heightStrength', 'weathering'].includes(field)
-        ? Number(event.target.value)
-        : event.target.value,
-      id: undefined,
-      label: `${base.label} custom`,
-      family: currentRegion?.family ?? base.family,
-    };
-    const customId = `custom-${hashDescriptor(descriptor)}`;
-    descriptor.id = customId;
-    const next = cloneDocument(this.document);
-    next.materialLibrary.presets[customId] = descriptor;
-    next.materialAreaOverrides[this.selectedRegionId] = customId;
-    this.commit(next, 'Custom full-PBR area preset stored.');
   }
 
   async sourceFileChange(event) {
@@ -441,7 +466,7 @@ export class ProceduralWorkshopMaterialController {
     event.target.value = '';
     if (!file) return;
     const uploadKey = `${regionId}\u0000${kind}`;
-    const uploadRevision = (this.sourceUploadRevisions.get(uploadKey) ?? 0) + 1;
+    const uploadRevision = ++this.sourceUploadRevision;
     this.sourceUploadRevisions.set(uploadKey, uploadRevision);
     this.onStatus?.(`Preparing ${file.name} as a ${kind.toUpperCase()} source…`, false);
     try {
@@ -598,6 +623,7 @@ export class ProceduralWorkshopMaterialController {
       return option;
     }));
     const preset = getWorkshopMaterialPreset(this.document, presetId)
+      ?? BUILILTIN_WORKSHOP_MATERIAL_PRESETS?.['granite-masonry']
       ?? BUILTIN_WORKSHOP_MATERIAL_PRESETS['granite-masonry'];
     this.regionName.textContent = `${region.label} · ${
       Object.hasOwn(this.document.materialAreaOverrides, region.id) ? 'overridden' : 'inherited'
@@ -624,6 +650,7 @@ export class ProceduralWorkshopMaterialController {
     if (this.disposed) return;
     this.disposed = true;
     this.pointerStart = null;
+    this.sourceUploadRevision += 1;
     this.sourceUploadRevisions.clear();
     this.clearMaterialPreview();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
