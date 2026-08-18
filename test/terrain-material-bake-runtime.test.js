@@ -2,12 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TerrainMaterialBakeRuntime } from '../src/editor/materials/TerrainMaterialBakeRuntime.js';
 
-function config() {
+function config(overrides = {}) {
   return {
     enabled: true,
     quality: 'balanced',
     qualityTiers: { balanced: { resolution: 4 } },
-    build: { rowsPerYield: 2, retryDelayMs: 10 },
+    build: {
+      rowsPerYield: 2,
+      maxConcurrent: overrides.maxConcurrent ?? 2,
+      retryDelayMs: 10,
+    },
     classification: {},
     macro: {},
     cache: { maxEntries: 8, maxBytes: 4096, staleWhileRevalidate: true },
@@ -40,6 +44,18 @@ function terrainDescriptor(chunkX, chunkZ) {
   };
 }
 
+function terrainSlot(slotIndex, chunkX, chunkZ = 0) {
+  return {
+    slotIndex,
+    descriptor: terrainDescriptor(chunkX, chunkZ),
+    page: page(chunkX * 4, chunkZ * 4),
+    mesh: { visible: true },
+    forestFloorKey: null,
+    forestFloorPixels: new Uint8Array(4),
+    forestFloorSize: 2,
+  };
+}
+
 function createRevisionTracker() {
   const revisions = { world: 0, tile: 0, height: 0, water: 0, canopy: 0 };
   return {
@@ -52,6 +68,16 @@ function createRevisionTracker() {
   };
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolveValue, rejectValue) => {
+    resolve = resolveValue;
+    reject = rejectValue;
+  });
+  return { promise, resolve, reject };
+}
+
 async function settle(runtime) {
   await runtime.cache.whenIdle();
   await Promise.resolve();
@@ -59,19 +85,12 @@ async function settle(runtime) {
 }
 
 test('runtime bakes resident terrain slots and releases leases on reassignment', async () => {
-  const slot = {
-    slotIndex: 0,
-    descriptor: terrainDescriptor(0, 0),
-    page: page(),
-    mesh: { visible: true },
-    forestFloorKey: null,
-    forestFloorPixels: new Uint8Array(4),
-    forestFloorSize: 2,
-  };
+  const slot = terrainSlot(0, 0);
   const terrainView = {
     slots: [slot],
     chunkSize: 4,
     surfaceMaskChunkRadius: 1,
+    focusChunk: { chunkX: 0, chunkZ: 0 },
     worldStore: { tileSize: 2 },
     materialBakeRuntime: null,
   };
@@ -111,20 +130,14 @@ test('runtime bakes resident terrain slots and releases leases on reassignment',
 });
 
 test('valid forest-floor changes invalidate canopy material revision and refresh the bake', async () => {
-  const slot = {
-    slotIndex: 0,
-    descriptor: terrainDescriptor(0, 0),
-    page: page(),
-    mesh: { visible: true },
-    forestFloorKey: null,
-    forestFloorPixels: new Uint8Array([0, 0, 0, 0]),
-    forestFloorSize: 2,
-  };
+  const slot = terrainSlot(0, 0);
+  slot.forestFloorPixels = new Uint8Array([0, 0, 0, 0]);
   const tracker = createRevisionTracker();
   const terrainView = {
     slots: [slot],
     chunkSize: 4,
     surfaceMaskChunkRadius: 1,
+    focusChunk: { chunkX: 0, chunkZ: 0 },
     worldStore: { tileSize: 2 },
     materialBakeRuntime: null,
   };
@@ -160,5 +173,55 @@ test('valid forest-floor changes invalidate canopy material revision and refresh
   assert.ok(builds >= 2);
   assert.equal(slot.materialBake.canopy, 255);
   assert.ok(slot.materialBake.descriptor.revisions.canopy > 0);
+  runtime.dispose();
+});
+
+test('runtime starts no more than the configured number of concurrent bakes', async () => {
+  const slots = [terrainSlot(0, 0), terrainSlot(1, 1), terrainSlot(2, 2)];
+  const terrainView = {
+    slots,
+    chunkSize: 4,
+    surfaceMaskChunkRadius: 1,
+    focusChunk: { chunkX: 0, chunkZ: 0 },
+    worldStore: { tileSize: 2 },
+    materialBakeRuntime: null,
+  };
+  const pending = [deferred(), deferred(), deferred()];
+  const started = [];
+  const runtime = new TerrainMaterialBakeRuntime({
+    terrainView,
+    revisionTracker: createRevisionTracker(),
+    config: config({ maxConcurrent: 2 }),
+    onError: () => {},
+    bakePage: ({ descriptor }) => {
+      started.push(descriptor.chunkX);
+      return pending[descriptor.chunkX].promise;
+    },
+  });
+
+  runtime.update();
+  await Promise.resolve();
+  assert.deepEqual(started, [0, 1]);
+  assert.equal(runtime.getStats().inFlight, 2);
+
+  pending[0].resolve({
+    value: { descriptor: runtime.descriptorFor(slots[0]), durationMs: 1 },
+    byteLength: 32,
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  runtime.update();
+  await Promise.resolve();
+  assert.deepEqual(started, [0, 1, 2]);
+
+  pending[1].resolve({
+    value: { descriptor: runtime.descriptorFor(slots[1]), durationMs: 1 },
+    byteLength: 32,
+  });
+  pending[2].resolve({
+    value: { descriptor: runtime.descriptorFor(slots[2]), durationMs: 1 },
+    byteLength: 32,
+  });
+  await settle(runtime);
   runtime.dispose();
 });
