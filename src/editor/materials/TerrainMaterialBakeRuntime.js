@@ -10,15 +10,10 @@ function clockNow() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
-function defaultErrorReporter(error, context) {
-  console.error('Terrain material bake failed.', context, error);
-}
-
 function createSlotState() {
   return {
     chunkKey: null,
     forestFloorKey: null,
-    desiredKey: null,
     pendingKey: null,
     generation: 0,
     retryAt: 0,
@@ -28,8 +23,9 @@ function createSlotState() {
 
 function validForestFloorKey(slot) {
   const key = slot.forestFloorKey;
-  if (!slot.descriptor || typeof key !== 'string') return null;
-  return key.startsWith(`${slot.descriptor.key}:`) ? key : null;
+  return slot.descriptor && typeof key === 'string' && key.startsWith(`${slot.descriptor.key}:`)
+    ? key
+    : null;
 }
 
 function focusDistance(slot, focus) {
@@ -47,7 +43,7 @@ export class TerrainMaterialBakeRuntime {
     config,
     cache = null,
     bakePage = bakeTerrainMaterialPage,
-    onError = defaultErrorReporter,
+    onError = (error, context) => console.error('Terrain material bake failed.', context, error),
   }) {
     if (!terrainView || !revisionTracker) {
       throw new Error('Terrain material bake runtime requires terrain view and revision tracker.');
@@ -69,15 +65,26 @@ export class TerrainMaterialBakeRuntime {
       : null;
     this.states = new Map();
     this.disposed = false;
-    if (this.enabled) terrainView.materialBakeRuntime = this;
+    if (this.enabled) {
+      terrainView.materialBakeRuntime = this;
+      for (const slot of terrainView.slots) {
+        slot.materialBake = null;
+        slot.materialBakeStale = false;
+      }
+    }
   }
 
   reportError(error, context) {
     try {
       this.onError?.(error, context);
     } catch {
-      // Diagnostics must not break streaming or cache lifecycle.
+      // Diagnostics must not break material-cache lifecycle guarantees.
     }
+  }
+
+  worldSeed() {
+    const seed = this.terrainView.worldStore.generator?.toMetadata?.().seed;
+    return Number.isSafeInteger(seed) ? seed : 0;
   }
 
   stateFor(slot) {
@@ -101,15 +108,14 @@ export class TerrainMaterialBakeRuntime {
     this.clearLease(slot, state);
     state.chunkKey = slot.descriptor?.key ?? null;
     state.forestFloorKey = validForestFloorKey(slot);
-    state.desiredKey = null;
     state.pendingKey = null;
     state.retryAt = 0;
   }
 
   syncCanopyRevision(slot, state) {
-    const forestFloorKey = validForestFloorKey(slot);
-    if (state.forestFloorKey === forestFloorKey) return;
-    state.forestFloorKey = forestFloorKey;
+    const key = validForestFloorKey(slot);
+    if (state.forestFloorKey === key) return;
+    state.forestFloorKey = key;
     this.revisionTracker.touchMaterialField(
       slot.descriptor.chunkX,
       slot.descriptor.chunkZ,
@@ -118,25 +124,23 @@ export class TerrainMaterialBakeRuntime {
   }
 
   descriptorFor(slot) {
-    const terrainDescriptor = slot.descriptor;
+    const { chunkX, chunkZ } = slot.descriptor;
     return createTerrainMaterialBakeDescriptor({
-      chunkX: terrainDescriptor.chunkX,
-      chunkZ: terrainDescriptor.chunkZ,
+      chunkX,
+      chunkZ,
       quality: this.config.quality,
-      revisions: this.revisionTracker.materialRevisionsFor(
-        terrainDescriptor.chunkX,
-        terrainDescriptor.chunkZ,
-        { tileHalo: this.terrainView.surfaceMaskChunkRadius ?? 0 },
-      ),
+      revisions: this.revisionTracker.materialRevisionsFor(chunkX, chunkZ, {
+        tileHalo: this.terrainView.surfaceMaskChunkRadius ?? 0,
+      }),
     });
   }
 
   captureSource(slot) {
-    const forestFloorKey = validForestFloorKey(slot);
+    const hasCanopy = Boolean(validForestFloorKey(slot));
     return captureTerrainMaterialBakeSource({
       page: slot.page,
-      canopyPixels: forestFloorKey ? slot.forestFloorPixels : null,
-      canopySize: forestFloorKey ? slot.forestFloorSize : 0,
+      canopyPixels: hasCanopy ? slot.forestFloorPixels : null,
+      canopySize: hasCanopy ? slot.forestFloorSize : 0,
     });
   }
 
@@ -159,7 +163,6 @@ export class TerrainMaterialBakeRuntime {
     }
     this.clearLease(slot, state);
     state.lease = lease;
-    state.desiredKey = descriptor.key;
     slot.materialBake = lease.value;
     slot.materialBakeStale = lease.stale;
     return true;
@@ -174,14 +177,13 @@ export class TerrainMaterialBakeRuntime {
   waitForFresh(slot, state, descriptor, generation) {
     void this.cache.whenResident(descriptor)
       .then((resident) => {
-        if (!resident
-            || this.disposed
-            || generation !== state.generation
-            || slot.descriptor?.key !== state.chunkKey) {
-          return;
+        if (resident
+            && !this.disposed
+            && generation === state.generation
+            && slot.descriptor?.key === state.chunkKey) {
+          state.pendingKey = null;
+          state.retryAt = 0;
         }
-        state.pendingKey = null;
-        state.retryAt = 0;
       })
       .catch((error) => {
         if (!this.disposed && generation === state.generation) {
@@ -205,6 +207,7 @@ export class TerrainMaterialBakeRuntime {
         config: this.config,
         chunkSize: this.terrainView.chunkSize,
         tileSize: this.terrainView.worldStore.tileSize,
+        worldSeed: this.worldSeed(),
       });
       PerfCounters.inc('terrainMaterialBakeCpuMs', result.value.durationMs ?? 0);
       return result;
@@ -244,6 +247,7 @@ export class TerrainMaterialBakeRuntime {
     const now = clockNow();
     const activeSlotIndexes = new Set();
     const candidates = [];
+
     for (const slot of this.terrainView.slots) {
       const state = this.stateFor(slot);
       activeSlotIndexes.add(slot.slotIndex);
@@ -251,11 +255,7 @@ export class TerrainMaterialBakeRuntime {
         if (state.chunkKey !== null || state.lease) this.resetStateForChunk(slot, state);
         continue;
       }
-      candidates.push({
-        slot,
-        state,
-        descriptor: this.prepareSlot(slot, state),
-      });
+      candidates.push({ slot, state, descriptor: this.prepareSlot(slot, state) });
     }
     for (const [slotIndex, state] of this.states) {
       if (activeSlotIndexes.has(slotIndex)) continue;
@@ -271,12 +271,7 @@ export class TerrainMaterialBakeRuntime {
     let available = Math.max(0, this.config.build.maxConcurrent - this.cache.getStats().inFlight);
     for (const candidate of candidates) {
       if (available <= 0) break;
-      if (this.requestSlot(
-        candidate.slot,
-        candidate.state,
-        candidate.descriptor,
-        now,
-      )) {
+      if (this.requestSlot(candidate.slot, candidate.state, candidate.descriptor, now)) {
         available -= 1;
       }
     }
