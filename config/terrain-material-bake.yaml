@@ -1,0 +1,44 @@
+schemaVersion: 1
+enabled: true
+quality: balanced
+
+qualityTiers:
+  low:
+    resolution: 32
+  balanced:
+    resolution: 64
+  high:
+    resolution: 128
+
+channels:
+  macroTint:
+    format: rgba8unorm
+  terrainShape:
+    # R = slope, G = signed curvature.
+    format: rg16float
+  materialWeights:
+    # Grass/dirt/rock/snow weights; consumers renormalize after filtering.
+    format: rgba8unorm
+  wetnessShoreline:
+    # R = wetness, G = shoreline influence.
+    format: rg8unorm
+  farColor:
+    format: rgba8unorm-srgb
+  farNormal:
+    # Octahedral XY normal encoding.
+    format: rg8snorm
+  canopyWater:
+    # R = canopy coverage, G = water coverage.
+    format: rg8unorm
+
+cache:
+  maxEntries: 192
+  maxBytes: 100663296
+  staleWhileRevalidate: true
+
+fallback:
+  allowProcedural: true
+  allowStale: true
+
+debug:
+  view: final
