@@ -82,6 +82,7 @@ export function installNaturalEditorInteractions(controller) {
   const hoverBridge = installNaturalEditorHoverBridge(controller);
   const constructionContextBridge = installNaturalConstructionContextBridge(controller);
   let additivePointerMode = false;
+  let terrainPointerId = null;
   let disposed = false;
 
   globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
@@ -107,12 +108,26 @@ export function installNaturalEditorInteractions(controller) {
     return true;
   };
 
+  const releaseTerrainPointer = () => {
+    const pointerId = terrainPointerId;
+    terrainPointerId = null;
+    if (
+      pointerId !== null
+      && controller.canvas?.hasPointerCapture?.(pointerId)
+    ) {
+      controller.canvas.releasePointerCapture(pointerId);
+    }
+  };
+
   const settleTerrainStroke = () => {
-    if (!controller.painting) return false;
-    controller.painting = false;
-    controller.lastPaintKey = null;
-    controller.finishStroke();
-    return true;
+    const wasPainting = controller.painting;
+    if (wasPainting) {
+      controller.painting = false;
+      controller.lastPaintKey = null;
+      controller.finishStroke();
+    }
+    releaseTerrainPointer();
+    return wasPainting;
   };
 
   const cancelNaturalPointerGestures = ({ updateState = false } = {}) => {
@@ -267,7 +282,9 @@ export function installNaturalEditorInteractions(controller) {
     const savedMode = controller.terrainMode;
     if (terrainGesture) controller.terrainMode = terrainGesture;
     try {
-      return original.onPointerDown(event);
+      const result = original.onPointerDown(event);
+      if (terrainPointer && controller.painting) terrainPointerId = event.pointerId;
+      return result;
     } finally {
       if (terrainGesture) controller.terrainMode = savedMode;
       if (wasSelect) restoreSelectionTool();
@@ -337,6 +354,7 @@ export function installNaturalEditorInteractions(controller) {
     try {
       return original.onPointerUp(event);
     } finally {
+      if (event.pointerId === terrainPointerId) terrainPointerId = null;
       if (event.button === PRIMARY_POINTER_BUTTON || event.type === 'pointercancel') {
         controller.naturalTerrainGestureMode = null;
       }
@@ -426,6 +444,7 @@ export function installNaturalEditorInteractions(controller) {
       if (disposed) return;
       disposed = true;
       abort.abort();
+      settleTerrainStroke();
       constructionContextBridge.dispose();
       hoverBridge.dispose();
       selection.dispose();
