@@ -415,27 +415,36 @@ export function installNaturalEditorInteractions(controller) {
   };
 
   controller.undo = () => {
+    const cancelled = cancelNaturalPointerGestures();
+    settleTerrainStroke();
     const entry = controller.undoStack.at(-1);
     const before = controller.undoStack.length;
     const result = original.undo();
     if (entry && controller.undoStack.length < before) {
       controller.emitNotice(`Undo ${historyLabel(entry)}.`);
+    } else if (cancelled) {
+      controller.emitState();
     }
     return result;
   };
 
   controller.redo = () => {
+    const cancelled = cancelNaturalPointerGestures();
+    settleTerrainStroke();
     const entry = controller.redoStack.at(-1);
     const before = controller.redoStack.length;
     const result = original.redo();
     if (entry && controller.redoStack.length < before) {
       controller.emitNotice(`Redo ${historyLabel(entry)}.`);
+    } else if (cancelled) {
+      controller.emitState();
     }
     return result;
   };
 
   controller.onKeyDown = (event) => {
     if (isTextControl(event.target)) return;
+    if (controller.isWorldInputBlocked()) return original.onKeyDown(event);
     if (
       (event.ctrlKey || event.metaKey)
       && event.key.toLowerCase() === 'd'
