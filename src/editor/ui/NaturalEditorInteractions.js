@@ -62,6 +62,7 @@ export function installNaturalEditorInteractions(controller) {
     'deleteSelectedConstruction',
     'applyHistory',
     'refreshObjects',
+    'cancelBlockedWorldInteraction',
     'undo',
     'redo',
     'onKeyDown',
@@ -97,6 +98,11 @@ export function installNaturalEditorInteractions(controller) {
     return true;
   };
 
+  const cancelNaturalPointerGestures = ({ updateState = false } = {}) => {
+    controller.naturalTerrainGestureMode = null;
+    return selection.cancelPointerGestures({ updateState });
+  };
+
   controller.setSelectedObject = (objectId) => selection.replace(objectId);
 
   controller.getState = () => ({
@@ -106,11 +112,25 @@ export function installNaturalEditorInteractions(controller) {
   });
 
   controller.selectTool = (tool) => {
-    if (tool !== 'select') selection.returnTool = tool;
-    controller.naturalConstructionReturnTool = null;
-    selection.drag = null;
-    selection.marquee.cancel();
-    return original.selectTool(tool);
+    cancelNaturalPointerGestures();
+    const previousTool = controller.tool;
+    const result = original.selectTool(tool);
+    if (controller.tool === tool) {
+      if (tool !== 'select') selection.returnTool = tool;
+      controller.naturalConstructionReturnTool = null;
+    } else if (controller.tool !== previousTool && controller.tool !== 'select') {
+      selection.returnTool = controller.tool;
+    }
+    return result;
+  };
+
+  controller.cancelBlockedWorldInteraction = () => {
+    cancelNaturalPointerGestures();
+    const result = original.cancelBlockedWorldInteraction();
+    selection.overlay.clearPreview();
+    controller.terrainView.setPreview(null);
+    controller.objectView.setPreview(null);
+    return result;
   };
 
   controller.onConstructionPointerDown = (event) => {
@@ -138,9 +158,13 @@ export function installNaturalEditorInteractions(controller) {
   };
 
   controller.onPointerDown = (event) => {
+    if (controller.isWorldInputBlocked()) {
+      cancelNaturalPointerGestures();
+      return original.onPointerDown(event);
+    }
+
     if (
-      !controller.isWorldInputBlocked()
-      && event.button === PRIMARY_POINTER_BUTTON
+      event.button === PRIMARY_POINTER_BUTTON
       && !controller.spacePressed
       && !controller.movingObjectId
     ) {
@@ -207,16 +231,17 @@ export function installNaturalEditorInteractions(controller) {
     }
 
     const wasSelect = controller.tool === 'select';
-    const terrainGesture = (
+    const terrainPointer = (
       controller.tool === 'terrain'
       && event.button === PRIMARY_POINTER_BUTTON
       && !controller.spacePressed
-    ) ? effectiveTerrainGestureMode(event) : null;
-    const savedMode = controller.terrainMode;
-    if (terrainGesture) {
+    );
+    const terrainGesture = terrainPointer ? effectiveTerrainGestureMode(event) : null;
+    if (event.button === PRIMARY_POINTER_BUTTON && !controller.spacePressed) {
       controller.naturalTerrainGestureMode = terrainGesture;
-      controller.terrainMode = terrainGesture;
     }
+    const savedMode = controller.terrainMode;
+    if (terrainGesture) controller.terrainMode = terrainGesture;
     try {
       return original.onPointerDown(event);
     } finally {
@@ -226,6 +251,10 @@ export function installNaturalEditorInteractions(controller) {
   };
 
   controller.onPointerMove = (event) => {
+    if (controller.isWorldInputBlocked()) {
+      cancelNaturalPointerGestures();
+      return original.onPointerMove(event);
+    }
     if (selection.marquee.update(event)) return;
     selection.updateDirectDrag(event);
     if (!controller.naturalTerrainGestureMode) return original.onPointerMove(event);
@@ -261,7 +290,7 @@ export function installNaturalEditorInteractions(controller) {
         : null;
       if (primary && controller.hoveredCell) {
         selection.overlay.previewTranslation(
-          selection.objects(),
+          selection.visibleObjects(),
           controller.hoveredCell.x - primary.x,
           controller.hoveredCell.z - primary.z,
         );
@@ -272,6 +301,10 @@ export function installNaturalEditorInteractions(controller) {
   };
 
   controller.onPointerUp = (event) => {
+    if (controller.isWorldInputBlocked()) {
+      controller.cancelBlockedWorldInteraction();
+      return original.onPointerUp(event);
+    }
     if (selection.marquee.finish(event)) return;
     if (selection.finishDirectDrag(event)) {
       controller.naturalTerrainGestureMode = null;
@@ -280,7 +313,7 @@ export function installNaturalEditorInteractions(controller) {
     try {
       return original.onPointerUp(event);
     } finally {
-      if (event.button === PRIMARY_POINTER_BUTTON && !controller.painting) {
+      if (event.button === PRIMARY_POINTER_BUTTON || event.type === 'pointercancel') {
         controller.naturalTerrainGestureMode = null;
       }
     }
@@ -315,7 +348,8 @@ export function installNaturalEditorInteractions(controller) {
 
   controller.refreshObjects = () => {
     const result = original.refreshObjects();
-    selection.retainExisting();
+    const selectionChanged = selection.retainExisting();
+    if (selectionChanged) controller.emitState();
     return result;
   };
 
@@ -352,12 +386,9 @@ export function installNaturalEditorInteractions(controller) {
     }
     const escapeConstructionReturn = event.key.toLowerCase() === 'escape'
       && Boolean(controller.naturalConstructionReturnTool);
+    if (event.key.toLowerCase() === 'escape') cancelNaturalPointerGestures();
     const result = original.onKeyDown(event);
-    if (event.key.toLowerCase() === 'escape') {
-      selection.drag = null;
-      selection.marquee.cancel();
-      restoreSelectionTool();
-    }
+    if (event.key.toLowerCase() === 'escape') restoreSelectionTool();
     if (escapeConstructionReturn) restoreConstructionTool();
     return result;
   };
