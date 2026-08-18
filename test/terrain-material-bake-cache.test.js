@@ -114,6 +114,41 @@ test('stale-while-revalidate returns the old bake and promotes the new revision'
   assert.equal(newResource.disposeCount, 1);
 });
 
+test('older revision finishing last cannot replace a newer requested revision', async () => {
+  const cache = new TerrainMaterialBakeCache({
+    config: cacheConfig({ staleWhileRevalidate: false }),
+  });
+  const older = descriptor({
+    revisions: { ...BASE_REVISIONS, tile: BASE_REVISIONS.tile + 1 },
+  });
+  const newer = descriptor({
+    revisions: { ...BASE_REVISIONS, tile: BASE_REVISIONS.tile + 2 },
+  });
+  const olderPending = deferred();
+  const newerPending = deferred();
+  const olderResource = resource('older');
+  const newerResource = resource('newer');
+
+  const olderAcquire = cache.acquire(older, () => olderPending.promise);
+  const newerAcquire = cache.acquire(newer, () => newerPending.promise);
+  newerPending.resolve({ value: newerResource, byteLength: 128 });
+  const newerLease = await newerAcquire;
+  olderPending.resolve({ value: olderResource, byteLength: 128 });
+  const olderLease = await olderAcquire;
+
+  assert.strictEqual(olderLease.value, olderResource);
+  const current = await cache.acquire(
+    newer,
+    async () => assert.fail('newer revision must remain current'),
+  );
+  assert.strictEqual(current.value, newerResource);
+
+  olderLease.release();
+  newerLease.release();
+  current.release();
+  cache.dispose();
+});
+
 test('failed fresh bake can fall back to a retained stale lease', async () => {
   const cache = new TerrainMaterialBakeCache({
     config: cacheConfig({ staleWhileRevalidate: false }),
