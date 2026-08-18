@@ -10,6 +10,7 @@ const MIN_RESOLUTION = 16;
 const MAX_RESOLUTION = 512;
 const MAX_CACHE_ENTRIES = 4096;
 const MAX_ROWS_PER_YIELD = 512;
+const MAX_CONCURRENT_BUILDS = 16;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -114,9 +115,14 @@ function normalizeBuild(source) {
   if (source.rowsPerYield > MAX_ROWS_PER_YIELD) {
     fail('build.rowsPerYield', `must not exceed ${MAX_ROWS_PER_YIELD}`);
   }
+  assertPositiveInteger(source.maxConcurrent, 'build.maxConcurrent');
+  if (source.maxConcurrent > MAX_CONCURRENT_BUILDS) {
+    fail('build.maxConcurrent', `must not exceed ${MAX_CONCURRENT_BUILDS}`);
+  }
   assertPositive(source.retryDelayMs, 'build.retryDelayMs');
   return Object.freeze({
     rowsPerYield: source.rowsPerYield,
+    maxConcurrent: source.maxConcurrent,
     retryDelayMs: source.retryDelayMs,
   });
 }
