@@ -19,7 +19,6 @@ export class StylizedChunkRevisionTracker {
     this.materialClock = 0;
     this.revisions = new Map();
     this.materialRevisionMaps = createMaterialRevisionMaps();
-    // Memoized all-zero signatures, one per shape, valid while no chunk is dirty.
     this.zeroSignatures = new Map();
     this.unsubscribe = worldStore.subscribe((change) => this.onWorldChange(change));
   }
@@ -31,7 +30,6 @@ export class StylizedChunkRevisionTracker {
       this.materialClock += 1;
       this.revisions.clear();
       for (const revisions of Object.values(this.materialRevisionMaps)) revisions.clear();
-      // The memoized strings embed the epoch, so they cannot outlive it.
       this.zeroSignatures.clear();
       return;
     }
@@ -96,24 +94,20 @@ export class StylizedChunkRevisionTracker {
     return revision;
   }
 
-  materialRevisionsFor(chunkX, chunkZ, { tileHalo = 0 } = {}) {
+  materialRevisionsFor(chunkX, chunkZ, { tileHalo = 0, waterHalo = tileHalo } = {}) {
     const tile = this.materialRevisionAt('tile', chunkX, chunkZ, tileHalo);
     const height = this.materialRevisionAt('height', chunkX, chunkZ);
-    const explicitWater = this.materialRevisionAt('water', chunkX, chunkZ, tileHalo);
+    const waterHeight = this.materialRevisionAt('height', chunkX, chunkZ, waterHalo);
+    const explicitWater = this.materialRevisionAt('water', chunkX, chunkZ, waterHalo);
     return Object.freeze({
       world: this.epoch,
       tile,
       height,
-      water: Math.max(tile, height, explicitWater),
+      water: Math.max(tile, waterHeight, explicitWater),
       canopy: this.materialRevisionAt('canopy', chunkX, chunkZ),
     });
   }
 
-  /**
-   * All-zero signature for a given shape, byte-identical to what the walk below
-   * produces when nothing is dirty — callers compare these strings, so the fast
-   * path must not have its own format.
-   */
   zeroSignature(cacheKey, entryCount, separator) {
     let cached = this.zeroSignatures.get(cacheKey);
     if (cached === undefined) {
@@ -125,15 +119,6 @@ export class StylizedChunkRevisionTracker {
     return cached;
   }
 
-  /**
-   * Change-detection token for a chunk and its halo. Callers key their caches by
-   * chunk coordinate separately, so this only has to distinguish revision state.
-   *
-   * An unedited world is the common case and leaves `revisions` empty, meaning
-   * every chunk reads zero. Taking that shortcut matters because the halo walk
-   * builds a string per neighbour, and `windowSignature` runs it for every chunk
-   * in the resident window, for trees, rocks and bushes, every frame.
-   */
   signature(chunkX, chunkZ, halo = 0) {
     if (this.revisions.size === 0) {
       return this.zeroSignature(`s${halo}`, (halo * 2 + 1) ** 2, ':');
