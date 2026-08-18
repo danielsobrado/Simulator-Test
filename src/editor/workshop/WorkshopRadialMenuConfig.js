@@ -156,6 +156,7 @@ export function loadWorkshopRadialMenuConfig() {
       'wheelMaxStepsPerEvent',
     ),
     swipeThresholdPx: boundedInteger(source.swipeThresholdPx, 30, 12, 120, 'swipeThresholdPx'),
+    commitDelayMs: boundedInteger(source.commitDelayMs, 90, 40, 500, 'commitDelayMs'),
     readoutMs: boundedInteger(source.readoutMs, 850, 250, 3000, 'readoutMs'),
     materialPresetColors: normalizePresetColors(source.materialPresetColors),
     modes: Object.freeze(modes),
