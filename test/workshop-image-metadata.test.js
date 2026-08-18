@@ -27,6 +27,17 @@ function jpegWithFrame({ segmentLength = 11, width = 1, height = 1, components =
   return bytes;
 }
 
+function webpLosslessHeader({ riffSize = 18, chunkLength = 5, signature = 0x2f } = {}) {
+  const bytes = Buffer.alloc(26);
+  bytes.write('RIFF', 0, 'ascii');
+  bytes.writeUInt32LE(riffSize, 4);
+  bytes.write('WEBP', 8, 'ascii');
+  bytes.write('VP8L', 12, 'ascii');
+  bytes.writeUInt32LE(chunkLength, 16);
+  bytes[20] = signature;
+  return bytes;
+}
+
 test('workshop PNG metadata requires a canonical IHDR chunk length', () => {
   assert.deepEqual(
     parseWorkshopImageDimensions(pngHeader(), 'image/png'),
@@ -50,6 +61,21 @@ test('workshop JPEG metadata validates complete frame component metadata', () =>
   assert.throws(
     () => parseWorkshopImageDimensions(jpegWithFrame({ segmentLength: 11, components: 2 }), 'image/jpeg'),
     /invalid frame components/i,
+  );
+});
+
+test('workshop WebP metadata accepts compact lossless headers and enforces declared bounds', () => {
+  assert.deepEqual(
+    parseWorkshopImageDimensions(webpLosslessHeader(), 'image/webp'),
+    { width: 1, height: 1 },
+  );
+  assert.throws(
+    () => parseWorkshopImageDimensions(webpLosslessHeader({ chunkLength: 4 }), 'image/webp'),
+    /invalid image chunk/i,
+  );
+  assert.throws(
+    () => parseWorkshopImageDimensions(webpLosslessHeader({ riffSize: 12 }), 'image/webp'),
+    /container is truncated/i,
   );
 });
 
