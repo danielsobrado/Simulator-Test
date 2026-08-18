@@ -2,7 +2,8 @@ import { parseWorkshopImageDimensions } from './ProceduralWorkshopImageMetadata.
 
 const MAX_PRESETS = 48;
 const MAX_SOURCES = 16;
-const MAX_TOTAL_SOURCE_LENGTH = 2_400_000;
+export const MAX_WORKSHOP_MATERIAL_SOURCE_DATA_URL_LENGTH = 800_000;
+export const MAX_WORKSHOP_MATERIAL_TOTAL_SOURCE_LENGTH = 2_400_000;
 export const MAX_WORKSHOP_MATERIAL_DRAW_PARTS = 16;
 const VALID_ID = /^[a-z][a-z0-9-]{0,63}$/;
 const VALID_REGION_ID = /^[a-z0-9][a-z0-9:-]{0,159}$/;
@@ -153,7 +154,10 @@ function normalizeSource(sourceId, input) {
   const kind = string(source.kind, `Material source ${sourceId} kind`);
   if (!VALID_SOURCE_KIND.has(kind)) throw new Error(`Unknown PBR source kind: ${kind}.`);
   const dataUrl = string(source.dataUrl, `Material source ${sourceId} data URL`);
-  if (!/^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl) || dataUrl.length > 800_000) {
+  if (
+    !/^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl)
+    || dataUrl.length > MAX_WORKSHOP_MATERIAL_SOURCE_DATA_URL_LENGTH
+  ) {
     throw new Error(`Material source ${sourceId} must be a bounded local PNG, JPEG, or WebP.`);
   }
   const [, mimeType, payload] = /^data:image\/(png|jpeg|webp);base64,([a-z0-9+/]+={0,2})$/i
@@ -259,7 +263,7 @@ export function normalizeWorkshopMaterialDocument(input = {}, { surfaceTextures 
       }
     }
   }
-  if (totalSourceLength > MAX_TOTAL_SOURCE_LENGTH) {
+  if (totalSourceLength > MAX_WORKSHOP_MATERIAL_TOTAL_SOURCE_LENGTH) {
     throw new Error('The full-PBR source maps are too large for one workshop object.');
   }
 
