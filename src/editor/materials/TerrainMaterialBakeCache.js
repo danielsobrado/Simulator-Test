@@ -336,6 +336,16 @@ export class TerrainMaterialBakeCache {
     }
   }
 
+  async whenResident(descriptor) {
+    this.assertOpen();
+    if (this.entries.has(descriptor.key)) return true;
+    const pending = this.inFlight.get(descriptor.key);
+    if (!pending) return false;
+    await pending.promise;
+    this.assertOpen();
+    return this.entries.has(descriptor.key);
+  }
+
   async whenIdle() {
     while (this.inFlight.size > 0) {
       await Promise.allSettled([...this.inFlight.values()].map((pending) => pending.promise));
