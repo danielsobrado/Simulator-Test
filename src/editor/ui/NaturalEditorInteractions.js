@@ -100,6 +100,25 @@ export function installNaturalEditorInteractions(controller) {
     controller.emitState();
   };
 
+  const alignSelectionToolAfterHistory = () => {
+    if (selection.size > 0) {
+      if (controller.tool === 'select') return;
+      selection.returnTool = controller.tool ?? selection.returnTool ?? DEFAULT_RETURN_TOOL;
+      if (controller.tool === 'construction') {
+        controller.cancelConstructionGesture();
+        controller.setSelectedConstruction(null);
+        controller.constructionGizmo?.close();
+      }
+      controller.naturalConstructionReturnTool = null;
+      controller.tool = 'select';
+      controller.updatePreviews();
+      return;
+    }
+    if (controller.tool !== 'select' || controller.movingObjectId) return;
+    controller.tool = selection.returnTool ?? DEFAULT_RETURN_TOOL;
+    controller.updatePreviews();
+  };
+
   const restoreConstructionTool = () => {
     const returnTool = controller.naturalConstructionReturnTool;
     if (!returnTool) return false;
@@ -402,6 +421,7 @@ export function installNaturalEditorInteractions(controller) {
   controller.applyHistory = (entry, direction) => {
     if (entry?.kind === 'object-batch') {
       selection.applyHistory(entry, direction);
+      alignSelectionToolAfterHistory();
       return;
     }
     return original.applyHistory(entry, direction);
