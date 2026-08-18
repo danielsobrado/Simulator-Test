@@ -178,12 +178,16 @@ export class ProceduralWorkshopMaterialController {
     this.root.dispatchEvent(new Event('change'));
   }
 
+  invalidateSourceUploads() {
+    this.sourceUploadRevision += 1;
+    this.sourceUploadRevisions.clear();
+  }
+
   setDocument(input) {
     this.document = normalizeWorkshopMaterialDocument(input);
     this.history = [];
     this.future = [];
-    this.sourceUploadRevision += 1;
-    this.sourceUploadRevisions.clear();
+    this.invalidateSourceUploads();
     this.refreshInspector();
     this.notifyRegionSelectionChanged();
   }
@@ -397,22 +401,26 @@ export class ProceduralWorkshopMaterialController {
   }
 
   rootClick(event) {
-    // Palette petals and the reset/more buttons are the palette's own events
-    // now; everything here belongs to the inspector.
     const action = event.target.closest('[data-material-action]')?.dataset.materialAction;
-    if (action === 'reset') this.resetSelected();
-    if (action === 'close-inspector') this.inspector.hidden = true;
-    if (action === 'copy') this.copySelected();
-    if (action === 'paste') this.pasteSelected();
-    if (action === 'apply-matching') this.applyMatching();
-    if (action === 'favorite') this.addFavorite();
-    if (action === 'load-map') {
-      this.root.querySelector(`[data-material-source-file="${event.target.closest(
-        '[data-source-kind]',
-      )?.dataset.sourceKind}"]`)?.click();
+    if (!action) return;
+    try {
+      if (action === 'reset') this.resetSelected();
+      if (action === 'close-inspector') this.inspector.hidden = true;
+      if (action === 'copy') this.copySelected();
+      if (action === 'paste') this.pasteSelected();
+      if (action === 'apply-matching') this.applyMatching();
+      if (action === 'favorite') this.addFavorite();
+      if (action === 'load-map') {
+        this.root.querySelector(`[data-material-source-file="${event.target.closest(
+          '[data-source-kind]',
+        )?.dataset.sourceKind}"]`)?.click();
+      }
+      if (action === 'undo') this.undo();
+      if (action === 'redo') this.redo();
+    } catch (error) {
+      this.refreshInspector();
+      this.onStatus?.(error instanceof Error ? error.message : String(error), true);
     }
-    if (action === 'undo') this.undo();
-    if (action === 'redo') this.redo();
   }
 
   rootChange(event) {
@@ -511,24 +519,34 @@ export class ProceduralWorkshopMaterialController {
     const presetId = this.document.materialAreaOverrides[this.selectedRegionId]
       ?? this.document.materialDefaults[region?.family];
     const preset = getWorkshopMaterialPreset(this.document, presetId);
-    if (preset) {
-      this.clipboard = { ...preset, sources: { ...preset.sources } };
-      this.onStatus?.(`Copied ${preset.label}.`, false);
+    if (!preset) return;
+    const sources = {};
+    for (const sourceId of Object.values(preset.sources)) {
+      const source = this.document.materialLibrary.sources[sourceId];
+      if (source) sources[sourceId] = { ...source };
     }
+    this.clipboard = {
+      preset: { ...preset, sources: { ...preset.sources } },
+      sources,
+    };
+    this.onStatus?.(`Copied ${preset.label}.`, false);
   }
 
   pasteSelected() {
     if (!this.clipboard || !this.selectedRegionId) return;
     const region = this.regions.get(this.selectedRegionId);
+    const copiedPreset = this.clipboard.preset;
     const descriptor = {
-      ...this.clipboard,
-      family: region?.family ?? this.clipboard.family,
+      ...copiedPreset,
+      sources: { ...copiedPreset.sources },
+      family: region?.family ?? copiedPreset.family,
       id: undefined,
-      label: `${this.clipboard.label} copy`,
+      label: `${copiedPreset.label} copy`,
     };
     const customId = `custom-${hashDescriptor(descriptor)}`;
     descriptor.id = customId;
     const next = cloneDocument(this.document);
+    Object.assign(next.materialLibrary.sources, this.clipboard.sources);
     next.materialLibrary.presets[customId] = descriptor;
     next.materialAreaOverrides[this.selectedRegionId] = customId;
     this.commit(next, 'Pasted material to selected area.');
@@ -566,8 +584,10 @@ export class ProceduralWorkshopMaterialController {
 
   restore(snapshot, destination, message) {
     if (!snapshot) return;
+    const restored = normalizeWorkshopMaterialDocument(snapshot);
     destination.push(cloneDocument(this.document));
-    this.document = normalizeWorkshopMaterialDocument(snapshot);
+    this.invalidateSourceUploads();
+    this.document = restored;
     this.closePalette();
     this.refreshInspector();
     this.onChange?.(cloneDocument(this.document));
@@ -649,8 +669,7 @@ export class ProceduralWorkshopMaterialController {
     if (this.disposed) return;
     this.disposed = true;
     this.pointerStart = null;
-    this.sourceUploadRevision += 1;
-    this.sourceUploadRevisions.clear();
+    this.invalidateSourceUploads();
     this.clearMaterialPreview();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
     this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
