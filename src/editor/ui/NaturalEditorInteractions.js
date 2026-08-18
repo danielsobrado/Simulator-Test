@@ -11,6 +11,10 @@ const OVERRIDDEN_METHODS = Object.freeze([
   'setSelectedObject',
   'getState',
   'selectTool',
+  'selectTerrainMode',
+  'selectTile',
+  'selectObjectDefinition',
+  'selectConstructionMode',
   'cancelBlockedWorldInteraction',
   'onConstructionPointerDown',
   'onPointerDown',
@@ -135,6 +139,12 @@ export function installNaturalEditorInteractions(controller) {
     return selection.cancelPointerGestures({ updateState });
   };
 
+  const settleBeforeModeChange = (action, ...args) => {
+    settleTerrainStroke();
+    cancelNaturalPointerGestures();
+    return action(...args);
+  };
+
   controller.setSelectedObject = (objectId) => selection.replace(objectId);
 
   controller.getState = () => ({
@@ -159,6 +169,15 @@ export function installNaturalEditorInteractions(controller) {
     }
     return result;
   };
+
+  controller.selectTerrainMode = (mode) => settleBeforeModeChange(original.selectTerrainMode, mode);
+  controller.selectTile = (tileId) => settleBeforeModeChange(original.selectTile, tileId);
+  controller.selectObjectDefinition = (definitionKey) => (
+    settleBeforeModeChange(original.selectObjectDefinition, definitionKey)
+  );
+  controller.selectConstructionMode = (mode) => (
+    settleBeforeModeChange(original.selectConstructionMode, mode)
+  );
 
   controller.cancelBlockedWorldInteraction = () => {
     const wasMovingSelection = controller.movingObjectId !== null;
