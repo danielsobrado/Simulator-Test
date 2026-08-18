@@ -9,12 +9,15 @@ export class ProceduralWorkshopPlannerClient {
     this.revision = 0;
     this.pending = new Map();
     this.worker = null;
-    if (typeof Worker !== 'undefined') {
+    if (workerFactory || typeof Worker !== 'undefined') {
       this.worker = workerFactory
         ? workerFactory()
         : new Worker(new URL('./ProceduralWorkshopPlanner.worker.js', import.meta.url), {
           type: 'module',
         });
+      if (!this.worker || typeof this.worker.addEventListener !== 'function') {
+        throw new Error('Workshop planner worker factory returned an invalid worker.');
+      }
       this.worker.addEventListener('message', ({ data }) => this.receive(data));
       this.worker.addEventListener('error', (event) => this.failAll(
         new Error(event.message || 'Workshop planning worker failed.'),
@@ -30,7 +33,9 @@ export class ProceduralWorkshopPlannerClient {
         this.pending.delete(pendingRevision);
       }
     }
-    if (!this.worker) return Promise.resolve(planWorkshopComposition(recipe, dirtyIds));
+    if (!this.worker) {
+      return Promise.resolve().then(() => planWorkshopComposition(recipe, dirtyIds));
+    }
     return new Promise((resolve, reject) => {
       this.pending.set(revision, { resolve, reject });
       this.worker.postMessage({ revision, recipe, dirtyIds });
