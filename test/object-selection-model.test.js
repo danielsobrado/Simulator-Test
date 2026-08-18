@@ -34,6 +34,17 @@ test('selection model retains only valid ids and repairs primary selection', () 
   assert.equal(selection.primaryId, 2);
 });
 
+test('selection model exposes bounded deterministic iteration', () => {
+  const selection = new ObjectSelectionModel();
+  selection.add(2);
+  selection.add(4);
+  selection.add(6);
+
+  assert.deepEqual([...selection], [2, 4, 6]);
+  assert.deepEqual(selection.values(2), [2, 4]);
+  assert.deepEqual(selection.values(0), []);
+});
+
 test('selection model rejects invalid object ids', () => {
   const selection = new ObjectSelectionModel();
   assert.equal(selection.add(0), false);
