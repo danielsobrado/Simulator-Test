@@ -335,6 +335,16 @@ export class ProceduralWorkshopUi {
     }
   }
 
+  syncMaterialModeButtons(active = this.materialController?.active === true) {
+    this.overlay.querySelector('[data-workshop-action="material"]')
+      ?.classList.toggle('is-active', active);
+    for (const action of ['reset-component', 'reset-all-components']) {
+      const button = this.overlay.querySelector(`[data-workshop-action="${action}"]`);
+      if (button) button.disabled = active;
+    }
+    this.syncTransformModeButtons(this.componentController?.mode ?? 'translate');
+  }
+
   setTransformMode(action) {
     if (!this.transformControls) return;
     if (this.materialController?.active) this.toggleMaterialMode(false);
@@ -348,12 +358,7 @@ export class ProceduralWorkshopUi {
     const active = this.materialController.setActive(
       force === undefined ? !this.materialController.active : force,
     );
-    this.overlay.querySelector('[data-workshop-action="material"]')
-      ?.classList.toggle('is-active', active);
-    for (const action of ['move', 'rotate', 'scale', 'reset-component', 'reset-all-components']) {
-      const button = this.overlay.querySelector(`[data-workshop-action="${action}"]`);
-      if (button) button.disabled = active;
-    }
+    this.syncMaterialModeButtons(active);
     this.status.textContent = active
       ? 'Material mode · hover a semantic area, then click for full-PBR favorites.'
       : 'Transform mode restored.';
@@ -530,11 +535,7 @@ export class ProceduralWorkshopUi {
           this.status.textContent = message;
           this.status.classList.toggle('is-error', isError);
         },
-        onActiveChange: (active) => {
-          this.overlay.querySelector('[data-workshop-action="material"]')
-            ?.classList.toggle('is-active', active);
-          this.syncTransformModeButtons(this.componentController?.mode ?? 'translate');
-        },
+        onActiveChange: (active) => this.syncMaterialModeButtons(active),
       });
       this.ambientOcclusion = new WorkshopAmbientOcclusion({
         renderer,
