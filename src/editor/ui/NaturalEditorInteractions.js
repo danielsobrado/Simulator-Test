@@ -121,24 +121,29 @@ export function installNaturalEditorInteractions(controller) {
   });
 
   controller.selectTool = (tool) => {
-    cancelNaturalPointerGestures();
+    const cancelled = cancelNaturalPointerGestures();
     const previousTool = controller.tool;
     const result = original.selectTool(tool);
     if (controller.tool === tool) {
       if (tool !== 'select') selection.returnTool = tool;
       controller.naturalConstructionReturnTool = null;
-    } else if (controller.tool !== previousTool && controller.tool !== 'select') {
-      selection.returnTool = controller.tool;
+    } else {
+      if (controller.tool !== previousTool && controller.tool !== 'select') {
+        selection.returnTool = controller.tool;
+      }
+      if (cancelled) controller.emitState();
     }
     return result;
   };
 
   controller.cancelBlockedWorldInteraction = () => {
+    const wasMovingSelection = controller.movingObjectId !== null;
     cancelNaturalPointerGestures();
     const result = original.cancelBlockedWorldInteraction();
     selection.overlay.clearPreview();
     controller.terrainView.setPreview(null);
     controller.objectView.setPreview(null);
+    if (wasMovingSelection) controller.emitState();
     return result;
   };
 
@@ -168,8 +173,8 @@ export function installNaturalEditorInteractions(controller) {
 
   controller.onPointerDown = (event) => {
     if (controller.isWorldInputBlocked()) {
-      cancelNaturalPointerGestures();
-      return original.onPointerDown(event);
+      controller.cancelBlockedWorldInteraction();
+      return;
     }
 
     if (
@@ -261,8 +266,8 @@ export function installNaturalEditorInteractions(controller) {
 
   controller.onPointerMove = (event) => {
     if (controller.isWorldInputBlocked()) {
-      cancelNaturalPointerGestures();
-      return original.onPointerMove(event);
+      controller.cancelBlockedWorldInteraction();
+      return;
     }
     if (selection.marquee.update(event)) return;
     selection.updateDirectDrag(event);
@@ -312,7 +317,7 @@ export function installNaturalEditorInteractions(controller) {
   controller.onPointerUp = (event) => {
     if (controller.isWorldInputBlocked()) {
       controller.cancelBlockedWorldInteraction();
-      return original.onPointerUp(event);
+      return;
     }
     if (selection.marquee.finish(event)) return;
     if (selection.finishDirectDrag(event)) {
