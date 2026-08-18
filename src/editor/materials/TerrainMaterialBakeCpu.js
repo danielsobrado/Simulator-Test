@@ -58,15 +58,23 @@ function cellHeight(heights, chunkSize, x, z) {
 }
 
 function terrainShape(heights, chunkSize, tileSize, x, z) {
-  const center = cellHeight(heights, chunkSize, x, z);
-  const left = cellHeight(heights, chunkSize, x - 1, z);
-  const right = cellHeight(heights, chunkSize, x + 1, z);
-  const near = cellHeight(heights, chunkSize, x, z - 1);
-  const far = cellHeight(heights, chunkSize, x, z + 1);
-  const dx = (right - left) / (2 * tileSize);
-  const dz = (far - near) / (2 * tileSize);
+  const vertexSize = chunkSize + 1;
+  const topLeft = heights[z * vertexSize + x];
+  const topRight = heights[z * vertexSize + x + 1];
+  const bottomLeft = heights[(z + 1) * vertexSize + x];
+  const bottomRight = heights[(z + 1) * vertexSize + x + 1];
+  const center = (topLeft + topRight + bottomLeft + bottomRight) * 0.25;
+  const dx = (topRight + bottomRight - topLeft - bottomLeft) / (2 * tileSize);
+  const dz = (bottomLeft + bottomRight - topLeft - topRight) / (2 * tileSize);
   const slope = Math.hypot(dx, dz);
-  const curvature = (left + right + near + far - center * 4) / (tileSize * tileSize);
+  let curvature = 0;
+  if (x > 0 && x + 1 < chunkSize && z > 0 && z + 1 < chunkSize) {
+    const left = cellHeight(heights, chunkSize, x - 1, z);
+    const right = cellHeight(heights, chunkSize, x + 1, z);
+    const near = cellHeight(heights, chunkSize, x, z - 1);
+    const far = cellHeight(heights, chunkSize, x, z + 1);
+    curvature = (left + right + near + far - center * 4) / (tileSize * tileSize);
+  }
   return { center, dx, dz, slope, curvature };
 }
 
@@ -181,6 +189,7 @@ export async function bakeTerrainMaterialPage({
   config,
   chunkSize,
   tileSize,
+  worldSeed = 0,
   yieldControl = yieldTerrainMaterialBake,
 }) {
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -222,6 +231,7 @@ export async function bakeTerrainMaterialPage({
   const waterDistance = distanceField(water, resolution);
   const classification = config.classification;
   const macro = config.macro;
+  const macroSeed = (macro.seedOffset ^ (Number.isSafeInteger(worldSeed) ? worldSeed : 0)) | 0;
 
   for (let z = 0; z < resolution; z += 1) {
     for (let x = 0; x < resolution; x += 1) {
@@ -262,11 +272,11 @@ export async function bakeTerrainMaterialPage({
 
       const worldX = (source.originX + (x + 0.5) * chunkSize / resolution) * tileSize;
       const worldZ = -(source.originZ + (z + 0.5) * chunkSize / resolution) * tileSize;
-      const macroBase = valueNoise(worldX, worldZ, macro.scaleMeters, macro.seedOffset) * 2 - 1;
+      const macroBase = valueNoise(worldX, worldZ, macro.scaleMeters, macroSeed) * 2 - 1;
       const macroR = 1 + macroBase * macro.strength;
-      const macroG = 1 + (valueNoise(worldX, worldZ, macro.scaleMeters, macro.seedOffset + 17) * 2 - 1)
+      const macroG = 1 + (valueNoise(worldX, worldZ, macro.scaleMeters, macroSeed + 17) * 2 - 1)
         * macro.strength * 0.72;
-      const macroB = 1 + (valueNoise(worldX, worldZ, macro.scaleMeters, macro.seedOffset + 31) * 2 - 1)
+      const macroB = 1 + (valueNoise(worldX, worldZ, macro.scaleMeters, macroSeed + 31) * 2 - 1)
         * macro.strength * 0.55;
       macroTint[index * 4] = Math.round(clamp01(macroR * 0.5) * 255);
       macroTint[index * 4 + 1] = Math.round(clamp01(macroG * 0.5) * 255);
@@ -279,9 +289,21 @@ export async function bakeTerrainMaterialPage({
         macro.maxHeightShade,
       );
       const wetShade = 1 - wetness * macro.wetDarkening;
-      farColor[index * 4] = Math.round(clamp(source.tilePixels[sourceOffset] * macroR * heightShade * wetShade, 0, 255));
-      farColor[index * 4 + 1] = Math.round(clamp(source.tilePixels[sourceOffset + 1] * macroG * heightShade * wetShade, 0, 255));
-      farColor[index * 4 + 2] = Math.round(clamp(source.tilePixels[sourceOffset + 2] * macroB * heightShade * wetShade, 0, 255));
+      farColor[index * 4] = Math.round(clamp(
+        source.tilePixels[sourceOffset] * macroR * heightShade * wetShade,
+        0,
+        255,
+      ));
+      farColor[index * 4 + 1] = Math.round(clamp(
+        source.tilePixels[sourceOffset + 1] * macroG * heightShade * wetShade,
+        0,
+        255,
+      ));
+      farColor[index * 4 + 2] = Math.round(clamp(
+        source.tilePixels[sourceOffset + 2] * macroB * heightShade * wetShade,
+        0,
+        255,
+      ));
       farColor[index * 4 + 3] = 255;
     }
     if ((z + 1) % rowsPerYield === 0 && z + 1 < resolution) await yieldControl();
@@ -296,7 +318,10 @@ export async function bakeTerrainMaterialPage({
     farNormal,
     canopyWater,
   });
-  const byteLength = Object.values(channels).reduce((total, pixels) => total + pixels.byteLength, 0);
+  const byteLength = Object.values(channels).reduce(
+    (total, pixels) => total + pixels.byteLength,
+    0,
+  );
   const finishedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return Object.freeze({
     value: Object.freeze({
