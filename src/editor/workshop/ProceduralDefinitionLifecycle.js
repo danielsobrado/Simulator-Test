@@ -1,7 +1,11 @@
 import { disposeModelParts } from '../assets/modelParts.js';
 
 function disposeRenderer(objectView, renderer) {
-  for (const mesh of renderer.meshes) {
+  if (typeof objectView.disposeRendererRecord === 'function') {
+    objectView.disposeRendererRecord(renderer);
+    return;
+  }
+  for (const mesh of renderer.meshes ?? []) {
     objectView.root.remove(mesh);
     mesh.dispose?.();
   }
@@ -11,7 +15,7 @@ function disposeRenderer(objectView, renderer) {
   }
   renderer.foundationGeometry?.dispose();
   renderer.foundationMaterial?.dispose();
-  disposeModelParts(renderer.parts);
+  disposeModelParts(renderer.parts ?? []);
 }
 
 function disposePreviewMaterial(material) {
