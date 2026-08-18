@@ -128,6 +128,33 @@ function distanceField(mask, size) {
   return distance;
 }
 
+function localWaterMask(surfaceMaskPixels, chunkSize) {
+  const water = new Uint8Array(chunkSize * chunkSize);
+  for (let index = 0; index < water.length; index += 1) {
+    water[index] = surfaceMaskPixels[index * 4 + 2];
+  }
+  return water;
+}
+
+function waterDistanceSource(source, chunkSize) {
+  if (source.waterHaloPixels instanceof Uint8Array
+      && Number.isInteger(source.waterHaloRadius)
+      && source.waterHaloRadius >= 0
+      && source.waterHaloSize === chunkSize + source.waterHaloRadius * 2
+      && source.waterHaloPixels.length === source.waterHaloSize ** 2) {
+    return {
+      distance: distanceField(source.waterHaloPixels, source.waterHaloSize),
+      size: source.waterHaloSize,
+      radius: source.waterHaloRadius,
+    };
+  }
+  return {
+    distance: distanceField(localWaterMask(source.surfaceMaskPixels, chunkSize), chunkSize),
+    size: chunkSize,
+    radius: 0,
+  };
+}
+
 function encodeWeights(target, offset, values) {
   const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
   const normalized = total > 1e-9
@@ -154,7 +181,14 @@ function sampleCanopy(source, x, z, resolution) {
   return pixels[sampleZ * size + sampleX] / 255;
 }
 
-export function captureTerrainMaterialBakeSource({ page, canopyPixels = null, canopySize = 0 }) {
+export function captureTerrainMaterialBakeSource({
+  page,
+  canopyPixels = null,
+  canopySize = 0,
+  waterHaloPixels = null,
+  waterHaloSize = 0,
+  waterHaloRadius = 0,
+}) {
   if (!(page?.tilePixels instanceof Uint8Array)
       || !(page.surfaceMaskPixels instanceof Uint8Array)
       || !(page.heights instanceof Float32Array)) {
@@ -168,6 +202,9 @@ export function captureTerrainMaterialBakeSource({ page, canopyPixels = null, ca
     heights: page.heights.slice(),
     canopyPixels: canopyPixels instanceof Uint8Array ? canopyPixels.slice() : null,
     canopySize: Number.isInteger(canopySize) ? canopySize : 0,
+    waterHaloPixels: waterHaloPixels instanceof Uint8Array ? waterHaloPixels.slice() : null,
+    waterHaloSize: Number.isInteger(waterHaloSize) ? waterHaloSize : 0,
+    waterHaloRadius: Number.isInteger(waterHaloRadius) ? waterHaloRadius : 0,
   });
 }
 
@@ -204,8 +241,8 @@ export async function bakeTerrainMaterialPage({
   const canopyWater = new Uint8Array(texelCount * 2);
   const heights = new Float32Array(texelCount);
   const slopes = new Float32Array(texelCount);
-  const water = new Uint8Array(texelCount);
   const sourceIndices = new Uint32Array(texelCount);
+  const waterSource = waterDistanceSource(source, chunkSize);
   const rowsPerYield = config.build.rowsPerYield;
 
   for (let z = 0; z < resolution; z += 1) {
@@ -218,7 +255,6 @@ export async function bakeTerrainMaterialPage({
       sourceIndices[index] = sourceIndex;
       heights[index] = shape.center;
       slopes[index] = shape.slope;
-      water[index] = source.surfaceMaskPixels[sourceIndex * 4 + 2];
       terrainShapePixels[index * 2] = floatToHalf(shape.slope);
       terrainShapePixels[index * 2 + 1] = floatToHalf(shape.curvature);
       const [normalX, normalZ] = octNormal(shape.dx, shape.dz);
@@ -228,7 +264,6 @@ export async function bakeTerrainMaterialPage({
     if ((z + 1) % rowsPerYield === 0 && z + 1 < resolution) await yieldControl();
   }
 
-  const waterDistance = distanceField(water, resolution);
   const classification = config.classification;
   const macro = config.macro;
   const macroSeed = (macro.seedOffset ^ (Number.isSafeInteger(worldSeed) ? worldSeed : 0)) | 0;
@@ -237,10 +272,13 @@ export async function bakeTerrainMaterialPage({
     for (let x = 0; x < resolution; x += 1) {
       const index = z * resolution + x;
       const sourceIndex = sourceIndices[index];
+      const sourceX = sourceIndex % chunkSize;
+      const sourceZ = Math.floor(sourceIndex / chunkSize);
       const sourceOffset = sourceIndex * 4;
       const path = source.surfaceMaskPixels[sourceOffset] / 255;
       const grassCoverage = source.surfaceMaskPixels[sourceOffset + 1] / 255;
-      const waterCoverage = water[index] / 255;
+      const waterByte = source.surfaceMaskPixels[sourceOffset + 2];
+      const waterCoverage = waterByte / 255;
       const slope = slopes[index];
       const height = heights[index];
       const land = 1 - waterCoverage;
@@ -260,15 +298,18 @@ export async function bakeTerrainMaterialPage({
       const dirt = Math.max(path, (1 - grassCoverage) * land) * (1 - rock) * (1 - snow);
       encodeWeights(materialWeights, index * 4, [grass, dirt, rock, snow]);
 
-      const shoreline = clamp01(1 - waterDistance[index] / classification.shorelineRadiusCells);
+      const waterIndex = (sourceZ + waterSource.radius) * waterSource.size
+        + sourceX + waterSource.radius;
+      const waterDistanceCells = waterSource.distance[waterIndex];
+      const shoreline = clamp01(1 - waterDistanceCells / classification.shorelineRadiusCells);
       const wetness = Math.max(
         waterCoverage,
-        clamp01(1 - waterDistance[index] / classification.wetnessRadiusCells),
+        clamp01(1 - waterDistanceCells / classification.wetnessRadiusCells),
       );
       wetnessShoreline[index * 2] = Math.round(wetness * 255);
       wetnessShoreline[index * 2 + 1] = Math.round(shoreline * 255);
       canopyWater[index * 2] = Math.round(sampleCanopy(source, x, z, resolution) * 255);
-      canopyWater[index * 2 + 1] = water[index];
+      canopyWater[index * 2 + 1] = waterByte;
 
       const worldX = (source.originX + (x + 0.5) * chunkSize / resolution) * tileSize;
       const worldZ = -(source.originZ + (z + 0.5) * chunkSize / resolution) * tileSize;
