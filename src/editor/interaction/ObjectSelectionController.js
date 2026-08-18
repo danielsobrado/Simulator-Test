@@ -29,12 +29,22 @@ export class ObjectSelectionController {
     return this.model.primaryId;
   }
 
-  ids() {
-    return this.model.values();
+  ids(limit = Infinity) {
+    return this.model.values(limit);
   }
 
-  objects() {
-    return this.ids().map((id) => this.controller.objectMap.getById(id)).filter(Boolean);
+  objects(limit = Infinity) {
+    const objects = [];
+    for (const id of this.model) {
+      if (objects.length >= limit) break;
+      const object = this.controller.objectMap.getById(id);
+      if (object) objects.push(object);
+    }
+    return objects;
+  }
+
+  visibleObjects() {
+    return this.objects(NATURAL_EDITOR_UI_CONFIG.selection.maxVisibleOverlays);
   }
 
   emit() {
@@ -50,14 +60,40 @@ export class ObjectSelectionController {
 
   syncVisuals() {
     this.applyPrimarySelection(this.primaryId);
-    this.overlay.sync(this.ids(), this.primaryId);
+    this.overlay.sync(this.model, this.primaryId);
     this.emit();
+  }
+
+  releaseDirectDrag() {
+    const drag = this.drag;
+    if (
+      drag
+      && this.controller.canvas?.hasPointerCapture?.(drag.pointerId)
+    ) {
+      this.controller.canvas.releasePointerCapture(drag.pointerId);
+    }
+    this.drag = null;
+    return drag;
+  }
+
+  cancelPointerGestures({ updateState = true } = {}) {
+    const drag = this.releaseDirectDrag();
+    const marqueeActive = Boolean(this.marquee.drag);
+    this.marquee.cancel();
+    const moving = this.controller.movingObjectId !== null;
+    this.controller.movingObjectId = null;
+    this.overlay.clearPreview();
+    if (updateState && moving) {
+      this.controller.updatePreviews();
+      this.controller.emitState();
+    }
+    return Boolean(drag || marqueeActive || moving);
   }
 
   replace(id) {
     const object = id == null ? null : this.controller.objectMap.getById(id);
+    if (!object) this.cancelPointerGestures({ updateState: false });
     this.model.replace(object?.id ?? null);
-    if (!object) this.drag = null;
     this.syncVisuals();
   }
 
@@ -86,15 +122,19 @@ export class ObjectSelectionController {
   }
 
   clear() {
+    this.cancelPointerGestures({ updateState: false });
     this.model.clear();
-    this.drag = null;
-    this.marquee.cancel();
     this.syncVisuals();
   }
 
   retainExisting() {
-    this.model.retain(this.ids().filter((id) => this.controller.objectMap.getById(id)));
+    const validIds = [];
+    for (const id of this.model) {
+      if (this.controller.objectMap.getById(id)) validIds.push(id);
+    }
+    const changed = this.model.retain(validIds);
     this.syncVisuals();
+    return changed;
   }
 
   beginDirectDrag(id, event) {
@@ -131,10 +171,7 @@ export class ObjectSelectionController {
   finishDirectDrag(event) {
     const drag = this.drag;
     if (!drag || drag.pointerId !== event.pointerId) return false;
-    if (this.controller.canvas?.hasPointerCapture?.(event.pointerId)) {
-      this.controller.canvas.releasePointerCapture(event.pointerId);
-    }
-    this.drag = null;
+    this.releaseDirectDrag();
 
     if (event.type === 'pointercancel') {
       this.cancelMove();
@@ -163,6 +200,7 @@ export class ObjectSelectionController {
 
   cancelMove() {
     this.controller.movingObjectId = null;
+    this.overlay.clearPreview();
     this.controller.updatePreviews();
     this.controller.emitState();
   }
@@ -217,8 +255,7 @@ export class ObjectSelectionController {
     const changes = this.batchEditor.delete(originals);
     if (changes.length === 0) return false;
     this.model.clear();
-    this.drag = null;
-    this.controller.movingObjectId = null;
+    this.cancelPointerGestures({ updateState: false });
     this.controller.commitHistory(createObjectBatchHistory(changes));
     this.controller.refreshObjects();
     this.syncVisuals();
@@ -259,8 +296,8 @@ export class ObjectSelectionController {
   }
 
   dispose() {
+    this.cancelPointerGestures({ updateState: false });
     this.marquee.dispose();
     this.overlay.dispose();
-    this.drag = null;
   }
 }
