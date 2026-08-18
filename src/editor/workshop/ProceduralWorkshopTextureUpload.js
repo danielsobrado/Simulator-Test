@@ -1,7 +1,16 @@
+import {
+  MAX_WORKSHOP_MATERIAL_SOURCE_DATA_URL_LENGTH,
+  MAX_WORKSHOP_MATERIAL_TOTAL_SOURCE_LENGTH,
+} from './ProceduralWorkshopMaterialConfig.js';
 import { parseWorkshopImageDimensions } from './ProceduralWorkshopImageMetadata.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const OUTPUT_SIZE = 512;
+const OUTPUT_SIZES = Object.freeze([512, 448, 384, 320, 256]);
+const PBR_SOURCE_COUNT = 4;
+const TARGET_DATA_URL_LENGTH = Math.min(
+  MAX_WORKSHOP_MATERIAL_SOURCE_DATA_URL_LENGTH,
+  Math.floor(MAX_WORKSHOP_MATERIAL_TOTAL_SOURCE_LENGTH / PBR_SOURCE_COUNT),
+);
 const ALBEDO_OUTPUT_TYPE = 'image/webp';
 const ALBEDO_OUTPUT_QUALITY = 0.88;
 const DATA_OUTPUT_TYPE = 'image/png';
@@ -66,6 +75,11 @@ function blobToDataUrl(blob, label) {
   });
 }
 
+function estimatedDataUrlLength(blob) {
+  const prefixLength = `data:${blob.type || 'application/octet-stream'};base64,`.length;
+  return prefixLength + 4 * Math.ceil(blob.size / 3);
+}
+
 function dimensionsMatchHeader(decodedWidth, decodedHeight, sourceDimensions) {
   return (
     decodedWidth === sourceDimensions.width
@@ -93,12 +107,51 @@ function createCanvasContext(canvas, kind) {
   return context;
 }
 
+function drawTexture(image, kind, label, crop, outputSize) {
+  const canvas = document.createElement('canvas');
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+  const context = createCanvasContext(canvas, kind);
+  if (!context) {
+    throw new Error(`The browser could not prepare the ${label} texture.`);
+  }
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.size,
+    crop.size,
+    0,
+    0,
+    outputSize,
+    outputSize,
+  );
+  return canvas;
+}
+
 async function encodeCanvas(canvas, kind) {
   if (DATA_TEXTURE_KINDS.has(kind)) {
     return canvasToBlob(canvas, DATA_OUTPUT_TYPE);
   }
   return await canvasToBlob(canvas, ALBEDO_OUTPUT_TYPE, ALBEDO_OUTPUT_QUALITY)
     ?? canvasToBlob(canvas, DATA_OUTPUT_TYPE);
+}
+
+async function encodeWithinBudget(image, kind, label, crop) {
+  for (const outputSize of OUTPUT_SIZES) {
+    const canvas = drawTexture(image, kind, label, crop, outputSize);
+    const blob = await encodeCanvas(canvas, kind);
+    if (!blob || estimatedDataUrlLength(blob) > TARGET_DATA_URL_LENGTH) continue;
+    const dataUrl = await blobToDataUrl(blob, label);
+    if (dataUrl.length <= TARGET_DATA_URL_LENGTH) {
+      return { dataUrl, outputSize };
+    }
+  }
+  throw new Error(
+    `${label} texture could not fit the workshop material budget without reducing it below 256 px.`,
+  );
 }
 
 export async function prepareWorkshopTexture(file, kind = 'albedo') {
@@ -126,39 +179,23 @@ export async function prepareWorkshopTexture(file, kind = 'albedo') {
     }
 
     const cropSize = Math.min(decodedWidth, decodedHeight);
-    const sourceX = (decodedWidth - cropSize) / 2;
-    const sourceY = (decodedHeight - cropSize) / 2;
-    const canvas = document.createElement('canvas');
-    canvas.width = OUTPUT_SIZE;
-    canvas.height = OUTPUT_SIZE;
-    const context = createCanvasContext(canvas, kind);
-    if (!context) {
-      throw new Error(`The browser could not prepare the ${label} texture.`);
-    }
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    context.drawImage(
+    const crop = Object.freeze({
+      x: (decodedWidth - cropSize) / 2,
+      y: (decodedHeight - cropSize) / 2,
+      size: cropSize,
+    });
+    const { dataUrl, outputSize } = await encodeWithinBudget(
       decoded.image,
-      sourceX,
-      sourceY,
-      cropSize,
-      cropSize,
-      0,
-      0,
-      OUTPUT_SIZE,
-      OUTPUT_SIZE,
+      kind,
+      label,
+      crop,
     );
-
-    const blob = await encodeCanvas(canvas, kind);
-    if (!blob) {
-      throw new Error(`The browser could not encode the ${label} texture.`);
-    }
 
     return Object.freeze({
       name: file.name,
-      dataUrl: await blobToDataUrl(blob, label),
-      width: OUTPUT_SIZE,
-      height: OUTPUT_SIZE,
+      dataUrl,
+      width: outputSize,
+      height: outputSize,
     });
   } finally {
     decoded.close();
