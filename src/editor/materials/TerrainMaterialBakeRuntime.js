@@ -157,13 +157,28 @@ export class TerrainMaterialBakeRuntime {
     }
   }
 
+  hasWaterHaloPages(slot, radius) {
+    const chunkSize = this.terrainView.chunkSize;
+    const minX = Math.floor((slot.page.originX - radius) / chunkSize);
+    const maxX = Math.floor((slot.page.originX + chunkSize - 1 + radius) / chunkSize);
+    const minZ = Math.floor((slot.page.originZ - radius) / chunkSize);
+    const maxZ = Math.floor((slot.page.originZ + chunkSize - 1 + radius) / chunkSize);
+    for (let chunkZ = minZ; chunkZ <= maxZ; chunkZ += 1) {
+      for (let chunkX = minX; chunkX <= maxX; chunkX += 1) {
+        if (!this.residentPages.has(`${chunkX}:${chunkZ}`)) return false;
+      }
+    }
+    return true;
+  }
+
   captureWaterHalo(slot) {
     const radius = this.waterHaloRadius();
     if (radius <= 0) return null;
+    if (!this.hasWaterHaloPages(slot, radius)) return null;
+
     const chunkSize = this.terrainView.chunkSize;
     const size = chunkSize + radius * 2;
     const pixels = new Uint8Array(size * size);
-
     for (let z = 0; z < size; z += 1) {
       const worldZ = slot.page.originZ + z - radius;
       const chunkZ = Math.floor(worldZ / chunkSize);
@@ -173,7 +188,6 @@ export class TerrainMaterialBakeRuntime {
         const chunkX = Math.floor(worldX / chunkSize);
         const localX = worldX - chunkX * chunkSize;
         const page = this.residentPages.get(`${chunkX}:${chunkZ}`);
-        if (!page?.surfaceMaskPixels) return null;
         pixels[z * size + x] = page.surfaceMaskPixels[
           (localZ * chunkSize + localX) * 4 + 2
         ];
@@ -183,8 +197,9 @@ export class TerrainMaterialBakeRuntime {
   }
 
   captureSource(slot) {
+    const radius = this.waterHaloRadius();
     const halo = this.captureWaterHalo(slot);
-    if (this.waterHaloRadius() > 0 && !halo) return null;
+    if (radius > 0 && !halo) return null;
     const hasCanopy = Boolean(validForestFloorKey(slot));
     return captureTerrainMaterialBakeSource({
       page: slot.page,
@@ -206,7 +221,7 @@ export class TerrainMaterialBakeRuntime {
     return descriptor;
   }
 
-  installLease(slot, state, descriptor, lease, generation) {
+  installLease(slot, state, lease, generation) {
     if (this.disposed
         || generation !== state.generation
         || slot.descriptor?.key !== state.chunkKey) {
@@ -268,7 +283,7 @@ export class TerrainMaterialBakeRuntime {
 
     void this.cache.acquire(descriptor, build)
       .then((lease) => {
-        if (!this.installLease(slot, state, descriptor, lease, generation)) return;
+        if (!this.installLease(slot, state, lease, generation)) return;
         if (lease.stale) {
           this.waitForFresh(slot, state, descriptor, generation);
           return;
