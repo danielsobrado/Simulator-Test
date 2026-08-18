@@ -212,8 +212,9 @@ export class ObjectSelectionController {
       if (result.error) this.controller.emitNotice(result.error.message, true);
       return false;
     }
-    this.controller.commitHistory(createObjectBatchHistory(result.changes));
     this.controller.movingObjectId = null;
+    this.syncVisuals();
+    this.controller.commitHistory(createObjectBatchHistory(result.changes));
     this.controller.refreshObjects();
     this.controller.emitMap();
     this.controller.emitNotice(
@@ -256,9 +257,9 @@ export class ObjectSelectionController {
     if (changes.length === 0) return false;
     this.model.clear();
     this.cancelPointerGestures({ updateState: false });
+    this.syncVisuals();
     this.controller.commitHistory(createObjectBatchHistory(changes));
     this.controller.refreshObjects();
-    this.syncVisuals();
     this.controller.emitMap();
     this.controller.emitNotice(`Deleted ${changes.length} object${changes.length === 1 ? '' : 's'}.`);
     return true;
@@ -277,9 +278,9 @@ export class ObjectSelectionController {
     if (primaryIndex >= 0 && result.created[primaryIndex]) {
       this.model.setPrimary(result.created[primaryIndex].id);
     }
+    this.syncVisuals();
     this.controller.commitHistory(createObjectBatchHistory(result.changes));
     this.controller.refreshObjects();
-    this.syncVisuals();
     this.controller.emitMap();
     this.controller.emitNotice(
       `Duplicated ${result.created.length} object${result.created.length === 1 ? '' : 's'}.`,
@@ -291,8 +292,8 @@ export class ObjectSelectionController {
     const targets = this.batchEditor.applyHistory(entry, direction);
     this.model.clear();
     for (const target of targets) this.model.add(target.id);
-    this.controller.refreshObjects();
     this.syncVisuals();
+    this.controller.refreshObjects();
   }
 
   dispose() {
