@@ -4,12 +4,21 @@ import configSource from '../../../config/workshop-radial-menus.yaml?raw';
 const VALID_SIDES = new Set(['left', 'right']);
 const VALID_SOURCES = new Set(['materialPresets', 'materialMaps', 'colorField', 'toggles']);
 const VALID_EVENTS = new Set(['change', 'input']);
+const VALID_COLOR = /^#[0-9a-f]{6}$/i;
 
 function requireString(value, field) {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new Error(`Workshop radial menu ${field} must be a non-empty string.`);
   }
   return value;
+}
+
+function optionalColor(value, field) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || !VALID_COLOR.test(value)) {
+    throw new Error(`Workshop radial menu ${field} must be a six-digit hex color.`);
+  }
+  return value.toLowerCase();
 }
 
 function normalizeItem(item, field) {
@@ -20,8 +29,17 @@ function normalizeItem(item, field) {
     value: requireString(String(item.value ?? ''), `${field}.value`),
     label: requireString(item.label, `${field}.label`),
     glyph: typeof item.glyph === 'string' ? item.glyph : '',
-    color: typeof item.color === 'string' ? item.color : '',
+    color: optionalColor(item.color, `${field}.color`),
   });
+}
+
+function normalizeItems(items, field) {
+  const normalized = (items ?? []).map((item, index) => normalizeItem(item, `${field}[${index}]`));
+  const values = new Set(normalized.map(({ value }) => value));
+  if (values.size !== normalized.length) {
+    throw new Error(`Workshop radial menu ${field} values must be unique.`);
+  }
+  return Object.freeze(normalized);
 }
 
 function normalizeLane(lane, modeId, laneIndex) {
@@ -39,12 +57,20 @@ function normalizeLane(lane, modeId, laneIndex) {
   if (!VALID_EVENTS.has(eventName)) {
     throw new Error(`Workshop radial menu lane ${id} has invalid event ${eventName}.`);
   }
-  const items = (lane.items ?? []).map((item, index) => normalizeItem(item, `${id}.items[${index}]`));
-  const fallbackItems = (lane.fallbackItems ?? []).map(
-    (item, index) => normalizeItem(item, `${id}.fallbackItems[${index}]`),
-  );
+  const items = normalizeItems(lane.items, `${id}.items`);
+  const fallbackItems = normalizeItems(lane.fallbackItems, `${id}.fallbackItems`);
   if (!lane.field && !lane.source) {
     throw new Error(`Workshop radial menu lane ${id} needs a field or source.`);
+  }
+  if (lane.source === 'colorField') {
+    requireString(lane.target, `lane ${id} target`);
+    for (const item of items) optionalColor(item.value, `${id} color value`);
+  }
+  if (lane.field && items.length === 0) {
+    throw new Error(`Workshop radial menu field lane ${id} needs items.`);
+  }
+  if (['materialMaps', 'colorField', 'toggles'].includes(lane.source) && items.length === 0) {
+    throw new Error(`Workshop radial menu lane ${id} needs items.`);
   }
   return Object.freeze({
     id,
@@ -54,8 +80,8 @@ function normalizeLane(lane, modeId, laneIndex) {
     source: typeof lane.source === 'string' ? lane.source : '',
     target: typeof lane.target === 'string' ? lane.target : '',
     event: eventName,
-    items: Object.freeze(items),
-    fallbackItems: Object.freeze(fallbackItems),
+    items,
+    fallbackItems,
   });
 }
 
@@ -66,6 +92,10 @@ function normalizeMode(mode, index) {
   const id = requireString(mode.id, `mode ${index} id`);
   const lanes = (mode.lanes ?? []).map((lane, laneIndex) => normalizeLane(lane, id, laneIndex));
   if (lanes.length === 0) throw new Error(`Workshop radial menu mode ${id} needs at least one lane.`);
+  const laneIds = new Set(lanes.map((lane) => lane.id));
+  if (laneIds.size !== lanes.length) {
+    throw new Error(`Workshop radial menu mode ${id} lane ids must be unique.`);
+  }
   return Object.freeze({
     id,
     label: requireString(mode.label, `mode ${id} label`),
@@ -83,6 +113,23 @@ function boundedInteger(value, fallback, minimum, maximum, field) {
   return result;
 }
 
+function boundedOddInteger(value, fallback, minimum, maximum, field) {
+  const result = boundedInteger(value, fallback, minimum, maximum, field);
+  if (result % 2 === 0) throw new Error(`Workshop radial menu ${field} must be odd.`);
+  return result;
+}
+
+function normalizePresetColors(input) {
+  if (input === undefined) return Object.freeze({});
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Workshop radial menu materialPresetColors must be an object.');
+  }
+  return Object.freeze(Object.fromEntries(Object.entries(input).map(([presetId, color]) => [
+    requireString(presetId, 'material preset color id'),
+    optionalColor(color, `material preset ${presetId} color`),
+  ])));
+}
+
 export function loadWorkshopRadialMenuConfig() {
   const source = yaml.load(configSource);
   if (!source || typeof source !== 'object' || Array.isArray(source)) {
@@ -95,14 +142,22 @@ export function loadWorkshopRadialMenuConfig() {
   }
   const defaultMode = source.defaultMode ?? modes[0].id;
   if (!modeIds.has(defaultMode)) throw new Error(`Unknown workshop radial default mode ${defaultMode}.`);
-  const materialPresetColors = Object.freeze({ ...(source.materialPresetColors ?? {}) });
   return Object.freeze({
-    version: boundedInteger(source.version, 1, 1, 1, 'version'),
+    version: boundedInteger(source.version, 1, 1, 2, 'version'),
     defaultMode,
-    visibleSlots: boundedInteger(source.visibleSlots, 5, 3, 7, 'visibleSlots'),
-    wheelCooldownMs: boundedInteger(source.wheelCooldownMs, 90, 30, 500, 'wheelCooldownMs'),
-    swipeThresholdPx: boundedInteger(source.swipeThresholdPx, 28, 12, 120, 'swipeThresholdPx'),
-    materialPresetColors,
+    visibleSlots: boundedOddInteger(source.visibleSlots, 5, 3, 7, 'visibleSlots'),
+    wheelCooldownMs: boundedInteger(source.wheelCooldownMs, 0, 0, 500, 'wheelCooldownMs'),
+    wheelStepPx: boundedInteger(source.wheelStepPx, 42, 12, 160, 'wheelStepPx'),
+    wheelMaxStepsPerEvent: boundedInteger(
+      source.wheelMaxStepsPerEvent,
+      2,
+      1,
+      4,
+      'wheelMaxStepsPerEvent',
+    ),
+    swipeThresholdPx: boundedInteger(source.swipeThresholdPx, 30, 12, 120, 'swipeThresholdPx'),
+    readoutMs: boundedInteger(source.readoutMs, 850, 250, 3000, 'readoutMs'),
+    materialPresetColors: normalizePresetColors(source.materialPresetColors),
     modes: Object.freeze(modes),
   });
 }
