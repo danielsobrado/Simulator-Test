@@ -87,6 +87,7 @@ export function installNaturalEditorInteractions(controller) {
   const constructionContextBridge = installNaturalConstructionContextBridge(controller);
   let additivePointerMode = false;
   let terrainPointerId = null;
+  let constructionPointerId = null;
   let disposed = false;
 
   globalThis.window?.addEventListener?.(OBJECT_SELECTION_ADDITIVE_MODE_EVENT, (event) => {
@@ -142,6 +143,17 @@ export function installNaturalEditorInteractions(controller) {
     }
   };
 
+  const releaseConstructionPointer = () => {
+    const pointerId = constructionPointerId;
+    constructionPointerId = null;
+    if (
+      pointerId !== null
+      && controller.canvas?.hasPointerCapture?.(pointerId)
+    ) {
+      controller.canvas.releasePointerCapture(pointerId);
+    }
+  };
+
   const settleTerrainStroke = () => {
     const wasPainting = controller.painting;
     if (wasPainting) {
@@ -161,12 +173,15 @@ export function installNaturalEditorInteractions(controller) {
   const cancelConstructionPointerGesture = () => {
     const active = Boolean(controller.constructionDrawing || controller.constructionAnchorDrag);
     if (active) controller.cancelConstructionGesture();
-    return active;
+    const hadCapture = constructionPointerId !== null;
+    releaseConstructionPointer();
+    return active || hadCapture;
   };
 
   const settleBeforeModeChange = (action, ...args) => {
     settleTerrainStroke();
     cancelNaturalPointerGestures();
+    cancelConstructionPointerGesture();
     return action(...args);
   };
 
@@ -180,7 +195,8 @@ export function installNaturalEditorInteractions(controller) {
 
   controller.selectTool = (tool) => {
     settleTerrainStroke();
-    const cancelled = cancelNaturalPointerGestures();
+    const cancelledSelection = cancelNaturalPointerGestures();
+    const cancelledConstruction = cancelConstructionPointerGesture();
     const previousTool = controller.tool;
     const result = original.selectTool(tool);
     if (controller.tool === tool) {
@@ -190,7 +206,7 @@ export function installNaturalEditorInteractions(controller) {
       if (controller.tool !== previousTool && controller.tool !== 'select') {
         selection.returnTool = controller.tool;
       }
-      if (cancelled) controller.emitState();
+      if (cancelledSelection || cancelledConstruction) controller.emitState();
     }
     return result;
   };
@@ -208,6 +224,7 @@ export function installNaturalEditorInteractions(controller) {
     const wasMovingSelection = controller.movingObjectId !== null;
     settleTerrainStroke();
     cancelNaturalPointerGestures();
+    cancelConstructionPointerGesture();
     const result = original.cancelBlockedWorldInteraction();
     selection.overlay.clearPreview();
     controller.terrainView.setPreview(null);
@@ -237,7 +254,11 @@ export function installNaturalEditorInteractions(controller) {
       }
       controller.constructionMode = handle || constructionId ? 'edit' : 'draw';
     }
-    return original.onConstructionPointerDown(event);
+    const result = original.onConstructionPointerDown(event);
+    if (controller.constructionDrawing || controller.constructionAnchorDrag) {
+      constructionPointerId = event.pointerId;
+    }
+    return result;
   };
 
   controller.onPointerDown = (event) => {
@@ -262,7 +283,7 @@ export function installNaturalEditorInteractions(controller) {
           : controller.tool;
         controller.naturalConstructionReturnTool = null;
         if (controller.tool === 'construction') {
-          controller.cancelConstructionGesture();
+          cancelConstructionPointerGesture();
           controller.setSelectedConstruction(null);
           controller.constructionGizmo?.close();
         }
@@ -406,6 +427,7 @@ export function installNaturalEditorInteractions(controller) {
       return original.onPointerUp(event);
     } finally {
       if (event.pointerId === terrainPointerId) terrainPointerId = null;
+      if (event.pointerId === constructionPointerId) constructionPointerId = null;
       if (event.button === PRIMARY_POINTER_BUTTON) {
         controller.naturalTerrainGestureMode = null;
       }
@@ -494,6 +516,7 @@ export function installNaturalEditorInteractions(controller) {
     if (event.key.toLowerCase() === 'escape') {
       settleTerrainStroke();
       cancelNaturalPointerGestures();
+      cancelConstructionPointerGesture();
     }
     const result = original.onKeyDown(event);
     if (event.key.toLowerCase() === 'escape') restoreSelectionTool();
@@ -508,6 +531,7 @@ export function installNaturalEditorInteractions(controller) {
       disposed = true;
       abort.abort();
       settleTerrainStroke();
+      cancelConstructionPointerGesture();
       constructionContextBridge.dispose();
       hoverBridge.dispose();
       selection.dispose();
