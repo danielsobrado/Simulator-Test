@@ -218,12 +218,15 @@ export class ProceduralWorkshopMaterialController {
     this.active = active === true;
     this.componentController.setExternalInteractionActive(this.active);
     this.canvasHost.classList.toggle('is-material-mode', this.active);
-    if (!this.active) {
+    if (this.active) {
+      this.updateHighlight(this.hoverRegionId ?? this.selectedRegionId);
+    } else {
       this.pointerStart = null;
       this.closePalette();
       this.hoverRegionId = null;
-      this.updateHighlight(this.selectedRegionId);
+      this.updateHighlight(null);
       this.regionLabel.hidden = true;
+      this.inspector.hidden = true;
     }
     this.onActiveChange?.(this.active);
     return this.active;
