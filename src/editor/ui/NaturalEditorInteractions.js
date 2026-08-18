@@ -107,6 +107,14 @@ export function installNaturalEditorInteractions(controller) {
     return true;
   };
 
+  const settleTerrainStroke = () => {
+    if (!controller.painting) return false;
+    controller.painting = false;
+    controller.lastPaintKey = null;
+    controller.finishStroke();
+    return true;
+  };
+
   const cancelNaturalPointerGestures = ({ updateState = false } = {}) => {
     controller.naturalTerrainGestureMode = null;
     return selection.cancelPointerGestures({ updateState });
@@ -121,6 +129,7 @@ export function installNaturalEditorInteractions(controller) {
   });
 
   controller.selectTool = (tool) => {
+    settleTerrainStroke();
     const cancelled = cancelNaturalPointerGestures();
     const previousTool = controller.tool;
     const result = original.selectTool(tool);
@@ -138,6 +147,7 @@ export function installNaturalEditorInteractions(controller) {
 
   controller.cancelBlockedWorldInteraction = () => {
     const wasMovingSelection = controller.movingObjectId !== null;
+    settleTerrainStroke();
     cancelNaturalPointerGestures();
     const result = original.cancelBlockedWorldInteraction();
     selection.overlay.clearPreview();
@@ -400,7 +410,10 @@ export function installNaturalEditorInteractions(controller) {
     }
     const escapeConstructionReturn = event.key.toLowerCase() === 'escape'
       && Boolean(controller.naturalConstructionReturnTool);
-    if (event.key.toLowerCase() === 'escape') cancelNaturalPointerGestures();
+    if (event.key.toLowerCase() === 'escape') {
+      settleTerrainStroke();
+      cancelNaturalPointerGestures();
+    }
     const result = original.onKeyDown(event);
     if (event.key.toLowerCase() === 'escape') restoreSelectionTool();
     if (escapeConstructionReturn) restoreConstructionTool();
