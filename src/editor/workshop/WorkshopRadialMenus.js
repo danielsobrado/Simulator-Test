@@ -1,5 +1,15 @@
 import './workshopRadialMenus.css';
+import { escapeAttribute } from '../ui/markup.js';
 import { loadWorkshopRadialMenuConfig } from './WorkshopRadialMenuConfig.js';
+import {
+  arcSlot,
+  circularOffset,
+  consumeSteppedDelta,
+  wheelDeltaPixels,
+  wrapIndex,
+} from './WorkshopRadialMenuMath.js';
+
+export { arcSlot, wrapIndex } from './WorkshopRadialMenuMath.js';
 
 const SELECTORS = Object.freeze({
   overlay: '[data-role="workshop-overlay"]',
@@ -12,30 +22,12 @@ const SELECTORS = Object.freeze({
   legacyMaterialPalette: '.radial-palette--workshop',
 });
 
-function escapeAttribute(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-}
-
-export function wrapIndex(index, length) {
-  if (length <= 0) return 0;
-  return ((index % length) + length) % length;
-}
-
-export function arcSlot(index, count) {
-  const center = (count - 1) / 2;
-  const denominator = Math.max(1, center);
-  const normalized = (index - center) / denominator;
-  return Object.freeze({
-    y: 50 + normalized * 42,
-    depth: 16 + (1 - normalized * normalized) * 72,
-    scale: 0.82 + (1 - Math.abs(normalized)) * 0.18,
-    opacity: 0.62 + (1 - Math.abs(normalized)) * 0.38,
-  });
-}
+const MATERIAL_AREA_SOURCES = new Set(['materialPresets', 'materialMaps', 'colorField']);
+const ACTION_SOURCES = new Set(['materialMaps', 'toggles']);
+const TOUCH_POINTER_TYPES = new Set(['touch', 'pen']);
+const CLICK_SUPPRESSION_MS = 260;
+const DRAG_CLICK_DISTANCE_PX = 6;
+const DRAG_VISUAL_RANGE_PX = 8;
 
 function eventFor(name) {
   return new Event(name, { bubbles: true });
@@ -47,7 +39,21 @@ function firstElement(value) {
   return value;
 }
 
-class WorkshopRadialMenus {
+function itemsSignature(items) {
+  return items.map(({ value, label, glyph, color }) => (
+    `${value}\u0000${label}\u0000${glyph}\u0000${color}`
+  )).join('\u0001');
+}
+
+function itemSwatch(lane, item) {
+  return item.color || (lane.source === 'colorField' ? item.value : '');
+}
+
+function isElement(value) {
+  return typeof Element !== 'undefined' && value instanceof Element;
+}
+
+export class WorkshopRadialMenus {
   constructor(overlay, config) {
     this.overlay = overlay;
     this.config = config;
@@ -60,35 +66,80 @@ class WorkshopRadialMenus {
     }
 
     this.modeId = config.defaultMode;
+    this.laneViews = new Map();
+    this.wheelResiduals = new Map();
     this.lastWheelAt = new Map();
-    this.pointerStarts = new Map();
+    this.pointerGestures = new Map();
     this.suppressClickUntil = 0;
+    this.syncFrame = 0;
+    this.pendingLaneRebuild = false;
+    this.readoutTimer = 0;
+    this.watchedFormFields = new Set();
+    for (const mode of config.modes) {
+      for (const lane of mode.lanes) {
+        if (lane.field) this.watchedFormFields.add(lane.field);
+        if (lane.source === 'toggles') {
+          lane.items.forEach(({ value }) => this.watchedFormFields.add(value));
+        }
+      }
+    }
+
     this.host = document.createElement('div');
     this.host.className = 'workshop-radial-menus';
     this.host.dataset.role = 'workshop-radial-menus';
+    this.host.innerHTML = `
+      <div class="workshop-radial-menus__lanes" data-role="radial-lanes"></div>
+      <div class="workshop-radial-menus__readout" data-role="radial-readout" hidden>
+        <strong></strong><span></span>
+      </div>
+      <div class="workshop-radial-menus__mode-title" data-role="radial-mode-title"></div>
+      <div class="workshop-radial-menus__modes" data-role="radial-modes"
+        role="toolbar" aria-label="Workbench radial menu categories"></div>
+    `;
     this.preview.append(this.host);
     this.overlay.classList.add('has-workshop-radial-menus');
+    this.lanesHost = this.host.querySelector('[data-role="radial-lanes"]');
+    this.modesHost = this.host.querySelector('[data-role="radial-modes"]');
+    this.modeTitle = this.host.querySelector('[data-role="radial-mode-title"]');
+    this.readout = this.host.querySelector('[data-role="radial-readout"]');
+    this.readoutLane = this.readout.querySelector('strong');
+    this.readoutItem = this.readout.querySelector('span');
 
     this.onClick = (event) => this.handleClick(event);
     this.onWheel = (event) => this.handleWheel(event);
     this.onKeyDown = (event) => this.handleKeyDown(event);
     this.onPointerDown = (event) => this.handlePointerDown(event);
-    this.onPointerUp = (event) => this.handlePointerUp(event);
-    this.onFormChange = () => this.render();
+    this.onPointerMove = (event) => this.handlePointerMove(event);
+    this.onPointerUp = (event) => this.finishPointerGesture(event);
+    this.onPointerCancel = (event) => this.finishPointerGesture(event, { cancelled: true });
+    this.onPointerOver = (event) => this.handlePointerOver(event);
+    this.onPointerOut = (event) => this.handlePointerOut(event);
+    this.onFocusIn = (event) => this.handleFocusIn(event);
+    this.onFocusOut = (event) => this.handleFocusOut(event);
+    this.onFormMutation = (event) => this.handleFormMutation(event);
+    this.onMaterialChange = () => this.scheduleSync();
+
     this.host.addEventListener('click', this.onClick);
     this.host.addEventListener('wheel', this.onWheel, { passive: false });
     this.host.addEventListener('keydown', this.onKeyDown);
     this.host.addEventListener('pointerdown', this.onPointerDown);
+    this.host.addEventListener('pointermove', this.onPointerMove);
     this.host.addEventListener('pointerup', this.onPointerUp);
-    this.form.addEventListener('change', this.onFormChange);
-    this.form.addEventListener('input', this.onFormChange);
+    this.host.addEventListener('pointercancel', this.onPointerCancel);
+    this.host.addEventListener('pointerover', this.onPointerOver);
+    this.host.addEventListener('pointerout', this.onPointerOut);
+    this.host.addEventListener('focusin', this.onFocusIn);
+    this.host.addEventListener('focusout', this.onFocusOut);
+    this.form.addEventListener('change', this.onFormMutation);
+    this.form.addEventListener('input', this.onFormMutation);
+    this.materialUi.addEventListener('change', this.onMaterialChange);
 
-    this.materialObserver = new MutationObserver(() => {
+    this.materialObserver = new MutationObserver((mutations) => {
       this.suppressLegacyPalette();
-      if (this.activeMode()?.materialMode) {
-        this.ensureMaterialMode(true);
-        this.render();
-      }
+      if (this.activeMode()?.materialMode) this.ensureMaterialMode(true);
+      this.scheduleSync({
+        rebuild: mutations.some(({ type }) => type === 'childList'),
+      });
     });
     this.materialObserver.observe(this.materialUi, {
       childList: true,
@@ -97,6 +148,7 @@ class WorkshopRadialMenus {
       attributeFilter: ['hidden'],
     });
 
+    this.renderModeButtons();
     this.activateMode(this.modeId, { initial: true });
   }
 
@@ -104,18 +156,47 @@ class WorkshopRadialMenus {
     return this.config.modes.find(({ id }) => id === this.modeId) ?? this.config.modes[0];
   }
 
+  renderModeButtons() {
+    this.modesHost.innerHTML = this.config.modes.map((mode) => (
+      `<button type="button" class="workshop-radial-menus__mode"`
+      + ` data-radial-mode="${escapeAttribute(mode.id)}"`
+      + ` aria-label="${escapeAttribute(mode.label)}" title="${escapeAttribute(mode.label)}"`
+      + ` aria-pressed="false"><span aria-hidden="true">${escapeAttribute(
+        mode.glyph || mode.label.slice(0, 1),
+      )}</span></button>`
+    )).join('');
+  }
+
+  syncModeButtons() {
+    const mode = this.activeMode();
+    for (const button of this.modesHost.querySelectorAll('[data-radial-mode]')) {
+      const active = button.dataset.radialMode === mode?.id;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+    this.modeTitle.textContent = mode?.label ?? '';
+  }
+
   activateMode(modeId, { initial = false } = {}) {
     const next = this.config.modes.find(({ id }) => id === modeId);
     if (!next) return;
     const previous = this.activeMode();
     this.modeId = next.id;
+    this.wheelResiduals.clear();
+    this.hideReadout();
+
     if (next.materialMode) {
       this.ensureMaterialMode(true);
-      if (!initial) this.setStatus('Material radial mode · select an area on the model, then choose a texture or color.');
+      if (!initial) {
+        this.setStatus('Material editing · select an area on the model, then use the radial controls.');
+      }
     } else if (previous?.materialMode) {
       this.ensureMaterialMode(false);
     }
-    this.render();
+
+    this.syncModeButtons();
+    this.renderActiveLanes();
+    this.suppressLegacyPalette();
   }
 
   ensureMaterialMode(active) {
@@ -137,7 +218,7 @@ class WorkshopRadialMenus {
     const hadFocus = palette.contains(document.activeElement);
     palette.hidden = true;
     if (hadFocus) {
-      this.host.querySelector(`[data-radial-mode="${CSS.escape(this.modeId)}"]`)
+      this.modesHost.querySelector(`[data-radial-mode="${CSS.escape(this.modeId)}"]`)
         ?.focus({ preventScroll: true });
     }
   }
@@ -148,6 +229,14 @@ class WorkshopRadialMenus {
 
   materialField(field) {
     return this.materialUi.querySelector(`[data-material-field="${CSS.escape(field)}"]`);
+  }
+
+  materialAreaReady() {
+    return (this.materialUi.querySelector(SELECTORS.materialPreset)?.options.length ?? 0) > 0;
+  }
+
+  laneEnabled(lane) {
+    return !MATERIAL_AREA_SOURCES.has(lane.source) || this.materialAreaReady();
   }
 
   selectedValue(lane, items) {
@@ -176,210 +265,467 @@ class WorkshopRadialMenus {
         color: item.color || this.config.materialPresetColors[item.value] || '',
       }));
     }
-    if (lane.source === 'toggles') {
-      return lane.items.map((item) => ({
-        ...item,
-        checked: this.fieldElement(item.value)?.checked === true,
-      }));
-    }
     return lane.items;
   }
 
-  visibleItems(lane, items) {
-    if (items.length <= this.config.visibleSlots) {
-      return items.map((item, index) => ({ item, slot: arcSlot(index, items.length) }));
+  renderActiveLanes() {
+    this.lanesHost.replaceChildren();
+    this.laneViews.clear();
+    const counts = { left: 0, right: 0 };
+    for (const lane of this.activeMode()?.lanes ?? []) {
+      const element = document.createElement('div');
+      element.className = 'workshop-radial-menus__lane';
+      element.dataset.radialLaneHost = lane.id;
+      element.dataset.side = lane.side;
+      element.style.setProperty('--radial-lane-offset', `${counts[lane.side] * 30}px`);
+      element.style.setProperty('--radial-lane-offset-mobile', `${counts[lane.side] * 24}px`);
+      element.setAttribute('role', 'group');
+      element.setAttribute('aria-label', lane.label);
+      counts[lane.side] += 1;
+
+      const label = document.createElement('span');
+      label.className = 'workshop-radial-menus__lane-label';
+      label.textContent = lane.label;
+      element.append(label);
+      this.lanesHost.append(element);
+
+      const view = {
+        lane,
+        element,
+        label,
+        buttons: new Map(),
+        items: [],
+        signature: '',
+      };
+      this.laneViews.set(lane.id, view);
+      this.syncLane(view, { rebuild: true });
     }
-    const selected = this.selectedValue(lane, items);
-    const selectedIndex = Math.max(0, items.findIndex(({ value }) => value.toLowerCase() === selected.toLowerCase()));
+  }
+
+  rebuildLaneButtons(view, items) {
+    for (const button of view.buttons.values()) button.remove();
+    view.buttons.clear();
+    for (const item of items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'workshop-radial-menus__item is-outside';
+      button.dataset.radialLane = view.lane.id;
+      button.dataset.radialItem = item.value;
+      button.setAttribute('aria-label', item.label);
+      button.title = item.label;
+
+      const swatch = itemSwatch(view.lane, item);
+      const content = document.createElement('span');
+      if (swatch) {
+        content.className = 'workshop-radial-menus__swatch';
+        content.style.setProperty('--radial-item-color', swatch);
+      } else {
+        content.className = 'workshop-radial-menus__glyph';
+        content.textContent = item.glyph || item.label.slice(0, 1);
+      }
+      button.append(content);
+      view.element.append(button);
+      view.buttons.set(item.value, button);
+    }
+    view.items = items;
+    view.signature = itemsSignature(items);
+  }
+
+  syncLane(view, { rebuild = false } = {}) {
+    const { lane } = view;
+    const items = this.resolveItems(lane);
+    const signature = itemsSignature(items);
+    if (rebuild || signature !== view.signature) this.rebuildLaneButtons(view, items);
+    if (items.length === 0) return;
+
+    const enabled = this.laneEnabled(lane);
+    const selected = this.selectedValue(lane, items).toLowerCase();
+    const selectedIndex = items.findIndex(({ value }) => value.toLowerCase() === selected);
+    const centerIndex = selectedIndex >= 0 ? selectedIndex : 0;
     const half = Math.floor(this.config.visibleSlots / 2);
-    return Array.from({ length: this.config.visibleSlots }, (_, slotIndex) => {
-      const itemIndex = wrapIndex(selectedIndex + slotIndex - half, items.length);
-      return { item: items[itemIndex], slot: arcSlot(slotIndex, this.config.visibleSlots) };
+    const sequence = !ACTION_SOURCES.has(lane.source);
+    view.element.classList.toggle('is-disabled', !enabled);
+    view.label.textContent = enabled ? lane.label : `${lane.label} · select area`;
+
+    items.forEach((item, index) => {
+      const button = view.buttons.get(item.value);
+      if (!button) return;
+      const offset = items.length <= this.config.visibleSlots
+        ? index - (items.length - 1) / 2
+        : circularOffset(index, centerIndex, items.length);
+      const visible = items.length <= this.config.visibleSlots || Math.abs(offset) <= half;
+      const slotIndex = items.length <= this.config.visibleSlots
+        ? index
+        : Math.round(offset + half);
+      const edgeSlot = offset < 0 ? 0 : this.config.visibleSlots - 1;
+      const slot = arcSlot(
+        visible ? slotIndex : edgeSlot,
+        items.length <= this.config.visibleSlots ? items.length : this.config.visibleSlots,
+      );
+      const active = lane.source === 'toggles'
+        ? this.fieldElement(item.value)?.checked === true
+        : lane.source !== 'materialMaps' && item.value.toLowerCase() === selected;
+
+      button.style.setProperty('--radial-y', `${slot.y}%`);
+      button.style.setProperty('--radial-depth', `${slot.depth}px`);
+      button.style.setProperty('--radial-scale', String(slot.scale));
+      button.style.setProperty('--radial-opacity', String(slot.opacity));
+      button.classList.toggle('is-outside', !visible);
+      button.classList.toggle('is-active', active);
+      button.disabled = !enabled;
+      button.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      if (lane.source === 'materialMaps') {
+        button.removeAttribute('aria-pressed');
+      } else {
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      }
+      if (!visible || !enabled) button.tabIndex = -1;
+      else if (!sequence) button.tabIndex = 0;
+      else button.tabIndex = active || (selectedIndex < 0 && index === centerIndex) ? 0 : -1;
     });
   }
 
-  renderLane(lane, laneIndex) {
-    const items = this.resolveItems(lane);
-    if (items.length === 0) return '';
-    const selected = this.selectedValue(lane, items).toLowerCase();
-    const buttons = this.visibleItems(lane, items).map(({ item, slot }) => {
-      const isActive = item.value.toLowerCase() === selected || item.checked === true;
-      const swatch = item.color || (lane.source === 'colorField' ? item.value : '');
-      const content = swatch
-        ? `<span class="workshop-radial-menus__swatch" style="--radial-item-color:${escapeAttribute(swatch)}"></span>`
-        : `<span class="workshop-radial-menus__glyph">${escapeAttribute(item.glyph || item.label.slice(0, 1))}</span>`;
-      return `<button type="button" class="workshop-radial-menus__item${isActive ? ' is-active' : ''}"`
-        + ` data-radial-lane="${escapeAttribute(lane.id)}" data-radial-item="${escapeAttribute(item.value)}"`
-        + ` aria-label="${escapeAttribute(item.label)}" title="${escapeAttribute(item.label)}"`
-        + ` aria-pressed="${isActive ? 'true' : 'false'}"`
-        + ` style="--radial-y:${slot.y}%;--radial-depth:${slot.depth}px;--radial-scale:${slot.scale};--radial-opacity:${slot.opacity}">`
-        + `${content}</button>`;
-    }).join('');
-    return `<div class="workshop-radial-menus__lane" data-radial-lane-host="${escapeAttribute(lane.id)}"`
-      + ` data-side="${lane.side}" style="--radial-lane-offset:${laneIndex * 30}px;--radial-lane-offset-mobile:${laneIndex * 24}px" role="group"`
-      + ` aria-label="${escapeAttribute(lane.label)}">`
-      + `<span class="workshop-radial-menus__lane-label">${escapeAttribute(lane.label)}</span>${buttons}</div>`;
-  }
-
-  render() {
-    const mode = this.activeMode();
-    if (!mode) return;
-    const laneCount = { left: 0, right: 0 };
-    const lanes = mode.lanes.map((lane) => {
-      const index = laneCount[lane.side];
-      laneCount[lane.side] += 1;
-      return this.renderLane(lane, index);
-    }).join('');
-    const modes = this.config.modes.map((entry) => (
-      `<button type="button" class="workshop-radial-menus__mode${entry.id === mode.id ? ' is-active' : ''}"`
-      + ` data-radial-mode="${escapeAttribute(entry.id)}" aria-label="${escapeAttribute(entry.label)}"`
-      + ` title="${escapeAttribute(entry.label)}" aria-pressed="${entry.id === mode.id ? 'true' : 'false'}">`
-      + `<span aria-hidden="true">${escapeAttribute(entry.glyph || entry.label.slice(0, 1))}</span></button>`
-    )).join('');
-    this.host.innerHTML = `<div class="workshop-radial-menus__lanes">${lanes}</div>`
-      + `<div class="workshop-radial-menus__mode-title">${escapeAttribute(mode.label)}</div>`
-      + `<div class="workshop-radial-menus__modes" role="toolbar" aria-label="Workbench radial menu categories">${modes}</div>`;
-    this.suppressLegacyPalette();
+  scheduleSync({ rebuild = false } = {}) {
+    this.pendingLaneRebuild ||= rebuild;
+    if (this.syncFrame !== 0) return;
+    this.syncFrame = requestAnimationFrame(() => {
+      this.syncFrame = 0;
+      const shouldRebuild = this.pendingLaneRebuild;
+      this.pendingLaneRebuild = false;
+      for (const view of this.laneViews.values()) this.syncLane(view, { rebuild: shouldRebuild });
+      this.suppressLegacyPalette();
+    });
   }
 
   laneById(laneId) {
     return this.activeMode()?.lanes.find(({ id }) => id === laneId) ?? null;
   }
 
-  applyLaneItem(lane, value) {
-    if (!lane) return;
+  itemByValue(lane, value) {
+    return this.resolveItems(lane).find((item) => item.value === value) ?? null;
+  }
+
+  showReadout(lane, item, { timed = false } = {}) {
+    if (!lane || !item) return;
+    window.clearTimeout(this.readoutTimer);
+    this.readoutLane.textContent = lane.label;
+    this.readoutItem.textContent = item.label;
+    this.readout.hidden = false;
+    if (timed) {
+      this.readoutTimer = window.setTimeout(() => this.hideReadout(), this.config.readoutMs);
+    }
+  }
+
+  hideReadout() {
+    window.clearTimeout(this.readoutTimer);
+    this.readoutTimer = 0;
+    this.readout.hidden = true;
+  }
+
+  focusItem(laneId, value) {
+    requestAnimationFrame(() => {
+      this.laneViews.get(laneId)?.buttons.get(value)?.focus({ preventScroll: true });
+    });
+  }
+
+  applyLaneItem(lane, value, { focus = false } = {}) {
+    if (!lane) return false;
+    if (!this.laneEnabled(lane)) {
+      this.setStatus('Select a material area on the model first.');
+      return false;
+    }
+
     if (lane.field) {
       const field = this.fieldElement(lane.field);
-      if (!field) return;
+      if (!field) return false;
+      if (String(field.value) === String(value)) return true;
       field.value = value;
       field.dispatchEvent(eventFor(lane.event));
-      if (lane.event === 'input') field.dispatchEvent(eventFor('change'));
-      this.render();
-      return;
-    }
-    if (lane.source === 'materialPresets') {
+    } else if (lane.source === 'materialPresets') {
       const select = this.materialUi.querySelector(SELECTORS.materialPreset);
-      if (!select || select.options.length === 0) {
-        this.setStatus('Select a material area on the model before choosing a texture.', true);
-        return;
-      }
+      if (!select || select.options.length === 0) return false;
+      if (select.value === value) return true;
       select.value = value;
       select.dispatchEvent(eventFor('change'));
-      this.render();
-      return;
-    }
-    if (lane.source === 'colorField') {
+    } else if (lane.source === 'colorField') {
       const field = this.materialField(lane.target);
-      if (!field) return;
-      if (!this.materialUi.querySelector(SELECTORS.materialPreset)?.options.length) {
-        this.setStatus('Select a material area on the model before choosing a color.', true);
-        return;
-      }
+      if (!field) return false;
+      if (field.value.toLowerCase() === value.toLowerCase()) return true;
       field.value = value;
       field.dispatchEvent(eventFor('change'));
-      this.render();
-      return;
-    }
-    if (lane.source === 'materialMaps') {
+    } else if (lane.source === 'materialMaps') {
       const button = this.materialUi.querySelector(
         `[data-material-action="load-map"][data-source-kind="${CSS.escape(value)}"]`,
       );
-      if (!button || !this.materialUi.querySelector(SELECTORS.materialPreset)?.options.length) {
-        this.setStatus('Select a material area on the model before loading a PBR map.', true);
-        return;
-      }
+      if (!button) return false;
       button.click();
-      return;
-    }
-    if (lane.source === 'toggles') {
+    } else if (lane.source === 'toggles') {
       const field = this.fieldElement(value);
-      if (!field) return;
+      if (!field) return false;
       field.checked = !field.checked;
       field.dispatchEvent(eventFor('change'));
-      this.render();
+    } else {
+      return false;
     }
+
+    this.scheduleSync();
+    const item = this.itemByValue(lane, value);
+    if (item) this.showReadout(lane, item, { timed: true });
+    if (focus) this.focusItem(lane.id, value);
+    return true;
   }
 
-  stepLane(lane, delta) {
+  stepLane(lane, delta, { focus = false } = {}) {
+    if (!lane || ACTION_SOURCES.has(lane.source) || !this.laneEnabled(lane)) return;
     const items = this.resolveItems(lane);
-    if (items.length < 2) return;
+    if (items.length < 2 || !Number.isFinite(delta) || delta === 0) return;
     const selected = this.selectedValue(lane, items).toLowerCase();
-    const current = Math.max(0, items.findIndex(({ value }) => value.toLowerCase() === selected));
-    this.applyLaneItem(lane, items[wrapIndex(current + delta, items.length)].value);
+    const selectedIndex = items.findIndex(({ value }) => value.toLowerCase() === selected);
+    const direction = Math.sign(delta);
+    const current = selectedIndex >= 0 ? selectedIndex : direction > 0 ? -1 : 0;
+    const nextIndex = wrapIndex(current + Math.trunc(delta), items.length);
+    this.applyLaneItem(lane, items[nextIndex].value, { focus });
+  }
+
+  handleFormMutation(event) {
+    if (!this.watchedFormFields.has(event.target?.name)) return;
+    this.scheduleSync();
   }
 
   handleClick(event) {
-    if (performance.now() < this.suppressClickUntil) return;
+    if (performance.now() < this.suppressClickUntil) {
+      event.preventDefault();
+      return;
+    }
     const modeButton = event.target.closest('[data-radial-mode]');
     if (modeButton) {
       this.activateMode(modeButton.dataset.radialMode);
       return;
     }
     const item = event.target.closest('[data-radial-item]');
-    if (!item) return;
-    this.applyLaneItem(this.laneById(item.dataset.radialLane), item.dataset.radialItem);
+    if (!item || item.disabled) return;
+    const lane = this.laneById(item.dataset.radialLane);
+    this.applyLaneItem(lane, item.dataset.radialItem, { focus: true });
   }
 
   handleWheel(event) {
-    const host = event.target.closest('[data-radial-lane-host]');
-    if (!host) return;
-    const lane = this.laneById(host.dataset.radialLaneHost);
-    if (!lane) return;
+    const item = event.target.closest('[data-radial-item]');
+    if (!item) return;
+    const lane = this.laneById(item.dataset.radialLane);
+    if (!lane || ACTION_SOURCES.has(lane.source) || !this.laneEnabled(lane)) return;
     event.preventDefault();
+
+    const delta = wheelDeltaPixels(event, this.preview.clientHeight);
+    if (Math.abs(delta) < 0.01) return;
     const now = performance.now();
+    const previous = this.wheelResiduals.get(lane.id) ?? 0;
     const last = this.lastWheelAt.get(lane.id) ?? 0;
-    if (now - last < this.config.wheelCooldownMs) return;
-    const direction = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-    if (Math.abs(direction) < 1) return;
+    if (this.config.wheelCooldownMs > 0 && now - last < this.config.wheelCooldownMs) {
+      const combined = previous + delta;
+      const limit = this.config.wheelStepPx * 0.95;
+      this.wheelResiduals.set(lane.id, Math.sign(combined) * Math.min(Math.abs(combined), limit));
+      return;
+    }
+
+    const { steps, remainder } = consumeSteppedDelta(
+      previous,
+      delta,
+      this.config.wheelStepPx,
+      this.config.wheelMaxStepsPerEvent,
+    );
+    this.wheelResiduals.set(lane.id, remainder);
+    if (steps === 0) return;
     this.lastWheelAt.set(lane.id, now);
-    this.stepLane(lane, direction > 0 ? 1 : -1);
+    this.stepLane(lane, steps);
+  }
+
+  focusAdjacentAction(item, delta) {
+    const view = this.laneViews.get(item.dataset.radialLane);
+    if (!view) return;
+    const buttons = [...view.buttons.values()].filter((button) => (
+      !button.disabled && !button.classList.contains('is-outside')
+    ));
+    const current = Math.max(0, buttons.indexOf(item));
+    buttons[wrapIndex(current + delta, buttons.length)]?.focus({ preventScroll: true });
   }
 
   handleKeyDown(event) {
+    const modeButton = event.target.closest('[data-radial-mode]');
+    if (modeButton && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      const current = this.config.modes.findIndex(({ id }) => id === modeButton.dataset.radialMode);
+      const next = this.config.modes[wrapIndex(current + (event.key === 'ArrowLeft' ? -1 : 1), this.config.modes.length)];
+      this.activateMode(next.id);
+      this.modesHost.querySelector(`[data-radial-mode="${CSS.escape(next.id)}"]`)
+        ?.focus({ preventScroll: true });
+      return;
+    }
+
     const item = event.target.closest('[data-radial-item]');
-    if (!item || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-    event.preventDefault();
+    if (!item) return;
     const lane = this.laneById(item.dataset.radialLane);
     if (!lane) return;
-    this.stepLane(lane, event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1);
+    const previousKey = event.key === 'ArrowUp' || event.key === 'ArrowLeft';
+    const nextKey = event.key === 'ArrowDown' || event.key === 'ArrowRight';
+    if (!previousKey && !nextKey && !['Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) return;
+    event.preventDefault();
+
+    if (ACTION_SOURCES.has(lane.source)) {
+      if (previousKey) this.focusAdjacentAction(item, -1);
+      else if (nextKey) this.focusAdjacentAction(item, 1);
+      else {
+        const view = this.laneViews.get(lane.id);
+        const buttons = [...(view?.buttons.values() ?? [])].filter((button) => (
+          !button.disabled && !button.classList.contains('is-outside')
+        ));
+        (event.key === 'Home' ? buttons[0] : buttons.at(-1))?.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      const items = this.resolveItems(lane);
+      const target = event.key === 'Home' ? items[0] : items.at(-1);
+      if (target) this.applyLaneItem(lane, target.value, { focus: true });
+      return;
+    }
+    const multiplier = event.key === 'PageUp' || event.key === 'PageDown'
+      ? this.config.visibleSlots
+      : 1;
+    const direction = previousKey || event.key === 'PageUp' ? -1 : 1;
+    this.stepLane(lane, direction * multiplier, { focus: true });
   }
 
   handlePointerDown(event) {
-    const host = event.target.closest('[data-radial-lane-host]');
-    if (!host || event.pointerType === 'mouse') return;
-    this.pointerStarts.set(event.pointerId, {
-      laneId: host.dataset.radialLaneHost,
-      y: event.clientY,
+    if (!TOUCH_POINTER_TYPES.has(event.pointerType)) return;
+    const item = event.target.closest('[data-radial-item]');
+    if (!item || item.disabled) return;
+    const lane = this.laneById(item.dataset.radialLane);
+    if (!lane || ACTION_SOURCES.has(lane.source)) return;
+    item.setPointerCapture?.(event.pointerId);
+    this.pointerGestures.set(event.pointerId, {
+      laneId: lane.id,
+      target: item,
+      lastY: event.clientY,
+      totalDistance: 0,
+      remainder: 0,
     });
+    this.laneViews.get(lane.id)?.element.classList.add('is-dragging');
   }
 
-  handlePointerUp(event) {
-    const start = this.pointerStarts.get(event.pointerId);
-    this.pointerStarts.delete(event.pointerId);
-    if (!start || event.pointerType === 'mouse') return;
-    const distance = event.clientY - start.y;
-    if (Math.abs(distance) < this.config.swipeThresholdPx) return;
-    const lane = this.laneById(start.laneId);
+  handlePointerMove(event) {
+    const gesture = this.pointerGestures.get(event.pointerId);
+    if (!gesture) return;
+    event.preventDefault();
+    const lane = this.laneById(gesture.laneId);
     if (!lane) return;
-    this.suppressClickUntil = performance.now() + 220;
-    this.stepLane(lane, distance > 0 ? -1 : 1);
+    const movement = event.clientY - gesture.lastY;
+    gesture.lastY = event.clientY;
+    gesture.totalDistance += Math.abs(movement);
+    const { steps, remainder } = consumeSteppedDelta(
+      gesture.remainder,
+      -movement,
+      this.config.swipeThresholdPx,
+      this.config.wheelMaxStepsPerEvent,
+    );
+    gesture.remainder = remainder;
+    const laneElement = this.laneViews.get(lane.id)?.element;
+    const dragShift = -remainder / this.config.swipeThresholdPx * DRAG_VISUAL_RANGE_PX;
+    laneElement?.style.setProperty('--radial-drag-shift', `${dragShift}px`);
+    if (steps !== 0) this.stepLane(lane, steps);
+  }
+
+  finishPointerGesture(event, { cancelled = false } = {}) {
+    const gesture = this.pointerGestures.get(event.pointerId);
+    this.pointerGestures.delete(event.pointerId);
+    if (!gesture) return;
+    const laneElement = this.laneViews.get(gesture.laneId)?.element;
+    laneElement?.classList.remove('is-dragging');
+    laneElement?.style.removeProperty('--radial-drag-shift');
+    if (!cancelled && gesture.totalDistance > DRAG_CLICK_DISTANCE_PX) {
+      this.suppressClickUntil = performance.now() + CLICK_SUPPRESSION_MS;
+    }
+    if (gesture.target?.hasPointerCapture?.(event.pointerId)) {
+      gesture.target.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  handlePointerOver(event) {
+    const item = event.target.closest('[data-radial-item]');
+    if (!item) return;
+    const lane = this.laneById(item.dataset.radialLane);
+    const descriptor = lane ? this.itemByValue(lane, item.dataset.radialItem) : null;
+    if (lane && descriptor) this.showReadout(lane, descriptor);
+  }
+
+  handlePointerOut(event) {
+    const item = event.target.closest('[data-radial-item]');
+    if (!item) return;
+    const relatedItem = isElement(event.relatedTarget)
+      ? event.relatedTarget.closest('[data-radial-item]')
+      : null;
+    if (!relatedItem) this.hideReadout();
+  }
+
+  handleFocusIn(event) {
+    const item = event.target.closest('[data-radial-item]');
+    if (!item) return;
+    const lane = this.laneById(item.dataset.radialLane);
+    const descriptor = lane ? this.itemByValue(lane, item.dataset.radialItem) : null;
+    if (lane && descriptor) this.showReadout(lane, descriptor);
+  }
+
+  handleFocusOut(event) {
+    const relatedItem = isElement(event.relatedTarget)
+      ? event.relatedTarget.closest('[data-radial-item]')
+      : null;
+    if (!relatedItem) this.hideReadout();
+  }
+
+  dispose() {
+    cancelAnimationFrame(this.syncFrame);
+    window.clearTimeout(this.readoutTimer);
+    this.materialObserver.disconnect();
+    this.host.removeEventListener('click', this.onClick);
+    this.host.removeEventListener('wheel', this.onWheel);
+    this.host.removeEventListener('keydown', this.onKeyDown);
+    this.host.removeEventListener('pointerdown', this.onPointerDown);
+    this.host.removeEventListener('pointermove', this.onPointerMove);
+    this.host.removeEventListener('pointerup', this.onPointerUp);
+    this.host.removeEventListener('pointercancel', this.onPointerCancel);
+    this.host.removeEventListener('pointerover', this.onPointerOver);
+    this.host.removeEventListener('pointerout', this.onPointerOut);
+    this.host.removeEventListener('focusin', this.onFocusIn);
+    this.host.removeEventListener('focusout', this.onFocusOut);
+    this.form.removeEventListener('change', this.onFormMutation);
+    this.form.removeEventListener('input', this.onFormMutation);
+    this.materialUi.removeEventListener('change', this.onMaterialChange);
+    this.overlay.classList.remove('has-workshop-radial-menus');
+    this.host.remove();
   }
 }
 
 const config = loadWorkshopRadialMenuConfig();
-let enhanced = false;
-const enhance = () => {
-  if (enhanced) return true;
+let instance = null;
+
+function enhance() {
+  if (instance?.overlay?.isConnected) return true;
+  instance?.dispose();
+  instance = null;
   const overlay = document.querySelector(SELECTORS.overlay);
   if (!overlay || overlay.querySelector('[data-role="workshop-radial-menus"]')) return false;
-  new WorkshopRadialMenus(overlay, config);
-  enhanced = true;
+  instance = new WorkshopRadialMenus(overlay, config);
   return true;
-};
+}
 
 if (!enhance()) {
-  const observer = new MutationObserver(() => {
-    if (enhance()) observer.disconnect();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  const app = document.querySelector('#app');
+  if (app) {
+    const observer = new MutationObserver(() => {
+      if (enhance()) observer.disconnect();
+    });
+    observer.observe(app, { childList: true });
+  } else {
+    window.addEventListener('DOMContentLoaded', enhance, { once: true });
+  }
 }
