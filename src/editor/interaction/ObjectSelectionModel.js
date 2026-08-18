@@ -18,8 +18,14 @@ export class ObjectSelectionModel {
     return numeric !== null && this.ids.has(numeric);
   }
 
-  values() {
-    return [...this.ids];
+  values(limit = Infinity) {
+    const maximum = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : Infinity;
+    const values = [];
+    for (const id of this.ids) {
+      if (values.length >= maximum) break;
+      values.push(id);
+    }
+    return values;
   }
 
   clear() {
