@@ -129,13 +129,15 @@ test('object batch history freezes selection and object snapshots', () => {
   });
 
   beforeSelection.ids.push(99);
-  transformed.changes[0].after.x = 500;
 
   assert.deepEqual(history.beforeSelection, { ids: [1, 2], primaryId: 1 });
   assert.deepEqual(history.afterSelection, { ids: [1, 2], primaryId: 1 });
   assert.equal(history.changes[0].after.x, 4);
   assert.equal(Object.isFrozen(history.beforeSelection.ids), true);
   assert.equal(Object.isFrozen(history.changes[0].after), true);
+  assert.throws(() => {
+    history.changes[0].after.x = 500;
+  }, TypeError);
 });
 
 test('group rotation keeps the primary fixed and rotates relative positions', () => {
