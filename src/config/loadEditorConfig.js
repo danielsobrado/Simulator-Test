@@ -2,10 +2,12 @@ import yaml from 'js-yaml';
 import azgaarGuidanceConfigSource from '../../config/azgaar-guidance.yaml?raw';
 import collisionConfigSource from '../../config/collision.yaml?raw';
 import configSource from '../../editor.config.yaml?raw';
+import terrainMaterialBakeConfigSource from '../../config/terrain-material-bake.yaml?raw';
 import waterConfigSource from '../../config/water-domain.yaml?raw';
 import waterVisualConfigSource from '../../config/water-visual.yaml?raw';
 import { createCollisionConfig } from '../editor/collision/CollisionConfig.js';
 import { registerCollisionConfig } from '../editor/collision/CollisionPlayerBridge.js';
+import { createTerrainMaterialBakeConfig } from '../editor/materials/TerrainMaterialBakeConfig.js';
 import {
   applyWaterDomainConfig,
   validateWaterDomainConfig,
@@ -35,6 +37,9 @@ function applyRuntimeOverrides(config) {
 export function loadEditorConfig() {
   const config = yaml.load(configSource);
   config.import.azgaarGuidance = yaml.load(azgaarGuidanceConfigSource);
+  config.stylizedSurface.materialBake = createTerrainMaterialBakeConfig(
+    yaml.load(terrainMaterialBakeConfigSource),
+  );
   applyWaterDomainConfig(config, yaml.load(waterConfigSource));
   applyWaterVisualConfig(config, yaml.load(waterVisualConfigSource));
   config.collision = createCollisionConfig(yaml.load(collisionConfigSource), runtimeSearch());
