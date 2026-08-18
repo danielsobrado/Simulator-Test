@@ -1,6 +1,8 @@
 const MAX_SOURCE_DIMENSION = 4096;
 const MAX_SOURCE_PIXELS = 4096 * 4096;
 const PNG_IHDR_LENGTH = 13;
+const JPEG_FRAME_BASE_LENGTH = 8;
+const JPEG_COMPONENT_DESCRIPTOR_LENGTH = 3;
 const JPEG_START_OF_FRAME_MARKERS = new Set([
   0xc0, 0xc1, 0xc2, 0xc3,
   0xc5, 0xc6, 0xc7,
@@ -82,10 +84,18 @@ function parseJpeg(bytes) {
       throw new Error('The selected JPEG image contains an invalid segment.');
     }
     if (JPEG_START_OF_FRAME_MARKERS.has(marker)) {
-      if (segmentLength < 7) {
+      if (segmentLength < JPEG_FRAME_BASE_LENGTH + JPEG_COMPONENT_DESCRIPTOR_LENGTH) {
         throw new Error('The selected JPEG image contains an invalid frame segment.');
       }
       requireBytes(bytes, offset, segmentLength, 'JPEG');
+      const componentCount = bytes[offset + 7];
+      if (
+        componentCount <= 0
+        || segmentLength !== JPEG_FRAME_BASE_LENGTH
+          + componentCount * JPEG_COMPONENT_DESCRIPTOR_LENGTH
+      ) {
+        throw new Error('The selected JPEG image contains invalid frame components.');
+      }
       return {
         height: readUint16BigEndian(bytes, offset + 3, 'JPEG'),
         width: readUint16BigEndian(bytes, offset + 5, 'JPEG'),
