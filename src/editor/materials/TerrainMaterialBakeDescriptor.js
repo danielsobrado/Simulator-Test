@@ -36,6 +36,11 @@ function normalizeRevisions(source) {
   return Object.freeze(revisions);
 }
 
+export function terrainMaterialBakeSlotKey(descriptor) {
+  return `terrain-material-slot:v${TERRAIN_MATERIAL_BAKE_SCHEMA_VERSION}`
+    + `:${descriptor.quality}:${descriptor.chunkX}:${descriptor.chunkZ}`;
+}
+
 export function terrainMaterialBakeKey(descriptor) {
   const revisionKey = TERRAIN_MATERIAL_BAKE_REVISION_FIELDS
     .map((field) => descriptor.revisions[field])
@@ -61,6 +66,7 @@ export function createTerrainMaterialBakeDescriptor({
     quality,
     revisions: normalizeRevisions(revisions),
   };
+  descriptor.slotKey = terrainMaterialBakeSlotKey(descriptor);
   descriptor.key = terrainMaterialBakeKey(descriptor);
   return Object.freeze(descriptor);
 }
