@@ -29,11 +29,23 @@ test('terrain material bake descriptor produces deterministic revision-aware key
   const right = descriptor();
 
   assert.equal(left.key, 'terrain-material:v1:balanced:-4:9:7.11.13.17.19');
+  assert.equal(left.slotKey, 'terrain-material-slot:v1:balanced:-4:9');
   assert.equal(left.key, right.key);
+  assert.equal(left.slotKey, right.slotKey);
   assert.equal(sameTerrainMaterialBakeSource(left, right), true);
   assert.equal(terrainMaterialBakeNeedsRefresh(left, right), false);
   assert.equal(Object.isFrozen(left), true);
   assert.equal(Object.isFrozen(left.revisions), true);
+});
+
+test('source revisions change the bake key but retain the physical cache slot', () => {
+  const current = descriptor();
+  const requested = descriptor({
+    revisions: { ...REVISIONS, water: REVISIONS.water + 1 },
+  });
+
+  assert.notEqual(current.key, requested.key);
+  assert.equal(current.slotKey, requested.slotKey);
 });
 
 test('terrain material bake descriptor invalidates on every source revision', () => {
@@ -49,6 +61,7 @@ test('terrain material bake descriptor separates chunks and quality tiers', () =
   assert.equal(sameTerrainMaterialBakeSource(descriptor(), descriptor({ chunkX: -3 })), false);
   assert.equal(sameTerrainMaterialBakeSource(descriptor(), descriptor({ chunkZ: 10 })), false);
   assert.equal(sameTerrainMaterialBakeSource(descriptor(), descriptor({ quality: 'high' })), false);
+  assert.notEqual(descriptor().slotKey, descriptor({ quality: 'high' }).slotKey);
 });
 
 test('terrain material bake descriptor rejects incomplete or unsafe revisions', () => {
