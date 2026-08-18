@@ -395,11 +395,18 @@ export function installNaturalEditorInteractions(controller) {
       controller.naturalTerrainGestureMode = null;
       return;
     }
+    if (event.type === 'pointercancel') {
+      const cancelledSelection = cancelNaturalPointerGestures();
+      const cancelledConstruction = cancelConstructionPointerGesture();
+      if (event.pointerId === terrainPointerId) settleTerrainStroke();
+      if (cancelledSelection || cancelledConstruction) controller.emitState();
+      return;
+    }
     try {
       return original.onPointerUp(event);
     } finally {
       if (event.pointerId === terrainPointerId) terrainPointerId = null;
-      if (event.button === PRIMARY_POINTER_BUTTON || event.type === 'pointercancel') {
+      if (event.button === PRIMARY_POINTER_BUTTON) {
         controller.naturalTerrainGestureMode = null;
       }
     }
