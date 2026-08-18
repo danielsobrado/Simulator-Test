@@ -176,11 +176,17 @@ export class ProceduralWorkshopMaterialController {
       (mesh) => mesh.userData.workshopMaterialRegion,
     );
     this.regions = new Map((parts.materialRegions ?? []).map((region) => [region.id, region]));
+    if (this.hoverRegionId && !this.regions.has(this.hoverRegionId)) {
+      this.hoverRegionId = null;
+      this.regionLabel.hidden = true;
+    }
     if (this.selectedRegionId && !this.regions.has(this.selectedRegionId)) {
       this.selectedRegionId = null;
       this.presetSelect.replaceChildren();
       this.inspector.hidden = true;
       this.notifyRegionSelectionChanged();
+    } else if (this.selectedRegionId) {
+      this.refreshInspector();
     }
     this.refreshBudget(parts.stats);
     this.updateHighlight(this.hoverRegionId ?? this.selectedRegionId);
