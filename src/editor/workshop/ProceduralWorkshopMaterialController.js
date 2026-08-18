@@ -623,7 +623,6 @@ export class ProceduralWorkshopMaterialController {
       return option;
     }));
     const preset = getWorkshopMaterialPreset(this.document, presetId)
-      ?? BUILILTIN_WORKSHOP_MATERIAL_PRESETS?.['granite-masonry']
       ?? BUILTIN_WORKSHOP_MATERIAL_PRESETS['granite-masonry'];
     this.regionName.textContent = `${region.label} · ${
       Object.hasOwn(this.document.materialAreaOverrides, region.id) ? 'overridden' : 'inherited'
