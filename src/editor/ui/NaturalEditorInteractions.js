@@ -223,13 +223,13 @@ export function installNaturalEditorInteractions(controller) {
   controller.cancelBlockedWorldInteraction = () => {
     const wasMovingSelection = controller.movingObjectId !== null;
     settleTerrainStroke();
-    cancelNaturalPointerGestures();
-    cancelConstructionPointerGesture();
+    const cancelledSelection = cancelNaturalPointerGestures();
+    const cancelledConstruction = cancelConstructionPointerGesture();
     const result = original.cancelBlockedWorldInteraction();
     selection.overlay.clearPreview();
     controller.terrainView.setPreview(null);
     controller.objectView.setPreview(null);
-    if (wasMovingSelection) controller.emitState();
+    if (wasMovingSelection || cancelledSelection || cancelledConstruction) controller.emitState();
     return result;
   };
 
