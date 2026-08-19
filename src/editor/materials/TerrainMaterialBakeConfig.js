@@ -11,6 +11,7 @@ const MAX_RESOLUTION = 512;
 const MAX_CACHE_ENTRIES = 4096;
 const MAX_ROWS_PER_YIELD = 512;
 const MAX_CONCURRENT_BUILDS = 16;
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -46,6 +47,12 @@ function assertNonNegativeInteger(value, path) {
 function assertUnitInterval(value, path) {
   assertFinite(value, path);
   if (value < 0 || value > 1) fail(path, 'must be within [0, 1]');
+}
+
+function assertHexColor(value, path) {
+  if (typeof value !== 'string' || !HEX_COLOR_PATTERN.test(value)) {
+    fail(path, 'must be a six-digit hexadecimal color');
+  }
 }
 
 function assertKnownValue(value, allowed, path) {
@@ -160,6 +167,31 @@ function normalizeMacro(source) {
   return Object.freeze({ ...source });
 }
 
+function normalizeRender(source) {
+  assertObject(source, 'render');
+  assertPositive(source.nearDistance, 'render.nearDistance');
+  assertPositive(source.farDistance, 'render.farDistance');
+  assertPositive(source.transitionDistance, 'render.transitionDistance');
+  if (source.farDistance <= source.nearDistance + source.transitionDistance) {
+    fail('render.farDistance', 'must start after the near transition band');
+  }
+  for (const field of [
+    'grassTintStrength',
+    'nearMacroStrength',
+    'nearMaterialBlend',
+    'nearWetnessScale',
+    'wetDarkening',
+    'shorelineStrength',
+    'canopyStrength',
+  ]) {
+    assertUnitInterval(source[field], `render.${field}`);
+  }
+  for (const field of ['rockColor', 'snowColor', 'shorelineColor']) {
+    assertHexColor(source[field], `render.${field}`);
+  }
+  return Object.freeze({ ...source });
+}
+
 function normalizeCache(source) {
   assertObject(source, 'cache');
   assertPositiveInteger(source.maxEntries, 'cache.maxEntries');
@@ -221,6 +253,7 @@ export function createTerrainMaterialBakeConfig(source) {
     build: normalizeBuild(source.build),
     classification: normalizeClassification(source.classification),
     macro: normalizeMacro(source.macro),
+    render: normalizeRender(source.render),
     cache: normalizeCache(source.cache),
     fallback: normalizeFallback(source.fallback),
     debug: normalizeDebug(source.debug),
