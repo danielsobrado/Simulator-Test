@@ -18,9 +18,11 @@ test('forest-floor tint excludes exposed dirt and path tread', () => {
   );
 });
 
-test('terrain uses its transformed plane normal for lighting and shadow response', () => {
+test('terrain uses PBR response while preserving its transformed base normal', () => {
+  assert.match(source, /new THREE\.MeshStandardNodeMaterial/);
+  assert.match(source, /material\.roughnessNode\s*=\s*bakedSurface\.roughness/);
   assert.doesNotMatch(source, /material\.normalNode\s*=/);
-  assert.match(source, /PlaneGeometry's local \+Z[\s\S]*?world \+Y[\s\S]*?view space/);
+  assert.match(source, /PlaneGeometry's local \+Z[\s\S]*?world \+Y/);
 });
 
 test('terrain color does not overlay the editor cell grid in player view', () => {
