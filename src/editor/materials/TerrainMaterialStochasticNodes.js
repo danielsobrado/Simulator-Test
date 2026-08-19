@@ -12,6 +12,7 @@ import {
   select,
   sin,
   smoothstep,
+  sqrt,
   texture,
   vec2,
   vec3,
@@ -80,6 +81,7 @@ function stochasticTriSample({
   familyIndex,
   variantsPerFamily,
   scaleJitter,
+  contrastPreservation,
 }) {
   const baseUv = planarMeters.div(mesoScaleMeters);
   const grid = planarMeters.div(variantCellMeters);
@@ -98,14 +100,25 @@ function stochasticTriSample({
   const weight1 = select(upper, oneMinus(local.y), local.x);
   const weight2 = select(upper, oneMinus(local.x), local.y);
 
-  return sampleVariant(atlas, baseUv, vertex0, familyIndex, variantsPerFamily, scaleJitter)
-    .mul(weight0)
+  const blended = sampleVariant(
+    atlas, baseUv, vertex0, familyIndex, variantsPerFamily, scaleJitter,
+  ).mul(weight0)
     .add(sampleVariant(
       atlas, baseUv, vertex1, familyIndex, variantsPerFamily, scaleJitter,
     ).mul(weight1))
     .add(sampleVariant(
       atlas, baseUv, vertex2, familyIndex, variantsPerFamily, scaleJitter,
     ).mul(weight2));
+  const weightLength = max(
+    sqrt(weight0.mul(weight0).add(weight1.mul(weight1)).add(weight2.mul(weight2))),
+    0.58,
+  );
+  const restored = clamp(
+    vec3(0.5).add(blended.sub(0.5).div(weightLength)),
+    vec3(0),
+    vec3(1),
+  );
+  return mix(blended, restored, contrastPreservation);
 }
 
 function stochasticSingleSample({
@@ -174,6 +187,7 @@ function projectedDetail({
     familyIndex,
     variantsPerFamily: families.variantsPerFamily,
     scaleJitter: families.scaleJitter,
+    contrastPreservation: families.contrastPreservation,
   };
   const sample = secondary
     ? stochasticSingleSample(sampleOptions)
