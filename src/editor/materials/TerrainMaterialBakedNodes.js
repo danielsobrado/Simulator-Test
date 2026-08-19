@@ -11,6 +11,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochasticNodes.js';
+import { createTerrainMaterialGenome } from './TerrainMaterialGenomeNodes.js';
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
@@ -111,10 +112,19 @@ export function createTerrainMaterialBakedSurface({
 
   const samples = sampleBakeTextures(gpuState, terrainUv);
   const weights = normalizedWeights(samples.materialWeights);
-  const roughness = materialRoughness(
-    weights,
-    samples.wetnessShoreline.r,
-    materialBake.families.profiles,
+  const genome = createTerrainMaterialGenome({
+    worldXZ,
+    biomeColor: tileColor,
+    genomes: materialBake.families.genomes,
+  });
+  const roughness = clamp(
+    materialRoughness(
+      weights,
+      samples.wetnessShoreline.r,
+      materialBake.families.profiles,
+    ).add(genome.roughnessOffset),
+    0,
+    1,
   );
   const publishedRoughness = select(
     gpuState.blend.greaterThan(PUBLISHED_BLEND_THRESHOLD),
@@ -151,7 +161,7 @@ export function createTerrainMaterialBakedSurface({
     .add(rockColor.mul(weights.b))
     .add(snowColor.mul(weights.a));
 
-  const familyMultiplier = createTerrainMaterialFamilyMultiplier({
+  const sampledFamilyMultiplier = createTerrainMaterialFamilyMultiplier({
     atlas: familyAtlas?.texture ?? null,
     worldXZ,
     terrainHeight,
@@ -163,8 +173,14 @@ export function createTerrainMaterialBakedSurface({
     canopy: samples.canopyWater.r,
     families: materialBake.families,
   });
+  const familyMultiplier = vec3(1).add(
+    sampledFamilyMultiplier.sub(1).mul(genome.detailScale),
+  );
   const macroMultiplier = clamp(samples.macroTint.rgb.mul(2), vec3(0.65), vec3(1.35));
-  midColor = midColor.mul(familyMultiplier).mul(macroMultiplier);
+  midColor = midColor
+    .mul(familyMultiplier)
+    .mul(macroMultiplier)
+    .mul(genome.colorMultiplier);
   midColor = mix(
     midColor,
     colorNode(render.shorelineColor),
@@ -185,6 +201,7 @@ export function createTerrainMaterialBakedSurface({
   const nearFamily = mix(vec3(1), familyMultiplier, materialBake.families.nearStrength);
   const nearDetailed = mix(
     proceduralColor
+      .mul(genome.colorMultiplier)
       .mul(nearMacro)
       .mul(nearFamily)
       .mul(float(1).sub(
@@ -199,6 +216,7 @@ export function createTerrainMaterialBakedSurface({
   const nearBlend = smoothstep(render.nearDistance, nearBlendEnd, cameraDistance);
   const farBlend = smoothstep(render.farDistance, farBlendEnd, cameraDistance);
 
+  const farColor = samples.farColor.rgb.mul(genome.colorMultiplier);
   const bakedColor = select(
     cameraDistance.lessThan(render.nearDistance),
     nearDetailed,
@@ -210,8 +228,8 @@ export function createTerrainMaterialBakedSurface({
         midColor,
         select(
           cameraDistance.lessThan(farBlendEnd),
-          mix(midColor, samples.farColor.rgb, farBlend),
-          samples.farColor.rgb,
+          mix(midColor, farColor, farBlend),
+          farColor,
         ),
       ),
     ),
