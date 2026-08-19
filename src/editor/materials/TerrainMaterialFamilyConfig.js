@@ -112,6 +112,15 @@ function normalizeGenomes(source) {
   return Object.freeze({ ...source });
 }
 
+function validateFadeRange(source, startField, endField) {
+  assertFinite(source[startField], `families.${startField}`);
+  if (source[startField] < 0) fail(`families.${startField}`, 'must be non-negative');
+  assertPositive(source[endField], `families.${endField}`);
+  if (source[endField] <= source[startField]) {
+    fail(`families.${endField}`, `must exceed ${startField}`);
+  }
+}
+
 export function normalizeTerrainMaterialFamilies(source) {
   assertObject(source, 'families');
   assertBoolean(source.enabled, 'families.enabled');
@@ -135,6 +144,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     'secondaryBlendStrength',
     'secondaryMinWeight',
     'contrastPreservation',
+    'normalStrength',
   ]) {
     assertUnit(source[field], `families.${field}`);
   }
@@ -145,14 +155,8 @@ export function normalizeTerrainMaterialFamilies(source) {
   if (source.scaleJitter > MAX_SCALE_JITTER) {
     fail('families.scaleJitter', `must not exceed ${MAX_SCALE_JITTER}`);
   }
-  assertFinite(source.microFadeStartDistance, 'families.microFadeStartDistance');
-  if (source.microFadeStartDistance < 0) {
-    fail('families.microFadeStartDistance', 'must be non-negative');
-  }
-  assertPositive(source.microFadeEndDistance, 'families.microFadeEndDistance');
-  if (source.microFadeEndDistance <= source.microFadeStartDistance) {
-    fail('families.microFadeEndDistance', 'must exceed microFadeStartDistance');
-  }
+  validateFadeRange(source, 'microFadeStartDistance', 'microFadeEndDistance');
+  validateFadeRange(source, 'normalFadeStartDistance', 'normalFadeEndDistance');
 
   assertObject(source.projection, 'families.projection');
   assertFinite(source.projection.slopeStart, 'families.projection.slopeStart');
@@ -200,6 +204,9 @@ export function normalizeTerrainMaterialFamilies(source) {
     microStrength: source.microStrength,
     microFadeStartDistance: source.microFadeStartDistance,
     microFadeEndDistance: source.microFadeEndDistance,
+    normalStrength: source.normalStrength,
+    normalFadeStartDistance: source.normalFadeStartDistance,
+    normalFadeEndDistance: source.normalFadeEndDistance,
     genomes: normalizeGenomes(source.genomes),
     projection: Object.freeze({ ...source.projection }),
     environment: Object.freeze({ ...source.environment }),
