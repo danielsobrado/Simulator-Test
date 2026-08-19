@@ -155,6 +155,23 @@ function normalizeFeatures(source) {
   return Object.freeze({ ...source });
 }
 
+function normalizeWeathering(source) {
+  const path = 'families.weathering';
+  assertObject(source, path);
+  assertBoolean(source.enabled, `${path}.enabled`);
+  validateFadeRange(source, 'fadeStartDistance', 'fadeEndDistance', path);
+  for (const field of [
+    'exposureBleach',
+    'concavityDarkening',
+    'wetDarkening',
+    'shorelineDeposit',
+    'roughnessResponse',
+  ]) {
+    assertUnit(source[field], `${path}.${field}`);
+  }
+  return Object.freeze({ ...source });
+}
+
 export function normalizeTerrainMaterialFamilies(source) {
   assertObject(source, 'families');
   assertBoolean(source.enabled, 'families.enabled');
@@ -243,6 +260,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     normalFadeEndDistance: source.normalFadeEndDistance,
     genomes: normalizeGenomes(source.genomes),
     features: normalizeFeatures(source.features),
+    weathering: normalizeWeathering(source.weathering),
     projection: Object.freeze({ ...source.projection }),
     environment: Object.freeze({ ...source.environment }),
     profiles,
