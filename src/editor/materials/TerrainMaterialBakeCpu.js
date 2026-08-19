@@ -2,6 +2,15 @@ import { floatToHalf } from './HalfFloat.js';
 
 const DISTANCE_INFINITY = 1e9;
 const SQRT_TWO = Math.SQRT2;
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+const SRGB_TO_LINEAR = new Float32Array(256);
+
+for (let index = 0; index < SRGB_TO_LINEAR.length; index += 1) {
+  const value = index / 255;
+  SRGB_TO_LINEAR[index] = value <= 0.04045
+    ? value / 12.92
+    : ((value + 0.055) / 1.055) ** 2.4;
+}
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -11,10 +20,51 @@ function clamp01(value) {
   return clamp(value, 0, 1);
 }
 
+function lerp(left, right, amount) {
+  return left + (right - left) * amount;
+}
+
 function smoothstep(edge0, edge1, value) {
   const span = Math.max(1e-9, edge1 - edge0);
   const t = clamp01((value - edge0) / span);
   return t * t * (3 - 2 * t);
+}
+
+function linearToSrgbByte(value) {
+  const linear = clamp01(value);
+  const srgb = linear <= 0.0031308
+    ? linear * 12.92
+    : 1.055 * linear ** (1 / 2.4) - 0.055;
+  return Math.round(clamp01(srgb) * 255);
+}
+
+function hexToLinearRgb(value, field) {
+  if (typeof value !== 'string' || !HEX_COLOR_PATTERN.test(value)) {
+    throw new Error(`Terrain material bake ${field} must be a six-digit hexadecimal color.`);
+  }
+  const packed = Number.parseInt(value.slice(1), 16);
+  return Object.freeze([
+    SRGB_TO_LINEAR[(packed >>> 16) & 0xff],
+    SRGB_TO_LINEAR[(packed >>> 8) & 0xff],
+    SRGB_TO_LINEAR[packed & 0xff],
+  ]);
+}
+
+function prepareFarMaterialStyle(materialStyle, render) {
+  if (!materialStyle) return null;
+  const grassBrightness = Number(materialStyle.grassBrightness);
+  if (!Number.isFinite(grassBrightness) || grassBrightness < 0) {
+    throw new Error('Terrain material bake grass brightness must be non-negative and finite.');
+  }
+  return Object.freeze({
+    grassBottom: hexToLinearRgb(materialStyle.grassBottomColor, 'grassBottomColor'),
+    grassBrightness,
+    dirt: hexToLinearRgb(materialStyle.dirtColor, 'dirtColor'),
+    forest: hexToLinearRgb(materialStyle.forestColor, 'forestColor'),
+    rock: hexToLinearRgb(render.rockColor, 'render.rockColor'),
+    snow: hexToLinearRgb(render.snowColor, 'render.snowColor'),
+    shoreline: hexToLinearRgb(render.shorelineColor, 'render.shorelineColor'),
+  });
 }
 
 function hashUnit(x, z, seed) {
@@ -155,21 +205,42 @@ function waterDistanceSource(source, chunkSize) {
   };
 }
 
-function encodeWeights(target, offset, values) {
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
-  const normalized = total > 1e-9
-    ? values.map((value) => Math.max(0, value) / total * 255)
-    : [0, 255, 0, 0];
-  const floors = normalized.map(Math.floor);
-  let remainder = 255 - floors.reduce((sum, value) => sum + value, 0);
-  const order = normalized
-    .map((value, index) => ({ index, fraction: value - floors[index] }))
-    .sort((left, right) => right.fraction - left.fraction);
-  for (let index = 0; index < order.length && remainder > 0; index += 1) {
-    floors[order[index].index] += 1;
+function encodeWeights(target, offset, red, green, blue, alpha) {
+  const scaledRed = red * 255;
+  const scaledGreen = green * 255;
+  const scaledBlue = blue * 255;
+  const scaledAlpha = alpha * 255;
+  let encodedRed = Math.floor(scaledRed);
+  let encodedGreen = Math.floor(scaledGreen);
+  let encodedBlue = Math.floor(scaledBlue);
+  let encodedAlpha = Math.floor(scaledAlpha);
+  let fractionRed = scaledRed - encodedRed;
+  let fractionGreen = scaledGreen - encodedGreen;
+  let fractionBlue = scaledBlue - encodedBlue;
+  let fractionAlpha = scaledAlpha - encodedAlpha;
+  let remainder = 255 - encodedRed - encodedGreen - encodedBlue - encodedAlpha;
+
+  while (remainder > 0) {
+    if (fractionRed >= fractionGreen && fractionRed >= fractionBlue && fractionRed >= fractionAlpha) {
+      encodedRed += 1;
+      fractionRed = -1;
+    } else if (fractionGreen >= fractionBlue && fractionGreen >= fractionAlpha) {
+      encodedGreen += 1;
+      fractionGreen = -1;
+    } else if (fractionBlue >= fractionAlpha) {
+      encodedBlue += 1;
+      fractionBlue = -1;
+    } else {
+      encodedAlpha += 1;
+      fractionAlpha = -1;
+    }
     remainder -= 1;
   }
-  for (let index = 0; index < 4; index += 1) target[offset + index] = floors[index];
+
+  target[offset] = encodedRed;
+  target[offset + 1] = encodedGreen;
+  target[offset + 2] = encodedBlue;
+  target[offset + 3] = encodedAlpha;
 }
 
 function sampleCanopy(source, x, z, resolution) {
@@ -227,6 +298,7 @@ export async function bakeTerrainMaterialPage({
   chunkSize,
   tileSize,
   worldSeed = 0,
+  materialStyle = null,
   yieldControl = yieldTerrainMaterialBake,
 }) {
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -244,6 +316,7 @@ export async function bakeTerrainMaterialPage({
   const sourceIndices = new Uint32Array(texelCount);
   const waterSource = waterDistanceSource(source, chunkSize);
   const rowsPerYield = config.build.rowsPerYield;
+  const farStyle = prepareFarMaterialStyle(materialStyle, config.render);
 
   for (let z = 0; z < resolution; z += 1) {
     const sourceZ = outputToSource(z, resolution, chunkSize);
@@ -266,6 +339,7 @@ export async function bakeTerrainMaterialPage({
 
   const classification = config.classification;
   const macro = config.macro;
+  const render = config.render;
   const macroSeed = (macro.seedOffset ^ (Number.isSafeInteger(worldSeed) ? worldSeed : 0)) | 0;
 
   for (let z = 0; z < resolution; z += 1) {
@@ -296,7 +370,20 @@ export async function bakeTerrainMaterialPage({
       const snow = snowAltitude * snowHold * land;
       const grass = grassCoverage * (1 - path) * (1 - rock) * (1 - snow) * land;
       const dirt = Math.max(path, (1 - grassCoverage) * land) * (1 - rock) * (1 - snow);
-      encodeWeights(materialWeights, index * 4, [grass, dirt, rock, snow]);
+      const weightTotal = grass + dirt + rock + snow;
+      const inverseWeightTotal = weightTotal > 1e-9 ? 1 / weightTotal : 0;
+      const grassWeight = weightTotal > 1e-9 ? grass * inverseWeightTotal : 0;
+      const dirtWeight = weightTotal > 1e-9 ? dirt * inverseWeightTotal : 1;
+      const rockWeight = weightTotal > 1e-9 ? rock * inverseWeightTotal : 0;
+      const snowWeight = weightTotal > 1e-9 ? snow * inverseWeightTotal : 0;
+      encodeWeights(
+        materialWeights,
+        index * 4,
+        grassWeight,
+        dirtWeight,
+        rockWeight,
+        snowWeight,
+      );
 
       const waterIndex = (sourceZ + waterSource.radius) * waterSource.size
         + sourceX + waterSource.radius;
@@ -306,9 +393,10 @@ export async function bakeTerrainMaterialPage({
         waterCoverage,
         clamp01(1 - waterDistanceCells / classification.wetnessRadiusCells),
       );
+      const canopy = sampleCanopy(source, x, z, resolution);
       wetnessShoreline[index * 2] = Math.round(wetness * 255);
       wetnessShoreline[index * 2 + 1] = Math.round(shoreline * 255);
-      canopyWater[index * 2] = Math.round(sampleCanopy(source, x, z, resolution) * 255);
+      canopyWater[index * 2] = Math.round(canopy * 255);
       canopyWater[index * 2 + 1] = waterByte;
 
       const worldX = (source.originX + (x + 0.5) * chunkSize / resolution) * tileSize;
@@ -329,22 +417,72 @@ export async function bakeTerrainMaterialPage({
         macro.minHeightShade,
         macro.maxHeightShade,
       );
-      const wetShade = 1 - wetness * macro.wetDarkening;
-      farColor[index * 4] = Math.round(clamp(
-        source.tilePixels[sourceOffset] * macroR * heightShade * wetShade,
-        0,
-        255,
-      ));
-      farColor[index * 4 + 1] = Math.round(clamp(
-        source.tilePixels[sourceOffset + 1] * macroG * heightShade * wetShade,
-        0,
-        255,
-      ));
-      farColor[index * 4 + 2] = Math.round(clamp(
-        source.tilePixels[sourceOffset + 2] * macroB * heightShade * wetShade,
-        0,
-        255,
-      ));
+
+      if (farStyle) {
+        const tileRed = SRGB_TO_LINEAR[source.tilePixels[sourceOffset]];
+        const tileGreen = SRGB_TO_LINEAR[source.tilePixels[sourceOffset + 1]];
+        const tileBlue = SRGB_TO_LINEAR[source.tilePixels[sourceOffset + 2]];
+        const grassRed = lerp(
+          tileRed,
+          farStyle.grassBottom[0] * farStyle.grassBrightness,
+          render.grassTintStrength,
+        );
+        const grassGreen = lerp(
+          tileGreen,
+          farStyle.grassBottom[1] * farStyle.grassBrightness,
+          render.grassTintStrength,
+        );
+        const grassBlue = lerp(
+          tileBlue,
+          farStyle.grassBottom[2] * farStyle.grassBrightness,
+          render.grassTintStrength,
+        );
+        let farRed = grassRed * grassWeight
+          + farStyle.dirt[0] * dirtWeight
+          + farStyle.rock[0] * rockWeight
+          + farStyle.snow[0] * snowWeight;
+        let farGreen = grassGreen * grassWeight
+          + farStyle.dirt[1] * dirtWeight
+          + farStyle.rock[1] * rockWeight
+          + farStyle.snow[1] * snowWeight;
+        let farBlue = grassBlue * grassWeight
+          + farStyle.dirt[2] * dirtWeight
+          + farStyle.rock[2] * rockWeight
+          + farStyle.snow[2] * snowWeight;
+        farRed *= macroR;
+        farGreen *= macroG;
+        farBlue *= macroB;
+
+        const shorelineBlend = shoreline * render.shorelineStrength;
+        farRed = lerp(farRed, farStyle.shoreline[0], shorelineBlend);
+        farGreen = lerp(farGreen, farStyle.shoreline[1], shorelineBlend);
+        farBlue = lerp(farBlue, farStyle.shoreline[2], shorelineBlend);
+        const canopyBlend = canopy * render.canopyStrength * (1 - dirtWeight);
+        farRed = lerp(farRed, farStyle.forest[0], canopyBlend);
+        farGreen = lerp(farGreen, farStyle.forest[1], canopyBlend);
+        farBlue = lerp(farBlue, farStyle.forest[2], canopyBlend);
+        const materialShade = (1 - wetness * render.wetDarkening) * heightShade;
+        farColor[index * 4] = linearToSrgbByte(farRed * materialShade);
+        farColor[index * 4 + 1] = linearToSrgbByte(farGreen * materialShade);
+        farColor[index * 4 + 2] = linearToSrgbByte(farBlue * materialShade);
+      } else {
+        const wetShade = 1 - wetness * macro.wetDarkening;
+        farColor[index * 4] = Math.round(clamp(
+          source.tilePixels[sourceOffset] * macroR * heightShade * wetShade,
+          0,
+          255,
+        ));
+        farColor[index * 4 + 1] = Math.round(clamp(
+          source.tilePixels[sourceOffset + 1] * macroG * heightShade * wetShade,
+          0,
+          255,
+        ));
+        farColor[index * 4 + 2] = Math.round(clamp(
+          source.tilePixels[sourceOffset + 2] * macroB * heightShade * wetShade,
+          0,
+          255,
+        ));
+      }
       farColor[index * 4 + 3] = 255;
     }
     if ((z + 1) % rowsPerYield === 0 && z + 1 < resolution) await yieldControl();
