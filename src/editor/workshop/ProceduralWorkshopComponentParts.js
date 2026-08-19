@@ -147,6 +147,8 @@ function applyPreset(material, preset, recipe, textureCache) {
   if (normal) result.normalMap = normal;
   if (height) result.bumpMap = height;
   if (orm) {
+    result.aoMap = orm;
+    result.aoMapIntensity = preset.aoStrength ?? 1;
     result.roughnessMap = orm;
     result.metalnessMap = orm;
   }
