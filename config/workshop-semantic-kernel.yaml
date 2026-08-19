@@ -1,0 +1,21 @@
+version: 1
+documentVersion: 1
+renderingAuthority: legacy-generator
+migrationMode: sidecar
+phase0CompatibilityConfig: config/workshop-compatibility.yaml
+commands:
+  - document.batch
+  - entity.put
+  - entity.remove
+  - entity.reparent
+  - entity.set-dependencies
+  - entity.set-properties
+contracts:
+  deterministicEntityOrder: true
+  atomicPatches: true
+  invertiblePatches: true
+  previewTransactions: true
+  staleTransactionProtection: true
+  acyclicDependencyGraph: true
+  preservePhase0RecipeRoundTrip: true
+  runtimeRendererChanges: false

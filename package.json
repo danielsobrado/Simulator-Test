@@ -44,6 +44,7 @@
     "qa:workshop": "node scripts/run-workshop-qa.mjs",
     "qa:workshop:compat": "node scripts/run-workshop-compatibility.mjs",
     "qa:workshop:compat:visual": "node scripts/run-workshop-compatibility.mjs --visual",
+    "qa:workshop:kernel": "node --test test/workshop-semantic-document.test.js test/workshop-dependency-graph.test.js test/workshop-command-transaction.test.js test/workshop-recipe-bridge.test.js",
     "qa:inventory": "node scripts/run-inventory-qa.mjs",
     "qa:construction:joints": "node scripts/run-construction-joint-width-qa.mjs",
     "qa:construction:relief": "node scripts/run-construction-stone-relief-qa.mjs",
