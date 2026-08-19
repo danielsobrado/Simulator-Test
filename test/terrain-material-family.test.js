@@ -32,6 +32,7 @@ test('terrain material families validate bounded shared-atlas settings', () => {
   assert.equal(config.families.enabled, true);
   assert.equal(config.families.resolution, 64);
   assert.equal(config.families.variantsPerFamily, 4);
+  assert.equal(config.families.scaleJitter, 0.18);
   assert.deepEqual(Object.keys(config.families.profiles), TERRAIN_MATERIAL_FAMILIES);
   assert.equal(config.families.projection.slopeStart < config.families.projection.slopeFull, true);
   assert.equal(config.families.microFadeStartDistance < config.families.microFadeEndDistance, true);
@@ -39,12 +40,19 @@ test('terrain material families validate bounded shared-atlas settings', () => {
   assert.equal(Object.isFrozen(config.families.profiles.rock), true);
 });
 
-test('terrain material family config rejects unsafe atlas, fade and projection settings', () => {
+test('terrain material family config rejects unsafe atlas, fade, scale and projection settings', () => {
   const tooManyVariants = sourceConfig();
   tooManyVariants.families.variantsPerFamily = 9;
   assert.throws(
     () => createTerrainMaterialBakeConfig(tooManyVariants),
     /families\.variantsPerFamily must be an integer within \[1, 8\]/,
+  );
+
+  const invalidScaleJitter = sourceConfig();
+  invalidScaleJitter.families.scaleJitter = 0.51;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidScaleJitter),
+    /families\.scaleJitter must not exceed 0\.5/,
   );
 
   const invalidSlope = sourceConfig();
