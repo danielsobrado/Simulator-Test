@@ -4,6 +4,7 @@ const MIN_RESOLUTION = 16;
 const MAX_RESOLUTION = 256;
 const MAX_VARIANTS_PER_FAMILY = 8;
 const MAX_FREQUENCY = 64;
+const MAX_SCALE_JITTER = 0.5;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -103,6 +104,10 @@ export function normalizeTerrainMaterialFamilies(source) {
   for (const field of ['strength', 'nearStrength', 'mesoStrength', 'microStrength']) {
     assertUnit(source[field], `families.${field}`);
   }
+  assertUnit(source.scaleJitter, 'families.scaleJitter');
+  if (source.scaleJitter > MAX_SCALE_JITTER) {
+    fail('families.scaleJitter', `must not exceed ${MAX_SCALE_JITTER}`);
+  }
   assertFinite(source.microFadeStartDistance, 'families.microFadeStartDistance');
   if (source.microFadeStartDistance < 0) {
     fail('families.microFadeStartDistance', 'must be non-negative');
@@ -147,6 +152,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     mesoScaleMeters: source.mesoScaleMeters,
     microScaleMeters: source.microScaleMeters,
     variantCellMeters: source.variantCellMeters,
+    scaleJitter: source.scaleJitter,
     strength: source.strength,
     nearStrength: source.nearStrength,
     dominantFadePower: source.dominantFadePower,
