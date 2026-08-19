@@ -1,0 +1,28 @@
+version: 1
+history:
+  maxEntries: 80
+replay:
+  version: 1
+preview:
+  mode: replace-candidate
+  oneCommitPerGesture: true
+  cancelStrategy: discard-preview
+generatedControls:
+  entityType: generation-control
+  modes:
+    - pinned
+    - detached
+    - suppressed
+  commands:
+    - generated.pin
+    - generated.detach
+    - generated.suppress
+    - generated.reset-to-auto
+contracts:
+  semanticOnlyHistory: true
+  deterministicReplay: true
+  stalePreviewProtection: true
+  pointerMoveHistoryNoise: false
+  rendererFreeInteractionState: true
+  legacyTransformsUseAdapter: true
+  runtimeRendererChanges: false
