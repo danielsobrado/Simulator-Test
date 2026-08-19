@@ -15,6 +15,7 @@ test('terrain material bake render config defines non-overlapping near, mid and 
   const config = createTerrainMaterialBakeConfig(sourceConfig());
   assert.ok(config.render.nearDistance > 0);
   assert.ok(config.render.transitionDistance > 0);
+  assert.ok(config.render.publishFadeMs >= 0);
   assert.ok(
     config.render.farDistance > config.render.nearDistance + config.render.transitionDistance,
   );
@@ -41,11 +42,18 @@ test('terrain material bake render config rejects overlapping LOD bands and malf
   );
 });
 
-test('terrain material bake render config rejects stale fallback blend outside unit interval', () => {
-  const invalid = sourceConfig();
-  invalid.render.staleProceduralBlend = 1.1;
+test('terrain material bake render config rejects invalid fade and stale fallback values', () => {
+  const badFade = sourceConfig();
+  badFade.render.publishFadeMs = -1;
   assert.throws(
-    () => createTerrainMaterialBakeConfig(invalid),
+    () => createTerrainMaterialBakeConfig(badFade),
+    /render\.publishFadeMs must be non-negative/,
+  );
+
+  const invalidBlend = sourceConfig();
+  invalidBlend.render.staleProceduralBlend = 1.1;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidBlend),
     /render\.staleProceduralBlend must be within \[0, 1\]/,
   );
 });
