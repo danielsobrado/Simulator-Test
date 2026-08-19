@@ -67,13 +67,12 @@ test('near and mid terrain consume the family atlas while far terrain remains ba
   assert.match(bakedSource, /cameraDistance\.lessThan\(farBlendEnd\)/);
 });
 
-test('terrain material acquires one shared atlas lease and ties it to material disposal', () => {
+test('terrain material owns both bake textures and the shared atlas before node assembly', () => {
   assert.match(terrainSource, /acquireTerrainMaterialFamilyAtlas\(stylizedConfig\.materialBake\)/);
-  assert.match(terrainSource, /familyAtlas,/);
-  assert.match(terrainSource, /worldXZ,/);
-  assert.match(terrainSource, /terrainHeight,/);
-  assert.match(terrainSource, /attachTerrainMaterialFamilyAtlas\(material, familyAtlas\)/);
-  assert.match(terrainSource, /familyAtlas\?\.release\(\);/);
+  assert.match(terrainSource, /const material = new THREE\.MeshLambertNodeMaterial\(\);/);
+  assert.match(terrainSource, /attachTerrainMaterialBakeGpuState\(material, materialBakeGpu\);/);
+  assert.match(terrainSource, /attachTerrainMaterialFamilyAtlas\(material, familyAtlas\);/);
+  assert.match(terrainSource, /catch \(error\) \{[\s\S]*?material\.dispose\(\);[\s\S]*?throw error;/);
 });
 
 test('terrain stochastic coordinates stay canonical across floating-origin rebases', () => {
