@@ -60,6 +60,7 @@ render:
   nearDistance: 90
   farDistance: 260
   transitionDistance: 32
+  publishFadeMs: 240
   grassTintStrength: 0.36
   nearMacroStrength: 0.32
   nearMaterialBlend: 0.14
