@@ -202,7 +202,8 @@ export function createTerrainMaterialFamilyMultiplier({
   );
   const environmentScale = mix(float(1), float(families.environment.wetDetailScale), wetness)
     .mul(mix(float(1), float(families.environment.canopyDetailScale), canopy));
-  const dominanceScale = pow(dominant.dominance, families.dominantFadePower);
+  const dominanceConfidence = clamp(dominant.dominance.mul(2).sub(1), 0, 1);
+  const dominanceScale = pow(dominanceConfidence, families.dominantFadePower);
   const strength = dominanceScale.mul(environmentScale).mul(families.strength);
   return mix(vec3(1), projected, strength);
 }
