@@ -27,8 +27,11 @@ export class EscapeStack {
     this.target = target;
     this.handlers = [];
     this.nextToken = 1;
+    this.disposed = false;
     this.onKeyDown = (event) => this.handleKeyDown(event);
+    this.onPageHide = () => this.dispose();
     this.target?.addEventListener?.('keydown', this.onKeyDown, true);
+    this.target?.addEventListener?.('pagehide', this.onPageHide, { once: true });
   }
 
   /**
@@ -36,6 +39,7 @@ export class EscapeStack {
    * @returns An unregister function.
    */
   register(priority, handler, { label = '' } = {}) {
+    if (this.disposed) throw new Error('Cannot register an escape handler after disposal.');
     if (typeof handler !== 'function') throw new Error('An escape handler must be a function.');
     if (!Number.isFinite(priority)) throw new Error('An escape priority must be finite.');
     const token = this.nextToken;
@@ -74,7 +78,10 @@ export class EscapeStack {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.target?.removeEventListener?.('keydown', this.onKeyDown, true);
+    this.target?.removeEventListener?.('pagehide', this.onPageHide);
     this.handlers = [];
   }
 }
