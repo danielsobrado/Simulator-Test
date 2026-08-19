@@ -18,6 +18,12 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessingMaterialData.js';
+import { createTerrainMaterialBakedColor } from './materials/TerrainMaterialBakedNodes.js';
+import {
+  attachTerrainMaterialBakeGpuState,
+  createTerrainMaterialBakeGpuState,
+} from './materials/TerrainMaterialBakeGpu.js';
 import {
   stylizedDirtMask,
   stylizedFbm,
@@ -25,7 +31,6 @@ import {
   stylizedPatchMask,
   stylizedPathWearMask,
 } from './stylized/StylizedNoiseNodes.js';
-import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessingMaterialData.js';
 
 const HEIGHT_SHADE_SCALE = 0.018;
 const MINIMUM_HEIGHT_SHADE = 0.72;
@@ -60,6 +65,7 @@ export function createTerrainMaterial({
     chunkCenter.x.add(terrainUv.x.sub(0.5).mul(chunkWorldSize)),
     chunkCenter.y.add(float(0.5).sub(terrainUv.y).mul(chunkWorldSize)),
   );
+  const cameraDistance = distance(cameraPosition, positionWorld);
   const dirtSettings = {
     scale: float(stylizedConfig.dirt.scale),
     coverage: float(stylizedConfig.dirt.coverage),
@@ -109,7 +115,11 @@ export function createTerrainMaterial({
     mix(grassTint, colorNode(stylizedConfig.dirt.color), pathConfig.vergeBlend ?? 0.55),
     pathWear.verge,
   );
-  groundColor = mix(groundColor, colorNode(stylizedConfig.dirt.color), max(pathWear.tread, proceduralDirt));
+  groundColor = mix(
+    groundColor,
+    colorNode(stylizedConfig.dirt.color),
+    max(pathWear.tread, proceduralDirt),
+  );
   // Layered soil variation keeps the path from reading as one flat tan ribbon.
   const rutStrength = pathConfig.rutStrength ?? 0;
   if (rutStrength > 0) {
@@ -153,7 +163,6 @@ export function createTerrainMaterial({
 
   const farCover = stylizedConfig.groundCover;
   if (farCover?.enabled) {
-    const cameraDistance = distance(cameraPosition, positionWorld);
     // A wooded floor is shaded, not bare. Removing the far cover outright under
     // canopy left distant forest as flat unbroken ground, which — together with
     // the `groundCoreColor` tint and the thinned blade density — is what made the
@@ -197,13 +206,25 @@ export function createTerrainMaterial({
   }
 
   groundColor = max(groundColor, vec3(0));
+  const proceduralColor = groundColor.mul(heightShade);
+  const materialBakeGpu = createTerrainMaterialBakeGpuState(stylizedConfig.materialBake);
+  const resolvedColor = createTerrainMaterialBakedColor({
+    terrainUv,
+    tileColor,
+    heightShade,
+    cameraDistance,
+    proceduralColor,
+    gpuState: materialBakeGpu,
+    stylizedConfig,
+  });
 
   const material = new THREE.MeshLambertNodeMaterial();
-  material.colorNode = groundColor.mul(heightShade);
+  material.colorNode = resolvedColor;
   // Leave normalNode on the material default: PlaneGeometry's local +Z is
   // transformed through the mesh's -90° X rotation into world +Y and then into
   // view space. A literal local +Z here bypasses those transforms and makes the
   // ground light as though its normal points toward the camera.
   material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
+  attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
   return assignTerrainMaterialData(material);
 }
