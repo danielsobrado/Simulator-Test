@@ -1,5 +1,7 @@
 import { TERRAIN_MATERIAL_FAMILIES } from './TerrainMaterialFamilyConstants.js';
 
+const TAU = Math.PI * 2;
+
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
@@ -54,6 +56,22 @@ function directionalCycles(profile) {
   return [x, y];
 }
 
+function orientedPhaseDetail(u, v, cyclesX, cyclesY, phase, seed, frequency) {
+  const warpFrequency = Math.max(2, Math.round(frequency * 0.5));
+  const warp = (periodicValueNoise(u, v, warpFrequency, seed + 211) - 0.5) * 0.85;
+  const phaseA = phase + warp;
+  const phaseB = phase * 1.71 - warp * 0.55;
+  const phaseC = phase * 2.37 + warp * 0.35;
+  const waveA = Math.sin((u * cyclesX + v * cyclesY + phaseA) * TAU);
+  const waveB = Math.sin((
+    u * (cyclesX + cyclesY) + v * (cyclesY - cyclesX) + phaseB
+  ) * TAU);
+  const waveC = Math.sin((
+    u * (cyclesX * 2 - cyclesY) + v * (cyclesX + cyclesY * 2) + phaseC
+  ) * TAU);
+  return (waveA * 0.52 + waveB * 0.31 + waveC * 0.17) * 0.5;
+}
+
 function writeLayer(target, layer, resolution, profile, seed) {
   const layerOffset = layer * resolution * resolution * 4;
   const phase = hashUnit(layer, seed, seed ^ 0x51f15e);
@@ -70,9 +88,15 @@ function writeLayer(target, layer, resolution, profile, seed) {
       const fine = periodicValueNoise(u, v, profile.fineFrequency, seed + 29);
       const ridgeNoise = periodicValueNoise(u, v, profile.ridgeFrequency, seed + 71);
       const ridge = 1 - Math.abs(ridgeNoise * 2 - 1);
-      const directional = Math.sin(
-        (u * directionCyclesX + v * directionCyclesY + phase) * Math.PI * 2,
-      ) * 0.5;
+      const directional = orientedPhaseDetail(
+        u,
+        v,
+        directionCyclesX,
+        directionCyclesY,
+        phase,
+        seed,
+        profile.directionalFrequency,
+      );
       const offset = layerOffset + (y * resolution + x) * 4;
       target[offset] = Math.round(channelVariation(
         base, fine, ridge, directional, profile, redBias,
