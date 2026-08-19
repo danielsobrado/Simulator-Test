@@ -117,6 +117,7 @@ export function createTerrainMaterialBakedColor({
     atlas: familyAtlas?.texture ?? null,
     worldXZ,
     terrainHeight,
+    cameraDistance,
     materialWeights: weights,
     terrainShape: samples.terrainShape,
     farNormal: samples.farNormal,
