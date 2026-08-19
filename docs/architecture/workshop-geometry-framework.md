@@ -1,196 +1,396 @@
 # Workshop geometry framework
 
-Status: Proposed architecture  
-Scope: `src/editor/workshop/` and derived workshop runtime data  
-Reference behavior: Tiny Glade-style gridless, context-sensitive building editing
+Status: Reviewed target architecture  
+Scope: `src/editor/workshop/`, reusable workshop assets, workshop instances, and derived runtime data  
+Reference behavior: Tiny Glade-style gridless/context-sensitive building interaction, extended for Simulator's huge-world RPG requirements  
+Behavior review: `docs/research/tiny-glade-workshop-behavior-review-2026-08-19.md`
 
-## Core decision
+## Architectural goal
 
-The workshop document stores construction intent. Generated geometry is disposable derived data.
+The workshop should feel like direct construction doodling rather than object placement: edits are gridless, neighboring geometry reacts naturally, details remain visually coherent, and the user can change their mind without fighting the system.
 
-Persist semantic entities such as footprints, walls, roofs, openings, slabs, stairs, supports, materials, attachments, and their relationships. Do not persist Three.js meshes, vertex buffers, scene groups, selection helpers, renderer caches, or other presentation state as the authoritative representation of a workshop asset.
+The core architectural rule is still:
 
-The required dependency direction is:
+> Canonical authoring state stores construction intent. Generated geometry is disposable derived data.
+
+The stronger reviewed version adds a second equally important rule:
+
+> Automatic building chemistry is resolved from authored intent; it must not silently become indistinguishable from authored intent.
+
+The required ownership flow is:
 
 ```text
-WorkshopDocument
-    -> semantic planners
-    -> constraints and reactions
-    -> geometry plans
-    -> generated geometry
-    -> derived gameplay data
+WorkshopDefinition / authored WorkshopDocument
+    -> constraints + topology
+    -> deterministic reaction/aesthetic resolution
+    -> ResolvedWorkshopModel
+    -> geometry/gameplay plans
+    -> generated geometry + runtime derivations
     -> render/cache state
+
+WorkshopInstance
+    -> world transform + runtime state/overrides
+    -> instance-specific derived products
 ```
 
-Never make generated geometry the source from which the editor must infer the canonical workshop model.
+Never make generated geometry the source from which normal workshop editing reconstructs canonical semantics.
 
-## Goals
+## Product-quality target
 
-- Provide a stable framework for walls, buildings, roofs, openings, stairs, bridges, castles, ruins, interiors, and future construction systems.
-- Support gridless edits where neighboring construction adapts naturally.
-- Keep editing deterministic, serializable, undoable, testable, and versioned.
-- Rebuild only the affected semantic and derived regions after an edit.
-- Reuse the existing workshop investment instead of creating a second editor.
-- Keep rendering, simulation, collision, navigation, materials, and editor interaction separated by responsibility.
-- Allow presets such as manor, gatehouse, tower, cottage, inn, temple, or bridge to be compositions of reusable semantic entities instead of permanent geometry archetypes.
-- Derive RPG information from the same semantic source as the visual geometry.
+Match the useful public behaviors that make Tiny Glade feel natural:
+
+- gridless editing;
+- curved/freeform structures;
+- context-sensitive openings/supports;
+- adaptive stairs/platforms/ladders/walkways;
+- surface pieces that fit around openings and roof shapes;
+- procedural clutter/vegetation that respects construction;
+- style inheritance;
+- stable-looking procedural detail through edits;
+- easy undo/redo and direct manipulation.
+
+Then exceed that behavior for Simulator with:
+
+- huge-world reusable definitions and lightweight instances;
+- deterministic replay/debugging;
+- explicit rooms/portals/navigation/collision/cover;
+- runtime door/window/lock/damage/destruction state;
+- chunk/LOD/detail residency;
+- stable auto-generated provenance and user pin/detach/suppress controls;
+- extensible style/aesthetic resolution;
+- local dependency/reaction evaluation rather than global rebuilding.
+
+This document references Tiny Glade only as public product behavior. It does not assume or reproduce its private implementation.
 
 ## Non-goals
 
-- Reproduce Tiny Glade internals. Its source architecture is not assumed or required.
+- Reproduce Tiny Glade internals.
 - Replace Three.js/WebGPU.
-- Replace all existing workshop generators immediately.
-- Add every future building primitive up front.
-- Turn the workshop into a general-purpose CAD application.
-- Store arbitrary generated mesh edits as canonical authoring state.
+- Build a general-purpose CAD package.
+- Support arbitrary mesh sculpting as canonical workshop state.
+- Rewrite all existing workshop systems at once.
+- Add every future construction primitive up front.
+- Couple workshop definition storage to current renderer classes.
+- Require GitHub Actions; project validation remains runnable through local deterministic harnesses.
 
-## Current foundation to preserve
+## Existing foundation to preserve
 
-The current workshop already contains useful pieces that should be migrated into the framework rather than discarded:
+The current workshop already contains useful systems that should migrate into the framework:
 
-- `ProceduralAssetStore.js`: versioned procedural asset records and serialization.
-- `ProceduralAssetManager.js`: generated parts, definition registration, footprint calculation, and LOD integration.
-- `ProceduralWorkshopComposition.js`: semantic rectangles, circles, walls, material regions, collision slabs, walkable floors, room boundaries, foundation contacts, cover surfaces, and dirty primitive IDs.
-- `ProceduralWorkshopArchitecturalSnapping.js`: architectural snapping and opening constraints.
-- `ProceduralWorkshopBoundaryResize.js`: semantic-style boundary resize behavior.
-- `ProceduralWorkshopOpeningAttachments.js`: opening attachment data.
-- `ProceduralWorkshopOpeningAssemblies.js`: opening assembly data.
-- `ProceduralStraightSkeleton.js`: a roof-solving building block.
-- castle-wall and medieval workshop generators: reusable generators/preset implementation pieces.
-- current material configuration and material-region systems.
-- current LOD generation and validation.
+- `ProceduralAssetStore.js`: versioned asset records and migration behavior;
+- `ProceduralAssetManager.js`: generated parts, definition registration, footprint and LOD integration;
+- `ProceduralWorkshopComposition.js`: semantic rectangles/circles/walls, material regions, collision slabs, floors, room boundaries, foundation contacts, cover surfaces, dirty primitive IDs;
+- `ProceduralWorkshopArchitecturalSnapping.js`: snapping/opening constraints;
+- `ProceduralWorkshopBoundaryResize.js`: semantic-style boundary resizing;
+- `ProceduralWorkshopOpeningAttachments.js`: opening attachment state;
+- `ProceduralWorkshopOpeningAssemblies.js`: opening assemblies;
+- `ProceduralStraightSkeleton.js`: roof-solving building block;
+- existing castle-wall/medieval generators;
+- current workshop material and texture configuration;
+- current LOD generation/validation.
 
-The architecture should promote the strongest semantic parts of the existing composition system into the canonical workshop model.
+The semantic direction already present in `ProceduralWorkshopComposition.js` should be promoted to the center of the system.
 
-## Problem with the current direction
+## Current architectural risk
 
-The existing system mixes several different layers:
+The existing workshop mixes:
 
 - recipe/archetype selection;
 - generation;
 - geometry inspection;
 - inferred editable components;
-- component transforms;
-- snapping;
-- opening editing;
-- selection helpers;
-- interaction history;
+- direct component transforms;
+- snapping/opening editing;
+- selection helpers and hit geometry;
+- local history;
 - material handling;
-- render-state manipulation.
+- render-state mutation.
 
-In particular, generated geometry is sometimes inspected by material slot, bounds, volume, and semantic hints to reconstruct editable component structure. That is acceptable as a migration or compatibility technique but must not remain the long-term authoring model.
+Generated meshes are sometimes classified by material slot, bounds, volume and semantic hints to reconstruct editable components. Keep that only as a migration/compatibility adapter.
 
-Target direction:
+Target:
 
 ```text
-WorkshopDocument
-    -> known semantic entities
+semantic model
+    -> resolved model
     -> GeometryPlan
-    -> BufferGeometry / meshes
+    -> BufferGeometry / render batches
 ```
 
-Avoid:
+Avoid as normal authoring architecture:
 
 ```text
-Recipe
-    -> meshes
-    -> inspect meshes
-    -> guess editable components
-    -> edit inferred components
+recipe
+    -> mesh
+    -> inspect mesh
+    -> guess editable component
+    -> manipulate guessed component
 ```
 
-## Canonical `WorkshopDocument`
+# 1. Canonical model layers
 
-Introduce one authoritative semantic document.
+A single `WorkshopDocument` is not enough once context-sensitive automatic generation, huge-world instancing and runtime RPG state are considered. Use four explicit layers.
+
+## 1.1 `WorkshopDefinition`
+
+Reusable authored asset definition.
 
 ```text
-WorkshopDocument
-├── version
+WorkshopDefinition
+├── schemaVersion
 ├── id
 ├── revision
+├── seed
 ├── entities
 ├── relationships
-├── materials
+├── styleProfile
+├── materialLibrary
+├── authoredOverrides
+├── suppressionRules
 ├── metadata
 └── extensionData
 ```
 
-Minimum requirements:
+Requirements:
 
-- Stable entity IDs.
-- Deterministic ordering during serialization.
-- Explicit schema version.
-- Document revision and optional per-entity revision.
-- No Three.js classes in persisted data.
-- No world-space renderer objects in persisted data.
-- Normalized references by ID instead of object identity.
-- Version-aware migrations.
-- Validation before commit and after migration/load.
+- pure serializable data;
+- stable IDs;
+- deterministic serialization order;
+- explicit schema/generator versions;
+- no Three.js objects;
+- definition-local coordinates;
+- normalized ID references;
+- migration/validation support.
 
-Example:
+This is the long-lived workshop asset authored by the user.
 
-```yaml
-version: 1
-id: workshop:house-01
-revision: 42
-entities:
-  house:
-    type: building
-  footprint-main:
-    type: footprint
-    parent: house
-    shape:
-      type: polygon
-      points:
-        - [-4, -3]
-        - [4, -3]
-        - [4, 3]
-        - [-4, 3]
-  wall-north:
-    type: wall
-    parent: footprint-main
-    edge: 0
-    height: 4.5
-    thickness: 0.4
-  door-main:
-    type: opening
-    host: wall-north
-    openingType: door
-    position: 0.45
-    width: 1.2
-    height: 2.3
-  roof-main:
-    type: roof
-    host: footprint-main
-    roofType: auto
-    pitch: 38
-```
+## 1.2 `ResolvedWorkshopModel`
 
-The exact schema can evolve, but generated geometry must stay outside the canonical document.
+Deterministically generated semantic resolution of the authored definition.
 
-## Small semantic primitive vocabulary
+Examples of data that normally belongs here rather than in authored state:
 
-Keep the core vocabulary deliberately small and capability-oriented:
+- automatically created wall/path doorway;
+- automatically selected corner treatment;
+- derived support column;
+- generated trim;
+- auto railing gaps around traversal paths;
+- generated clutter anchors;
+- generated masonry/plank layout cells;
+- inferred style inheritance;
+- roof intersection trims.
 
 ```text
-Point
-Path
-ClosedPath
+ResolvedWorkshopModel
+├── definitionRevision
+├── resolutionVersion
+├── resolvedEntities
+├── reactionOutputs
+├── styleResolution
+├── surfaceDomains
+├── topology
+├── provenance
+└── diagnostics
+```
+
+This layer is rebuildable. It is not persisted as authoritative geometry state.
+
+## 1.3 Derived products
+
+```text
+ResolvedWorkshopModel
+├── RenderPlans
+├── CollisionPlans
+├── NavigationPlan
+├── RoomGraph
+├── PortalGraph
+├── CoverGraph
+├── SupportGraph
+├── DestructionGraph
+├── GameplaySockets
+└── Bounds/LOD plans
+```
+
+Derived products may be cached but remain disposable.
+
+## 1.4 `WorkshopInstance`
+
+World placement/runtime state is separate from the reusable definition.
+
+```text
+WorkshopInstance
+├── id
+├── definitionId
+├── transform
+├── variationSeed
+├── runtimeState
+│   ├── door/window state
+│   ├── lock state
+│   ├── damage/repair
+│   ├── ownership
+│   └── interaction state
+├── instanceOverrides
+└── revision
+```
+
+Do not duplicate the complete semantic definition for each repeated house, wall tower or prop in the huge world.
+
+Instance runtime state must not mutate the shared workshop definition.
+
+# 2. Stable identity and provenance
+
+Every authored semantic entity has a stable ID. Every generated/resolved child has a deterministic derivation key.
+
+Suggested generated key structure:
+
+```text
+<rule-id>:<source-entity-id(s)>:<local-role-or-cell>
+```
+
+Generated provenance records at least:
+
+```text
+source = auto | authored | promoted
+ruleId
+generatorVersion
+sourceEntityIds[]
+derivationKey
+seedDomain
+```
+
+## User control over automatic output
+
+Automatic output must support:
+
+- **pin/promote**: convert a generated result into explicit authored intent;
+- **detach**: remove an attachment relationship but preserve the object as authored;
+- **suppress**: persist that a particular generated result/rule key should not appear here;
+- **reset to auto**: remove the authored override and return control to resolution.
+
+This is required for Tiny-Glade-like automatic richness without taking control away from the user.
+
+# 3. Coordinate contract
+
+## 3.1 Definition-local coordinates
+
+Workshop geometry is authored in definition-local coordinates. World placement is applied only through `WorkshopInstance`.
+
+Benefits:
+
+- precision is stable on huge maps;
+- reusable definitions remain portable;
+- geometry planners do not depend on world-origin/floating-origin state;
+- cache keys remain reusable between instances.
+
+## 3.2 Local surface frames
+
+Every hostable surface exposes a stable local frame:
+
+```text
+origin
+u-axis
+v-axis
+normal
+parameter domain
+```
+
+Openings, trim, material layout, ivy masks, clutter and attachments use host-local coordinates rather than arbitrary world positions.
+
+# 4. Curve and topology kernel
+
+The previous proposal was too polyline-oriented. Freeform/gridless construction requires first-class curves.
+
+## 4.1 `CurvePath`
+
+A path is an ordered set of stable segments:
+
+```text
+CurvePath
+├── id
+├── controlPoints[]
+├── segments[]
+└── closed
+
+CurveSegment
+├── id
+├── type: line | arc | quadratic | cubic
+├── controlPointIds[]
+└── metadata
+```
+
+Start with only the segment types current tools need. Do not add NURBS/general CAD surfaces unless a real requirement appears.
+
+## 4.2 Arc-length parameterization
+
+Host positions on curves should use stable distance/normalized-distance semantics rather than raw spline implementation parameters.
+
+For example an opening on a curved wall stores:
+
+```text
+hostPathId
+segmentAnchor
+arcLengthPosition
+verticalPosition
+```
+
+Reprojection rules preserve identity when a host path is edited.
+
+## 4.3 Stable topology through split/merge
+
+Path edits need identity mapping:
+
+```text
+split edge A
+    -> A-left preserves A lineage
+    -> A-right gets deterministic child ID
+    -> hosted openings/attachments reproject
+```
+
+Merging/splitting must emit explicit topology remap data for dependents and undo/redo.
+
+## 4.4 Robust geometry tolerance policy
+
+Centralize tolerances:
+
+```text
+GeometryTolerancePolicy
+├── pointCoincidence
+├── zeroLength
+├── angularEquality
+├── intersectionEpsilon
+├── surfaceDistance
+└── curveProjectionTolerance
+```
+
+Do not scatter magic epsilon values across snapping, roofs, openings and generators.
+
+Degenerate preview states may temporarily exist while dragging, but committed canonical topology must satisfy invariants.
+
+# 5. Semantic entity vocabulary
+
+Keep core entities capability-oriented, not preset-oriented.
+
+Recommended initial vocabulary:
+
+```text
+Structure
 Footprint
-Volume
+CurvePath
 Wall
 Slab
 Roof
 Opening
-Portal
-Stair
+TraversalPath
+Support
 Column
 Beam
 Attachment
-DecorationRegion
+TerrainContact
+StyleRegion
+DecorationAnchor
 ```
 
-Do not add a new core entity type merely because a new preset is added.
+Optional future entities should be added only when behavior cannot be represented cleanly by composition.
 
 Examples:
 
@@ -199,408 +399,470 @@ Cottage
 = Footprint + Walls + Slab + Roof + Openings
 
 Castle tower
-= CircularFootprint + WallShell + Floors + Roof + Openings + BattlementModifier
+= Footprint(circle) + Wall shell + Floors + Roof + Openings + Battlement modifier
 
 Bridge
-= Path + Deck + Supports + Railings
+= TraversalPath + Deck style + Supports + Railings
 
 City wall
-= Path + Wall + BattlementModifier + TowerAttachments + GateOpening
+= CurvePath + Wall + Battlement modifier + tower/gate attachments
 ```
 
-## Presets are templates, not geometry types
+Presets such as manor/gatehouse/tower/cottage/inn/temple remain templates that create semantic patches.
 
-Current archetypes such as wall, gatehouse, tower, square-tower, and manor remain useful as user-facing presets and migration inputs, but they should produce semantic entities.
+# 6. Relationship graph
+
+Use explicit typed relationships rather than implicit proximity whenever a meaningful semantic relationship exists.
+
+Minimum relationship kinds:
 
 ```text
-Manor preset
-    -> WorkshopDocument patch
-       -> footprints
-       -> walls
-       -> slabs
-       -> roofs
-       -> openings
-       -> attachments
+parent-of
+hosted-by
+attached-to
+constrained-to
+inherits-style-from
+depends-on
+adjacent-to
+supports
+supported-by
+connects-to
 ```
 
-Future presets such as cottage, tavern, temple, fortress, bridge, or ruin should not require central generator switch statements to understand those names.
+Spatial contact/intersection relationships may be derived and cached rather than persisted.
 
-## Entity relationship and dependency graph
+The relationship graph feeds dependency invalidation, style inheritance, gameplay derivation and reaction scope.
 
-Every semantic entity and every derived product must declare dependencies.
+# 7. Spatial index and locality contract
 
-Example:
+Building chemistry must not scan the whole workshop for every pointer move.
+
+Maintain a semantic/local spatial index of:
+
+- path bounds;
+- wall envelopes;
+- roof bounds;
+- traversal segments;
+- openings;
+- terrain contacts;
+- attachment surfaces.
+
+Reaction/constraint evaluation uses:
 
 ```text
-footprint-main
-├── wall-north
-│   ├── window-1
-│   ├── window-2
-│   └── wall-north-geometry
-├── wall-east
-├── floor-0
-├── roof-main
-│   ├── chimney-1
-│   └── roof-decoration
-└── foundation
+changed entity
+    -> dependency neighbors
+    + spatial neighborhood
+    -> candidate rules only
 ```
 
-If one footprint corner moves, invalidate only the affected dependencies:
+The architecture should guarantee that a local edit is normally proportional to the affected neighborhood, not total document size.
+
+# 8. Commands, preview and history
+
+Every authoring edit follows:
 
 ```text
-control point changed
-    -> footprint topology dirty
-    -> affected walls dirty
-    -> floor boundary dirty
-    -> roof boundary dirty
-    -> affected openings reprojected/validated
-    -> affected foundation dirty
-    -> dependent detail dirty
-```
-
-Unrelated entities must not rebuild.
-
-## Dirty domains
-
-Do not represent invalidation with one generic `dirty = true` flag. Track the domain of invalidation.
-
-Recommended domains:
-
-```text
-TOPOLOGY
-GEOMETRY
-MATERIAL
-COLLISION
-NAVIGATION
-ROOMS
-PORTALS
-DECORATION
-LOD
-BOUNDS
-FOUNDATION
-```
-
-Examples:
-
-```text
-material change
-    -> MATERIAL
-
-window move
-    -> TOPOLOGY, GEOMETRY, COLLISION, PORTALS, DECORATION
-
-wall resize
-    -> TOPOLOGY, GEOMETRY, COLLISION, NAVIGATION, ROOMS,
-       PORTALS, FOUNDATION, DECORATION, LOD, BOUNDS
-```
-
-Dependencies decide the exact propagation. Callers should not manually enumerate every downstream renderer operation.
-
-## Unified edit flow
-
-Every workshop edit should travel through one logical pipeline:
-
-```text
-pointer/touch/tool input
-    -> edit intent
+input gesture
+    -> semantic intent
     -> preview transaction
-    -> constraint solver
-    -> semantic patch
-    -> dependency resolver
-    -> geometry planners
-    -> geometry builders
-    -> derived gameplay systems
-    -> scene diff
-    -> render
+    -> constraint/adaptation solve
+    -> authored patch
+    -> resolved preview
+    -> derived preview scene diff
 ```
 
-Example wall drag:
+On commit:
 
 ```text
-PointerMove
-    -> MoveWallIntent
-    -> SnapSolver
-    -> ConstraintEngine
-    -> PreviewPatch
-    -> DependencyGraph
-    -> affected plan rebuild
-    -> preview scene diff
+validated authored patch
+    -> definition revision +1
+    -> deterministic resolution
+    -> dirty propagation
+    -> derived scene diff
+    -> one history command
 ```
 
-Pointer release commits the semantic patch. Escape/cancel discards the preview transaction.
+Escape/cancel drops the preview patch.
 
-## Preview transactions
-
-Do not continuously mutate the committed document while a user is dragging.
+Commands remain semantic:
 
 ```text
-CommittedDocument + PreviewPatch = PreviewDocument
-```
-
-Rules:
-
-- Preview changes are ephemeral.
-- Preview changes use the same validators and planners as committed changes where practical.
-- Pointer-up or explicit confirmation commits one logical command.
-- Escape/cancel discards the patch with no inverse mutation required.
-- Undo history records committed semantic commands, not pointer-move noise.
-
-## Commands edit semantics
-
-Command examples:
-
-```text
-CreateFootprint
+CreatePath
 MoveControlPoint
-InsertPathPoint
-RemovePathPoint
-ResizeVolume
-ChangeWallHeight
-SetRoofPitch
+InsertControlPoint
+DeleteControlPoint
+ResizeWall
+SetWallHeight
 AddOpening
 MoveOpening
-ResizeOpening
-AttachStairs
-ChangeMaterial
-DuplicateEntity
+SetRoofPitch
+CreateTraversalPath
+MoveTraversalNode
+ChangeStyle
+PinGeneratedEntity
+SuppressReactionOutput
 DeleteEntity
 ```
 
-Commands must not be named around Three.js implementation operations such as moving a mesh, scaling a scene group, or cutting an arbitrary `BufferGeometry`.
+No canonical command should mean `MoveMesh`, `ScaleGroup` or arbitrary `BufferGeometry` mutation.
 
-UI/controller code asks for semantic operations. The workshop domain decides how those operations affect topology, geometry, collision, navigation, and details.
-
-## Immutable semantic patches
-
-Commands should produce deterministic patches.
+# 9. Immutable authored patches
 
 ```text
 WorkshopPatch
 ├── created[]
 ├── updated[]
 ├── deleted[]
-└── relationshipChanges[]
+├── relationshipChanges[]
+├── overrideChanges[]
+└── suppressionChanges[]
 ```
 
-Example:
-
-```js
-{
-  updated: {
-    'footprint-main': {
-      points: [/* normalized points */],
-    },
-  },
-}
-```
+Patches are normalized and deterministic.
 
 Benefits:
 
 - clean undo/redo;
-- deterministic persistence;
 - replay/debugging;
-- easier tests;
-- future collaborative/network editing if required;
-- clear change sets for dependency invalidation.
+- exact dependency invalidation;
+- future collaborative editing if needed;
+- stable test fixtures.
 
-## Constraint engine
+# 10. Constraint and adaptation engine
 
-Introduce a shared `ConstraintEngine` with provider-style constraints rather than embedding all architectural rules in interaction controllers.
+A Tiny-Glade-like editor should avoid saying "invalid" for normal creative edits.
 
-Constraint families:
+Split constraints into three classes.
 
-### Positional
+## 10.1 Hard invariants
 
-- parallel;
-- perpendicular;
-- collinear;
-- coincident control points;
-- equal distance;
-- equal height;
-- center alignment;
-- optional grid;
-- terrain/foundation contact.
+Must be true to commit canonical data:
 
-### Topological
+- finite coordinates;
+- valid references;
+- valid canonical path structure;
+- no unsupported zero-length committed segments;
+- no corrupt polygon topology;
+- no duplicate stable IDs.
 
-- shared vertex/edge relationships;
-- valid polygon winding;
-- no zero-length segments;
-- valid closed footprints;
-- no illegal self-intersections;
-- stable host references.
+Hard failures reject commit with structured diagnostics.
 
-### Architectural
-
-- opening remains within its host wall;
-- minimum opening-to-corner distance;
-- door reaches a valid floor/landing;
-- stairs meet valid elevations;
-- roof is supported by a valid boundary;
-- window cannot exceed the host wall;
-- support/foundation rules remain valid after elevation changes.
-
-Existing architectural snapping should become one constraint provider rather than remain tightly coupled to a large component interaction controller.
-
-## Reaction engine: building chemistry
-
-Create a context-sensitive `WorkshopReactionEngine` that derives local adaptation from semantic relationships.
-
-The reaction engine does not replace commands. A command changes canonical intent; reactions calculate deterministic dependent behavior or proposed semantic additions from the resulting context.
+## 10.2 Soft constraints/preferences
 
 Examples:
 
-### Path intersects wall
+- parallel/perpendicular alignment;
+- endpoint coincidence;
+- center alignment;
+- equal height;
+- preferred opening clearance;
+- preferred stair landing alignment;
+- style/proportion preferences.
+
+Soft constraints influence snapping/resolution but do not make the user's edit impossible.
+
+## 10.3 Adaptive constraints/morphs
+
+Context may morph the resolved result:
+
+- low window -> door role when tool policy allows;
+- traversal segment -> walkway/stair/ramp/ladder according to slope/context;
+- raised floor -> supports/foundation;
+- wall/path crossing -> opening/portal;
+- unsupported traversal -> alternative support policy;
+- roof intersection -> trim/valley/reprojection.
+
+The constraint engine should return candidate solutions with reasons/scores rather than hiding all decision logic inside tools.
+
+# 11. Deterministic building chemistry
+
+`WorkshopReactionEngine` operates on authored semantics and candidate spatial relationships.
+
+A reaction is evaluated in explicit stages:
 
 ```text
+Detect
+    -> propose reaction outputs
+Resolve conflicts/priorities
+    -> build ResolvedWorkshopModel
+Validate
+    -> publish dirty domains/products
+```
+
+Rules must not directly mutate the committed document.
+
+## Reaction properties
+
+Every reaction declares:
+
+- ID/version;
+- input entity/relationship kinds;
+- spatial scope;
+- priority;
+- deterministic key strategy;
+- outputs;
+- dirty domains;
+- suppression/promotion policy;
+- bounded recursion/pass behavior.
+
+## Initial reactions
+
+```text
+Wall + Wall
+    -> corner join/treatment
+
 Path + Wall
-    -> wall/path reaction
-    -> portal/opening candidate or automatic opening according to tool policy
-```
+    -> portal/opening candidate
 
-### Stair reaches wall
+Opening + Wall
+    -> wall cut + frame/lintel/sill anchors
 
-```text
-Stair landing + Wall
-    -> landing reaction
-    -> compatible opening/portal
-```
-
-### Two walls meet
-
-```text
-Wall A + Wall B
-    -> corner reaction
-    -> miter / pillar / masonry corner treatment
-```
-
-### Roof and chimney
-
-```text
 Roof + Chimney
-    -> roof trim
-    -> flashing/detail anchors
+    -> roof trim + flashing anchor
+
+Raised Structure + Terrain
+    -> foundation/support resolution
+
+Traversal + Wall/Roof
+    -> host-follow/landing/corner platform adaptation
+
+Traversal crossing railing/battlement
+    -> railing/battlement gap
 ```
 
-### Raised building
+# 12. Reaction conflict resolution
+
+Multiple rules may target the same local region. Resolve proposals deterministically instead of depending on execution order.
+
+Example ordering dimensions:
+
+1. explicit authored override;
+2. hard architectural safety/topology;
+3. explicit tool intent;
+4. host/attachment reaction;
+5. style/aesthetic reaction;
+6. decorative reaction.
+
+Conflicts that cannot be combined produce diagnostics and a stable fallback, not nondeterministic output.
+
+# 13. Stable procedural randomness and temporal coherence
+
+This is a first-class requirement.
+
+Do not seed one generator and then consume random values sequentially for an entire building. Small structural edits would reshuffle unrelated detail.
+
+Use domain-separated deterministic streams:
 
 ```text
-building elevation changed
-    -> foundation/support reaction
-    -> columns / piers / stilts / foundation profile
+random(definitionSeed, entityId, domainId, localKey)
 ```
 
-### Window/opening
+Example domains:
 
 ```text
-Opening
-    -> wall cut
-    -> frame
-    -> lintel
-    -> sill
-    -> optional shutters/assembly
-    -> detail anchors
+masonry-layout
+plank-layout
+roof-tiles
+weathering
+ivy
+clutter
+support-variation
+trim-variation
 ```
 
-Reactions should be local, deterministic, ordered, bounded, and protected from recursive cycles.
+Each generated child has a stable local key based on semantic position/cell/role.
 
-## Geometry planning before geometry construction
+Requirements:
 
-Do not jump directly from an entity to triangles.
+- local edits preserve unrelated details;
+- adding a chimney must not reroll all windows;
+- changing ivy intensity must not reroll brick arrangement;
+- moving one stair node must not reshuffle unrelated stair decoration;
+- undo/redo restores identical resolved detail.
+
+# 14. Style and aesthetic resolution
+
+Procedural richness should not be random noise. Introduce an explicit `StyleProfile` and deterministic `AestheticResolver`.
+
+`StyleProfile` may include:
 
 ```text
-Semantic entity
-    -> GeometryPlanner
-    -> GeometryPlan
-    -> GeometryBuilder
-    -> BufferGeometry / mesh parts
+architecture family
+material families
+roof preferences
+trim family
+opening proportion family
+support family
+surface layout rules
+weathering range
+clutter family/density
+irregularity profile
+color/pattern inheritance
 ```
 
-A wall plan can contain:
+The `AestheticResolver` chooses among valid generated variants using:
+
+- explicit user choices first;
+- inherited style;
+- local geometry/proportions;
+- curvature;
+- neighboring repetition;
+- semantic context;
+- stable random stream.
+
+Style inheritance is explicit:
 
 ```text
-WallGeometryPlan
-├── path
+new snapped/connected entity
+    -> inherits style from host/parent according to policy
+    -> stores only overrides that differ
+```
+
+# 15. Surface-domain system
+
+Tiny-Glade-grade visual detail requires a reusable representation for repeated physical surface pieces.
+
+Define a `SurfaceDomain` derived from structural semantics:
+
+```text
+SurfaceDomain
+├── id
+├── hostEntityId
+├── localFrame
+├── boundary2D
+├── holes/exclusionMasks[]
+├── curvatureInfo
+├── material/style family
+├── trimBoundaries[]
+└── detailAnchors[]
+```
+
+Consumers include:
+
+- brick/stone courses;
+- planks;
+- timber framing;
+- roof tiles;
+- plaster wear;
+- ivy/moss/dirt;
+- clutter anchoring;
+- snow/wetness later.
+
+## Exclusion masks
+
+Publish shared masks for:
+
+- openings;
+- traversal contact;
+- roof intersection;
+- corners/trim;
+- decoration clearance;
+- gameplay interaction clearance.
+
+This prevents independent systems from rediscovering door/window bounds from triangles.
+
+# 16. Repeated-piece layout grammars
+
+Use deterministic layout planners:
+
+```text
+MasonryLayoutPlanner
+PlankLayoutPlanner
+TimberFrameLayoutPlanner
+RoofTileLayoutPlanner
+```
+
+They operate in host-local surface coordinates.
+
+Required capabilities:
+
+- crop/split pieces around openings;
+- avoid tiny invalid fragments using deterministic merge/adjust policies;
+- preserve course/plank continuity across small edits;
+- handle curved surfaces according to supported layout policy;
+- expose coarse shell equivalents for distance LOD;
+- avoid one `Object3D` per brick/plank/tile.
+
+For arbitrary curved surfaces, layout policy can intentionally restrict unsupported orientations rather than producing bad geometry.
+
+# 17. Wall subsystem
+
+Walls are semantic paths with profile data, not transformed generated groups.
+
+```text
+Wall
+├── pathId / edge reference
 ├── elevation
 ├── height
 ├── thickness
-├── visibleIntervals
-├── openings
-├── cornerJoins
-├── topProfile
-├── foundationProfile
-├── materialRegions
-└── detailAnchors
+├── profile
+├── topFamily
+├── styleRegionId
+└── authored options
 ```
 
-This separates semantic correctness from triangulation and material assignment, making debugging and caching substantially easier.
-
-## Ordered geometry modifiers
-
-Use deterministic modifier pipelines for local visual/structural adaptations.
-
-Example:
+`WallPlanner` produces:
 
 ```text
-Base wall
-    -> opening modifier
-    -> intersection trimming
-    -> corner joins
-    -> roof clipping
-    -> architectural detail
-    -> surface breakup
-    -> weathering
-    -> decoration anchors
-```
-
-Potential modifiers:
-
-```text
-OpeningModifier
-BattlementModifier
-RoofIntersectionModifier
-TimberFrameModifier
-DamageModifier
-WeatheringModifier
-```
-
-A modifier should declare inputs, outputs, dependencies, and dirty domains.
-
-## Separate structural, visual, and micro-detail data
-
-Maintain explicit layers.
-
-```text
-Structural
+WallGeometryPlan
+├── sampled/analytic path
 ├── envelope
-├── collision
-├── portals
-├── floors
-├── supports
-└── navigation semantics
-
-Visual
-├── stones
-├── planks
-├── beams
-├── trim
-├── tiles
-├── shutters
-└── decoration
-
-Micro detail
-├── cracks
-├── moss
-├── ivy
-├── dirt
-└── clutter
+├── visible intervals
+├── openings
+├── joins
+├── roof trims
+├── foundation interface
+├── surface domains
+├── material regions
+└── gameplay slabs
 ```
 
-Changing moss must not rebuild collision. Changing roof tile style must not recalculate rooms. Moving a window can legitimately affect wall geometry, collision, portals, visibility, and nearby decoration.
+Corner joining is a reaction/planning concern with deterministic fallback modes.
 
-## Roof subsystem
+# 18. Opening subsystem
 
-Treat roofs as semantic entities with solver-based implementations.
+Doors, windows, arches, gates and trapdoors share semantic opening behavior.
+
+```text
+Opening
+├── hostSurfaceId
+├── hostPosition
+├── verticalPosition
+├── width
+├── height
+├── shape
+├── depth
+├── role
+├── assemblyId
+└── authored overrides
+```
+
+Assemblies can contain:
+
+```text
+frame
+leaf/sash
+shutters
+lintel
+sill
+trim
+grille/bars
+```
+
+Opening roles may morph under adaptive tool policy, but explicit user choices win.
+
+An opening publishes:
+
+- render cut mask;
+- collision gap;
+- portal/visibility semantics;
+- decoration/ivy exclusion;
+- attachment sockets.
+
+# 19. Roof subsystem
+
+Roofs are semantic host surfaces with pluggable solvers.
 
 ```text
 Roof
@@ -610,10 +872,11 @@ Roof
 ├── pitch
 ├── family
 ├── ridgeHints[]
-└── overhang
+├── overhang
+└── styleRegionId
 ```
 
-Proposed solver interface implementations:
+Solvers:
 
 ```text
 FlatRoofSolver
@@ -624,242 +887,359 @@ StraightSkeletonRoofSolver
 ManualRoofSolver
 ```
 
-`roofFamily: auto` selects a suitable solver based on footprint and hints. The existing straight-skeleton code becomes one solver, not the entire roof architecture.
+`auto` selects deterministically using footprint/topology/style hints.
 
-This leaves a clean extension path for lean-to, gambrel, mansard, cross-gable, turret, dome, and fantasy curved roofs.
+The existing straight-skeleton implementation becomes one solver.
 
-## Opening subsystem
-
-Doors, windows, arches, gates, and similar cuts should share one semantic `Opening` model.
+Roof output publishes stable surfaces/sockets:
 
 ```text
-Opening
-├── hostSurfaceId
-├── u
-├── v
+ridge
+slope
+eave
+valley
+flat-walkable region
+```
+
+This supports chimneys, dormers, gutters, stairs/traversal attachment and RPG walkable roofs.
+
+# 20. Traversal system: stairs, ramps, platforms, ladders, bridges and walkways
+
+Do not create a narrow fixed `Stair` model. Use a generalized `TraversalPath`.
+
+```text
+TraversalPath
+├── nodes[]
+├── edges[]
 ├── width
-├── height
-├── shape
-├── depth
-├── role
-└── assemblyId
+├── clearance
+├── style
+├── railingPolicy
+├── supportPolicy
+├── attachmentPolicy
+└── authored segment overrides
 ```
 
-Opening assemblies may contain:
+Each node has stable identity and 3D definition-local position or host-relative position.
+
+Each edge is resolved into one of:
 
 ```text
-frame
-door leaf
-window sash
-shutters
-lintel
-sill
-trim
-bars/grille
+walkway
+platform
+ramp
+stairs
+ladder
+bridge span
 ```
 
-Converting a window to a door should normally change the semantic opening role/assembly rather than delete one unrelated geometry object and create another.
+based on:
 
-## Attachment sockets
+- slope;
+- length;
+- vertical difference;
+- host surface;
+- curvature/path-follow relation;
+- explicit user override.
 
-Semantic entities expose named attachment sockets or surfaces.
+## Host-follow behavior
+
+Traversal can constrain nodes/segments to:
+
+- wall facade;
+- wall top;
+- tower/curved wall offset;
+- flat roof;
+- floor/slab edge;
+- another traversal network.
+
+Corner transitions can insert resolved platform nodes without polluting authored state unless the user promotes them.
+
+Traversal publishes:
+
+- walkable/nav connectivity;
+- supports;
+- railing gaps;
+- clutter surface sockets;
+- collision;
+- path/animation spline where required.
+
+# 21. Supports and foundations
+
+Treat support/foundation behavior as a semantic/derived system rather than decoration.
+
+Inputs:
+
+- terrain contact field;
+- structure footprint;
+- elevation;
+- supported surfaces;
+- traversal/support graph;
+- style profile;
+- authored suppress/override choices.
+
+Outputs may include:
+
+```text
+continuous foundation
+stone plinth
+columns
+piers
+stilts
+arches
+beams
+```
+
+Support resolution also feeds gameplay/destruction semantics.
+
+# 22. Attachment sockets
+
+Semantic surfaces expose named sockets/regions rather than requiring world-space guessing.
 
 Examples:
 
 ```text
-Wall
-├── facade
-├── top
-├── corner
-└── opening
-
-Roof
-├── ridge
-├── slope
-├── eave
-└── valley
-
-Floor
-├── surface
-└── edge
+Wall: facade, top, corner, opening
+Roof: ridge, slope, eave, valley
+Floor: surface, edge
+Traversal: deck, rail, node, underside
+Opening: frame, sill, lintel, leaf
 ```
 
-Attachments resolve against sockets rather than arbitrary world coordinates:
+Attachments use host-local coordinates and survive compatible host edits.
+
+# 23. RPG/gameplay derivation
+
+The workshop architecture should produce gameplay truth without decorative mesh inspection.
 
 ```text
-chimney -> roof:slope
-banner -> wall:facade
-gutter -> roof:eave
-stairs -> floor:edge
-torch -> wall:facade
-```
-
-## RPG/gameplay derivation
-
-The same canonical document must derive visual geometry and gameplay semantics.
-
-```text
-WorkshopDocument
-├── RenderGeometry
-├── CollisionGeometry
-├── NavigationGeometry
+ResolvedWorkshopModel
+├── CollisionGraph
+├── NavigationGraph
 ├── RoomGraph
 ├── PortalGraph
 ├── CoverGraph
+├── SupportGraph
 ├── DestructionGraph
 └── GameplaySockets
 ```
 
-Door semantics may provide:
+Door semantics can provide:
 
-- navigation portal;
-- interaction socket;
+- nav portal;
+- visibility/sound portal;
 - lock socket;
-- sound-occlusion portal;
-- visibility portal;
+- interaction state;
 - AI entry/exit.
 
-Window semantics may provide:
+Window semantics can provide:
 
-- visibility portal;
-- projectile opening;
-- cover information;
-- climbing possibility when allowed.
+- visibility/projectile opening;
+- cover edge;
+- climb socket when allowed.
 
-Existing composition-derived collision slabs, walkable floors, room boundaries, foundation contacts, and cover surfaces are the starting point for this layer.
+Traversal directly contributes navigation edges.
 
-## Render and derivation caches
+Structural support graph enables later damage/collapse logic without inferring structure from visual bricks.
 
-Cache derived products by stable entity ID, revision, and plan hash.
+# 24. Dirty domains and dependency graph
+
+Use domain-specific invalidation:
 
 ```text
-WorkshopRenderCache
-entityId
-├── documentRevision
-├── geometryPlanHash
-├── highGeometry
-├── mediumGeometry
-├── lowGeometry
-├── bounds
-└── materialBindings
+TOPOLOGY
+GEOMETRY
+SURFACE_LAYOUT
+MATERIAL
+STYLE
+COLLISION
+NAVIGATION
+ROOMS
+PORTALS
+SUPPORTS
+DECORATION
+LOD
+BOUNDS
+FOUNDATION
+SPATIAL_INDEX
 ```
 
-Separate caches may exist for collision/navigation if their invalidation domains differ.
+Examples:
+
+```text
+material tint change
+    -> MATERIAL
+
+plaster wear change
+    -> MATERIAL/DECORATION only
+
+window move
+    -> TOPOLOGY, GEOMETRY, SURFACE_LAYOUT,
+       COLLISION, PORTALS, DECORATION
+
+wall control-point drag
+    -> TOPOLOGY, SPATIAL_INDEX, GEOMETRY,
+       SURFACE_LAYOUT, ROOF dependencies,
+       COLLISION, NAVIGATION, ROOMS, PORTALS,
+       SUPPORTS, FOUNDATION, DECORATION, LOD, BOUNDS
+```
+
+Callers do not manually trigger each downstream operation; the dependency graph does.
+
+# 25. Interactive evaluation tiers
+
+Direct manipulation needs a stable latency budget. Use two resolution tiers without changing authored semantics.
+
+## Interactive preview tier
+
+During drag:
+
+- resolve only local dependencies;
+- use simplified repeated-piece detail where necessary;
+- defer expensive decorative refinement;
+- reuse cached unaffected products;
+- preserve collision/selection proxy correctness needed for editing.
+
+## Settled tier
+
+After commit/idle frame budget allows:
+
+- generate full near visual detail;
+- refresh decorative fields;
+- prepare LOD tiers;
+- update expensive secondary caches.
+
+Both tiers must resolve to semantically equivalent structure. Preview is not allowed to invent a different final topology.
+
+# 26. Render/cache architecture
+
+Cache by stable semantic/resolved identity and normalized plan hashes.
+
+```text
+WorkshopDerivedCache
+├── geometryPlanCache
+├── surfaceLayoutCache
+├── renderBatchCache
+├── collisionCache
+├── navCache
+├── roomPortalCache
+└── lodCache
+```
 
 Requirements:
 
-- unchanged hashes reuse derived geometry;
-- undo/redo may reuse prior cached plans;
-- cache eviction is bounded;
-- cache data is never canonical persistence;
-- disposing a cache entry disposes owned GPU resources safely;
-- shared material/texture resources are reference-safe.
+- unchanged plan hashes reuse output;
+- undo/redo may reuse previous cache entries;
+- cache ownership/disposal is explicit;
+- shared textures/materials are reference-safe;
+- cache eviction is bounded by memory policy, not canonical semantics.
 
-## Registries and extension points
+# 27. Rendering repeated details
 
-Avoid central generator conditionals as the primary extension mechanism.
+Do not create one Three.js scene object per brick/plank/tile.
 
-Proposed registries:
+Prefer:
+
+- instanced/batched geometry;
+- shared geometry/material resources;
+- merged coarse shells for distance;
+- GPU-driven/indirect approaches only where Three.js/WebGPU support and measured benefit justify complexity;
+- per-structure/object culling boundaries;
+- detail residency by distance/importance.
+
+Current near/coarse/shell LOD validation remains useful and should evolve into the new render path.
+
+# 28. Huge-world residency
+
+Tiny Glade is a small diorama; Simulator is not.
+
+Use separate residency levels:
 
 ```text
+semantic definition: persistent/shared
+instance runtime state: lightweight/persistent as needed
+coarse collision/nav: loaded for simulation radius
+coarse render shell: world streaming radius
+near structural detail: visual radius
+micro detail: close visual radius only
+```
+
+Repeated world instances share definition-level render products when instance-specific variation permits.
+
+Avoid fixed architectural assumptions such as a low global `maxEntities: 4096`. Safety limits should be configurable/resource-based and scoped to the correct object/document, with diagnostics rather than arbitrary product ceilings.
+
+# 29. Registries and extension points
+
+Use validated deterministic registries:
+
+```text
+EntityValidatorRegistry
 GeometryRegistry
-ModifierRegistry
 ConstraintRegistry
 ReactionRegistry
+ModifierRegistry
 RoofSolverRegistry
+SurfaceLayoutRegistry
+TraversalResolverRegistry
 DerivedSystemRegistry
 PresetRegistry
 ```
 
-Conceptual examples:
+Registries must reject duplicate IDs and freeze ordering/priority rules.
 
-```js
-geometryRegistry.register('wall', wallGenerator);
-geometryRegistry.register('roof', roofGenerator);
-geometryRegistry.register('slab', slabGenerator);
+Avoid central archetype `if/else` growth.
 
-modifierRegistry.register('battlements', battlementModifier);
-modifierRegistry.register('damage', damageModifier);
-
-reactionRegistry.register('wall+wall', wallCornerReaction);
-reactionRegistry.register('wall+path', wallPathReaction);
-reactionRegistry.register('roof+chimney', roofChimneyReaction);
-```
-
-Registrations must be deterministic and validated for duplicate IDs.
-
-## Proposed source structure
+# 30. Suggested source structure
 
 ```text
 src/editor/workshop/
-├── document/
-│   ├── WorkshopDocument.js
-│   ├── WorkshopEntity.js
-│   ├── WorkshopPatch.js
-│   ├── WorkshopMigration.js
-│   └── WorkshopSerializer.js
+├── model/
+│   ├── definition/
+│   ├── resolved/
+│   ├── instance/
+│   ├── ids/
+│   └── provenance/
 ├── commands/
-│   ├── WorkshopCommandBus.js
-│   ├── CreateEntityCommand.js
-│   ├── UpdateEntityCommand.js
-│   └── DeleteEntityCommand.js
+├── history/
+├── curves/
+│   ├── CurvePath.js
+│   ├── CurveProjection.js
+│   ├── CurveIntersections.js
+│   └── GeometryTolerancePolicy.js
 ├── topology/
-│   ├── TopologyGraph.js
-│   ├── FootprintTopology.js
-│   └── RelationshipGraph.js
+├── spatial/
 ├── constraints/
-│   ├── ConstraintEngine.js
-│   ├── SnapSolver.js
-│   ├── OpeningConstraints.js
-│   └── IntersectionConstraints.js
 ├── reactions/
-│   ├── ReactionEngine.js
-│   ├── WallCornerReaction.js
-│   ├── WallPathReaction.js
-│   └── SupportReaction.js
+├── style/
+│   ├── StyleProfile.js
+│   ├── StyleResolver.js
+│   └── AestheticResolver.js
+├── surfaces/
+│   ├── SurfaceDomain.js
+│   ├── SurfaceMasks.js
+│   └── layouts/
 ├── geometry/
-│   ├── GeometryPlanner.js
-│   ├── GeometryRegistry.js
 │   ├── wall/
 │   ├── roof/
 │   ├── slab/
 │   ├── opening/
-│   ├── stair/
-│   └── support/
+│   ├── support/
+│   └── shared/
+├── traversal/
 ├── modifiers/
-│   ├── ModifierPipeline.js
-│   ├── OpeningModifier.js
-│   ├── DamageModifier.js
-│   └── BattlementModifier.js
 ├── derived/
-│   ├── CollisionDeriver.js
-│   ├── RoomGraphDeriver.js
-│   ├── NavigationDeriver.js
-│   └── CoverDeriver.js
 ├── rendering/
-│   ├── WorkshopRenderer.js
-│   ├── WorkshopRenderCache.js
-│   ├── WorkshopSceneDiff.js
-│   └── WorkshopLodBuilder.js
 ├── interaction/
-│   ├── WorkshopToolController.js
-│   ├── SelectionController.js
-│   ├── HandleController.js
-│   └── PreviewTransaction.js
 ├── presets/
-│   ├── CottagePreset.js
-│   ├── ManorPreset.js
-│   ├── CastleWallPreset.js
-│   └── GatehousePreset.js
+├── migration/
 └── config/
-    └── workshop.yaml
 ```
 
-Paths are proposed. Keep files small and split by responsibility; do not replace current large files with new large facade/controller files.
+Paths are targets, not a reason to move files prematurely. Split responsibilities only as corresponding behavior migrates.
 
-## Configuration
+# 31. Configuration
 
-Prefer YAML for tunable policy and limits. Keep algorithms and invariants in code.
+Use YAML for tunable policy, not structural invariants.
 
 Example direction:
 
@@ -867,86 +1247,214 @@ Example direction:
 workshop:
   document:
     schemaVersion: 1
-    maxEntities: 4096
   history:
     maxCommands: 200
+  tolerances:
+    pointCoincidence: 0.01
+    zeroLength: 0.001
   constraints:
+    snappingEnabled: true
     snapDistance: 0.08
-    minimumWallLength: 0.20
-    minimumOpeningCornerDistance: 0.10
-  cache:
-    maxGeometryEntries: 512
   reactions:
     enabled: true
     maxPasses: 8
+  detail:
+    previewQuality: reduced
+  cache:
+    memoryBudgetMb: 256
 ```
 
-Do not hardcode user-tunable thresholds throughout controllers/generators.
+Values above are configuration examples, not established performance targets. Tune them from measured workshop behavior and device profiles.
 
-## Determinism contract
+# 32. Determinism contract
 
-Given the same canonical document, configuration, generator versions, and seed, semantic plans and geometry plans must be deterministic.
+Given the same:
+
+- authored definition;
+- instance state/overrides;
+- configuration;
+- generator/resolver versions;
+- seeds;
+
+the resolved model and plans must be deterministic.
 
 Rules:
 
-- no `Math.random()` in deterministic workshop generation;
+- no `Math.random()` in deterministic workshop resolution;
 - stable iteration order;
-- seeded random services for aesthetic variation;
-- no timestamps in canonical IDs;
-- stable generated child IDs derived from semantic parents and deterministic ordinals/roles;
-- plan hashes use normalized data;
-- version changes that intentionally alter output are explicit.
+- domain-separated seeded random streams;
+- no timestamp/UUID randomness in canonical generated IDs;
+- stable derived child keys;
+- normalized plan hashes;
+- explicit version changes when output intentionally changes;
+- deterministic conflict resolution.
 
-## Error handling and validation
+# 33. Failure handling
 
-- Reject invalid semantic commands before committed mutation.
-- Return structured validation errors suitable for UI feedback.
-- Log unexpected planner/generator failures with semantic entity ID, document revision, subsystem, and generator version.
-- Do not silently drop invalid openings, roofs, portals, or supports from committed documents.
-- Preview may show an invalid state visually, but it must indicate why it cannot be committed.
-- Derived render failure must not corrupt the canonical document.
+- Reject corrupt hard-invariant changes before commit.
+- Prefer adaptive repair/morph over rejection for normal creative edits.
+- Return structured diagnostics that tools can visualize.
+- Derived failures cannot corrupt authored data.
+- A failed reaction uses a deterministic fallback or suppresses only that output.
+- A failed surface-detail planner may fall back to simpler surface geometry while retaining structural correctness.
+- Log entity IDs, definition revision, rule/planner version and local context for unexpected failures.
 
-## Migration policy
+# 34. Testing contract
 
-Migration should be incremental, not a rewrite.
+## Semantic tests
 
-Existing versioned procedural recipes remain loadable during the migration window. A compatibility adapter projects legacy records into `WorkshopDocument` entities. New authoring should increasingly write semantic entities directly.
+- definition validation/serialization/migration;
+- patch/replay/undo determinism;
+- relationship graph;
+- curve split/merge/remap;
+- topology;
+- constraint candidates;
+- reaction conflict resolution;
+- provenance/pin/detach/suppress;
+- style inheritance;
+- domain-separated randomness.
 
-Once a legacy archetype has a stable semantic projection and round-trip acceptance tests, stop adding new feature-specific state to its legacy recipe representation.
+## Property/fuzz tests
 
-## Architectural invariants
-
-The following rules are non-negotiable for new workshop work:
-
-1. Canonical authoring state is semantic, serializable data.
-2. Three.js objects are derived presentation state.
-3. Commands mutate semantics through validated patches.
-4. Preview edits do not pollute committed history.
-5. Geometry generation does not own gameplay truth.
-6. Gameplay derivation does not inspect decorative meshes when semantic data exists.
-7. Presets compose primitives; they do not define permanent engine branches.
-8. Reactions are deterministic, local, bounded, and cycle-safe.
-9. Dirty propagation is domain-specific and dependency-driven.
-10. Existing compatible workshop systems are migrated/reused before replacements are written.
-11. Rendering and cache failures cannot corrupt the document.
-12. Large controllers/generators must be split as responsibilities migrate.
-
-## End-to-end target flow
+Generate deterministic edit sequences:
 
 ```text
-USER
-  -> Tool Intent
-  -> Preview Transaction
-  -> Constraint Engine
-  -> Semantic Patch
-  -> WorkshopDocument
-  -> Dependency Graph
-       ├── Geometry Planner -> Geometry Builder -> Render Cache -> Three.js/WebGPU
-       ├── Collision/Nav/Room/Portal Derivers -> RPG runtime data
-       └── Material/Decoration Derivers
-  -> Reaction Engine feeds deterministic dependent semantic/plan changes
+create path
+split edge
+move node
+attach opening
+merge edge
+raise structure
+undo/redo
+save/load
 ```
 
-The central long-term rule is therefore:
+Assert:
 
-> `WorkshopDocument -> Geometry`; never `Geometry -> infer WorkshopDocument` as the normal editing architecture.
+- no NaN/Infinity;
+- valid IDs/references;
+- no illegal committed zero-length segments;
+- deterministic serialization;
+- no reaction cycles;
+- exact semantic undo round-trip;
+- unaffected procedural regions retain stable derivation keys.
+
+## Geometry tests
+
+- valid indices;
+- expected bounds;
+- opening cuts;
+- curve continuity;
+- corner joins;
+- roof continuity;
+- traversal continuity;
+- surface layout excludes openings;
+- piece clipping has no invalid tiny/negative geometry;
+- safe resource disposal.
+
+## Visual regression
+
+Use deterministic scenes/cameras/seeds to capture local reference images for:
+
+- wall joins;
+- curved walls;
+- doors/windows;
+- roofs;
+- masonry/planks;
+- traversal wrapping;
+- foundations/supports;
+- ivy/clutter exclusion.
+
+Keep this runnable locally; do not add GitHub Actions for this project.
+
+## Performance regression
+
+Track:
+
+- preview edit latency;
+- affected semantic count;
+- reaction candidate count;
+- geometry plan rebuild count;
+- surface layout rebuild count;
+- CPU generation time;
+- GPU upload count;
+- cache hit ratio;
+- near/coarse/shell triangles/batches.
+
+Compare against deterministic baselines rather than inventing unmeasured absolute targets.
+
+# 35. Migration policy
+
+Migration is incremental.
+
+Legacy recipes remain readable while adapters project them into `WorkshopDefinition`.
+
+As each legacy archetype is fully represented semantically:
+
+1. add deterministic projection fixtures;
+2. prove visual/semantic compatibility;
+3. route new edits through semantic commands;
+4. stop adding new feature-specific state to the old recipe representation;
+5. retire mesh-to-component inference for that capability.
+
+Existing generators may remain as builders behind semantic planners until replacement is justified.
+
+# 36. Architectural invariants
+
+New workshop code must obey these rules:
+
+1. Authored construction intent is semantic and serializable.
+2. Automatic chemistry lives in a deterministic resolved layer unless explicitly promoted.
+3. Three.js objects are derived presentation state.
+4. Definition-local geometry is separate from world instances.
+5. Curves/topology are first-class; freeform behavior is not approximated by controller hacks.
+6. Commands modify authored semantics through validated patches.
+7. Preview edits do not pollute committed history.
+8. Hard constraints protect data; soft/adaptive constraints preserve creative flow.
+9. Reactions are deterministic, local, bounded, conflict-resolved and suppressible.
+10. Generated children have provenance and stable derivation keys.
+11. Procedural randomness is domain-separated and temporally coherent.
+12. Surface detail consumes semantic masks/domains, not mesh classification.
+13. Presets compose capabilities; they do not create permanent core branches.
+14. Gameplay truth derives from semantics/plans, not decorative meshes.
+15. Dirty propagation is domain-specific and dependency/spatially driven.
+16. Local edits must not trigger avoidable whole-document rebuilds.
+17. Repeated visual pieces are batched/instanced, not represented as thousands of scene objects.
+18. Cache/render failures cannot corrupt authored documents.
+19. Existing compatible workshop systems are reused/migrated before replacements are written.
+20. Large mixed-responsibility controllers/generators shrink as ownership moves.
+
+# 37. End-to-end target flow
+
+```text
+USER INPUT
+    -> Tool/Gesture Intent
+    -> Preview Authored Patch
+    -> Curve/Topology + Constraint Solver
+    -> Authored Preview Definition
+    -> Spatial/Dependency Neighborhood
+    -> Reaction + Style/Aesthetic Resolution
+    -> ResolvedWorkshopModel
+         ├── Structural Geometry Plans
+         ├── Surface Domains/Layout Plans
+         ├── Traversal/Support Plans
+         └── RPG Derived Plans
+    -> Cache-aware builders
+    -> Scene Diff / Render Batches
+```
+
+World use:
+
+```text
+WorkshopDefinition
+    -> shared resolved/derived definition products
+    -> WorkshopInstance transform/runtime state
+    -> instance-specific collision/nav/state/render overrides
+    -> streamed huge-world runtime
+```
+
+The long-term rule is therefore stronger than the original proposal:
+
+> `Authored intent -> deterministic resolved chemistry -> derived geometry/gameplay`.
+>
+> Never make final geometry the normal source of truth, and never allow automatic detail to erase the distinction between what the user asked for and what the system chose to add.
