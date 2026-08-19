@@ -49,21 +49,13 @@ function rotateQuarterTurns(uvNode, hashNode) {
   );
 }
 
-function sampleVariant(
-  atlas,
-  baseUv,
-  vertex,
-  familyIndex,
-  variantsPerFamily,
-  scaleJitter,
-  offset,
-) {
-  const variantHash = hash2(vertex, HASH_VECTOR_A, offset);
-  const transformHash = hash2(vertex, HASH_VECTOR_B, offset + 13.7);
-  const mirrorHash = hash2(vertex, HASH_VECTOR_A, offset + 29.3);
-  const shiftX = hash2(vertex, HASH_VECTOR_B, offset + 41.1);
-  const shiftY = hash2(vertex, HASH_VECTOR_A, offset + 57.9);
-  const scaleHash = hash2(vertex, HASH_VECTOR_B, offset + 71.3);
+function sampleVariant(atlas, baseUv, vertex, familyIndex, variantsPerFamily, scaleJitter) {
+  const variantHash = hash2(vertex, HASH_VECTOR_A);
+  const transformHash = hash2(vertex, HASH_VECTOR_B, 13.7);
+  const mirrorHash = hash2(vertex, HASH_VECTOR_A, 29.3);
+  const shiftX = hash2(vertex, HASH_VECTOR_B, 41.1);
+  const shiftY = hash2(vertex, HASH_VECTOR_A, 57.9);
+  const scaleHash = hash2(vertex, HASH_VECTOR_B, 71.3);
   const variant = floor(variantHash.mul(variantsPerFamily));
   const layer = familyIndex.mul(variantsPerFamily).add(variant);
   const scale = mix(float(1 - scaleJitter), float(1 + scaleJitter), scaleHash);
@@ -103,14 +95,13 @@ function stochasticTriSample({
   const weight1 = select(upper, oneMinus(local.y), local.x);
   const weight2 = select(upper, oneMinus(local.x), local.y);
 
-  return sampleVariant(
-    atlas, baseUv, vertex0, familyIndex, variantsPerFamily, scaleJitter, 0,
-  ).mul(weight0)
+  return sampleVariant(atlas, baseUv, vertex0, familyIndex, variantsPerFamily, scaleJitter)
+    .mul(weight0)
     .add(sampleVariant(
-      atlas, baseUv, vertex1, familyIndex, variantsPerFamily, scaleJitter, 17,
+      atlas, baseUv, vertex1, familyIndex, variantsPerFamily, scaleJitter,
     ).mul(weight1))
     .add(sampleVariant(
-      atlas, baseUv, vertex2, familyIndex, variantsPerFamily, scaleJitter, 37,
+      atlas, baseUv, vertex2, familyIndex, variantsPerFamily, scaleJitter,
     ).mul(weight2));
 }
 
