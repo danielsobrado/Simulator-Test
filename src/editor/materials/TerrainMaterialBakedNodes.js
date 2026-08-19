@@ -1,9 +1,11 @@
 import * as THREE from 'three/webgpu';
 import {
   clamp,
+  dot,
   float,
   max,
   mix,
+  normalView,
   oneMinus,
   select,
   smoothstep,
@@ -12,6 +14,7 @@ import {
 } from 'three/tsl';
 import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochasticNodes.js';
 import { createTerrainMaterialGenome } from './TerrainMaterialGenomeNodes.js';
+import { createTerrainSurfaceNormal } from './TerrainMaterialSurfaceGradientNodes.js';
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
@@ -107,7 +110,7 @@ export function createTerrainMaterialBakedSurface({
   const render = materialBake.render;
   const fallbackRoughness = float(render.fallbackRoughness);
   if (!gpuState) {
-    return { color: proceduralColor, roughness: fallbackRoughness };
+    return { color: proceduralColor, roughness: fallbackRoughness, normal: null };
   }
 
   const samples = sampleBakeTextures(gpuState, terrainUv);
@@ -145,6 +148,7 @@ export function createTerrainMaterialBakedSurface({
     return {
       color: select(gpuState.ready.greaterThan(0.5), requestedDebugColor, proceduralColor),
       roughness: readyRoughness,
+      normal: normalView,
     };
   }
 
@@ -175,6 +179,22 @@ export function createTerrainMaterialBakedSurface({
   });
   const familyMultiplier = vec3(1).add(
     sampledFamilyMultiplier.sub(1).mul(genome.detailScale),
+  );
+  const detailHeight = dot(familyMultiplier.sub(1), vec3(1 / 3));
+  const normalVisibility = oneMinus(smoothstep(
+    materialBake.families.normalFadeStartDistance,
+    materialBake.families.normalFadeEndDistance,
+    cameraDistance,
+  ));
+  const surfaceNormal = createTerrainSurfaceNormal({
+    encodedNormal: samples.farNormal,
+    detailHeight,
+    detailStrength: normalVisibility.mul(materialBake.families.normalStrength),
+  });
+  const readyNormal = select(
+    gpuState.ready.greaterThan(0.5),
+    surfaceNormal,
+    normalView,
   );
   const macroMultiplier = clamp(samples.macroTint.rgb.mul(2), vec3(0.65), vec3(1.35));
   midColor = midColor
@@ -247,6 +267,7 @@ export function createTerrainMaterialBakedSurface({
   return {
     color: select(gpuState.ready.greaterThan(0.5), publishedColor, proceduralColor),
     roughness: readyRoughness,
+    normal: readyNormal,
   };
 }
 
