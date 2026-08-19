@@ -111,10 +111,10 @@ function dominantFamily(weights) {
   };
 }
 
-function microVariation(planarMeters, scaleMeters, strength) {
+function microVariation(planarMeters, scaleMeters, strength, visibility) {
   const first = sin(dot(planarMeters, vec2(1.73, 2.31)).div(scaleMeters));
   const second = sin(dot(planarMeters, vec2(-2.17, 1.41)).div(scaleMeters * 0.63));
-  return first.mul(second).mul(strength);
+  return first.mul(second).mul(strength).mul(visibility);
 }
 
 function projectedDetail({
@@ -122,6 +122,7 @@ function projectedDetail({
   planarMeters,
   familyIndex,
   families,
+  microVisibility,
 }) {
   const sample = stochasticTriSample({
     atlas,
@@ -136,6 +137,7 @@ function projectedDetail({
     planarMeters,
     families.microScaleMeters,
     families.microStrength,
+    microVisibility,
   );
   return clamp(
     vec3(1).add(meso).add(vec3(micro)),
@@ -148,6 +150,7 @@ export function createTerrainMaterialFamilyMultiplier({
   atlas,
   worldXZ,
   terrainHeight,
+  cameraDistance,
   materialWeights,
   terrainShape,
   farNormal,
@@ -157,11 +160,17 @@ export function createTerrainMaterialFamilyMultiplier({
 }) {
   if (!atlas || !families?.enabled) return vec3(1);
   const dominant = dominantFamily(materialWeights);
+  const microVisibility = oneMinus(smoothstep(
+    families.microFadeStartDistance,
+    families.microFadeEndDistance,
+    cameraDistance,
+  ));
   const topDetail = projectedDetail({
     atlas,
     planarMeters: worldXZ,
     familyIndex: dominant.index,
     families,
+    microVisibility,
   });
   const vertical = terrainHeight.mul(families.projection.verticalScale);
   const sidePlanar = select(
@@ -175,6 +184,7 @@ export function createTerrainMaterialFamilyMultiplier({
     planarMeters: sidePlanar,
     familyIndex: dominant.index,
     families,
+    microVisibility,
   });
   const projectionBlend = smoothstep(
     families.projection.slopeStart,
