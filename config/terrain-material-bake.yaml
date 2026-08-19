@@ -69,8 +69,8 @@ render:
   wetDarkening: 0.16
   shorelineStrength: 0.12
   canopyStrength: 0.30
-  rockColor: '#666b67'
-  snowColor: '#dce3e4'
+  rockColor: '#8d9195'
+  snowColor: '#e8eef2'
   shorelineColor: '#59604f'
 
 cache:
