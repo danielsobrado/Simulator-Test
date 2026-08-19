@@ -88,6 +88,16 @@ export class TerrainMaterialBakeRuntime {
     return Number.isSafeInteger(seed) ? seed : 0;
   }
 
+  materialStyle() {
+    const style = this.terrainView.stylizedConfig;
+    return {
+      grassBottomColor: style?.color?.bottom ?? '#ffffff',
+      grassBrightness: Number(style?.color?.brightness) || 1,
+      dirtColor: style?.dirt?.color ?? '#808080',
+      forestColor: style?.trees?.forestFloor?.groundCoreColor ?? '#3b5233',
+    };
+  }
+
   waterHaloRadius() {
     return Math.ceil(Math.max(
       Number(this.config.classification?.shorelineRadiusCells) || 0,
@@ -276,6 +286,7 @@ export class TerrainMaterialBakeRuntime {
         chunkSize: this.terrainView.chunkSize,
         tileSize: this.terrainView.worldStore.tileSize,
         worldSeed: this.worldSeed(),
+        materialStyle: this.materialStyle(),
       });
       PerfCounters.inc('terrainMaterialBakeCpuMs', result.value.durationMs ?? 0);
       return result;
