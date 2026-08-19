@@ -65,6 +65,7 @@ families:
   microScaleMeters: 0.42
   variantCellMeters: 18
   strength: 0.36
+  nearStrength: 0.55
   dominantFadePower: 1.6
   mesoStrength: 0.24
   microStrength: 0.06
