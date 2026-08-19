@@ -559,6 +559,7 @@ export class ObjectView {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.placementResolver.dispose();
     for (const renderer of this.renderers.values()) this.disposeRendererRecord(renderer);
     for (const child of this.previewGroup.children) child.material.dispose();
     this.previewGroup.clear();
