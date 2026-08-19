@@ -14,6 +14,10 @@ import {
 } from 'three/tsl';
 import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochasticNodes.js';
 import { createTerrainMaterialGenome } from './TerrainMaterialGenomeNodes.js';
+import {
+  applyTerrainMaterialFeatureColor,
+  createTerrainMaterialFeatureState,
+} from './TerrainMaterialFeatureResponseNodes.js';
 import { createTerrainSurfaceNormal } from './TerrainMaterialSurfaceGradientNodes.js';
 
 const MIN_WEIGHT_SUM = 0.0001;
@@ -108,6 +112,7 @@ export function createTerrainMaterialBakedSurface({
 }) {
   const materialBake = stylizedConfig.materialBake;
   const render = materialBake.render;
+  const families = materialBake.families;
   const fallbackRoughness = float(render.fallbackRoughness);
   if (!gpuState) {
     return { color: proceduralColor, roughness: fallbackRoughness, normal: null };
@@ -118,14 +123,22 @@ export function createTerrainMaterialBakedSurface({
   const genome = createTerrainMaterialGenome({
     worldXZ,
     biomeColor: tileColor,
-    genomes: materialBake.families.genomes,
+    genomes: families.genomes,
+  });
+  const featureState = createTerrainMaterialFeatureState({
+    worldXZ,
+    materialWeights: weights,
+    terrainShape: samples.terrainShape,
+    wetness: samples.wetnessShoreline.r,
+    canopy: samples.canopyWater.r,
+    shoreline: samples.wetnessShoreline.g,
+    cameraDistance,
+    features: families.features,
   });
   const roughness = clamp(
-    materialRoughness(
-      weights,
-      samples.wetnessShoreline.r,
-      materialBake.families.profiles,
-    ).add(genome.roughnessOffset),
+    materialRoughness(weights, samples.wetnessShoreline.r, families.profiles)
+      .add(genome.roughnessOffset)
+      .add(featureState.roughnessOffset),
     0,
     1,
   );
@@ -175,21 +188,22 @@ export function createTerrainMaterialBakedSurface({
     farNormal: samples.farNormal,
     wetness: samples.wetnessShoreline.r,
     canopy: samples.canopyWater.r,
-    families: materialBake.families,
+    families,
   });
   const familyMultiplier = vec3(1).add(
     sampledFamilyMultiplier.sub(1).mul(genome.detailScale),
   );
-  const detailHeight = dot(familyMultiplier.sub(1), vec3(1 / 3));
+  const detailHeight = dot(familyMultiplier.sub(1), vec3(1 / 3))
+    .add(featureState.heightOffset);
   const normalVisibility = oneMinus(smoothstep(
-    materialBake.families.normalFadeStartDistance,
-    materialBake.families.normalFadeEndDistance,
+    families.normalFadeStartDistance,
+    families.normalFadeEndDistance,
     cameraDistance,
   ));
   const surfaceNormal = createTerrainSurfaceNormal({
     encodedNormal: samples.farNormal,
     detailHeight,
-    detailStrength: normalVisibility.mul(materialBake.families.normalStrength),
+    detailStrength: normalVisibility.mul(families.normalStrength),
   });
   const readyNormal = select(
     gpuState.ready.greaterThan(0.5),
@@ -201,6 +215,7 @@ export function createTerrainMaterialBakedSurface({
     .mul(familyMultiplier)
     .mul(macroMultiplier)
     .mul(genome.colorMultiplier);
+  midColor = applyTerrainMaterialFeatureColor(midColor, featureState, families.features);
   midColor = mix(
     midColor,
     colorNode(render.shorelineColor),
@@ -218,18 +233,20 @@ export function createTerrainMaterialBakedSurface({
     .mul(heightShade);
 
   const nearMacro = mix(vec3(1), macroMultiplier, render.nearMacroStrength);
-  const nearFamily = mix(vec3(1), familyMultiplier, materialBake.families.nearStrength);
-  const nearDetailed = mix(
-    proceduralColor
-      .mul(genome.colorMultiplier)
-      .mul(nearMacro)
-      .mul(nearFamily)
-      .mul(float(1).sub(
-        samples.wetnessShoreline.r.mul(render.wetDarkening * render.nearWetnessScale),
-      )),
-    midColor,
-    render.nearMaterialBlend,
+  const nearFamily = mix(vec3(1), familyMultiplier, families.nearStrength);
+  let nearProcedural = proceduralColor
+    .mul(genome.colorMultiplier)
+    .mul(nearMacro)
+    .mul(nearFamily)
+    .mul(float(1).sub(
+      samples.wetnessShoreline.r.mul(render.wetDarkening * render.nearWetnessScale),
+    ));
+  nearProcedural = applyTerrainMaterialFeatureColor(
+    nearProcedural,
+    featureState,
+    families.features,
   );
+  const nearDetailed = mix(nearProcedural, midColor, render.nearMaterialBlend);
 
   const nearBlendEnd = render.nearDistance + render.transitionDistance;
   const farBlendEnd = render.farDistance + render.transitionDistance;
