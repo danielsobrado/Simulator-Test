@@ -86,6 +86,23 @@ families:
     colorStrength: 0.08
     roughnessStrength: 0.045
     detailStrength: 0.12
+  features:
+    enabled: true
+    seedOffset: 1571
+    patchScaleMeters: 13
+    detailScaleMeters: 3.2
+    fadeStartDistance: 85
+    fadeEndDistance: 230
+    lichenStrength: 0.18
+    litterStrength: 0.12
+    crackStrength: 0.14
+    mineralStrength: 0.10
+    roughnessResponse: 0.08
+    heightResponse: 0.035
+    lichenColor: '#66745a'
+    litterColor: '#66533b'
+    crackColor: '#58483c'
+    mineralColor: '#8a908a'
   projection:
     # Flat ground uses world XZ. Steep ground switches to its dominant vertical plane.
     slopeStart: 0.22
