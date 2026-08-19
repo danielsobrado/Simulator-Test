@@ -8,15 +8,23 @@ function createSlotState() {
   return {
     key: null,
     stale: false,
+    failedKey: null,
   };
 }
 
 export class TerrainMaterialBakeGpuBridge {
-  constructor({ terrainView }) {
+  constructor({
+    terrainView,
+    onError = (error, context) => console.error('Terrain material GPU upload failed.', context, error),
+  }) {
     if (!terrainView) {
       throw new Error('Terrain material GPU bridge requires a terrain view.');
     }
+    if (typeof onError !== 'function') {
+      throw new Error('Terrain material GPU bridge error reporter must be a function.');
+    }
     this.terrainView = terrainView;
+    this.onError = onError;
     this.states = new Map();
     this.disposed = false;
   }
@@ -30,11 +38,32 @@ export class TerrainMaterialBakeGpuBridge {
     return state;
   }
 
+  reportError(error, context) {
+    try {
+      this.onError(error, context);
+    } catch {
+      // Diagnostics must not interrupt rendering or material fallback.
+    }
+  }
+
   clearSlot(slot, state) {
-    if (state.key === null && !state.stale) return;
+    if (state.key !== null || state.stale) clearTerrainMaterialBakeGpu(slot.material);
+    state.key = null;
+    state.stale = false;
+    state.failedKey = null;
+  }
+
+  failSlot(slot, state, page, error) {
     clearTerrainMaterialBakeGpu(slot.material);
     state.key = null;
     state.stale = false;
+    state.failedKey = page.descriptor.key;
+    PerfCounters.inc('terrainMaterialBakeGpuUploadFailures');
+    this.reportError(error, {
+      operation: 'upload',
+      slotIndex: slot.slotIndex,
+      descriptor: page.descriptor,
+    });
   }
 
   updateSlot(slot, state) {
@@ -43,18 +72,25 @@ export class TerrainMaterialBakeGpuBridge {
       this.clearSlot(slot, state);
       return false;
     }
+    if (state.failedKey === page.descriptor.key) return false;
+    if (state.failedKey !== null) state.failedKey = null;
 
     const stale = Boolean(slot.materialBakeStale);
     if (state.key === page.descriptor.key && state.stale === stale) return true;
 
-    const bytes = uploadTerrainMaterialBakeGpu(slot.material, page, { stale });
-    if (bytes > 0) {
-      PerfCounters.inc('terrainMaterialBakeGpuUploads');
-      PerfCounters.inc('terrainMaterialBakeGpuUploadBytes', bytes);
+    try {
+      const bytes = uploadTerrainMaterialBakeGpu(slot.material, page, { stale });
+      if (bytes > 0) {
+        PerfCounters.inc('terrainMaterialBakeGpuUploads');
+        PerfCounters.inc('terrainMaterialBakeGpuUploadBytes', bytes);
+      }
+      state.key = page.descriptor.key;
+      state.stale = stale;
+      return true;
+    } catch (error) {
+      this.failSlot(slot, state, page, error);
+      return false;
     }
-    state.key = page.descriptor.key;
-    state.stale = stale;
-    return true;
   }
 
   update() {
