@@ -158,6 +158,10 @@ export function createTerrainMaterialBakedColor({
       ),
     ),
   );
-
-  return select(gpuState.ready.greaterThan(0.5), bakedColor, proceduralColor);
+  const readyColor = select(
+    gpuState.stale.greaterThan(0.5),
+    mix(bakedColor, proceduralColor, render.staleProceduralBlend),
+    bakedColor,
+  );
+  return select(gpuState.ready.greaterThan(0.5), readyColor, proceduralColor);
 }
