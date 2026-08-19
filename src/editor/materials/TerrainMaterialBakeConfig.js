@@ -180,6 +180,7 @@ function normalizeRender(source) {
     'nearMacroStrength',
     'nearMaterialBlend',
     'nearWetnessScale',
+    'staleProceduralBlend',
     'wetDarkening',
     'shorelineStrength',
     'canopyStrength',
