@@ -10,6 +10,7 @@ import {
   texture,
   vec3,
 } from 'three/tsl';
+import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochasticNodes.js';
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
@@ -70,12 +71,16 @@ export function createTerrainMaterialBakedColor({
   heightShade,
   cameraDistance,
   proceduralColor,
+  worldXZ,
+  terrainHeight,
+  familyAtlas,
   gpuState,
   stylizedConfig,
 }) {
   if (!gpuState) return proceduralColor;
 
-  const render = stylizedConfig.materialBake.render;
+  const materialBake = stylizedConfig.materialBake;
+  const render = materialBake.render;
   const samples = {
     macroTint: texture(gpuState.textures.macroTint, terrainUv),
     terrainShape: texture(gpuState.textures.terrainShape, terrainUv),
@@ -87,7 +92,7 @@ export function createTerrainMaterialBakedColor({
   };
 
   const requestedDebugColor = debugColor({
-    view: stylizedConfig.materialBake.debug.view,
+    view: materialBake.debug.view,
     samples,
   });
   if (requestedDebugColor) {
@@ -108,8 +113,19 @@ export function createTerrainMaterialBakedColor({
     .add(rockColor.mul(weights.b))
     .add(snowColor.mul(weights.a));
 
+  const familyMultiplier = createTerrainMaterialFamilyMultiplier({
+    atlas: familyAtlas?.texture ?? null,
+    worldXZ,
+    terrainHeight,
+    materialWeights: weights,
+    terrainShape: samples.terrainShape,
+    farNormal: samples.farNormal,
+    wetness: samples.wetnessShoreline.r,
+    canopy: samples.canopyWater.r,
+    families: materialBake.families,
+  });
   const macroMultiplier = clamp(samples.macroTint.rgb.mul(2), vec3(0.65), vec3(1.35));
-  midColor = midColor.mul(macroMultiplier);
+  midColor = midColor.mul(familyMultiplier).mul(macroMultiplier);
   midColor = mix(
     midColor,
     colorNode(render.shorelineColor),
@@ -127,9 +143,11 @@ export function createTerrainMaterialBakedColor({
     .mul(heightShade);
 
   const nearMacro = mix(vec3(1), macroMultiplier, render.nearMacroStrength);
+  const nearFamily = mix(vec3(1), familyMultiplier, materialBake.families.nearStrength);
   const nearDetailed = mix(
     proceduralColor
       .mul(nearMacro)
+      .mul(nearFamily)
       .mul(float(1).sub(
         samples.wetnessShoreline.r.mul(render.wetDarkening * render.nearWetnessScale),
       )),
