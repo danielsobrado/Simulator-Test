@@ -13,6 +13,7 @@ import {
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
+const PUBLISHED_BLEND_THRESHOLD = 0.999;
 
 function colorNode(value) {
   const color = new THREE.Color(value);
@@ -163,5 +164,10 @@ export function createTerrainMaterialBakedColor({
     mix(bakedColor, proceduralColor, render.staleProceduralBlend),
     bakedColor,
   );
-  return select(gpuState.ready.greaterThan(0.5), readyColor, proceduralColor);
+  const publishedColor = select(
+    gpuState.blend.greaterThan(PUBLISHED_BLEND_THRESHOLD),
+    readyColor,
+    mix(proceduralColor, readyColor, gpuState.blend),
+  );
+  return select(gpuState.ready.greaterThan(0.5), publishedColor, proceduralColor);
 }
