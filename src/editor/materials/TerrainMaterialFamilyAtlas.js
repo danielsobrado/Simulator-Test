@@ -35,7 +35,7 @@ function createAtlas(config) {
 
 export function acquireTerrainMaterialFamilyAtlas(config) {
   const key = config?.families;
-  if (!key?.enabled) return null;
+  if (!config?.enabled || !key?.enabled) return null;
   let entry = atlasEntries.get(key);
   if (!entry) {
     entry = createAtlas(config);
