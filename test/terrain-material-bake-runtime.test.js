@@ -225,3 +225,44 @@ test('runtime starts no more than the configured number of concurrent bakes', as
   await settle(runtime);
   runtime.dispose();
 });
+
+test('runtime forwards the active stylized palette into the far-color baker', async () => {
+  const slot = terrainSlot(0, 0);
+  const terrainView = {
+    slots: [slot],
+    chunkSize: 4,
+    surfaceMaskChunkRadius: 0,
+    focusChunk: { chunkX: 0, chunkZ: 0 },
+    stylizedConfig: {
+      color: { bottom: '#4f7c13', brightness: 0.8 },
+      dirt: { color: '#ac956c' },
+      trees: { forestFloor: { groundCoreColor: '#3b5233' } },
+    },
+    worldStore: { tileSize: 2 },
+    materialBakeRuntime: null,
+  };
+  let capturedStyle = null;
+  const runtime = new TerrainMaterialBakeRuntime({
+    terrainView,
+    revisionTracker: createRevisionTracker(),
+    config: config(),
+    onError: () => {},
+    bakePage: async ({ descriptor, materialStyle }) => {
+      capturedStyle = materialStyle;
+      return {
+        value: { descriptor, durationMs: 1 },
+        byteLength: 32,
+      };
+    },
+  });
+
+  runtime.update();
+  await settle(runtime);
+  assert.deepEqual(capturedStyle, {
+    grassBottomColor: '#4f7c13',
+    grassBrightness: 0.8,
+    dirtColor: '#ac956c',
+    forestColor: '#3b5233',
+  });
+  runtime.dispose();
+});
