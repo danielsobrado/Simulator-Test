@@ -6,6 +6,7 @@ const MAX_VARIANTS_PER_FAMILY = 8;
 const MAX_FREQUENCY = 64;
 const MAX_SCALE_JITTER = 0.5;
 const MAX_SECONDARY_MIN_WEIGHT = 0.49;
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -35,6 +36,12 @@ function assertUnit(value, path) {
   if (value < 0 || value > 1) fail(path, 'must be within [0, 1]');
 }
 
+function assertColor(value, path) {
+  if (typeof value !== 'string' || !HEX_COLOR.test(value)) {
+    fail(path, 'must be a six-digit hex color');
+  }
+}
+
 function assertPositiveInteger(value, path, maximum = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
     fail(path, `must be an integer within [1, ${maximum}]`);
@@ -48,6 +55,15 @@ function assertResolution(value) {
   }
   if ((value & (value - 1)) !== 0) {
     fail('families.resolution', 'must be a power of two');
+  }
+}
+
+function validateFadeRange(source, startField, endField, path = 'families') {
+  assertFinite(source[startField], `${path}.${startField}`);
+  if (source[startField] < 0) fail(`${path}.${startField}`, 'must be non-negative');
+  assertPositive(source[endField], `${path}.${endField}`);
+  if (source[endField] <= source[startField]) {
+    fail(`${path}.${endField}`, `must exceed ${startField}`);
   }
 }
 
@@ -95,11 +111,12 @@ function normalizeProfile(source, family) {
 }
 
 function normalizeGenomes(source) {
-  assertObject(source, 'families.genomes');
-  assertBoolean(source.enabled, 'families.genomes.enabled');
-  assertPositive(source.regionScaleMeters, 'families.genomes.regionScaleMeters');
+  const path = 'families.genomes';
+  assertObject(source, path);
+  assertBoolean(source.enabled, `${path}.enabled`);
+  assertPositive(source.regionScaleMeters, `${path}.regionScaleMeters`);
   if (!Number.isSafeInteger(source.seedOffset) || source.seedOffset < 0) {
-    fail('families.genomes.seedOffset', 'must be a non-negative safe integer');
+    fail(`${path}.seedOffset`, 'must be a non-negative safe integer');
   }
   for (const field of [
     'biomeInfluence',
@@ -107,18 +124,35 @@ function normalizeGenomes(source) {
     'roughnessStrength',
     'detailStrength',
   ]) {
-    assertUnit(source[field], `families.genomes.${field}`);
+    assertUnit(source[field], `${path}.${field}`);
   }
   return Object.freeze({ ...source });
 }
 
-function validateFadeRange(source, startField, endField) {
-  assertFinite(source[startField], `families.${startField}`);
-  if (source[startField] < 0) fail(`families.${startField}`, 'must be non-negative');
-  assertPositive(source[endField], `families.${endField}`);
-  if (source[endField] <= source[startField]) {
-    fail(`families.${endField}`, `must exceed ${startField}`);
+function normalizeFeatures(source) {
+  const path = 'families.features';
+  assertObject(source, path);
+  assertBoolean(source.enabled, `${path}.enabled`);
+  if (!Number.isSafeInteger(source.seedOffset) || source.seedOffset < 0) {
+    fail(`${path}.seedOffset`, 'must be a non-negative safe integer');
   }
+  assertPositive(source.patchScaleMeters, `${path}.patchScaleMeters`);
+  assertPositive(source.detailScaleMeters, `${path}.detailScaleMeters`);
+  validateFadeRange(source, 'fadeStartDistance', 'fadeEndDistance', path);
+  for (const field of [
+    'lichenStrength',
+    'litterStrength',
+    'crackStrength',
+    'mineralStrength',
+    'roughnessResponse',
+    'heightResponse',
+  ]) {
+    assertUnit(source[field], `${path}.${field}`);
+  }
+  for (const field of ['lichenColor', 'litterColor', 'crackColor', 'mineralColor']) {
+    assertColor(source[field], `${path}.${field}`);
+  }
+  return Object.freeze({ ...source });
 }
 
 export function normalizeTerrainMaterialFamilies(source) {
@@ -208,6 +242,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     normalFadeStartDistance: source.normalFadeStartDistance,
     normalFadeEndDistance: source.normalFadeEndDistance,
     genomes: normalizeGenomes(source.genomes),
+    features: normalizeFeatures(source.features),
     projection: Object.freeze({ ...source.projection }),
     environment: Object.freeze({ ...source.environment }),
     profiles,
