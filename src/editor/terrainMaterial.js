@@ -213,8 +213,11 @@ export function createTerrainMaterial({
   const proceduralColor = groundColor.mul(heightShade);
   const materialBakeGpu = createTerrainMaterialBakeGpuState(stylizedConfig.materialBake);
   const familyAtlas = acquireTerrainMaterialFamilyAtlas(stylizedConfig.materialBake);
+  const material = new THREE.MeshLambertNodeMaterial();
+  attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
+  attachTerrainMaterialFamilyAtlas(material, familyAtlas);
   try {
-    const resolvedColor = createTerrainMaterialBakedColor({
+    material.colorNode = createTerrainMaterialBakedColor({
       terrainUv,
       tileColor,
       heightShade,
@@ -226,20 +229,14 @@ export function createTerrainMaterial({
       gpuState: materialBakeGpu,
       stylizedConfig,
     });
-
-    const material = new THREE.MeshLambertNodeMaterial();
-    material.colorNode = resolvedColor;
     // Leave normalNode on the material default: PlaneGeometry's local +Z is
     // transformed through the mesh's -90° X rotation into world +Y and then into
     // view space. A literal local +Z here bypasses those transforms and makes the
     // ground light as though its normal points toward the camera.
     material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
-    attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
-    assignTerrainMaterialData(material);
-    attachTerrainMaterialFamilyAtlas(material, familyAtlas);
-    return material;
+    return assignTerrainMaterialData(material);
   } catch (error) {
-    familyAtlas?.release();
+    material.dispose();
     throw error;
   }
 }
