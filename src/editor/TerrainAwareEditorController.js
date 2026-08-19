@@ -436,6 +436,27 @@ export class TerrainAwareEditorController extends EditorController {
     this.emitState();
   }
 
+  dispose() {
+    const attachedControllers = [
+      ['construction gizmo', this.constructionGizmo],
+      ['construction palette', this.constructionPalette],
+    ];
+    this.constructionGizmo = null;
+    this.constructionPalette = null;
+    for (const [label, resource] of attachedControllers) {
+      try {
+        resource?.dispose?.();
+      } catch (error) {
+        console.error(`Unable to dispose ${label}.`, error);
+      }
+    }
+    this.listeners.clear();
+    this.mapListeners.clear();
+    this.hoverListeners.clear();
+    this.noticeListeners.clear();
+    super.dispose();
+  }
+
   validateLoadedObjectSurfaces() {
     for (const object of this.objectMap.list()) {
       const validation = this.validateObjectPlacement({
