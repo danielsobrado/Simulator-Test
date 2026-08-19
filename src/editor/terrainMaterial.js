@@ -25,6 +25,10 @@ import {
   createTerrainMaterialBakeGpuState,
 } from './materials/TerrainMaterialBakeGpu.js';
 import {
+  acquireTerrainMaterialFamilyAtlas,
+  attachTerrainMaterialFamilyAtlas,
+} from './materials/TerrainMaterialFamilyAtlas.js';
+import {
   stylizedDirtMask,
   stylizedFbm,
   stylizedNaturalTrailMask,
@@ -208,23 +212,34 @@ export function createTerrainMaterial({
   groundColor = max(groundColor, vec3(0));
   const proceduralColor = groundColor.mul(heightShade);
   const materialBakeGpu = createTerrainMaterialBakeGpuState(stylizedConfig.materialBake);
-  const resolvedColor = createTerrainMaterialBakedColor({
-    terrainUv,
-    tileColor,
-    heightShade,
-    cameraDistance,
-    proceduralColor,
-    gpuState: materialBakeGpu,
-    stylizedConfig,
-  });
+  const familyAtlas = acquireTerrainMaterialFamilyAtlas(stylizedConfig.materialBake);
+  try {
+    const resolvedColor = createTerrainMaterialBakedColor({
+      terrainUv,
+      tileColor,
+      heightShade,
+      cameraDistance,
+      proceduralColor,
+      worldXZ,
+      terrainHeight,
+      familyAtlas,
+      gpuState: materialBakeGpu,
+      stylizedConfig,
+    });
 
-  const material = new THREE.MeshLambertNodeMaterial();
-  material.colorNode = resolvedColor;
-  // Leave normalNode on the material default: PlaneGeometry's local +Z is
-  // transformed through the mesh's -90° X rotation into world +Y and then into
-  // view space. A literal local +Z here bypasses those transforms and makes the
-  // ground light as though its normal points toward the camera.
-  material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
-  attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
-  return assignTerrainMaterialData(material);
+    const material = new THREE.MeshLambertNodeMaterial();
+    material.colorNode = resolvedColor;
+    // Leave normalNode on the material default: PlaneGeometry's local +Z is
+    // transformed through the mesh's -90° X rotation into world +Y and then into
+    // view space. A literal local +Z here bypasses those transforms and makes the
+    // ground light as though its normal points toward the camera.
+    material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
+    attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
+    assignTerrainMaterialData(material);
+    attachTerrainMaterialFamilyAtlas(material, familyAtlas);
+    return material;
+  } catch (error) {
+    familyAtlas?.release();
+    throw error;
+  }
 }
