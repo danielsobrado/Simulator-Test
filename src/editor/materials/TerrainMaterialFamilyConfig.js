@@ -100,7 +100,7 @@ export function normalizeTerrainMaterialFamilies(source) {
   for (const field of ['mesoScaleMeters', 'microScaleMeters', 'variantCellMeters', 'dominantFadePower']) {
     assertPositive(source[field], `families.${field}`);
   }
-  for (const field of ['strength', 'mesoStrength', 'microStrength']) {
+  for (const field of ['strength', 'nearStrength', 'mesoStrength', 'microStrength']) {
     assertUnit(source[field], `families.${field}`);
   }
 
@@ -140,6 +140,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     microScaleMeters: source.microScaleMeters,
     variantCellMeters: source.variantCellMeters,
     strength: source.strength,
+    nearStrength: source.nearStrength,
     dominantFadePower: source.dominantFadePower,
     mesoStrength: source.mesoStrength,
     microStrength: source.microStrength,
