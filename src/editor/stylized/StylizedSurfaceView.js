@@ -1,4 +1,5 @@
 import { registerCollisionNaturalSource } from '../collision/CollisionPlayerBridge.js';
+import { TerrainMaterialBakeGpuBridge } from '../materials/TerrainMaterialBakeGpuBridge.js';
 import { TerrainMaterialBakeRuntime } from '../materials/TerrainMaterialBakeRuntime.js';
 import { StylizedSurfaceView as StylizedSurfaceViewBase } from './StylizedSurfaceViewBase.js';
 import { loadOptionalTreeVariants } from './loadOptionalTreeVariants.js';
@@ -14,6 +15,9 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
         revisionTracker: this.revisionTracker,
         config: this.config.materialBake,
       })
+      : null;
+    this.materialBakeGpuBridge = this.materialBakeRuntime
+      ? new TerrainMaterialBakeGpuBridge({ terrainView: options.terrainView })
       : null;
     this.collisionSourceDisposed = false;
     this.releaseCollisionNaturalSource = null;
@@ -60,9 +64,12 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
   update(timestamp, camera) {
     super.update(timestamp, camera);
     this.materialBakeRuntime?.update();
+    this.materialBakeGpuBridge?.update();
   }
 
   dispose() {
+    this.materialBakeGpuBridge?.dispose();
+    this.materialBakeGpuBridge = null;
     this.materialBakeRuntime?.dispose();
     this.materialBakeRuntime = null;
     this.collisionSourceDisposed = true;
