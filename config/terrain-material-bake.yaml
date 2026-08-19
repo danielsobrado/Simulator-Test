@@ -68,6 +68,8 @@ families:
   strength: 0.36
   nearStrength: 0.55
   dominantFadePower: 1.6
+  secondaryBlendStrength: 0.85
+  secondaryMinWeight: 0.08
   mesoStrength: 0.24
   microStrength: 0.06
   microFadeStartDistance: 28
