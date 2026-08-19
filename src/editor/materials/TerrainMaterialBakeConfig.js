@@ -5,6 +5,7 @@ import {
   TERRAIN_MATERIAL_BAKE_QUALITY_TIERS,
   TERRAIN_MATERIAL_BAKE_SCHEMA_VERSION,
 } from './TerrainMaterialBakeConstants.js';
+import { normalizeTerrainMaterialFamilies } from './TerrainMaterialFamilyConfig.js';
 
 const MIN_RESOLUTION = 16;
 const MAX_RESOLUTION = 512;
@@ -260,6 +261,7 @@ export function createTerrainMaterialBakeConfig(source) {
     build: normalizeBuild(source.build),
     classification: normalizeClassification(source.classification),
     macro: normalizeMacro(source.macro),
+    families: normalizeTerrainMaterialFamilies(source.families),
     render: normalizeRender(source.render),
     cache: normalizeCache(source.cache),
     fallback: normalizeFallback(source.fallback),
