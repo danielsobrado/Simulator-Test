@@ -108,7 +108,14 @@ export function normalizeTerrainMaterialFamilies(source) {
   for (const field of ['mesoScaleMeters', 'microScaleMeters', 'variantCellMeters', 'dominantFadePower']) {
     assertPositive(source[field], `families.${field}`);
   }
-  for (const field of ['strength', 'nearStrength', 'mesoStrength', 'microStrength']) {
+  for (const field of [
+    'strength',
+    'nearStrength',
+    'mesoStrength',
+    'microStrength',
+    'secondaryBlendStrength',
+    'secondaryMinWeight',
+  ]) {
     assertUnit(source[field], `families.${field}`);
   }
   assertUnit(source.scaleJitter, 'families.scaleJitter');
@@ -163,6 +170,8 @@ export function normalizeTerrainMaterialFamilies(source) {
     strength: source.strength,
     nearStrength: source.nearStrength,
     dominantFadePower: source.dominantFadePower,
+    secondaryBlendStrength: source.secondaryBlendStrength,
+    secondaryMinWeight: source.secondaryMinWeight,
     mesoStrength: source.mesoStrength,
     microStrength: source.microStrength,
     microFadeStartDistance: source.microFadeStartDistance,
