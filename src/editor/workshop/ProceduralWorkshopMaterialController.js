@@ -16,6 +16,7 @@ const NUMERIC_MATERIAL_FIELDS = new Set([
   'roughness',
   'metalness',
   'normalStrength',
+  'aoStrength',
   'heightStrength',
   'weathering',
 ]);
@@ -39,6 +40,7 @@ function applyPreset(material, preset) {
   result.color.set(preset.baseColor).multiply(new THREE.Color(preset.tint));
   result.roughness = preset.roughness;
   result.metalness = preset.metalness;
+  result.aoMapIntensity = preset.aoStrength ?? 1;
   if (result.normalScale?.setScalar) result.normalScale.setScalar(preset.normalStrength);
   if ('bumpScale' in result) result.bumpScale = preset.heightStrength;
   result.userData = { ...material.userData, workshopMaterialPreview: true };
@@ -105,6 +107,7 @@ export class ProceduralWorkshopMaterialController {
           <label>Roughness<input type="number" min="0" max="1" step="0.05" data-material-field="roughness" /></label>
           <label>Metalness<input type="number" min="0" max="1" step="0.05" data-material-field="metalness" /></label>
           <label>Normal<input type="number" min="0" max="4" step="0.1" data-material-field="normalStrength" /></label>
+          <label>AO<input type="number" min="0" max="2" step="0.05" data-material-field="aoStrength" /></label>
           <label>Height<input type="number" min="0" max="2" step="0.05" data-material-field="heightStrength" /></label>
           <label>Weathering<input type="number" min="0" max="1" step="0.05" data-material-field="weathering" /></label>
         </div>
@@ -132,9 +135,6 @@ export class ProceduralWorkshopMaterialController {
       </aside>
       <div class="workshop-material-region-label" data-role="material-region-label" hidden></div>
     `;
-    // The palette itself is the shared `RadialPalette`; only its colours and
-    // its contents are workshop-specific. Preview/commit, the local undo stack
-    // and the layered Escape all stay exactly as they were.
     this.palette = new RadialPalette({
       host: root,
       modifier: 'radial-palette--workshop',
