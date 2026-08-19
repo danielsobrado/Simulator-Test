@@ -1,4 +1,4 @@
-import { cloneWorkshopProperties } from '../kernel/WorkshopEntity.js';
+import { cloneWorkshopProperties, normalizeWorkshopEntity } from '../kernel/WorkshopEntity.js';
 
 const STRUCTURED_TYPES = Object.freeze({
   componentTransforms: Object.freeze({ prefix: 'component-transform:', type: 'component-transform', key: 'componentId', value: 'transform' }),
@@ -14,7 +14,7 @@ function entries(input) {
   return Object.entries(input).sort(([left], [right]) => left.localeCompare(right));
 }
 
-function putCommand(definition, sourceId, value, desiredAttachments) {
+function entityDefinition(definition, sourceId, value, desiredAttachments) {
   const storedValue = cloneWorkshopProperties(value, `Legacy workshop ${definition.type} ${sourceId}`);
   const dependsOn = definition.type === 'opening-assembly'
     ? (storedValue.memberIds ?? [])
@@ -23,18 +23,20 @@ function putCommand(definition, sourceId, value, desiredAttachments) {
       .sort()
     : [];
   return Object.freeze({
-    type: 'entity.put',
-    entity: Object.freeze({
-      id: `${definition.prefix}${sourceId}`,
-      type: definition.type,
-      parentId: 'recipe',
-      properties: Object.freeze({
-        [definition.key]: sourceId,
-        [definition.value]: storedValue,
-      }),
-      dependsOn: Object.freeze(dependsOn),
+    id: `${definition.prefix}${sourceId}`,
+    type: definition.type,
+    parentId: 'recipe',
+    properties: Object.freeze({
+      [definition.key]: sourceId,
+      [definition.value]: storedValue,
     }),
+    dependsOn: Object.freeze(dependsOn),
   });
+}
+
+function sameEntity(existing, candidate) {
+  return Boolean(existing)
+    && JSON.stringify(existing.toJSON()) === JSON.stringify(normalizeWorkshopEntity(candidate).toJSON());
 }
 
 export function legacyWorkshopEditStateCommand(document, state, { label = 'Legacy workshop edit' } = {}) {
@@ -59,7 +61,9 @@ export function legacyWorkshopEditStateCommand(document, state, { label = 'Legac
   for (const section of ['componentTransforms', 'openingAttachments', 'openingAssemblies']) {
     const definition = STRUCTURED_TYPES[section];
     for (const [sourceId, value] of desired[section]) {
-      commands.push(putCommand(definition, sourceId, value, desiredAttachments));
+      const entity = entityDefinition(definition, sourceId, value, desiredAttachments);
+      if (sameEntity(existing[section].get(sourceId), entity)) continue;
+      commands.push(Object.freeze({ type: 'entity.put', entity }));
     }
   }
   for (const section of ['openingAssemblies', 'openingAttachments', 'componentTransforms']) {
@@ -70,4 +74,23 @@ export function legacyWorkshopEditStateCommand(document, state, { label = 'Legac
     }
   }
   return Object.freeze({ type: 'document.batch', label, commands: Object.freeze(commands) });
+}
+
+export function legacyWorkshopEditStateFromDocument(document) {
+  if (!document || typeof document.listEntities !== 'function') {
+    throw new Error('Legacy workshop edit state projection requires a workshop document.');
+  }
+  const state = Object.fromEntries(Object.keys(STRUCTURED_TYPES).map((section) => [section, {}]));
+  const sectionByType = new Map(Object.entries(STRUCTURED_TYPES).map(([section, value]) => [value.type, section]));
+  for (const entity of document.listEntities()) {
+    const section = sectionByType.get(entity.type);
+    if (!section) continue;
+    const definition = STRUCTURED_TYPES[section];
+    const sourceId = entity.properties[definition.key];
+    if (typeof sourceId !== 'string' || sourceId.length === 0) {
+      throw new Error(`Legacy workshop ${definition.type} entity is missing its source id.`);
+    }
+    state[section][sourceId] = entity.properties[definition.value];
+  }
+  return cloneWorkshopProperties(state, 'Legacy workshop edit state');
 }

@@ -18,6 +18,10 @@ generatedControls:
     - generated.detach
     - generated.suppress
     - generated.reset-to-auto
+liveComponentController:
+  historyOwner: semantic-session
+  gestureOwner: workshop-tool-controller
+  legacyCoreDirectImports: false
 contracts:
   semanticOnlyHistory: true
   deterministicReplay: true
@@ -25,4 +29,5 @@ contracts:
   pointerMoveHistoryNoise: false
   rendererFreeInteractionState: true
   legacyTransformsUseAdapter: true
+  liveComponentHistoryMigrated: true
   runtimeRendererChanges: false

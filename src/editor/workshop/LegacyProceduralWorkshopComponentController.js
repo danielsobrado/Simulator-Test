@@ -1,0 +1,2393 @@
+import * as THREE from 'three/webgpu';
+import {
+  createIdentityComponentTransform,
+  isIdentityComponentTransform,
+  normalizeComponentTransform,
+  serializeComponentTransforms,
+  WORKSHOP_COMPONENT_TRANSFORM_LIMITS,
+} from './ProceduralWorkshopComponentTransforms.js';
+import {
+  axesForWorkshopMode,
+  describeWorkshopEditPolicy,
+  getWorkshopComponentEditPolicy,
+  supportsWorkshopTransformMode,
+} from './ProceduralWorkshopEditPolicy.js';
+import {
+  isWorkshopArchitecturalOpening,
+  solveWorkshopArchitecturalSnap,
+  solveWorkshopOpeningConstraints,
+  validateWorkshopOpeningPlacement,
+} from './ProceduralWorkshopArchitecturalSnapping.js';
+import {
+  nextOpeningCopyId,
+  serializeOpeningAttachments,
+} from './ProceduralWorkshopOpeningAttachments.js';
+import {
+  nextOpeningAssemblyId,
+  serializeOpeningAssemblies,
+} from './ProceduralWorkshopOpeningAssemblies.js';
+import { solveWorkshopBoundaryResize } from './ProceduralWorkshopBoundaryResize.js';
+
+const POINTER_SELECT_DISTANCE = 5;
+const COMPONENT_POSITION_LIMIT = WORKSHOP_COMPONENT_TRANSFORM_LIMITS.position;
+const SELECTION_COLOR = 0xf0d675;
+const INFERENCE_COLOR = 0x7de0cf;
+const HANDLE_COLOR = 0xf3d879;
+const HANDLE_HOVER_COLOR = 0xfff3bd;
+const INFERENCE_THRESHOLD = 0.08;
+const MAX_HISTORY = 80;
+const HANDLE_COUNT = 6;
+const POSITIVE_Y = new THREE.Vector3(0, 1, 0);
+const COMPONENT_KIND_ORDER = Object.freeze({
+  structure: 0,
+  roof: 1,
+  door: 2,
+  window: 3,
+  opening: 4,
+  woodwork: 5,
+  metalwork: 6,
+  foliage: 7,
+});
+
+function normalizeAngle(value) {
+  return Math.atan2(Math.sin(value), Math.cos(value));
+}
+
+function componentTransformFromGroup(group) {
+  const basePosition = group.userData.workshopBasePosition;
+  return normalizeComponentTransform({
+    position: [
+      group.position.x - basePosition.x,
+      group.position.y - basePosition.y,
+      group.position.z - basePosition.z,
+    ],
+    rotation: [
+      normalizeAngle(group.rotation.x),
+      normalizeAngle(group.rotation.y),
+      normalizeAngle(group.rotation.z),
+    ],
+    scale: group.scale.toArray(),
+  });
+}
+
+function combineComponentTransforms(base, delta) {
+  return normalizeComponentTransform({
+    position: base.position.map((value, index) => THREE.MathUtils.clamp(
+      value + delta.position[index],
+      -COMPONENT_POSITION_LIMIT,
+      COMPONENT_POSITION_LIMIT,
+    )),
+    rotation: base.rotation.map((value, index) => normalizeAngle(value + delta.rotation[index])),
+    scale: base.scale.map((value, index) => THREE.MathUtils.clamp(
+      value * delta.scale[index],
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+    )),
+  });
+}
+
+function applyTransform(group, transform) {
+  const basePosition = group.userData.workshopBasePosition;
+  group.position.set(
+    basePosition.x + transform.position[0],
+    basePosition.y + transform.position[1],
+    basePosition.z + transform.position[2],
+  );
+  group.rotation.set(...transform.rotation);
+  group.scale.set(...transform.scale);
+  group.updateMatrixWorld(true);
+}
+
+function componentSort(left, right) {
+  const leftOrder = COMPONENT_KIND_ORDER[left.kind] ?? 99;
+  const rightOrder = COMPONENT_KIND_ORDER[right.kind] ?? 99;
+  return leftOrder - rightOrder || left.label.localeCompare(right.label) || left.id.localeCompare(right.id);
+}
+
+function createSelectionHelper() {
+  const helper = new THREE.Box3Helper(new THREE.Box3(), SELECTION_COLOR);
+  helper.name = 'workshop-component-selection';
+  helper.visible = false;
+  helper.raycast = () => {};
+  return helper;
+}
+
+function createInferenceHelper() {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(18), 3));
+  const helper = new THREE.LineSegments(
+    geometry,
+    new THREE.LineBasicMaterial({
+      color: INFERENCE_COLOR,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+    }),
+  );
+  helper.name = 'workshop-component-inference';
+  helper.visible = false;
+  helper.renderOrder = 1000;
+  helper.raycast = () => {};
+  return helper;
+}
+
+function createArchitecturalHandleHelper() {
+  const helper = new THREE.Group();
+  helper.name = 'workshop-architectural-handles';
+  helper.visible = false;
+  for (let index = 0; index < HANDLE_COUNT; index += 1) {
+    const handle = new THREE.Group();
+    handle.name = `workshop-boundary-handle-${index}`;
+    handle.visible = false;
+
+    const material = new THREE.MeshBasicMaterial({
+      color: HANDLE_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.98,
+    });
+    const collar = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 6), material);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.38, 10), material);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 12), material);
+    shaft.position.y = 0.24;
+    tip.position.y = 0.59;
+    handle.add(collar, shaft, tip);
+
+    const hitTarget = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.82, 8),
+      new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    );
+    hitTarget.position.y = 0.32;
+    hitTarget.name = 'workshop-boundary-handle-hit-target';
+    handle.add(hitTarget);
+    handle.userData.workshopHandleMaterial = material;
+    for (const child of handle.children) child.renderOrder = 1001;
+    helper.add(handle);
+  }
+  return helper;
+}
+
+function createPlacementHelper() {
+  const helper = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x7de0cf,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+    }),
+  );
+  helper.name = 'workshop-opening-placement-preview';
+  helper.visible = false;
+  helper.renderOrder = 1002;
+  helper.raycast = () => {};
+  return helper;
+}
+
+function copyTransformDocument(input = {}) {
+  return Object.fromEntries(
+    Object.entries(serializeComponentTransforms(input)).map(([componentId, transform]) => [
+      componentId,
+      {
+        position: [...transform.position],
+        rotation: [...transform.rotation],
+        scale: [...transform.scale],
+      },
+    ]),
+  );
+}
+
+function sameEditDocument(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isOpening2d(component) {
+  return component?.transformPolicy === 'opening2d';
+}
+
+function directMeshBounds(group) {
+  const bounds = new THREE.Box3();
+  bounds.makeEmpty();
+  for (const child of group?.children ?? []) {
+    if (!child.isMesh || !child.geometry) continue;
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    if (!child.geometry.boundingBox) continue;
+    child.updateMatrix();
+    bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrix));
+  }
+  return bounds;
+}
+
+function openingDescriptor(group) {
+  const bounds = directMeshBounds(group);
+  if (bounds.isEmpty()) return null;
+  const baseSize = bounds.getSize(new THREE.Vector3());
+  const baseCenter = bounds.getCenter(new THREE.Vector3());
+  return {
+    componentId: group.userData.workshopComponent.id,
+    kind: group.userData.workshopComponent.kind,
+    label: group.userData.workshopComponent.label,
+    assemblyId: group.userData.workshopComponent.assemblyId ?? null,
+    memberIds: group.userData.workshopComponent.memberIds ?? null,
+    position: {
+      x: group.position.x + baseCenter.x * group.scale.x,
+      y: group.position.y + baseCenter.y * group.scale.y,
+    },
+    size: {
+      x: baseSize.x * Math.abs(group.scale.x),
+      y: baseSize.y * Math.abs(group.scale.y),
+    },
+    baseSize,
+    baseCenter,
+  };
+}
+
+export class ProceduralWorkshopComponentController {
+  constructor({
+    root,
+    previewRoot,
+    renderer,
+    camera,
+    orbitControls,
+    transformControls,
+    onChange,
+    onModeChange,
+  }) {
+    this.root = root;
+    this.previewRoot = previewRoot;
+    this.renderer = renderer;
+    this.camera = camera;
+    this.orbitControls = orbitControls;
+    this.transformControls = transformControls;
+    this.onChange = onChange;
+    this.onModeChange = onModeChange;
+    this.transforms = {};
+    this.openingAttachments = {};
+    this.openingAssemblies = {};
+    this.groups = new Map();
+    this.meshes = [];
+    this.selectedComponentId = null;
+    this.mode = 'translate';
+    this.space = 'world';
+    this.axisConstraint = 'policy';
+    this.snapEnabled = true;
+    this.snapInverted = false;
+    this.autoJoinEnabled = true;
+    this.pendingJoinCandidates = [];
+    this.history = [];
+    this.future = [];
+    this.dragStartTransforms = null;
+    this.dragging = false;
+    this.pointerStart = null;
+    this.boundaryDrag = null;
+    this.hoveredBoundaryHandle = null;
+    this.externalInteractionActive = false;
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2();
+    this.selectionHelper = createSelectionHelper();
+    this.inferenceHelper = createInferenceHelper();
+    this.handleHelper = createArchitecturalHandleHelper();
+    this.placementHelper = createPlacementHelper();
+    this.handleMetadata = [];
+    this.selectionRoot = previewRoot.parent ?? previewRoot;
+    this.selectionRoot.add(this.selectionHelper);
+    this.selectionRoot.add(this.inferenceHelper);
+    this.selectionRoot.add(this.handleHelper);
+    this.selectionRoot.add(this.placementHelper);
+
+    root.innerHTML = `
+      <div class="workshop-component-heading">
+        <label class="workshop-component-select">
+          Selected area
+          <select data-role="workshop-component-select" aria-label="Selected editable component"></select>
+        </label>
+        <label class="workshop-component-space">
+          Space
+          <select data-role="workshop-component-space" aria-label="Transform orientation">
+            <option value="world">World</option>
+            <option value="parent">Parent</option>
+            <option value="local">Local</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          class="workshop-component-details-toggle"
+          data-component-action="toggle-details"
+          title="Show exact transform values and advanced actions"
+          aria-label="Show exact transform values and advanced actions"
+          aria-expanded="false"
+        >+</button>
+      </div>
+      <div class="workshop-component-actions" role="toolbar" aria-label="Component edit history and constraints">
+        <button type="button" data-component-action="undo" title="Undo component edit (Ctrl+Z)">Undo</button>
+        <button type="button" data-component-action="redo" title="Redo component edit (Ctrl+Y)">Redo</button>
+        <button type="button" data-component-action="mirror" title="Mirror the selected area across the workshop centre">Mirror X</button>
+        <button type="button" data-component-action="attach" title="Place the selected opening on another compatible wall" disabled>Place on wall</button>
+        <button type="button" data-component-action="duplicate" title="Duplicate the selected opening beside itself" disabled>Duplicate</button>
+        <button type="button" data-component-action="repeat" title="Create a row of three evenly spaced openings" disabled>Repeat ×3</button>
+        <button type="button" data-component-action="delete-opening" title="Delete a duplicated opening" disabled>Delete copy</button>
+        <button type="button" data-component-action="separate" title="Separate a joined opening assembly" disabled>Separate</button>
+        <label class="workshop-component-snap">
+          <input type="checkbox" data-role="workshop-component-snap" checked />
+          Smart snap
+        </label>
+        <label class="workshop-component-snap">
+          <input type="checkbox" data-role="workshop-component-auto-join" checked />
+          Auto-join openings
+        </label>
+        <label class="workshop-component-axis">
+          Axes
+          <select data-role="workshop-component-axis" aria-label="Constrain transform axes">
+            <option value="policy">Smart</option>
+            <option value="x">X</option>
+            <option value="y">Y</option>
+            <option value="z">Z</option>
+            <option value="xy">XY</option>
+            <option value="xz">XZ</option>
+            <option value="yz">YZ</option>
+          </select>
+        </label>
+      </div>
+      <div class="workshop-component-values" data-role="workshop-component-values">
+        <span></span><b>X</b><b>Y</b><b>Z</b>
+        <label>Move</label>
+        <input type="number" step="0.05" data-transform-field="position-0" aria-label="Move X" />
+        <input type="number" step="0.05" data-transform-field="position-1" aria-label="Move Y" />
+        <input type="number" step="0.05" data-transform-field="position-2" aria-label="Move Z" />
+        <label>Rotate</label>
+        <input type="number" step="1" data-transform-field="rotation-0" aria-label="Rotate X degrees" />
+        <input type="number" step="1" data-transform-field="rotation-1" aria-label="Rotate Y degrees" />
+        <input type="number" step="1" data-transform-field="rotation-2" aria-label="Rotate Z degrees" />
+        <label>Scale</label>
+        <input type="number" min="0.1" max="4" step="0.025" data-transform-field="scale-0" aria-label="Scale X" />
+        <input type="number" min="0.1" max="4" step="0.025" data-transform-field="scale-1" aria-label="Scale Y" />
+        <input type="number" min="0.1" max="4" step="0.025" data-transform-field="scale-2" aria-label="Scale Z" />
+      </div>
+      <span class="workshop-component-hint" data-role="workshop-component-hint">
+        Select an area, then drag its gold arrows to reshape one edge at a time.
+      </span>
+      <span class="workshop-component-snap-feedback" data-role="workshop-component-snap-feedback"></span>
+    `;
+    this.select = root.querySelector('[data-role="workshop-component-select"]');
+    this.spaceSelect = root.querySelector('[data-role="workshop-component-space"]');
+    this.axisSelect = root.querySelector('[data-role="workshop-component-axis"]');
+    this.snapInput = root.querySelector('[data-role="workshop-component-snap"]');
+    this.autoJoinInput = root.querySelector('[data-role="workshop-component-auto-join"]');
+    this.valueFields = [...root.querySelectorAll('[data-transform-field]')];
+    this.undoButton = root.querySelector('[data-component-action="undo"]');
+    this.redoButton = root.querySelector('[data-component-action="redo"]');
+    this.attachButton = root.querySelector('[data-component-action="attach"]');
+    this.openingActionButtons = [...root.querySelectorAll(
+      '[data-component-action="attach"], [data-component-action="duplicate"], [data-component-action="repeat"]',
+    )];
+    this.deleteOpeningButton = root.querySelector('[data-component-action="delete-opening"]');
+    this.separateButton = root.querySelector('[data-component-action="separate"]');
+    this.detailsButton = root.querySelector('[data-component-action="toggle-details"]');
+    this.hint = root.querySelector('[data-role="workshop-component-hint"]');
+    this.snapFeedback = root.querySelector('[data-role="workshop-component-snap-feedback"]');
+
+    this.onSelectChange = () => this.selectComponent(this.select.value);
+    this.onSpaceChange = () => this.setSpace(this.spaceSelect.value);
+    this.onAxisChange = () => this.setAxisConstraint(this.axisSelect.value);
+    this.onSnapChange = () => this.setSnapEnabled(this.snapInput.checked);
+    this.onAutoJoinChange = () => this.setAutoJoinEnabled(this.autoJoinInput.checked);
+    this.onRootClick = (event) => {
+      const action = event.target.closest('[data-component-action]')?.dataset.componentAction;
+      if (action === 'undo') this.undo();
+      if (action === 'redo') this.redo();
+      if (action === 'mirror') this.mirrorSelected();
+      if (action === 'attach') this.beginAttachmentPlacement();
+      if (action === 'duplicate') this.duplicateSelectedOpening();
+      if (action === 'repeat') this.repeatSelectedOpening();
+      if (action === 'delete-opening') this.deleteSelectedOpening();
+      if (action === 'separate') this.separateSelectedAssembly();
+      if (action === 'toggle-details') this.toggleDetails();
+    };
+    this.onValueChange = (event) => {
+      if (event.target.matches('[data-transform-field]')) this.commitNumericTransform();
+    };
+    this.onPointerDown = (event) => this.pointerDown(event);
+    this.onPointerMove = (event) => this.pointerMove(event);
+    this.onPointerUp = (event) => this.pointerUp(event);
+    this.onPointerCancel = (event) => this.pointerCancel(event);
+    this.onPointerLeave = () => {
+      if (!this.boundaryDrag) this.setHoveredBoundaryHandle(null);
+    };
+    this.onDraggingChanged = ({ value }) => {
+      this.dragging = value;
+      this.orbitControls.enabled = !value;
+      if (value) {
+        this.dragStartTransforms = this.captureEditState();
+      } else {
+        this.commitSelectedTransform(this.dragStartTransforms);
+        this.dragStartTransforms = null;
+      }
+    };
+    this.onObjectChange = () => {
+      this.constrainSelectedTransform();
+      this.updateSelectionHelper();
+      this.updateNumericFields();
+    };
+    this.onWindowKeyDown = (event) => this.keyDown(event);
+    this.onWindowKeyUp = (event) => this.keyUp(event);
+
+    this.select.addEventListener('change', this.onSelectChange);
+    this.spaceSelect.addEventListener('change', this.onSpaceChange);
+    this.axisSelect.addEventListener('change', this.onAxisChange);
+    this.snapInput.addEventListener('change', this.onSnapChange);
+    this.autoJoinInput.addEventListener('change', this.onAutoJoinChange);
+    this.root.addEventListener('click', this.onRootClick);
+    this.root.addEventListener('change', this.onValueChange);
+    renderer.domElement.addEventListener('pointerdown', this.onPointerDown);
+    renderer.domElement.addEventListener('pointermove', this.onPointerMove);
+    renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+    renderer.domElement.addEventListener('pointercancel', this.onPointerCancel);
+    renderer.domElement.addEventListener('pointerleave', this.onPointerLeave);
+    transformControls.addEventListener('dragging-changed', this.onDraggingChanged);
+    transformControls.addEventListener('objectChange', this.onObjectChange);
+    window.addEventListener('keydown', this.onWindowKeyDown);
+    window.addEventListener('keyup', this.onWindowKeyUp);
+    this.toggleDetails(true);
+    this.updateHistoryButtons();
+  }
+
+  toggleDetails(force) {
+    const collapsed = force === undefined
+      ? !this.root.classList.contains('is-collapsed')
+      : Boolean(force);
+    this.root.classList.toggle('is-collapsed', collapsed);
+    this.detailsButton.textContent = collapsed ? '+' : '−';
+    this.detailsButton.title = collapsed
+      ? 'Show exact transform values and advanced actions'
+      : 'Hide exact values for a clearer editing view';
+    this.detailsButton.setAttribute('aria-label', this.detailsButton.title);
+    this.detailsButton.setAttribute('aria-expanded', String(!collapsed));
+    return collapsed;
+  }
+
+  pointerDown(event) {
+    if (this.externalInteractionActive) return;
+    if (event.button !== 0) return;
+    if (!this.attachmentMode && this.setPointerRay(event)) {
+      const handle = this.intersectBoundaryHandle();
+      if (handle && this.beginBoundaryDrag(event, handle)) {
+        event.preventDefault();
+        return;
+      }
+    }
+    this.pointerStart = { x: event.clientX, y: event.clientY };
+  }
+
+  setPointerRay(event) {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return false;
+    this.pointer.set(
+      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+      -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return true;
+  }
+
+  pointerMove(event) {
+    if (this.externalInteractionActive) return;
+    if (this.boundaryDrag) {
+      this.updateBoundaryDrag(event);
+      event.preventDefault();
+      return;
+    }
+    if (!this.attachmentMode) {
+      if (this.setPointerRay(event)) this.setHoveredBoundaryHandle(this.intersectBoundaryHandle());
+      return;
+    }
+    if (!this.setPointerRay(event)) return;
+    const structureMeshes = this.meshes.filter((mesh) => {
+      const group = this.groups.get(mesh.userData.workshopComponentId);
+      return group?.userData?.workshopComponent?.kind === 'structure';
+    });
+    const hit = this.raycaster.intersectObjects(structureMeshes, false)[0];
+    if (!hit) {
+      this.attachmentPreview = null;
+      this.placementHelper.visible = false;
+      this.updateSnapFeedback([{ reason: 'Point at a compatible wall' }]);
+      return;
+    }
+    this.updateAttachmentPreview(hit);
+  }
+
+  pointerUp(event) {
+    if (this.externalInteractionActive) return;
+    if (this.boundaryDrag) {
+      this.finishBoundaryDrag(true, event);
+      event.preventDefault();
+      return;
+    }
+    const start = this.pointerStart;
+    this.pointerStart = null;
+    if (!start || this.dragging || event.button !== 0) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > POINTER_SELECT_DISTANCE) {
+      return;
+    }
+
+    if (this.attachmentMode) {
+      if (this.attachmentPreview?.valid) this.commitAttachmentPlacement();
+      return;
+    }
+    if (!this.setPointerRay(event)) return;
+    const hit = this.raycaster.intersectObjects(this.meshes, false)[0];
+    const componentId = hit?.object?.userData?.workshopComponentId;
+    if (componentId) this.selectComponent(componentId);
+  }
+
+  pointerCancel(event) {
+    if (this.boundaryDrag) this.finishBoundaryDrag(false, event);
+    this.pointerStart = null;
+  }
+
+  intersectBoundaryHandle() {
+    if (!this.handleHelper.visible) return null;
+    const hit = this.raycaster.intersectObject(this.handleHelper, true)[0];
+    let object = hit?.object ?? null;
+    while (object && object !== this.handleHelper) {
+      if (object.userData.workshopBoundaryHandle) {
+        return object.userData.workshopBoundaryHandle;
+      }
+      object = object.parent;
+    }
+    return null;
+  }
+
+  setHoveredBoundaryHandle(handle) {
+    if (this.hoveredBoundaryHandle === handle) return;
+    for (const slot of this.handleHelper.children) {
+      slot.userData.workshopHandleMaterial?.color.set(
+        slot.userData.workshopBoundaryHandle === handle ? HANDLE_HOVER_COLOR : HANDLE_COLOR,
+      );
+    }
+    this.hoveredBoundaryHandle = handle;
+    this.renderer.domElement.style.cursor = handle ? 'grab' : '';
+    if (handle && !this.boundaryDrag) {
+      this.hint.textContent = `Drag ${handle.label.toLowerCase()} to reshape ${this.selectedComponent()?.label ?? 'this area'} · the opposite edge stays fixed.`;
+    }
+  }
+
+  projectedAxis(worldOrigin, worldDirection) {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const start = worldOrigin.clone().project(this.camera);
+    const end = worldOrigin.clone().add(worldDirection).project(this.camera);
+    const dx = (end.x - start.x) * bounds.width * 0.5;
+    const dy = (start.y - end.y) * bounds.height * 0.5;
+    const pixelsPerWorldUnit = Math.hypot(dx, dy);
+    if (!Number.isFinite(pixelsPerWorldUnit) || pixelsPerWorldUnit < 1) return null;
+    return {
+      screenX: dx / pixelsPerWorldUnit,
+      screenY: dy / pixelsPerWorldUnit,
+      worldPerPixel: 1 / pixelsPerWorldUnit,
+    };
+  }
+
+  beginBoundaryDrag(event, handle) {
+    const group = this.selectedGroup();
+    const localBounds = directMeshBounds(group);
+    if (!group || localBounds.isEmpty() || !this.selectedPolicy().scaleAxes.includes(handle.axis)) {
+      return false;
+    }
+    const center = localBounds.getCenter(new THREE.Vector3());
+    const minimum = center.clone();
+    const maximum = center.clone();
+    minimum[handle.axis] = localBounds.min[handle.axis];
+    maximum[handle.axis] = localBounds.max[handle.axis];
+    const minimumWorld = group.localToWorld(minimum.clone());
+    const maximumWorld = group.localToWorld(maximum.clone());
+    const positiveWorldAxis = maximumWorld.clone().sub(minimumWorld).normalize();
+    const boundaryWorld = handle.side < 0 ? minimumWorld : maximumWorld;
+    const projected = this.projectedAxis(boundaryWorld, positiveWorldAxis);
+    const startSpan = minimumWorld.distanceTo(maximumWorld);
+    if (!projected || startSpan <= Number.EPSILON) {
+      this.hint.textContent = 'Orbit slightly to see this reshape direction, then drag its arrow.';
+      return false;
+    }
+
+    const oppositeLocal = handle.side < 0 ? maximum : minimum;
+    this.boundaryDrag = {
+      axis: handle.axis,
+      side: handle.side,
+      label: handle.label,
+      pointerId: event.pointerId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      projected,
+      startSpan,
+      startScale: group.scale[handle.axis],
+      startScaleVector: group.scale.clone(),
+      startPosition: group.position.clone(),
+      oppositeLocal,
+      oppositeWorld: group.localToWorld(oppositeLocal.clone()),
+      before: this.captureEditState(),
+      transformHelperVisible: this.transformControls.getHelper().visible,
+    };
+    this.pointerStart = null;
+    this.setMode('scale');
+    this.setAxisConstraint(handle.axis);
+    this.transformControls.enabled = false;
+    this.transformControls.getHelper().visible = false;
+    this.orbitControls.enabled = false;
+    this.renderer.domElement.style.cursor = 'grabbing';
+    this.renderer.domElement.setPointerCapture?.(event.pointerId);
+    this.hint.textContent = `Reshaping ${this.selectedComponent()?.label ?? 'area'} · drag ${handle.label.toLowerCase()} · release to apply.`;
+    return true;
+  }
+
+  updateBoundaryDrag(event) {
+    const drag = this.boundaryDrag;
+    const group = this.selectedGroup();
+    if (!drag || !group) return;
+    const pixelDelta = (
+      (event.clientX - drag.pointerX) * drag.projected.screenX
+      + (event.clientY - drag.pointerY) * drag.projected.screenY
+    );
+    const result = solveWorkshopBoundaryResize({
+      startScale: drag.startScale,
+      startSpan: drag.startSpan,
+      pointerDelta: pixelDelta * drag.projected.worldPerPixel,
+      side: drag.side,
+      scaleMin: WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      scaleMax: WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+      scaleSnap: this.selectedPolicy().scaleSnap,
+      snapEnabled: this.snapEnabled !== this.snapInverted,
+    });
+
+    group.position.copy(drag.startPosition);
+    group.scale.copy(drag.startScaleVector);
+    group.scale[drag.axis] = result.scale;
+    group.updateMatrixWorld(true);
+    const oppositeNow = group.localToWorld(drag.oppositeLocal.clone());
+    const correction = drag.oppositeWorld.clone().sub(oppositeNow);
+    const correctedOrigin = group.getWorldPosition(new THREE.Vector3()).add(correction);
+    group.position.copy(group.parent
+      ? group.parent.worldToLocal(correctedOrigin)
+      : correctedOrigin);
+    group.updateMatrixWorld(true);
+    this.constrainSelectedTransform();
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    const axisLabel = { x: 'width', y: 'height', z: 'depth' }[drag.axis];
+    this.hint.textContent = `${this.selectedComponent()?.label ?? 'Area'} ${axisLabel}: ${result.span.toFixed(2)} · opposite edge anchored.`;
+  }
+
+  finishBoundaryDrag(commit, event) {
+    const drag = this.boundaryDrag;
+    if (!drag) return;
+    this.boundaryDrag = null;
+    if (event?.pointerId != null && this.renderer.domElement.hasPointerCapture?.(event.pointerId)) {
+      this.renderer.domElement.releasePointerCapture(event.pointerId);
+    }
+    this.transformControls.enabled = true;
+    this.transformControls.getHelper().visible = drag.transformHelperVisible;
+    this.orbitControls.enabled = true;
+    this.renderer.domElement.style.cursor = '';
+    this.hoveredBoundaryHandle = null;
+    if (commit) {
+      this.commitSelectedTransform(drag.before);
+      this.hint.textContent = `${this.selectedComponent()?.label ?? 'Area'} reshaped · drag another gold arrow or type an exact value.`;
+    } else {
+      this.restoreTransformDocument(drag.before, false);
+      this.hint.textContent = 'Reshape cancelled.';
+    }
+  }
+
+  beginAttachmentPlacement() {
+    const component = this.selectedComponent();
+    if (!isWorkshopArchitecturalOpening(component)) {
+      this.hint.textContent = 'Select a door, window, or arch before placing it on a wall.';
+      return false;
+    }
+    this.attachmentMode = !this.attachmentMode;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = !this.attachmentMode;
+    this.handleHelper.visible = !this.attachmentMode && this.handleMetadata.length > 0;
+    this.attachButton?.classList.toggle('is-active', this.attachmentMode);
+    this.hint.textContent = this.attachmentMode
+      ? `Place ${component.label} · point at a compatible wall, then click to attach.`
+      : `${component.label} placement cancelled.`;
+    this.updateSnapFeedback();
+    return this.attachmentMode;
+  }
+
+  setExternalInteractionActive(active) {
+    if (active === true && this.boundaryDrag) this.finishBoundaryDrag(false);
+    this.externalInteractionActive = active === true;
+    if (this.externalInteractionActive) {
+      this.cancelAttachmentPlacement();
+      this.transformControls.detach();
+      this.transformControls.enabled = false;
+      this.selectionHelper.visible = false;
+      this.inferenceHelper.visible = false;
+      this.handleHelper.visible = false;
+      this.placementHelper.visible = false;
+    } else {
+      this.transformControls.enabled = true;
+      if (this.selectedComponentId) this.selectComponent(this.selectedComponentId);
+    }
+  }
+
+  cancelAttachmentPlacement() {
+    if (!this.attachmentMode) return false;
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = true;
+    this.updateSelectionHelper();
+    this.attachButton?.classList.remove('is-active');
+    this.updateSnapFeedback();
+    return true;
+  }
+
+  attachmentHostContext(hostGroup, selected) {
+    const component = hostGroup.userData.workshopComponent;
+    const localBounds = directMeshBounds(hostGroup);
+    if (localBounds.isEmpty()) return null;
+    const surface = component.attachmentSurface ?? {
+      type: 'planar',
+      width: localBounds.max.x - localBounds.min.x,
+      height: localBounds.max.y - localBounds.min.y,
+      radius: 0,
+    };
+    const wallBounds = surface.type === 'round'
+      ? {
+        minX: -Math.PI * surface.radius,
+        maxX: Math.PI * surface.radius,
+        minY: localBounds.min.y,
+        maxY: localBounds.max.y,
+      }
+      : {
+        minX: localBounds.min.x,
+        maxX: localBounds.max.x,
+        minY: localBounds.min.y,
+        maxY: localBounds.max.y,
+      };
+    const siblings = [];
+    for (const sibling of hostGroup.children) {
+      if (sibling === this.selectedGroup()) continue;
+      if (!isWorkshopArchitecturalOpening(sibling.userData?.workshopComponent)) continue;
+      const descriptor = this.openingDescriptorOnSurface(sibling, surface);
+      if (descriptor) siblings.push(descriptor);
+    }
+    return {
+      component,
+      localBounds,
+      surface,
+      wallBounds,
+      siblings,
+      selected: this.openingDescriptorOnSurface(this.selectedGroup(), surface) ?? selected,
+    };
+  }
+
+  openingDescriptorOnSurface(group, surface) {
+    const descriptor = openingDescriptor(group);
+    const component = group?.userData?.workshopComponent;
+    if (!descriptor || surface?.type !== 'round' || !component?.attachmentPosition) {
+      return descriptor;
+    }
+    const baseSize = component.attachmentSize
+      ? {
+        x: component.attachmentSize[0],
+        y: component.attachmentSize[1],
+      }
+      : descriptor.size;
+    const basePosition = group.userData.workshopBasePosition ?? group.position;
+    const deltaX = group.position.x - basePosition.x;
+    const deltaY = group.position.y - basePosition.y;
+    const size = {
+      x: baseSize.x * Math.abs(group.scale.x),
+      y: baseSize.y * Math.abs(group.scale.y),
+    };
+    return {
+      ...descriptor,
+      position: {
+        x: component.attachmentPosition[0] + deltaX,
+        y: component.attachmentPosition[1] + size.y / 2 + deltaY,
+      },
+      size,
+      baseSize,
+      baseCenter: { x: 0, y: baseSize.y / 2 },
+      baseSurfacePosition: {
+        x: component.attachmentPosition[0],
+        y: component.attachmentPosition[1] + baseSize.y / 2,
+      },
+    };
+  }
+
+  updateAttachmentPreview(hit) {
+    const selectedGroup = this.selectedGroup();
+    const selected = openingDescriptor(selectedGroup);
+    const hostGroup = this.groups.get(hit.object.userData.workshopComponentId);
+    const context = selected && hostGroup
+      ? this.attachmentHostContext(hostGroup, selected)
+      : null;
+    if (!context) {
+      this.attachmentPreview = null;
+      this.placementHelper.visible = false;
+      return;
+    }
+    if (context.surface.type === 'planar' && hit.face?.normal) {
+      const worldNormal = hit.face.normal.clone().applyNormalMatrix(
+        new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld),
+      );
+      const hostQuaternion = hostGroup.getWorldQuaternion(new THREE.Quaternion()).invert();
+      const hostNormal = worldNormal.applyQuaternion(hostQuaternion);
+      if (hostNormal.z < 0.45) {
+        this.attachmentPreview = null;
+        this.placementHelper.visible = false;
+        this.updateSnapFeedback([{ reason: 'Choose the highlighted front façade' }]);
+        return;
+      }
+    }
+    const localPoint = hostGroup.worldToLocal(hit.point.clone());
+    const surfaceX = context.surface.type === 'round'
+      ? Math.atan2(localPoint.x, localPoint.z) * context.surface.radius
+      : localPoint.x;
+    const result = solveWorkshopArchitecturalSnap({
+      kind: selected.kind,
+      mode: 'translate',
+      position: { x: surfaceX, y: localPoint.y },
+      size: selected.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+      enabled: this.snapEnabled !== this.snapInverted,
+      threshold: Math.max(0.16, this.selectedPolicy().translationSnap * 4),
+    });
+    const validation = validateWorkshopOpeningPlacement({
+      position: result.position,
+      size: result.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+    });
+    const localCenter = context.surface.type === 'round'
+      ? new THREE.Vector3(
+        Math.sin(result.position.x / context.surface.radius) * (context.surface.radius + 0.12),
+        result.position.y,
+        Math.cos(result.position.x / context.surface.radius) * (context.surface.radius + 0.12),
+      )
+      : new THREE.Vector3(
+        result.position.x,
+        result.position.y,
+        context.localBounds.max.z + 0.12,
+      );
+    const worldCenter = hostGroup.localToWorld(localCenter);
+    const orientation = hostGroup.getWorldQuaternion(new THREE.Quaternion());
+    if (context.surface.type === 'round') {
+      orientation.multiply(new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        result.position.x / context.surface.radius,
+      ));
+    }
+    this.placementHelper.position.copy(worldCenter);
+    this.placementHelper.quaternion.copy(orientation);
+    this.placementHelper.scale.set(result.size.x, result.size.y, 0.24);
+    this.placementHelper.material.color.set(validation.valid ? 0x7de0cf : 0xef6f68);
+    this.placementHelper.visible = true;
+    const existing = this.openingAttachments[this.selectedComponentId];
+    const stored = selectedGroup.userData.workshopStoredTransform;
+    const selectedComponent = selectedGroup.userData.workshopComponent;
+    this.attachmentPreview = {
+      valid: validation.valid,
+      componentId: this.selectedComponentId,
+      assemblyPlacement: selectedComponent.assemblyId
+        ? {
+          hostId: context.component.id,
+          position: [
+            result.position.x,
+            result.position.y - result.size.y / 2,
+          ],
+        }
+        : null,
+      attachment: {
+        sourceId: existing?.sourceId ?? this.selectedComponentId,
+        hostId: context.component.id,
+        position: [
+          result.position.x,
+          result.position.y - result.size.y / 2,
+        ],
+        scale: existing?.scale
+          ? [...existing.scale]
+          : [stored.scale[0], stored.scale[1]],
+      },
+    };
+    this.updateSnapFeedback(validation.valid
+      ? [...result.guides, { reason: `Ready on ${context.component.label}` }]
+      : validation.reasons.map((reason) => ({ reason })));
+  }
+
+  commitAttachmentPlacement() {
+    const preview = this.attachmentPreview;
+    if (!preview?.valid) return false;
+    const before = this.captureEditState();
+    const component = this.selectedComponent();
+    if (component?.assemblyId && preview.assemblyPlacement) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      const targetHost = this.groups.get(preview.assemblyPlacement.hostId);
+      const oldX = component.attachmentPosition?.[0] ?? 0;
+      const oldBottom = component.attachmentPosition?.[1] ?? 0;
+      const next = { ...this.openingAttachments };
+      for (const memberId of assembly.memberIds) {
+        const member = next[memberId];
+        if (!member) continue;
+        next[memberId] = {
+          ...member,
+          hostId: preview.assemblyPlacement.hostId,
+          position: [
+            this.surfaceWrappedX(
+              preview.assemblyPlacement.position[0] + member.position[0] - oldX,
+              targetHost,
+            ),
+            preview.assemblyPlacement.position[1] + member.position[1] - oldBottom,
+          ],
+        };
+      }
+      this.openingAttachments = next;
+      this.openingAssemblies = serializeOpeningAssemblies({
+        ...this.openingAssemblies,
+        [component.assemblyId]: {
+          ...assembly,
+          hostId: preview.assemblyPlacement.hostId,
+          memberIds: this.sortAssemblyMembers(
+            assembly.memberIds,
+            targetHost,
+            preview.assemblyPlacement.position[0],
+          ),
+        },
+      });
+    } else {
+    this.openingAttachments = {
+      ...this.openingAttachments,
+      [preview.componentId]: preview.attachment,
+    };
+    }
+    delete this.transforms[preview.componentId];
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.placementHelper.visible = false;
+    this.transformControls.enabled = true;
+    this.attachButton?.classList.remove('is-active');
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
+  isEditorVisible() {
+    const overlay = this.root.closest('[data-role="workshop-overlay"]');
+    return !overlay?.hidden;
+  }
+
+  keyDown(event) {
+    if (!this.isEditorVisible() || this.externalInteractionActive) return;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    const key = event.key.toLowerCase();
+    if (key === 'escape' && this.attachmentMode) {
+      this.beginAttachmentPlacement();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey) this.redo();
+      else this.undo();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && key === 'y') {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+    if (event.key === 'Shift' && !event.repeat) {
+      this.snapInverted = true;
+      this.applySnapSettings();
+      return;
+    }
+    if (key === 'w' || key === 'g') this.setMode('translate');
+    if (key === 'e') this.setMode('rotate');
+    if (key === 'r') this.setMode('scale');
+    if (['x', 'y', 'z'].includes(key)) this.setAxisConstraint(key);
+    if (key === '.') this.setAxisConstraint('policy');
+  }
+
+  keyUp(event) {
+    if (this.externalInteractionActive) return;
+    if (event.key !== 'Shift' || !this.snapInverted) return;
+    this.snapInverted = false;
+    this.applySnapSettings();
+  }
+
+  selectedGroup() {
+    return this.groups.get(this.selectedComponentId) ?? null;
+  }
+
+  selectedComponent() {
+    return this.selectedGroup()?.userData.workshopComponent ?? null;
+  }
+
+  selectedPolicy() {
+    const component = this.selectedComponent();
+    return component?.editPolicy ?? getWorkshopComponentEditPolicy(component);
+  }
+
+  supportsMode(mode) {
+    return supportsWorkshopTransformMode(this.selectedPolicy(), mode);
+  }
+
+  updateHistoryButtons() {
+    if (this.undoButton) this.undoButton.disabled = this.history.length === 0;
+    if (this.redoButton) this.redoButton.disabled = this.future.length === 0;
+  }
+
+  captureEditState() {
+    return {
+      componentTransforms: copyTransformDocument(this.transforms),
+      openingAttachments: serializeOpeningAttachments(this.openingAttachments),
+      openingAssemblies: serializeOpeningAssemblies(this.openingAssemblies),
+    };
+  }
+
+  recordHistory(before) {
+    if (!before) return;
+    const after = this.captureEditState();
+    if (sameEditDocument(before, after)) return;
+    this.history.push(before);
+    if (this.history.length > MAX_HISTORY) this.history.shift();
+    this.future = [];
+    this.updateHistoryButtons();
+  }
+
+  restoreTransformDocument(document, notify = true) {
+    const state = document?.componentTransforms
+      ? document
+      : { componentTransforms: document, openingAttachments: {}, openingAssemblies: {} };
+    this.transforms = Object.fromEntries(
+      Object.entries(copyTransformDocument(state.componentTransforms)).filter(([componentId]) => (
+        this.groups.has(componentId)
+      )),
+    );
+    this.openingAttachments = serializeOpeningAttachments(state.openingAttachments);
+    this.openingAssemblies = serializeOpeningAssemblies(state.openingAssemblies);
+    const identity = createIdentityComponentTransform();
+    for (const [componentId, group] of this.groups) {
+      const transform = this.transforms[componentId] ?? identity;
+      group.userData.workshopStoredTransform = transform;
+      applyTransform(group, isOpening2d(group.userData.workshopComponent) ? identity : transform);
+    }
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    if (notify) {
+      this.onChange?.(
+        null,
+        this.transforms[this.selectedComponentId] ?? identity,
+        { reason: 'history' },
+      );
+    }
+  }
+
+  undo() {
+    const previous = this.history.pop();
+    if (!previous) return false;
+    this.future.push(this.captureEditState());
+    this.restoreTransformDocument(previous);
+    this.updateHistoryButtons();
+    return true;
+  }
+
+  redo() {
+    const next = this.future.pop();
+    if (!next) return false;
+    this.history.push(this.captureEditState());
+    this.restoreTransformDocument(next);
+    this.updateHistoryButtons();
+    return true;
+  }
+
+  pruneTransforms(definitions) {
+    for (const componentId of Object.keys(this.transforms)) {
+      if (!definitions.has(componentId)) delete this.transforms[componentId];
+    }
+    const assembledMembers = new Set(Object.values(this.openingAssemblies).flatMap(
+      ({ memberIds }) => memberIds,
+    ));
+    for (const componentId of Object.keys(this.openingAttachments)) {
+      if (componentId.startsWith('copy-') && !definitions.has(componentId)) {
+        if (assembledMembers.has(componentId)) continue;
+        delete this.openingAttachments[componentId];
+      }
+    }
+  }
+
+  createGroups(definitions) {
+    for (const component of definitions.values()) {
+      const group = new THREE.Group();
+      group.name = `workshop-component-${component.id}`;
+      group.userData.workshopComponent = component;
+      group.userData.workshopPivot = new THREE.Vector3(...component.pivot);
+      this.groups.set(component.id, group);
+    }
+
+    for (const component of definitions.values()) {
+      const group = this.groups.get(component.id);
+      const parent = component.parentId ? this.groups.get(component.parentId) : null;
+      const parentPivot = parent?.userData.workshopPivot ?? new THREE.Vector3();
+      group.userData.workshopBasePosition = group.userData.workshopPivot.clone().sub(parentPivot);
+      if (parent) parent.add(group);
+      else this.previewRoot.add(group);
+
+      const storedTransform = this.transforms[component.id]
+        ?? component.storedTransform
+        ?? component.transform;
+      group.userData.workshopStoredTransform = storedTransform;
+      if (!isIdentityComponentTransform(storedTransform)) {
+        this.transforms[component.id] = storedTransform;
+      }
+      applyTransform(
+        group,
+        isOpening2d(component) ? createIdentityComponentTransform() : storedTransform,
+      );
+    }
+  }
+
+  replaceParts(parts) {
+    this.clear();
+    const definitions = new Map();
+    for (const part of parts) {
+      const identity = createIdentityComponentTransform();
+      const component = part.component ?? Object.freeze({
+        id: 'structure-main',
+        label: 'Main structure',
+        kind: 'structure',
+        parentId: null,
+        pivot: Object.freeze([0, 0, 0]),
+        transform: identity,
+        storedTransform: identity,
+        transformPolicy: 'free',
+      });
+      definitions.set(component.id, component);
+    }
+    this.pruneTransforms(definitions);
+    this.createGroups(definitions);
+
+    for (const part of parts) {
+      const componentId = part.component?.id ?? 'structure-main';
+      const group = this.groups.get(componentId);
+      const mesh = new THREE.Mesh(part.geometry, part.material);
+      part.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.workshopComponentId = componentId;
+      mesh.userData.workshopMaterialRegion = part.materialRegion ?? null;
+      group.add(mesh);
+      this.meshes.push(mesh);
+    }
+
+    const ordered = [...definitions.values()].sort(componentSort);
+    const groups = new Map();
+    for (const component of ordered) {
+      const label = component.kind === 'structure'
+        ? 'Structures'
+        : component.kind === 'roof'
+          ? 'Roofs'
+          : ['door', 'window', 'opening'].includes(component.kind)
+            ? 'Openings'
+            : 'Attached details';
+      const optgroup = groups.get(label) ?? document.createElement('optgroup');
+      optgroup.label = label;
+      const option = document.createElement('option');
+      option.value = component.id;
+      option.textContent = component.label;
+      optgroup.append(option);
+      groups.set(label, optgroup);
+    }
+    this.select.replaceChildren(...groups.values());
+    const preferred = this.selectedComponentId && this.groups.has(this.selectedComponentId)
+      ? this.selectedComponentId
+      : this.groups.has('structure-main') ? 'structure-main' : ordered[0]?.id;
+    if (preferred) this.selectComponent(preferred);
+  }
+
+  updateSelectionHelper() {
+    const group = this.groups.get(this.selectedComponentId);
+    if (!group) {
+      this.selectionHelper.visible = false;
+      this.handleHelper.visible = false;
+      return;
+    }
+    group.updateWorldMatrix(true, true);
+    this.selectionHelper.box.setFromObject(group);
+    this.selectionHelper.visible = !this.selectionHelper.box.isEmpty();
+    this.updateArchitecturalHandles();
+  }
+
+  updateArchitecturalHandles() {
+    const group = this.selectedGroup();
+    const bounds = directMeshBounds(group);
+    if (!group || bounds.isEmpty()) {
+      this.handleHelper.visible = false;
+      return;
+    }
+    const policy = this.selectedPolicy();
+    const center = bounds.getCenter(new THREE.Vector3());
+    const metadata = [];
+    const add = (axis, side, label) => {
+      const localPosition = center.clone();
+      localPosition[axis] = side < 0 ? bounds.min[axis] : bounds.max[axis];
+      const worldPosition = group.localToWorld(localPosition.clone());
+      const axisStep = localPosition.clone();
+      axisStep[axis] += side;
+      const worldDirection = group.localToWorld(axisStep).sub(worldPosition).normalize();
+      metadata.push({
+        axis,
+        side,
+        label,
+        position: worldPosition,
+        direction: worldDirection,
+      });
+    };
+    if (policy.scaleAxes.includes('x')) {
+      add('x', -1, 'Left edge');
+      add('x', 1, 'Right edge');
+    }
+    if (policy.scaleAxes.includes('y')) {
+      add('y', -1, 'Bottom edge');
+      add('y', 1, 'Top edge');
+    }
+    if (policy.scaleAxes.includes('z')) {
+      add('z', -1, 'Back edge');
+      add('z', 1, 'Front edge');
+    }
+
+    for (let index = 0; index < this.handleHelper.children.length; index += 1) {
+      const slot = this.handleHelper.children[index];
+      const handle = metadata[index];
+      slot.visible = Boolean(handle);
+      slot.userData.workshopBoundaryHandle = handle ?? null;
+      if (!handle) continue;
+      slot.position.copy(handle.position);
+      slot.quaternion.setFromUnitVectors(POSITIVE_Y, handle.direction);
+      slot.scale.setScalar(THREE.MathUtils.clamp(
+        this.camera.position.distanceTo(handle.position) * 0.055,
+        0.32,
+        0.9,
+      ));
+      slot.userData.workshopHandleMaterial.color.set(
+        handle === this.hoveredBoundaryHandle ? HANDLE_HOVER_COLOR : HANDLE_COLOR,
+      );
+    }
+    this.handleMetadata = metadata;
+    this.handleHelper.visible = metadata.length > 0;
+  }
+
+  selectComponent(componentId) {
+    const group = this.groups.get(componentId);
+    if (!group) return;
+    this.selectedComponentId = componentId;
+    this.pendingJoinCandidates = [];
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
+    this.select.value = componentId;
+    this.transformControls.attach(group);
+    const policy = group.userData.workshopComponent.editPolicy
+      ?? getWorkshopComponentEditPolicy(group.userData.workshopComponent);
+    this.space = policy.defaultSpace;
+    this.spaceSelect.value = this.space;
+    if (!supportsWorkshopTransformMode(policy, this.mode)) {
+      this.mode = policy.translateAxes ? 'translate' : 'scale';
+    }
+    this.setMode(this.mode);
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    this.updateSnapFeedback();
+    const component = group.userData.workshopComponent;
+    const openingSelected = isWorkshopArchitecturalOpening(component);
+    for (const button of this.openingActionButtons) button.disabled = !openingSelected;
+    const assembly = component.assemblyId
+      ? this.openingAssemblies[component.assemblyId]
+      : null;
+    const deletableAssembly = Boolean(assembly?.memberIds.every((memberId) => (
+      memberId.startsWith('copy-') && this.openingAttachments[memberId]
+    )));
+    this.deleteOpeningButton.disabled = !(
+      openingSelected
+      && (
+        deletableAssembly
+        || (
+          this.selectedComponentId.startsWith('copy-')
+          && this.openingAttachments[this.selectedComponentId]
+        )
+      )
+    );
+    this.deleteOpeningButton.textContent = deletableAssembly ? 'Delete assembly' : 'Delete copy';
+    this.separateButton.disabled = !component.assemblyId;
+    this.hint.textContent = `${component.label} · drag gold edge arrows to reshape · ${describeWorkshopEditPolicy(policy)} · Shift temporarily inverts snapping.`;
+  }
+
+  setMode(requestedMode) {
+    if (!['translate', 'rotate', 'scale'].includes(requestedMode)) return this.mode;
+    const policy = this.selectedPolicy();
+    const mode = supportsWorkshopTransformMode(policy, requestedMode)
+      ? requestedMode
+      : supportsWorkshopTransformMode(policy, 'translate')
+        ? 'translate'
+        : 'scale';
+    this.mode = mode;
+    this.transformControls.setMode(mode);
+    this.applyTransformSpace();
+    this.applyAxisVisibility();
+    this.applySnapSettings();
+    this.onModeChange?.(mode);
+    return mode;
+  }
+
+  setSpace(space) {
+    if (!['world', 'parent', 'local'].includes(space)) return this.space;
+    this.space = space;
+    this.spaceSelect.value = space;
+    this.applyTransformSpace();
+    return this.space;
+  }
+
+  applyTransformSpace() {
+    this.transformControls.setSpace(this.space === 'world' ? 'world' : 'local');
+  }
+
+  setAxisConstraint(constraint) {
+    if (!['policy', 'x', 'y', 'z', 'xy', 'xz', 'yz'].includes(constraint)) {
+      return this.axisConstraint;
+    }
+    this.axisConstraint = constraint;
+    this.axisSelect.value = constraint;
+    this.applyAxisVisibility();
+    return this.axisConstraint;
+  }
+
+  applyAxisVisibility() {
+    const policyAxes = axesForWorkshopMode(this.selectedPolicy(), this.mode);
+    const requestedAxes = this.axisConstraint === 'policy' ? policyAxes : this.axisConstraint;
+    const axes = [...requestedAxes].filter((axis) => policyAxes.includes(axis)).join('');
+    this.transformControls.showX = axes.includes('x');
+    this.transformControls.showY = axes.includes('y');
+    this.transformControls.showZ = axes.includes('z');
+  }
+
+  setSnapEnabled(enabled) {
+    this.snapEnabled = Boolean(enabled);
+    this.snapInput.checked = this.snapEnabled;
+    if (!this.snapEnabled) this.updateSnapFeedback();
+    this.applySnapSettings();
+  }
+
+  setAutoJoinEnabled(enabled) {
+    this.autoJoinEnabled = Boolean(enabled);
+    this.autoJoinInput.checked = this.autoJoinEnabled;
+    this.pendingJoinCandidates = [];
+    this.constrainSelectedTransform();
+    return this.autoJoinEnabled;
+  }
+
+  applySnapSettings() {
+    const policy = this.selectedPolicy();
+    const enabled = this.snapEnabled !== this.snapInverted;
+    this.transformControls.setTranslationSnap(enabled ? policy.translationSnap : null);
+    this.transformControls.setRotationSnap(
+      enabled ? THREE.MathUtils.degToRad(policy.rotationSnapDegrees) : null,
+    );
+    this.transformControls.setScaleSnap(enabled ? policy.scaleSnap : null);
+  }
+
+  snapSelectedToInferences(group, basePosition, allowedAxes) {
+    const snappedAxes = new Set();
+    if (this.mode !== 'translate' || this.snapEnabled === this.snapInverted) return snappedAxes;
+    const parent = group.parent;
+    for (const axis of allowedAxes) {
+      const candidates = [basePosition[axis]];
+      for (const sibling of this.groups.values()) {
+        if (sibling !== group && sibling.parent === parent) candidates.push(sibling.position[axis]);
+      }
+      let best = null;
+      let bestDistance = INFERENCE_THRESHOLD;
+      for (const candidate of candidates) {
+        const distance = Math.abs(group.position[axis] - candidate);
+        if (distance < bestDistance) {
+          best = candidate;
+          bestDistance = distance;
+        }
+      }
+      if (best != null) {
+        group.position[axis] = best;
+        snappedAxes.add(axis);
+      }
+    }
+    return snappedAxes;
+  }
+
+  architecturalSnapContext(group) {
+    const component = group?.userData?.workshopComponent;
+    const parent = group?.parent;
+    if (
+      !component?.editPolicy?.adaptivePlacement
+      || !isWorkshopArchitecturalOpening(component)
+      || !parent?.userData?.workshopComponent
+    ) {
+      return null;
+    }
+    const wallBounds = directMeshBounds(parent);
+    const surface = parent.userData.workshopComponent.attachmentSurface;
+    const selected = this.openingDescriptorOnSurface(group, surface);
+    if (wallBounds.isEmpty() || !selected) return null;
+    const siblings = [];
+    for (const sibling of parent.children) {
+      if (sibling === group || !isWorkshopArchitecturalOpening(
+        sibling.userData?.workshopComponent,
+      )) {
+        continue;
+      }
+      const descriptor = this.openingDescriptorOnSurface(sibling, surface);
+      if (descriptor) siblings.push(descriptor);
+    }
+    return {
+      selected,
+      siblings,
+      surface,
+      wallBounds: surface?.type === 'round'
+        ? {
+          minX: -Math.PI * surface.radius,
+          maxX: Math.PI * surface.radius,
+          minY: wallBounds.min.y,
+          maxY: wallBounds.max.y,
+        }
+        : {
+          minX: wallBounds.min.x,
+          maxX: wallBounds.max.x,
+          minY: wallBounds.min.y,
+          maxY: wallBounds.max.y,
+        },
+    };
+  }
+
+  snapSelectedArchitecturally(group, policy) {
+    const context = this.architecturalSnapContext(group);
+    if (!context) {
+      this.pendingJoinCandidates = [];
+      return null;
+    }
+    const enabled = this.snapEnabled !== this.snapInverted;
+    const result = solveWorkshopArchitecturalSnap({
+      kind: group.userData.workshopComponent.kind,
+      mode: this.mode,
+      position: context.selected.position,
+      size: context.selected.size,
+      wallBounds: context.wallBounds,
+      siblings: context.siblings,
+      enabled,
+      threshold: Math.max(0.14, policy.translationSnap * 4),
+      edgeInset: Math.max(0.04, policy.translationSnap),
+      neighborGap: Math.max(0.12, policy.translationSnap * 3),
+    });
+    const component = group.userData.workshopComponent;
+    const constrained = component.kind === 'door' || component.kind === 'window'
+      ? solveWorkshopOpeningConstraints({
+        kind: component.kind,
+        mode: this.mode,
+        position: result.position,
+        size: result.size,
+        wallBounds: context.wallBounds,
+        siblings: context.siblings,
+        autoJoin: this.autoJoinEnabled,
+        edgeInset: Math.max(0.04, policy.translationSnap),
+        neighborGap: Math.max(0.12, policy.translationSnap * 3, 0.16),
+      })
+      : {
+        position: result.position,
+        size: result.size,
+        joins: [],
+        guides: [],
+      };
+    this.pendingJoinCandidates = [...constrained.joins];
+    this.selectionHelper.material.color.set(
+      this.pendingJoinCandidates.length > 0 ? INFERENCE_COLOR : SELECTION_COLOR,
+    );
+    if (this.mode === 'scale') {
+      for (const axis of policy.scaleAxes) {
+        const baseSize = context.selected.baseSize[axis];
+        if (baseSize > 0) group.scale[axis] = constrained.size[axis] / baseSize;
+      }
+    }
+    if (context.surface?.type === 'round' && context.selected.baseSurfacePosition) {
+      const basePosition = group.userData.workshopBasePosition;
+      group.position.x = basePosition.x
+        + constrained.position.x - context.selected.baseSurfacePosition.x;
+      group.position.y = basePosition.y
+        + constrained.position.y
+        - (
+          group.userData.workshopComponent.attachmentPosition[1]
+          + context.selected.baseSize.y * group.scale.y / 2
+        );
+    } else {
+      group.position.x = constrained.position.x - context.selected.baseCenter.x * group.scale.x;
+      group.position.y = constrained.position.y - context.selected.baseCenter.y * group.scale.y;
+    }
+    return {
+      ...result,
+      position: constrained.position,
+      size: constrained.size,
+      guides: [...result.guides, ...constrained.guides],
+      joins: constrained.joins,
+    };
+  }
+
+  updateSnapFeedback(guides = []) {
+    if (!this.snapFeedback) return;
+    const reasons = [...new Set(guides.map((guide) => guide.reason))];
+    this.snapFeedback.textContent = reasons.length > 0
+      ? `${guides.some(({ type }) => type === 'join') ? 'Auto-join' : 'Smart snap'} · ${reasons.slice(0, 2).join(' · ')}`
+      : '';
+  }
+
+  updateInferenceHelper(snappedAxes = new Set()) {
+    const group = this.selectedGroup();
+    if (!group || snappedAxes.size === 0) {
+      this.inferenceHelper.visible = false;
+      return;
+    }
+    const bounds = new THREE.Box3().setFromObject(group);
+    if (bounds.isEmpty()) {
+      this.inferenceHelper.visible = false;
+      return;
+    }
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = Math.max(3, bounds.getSize(new THREE.Vector3()).length() * 1.2);
+    const positions = this.inferenceHelper.geometry.getAttribute('position');
+    const lines = [];
+    for (const axis of ['x', 'y', 'z']) {
+      const from = center.clone();
+      const to = center.clone();
+      if (snappedAxes.has(axis)) {
+        from[axis] -= size;
+        to[axis] += size;
+      }
+      lines.push(...from.toArray(), ...to.toArray());
+    }
+    positions.array.set(lines);
+    positions.needsUpdate = true;
+    this.inferenceHelper.geometry.computeBoundingSphere();
+    this.inferenceHelper.visible = true;
+  }
+
+  constrainSelectedTransform() {
+    const group = this.groups.get(this.selectedComponentId);
+    if (!group || this.transformControls.object !== group) return;
+    const basePosition = group.userData.workshopBasePosition;
+    const policy = this.selectedPolicy();
+    group.position.x = THREE.MathUtils.clamp(
+      group.position.x,
+      basePosition.x - COMPONENT_POSITION_LIMIT,
+      basePosition.x + COMPONENT_POSITION_LIMIT,
+    );
+    group.position.y = THREE.MathUtils.clamp(
+      group.position.y,
+      basePosition.y - COMPONENT_POSITION_LIMIT,
+      basePosition.y + COMPONENT_POSITION_LIMIT,
+    );
+    group.position.z = THREE.MathUtils.clamp(
+      group.position.z,
+      basePosition.z - COMPONENT_POSITION_LIMIT,
+      basePosition.z + COMPONENT_POSITION_LIMIT,
+    );
+    group.scale.x = THREE.MathUtils.clamp(
+      Math.abs(group.scale.x),
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+    );
+    group.scale.y = THREE.MathUtils.clamp(
+      Math.abs(group.scale.y),
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+    );
+    group.scale.z = THREE.MathUtils.clamp(
+      Math.abs(group.scale.z),
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+      WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+    );
+
+    for (const axis of ['x', 'y', 'z']) {
+      if (!policy.translateAxes.includes(axis)) group.position[axis] = basePosition[axis];
+      if (!policy.rotateAxes.includes(axis)) group.rotation[axis] = 0;
+      if (!policy.scaleAxes.includes(axis)) group.scale[axis] = 1;
+    }
+    const architectural = this.snapSelectedArchitecturally(group, policy);
+    const snappedAxes = architectural
+      ? new Set(architectural.guides.map((guide) => guide.axis))
+      : this.snapSelectedToInferences(group, basePosition, policy.translateAxes);
+    this.updateSnapFeedback(architectural?.guides);
+    this.updateInferenceHelper(snappedAxes);
+  }
+
+  attachmentForOpeningGroup(group, descriptor = openingDescriptor(group)) {
+    const component = group?.userData?.workshopComponent;
+    if (!component || !descriptor) return null;
+    const existing = this.openingAttachments[component.id];
+    const stored = group.userData.workshopStoredTransform ?? createIdentityComponentTransform();
+    return {
+      sourceId: existing?.sourceId ?? component.id,
+      hostId: group.parent?.userData?.workshopComponent?.id ?? component.hostId,
+      position: [
+        descriptor.position.x,
+        descriptor.position.y - descriptor.size.y / 2,
+      ],
+      scale: existing ? [...existing.scale] : [stored.scale[0], stored.scale[1]],
+    };
+  }
+
+  materializeAssemblyMember(componentId, preferredGroup = null, preferredDescriptor = null) {
+    if (this.openingAttachments[componentId]) return true;
+    const group = preferredGroup ?? this.groups.get(componentId);
+    const descriptor = preferredDescriptor ?? openingDescriptor(group);
+    const attachment = this.attachmentForOpeningGroup(group, descriptor);
+    if (!attachment) return false;
+    this.openingAttachments = {
+      ...this.openingAttachments,
+      [componentId]: attachment,
+    };
+    delete this.transforms[componentId];
+    return true;
+  }
+
+  surfaceWrappedX(value, hostGroup) {
+    const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    if (surface?.type !== 'round' || !(surface.radius > 0)) return value;
+    const circumference = Math.PI * 2 * surface.radius;
+    const half = circumference / 2;
+    return ((value + half) % circumference + circumference) % circumference - half;
+  }
+
+  sortAssemblyMembers(memberIds, hostGroup, anchorX) {
+    const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    const circumference = surface?.type === 'round' && surface.radius > 0
+      ? Math.PI * 2 * surface.radius
+      : 0;
+    const position = (memberId) => {
+      const raw = this.openingAttachments[memberId]?.position[0] ?? 0;
+      if (!(circumference > 0)) return raw;
+      let delta = raw - anchorX;
+      const half = circumference / 2;
+      delta = ((delta + half) % circumference + circumference) % circumference - half;
+      return anchorX + delta;
+    };
+    return [...new Set(memberIds)].sort((left, right) => (
+      position(left) - position(right) || left.localeCompare(right)
+    ));
+  }
+
+  applyAssemblyDelta(component, delta) {
+    const assembly = this.openingAssemblies[component.assemblyId];
+    if (!assembly) return false;
+    const hostGroup = this.groups.get(assembly.hostId);
+    const baseX = component.attachmentPosition?.[0] ?? 0;
+    const baseY = component.attachmentPosition?.[1] ?? 0;
+    const next = { ...this.openingAttachments };
+    for (const memberId of assembly.memberIds) {
+      const attachment = next[memberId];
+      if (!attachment) continue;
+      let offsetX = attachment.position[0] - baseX;
+      const surface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+      if (surface?.type === 'round' && surface.radius > 0) {
+        const circumference = Math.PI * 2 * surface.radius;
+        const half = circumference / 2;
+        offsetX = ((offsetX + half) % circumference + circumference) % circumference - half;
+      }
+      next[memberId] = {
+        ...attachment,
+        position: [
+          this.surfaceWrappedX(baseX + offsetX * delta.scale[0] + delta.position[0], hostGroup),
+          THREE.MathUtils.clamp(
+            baseY + (attachment.position[1] - baseY) * delta.scale[1] + delta.position[1],
+            0,
+            COMPONENT_POSITION_LIMIT,
+          ),
+        ],
+        scale: [
+          THREE.MathUtils.clamp(
+            attachment.scale[0] * delta.scale[0],
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+          ),
+          THREE.MathUtils.clamp(
+            attachment.scale[1] * delta.scale[1],
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+            WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+          ),
+        ],
+      };
+    }
+    this.openingAttachments = next;
+    delete this.transforms[component.assemblyId];
+    return true;
+  }
+
+  commitPendingOpeningAssembly(selectedGroup, selectedDescriptor) {
+    if (this.pendingJoinCandidates.length === 0) return null;
+    const component = selectedGroup.userData.workshopComponent;
+    if (component.kind !== 'door' && component.kind !== 'window') return null;
+    const candidates = [...this.pendingJoinCandidates];
+    const memberIds = component.memberIds
+      ? [...component.memberIds]
+      : [component.id];
+    const consumedAssemblies = new Set();
+    if (component.assemblyId) consumedAssemblies.add(component.assemblyId);
+    if (!component.memberIds) {
+      this.materializeAssemblyMember(component.id, selectedGroup, selectedDescriptor);
+    }
+    for (const candidate of candidates) {
+      if (candidate.memberIds) {
+        memberIds.push(...candidate.memberIds);
+        if (candidate.assemblyId) consumedAssemblies.add(candidate.assemblyId);
+        continue;
+      }
+      memberIds.push(candidate.componentId);
+      this.materializeAssemblyMember(candidate.componentId);
+    }
+    const hostGroup = selectedGroup.parent;
+    const hostId = hostGroup?.userData?.workshopComponent?.id;
+    if (!hostId || memberIds.some((memberId) => !this.openingAttachments[memberId])) {
+      this.pendingJoinCandidates = [];
+      return null;
+    }
+    const preferredAssemblyId = component.assemblyId
+      ?? candidates.find(({ assemblyId }) => assemblyId)?.assemblyId
+      ?? nextOpeningAssemblyId(component.kind, this.openingAssemblies);
+    const nextAssemblies = { ...this.openingAssemblies };
+    for (const assemblyId of consumedAssemblies) delete nextAssemblies[assemblyId];
+    nextAssemblies[preferredAssemblyId] = {
+      kind: component.kind,
+      hostId,
+      memberIds: this.sortAssemblyMembers(
+        memberIds,
+        hostGroup,
+        selectedDescriptor.position.x,
+      ),
+    };
+    this.openingAssemblies = serializeOpeningAssemblies(nextAssemblies);
+    this.pendingJoinCandidates = [];
+    return preferredAssemblyId;
+  }
+
+  commitSelectedTransform(before = this.captureEditState()) {
+    const group = this.groups.get(this.selectedComponentId);
+    if (!group) return;
+    const previewJoinCandidates = [...this.pendingJoinCandidates];
+    this.constrainSelectedTransform();
+    if (this.pendingJoinCandidates.length === 0 && previewJoinCandidates.length > 0) {
+      this.pendingJoinCandidates = previewJoinCandidates;
+    }
+    const delta = componentTransformFromGroup(group);
+    const component = group.userData.workshopComponent;
+    const topologyDriven = isOpening2d(component);
+    const selectedDescriptor = openingDescriptor(group);
+    if (component.assemblyId) {
+      this.applyAssemblyDelta(component, delta);
+      this.commitPendingOpeningAssembly(group, selectedDescriptor);
+      this.selectionHelper.material.color.set(SELECTION_COLOR);
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateInferenceHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(component, delta, { reason: 'assemblies' });
+      return;
+    }
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    const transform = topologyDriven && !attachment
+      ? combineComponentTransforms(group.userData.workshopStoredTransform, delta)
+      : delta;
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [
+            THREE.MathUtils.clamp(
+              attachment.position[0] + delta.position[0],
+              -COMPONENT_POSITION_LIMIT,
+              COMPONENT_POSITION_LIMIT,
+            ),
+            THREE.MathUtils.clamp(
+              attachment.position[1] + delta.position[1],
+              0,
+              COMPONENT_POSITION_LIMIT,
+            ),
+          ],
+          scale: [
+            THREE.MathUtils.clamp(
+              attachment.scale[0] * delta.scale[0],
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+            ),
+            THREE.MathUtils.clamp(
+              attachment.scale[1] * delta.scale[1],
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+              WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+            ),
+          ],
+        },
+      };
+      delete this.transforms[this.selectedComponentId];
+    } else if (isIdentityComponentTransform(transform)) {
+      delete this.transforms[this.selectedComponentId];
+    } else {
+      this.transforms[this.selectedComponentId] = transform;
+    }
+    group.userData.workshopStoredTransform = transform;
+    this.commitPendingOpeningAssembly(group, selectedDescriptor);
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
+    if (topologyDriven) applyTransform(group, createIdentityComponentTransform());
+    this.updateSelectionHelper();
+    this.updateInferenceHelper();
+    this.updateNumericFields();
+    this.recordHistory(before);
+    this.onChange?.(component, transform);
+  }
+
+  updateNumericFields() {
+    const group = this.selectedGroup();
+    if (!group) return;
+    const component = group.userData.workshopComponent;
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    const transform = attachment
+      ? {
+        position: [attachment.position[0], attachment.position[1], 0],
+        rotation: [0, 0, 0],
+        scale: [attachment.scale[0], attachment.scale[1], 1],
+      }
+      : isOpening2d(component)
+        ? group.userData.workshopStoredTransform
+      : componentTransformFromGroup(group);
+    const policy = this.selectedPolicy();
+    for (const field of this.valueFields) {
+      const [kind, indexText] = field.dataset.transformField.split('-');
+      const index = Number(indexText);
+      const axis = 'xyz'[index];
+      const value = kind === 'rotation'
+        ? THREE.MathUtils.radToDeg(transform.rotation[index])
+        : transform[kind][index];
+      field.value = Number(value.toFixed(kind === 'rotation' ? 1 : 3));
+      const allowedAxes = kind === 'position'
+        ? policy.translateAxes
+        : kind === 'rotation'
+          ? policy.rotateAxes
+          : policy.scaleAxes;
+      field.disabled = !allowedAxes.includes(axis);
+    }
+  }
+
+  commitNumericTransform() {
+    const group = this.selectedGroup();
+    if (!group) return;
+    const before = this.captureEditState();
+    const values = { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+    for (const field of this.valueFields) {
+      const [kind, indexText] = field.dataset.transformField.split('-');
+      const index = Number(indexText);
+      const number = Number(field.value);
+      if (!Number.isFinite(number)) {
+        this.updateNumericFields();
+        return;
+      }
+      values[kind][index] = kind === 'rotation' ? THREE.MathUtils.degToRad(number) : number;
+    }
+    const policy = this.selectedPolicy();
+    for (let index = 0; index < 3; index += 1) {
+      const axis = 'xyz'[index];
+      if (!policy.translateAxes.includes(axis)) values.position[index] = 0;
+      if (!policy.rotateAxes.includes(axis)) values.rotation[index] = 0;
+      if (!policy.scaleAxes.includes(axis)) values.scale[index] = 1;
+      values.position[index] = THREE.MathUtils.clamp(
+        values.position[index],
+        -COMPONENT_POSITION_LIMIT,
+        COMPONENT_POSITION_LIMIT,
+      );
+      values.scale[index] = THREE.MathUtils.clamp(
+        Math.abs(values.scale[index]),
+        WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMin,
+        WORKSHOP_COMPONENT_TRANSFORM_LIMITS.scaleMax,
+      );
+    }
+    const transform = normalizeComponentTransform(values);
+    const component = group.userData.workshopComponent;
+    if (component.assemblyId) {
+      this.applyAssemblyDelta(component, transform);
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(component, transform, { reason: 'assemblies' });
+      return;
+    }
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [transform.position[0], transform.position[1]],
+          scale: [transform.scale[0], transform.scale[1]],
+        },
+      };
+      delete this.transforms[this.selectedComponentId];
+      group.userData.workshopStoredTransform = createIdentityComponentTransform();
+      applyTransform(group, createIdentityComponentTransform());
+      this.updateSelectionHelper();
+      this.updateNumericFields();
+      this.recordHistory(before);
+      this.onChange?.(group.userData.workshopComponent, transform);
+      return;
+    }
+    if (isIdentityComponentTransform(transform)) delete this.transforms[this.selectedComponentId];
+    else this.transforms[this.selectedComponentId] = transform;
+    group.userData.workshopStoredTransform = transform;
+    applyTransform(
+      group,
+      isOpening2d(group.userData.workshopComponent)
+        ? createIdentityComponentTransform()
+        : transform,
+    );
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    this.recordHistory(before);
+    this.onChange?.(group.userData.workshopComponent, transform);
+  }
+
+  mirrorSelected() {
+    const group = this.selectedGroup();
+    if (!group) return;
+    const before = this.captureEditState();
+    const component = group.userData.workshopComponent;
+    if (component.assemblyId) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      const next = { ...this.openingAttachments };
+      for (const memberId of assembly?.memberIds ?? []) {
+        const member = next[memberId];
+        if (!member) continue;
+        next[memberId] = {
+          ...member,
+          position: [
+            this.surfaceWrappedX(-member.position[0], group.parent),
+            member.position[1],
+          ],
+        };
+      }
+      this.openingAttachments = next;
+      if (assembly) {
+        this.openingAssemblies = serializeOpeningAssemblies({
+          ...this.openingAssemblies,
+          [component.assemblyId]: {
+            ...assembly,
+            memberIds: this.sortAssemblyMembers(
+              assembly.memberIds,
+              group.parent,
+              -(component.attachmentPosition?.[0] ?? 0),
+            ),
+          },
+        });
+      }
+      this.recordHistory(before);
+      this.onChange?.(component, createIdentityComponentTransform(), { reason: 'assemblies' });
+      return;
+    }
+    const attachment = this.openingAttachments[this.selectedComponentId];
+    if (attachment) {
+      this.openingAttachments = {
+        ...this.openingAttachments,
+        [this.selectedComponentId]: {
+          ...attachment,
+          position: [-attachment.position[0], attachment.position[1]],
+        },
+      };
+      this.recordHistory(before);
+      this.onChange?.(component, createIdentityComponentTransform());
+      return;
+    }
+    const source = isOpening2d(component)
+      ? group.userData.workshopStoredTransform
+      : componentTransformFromGroup(group);
+    const transform = normalizeComponentTransform({
+      position: [-source.position[0], source.position[1], source.position[2]],
+      rotation: [source.rotation[0], -source.rotation[1], -source.rotation[2]],
+      scale: source.scale,
+    });
+    if (isIdentityComponentTransform(transform)) delete this.transforms[this.selectedComponentId];
+    else this.transforms[this.selectedComponentId] = transform;
+    group.userData.workshopStoredTransform = transform;
+    applyTransform(group, isOpening2d(component) ? createIdentityComponentTransform() : transform);
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    this.recordHistory(before);
+    this.onChange?.(component, transform);
+  }
+
+  createAssemblyCopies(count, group, component, context) {
+    const assembly = this.openingAssemblies[component.assemblyId];
+    if (!assembly) return 0;
+    const before = this.captureEditState();
+    const siblings = [...context.siblings, context.selected];
+    let attachments = { ...this.openingAttachments };
+    let assemblies = { ...this.openingAssemblies };
+    let created = 0;
+    let lastAssemblyId = null;
+    const step = context.selected.size.x + 0.16;
+    const rightRoom = context.wallBounds.maxX - context.selected.position.x;
+    const leftRoom = context.selected.position.x - context.wallBounds.minX;
+    const preferredDirection = rightRoom >= leftRoom ? 1 : -1;
+    for (let index = 1; index <= count; index += 1) {
+      let placement = null;
+      for (const direction of [preferredDirection, -preferredDirection]) {
+        const result = solveWorkshopArchitecturalSnap({
+          kind: component.kind,
+          position: {
+            x: context.selected.position.x + direction * step * index,
+            y: context.selected.position.y,
+          },
+          size: context.selected.size,
+          wallBounds: context.wallBounds,
+          siblings,
+          enabled: true,
+        });
+        const validation = validateWorkshopOpeningPlacement({
+          position: result.position,
+          size: result.size,
+          wallBounds: context.wallBounds,
+          siblings,
+        });
+        if (validation.valid) {
+          placement = result;
+          break;
+        }
+      }
+      if (!placement) continue;
+      const deltaX = placement.position.x - context.selected.position.x;
+      const deltaY = (
+        placement.position.y - placement.size.y / 2
+        - (context.selected.position.y - context.selected.size.y / 2)
+      );
+      const copiedMemberIds = [];
+      for (const memberId of assembly.memberIds) {
+        const member = attachments[memberId];
+        if (!member) continue;
+        const copyId = nextOpeningCopyId(member.sourceId, attachments);
+        attachments[copyId] = {
+          ...member,
+          position: [
+            this.surfaceWrappedX(member.position[0] + deltaX, group.parent),
+            member.position[1] + deltaY,
+          ],
+          scale: [...member.scale],
+        };
+        copiedMemberIds.push(copyId);
+      }
+      if (copiedMemberIds.length !== assembly.memberIds.length) continue;
+      const assemblyId = nextOpeningAssemblyId(component.kind, assemblies);
+      assemblies[assemblyId] = {
+        kind: component.kind,
+        hostId: assembly.hostId,
+        memberIds: this.sortAssemblyMembers(
+          copiedMemberIds,
+          group.parent,
+          placement.position.x,
+        ),
+      };
+      siblings.push({
+        componentId: assemblyId,
+        assemblyId,
+        memberIds: copiedMemberIds,
+        kind: component.kind,
+        label: `${component.label} copy`,
+        position: placement.position,
+        size: placement.size,
+      });
+      lastAssemblyId = assemblyId;
+      created += 1;
+    }
+    if (created === 0) {
+      this.updateSnapFeedback([{ reason: 'No collision-free wall space for another assembly' }]);
+      return 0;
+    }
+    this.openingAttachments = attachments;
+    this.openingAssemblies = serializeOpeningAssemblies(assemblies);
+    this.selectedComponentId = lastAssemblyId;
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return created;
+  }
+
+  createOpeningCopies(count) {
+    const group = this.selectedGroup();
+    const component = group?.userData?.workshopComponent;
+    const hostGroup = group?.parent;
+    const hostSurface = hostGroup?.userData?.workshopComponent?.attachmentSurface;
+    const selected = this.openingDescriptorOnSurface(group, hostSurface);
+    const context = hostGroup && selected
+      ? this.attachmentHostContext(hostGroup, selected)
+      : null;
+    if (!group || !isWorkshopArchitecturalOpening(component) || !context) {
+      this.hint.textContent = 'Select a door, window, or arch with a compatible host wall.';
+      return 0;
+    }
+    if (component.assemblyId) {
+      return this.createAssemblyCopies(count, group, component, context);
+    }
+    const before = this.captureEditState();
+    const existing = this.openingAttachments[this.selectedComponentId];
+    const sourceId = existing?.sourceId ?? this.selectedComponentId;
+    const scale = existing?.scale
+      ? [...existing.scale]
+      : [
+        group.userData.workshopStoredTransform.scale[0],
+        group.userData.workshopStoredTransform.scale[1],
+      ];
+    const siblings = [...context.siblings, context.selected];
+    let attachments = { ...this.openingAttachments };
+    let created = 0;
+    let lastId = null;
+    const step = context.selected.size.x + 0.16;
+    const rightRoom = context.wallBounds.maxX - context.selected.position.x;
+    const leftRoom = context.selected.position.x - context.wallBounds.minX;
+    const preferredDirection = rightRoom >= leftRoom ? 1 : -1;
+    for (let index = 1; index <= count; index += 1) {
+      let placement = null;
+      for (const direction of [preferredDirection, -preferredDirection]) {
+        const result = solveWorkshopArchitecturalSnap({
+          kind: component.kind,
+          position: {
+            x: context.selected.position.x + direction * step * index,
+            y: context.selected.position.y,
+          },
+          size: context.selected.size,
+          wallBounds: context.wallBounds,
+          siblings,
+          enabled: true,
+        });
+        const validation = validateWorkshopOpeningPlacement({
+          position: result.position,
+          size: result.size,
+          wallBounds: context.wallBounds,
+          siblings,
+        });
+        if (validation.valid) {
+          placement = result;
+          break;
+        }
+      }
+      if (!placement) continue;
+      const componentId = nextOpeningCopyId(sourceId, attachments);
+      attachments[componentId] = {
+        sourceId,
+        hostId: group.parent.userData.workshopComponent.id,
+        position: [
+          placement.position.x,
+          placement.position.y - placement.size.y / 2,
+        ],
+        scale: [...scale],
+      };
+      siblings.push({
+        kind: component.kind,
+        label: `${component.label} copy`,
+        position: placement.position,
+        size: placement.size,
+      });
+      lastId = componentId;
+      created += 1;
+    }
+    if (created === 0) {
+      this.updateSnapFeedback([{ reason: 'No collision-free wall space for another opening' }]);
+      return 0;
+    }
+    this.openingAttachments = attachments;
+    this.selectedComponentId = lastId;
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return created;
+  }
+
+  duplicateSelectedOpening() {
+    return this.createOpeningCopies(1);
+  }
+
+  repeatSelectedOpening() {
+    return this.createOpeningCopies(2);
+  }
+
+  deleteSelectedOpening() {
+    const component = this.selectedComponent();
+    if (component?.assemblyId) {
+      const assembly = this.openingAssemblies[component.assemblyId];
+      if (!assembly || !assembly.memberIds.every((memberId) => (
+        memberId.startsWith('copy-') && this.openingAttachments[memberId]
+      ))) {
+        return false;
+      }
+      const before = this.captureEditState();
+      const attachments = { ...this.openingAttachments };
+      assembly.memberIds.forEach((memberId) => delete attachments[memberId]);
+      const assemblies = { ...this.openingAssemblies };
+      delete assemblies[component.assemblyId];
+      this.openingAttachments = attachments;
+      this.openingAssemblies = serializeOpeningAssemblies(assemblies);
+      this.recordHistory(before);
+      this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+      return true;
+    }
+    if (
+      !this.selectedComponentId?.startsWith('copy-')
+      || !this.openingAttachments[this.selectedComponentId]
+    ) {
+      return false;
+    }
+    const before = this.captureEditState();
+    const next = { ...this.openingAttachments };
+    delete next[this.selectedComponentId];
+    this.openingAttachments = next;
+    delete this.transforms[this.selectedComponentId];
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
+  separateSelectedAssembly() {
+    const component = this.selectedComponent();
+    const assemblyId = component?.assemblyId;
+    if (!assemblyId || !this.openingAssemblies[assemblyId]) return false;
+    const before = this.captureEditState();
+    const next = { ...this.openingAssemblies };
+    delete next[assemblyId];
+    this.openingAssemblies = serializeOpeningAssemblies(next);
+    delete this.transforms[assemblyId];
+    this.pendingJoinCandidates = [];
+    this.selectionHelper.material.color.set(SELECTION_COLOR);
+    this.recordHistory(before);
+    this.onChange?.(null, createIdentityComponentTransform(), { reason: 'attachments' });
+    return true;
+  }
+
+  resetSelected() {
+    const group = this.groups.get(this.selectedComponentId);
+    if (!group) return;
+    if (group.userData.workshopComponent.assemblyId) {
+      this.separateSelectedAssembly();
+      return;
+    }
+    const before = this.captureEditState();
+    delete this.transforms[this.selectedComponentId];
+    if (this.openingAttachments[this.selectedComponentId]) {
+      const next = { ...this.openingAttachments };
+      delete next[this.selectedComponentId];
+      this.openingAttachments = next;
+    }
+    const identity = createIdentityComponentTransform();
+    group.userData.workshopStoredTransform = identity;
+    applyTransform(group, identity);
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    this.recordHistory(before);
+    this.onChange?.(group.userData.workshopComponent, identity);
+  }
+
+  resetAll() {
+    const before = this.captureEditState();
+    this.transforms = {};
+    this.openingAttachments = {};
+    this.openingAssemblies = {};
+    const identity = createIdentityComponentTransform();
+    for (const group of this.groups.values()) {
+      group.userData.workshopStoredTransform = identity;
+      applyTransform(group, identity);
+    }
+    this.updateSelectionHelper();
+    this.updateNumericFields();
+    this.recordHistory(before);
+    this.onChange?.(null, identity, { reason: 'reset-all' });
+  }
+
+  toDocument() {
+    return serializeComponentTransforms(this.transforms);
+  }
+
+  toOpeningAttachmentsDocument() {
+    return serializeOpeningAttachments(this.openingAttachments);
+  }
+
+  toOpeningAssembliesDocument() {
+    return serializeOpeningAssemblies(this.openingAssemblies);
+  }
+
+  clear() {
+    if (this.boundaryDrag) this.finishBoundaryDrag(false);
+    const attachedId = this.transformControls.object?.userData?.workshopComponent?.id;
+    if (attachedId && this.groups.has(attachedId)) this.transformControls.detach();
+    for (const group of this.groups.values()) {
+      if (!group.userData.workshopComponent.parentId) this.previewRoot.remove(group);
+    }
+    this.groups.clear();
+    this.meshes = [];
+    this.select.replaceChildren();
+    this.selectionHelper.visible = false;
+    this.inferenceHelper.visible = false;
+    this.handleHelper.visible = false;
+    this.placementHelper.visible = false;
+    this.handleMetadata = [];
+    this.hoveredBoundaryHandle = null;
+    this.attachmentMode = false;
+    this.attachmentPreview = null;
+    this.pendingJoinCandidates = [];
+    this.transformControls.enabled = true;
+    this.attachButton?.classList.remove('is-active');
+    this.updateSnapFeedback();
+  }
+
+  dispose() {
+    this.clear();
+    this.selectionRoot.remove(this.selectionHelper);
+    this.selectionRoot.remove(this.inferenceHelper);
+    this.selectionRoot.remove(this.handleHelper);
+    this.selectionRoot.remove(this.placementHelper);
+    this.selectionHelper.geometry.dispose();
+    this.selectionHelper.material.dispose();
+    this.inferenceHelper.geometry.dispose();
+    this.inferenceHelper.material.dispose();
+    this.handleHelper.traverse((object) => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
+    this.placementHelper.geometry.dispose();
+    this.placementHelper.material.dispose();
+    this.select.removeEventListener('change', this.onSelectChange);
+    this.spaceSelect.removeEventListener('change', this.onSpaceChange);
+    this.axisSelect.removeEventListener('change', this.onAxisChange);
+    this.snapInput.removeEventListener('change', this.onSnapChange);
+    this.autoJoinInput.removeEventListener('change', this.onAutoJoinChange);
+    this.root.removeEventListener('click', this.onRootClick);
+    this.root.removeEventListener('change', this.onValueChange);
+    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
+    this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
+    this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+    this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
+    this.renderer.domElement.removeEventListener('pointerleave', this.onPointerLeave);
+    this.transformControls.removeEventListener('dragging-changed', this.onDraggingChanged);
+    this.transformControls.removeEventListener('objectChange', this.onObjectChange);
+    window.removeEventListener('keydown', this.onWindowKeyDown);
+    window.removeEventListener('keyup', this.onWindowKeyUp);
+    this.root.replaceChildren();
+  }
+}
