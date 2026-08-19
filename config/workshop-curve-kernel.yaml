@@ -1,0 +1,29 @@
+version: 1
+curvePathVersion: 1
+supportedSegments:
+  - line
+  - arc
+  - quadratic
+limits:
+  pointsPerPath: 256
+  segmentsPerPath: 256
+tolerance:
+  position: 0.000001
+  length: 0.000001
+  parameter: 0.000000001
+  angle: 0.00000001
+  intersection: 0.000001
+  relativeRadius: 0.000001
+  projectionIterations: 28
+  bezierSubdivisions: 64
+  intersectionSubdivisions: 96
+contracts:
+  rendererFree: true
+  deterministicSerialization: true
+  deterministicProjection: true
+  previewDegeneratesFinite: true
+  committedDegeneratesRejected: true
+  deterministicSplitMergeRemap: true
+  hostedCoordinatesSurviveCompatibleRemap: true
+  localSurfaceCoordinates: true
+  generalNurbsSupport: false
