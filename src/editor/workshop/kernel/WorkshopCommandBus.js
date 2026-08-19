@@ -1,3 +1,4 @@
+import { planWorkshopInvalidation } from '../invalidation/WorkshopInvalidation.js';
 import { normalizeWorkshopDocument } from './WorkshopDocument.js';
 import { WorkshopDependencyGraph } from './WorkshopDependencyGraph.js';
 import { normalizeWorkshopEntity } from './WorkshopEntity.js';
@@ -128,13 +129,20 @@ export class WorkshopCommandBus {
     const before = this.#document;
     const result = applyWorkshopPatch(before, patch);
     if (result.document === before) {
-      return Object.freeze({ ...result, impactedIds: Object.freeze([]), metadata: Object.freeze(metadata) });
+      return Object.freeze({
+        ...result,
+        impactedIds: Object.freeze([]),
+        dirty: Object.freeze({ entities: Object.freeze([]), domains: Object.freeze([]), byEntity: Object.freeze([]) }),
+        metadata: Object.freeze(metadata),
+      });
     }
     const beforeGraph = new WorkshopDependencyGraph(before);
     const afterGraph = new WorkshopDependencyGraph(result.document);
+    const dirty = planWorkshopInvalidation(before, result.document, result.touchedIds);
     const event = Object.freeze({
       ...result,
       impactedIds: impactedIds(beforeGraph, afterGraph, result.touchedIds),
+      dirty,
       metadata: Object.freeze({ ...metadata }),
     });
     this.#document = result.document;

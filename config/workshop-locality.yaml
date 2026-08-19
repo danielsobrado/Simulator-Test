@@ -1,0 +1,38 @@
+version: 1
+compositionEntityPrefix: "composition:"
+dirtyDomains:
+  - TOPOLOGY
+  - GEOMETRY
+  - SURFACE_LAYOUT
+  - STYLE
+  - MATERIAL
+  - COLLISION
+  - NAVIGATION
+  - ROOMS
+  - PORTALS
+  - SUPPORTS
+  - FOUNDATION
+  - DECORATION
+  - LOD
+  - BOUNDS
+  - SPATIAL_INDEX
+relationships:
+  types:
+    - PARENT
+    - DEPENDENCY
+  parentPropagatedDomains:
+    - STYLE
+    - MATERIAL
+    - DECORATION
+spatial:
+  cellSize: 8
+  maxQueryCells: 8192
+contracts:
+  rendererIndependent: true
+  deterministicRelationships: true
+  deterministicNeighborhoodQueries: true
+  incrementalSpatialUpdates: true
+  domainSpecificInvalidation: true
+  preserveCompositionMaterialRegions: true
+  preserveCompositionRpgSemantics: true
+  noWholeDocumentReactionScans: true

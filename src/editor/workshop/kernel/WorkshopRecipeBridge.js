@@ -9,8 +9,10 @@ import {
   serializeOpeningAttachments,
 } from '../ProceduralWorkshopOpeningAttachments.js';
 import {
-  serializeWorkshopComposition,
-} from '../ProceduralWorkshopComposition.js';
+  createWorkshopCompositionEntities,
+  readWorkshopComposition,
+} from '../model/composition/WorkshopCompositionEntities.js';
+import { serializeWorkshopComposition } from '../ProceduralWorkshopComposition.js';
 import {
   serializeWorkshopMaterialDocument,
 } from '../ProceduralWorkshopMaterialConfig.js';
@@ -67,13 +69,7 @@ export function createWorkshopDocumentFromRecipe(input) {
     dependsOn: [],
   }];
 
-  for (const primitive of recipe.composition.primitives) {
-    entities.push(childEntity(
-      `composition:${primitive.id}`,
-      `composition-${primitive.kind}`,
-      { primitive },
-    ));
-  }
+  entities.push(...createWorkshopCompositionEntities(recipe.composition));
   for (const [componentId, transform] of Object.entries(recipe.componentTransforms)) {
     entities.push(childEntity(
       `component-transform:${componentId}`,
@@ -114,17 +110,14 @@ function rootRecipeEntity(document) {
 export function resolveWorkshopRecipe(documentInput) {
   const document = normalizeWorkshopDocument(documentInput);
   const root = rootRecipeEntity(document);
-  const composition = [];
+  const composition = readWorkshopComposition(document);
   const componentTransforms = {};
   const openingAttachments = {};
   const openingAssemblies = {};
 
   for (const entity of document.listEntities()) {
-    if (entity.id === root.id) continue;
-    if (entity.parentId !== root.id) continue;
-    if (entity.type.startsWith('composition-')) {
-      composition.push(entity.properties.primitive);
-    } else if (entity.type === 'component-transform') {
+    if (entity.id === root.id || entity.parentId !== root.id) continue;
+    if (entity.type === 'component-transform') {
       componentTransforms[entity.properties.componentId] = entity.properties.transform;
     } else if (entity.type === 'opening-attachment') {
       openingAttachments[entity.properties.componentId] = entity.properties.attachment;
@@ -135,7 +128,7 @@ export function resolveWorkshopRecipe(documentInput) {
 
   return normalizeProceduralRecipe({
     ...root.properties,
-    composition: { version: 1, primitives: composition },
+    composition,
     componentTransforms,
     openingAttachments,
     openingAssemblies,
