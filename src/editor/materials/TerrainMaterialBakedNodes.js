@@ -19,6 +19,10 @@ import {
   createTerrainMaterialFeatureState,
 } from './TerrainMaterialFeatureResponseNodes.js';
 import { createTerrainSurfaceNormal } from './TerrainMaterialSurfaceGradientNodes.js';
+import {
+  applyTerrainWeatheringColor,
+  createTerrainWeatheringState,
+} from './TerrainMaterialWeatheringNodes.js';
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
@@ -135,10 +139,19 @@ export function createTerrainMaterialBakedSurface({
     cameraDistance,
     features: families.features,
   });
+  const weatheringState = createTerrainWeatheringState({
+    terrainShape: samples.terrainShape,
+    wetness: samples.wetnessShoreline.r,
+    canopy: samples.canopyWater.r,
+    shoreline: samples.wetnessShoreline.g,
+    cameraDistance,
+    weathering: families.weathering,
+  });
   const roughness = clamp(
     materialRoughness(weights, samples.wetnessShoreline.r, families.profiles)
       .add(genome.roughnessOffset)
-      .add(featureState.roughnessOffset),
+      .add(featureState.roughnessOffset)
+      .add(weatheringState.roughnessOffset),
     0,
     1,
   );
@@ -216,6 +229,7 @@ export function createTerrainMaterialBakedSurface({
     .mul(macroMultiplier)
     .mul(genome.colorMultiplier);
   midColor = applyTerrainMaterialFeatureColor(midColor, featureState, families.features);
+  midColor = applyTerrainWeatheringColor(midColor, weatheringState);
   midColor = mix(
     midColor,
     colorNode(render.shorelineColor),
@@ -246,6 +260,7 @@ export function createTerrainMaterialBakedSurface({
     featureState,
     families.features,
   );
+  nearProcedural = applyTerrainWeatheringColor(nearProcedural, weatheringState);
   const nearDetailed = mix(nearProcedural, midColor, render.nearMaterialBlend);
 
   const nearBlendEnd = render.nearDistance + render.transitionDistance;
