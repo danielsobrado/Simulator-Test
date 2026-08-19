@@ -857,6 +857,13 @@ export class InfiniteTerrainView {
       return;
     }
     this.disposed = true;
+    if (typeof this.worldStore.cancelChunk === 'function') {
+      for (const slot of this.slots) {
+        if (slot.loading && slot.descriptor) {
+          this.worldStore.cancelChunk(slot.descriptor.chunkX, slot.descriptor.chunkZ);
+        }
+      }
+    }
     this.commitQueue.clear();
     this.pendingFetches.clear();
     this.streamingListeners.clear();
