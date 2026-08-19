@@ -72,6 +72,11 @@ function normalizeProfile(source, family) {
   assertPositive(source.directionalFrequency, `${path}.directionalFrequency`);
   assertUnit(source.directionalStrength, `${path}.directionalStrength`);
   assertUnit(source.colorSpread, `${path}.colorSpread`);
+  assertUnit(source.roughness, `${path}.roughness`);
+  assertUnit(source.wetRoughness, `${path}.wetRoughness`);
+  if (source.wetRoughness > source.roughness) {
+    fail(`${path}.wetRoughness`, 'must not exceed dry roughness');
+  }
   return Object.freeze({
     contrast: source.contrast,
     coarseFrequency: source.coarseFrequency,
@@ -83,6 +88,8 @@ function normalizeProfile(source, family) {
     directionalStrength: source.directionalStrength,
     direction: normalizeDirection(source.direction, `${path}.direction`),
     colorSpread: source.colorSpread,
+    roughness: source.roughness,
+    wetRoughness: source.wetRoughness,
   });
 }
 
