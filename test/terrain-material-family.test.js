@@ -33,14 +33,22 @@ test('terrain material families validate bounded shared-atlas settings', () => {
   assert.equal(config.families.resolution, 64);
   assert.equal(config.families.variantsPerFamily, 4);
   assert.equal(config.families.scaleJitter, 0.18);
+  assert.equal(config.families.contrastPreservation, 0.62);
+  assert.equal(config.families.secondaryBlendStrength, 0.85);
+  assert.equal(config.families.genomes.enabled, true);
+  assert.equal(config.families.features.enabled, true);
   assert.deepEqual(Object.keys(config.families.profiles), TERRAIN_MATERIAL_FAMILIES);
   assert.equal(config.families.projection.slopeStart < config.families.projection.slopeFull, true);
   assert.equal(config.families.microFadeStartDistance < config.families.microFadeEndDistance, true);
+  assert.equal(config.families.normalFadeStartDistance < config.families.normalFadeEndDistance, true);
+  assert.equal(config.families.features.fadeStartDistance < config.families.features.fadeEndDistance, true);
   assert.equal(Object.isFrozen(config.families), true);
   assert.equal(Object.isFrozen(config.families.profiles.rock), true);
+  assert.equal(Object.isFrozen(config.families.genomes), true);
+  assert.equal(Object.isFrozen(config.families.features), true);
 });
 
-test('terrain material family config rejects unsafe atlas, fade, scale and projection settings', () => {
+test('terrain material family config rejects unsafe atlas, fade, scale and feature settings', () => {
   const tooManyVariants = sourceConfig();
   tooManyVariants.families.variantsPerFamily = 9;
   assert.throws(
@@ -67,6 +75,20 @@ test('terrain material family config rejects unsafe atlas, fade, scale and proje
   assert.throws(
     () => createTerrainMaterialBakeConfig(invalidMicroFade),
     /families\.microFadeEndDistance must exceed microFadeStartDistance/,
+  );
+
+  const invalidFeatureFade = sourceConfig();
+  invalidFeatureFade.families.features.fadeEndDistance = invalidFeatureFade.families.features.fadeStartDistance;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidFeatureFade),
+    /families\.features\.fadeEndDistance must exceed fadeStartDistance/,
+  );
+
+  const invalidFeatureColor = sourceConfig();
+  invalidFeatureColor.families.features.lichenColor = 'green';
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidFeatureColor),
+    /families\.features\.lichenColor must be a six-digit hex color/,
   );
 
   const zeroDirection = sourceConfig();
