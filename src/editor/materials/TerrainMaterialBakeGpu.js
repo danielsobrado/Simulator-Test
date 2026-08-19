@@ -103,6 +103,7 @@ export function createTerrainMaterialBakeGpuState(config) {
     textures: Object.freeze(textures),
     ready: uniform(0),
     stale: uniform(0),
+    blend: uniform(0),
     key: null,
     disposed: false,
   };
@@ -117,6 +118,7 @@ export function attachTerrainMaterialBakeGpuState(material, state) {
     for (const texture of Object.values(state.textures)) texture.dispose();
     state.ready.value = 0;
     state.stale.value = 0;
+    state.blend.value = 0;
     state.key = null;
     material.removeEventListener('dispose', dispose);
   };
@@ -132,6 +134,7 @@ export function clearTerrainMaterialBakeGpu(material) {
   if (!state || state.disposed) return;
   state.ready.value = 0;
   state.stale.value = 0;
+  state.blend.value = 0;
 }
 
 export function uploadTerrainMaterialBakeGpu(material, page, { stale = false } = {}) {
@@ -148,6 +151,7 @@ export function uploadTerrainMaterialBakeGpu(material, page, { stale = false } =
       uploadedBytes += source.byteLength;
     }
     state.key = page.descriptor.key;
+    state.blend.value = 0;
   }
   state.ready.value = 1;
   state.stale.value = stale ? 1 : 0;
