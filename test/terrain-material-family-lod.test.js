@@ -32,8 +32,16 @@ test('terrain family projection uses baked shape only for texture projection, no
   assert.doesNotMatch(terrainSource, /material\.normalNode\s*=/);
 });
 
+test('micro detail fades before it undersamples while mip-filtered meso detail survives', () => {
+  assert.match(stochasticSource, /families\.microFadeStartDistance/);
+  assert.match(stochasticSource, /families\.microFadeEndDistance/);
+  assert.match(stochasticSource, /const microVisibility = oneMinus\(smoothstep\(/);
+  assert.match(stochasticSource, /\.mul\(visibility\)/);
+});
+
 test('near and mid terrain consume the family atlas while far terrain remains baked color', () => {
   assert.match(bakedSource, /createTerrainMaterialFamilyMultiplier\(\{/);
+  assert.match(bakedSource, /cameraDistance,/);
   assert.match(bakedSource, /midColor = midColor\.mul\(familyMultiplier\)\.mul\(macroMultiplier\);/);
   assert.match(bakedSource, /const nearFamily = mix\(vec3\(1\), familyMultiplier, materialBake\.families\.nearStrength\);/);
   assert.match(bakedSource, /samples\.farColor\.rgb/);
