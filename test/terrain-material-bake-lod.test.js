@@ -33,6 +33,14 @@ test('baked terrain color uses ready-gated near, mid and far conditional nodes',
   assert.doesNotMatch(bakedSource, /stylizedFbm|stylizedDirtMask|stylizedPathWearMask/);
 });
 
+test('stale baked terrain partially favors live procedural shading until refresh completes', () => {
+  assert.match(bakedSource, /gpuState\.stale\.greaterThan\(0\.5\)/);
+  assert.match(
+    bakedSource,
+    /mix\(bakedColor, proceduralColor, render\.staleProceduralBlend\)/,
+  );
+});
+
 test('stylized surface uploads CPU bakes after the bake runtime update', () => {
   const runtimeIndex = surfaceSource.indexOf('this.materialBakeRuntime?.update();');
   const gpuIndex = surfaceSource.indexOf('this.materialBakeGpuBridge?.update();');
