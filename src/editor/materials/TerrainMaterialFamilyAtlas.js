@@ -5,16 +5,6 @@ import { generateTerrainMaterialFamilyPixels } from './TerrainMaterialFamilyPixe
 const atlasEntries = new Map();
 const FULL_MIP_CHAIN_RATIO = 4 / 3;
 
-function atlasKey(config) {
-  const families = config.families;
-  return JSON.stringify({
-    seed: families.seed,
-    resolution: families.resolution,
-    variantsPerFamily: families.variantsPerFamily,
-    profiles: families.profiles,
-  });
-}
-
 function publishCounters() {
   let bytes = 0;
   for (const entry of atlasEntries.values()) bytes += entry.estimatedGpuBytes;
@@ -44,8 +34,8 @@ function createAtlas(config) {
 }
 
 export function acquireTerrainMaterialFamilyAtlas(config) {
-  if (!config?.families?.enabled) return null;
-  const key = atlasKey(config);
+  const key = config?.families;
+  if (!key?.enabled) return null;
   let entry = atlasEntries.get(key);
   if (!entry) {
     entry = createAtlas(config);
