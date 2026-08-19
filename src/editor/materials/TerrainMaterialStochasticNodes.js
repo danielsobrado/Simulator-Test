@@ -49,15 +49,25 @@ function rotateQuarterTurns(uvNode, hashNode) {
   );
 }
 
-function sampleVariant(atlas, baseUv, vertex, familyIndex, variantsPerFamily, offset) {
+function sampleVariant(
+  atlas,
+  baseUv,
+  vertex,
+  familyIndex,
+  variantsPerFamily,
+  scaleJitter,
+  offset,
+) {
   const variantHash = hash2(vertex, HASH_VECTOR_A, offset);
   const transformHash = hash2(vertex, HASH_VECTOR_B, offset + 13.7);
   const mirrorHash = hash2(vertex, HASH_VECTOR_A, offset + 29.3);
   const shiftX = hash2(vertex, HASH_VECTOR_B, offset + 41.1);
   const shiftY = hash2(vertex, HASH_VECTOR_A, offset + 57.9);
+  const scaleHash = hash2(vertex, HASH_VECTOR_B, offset + 71.3);
   const variant = floor(variantHash.mul(variantsPerFamily));
   const layer = familyIndex.mul(variantsPerFamily).add(variant);
-  let sampleUv = baseUv.add(vec2(shiftX, shiftY));
+  const scale = mix(float(1 - scaleJitter), float(1 + scaleJitter), scaleHash);
+  let sampleUv = baseUv.mul(scale).add(vec2(shiftX, shiftY));
   sampleUv = rotateQuarterTurns(sampleUv, transformHash);
   sampleUv = select(
     mirrorHash.greaterThan(0.5),
@@ -74,6 +84,7 @@ function stochasticTriSample({
   variantCellMeters,
   familyIndex,
   variantsPerFamily,
+  scaleJitter,
 }) {
   const baseUv = planarMeters.div(mesoScaleMeters);
   const grid = planarMeters.div(variantCellMeters);
@@ -92,10 +103,15 @@ function stochasticTriSample({
   const weight1 = select(upper, oneMinus(local.y), local.x);
   const weight2 = select(upper, oneMinus(local.x), local.y);
 
-  return sampleVariant(atlas, baseUv, vertex0, familyIndex, variantsPerFamily, 0)
-    .mul(weight0)
-    .add(sampleVariant(atlas, baseUv, vertex1, familyIndex, variantsPerFamily, 17).mul(weight1))
-    .add(sampleVariant(atlas, baseUv, vertex2, familyIndex, variantsPerFamily, 37).mul(weight2));
+  return sampleVariant(
+    atlas, baseUv, vertex0, familyIndex, variantsPerFamily, scaleJitter, 0,
+  ).mul(weight0)
+    .add(sampleVariant(
+      atlas, baseUv, vertex1, familyIndex, variantsPerFamily, scaleJitter, 17,
+    ).mul(weight1))
+    .add(sampleVariant(
+      atlas, baseUv, vertex2, familyIndex, variantsPerFamily, scaleJitter, 37,
+    ).mul(weight2));
 }
 
 function dominantFamily(weights) {
@@ -131,6 +147,7 @@ function projectedDetail({
     variantCellMeters: families.variantCellMeters,
     familyIndex,
     variantsPerFamily: families.variantsPerFamily,
+    scaleJitter: families.scaleJitter,
   });
   const meso = sample.sub(0.5).mul(families.mesoStrength * 2);
   const micro = microVariation(
