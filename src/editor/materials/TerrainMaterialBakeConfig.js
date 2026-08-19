@@ -191,6 +191,7 @@ function normalizeRender(source) {
     'wetDarkening',
     'shorelineStrength',
     'canopyStrength',
+    'fallbackRoughness',
   ]) {
     assertUnitInterval(source[field], `render.${field}`);
   }
