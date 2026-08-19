@@ -17,7 +17,10 @@ export class StylizedSurfaceView extends StylizedSurfaceViewBase {
       })
       : null;
     this.materialBakeGpuBridge = this.materialBakeRuntime
-      ? new TerrainMaterialBakeGpuBridge({ terrainView: options.terrainView })
+      ? new TerrainMaterialBakeGpuBridge({
+        terrainView: options.terrainView,
+        config: this.config.materialBake,
+      })
       : null;
     this.collisionSourceDisposed = false;
     this.releaseCollisionNaturalSource = null;
