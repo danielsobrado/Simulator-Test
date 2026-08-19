@@ -55,6 +55,74 @@ macro:
   maxHeightShade: 1.22
   wetDarkening: 0.18
 
+families:
+  enabled: true
+  seed: 7717
+  resolution: 64
+  variantsPerFamily: 4
+  # Meso uses the shared stochastic atlas; micro is an independent analytic field.
+  mesoScaleMeters: 3.8
+  microScaleMeters: 0.42
+  variantCellMeters: 18
+  strength: 0.36
+  dominantFadePower: 1.6
+  mesoStrength: 0.24
+  microStrength: 0.06
+  projection:
+    # Flat ground uses world XZ. Steep ground switches to its dominant vertical plane.
+    slopeStart: 0.22
+    slopeFull: 0.58
+    verticalScale: 0.85
+  environment:
+    # Wet and shaded ground retains structure but suppresses harsh high-frequency contrast.
+    wetDetailScale: 0.72
+    canopyDetailScale: 0.86
+  profiles:
+    grass:
+      contrast: 0.26
+      coarseFrequency: 3
+      fineFrequency: 11
+      fineStrength: 0.42
+      ridgeFrequency: 7
+      ridgeStrength: 0.08
+      directionalFrequency: 5
+      directionalStrength: 0.10
+      direction: [0.86, 0.51]
+      colorSpread: 0.035
+    dirt:
+      contrast: 0.34
+      coarseFrequency: 4
+      fineFrequency: 13
+      fineStrength: 0.55
+      ridgeFrequency: 5
+      ridgeStrength: 0.18
+      directionalFrequency: 3
+      directionalStrength: 0.12
+      direction: [0.60, -0.80]
+      colorSpread: 0.050
+    rock:
+      contrast: 0.42
+      coarseFrequency: 3
+      fineFrequency: 17
+      fineStrength: 0.38
+      ridgeFrequency: 6
+      ridgeStrength: 0.55
+      directionalFrequency: 4
+      directionalStrength: 0.32
+      direction: [0.92, 0.38]
+      colorSpread: 0.025
+    snow:
+      contrast: 0.16
+      coarseFrequency: 2
+      fineFrequency: 9
+      fineStrength: 0.24
+      ridgeFrequency: 4
+      ridgeStrength: 0.08
+      directionalFrequency: 2
+      directionalStrength: 0.06
+      direction: [0.40, 0.92]
+      colorSpread: 0.012
+
 render:
   # Near keeps full procedural detail; mid uses baked material classes; far uses baked color.
   nearDistance: 90
