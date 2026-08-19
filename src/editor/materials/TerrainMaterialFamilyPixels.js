@@ -44,9 +44,20 @@ function channelVariation(base, fine, ridge, directional, profile, channelBias) 
   return clamp01(0.5 + value * profile.contrast + channelBias);
 }
 
+function directionalCycles(profile) {
+  let x = Math.round(profile.direction[0] * profile.directionalFrequency);
+  let y = Math.round(profile.direction[1] * profile.directionalFrequency);
+  if (x === 0 && y === 0) {
+    if (Math.abs(profile.direction[0]) >= Math.abs(profile.direction[1])) x = 1;
+    else y = 1;
+  }
+  return [x, y];
+}
+
 function writeLayer(target, layer, resolution, profile, seed) {
   const layerOffset = layer * resolution * resolution * 4;
   const phase = hashUnit(layer, seed, seed ^ 0x51f15e);
+  const [directionCyclesX, directionCyclesY] = directionalCycles(profile);
   const redBias = (hashUnit(seed, layer, 0x125f3) - 0.5) * profile.colorSpread;
   const greenBias = (hashUnit(seed, layer, 0x33d17) - 0.5) * profile.colorSpread;
   const blueBias = (hashUnit(seed, layer, 0x71a93) - 0.5) * profile.colorSpread;
@@ -60,8 +71,7 @@ function writeLayer(target, layer, resolution, profile, seed) {
       const ridgeNoise = periodicValueNoise(u, v, profile.ridgeFrequency, seed + 71);
       const ridge = 1 - Math.abs(ridgeNoise * 2 - 1);
       const directional = Math.sin(
-        (u * profile.direction[0] + v * profile.direction[1] + phase)
-        * Math.PI * 2 * profile.directionalFrequency,
+        (u * directionCyclesX + v * directionCyclesY + phase) * Math.PI * 2,
       ) * 0.5;
       const offset = layerOffset + (y * resolution + x) * 4;
       target[offset] = Math.round(channelVariation(
