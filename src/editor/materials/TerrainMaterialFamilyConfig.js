@@ -5,6 +5,7 @@ const MAX_RESOLUTION = 256;
 const MAX_VARIANTS_PER_FAMILY = 8;
 const MAX_FREQUENCY = 64;
 const MAX_SCALE_JITTER = 0.5;
+const MAX_SECONDARY_MIN_WEIGHT = 0.49;
 
 function fail(path, message) {
   throw new Error(`Invalid terrain material bake configuration: ${path} ${message}.`);
@@ -93,6 +94,24 @@ function normalizeProfile(source, family) {
   });
 }
 
+function normalizeGenomes(source) {
+  assertObject(source, 'families.genomes');
+  assertBoolean(source.enabled, 'families.genomes.enabled');
+  assertPositive(source.regionScaleMeters, 'families.genomes.regionScaleMeters');
+  if (!Number.isSafeInteger(source.seedOffset) || source.seedOffset < 0) {
+    fail('families.genomes.seedOffset', 'must be a non-negative safe integer');
+  }
+  for (const field of [
+    'biomeInfluence',
+    'colorStrength',
+    'roughnessStrength',
+    'detailStrength',
+  ]) {
+    assertUnit(source[field], `families.genomes.${field}`);
+  }
+  return Object.freeze({ ...source });
+}
+
 export function normalizeTerrainMaterialFamilies(source) {
   assertObject(source, 'families');
   assertBoolean(source.enabled, 'families.enabled');
@@ -117,6 +136,9 @@ export function normalizeTerrainMaterialFamilies(source) {
     'secondaryMinWeight',
   ]) {
     assertUnit(source[field], `families.${field}`);
+  }
+  if (source.secondaryMinWeight > MAX_SECONDARY_MIN_WEIGHT) {
+    fail('families.secondaryMinWeight', `must not exceed ${MAX_SECONDARY_MIN_WEIGHT}`);
   }
   assertUnit(source.scaleJitter, 'families.scaleJitter');
   if (source.scaleJitter > MAX_SCALE_JITTER) {
@@ -176,6 +198,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     microStrength: source.microStrength,
     microFadeStartDistance: source.microFadeStartDistance,
     microFadeEndDistance: source.microFadeEndDistance,
+    genomes: normalizeGenomes(source.genomes),
     projection: Object.freeze({ ...source.projection }),
     environment: Object.freeze({ ...source.environment }),
     profiles,
