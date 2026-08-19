@@ -17,6 +17,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import { createTerrainOrientedMicroDetail } from './TerrainMaterialMicroDetailNodes.js';
 
 const HASH_VECTOR_A = Object.freeze([127.1, 311.7]);
 const HASH_VECTOR_B = Object.freeze([269.5, 183.3]);
@@ -165,12 +166,6 @@ function topTwoFamilies(weights) {
   };
 }
 
-function microVariation(planarMeters, scaleMeters, strength, visibility) {
-  const first = sin(dot(planarMeters, vec2(1.73, 2.31)).div(scaleMeters));
-  const second = sin(dot(planarMeters, vec2(-2.17, 1.41)).div(scaleMeters * 0.63));
-  return first.mul(second).mul(strength).mul(visibility);
-}
-
 function projectedDetail({
   atlas,
   planarMeters,
@@ -193,12 +188,12 @@ function projectedDetail({
     ? stochasticSingleSample(sampleOptions)
     : stochasticTriSample(sampleOptions);
   const meso = sample.sub(0.5).mul(families.mesoStrength * 2);
-  const micro = microVariation(
+  const micro = createTerrainOrientedMicroDetail({
     planarMeters,
-    families.microScaleMeters,
-    families.microStrength,
-    microVisibility,
-  );
+    scaleMeters: families.microScaleMeters,
+    strength: families.microStrength,
+    visibility: microVisibility,
+  });
   return clamp(
     vec3(1).add(meso).add(vec3(micro)),
     vec3(MIN_DETAIL_MULTIPLIER),
