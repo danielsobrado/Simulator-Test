@@ -1,7 +1,9 @@
 import * as THREE from 'three/webgpu';
+import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { generateTerrainMaterialFamilyPixels } from './TerrainMaterialFamilyPixels.js';
 
 const atlasEntries = new Map();
+const FULL_MIP_CHAIN_RATIO = 4 / 3;
 
 function atlasKey(config) {
   const families = config.families;
@@ -13,6 +15,13 @@ function atlasKey(config) {
   });
 }
 
+function publishCounters() {
+  let bytes = 0;
+  for (const entry of atlasEntries.values()) bytes += entry.estimatedGpuBytes;
+  PerfCounters.set('terrainMaterialFamilyAtlasEntries', atlasEntries.size);
+  PerfCounters.set('terrainMaterialFamilyAtlasBytes', bytes);
+}
+
 function createAtlas(config) {
   const { pixels, resolution, depth } = generateTerrainMaterialFamilyPixels(config);
   const texture = new THREE.DataArrayTexture(pixels, resolution, resolution, depth);
@@ -22,10 +31,16 @@ function createAtlas(config) {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
   texture.needsUpdate = true;
-  return { texture, resolution, depth, refs: 0 };
+  return {
+    texture,
+    resolution,
+    depth,
+    refs: 0,
+    estimatedGpuBytes: Math.ceil(pixels.byteLength * FULL_MIP_CHAIN_RATIO),
+  };
 }
 
 export function acquireTerrainMaterialFamilyAtlas(config) {
@@ -35,6 +50,7 @@ export function acquireTerrainMaterialFamilyAtlas(config) {
   if (!entry) {
     entry = createAtlas(config);
     atlasEntries.set(key, entry);
+    publishCounters();
   }
   entry.refs += 1;
   let released = false;
@@ -49,6 +65,7 @@ export function acquireTerrainMaterialFamilyAtlas(config) {
       if (entry.refs <= 0 && atlasEntries.get(key) === entry) {
         atlasEntries.delete(key);
         entry.texture.dispose();
+        publishCounters();
       }
     },
   });
