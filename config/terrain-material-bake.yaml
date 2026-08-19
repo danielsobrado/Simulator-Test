@@ -64,6 +64,7 @@ families:
   mesoScaleMeters: 3.8
   microScaleMeters: 0.42
   variantCellMeters: 18
+  scaleJitter: 0.18
   strength: 0.36
   nearStrength: 0.55
   dominantFadePower: 1.6
