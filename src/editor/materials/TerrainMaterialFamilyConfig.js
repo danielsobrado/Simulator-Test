@@ -103,6 +103,14 @@ export function normalizeTerrainMaterialFamilies(source) {
   for (const field of ['strength', 'nearStrength', 'mesoStrength', 'microStrength']) {
     assertUnit(source[field], `families.${field}`);
   }
+  assertFinite(source.microFadeStartDistance, 'families.microFadeStartDistance');
+  if (source.microFadeStartDistance < 0) {
+    fail('families.microFadeStartDistance', 'must be non-negative');
+  }
+  assertPositive(source.microFadeEndDistance, 'families.microFadeEndDistance');
+  if (source.microFadeEndDistance <= source.microFadeStartDistance) {
+    fail('families.microFadeEndDistance', 'must exceed microFadeStartDistance');
+  }
 
   assertObject(source.projection, 'families.projection');
   assertFinite(source.projection.slopeStart, 'families.projection.slopeStart');
@@ -144,6 +152,8 @@ export function normalizeTerrainMaterialFamilies(source) {
     dominantFadePower: source.dominantFadePower,
     mesoStrength: source.mesoStrength,
     microStrength: source.microStrength,
+    microFadeStartDistance: source.microFadeStartDistance,
+    microFadeEndDistance: source.microFadeEndDistance,
     projection: Object.freeze({ ...source.projection }),
     environment: Object.freeze({ ...source.environment }),
     profiles,
