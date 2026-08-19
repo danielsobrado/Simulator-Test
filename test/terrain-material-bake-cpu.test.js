@@ -24,8 +24,8 @@ function bakeConfig(resolution = 4) {
       strength: 0.14,
       seedOffset: 2401,
       heightShadeScale: 0.018,
-      minHeightShade: 0.78,
-      maxHeightShade: 1.18,
+      minHeightShade: 0.72,
+      maxHeightShade: 1.22,
       wetDarkening: 0.18,
     },
   };
@@ -131,6 +131,55 @@ test('terrain bake uses full cell gradients on the outer chunk ring', async () =
 
   assert.notEqual(normals[0], 0);
   assert.equal(normals[0], normals[(4 - 1) * 2]);
+});
+
+test('material-aware far color preserves classified rock instead of reverting to the base tile', async () => {
+  const live = page();
+  live.surfaceMaskPixels.fill(0);
+  for (let index = 0; index < 16; index += 1) {
+    live.surfaceMaskPixels[index * 4 + 1] = 255;
+    live.surfaceMaskPixels[index * 4 + 3] = 255;
+  }
+  for (let z = 0; z <= 4; z += 1) {
+    for (let x = 0; x <= 4; x += 1) {
+      live.heights[z * 5 + x] = x * 4;
+    }
+  }
+  const source = captureTerrainMaterialBakeSource({ page: live });
+  const config = bakeConfig();
+  config.classification.rockSlopeStart = 0.01;
+  config.classification.rockSlopeFull = 0.02;
+  config.classification.snowLine = 1000;
+  config.macro.strength = 0;
+  config.macro.heightShadeScale = 0;
+  config.macro.minHeightShade = 1;
+  config.macro.maxHeightShade = 1;
+  config.render = {
+    grassTintStrength: 0,
+    wetDarkening: 0,
+    shorelineStrength: 0,
+    canopyStrength: 0,
+    rockColor: '#8d9195',
+    snowColor: '#e8eef2',
+    shorelineColor: '#59604f',
+  };
+  const result = await bakeTerrainMaterialPage({
+    source,
+    descriptor: descriptor(),
+    config,
+    chunkSize: 4,
+    tileSize: 2,
+    materialStyle: {
+      grassBottomColor: '#4f7c13',
+      grassBrightness: 0.8,
+      dirtColor: '#ac956c',
+      forestColor: '#3b5233',
+    },
+    yieldControl: async () => {},
+  });
+
+  assert.deepEqual([...result.value.channels.materialWeights.slice(0, 4)], [0, 0, 255, 0]);
+  assert.deepEqual([...result.value.channels.farColor.slice(0, 3)], [0x8d, 0x91, 0x95]);
 });
 
 test('terrain bake source is snapshotted before asynchronous work mutates the live page', () => {
