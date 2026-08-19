@@ -1,0 +1,54 @@
+[
+  {
+    "version": 4,
+    "key": "workshop-legacy-v4",
+    "label": "Legacy V4",
+    "recipe": {
+      "archetype": "wall",
+      "style": "granite",
+      "topStyle": "battlements",
+      "finish": "masonry",
+      "shape": "classic",
+      "towerSide": "left",
+      "width": 8,
+      "depth": 2,
+      "height": 5,
+      "roofScale": 1,
+      "roofOverhang": 0.35,
+      "seed": 41,
+      "detail": 2,
+      "weathering": 0.35,
+      "windows": true,
+      "ivy": false,
+      "remesh": true,
+      "albedo": true
+    }
+  },
+  {
+    "version": 6,
+    "key": "workshop-legacy-v6",
+    "label": "Legacy V6",
+    "recipe": {
+      "archetype": "manor",
+      "style": "limestone",
+      "topStyle": "slate",
+      "finish": "limewash",
+      "shape": "classic",
+      "towerSide": "right",
+      "width": 10,
+      "depth": 3,
+      "height": 6,
+      "roofScale": 1,
+      "roofOverhang": 0.35,
+      "roofPitch": 38,
+      "seed": 42,
+      "detail": 2,
+      "weathering": 0.35,
+      "irregularity": 0.45,
+      "windows": true,
+      "ivy": false,
+      "remesh": true,
+      "albedo": true
+    }
+  }
+]

@@ -1,0 +1,285 @@
+version: 1
+precision: 6
+reportPath: tmp/workshop-compatibility/report.json
+contracts:
+  assetVersion: 7
+  supportedAssetVersions: [1, 2, 3, 4, 5, 6, 7]
+  compositionVersion: 1
+  normalizedRecipeFields:
+    - archetype
+    - style
+    - topStyle
+    - finish
+    - shape
+    - towerSide
+    - width
+    - depth
+    - height
+    - roofScale
+    - roofOverhang
+    - roofPitch
+    - seed
+    - detail
+    - weathering
+    - irregularity
+    - windows
+    - ivy
+    - remesh
+    - albedo
+    - composition
+    - surfaceTextures
+    - materialLibrary
+    - materialDefaults
+    - materialAreaOverrides
+    - materialFavorites
+    - componentTransforms
+    - openingAttachments
+    - openingAssemblies
+  ids:
+    assetKey: "^workshop-[a-z0-9-]+$"
+    component: "^[a-z][a-z0-9-]{0,63}$"
+    openingHost: "^structure-[a-z0-9-]{1,55}$"
+    openingAssembly: "^assembly-(window|door)-[1-9][0-9]*$"
+visualQa:
+  command: npm run qa:workshop -- --runs 1
+  outputDirectory: tmp/workshop-qa
+  representativeCheckpoints:
+    - 1-03-radial-attached.png
+    - 1-07-material-area-override.png
+    - 1-10-composition-l-roof.png
+lod:
+  enabled: true
+  nearPixels: 140
+  coarsePixels: 35
+  hysteresisRatio: 0.15
+  transitionMs: 240
+  fadeSteps: 16
+fixtures:
+  - id: wall-classic
+    label: Compatibility Classic Wall
+    recipe:
+      archetype: wall
+      shape: classic
+      style: granite
+      topStyle: battlements
+      finish: masonry
+      width: 8
+      depth: 2
+      height: 5
+      detail: 3
+      seed: 1101
+      windows: true
+  - id: wall-stepped
+    label: Compatibility Stepped Wall
+    recipe:
+      archetype: wall
+      shape: stepped
+      style: limestone
+      topStyle: battlements
+      finish: masonry
+      width: 10
+      depth: 2.5
+      height: 5.5
+      detail: 3
+      seed: 1102
+      windows: true
+  - id: wall-tapered
+    label: Compatibility Tapered Wall
+    recipe:
+      archetype: wall
+      shape: tapered
+      style: sandstone
+      topStyle: battlements
+      finish: masonry
+      width: 9
+      depth: 2.2
+      height: 6
+      detail: 3
+      seed: 1103
+      windows: true
+  - id: gatehouse
+    label: Compatibility Gatehouse
+    recipe:
+      archetype: gatehouse
+      style: granite
+      topStyle: battlements
+      finish: masonry
+      width: 10
+      depth: 3
+      height: 6
+      detail: 3
+      seed: 1201
+      windows: true
+  - id: round-tower
+    label: Compatibility Round Tower
+    recipe:
+      archetype: tower
+      style: limestone
+      topStyle: slate
+      finish: masonry
+      width: 7
+      depth: 3
+      height: 8
+      detail: 3
+      seed: 1202
+      windows: true
+  - id: square-tower
+    label: Compatibility Square Tower
+    recipe:
+      archetype: square-tower
+      style: granite
+      topStyle: battlements
+      finish: masonry
+      width: 7
+      depth: 3
+      height: 8
+      detail: 3
+      seed: 1203
+      windows: true
+  - id: manor-materials
+    label: Compatibility Manor Materials
+    recipe:
+      archetype: manor
+      style: limestone
+      topStyle: slate
+      finish: limewash
+      towerSide: right
+      width: 10
+      depth: 3
+      height: 6
+      detail: 3
+      seed: 1301
+      windows: true
+      ivy: true
+      materialDefaults:
+        walls: limestone-masonry
+        roof: slate-roof
+        wood: aged-timber
+      materialFavorites:
+        - limestone-masonry
+        - slate-roof
+        - aged-timber
+  - id: transformed-components
+    label: Compatibility Transformed Components
+    recipe:
+      archetype: gatehouse
+      style: granite
+      topStyle: battlements
+      finish: masonry
+      width: 10
+      depth: 3
+      height: 6
+      detail: 3
+      seed: 1401
+      windows: true
+      componentTransforms:
+        structure-left:
+          position: [-0.2, 0.1, 0.15]
+          rotation: [0, 0.08, 0]
+          scale: [1.03, 1, 0.98]
+  - id: opening-assembly
+    label: Compatibility Opening Assembly
+    geometry: false
+    recipe:
+      archetype: wall
+      shape: classic
+      style: granite
+      topStyle: battlements
+      finish: masonry
+      width: 8
+      depth: 2
+      height: 5
+      detail: 2
+      seed: 1501
+      windows: true
+      openingAttachments:
+        copy-window-1-1:
+          sourceId: window-1
+          hostId: structure-main
+          position: [1.4, 2.1]
+          scale: [1, 1]
+      openingAssemblies:
+        assembly-window-1:
+          kind: window
+          hostId: structure-main
+          memberIds:
+            - window-1
+            - copy-window-1-1
+  - id: surface-texture
+    label: Compatibility Surface Texture
+    geometry: false
+    recipe:
+      archetype: wall
+      shape: classic
+      seed: 1601
+      surfaceTextures:
+        sources:
+          albedo-baseline:
+            name: Baseline pixel
+            dataUrl: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=
+        slots:
+          walls:
+            sourceId: albedo-baseline
+            mapping: repeat
+            repeat: 2
+            rotation: 0
+            tint: "#ffffff"
+  - id: composition-l-roof
+    label: Compatibility Composition L Roof
+    recipe:
+      archetype: manor
+      style: granite
+      topStyle: slate
+      finish: masonry
+      width: 10
+      depth: 3
+      height: 6
+      detail: 3
+      seed: 1701
+      roofPitch: 42
+      roofOverhang: 0.35
+      composition:
+        version: 1
+        primitives:
+          - id: hall
+            kind: rectangle
+            position: [0, 0]
+            rotation: 0
+            dimensions: [8, 3]
+            elevation: 0
+            height: 5
+            levels: 1
+            roofFamily: hip
+          - id: wing
+            kind: rectangle
+            position: [-2.5, 2]
+            rotation: 0
+            dimensions: [3, 5]
+            elevation: 0
+            height: 5
+            levels: 1
+            roofFamily: hip
+          - id: tower
+            kind: circle
+            position: [3.5, 0]
+            rotation: 0
+            radius: 1.5
+            elevation: 0
+            height: 8
+            levels: 2
+            roofFamily: cone
+straightSkeletons:
+  - id: rectangle
+    polygon:
+      - [0, 0]
+      - [8, 0]
+      - [8, 6]
+      - [0, 6]
+  - id: l-footprint
+    polygon:
+      - [0, 0]
+      - [8, 0]
+      - [8, 3]
+      - [3, 3]
+      - [3, 7]
+      - [0, 7]

@@ -42,6 +42,8 @@
     "verify:asset-serving": "node scripts/verify-asset-serving.mjs",
     "qa:workshop:install": "playwright install chromium",
     "qa:workshop": "node scripts/run-workshop-qa.mjs",
+    "qa:workshop:compat": "node scripts/run-workshop-compatibility.mjs",
+    "qa:workshop:compat:visual": "node scripts/run-workshop-compatibility.mjs --visual",
     "qa:inventory": "node scripts/run-inventory-qa.mjs",
     "qa:construction:joints": "node scripts/run-construction-joint-width-qa.mjs",
     "qa:construction:relief": "node scripts/run-construction-stone-relief-qa.mjs",
