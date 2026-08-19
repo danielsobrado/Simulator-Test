@@ -44,6 +44,11 @@ function assertNonNegativeInteger(value, path) {
   if (!Number.isSafeInteger(value) || value < 0) fail(path, 'must be a non-negative safe integer');
 }
 
+function assertNonNegative(value, path) {
+  assertFinite(value, path);
+  if (value < 0) fail(path, 'must be non-negative');
+}
+
 function assertUnitInterval(value, path) {
   assertFinite(value, path);
   if (value < 0 || value > 1) fail(path, 'must be within [0, 1]');
@@ -172,6 +177,7 @@ function normalizeRender(source) {
   assertPositive(source.nearDistance, 'render.nearDistance');
   assertPositive(source.farDistance, 'render.farDistance');
   assertPositive(source.transitionDistance, 'render.transitionDistance');
+  assertNonNegative(source.publishFadeMs, 'render.publishFadeMs');
   if (source.farDistance <= source.nearDistance + source.transitionDistance) {
     fail('render.farDistance', 'must start after the near transition band');
   }
