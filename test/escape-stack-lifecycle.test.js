@@ -7,8 +7,6 @@ function escapeEvent() {
   const event = new Event('keydown', { cancelable: true });
   Object.defineProperty(event, 'key', { value: 'Escape' });
   Object.defineProperty(event, 'code', { value: 'Escape' });
-  Object.defineProperty(event, 'target', { value: null });
-  event.stopImmediatePropagation = () => {};
   return event;
 }
 
