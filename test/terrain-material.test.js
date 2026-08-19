@@ -18,11 +18,10 @@ test('forest-floor tint excludes exposed dirt and path tread', () => {
   );
 });
 
-test('terrain uses PBR response while preserving its transformed base normal', () => {
+test('terrain uses PBR response and baked slope-aware surface normals', () => {
   assert.match(source, /new THREE\.MeshStandardNodeMaterial/);
   assert.match(source, /material\.roughnessNode\s*=\s*bakedSurface\.roughness/);
-  assert.doesNotMatch(source, /material\.normalNode\s*=/);
-  assert.match(source, /PlaneGeometry's local \+Z[\s\S]*?world \+Y/);
+  assert.match(source, /material\.normalNode\s*=\s*bakedSurface\.normal/);
 });
 
 test('terrain color does not overlay the editor cell grid in player view', () => {
