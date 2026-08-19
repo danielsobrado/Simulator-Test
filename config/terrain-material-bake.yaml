@@ -51,8 +51,8 @@ macro:
   strength: 0.14
   seedOffset: 2401
   heightShadeScale: 0.018
-  minHeightShade: 0.78
-  maxHeightShade: 1.18
+  minHeightShade: 0.72
+  maxHeightShade: 1.22
   wetDarkening: 0.18
 
 render:
