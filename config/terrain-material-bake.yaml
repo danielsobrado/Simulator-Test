@@ -74,6 +74,14 @@ families:
   microStrength: 0.06
   microFadeStartDistance: 28
   microFadeEndDistance: 85
+  genomes:
+    enabled: true
+    regionScaleMeters: 720
+    seedOffset: 991
+    biomeInfluence: 0.58
+    colorStrength: 0.08
+    roughnessStrength: 0.045
+    detailStrength: 0.12
   projection:
     # Flat ground uses world XZ. Steep ground switches to its dominant vertical plane.
     slopeStart: 0.22
