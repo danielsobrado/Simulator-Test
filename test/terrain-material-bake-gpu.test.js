@@ -108,3 +108,35 @@ test('GPU bridge publishes a bake and disables it immediately when the slot lose
 
   bridge.dispose();
 });
+
+test('GPU bridge isolates a malformed page and retries only after the bake revision changes', () => {
+  const { material, state } = materialWithState();
+  const broken = page('broken');
+  broken.channels.farColor = new Uint8Array(1);
+  const slot = {
+    slotIndex: 0,
+    descriptor: { key: '0:0' },
+    mesh: { visible: true },
+    material,
+    materialBake: broken,
+    materialBakeStale: false,
+  };
+  let errors = 0;
+  const bridge = new TerrainMaterialBakeGpuBridge({
+    terrainView: { slots: [slot] },
+    onError: () => {
+      errors += 1;
+    },
+  });
+
+  bridge.update();
+  bridge.update();
+  assert.equal(errors, 1);
+  assert.equal(state.ready.value, 0);
+
+  slot.materialBake = page('repaired');
+  bridge.update();
+  assert.equal(errors, 1);
+  assert.equal(state.ready.value, 1);
+  bridge.dispose();
+});
