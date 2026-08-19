@@ -29,6 +29,31 @@ function normalizedWeights(textureNode) {
   return textureNode.div(total);
 }
 
+function sampleBakeTextures(gpuState, terrainUv) {
+  return {
+    macroTint: texture(gpuState.textures.macroTint, terrainUv),
+    terrainShape: texture(gpuState.textures.terrainShape, terrainUv),
+    materialWeights: texture(gpuState.textures.materialWeights, terrainUv),
+    wetnessShoreline: texture(gpuState.textures.wetnessShoreline, terrainUv),
+    farColor: texture(gpuState.textures.farColor, terrainUv),
+    farNormal: texture(gpuState.textures.farNormal, terrainUv),
+    canopyWater: texture(gpuState.textures.canopyWater, terrainUv),
+  };
+}
+
+function weightedFamilyProperty(weights, profiles, property) {
+  return weights.r.mul(profiles.grass[property])
+    .add(weights.g.mul(profiles.dirt[property]))
+    .add(weights.b.mul(profiles.rock[property]))
+    .add(weights.a.mul(profiles.snow[property]));
+}
+
+function materialRoughness(weights, wetness, profiles) {
+  const dry = weightedFamilyProperty(weights, profiles, 'roughness');
+  const wet = weightedFamilyProperty(weights, profiles, 'wetRoughness');
+  return clamp(mix(dry, wet, wetness), 0, 1);
+}
+
 function debugColor({ view, samples }) {
   switch (view) {
     case 'macroTint':
@@ -65,7 +90,7 @@ function debugColor({ view, samples }) {
   }
 }
 
-export function createTerrainMaterialBakedColor({
+export function createTerrainMaterialBakedSurface({
   terrainUv,
   tileColor,
   heightShade,
@@ -77,29 +102,42 @@ export function createTerrainMaterialBakedColor({
   gpuState,
   stylizedConfig,
 }) {
-  if (!gpuState) return proceduralColor;
-
   const materialBake = stylizedConfig.materialBake;
   const render = materialBake.render;
-  const samples = {
-    macroTint: texture(gpuState.textures.macroTint, terrainUv),
-    terrainShape: texture(gpuState.textures.terrainShape, terrainUv),
-    materialWeights: texture(gpuState.textures.materialWeights, terrainUv),
-    wetnessShoreline: texture(gpuState.textures.wetnessShoreline, terrainUv),
-    farColor: texture(gpuState.textures.farColor, terrainUv),
-    farNormal: texture(gpuState.textures.farNormal, terrainUv),
-    canopyWater: texture(gpuState.textures.canopyWater, terrainUv),
-  };
+  const fallbackRoughness = float(render.fallbackRoughness);
+  if (!gpuState) {
+    return { color: proceduralColor, roughness: fallbackRoughness };
+  }
+
+  const samples = sampleBakeTextures(gpuState, terrainUv);
+  const weights = normalizedWeights(samples.materialWeights);
+  const roughness = materialRoughness(
+    weights,
+    samples.wetnessShoreline.r,
+    materialBake.families.profiles,
+  );
+  const publishedRoughness = select(
+    gpuState.blend.greaterThan(PUBLISHED_BLEND_THRESHOLD),
+    roughness,
+    mix(fallbackRoughness, roughness, gpuState.blend),
+  );
+  const readyRoughness = select(
+    gpuState.ready.greaterThan(0.5),
+    publishedRoughness,
+    fallbackRoughness,
+  );
 
   const requestedDebugColor = debugColor({
     view: materialBake.debug.view,
     samples,
   });
   if (requestedDebugColor) {
-    return select(gpuState.ready.greaterThan(0.5), requestedDebugColor, proceduralColor);
+    return {
+      color: select(gpuState.ready.greaterThan(0.5), requestedDebugColor, proceduralColor),
+      roughness: readyRoughness,
+    };
   }
 
-  const weights = normalizedWeights(samples.materialWeights);
   const grassColor = mix(
     tileColor,
     colorNode(stylizedConfig.color.bottom).mul(stylizedConfig.color.brightness),
@@ -188,5 +226,12 @@ export function createTerrainMaterialBakedColor({
     readyColor,
     mix(proceduralColor, readyColor, gpuState.blend),
   );
-  return select(gpuState.ready.greaterThan(0.5), publishedColor, proceduralColor);
+  return {
+    color: select(gpuState.ready.greaterThan(0.5), publishedColor, proceduralColor),
+    roughness: readyRoughness,
+  };
+}
+
+export function createTerrainMaterialBakedColor(options) {
+  return createTerrainMaterialBakedSurface(options).color;
 }
