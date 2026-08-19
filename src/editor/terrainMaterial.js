@@ -19,7 +19,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessingMaterialData.js';
-import { createTerrainMaterialBakedColor } from './materials/TerrainMaterialBakedNodes.js';
+import { createTerrainMaterialBakedSurface } from './materials/TerrainMaterialBakedNodes.js';
 import {
   attachTerrainMaterialBakeGpuState,
   createTerrainMaterialBakeGpuState,
@@ -112,8 +112,6 @@ export function createTerrainMaterial({
     stylizedConfig.patch.strength,
   ).mul(stylizedConfig.color.brightness);
   let groundColor = mix(tileColor, grassTint, grassCoverage);
-  // Verge first, then the bare tread on top, so the path reads as a worn centre
-  // with a scuffed margin instead of a hard-edged stripe.
   groundColor = mix(
     groundColor,
     mix(grassTint, colorNode(stylizedConfig.dirt.color), pathConfig.vergeBlend ?? 0.55),
@@ -124,7 +122,6 @@ export function createTerrainMaterial({
     colorNode(stylizedConfig.dirt.color),
     max(pathWear.tread, proceduralDirt),
   );
-  // Layered soil variation keeps the path from reading as one flat tan ribbon.
   const rutStrength = pathConfig.rutStrength ?? 0;
   if (rutStrength > 0) {
     const rutScale = pathConfig.rutScale ?? 1.6;
@@ -135,11 +132,6 @@ export function createTerrainMaterial({
     );
   }
   const forestFloorConfig = stylizedConfig.trees?.forestFloor ?? {};
-  // Canopy tint belongs to the living forest floor, not exposed earth. Applying
-  // it after the dirt/path layers without this guard recolours their warm soil
-  // into broad grey-green swaths wherever the forest field overlaps a worn area.
-  // Keeping the masks mutually exclusive also preserves the same dirt colour the
-  // grass and flower shaders use at the transition.
   const forestFloorTint = forestFloor
     .mul(forestFloorConfig.groundStrength ?? 0.68)
     .mul(oneMinus(dirt));
@@ -167,10 +159,6 @@ export function createTerrainMaterial({
 
   const farCover = stylizedConfig.groundCover;
   if (farCover?.enabled) {
-    // A wooded floor is shaded, not bare. Removing the far cover outright under
-    // canopy left distant forest as flat unbroken ground, which — together with
-    // the `groundCoreColor` tint and the thinned blade density — is what made the
-    // forest interior read as near-black. `forestRetention` thins it instead.
     const retention = float(farCover.forestRetention ?? 0.5);
     const farMask = smoothstep(farCover.startDistance, farCover.endDistance, cameraDistance)
       .mul(grassCoverage)
@@ -213,11 +201,14 @@ export function createTerrainMaterial({
   const proceduralColor = groundColor.mul(heightShade);
   const materialBakeGpu = createTerrainMaterialBakeGpuState(stylizedConfig.materialBake);
   const familyAtlas = acquireTerrainMaterialFamilyAtlas(stylizedConfig.materialBake);
-  const material = new THREE.MeshLambertNodeMaterial();
+  const material = new THREE.MeshStandardNodeMaterial({
+    metalness: 0,
+    roughness: stylizedConfig.materialBake.render.fallbackRoughness,
+  });
   attachTerrainMaterialBakeGpuState(material, materialBakeGpu);
   attachTerrainMaterialFamilyAtlas(material, familyAtlas);
   try {
-    material.colorNode = createTerrainMaterialBakedColor({
+    const bakedSurface = createTerrainMaterialBakedSurface({
       terrainUv,
       tileColor,
       heightShade,
@@ -229,10 +220,10 @@ export function createTerrainMaterial({
       gpuState: materialBakeGpu,
       stylizedConfig,
     });
-    // Leave normalNode on the material default: PlaneGeometry's local +Z is
-    // transformed through the mesh's -90° X rotation into world +Y and then into
-    // view space. A literal local +Z here bypasses those transforms and makes the
-    // ground light as though its normal points toward the camera.
+    material.colorNode = bakedSurface.color;
+    material.roughnessNode = bakedSurface.roughness;
+    // PlaneGeometry's local +Z is transformed through the mesh's -90° X rotation
+    // into world +Y, so the default normal remains the correct terrain base normal.
     material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
     return assignTerrainMaterialData(material);
   } catch (error) {
