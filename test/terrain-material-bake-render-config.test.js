@@ -4,11 +4,12 @@ import test from 'node:test';
 import yaml from 'js-yaml';
 import { createTerrainMaterialBakeConfig } from '../src/editor/materials/TerrainMaterialBakeConfig.js';
 
+function loadYaml(relativePath) {
+  return yaml.load(fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8'));
+}
+
 function sourceConfig() {
-  return yaml.load(fs.readFileSync(
-    new URL('../config/terrain-material-bake.yaml', import.meta.url),
-    'utf8',
-  ));
+  return loadYaml('../config/terrain-material-bake.yaml');
 }
 
 test('terrain material bake render config defines non-overlapping near, mid and far bands', () => {
@@ -24,6 +25,18 @@ test('terrain material bake render config defines non-overlapping near, mid and 
   assert.match(config.render.rockColor, /^#[0-9a-f]{6}$/i);
   assert.match(config.render.snowColor, /^#[0-9a-f]{6}$/i);
   assert.equal(Object.isFrozen(config.render), true);
+});
+
+test('streamed terrain material palette stays aligned with the macro far terrain', () => {
+  const config = createTerrainMaterialBakeConfig(sourceConfig());
+  const editorConfig = loadYaml('../editor.config.yaml');
+  assert.equal(config.render.rockColor, editorConfig.world.farTerrain.rockColor);
+  assert.equal(config.render.snowColor, editorConfig.world.farTerrain.snowColor);
+  assert.equal(config.classification.rockSlopeStart, editorConfig.world.farTerrain.rockSlopeStart);
+  assert.equal(config.classification.rockSlopeFull, editorConfig.world.farTerrain.rockSlopeFull);
+  assert.equal(config.classification.snowLine, editorConfig.world.farTerrain.snowLine);
+  assert.equal(config.classification.snowFade, editorConfig.world.farTerrain.snowFade);
+  assert.equal(config.classification.snowSlopeMax, editorConfig.world.farTerrain.snowSlopeMax);
 });
 
 test('terrain material bake render config rejects overlapping LOD bands and malformed colors', () => {
