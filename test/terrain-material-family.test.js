@@ -37,15 +37,18 @@ test('terrain material families validate bounded shared-atlas settings', () => {
   assert.equal(config.families.secondaryBlendStrength, 0.85);
   assert.equal(config.families.genomes.enabled, true);
   assert.equal(config.families.features.enabled, true);
+  assert.equal(config.families.weathering.enabled, true);
   assert.deepEqual(Object.keys(config.families.profiles), TERRAIN_MATERIAL_FAMILIES);
   assert.equal(config.families.projection.slopeStart < config.families.projection.slopeFull, true);
   assert.equal(config.families.microFadeStartDistance < config.families.microFadeEndDistance, true);
   assert.equal(config.families.normalFadeStartDistance < config.families.normalFadeEndDistance, true);
   assert.equal(config.families.features.fadeStartDistance < config.families.features.fadeEndDistance, true);
+  assert.equal(config.families.weathering.fadeStartDistance < config.families.weathering.fadeEndDistance, true);
   assert.equal(Object.isFrozen(config.families), true);
   assert.equal(Object.isFrozen(config.families.profiles.rock), true);
   assert.equal(Object.isFrozen(config.families.genomes), true);
   assert.equal(Object.isFrozen(config.families.features), true);
+  assert.equal(Object.isFrozen(config.families.weathering), true);
 });
 
 test('terrain material family config rejects unsafe atlas, fade, scale and feature settings', () => {
@@ -84,11 +87,25 @@ test('terrain material family config rejects unsafe atlas, fade, scale and featu
     /families\.features\.fadeEndDistance must exceed fadeStartDistance/,
   );
 
+  const invalidWeatheringFade = sourceConfig();
+  invalidWeatheringFade.families.weathering.fadeEndDistance = invalidWeatheringFade.families.weathering.fadeStartDistance;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidWeatheringFade),
+    /families\.weathering\.fadeEndDistance must exceed fadeStartDistance/,
+  );
+
   const invalidFeatureColor = sourceConfig();
   invalidFeatureColor.families.features.lichenColor = 'green';
   assert.throws(
     () => createTerrainMaterialBakeConfig(invalidFeatureColor),
     /families\.features\.lichenColor must be a six-digit hex color/,
+  );
+
+  const invalidFallbackRoughness = sourceConfig();
+  invalidFallbackRoughness.render.fallbackRoughness = 1.1;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidFallbackRoughness),
+    /render\.fallbackRoughness must be within \[0, 1\]/,
   );
 
   const zeroDirection = sourceConfig();
