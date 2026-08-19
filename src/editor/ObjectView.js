@@ -55,6 +55,7 @@ export class ObjectView {
     this.heightField = heightField;
     this.objectMap = objectMap;
     this.objectCatalog = objectCatalog;
+    this.disposed = false;
     this.definitionByKey = new Map(objectCatalog.map((definition) => [definition.key, definition]));
     this.placementResolver = new ObjectPlacementResolver({
       objectMap,
@@ -556,8 +557,11 @@ export class ObjectView {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     for (const renderer of this.renderers.values()) this.disposeRendererRecord(renderer);
     for (const child of this.previewGroup.children) child.material.dispose();
+    this.previewGroup.clear();
     this.previewFoundation.geometry.dispose();
     this.previewFoundation.material.dispose();
     this.footprintPreview.geometry.dispose();
@@ -570,7 +574,11 @@ export class ObjectView {
       this.previewFoundation,
       this.footprintPreview,
       this.selectionOverlay,
+      ...this.fallbackLights,
     );
+    this.renderers.clear();
+    this.pickMeshes = [];
+    this.fallbackLights = [];
   }
 
   disposeRendererRecord(renderer) {
