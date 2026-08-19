@@ -64,6 +64,7 @@ render:
   nearMacroStrength: 0.32
   nearMaterialBlend: 0.14
   nearWetnessScale: 0.45
+  staleProceduralBlend: 0.35
   wetDarkening: 0.16
   shorelineStrength: 0.12
   canopyStrength: 0.30
