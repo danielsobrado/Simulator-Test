@@ -1,3 +1,4 @@
+import { hashUnit2d } from './ProceduralMaterialRandom.js';
 import { TERRAIN_MATERIAL_FAMILIES } from './TerrainMaterialFamilyConstants.js';
 
 const TAU = Math.PI * 2;
@@ -8,13 +9,6 @@ function clamp01(value) {
 
 function smooth(value) {
   return value * value * (3 - 2 * value);
-}
-
-function hashUnit(x, y, seed) {
-  let value = Math.imul((x | 0) ^ seed, 0x45d9f3b);
-  value = Math.imul(value ^ (value >>> 16) ^ (y | 0), 0x45d9f3b);
-  value ^= value >>> 16;
-  return (value >>> 0) / 0xffffffff;
 }
 
 function periodicValueNoise(x, y, frequency, seed) {
@@ -29,10 +23,10 @@ function periodicValueNoise(x, y, frequency, seed) {
   const wrappedY0 = ((y0 % period) + period) % period;
   const tx = smooth(scaledX - Math.floor(scaledX));
   const ty = smooth(scaledY - Math.floor(scaledY));
-  const a = hashUnit(wrappedX0, wrappedY0, seed);
-  const b = hashUnit(x1, wrappedY0, seed);
-  const c = hashUnit(wrappedX0, y1, seed);
-  const d = hashUnit(x1, y1, seed);
+  const a = hashUnit2d(wrappedX0, wrappedY0, seed);
+  const b = hashUnit2d(x1, wrappedY0, seed);
+  const c = hashUnit2d(wrappedX0, y1, seed);
+  const d = hashUnit2d(x1, y1, seed);
   const ab = a + (b - a) * tx;
   const cd = c + (d - c) * tx;
   return ab + (cd - ab) * ty;
@@ -74,11 +68,11 @@ function orientedPhaseDetail(u, v, cyclesX, cyclesY, phase, seed, frequency) {
 
 function writeLayer(target, layer, resolution, profile, seed) {
   const layerOffset = layer * resolution * resolution * 4;
-  const phase = hashUnit(layer, seed, seed ^ 0x51f15e);
+  const phase = hashUnit2d(layer, seed, seed ^ 0x51f15e);
   const [directionCyclesX, directionCyclesY] = directionalCycles(profile);
-  const redBias = (hashUnit(seed, layer, 0x125f3) - 0.5) * profile.colorSpread;
-  const greenBias = (hashUnit(seed, layer, 0x33d17) - 0.5) * profile.colorSpread;
-  const blueBias = (hashUnit(seed, layer, 0x71a93) - 0.5) * profile.colorSpread;
+  const redBias = (hashUnit2d(seed, layer, 0x125f3) - 0.5) * profile.colorSpread;
+  const greenBias = (hashUnit2d(seed, layer, 0x33d17) - 0.5) * profile.colorSpread;
+  const blueBias = (hashUnit2d(seed, layer, 0x71a93) - 0.5) * profile.colorSpread;
 
   for (let y = 0; y < resolution; y += 1) {
     const v = y / resolution;
