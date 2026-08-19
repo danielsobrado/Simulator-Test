@@ -24,6 +24,9 @@ const SQRT_THREE_OVER_TWO = Math.sqrt(3) * 0.5;
 const TRIANGLE_SKEW = 0.5;
 const MIN_DETAIL_MULTIPLIER = 0.65;
 const MAX_DETAIL_MULTIPLIER = 1.35;
+const MAX_SECONDARY_BLEND = 0.5;
+const SECONDARY_FADE_WIDTH = 0.18;
+const MIN_PAIR_WEIGHT = 0.0001;
 
 function hash2(cell, vector, offset = 0) {
   return fract(
@@ -105,16 +108,47 @@ function stochasticTriSample({
     ).mul(weight2));
 }
 
-function dominantFamily(weights) {
-  const rockOrSnow = max(weights.b, weights.a);
-  const grassOrDirt = max(weights.r, weights.g);
-  const snowWinsRock = weights.a.greaterThan(weights.b);
-  const dirtWinsGrass = weights.g.greaterThan(weights.r);
-  const rockFamily = select(snowWinsRock, float(3), float(2));
-  const groundFamily = select(dirtWinsGrass, float(1), float(0));
+function stochasticSingleSample({
+  atlas,
+  planarMeters,
+  mesoScaleMeters,
+  variantCellMeters,
+  familyIndex,
+  variantsPerFamily,
+  scaleJitter,
+}) {
+  const baseUv = planarMeters.div(mesoScaleMeters);
+  const cell = floor(planarMeters.div(variantCellMeters));
+  return sampleVariant(atlas, baseUv, cell, familyIndex, variantsPerFamily, scaleJitter);
+}
+
+function topTwoFamilies(weights) {
+  const grassWinsDirt = weights.r.greaterThan(weights.g);
+  const groundTopWeight = select(grassWinsDirt, weights.r, weights.g);
+  const groundTopIndex = select(grassWinsDirt, float(0), float(1));
+  const groundRunnerWeight = select(grassWinsDirt, weights.g, weights.r);
+  const groundRunnerIndex = select(grassWinsDirt, float(1), float(0));
+
+  const rockWinsSnow = weights.b.greaterThan(weights.a);
+  const coldTopWeight = select(rockWinsSnow, weights.b, weights.a);
+  const coldTopIndex = select(rockWinsSnow, float(2), float(3));
+  const coldRunnerWeight = select(rockWinsSnow, weights.a, weights.b);
+  const coldRunnerIndex = select(rockWinsSnow, float(3), float(2));
+
+  const groundWins = groundTopWeight.greaterThan(coldTopWeight);
+  const primaryWeight = select(groundWins, groundTopWeight, coldTopWeight);
+  const primaryIndex = select(groundWins, groundTopIndex, coldTopIndex);
+  const winnerRunnerWeight = select(groundWins, groundRunnerWeight, coldRunnerWeight);
+  const winnerRunnerIndex = select(groundWins, groundRunnerIndex, coldRunnerIndex);
+  const loserTopWeight = select(groundWins, coldTopWeight, groundTopWeight);
+  const loserTopIndex = select(groundWins, coldTopIndex, groundTopIndex);
+  const winnerRunnerWins = winnerRunnerWeight.greaterThan(loserTopWeight);
+
   return {
-    index: select(rockOrSnow.greaterThan(grassOrDirt), rockFamily, groundFamily),
-    dominance: max(rockOrSnow, grassOrDirt),
+    primaryIndex,
+    primaryWeight,
+    secondaryIndex: select(winnerRunnerWins, winnerRunnerIndex, loserTopIndex),
+    secondaryWeight: select(winnerRunnerWins, winnerRunnerWeight, loserTopWeight),
   };
 }
 
@@ -130,8 +164,9 @@ function projectedDetail({
   familyIndex,
   families,
   microVisibility,
+  secondary = false,
 }) {
-  const sample = stochasticTriSample({
+  const sampleOptions = {
     atlas,
     planarMeters,
     mesoScaleMeters: families.mesoScaleMeters,
@@ -139,7 +174,10 @@ function projectedDetail({
     familyIndex,
     variantsPerFamily: families.variantsPerFamily,
     scaleJitter: families.scaleJitter,
-  });
+  };
+  const sample = secondary
+    ? stochasticSingleSample(sampleOptions)
+    : stochasticTriSample(sampleOptions);
   const meso = sample.sub(0.5).mul(families.mesoStrength * 2);
   const micro = microVariation(
     planarMeters,
@@ -151,6 +189,21 @@ function projectedDetail({
     vec3(1).add(meso).add(vec3(micro)),
     vec3(MIN_DETAIL_MULTIPLIER),
     vec3(MAX_DETAIL_MULTIPLIER),
+  );
+}
+
+function secondaryBlend(pair, families) {
+  const pairWeight = max(pair.primaryWeight.add(pair.secondaryWeight), MIN_PAIR_WEIGHT);
+  const ratio = pair.secondaryWeight.div(pairWeight);
+  const visibility = smoothstep(
+    families.secondaryMinWeight,
+    families.secondaryMinWeight + SECONDARY_FADE_WIDTH,
+    pair.secondaryWeight,
+  );
+  return clamp(
+    ratio.mul(families.secondaryBlendStrength).mul(visibility),
+    0,
+    MAX_SECONDARY_BLEND,
   );
 }
 
@@ -167,19 +220,29 @@ export function createTerrainMaterialFamilyMultiplier({
   families,
 }) {
   if (!atlas || !families?.enabled) return vec3(1);
-  const dominant = dominantFamily(materialWeights);
+  const pair = topTwoFamilies(materialWeights);
+  const blend = secondaryBlend(pair, families);
   const microVisibility = oneMinus(smoothstep(
     families.microFadeStartDistance,
     families.microFadeEndDistance,
     cameraDistance,
   ));
-  const topDetail = projectedDetail({
+  const topPrimary = projectedDetail({
     atlas,
     planarMeters: worldXZ,
-    familyIndex: dominant.index,
+    familyIndex: pair.primaryIndex,
     families,
     microVisibility,
   });
+  const topSecondary = projectedDetail({
+    atlas,
+    planarMeters: worldXZ,
+    familyIndex: pair.secondaryIndex,
+    families,
+    microVisibility,
+    secondary: true,
+  });
+  const topDetail = mix(topPrimary, topSecondary, blend);
   const vertical = terrainHeight.mul(families.projection.verticalScale);
   const sidePlanar = select(
     abs(farNormal.r).greaterThan(abs(farNormal.g)),
@@ -187,13 +250,22 @@ export function createTerrainMaterialFamilyMultiplier({
     vec2(worldXZ.x, vertical),
   );
   const slope = terrainShape.r;
-  const sideDetail = projectedDetail({
+  const sidePrimary = projectedDetail({
     atlas,
     planarMeters: sidePlanar,
-    familyIndex: dominant.index,
+    familyIndex: pair.primaryIndex,
     families,
     microVisibility,
   });
+  const sideSecondary = projectedDetail({
+    atlas,
+    planarMeters: sidePlanar,
+    familyIndex: pair.secondaryIndex,
+    families,
+    microVisibility,
+    secondary: true,
+  });
+  const sideDetail = mix(sidePrimary, sideSecondary, blend);
   const projectionBlend = smoothstep(
     families.projection.slopeStart,
     families.projection.slopeFull,
@@ -210,8 +282,8 @@ export function createTerrainMaterialFamilyMultiplier({
   );
   const environmentScale = mix(float(1), float(families.environment.wetDetailScale), wetness)
     .mul(mix(float(1), float(families.environment.canopyDetailScale), canopy));
-  const dominanceConfidence = clamp(dominant.dominance.mul(2).sub(1), 0, 1);
-  const dominanceScale = pow(dominanceConfidence, families.dominantFadePower);
-  const strength = dominanceScale.mul(environmentScale).mul(families.strength);
+  const pairConfidence = clamp(pair.primaryWeight.add(pair.secondaryWeight), 0, 1);
+  const confidenceScale = pow(pairConfidence, families.dominantFadePower);
+  const strength = confidenceScale.mul(environmentScale).mul(families.strength);
   return mix(vec3(1), projected, strength);
 }
