@@ -223,8 +223,7 @@ export function createTerrainMaterial({
     material.colorNode = bakedSurface.color;
     material.roughnessNode = bakedSurface.roughness;
     if (bakedSurface.normal) material.normalNode = bakedSurface.normal;
-    // PlaneGeometry's local +Z is transformed through the mesh's -90° X rotation
-    // into world +Y, so the default normal remains the correct terrain base normal.
+    // Geometry displacement and the baked surface normal are derived from the same heightfield.
     material.positionNode = positionLocal.add(vec3(0, 0, terrainHeight));
     return assignTerrainMaterialData(material);
   } catch (error) {
