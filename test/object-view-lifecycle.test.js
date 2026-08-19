@@ -20,7 +20,7 @@ function createTerrainView() {
   };
 }
 
-test('ObjectView disposes its scene-owned fallback lights and teardown is idempotent', () => {
+test('ObjectView releases owned scene and placement resources exactly once', () => {
   const terrainView = createTerrainView();
   const objectView = new ObjectView({
     terrainView,
@@ -33,6 +33,12 @@ test('ObjectView disposes its scene-owned fallback lights and teardown is idempo
     },
     objectCatalog: [],
   });
+  let resolverDisposals = 0;
+  objectView.placementResolver = {
+    dispose() {
+      resolverDisposals += 1;
+    },
+  };
 
   const fallbackLights = () => terrainView.scene.children.filter(
     (child) => child.userData?.fallbackLighting === true,
@@ -41,5 +47,7 @@ test('ObjectView disposes its scene-owned fallback lights and teardown is idempo
   assert.equal(fallbackLights().length, 2);
   objectView.dispose();
   assert.equal(fallbackLights().length, 0);
+  assert.equal(resolverDisposals, 1);
   assert.doesNotThrow(() => objectView.dispose());
+  assert.equal(resolverDisposals, 1);
 });
