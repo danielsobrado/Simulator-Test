@@ -34,11 +34,12 @@ test('terrain material families validate bounded shared-atlas settings', () => {
   assert.equal(config.families.variantsPerFamily, 4);
   assert.deepEqual(Object.keys(config.families.profiles), TERRAIN_MATERIAL_FAMILIES);
   assert.equal(config.families.projection.slopeStart < config.families.projection.slopeFull, true);
+  assert.equal(config.families.microFadeStartDistance < config.families.microFadeEndDistance, true);
   assert.equal(Object.isFrozen(config.families), true);
   assert.equal(Object.isFrozen(config.families.profiles.rock), true);
 });
 
-test('terrain material family config rejects unsafe atlas and projection settings', () => {
+test('terrain material family config rejects unsafe atlas, fade and projection settings', () => {
   const tooManyVariants = sourceConfig();
   tooManyVariants.families.variantsPerFamily = 9;
   assert.throws(
@@ -51,6 +52,13 @@ test('terrain material family config rejects unsafe atlas and projection setting
   assert.throws(
     () => createTerrainMaterialBakeConfig(invalidSlope),
     /families\.projection\.slopeFull must exceed non-negative slopeStart/,
+  );
+
+  const invalidMicroFade = sourceConfig();
+  invalidMicroFade.families.microFadeEndDistance = invalidMicroFade.families.microFadeStartDistance;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalidMicroFade),
+    /families\.microFadeEndDistance must exceed microFadeStartDistance/,
   );
 
   const zeroDirection = sourceConfig();
