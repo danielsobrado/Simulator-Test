@@ -134,6 +134,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     'microStrength',
     'secondaryBlendStrength',
     'secondaryMinWeight',
+    'contrastPreservation',
   ]) {
     assertUnit(source[field], `families.${field}`);
   }
@@ -194,6 +195,7 @@ export function normalizeTerrainMaterialFamilies(source) {
     dominantFadePower: source.dominantFadePower,
     secondaryBlendStrength: source.secondaryBlendStrength,
     secondaryMinWeight: source.secondaryMinWeight,
+    contrastPreservation: source.contrastPreservation,
     mesoStrength: source.mesoStrength,
     microStrength: source.microStrength,
     microFadeStartDistance: source.microFadeStartDistance,
