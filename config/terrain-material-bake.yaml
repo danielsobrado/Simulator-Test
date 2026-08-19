@@ -69,6 +69,8 @@ families:
   dominantFadePower: 1.6
   mesoStrength: 0.24
   microStrength: 0.06
+  microFadeStartDistance: 28
+  microFadeEndDistance: 85
   projection:
     # Flat ground uses world XZ. Steep ground switches to its dominant vertical plane.
     slopeStart: 0.22
