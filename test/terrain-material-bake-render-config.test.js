@@ -18,6 +18,8 @@ test('terrain material bake render config defines non-overlapping near, mid and 
   assert.ok(
     config.render.farDistance > config.render.nearDistance + config.render.transitionDistance,
   );
+  assert.ok(config.render.staleProceduralBlend > 0);
+  assert.ok(config.render.staleProceduralBlend < 1);
   assert.match(config.render.rockColor, /^#[0-9a-f]{6}$/i);
   assert.match(config.render.snowColor, /^#[0-9a-f]{6}$/i);
   assert.equal(Object.isFrozen(config.render), true);
@@ -36,5 +38,14 @@ test('terrain material bake render config rejects overlapping LOD bands and malf
   assert.throws(
     () => createTerrainMaterialBakeConfig(badColor),
     /render\.rockColor must be a six-digit hexadecimal color/,
+  );
+});
+
+test('terrain material bake render config rejects stale fallback blend outside unit interval', () => {
+  const invalid = sourceConfig();
+  invalid.render.staleProceduralBlend = 1.1;
+  assert.throws(
+    () => createTerrainMaterialBakeConfig(invalid),
+    /render\.staleProceduralBlend must be within \[0, 1\]/,
   );
 });
