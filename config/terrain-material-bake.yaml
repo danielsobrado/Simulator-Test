@@ -75,6 +75,9 @@ families:
   microStrength: 0.06
   microFadeStartDistance: 28
   microFadeEndDistance: 85
+  normalStrength: 0.72
+  normalFadeStartDistance: 45
+  normalFadeEndDistance: 150
   genomes:
     enabled: true
     regionScaleMeters: 720
