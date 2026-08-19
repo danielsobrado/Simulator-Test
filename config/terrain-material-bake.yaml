@@ -103,6 +103,15 @@ families:
     litterColor: '#66533b'
     crackColor: '#58483c'
     mineralColor: '#8a908a'
+  weathering:
+    enabled: true
+    fadeStartDistance: 120
+    fadeEndDistance: 245
+    exposureBleach: 0.055
+    concavityDarkening: 0.075
+    wetDarkening: 0.065
+    shorelineDeposit: 0.045
+    roughnessResponse: 0.055
   projection:
     # Flat ground uses world XZ. Steep ground switches to its dominant vertical plane.
     slopeStart: 0.22
