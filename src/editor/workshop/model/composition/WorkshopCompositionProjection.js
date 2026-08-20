@@ -7,20 +7,41 @@ import {
   workshopCompositionPrimitiveId,
 } from './WorkshopCompositionEntities.js';
 
+const RPG_FIELDS = Object.freeze([
+  'collisionSlabs',
+  'walkableFloors',
+  'roomBoundaries',
+  'portals',
+  'stairSockets',
+  'foundationContacts',
+  'coverSurfaces',
+]);
+
 function freezeItems(items) {
   return Object.freeze(items.map((item) => Object.freeze(item)));
 }
 
+function projectionRpgItem(item, wallId) {
+  const { wallId: _wallId, segmentId: _segmentId, ...projected } = item;
+  return { ...projected, primitiveId: projected.primitiveId ?? wallId };
+}
+
+function mergeWallRpg(legacyRpg, wallPlans) {
+  const semanticWallIds = new Set(wallPlans.map(({ wallId }) => wallId));
+  return Object.freeze(Object.fromEntries(RPG_FIELDS.map((field) => {
+    const retained = (legacyRpg[field] ?? []).filter(({ primitiveId }) => !semanticWallIds.has(primitiveId));
+    const semantic = wallPlans.flatMap((wallPlan) => (
+      (wallPlan.rpg[field] ?? []).map((item) => projectionRpgItem(item, wallPlan.wallId))
+    ));
+    return [field, freezeItems([...retained, ...semantic].sort((left, right) => left.id.localeCompare(right.id)))];
+  })));
+}
+
 function rpgForPrimitive(rpg, primitiveId) {
-  return Object.freeze({
-    collisionSlabs: freezeItems(rpg.collisionSlabs.filter((item) => item.primitiveId === primitiveId)),
-    walkableFloors: freezeItems(rpg.walkableFloors.filter((item) => item.primitiveId === primitiveId)),
-    roomBoundaries: freezeItems(rpg.roomBoundaries.filter((item) => item.primitiveId === primitiveId)),
-    portals: freezeItems(rpg.portals.filter((item) => item.primitiveId === primitiveId)),
-    stairSockets: freezeItems(rpg.stairSockets.filter((item) => item.primitiveId === primitiveId)),
-    foundationContacts: freezeItems(rpg.foundationContacts.filter((item) => item.primitiveId === primitiveId)),
-    coverSurfaces: freezeItems(rpg.coverSurfaces.filter((item) => item.primitiveId === primitiveId)),
-  });
+  return Object.freeze(Object.fromEntries(RPG_FIELDS.map((field) => [
+    field,
+    freezeItems((rpg[field] ?? []).filter((item) => item.primitiveId === primitiveId)),
+  ])));
 }
 
 export function projectWorkshopComposition(document, dirtyEntityIds = []) {
@@ -38,7 +59,9 @@ export function projectWorkshopComposition(document, dirtyEntityIds = []) {
   const plan = planWorkshopComposition(recipe, dirtyPrimitiveIds);
   const wallPlans = entities
     .filter(({ type, properties }) => type === 'composition-wall' && properties?.wall)
-    .map((entity) => planWallEntity(entity));
+    .map((entity) => planWallEntity(entity))
+    .sort((left, right) => left.wallId.localeCompare(right.wallId));
+  const rpg = mergeWallRpg(plan.rpg, wallPlans);
   const wallPlanByEntity = new Map(wallPlans.map((wallPlan) => [
     workshopCompositionEntityId(wallPlan.wallId),
     wallPlan,
@@ -51,20 +74,25 @@ export function projectWorkshopComposition(document, dirtyEntityIds = []) {
       primitive: entity.properties.primitive,
       wallPlan: wallPlanByEntity.get(entity.id) ?? null,
       materialRegions: freezeItems(plan.materialRegions.filter((region) => region.primitiveId === primitiveId)),
-      rpg: rpgForPrimitive(plan.rpg, primitiveId),
+      rpg: rpgForPrimitive(rpg, primitiveId),
     });
   });
+  const revisionKey = JSON.stringify([
+    plan.revisionKey,
+    wallPlans.map(({ wallId, revisionKey: wallRevisionKey }) => [wallId, wallRevisionKey]),
+  ]);
 
   return Object.freeze({
     version: plan.version,
-    revisionKey: plan.revisionKey,
+    recipe: plan.recipe,
+    revisionKey,
     dirtyEntityIds: Object.freeze(dirtyPrimitiveIds.map(workshopCompositionEntityId)),
     entityIds: Object.freeze(entities.map(({ id }) => id).sort()),
     materialRegions: plan.materialRegions,
     structural: plan.structural,
     attachments: plan.attachments,
-    rpg: plan.rpg,
-    wallPlans: Object.freeze(wallPlans.sort((left, right) => left.wallId.localeCompare(right.wallId))),
+    rpg,
+    wallPlans: Object.freeze(wallPlans),
     byEntity: Object.freeze(byEntity.sort((left, right) => left.entityId.localeCompare(right.entityId))),
   });
 }

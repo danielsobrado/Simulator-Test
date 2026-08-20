@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { buildWallMeshData } from './geometry/wall/WallBuilder.js';
 import { normalizeWorkshopComposition } from './ProceduralWorkshopComposition.js';
 import { createSkeletonRoofParts } from './ProceduralWorkshopSkeletonRoof.js';
 
@@ -146,8 +147,82 @@ function wallParts(primitive, materials) {
   return result;
 }
 
-export function createWorkshopCompositionParts(recipe) {
+function wallPlanMap(wallPlans, composition) {
+  if (!Array.isArray(wallPlans)) throw new Error('Workshop wall plans must be an array.');
+  const primitiveIds = new Set(composition.primitives.filter(({ kind }) => kind === 'wall').map(({ id }) => id));
+  const result = new Map();
+  for (const wallPlan of wallPlans) {
+    if (!wallPlan?.wallId || !Array.isArray(wallPlan.sections)) {
+      throw new Error('Workshop wall plan is invalid.');
+    }
+    if (!primitiveIds.has(wallPlan.wallId)) {
+      throw new Error(`Workshop wall plan ${wallPlan.wallId} has no matching composition wall.`);
+    }
+    if (result.has(wallPlan.wallId)) throw new Error(`Duplicate workshop wall plan: ${wallPlan.wallId}.`);
+    result.set(wallPlan.wallId, wallPlan);
+  }
+  return result;
+}
+
+function geometryForMeshGroup(mesh, group) {
+  const sourceIndices = mesh.indices.slice(group.start, group.start + group.count);
+  const remap = new Map();
+  const positions = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+  for (const sourceIndex of sourceIndices) {
+    let localIndex = remap.get(sourceIndex);
+    if (localIndex === undefined) {
+      localIndex = remap.size;
+      remap.set(sourceIndex, localIndex);
+      positions.push(...mesh.positions.slice(sourceIndex * 3, sourceIndex * 3 + 3));
+      normals.push(...mesh.normals.slice(sourceIndex * 3, sourceIndex * 3 + 3));
+      uvs.push(...mesh.uvs.slice(sourceIndex * 2, sourceIndex * 2 + 2));
+    }
+    indices.push(localIndex);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function wallRegion(plan, group, primitive) {
+  const domain = plan.surfaceDomains.find(({ id }) => id === group.regionId);
+  const side = domain?.side ?? (group.regionId.endsWith('cap-start') ? 'cap-start' : 'cap-end');
+  return {
+    id: group.regionId,
+    componentId: primitive.id,
+    primitiveId: primitive.id,
+    label: `Wall ${side}`,
+    family: group.family,
+    connected: true,
+  };
+}
+
+function semanticWallParts(primitive, materials, plan) {
+  const mesh = buildWallMeshData(plan);
+  return mesh.groups.map((group) => {
+    const geometry = semanticGeometry(geometryForMeshGroup(mesh, group), primitive);
+    geometry.userData.workshopWallPlanId = plan.wallId;
+    geometry.userData.workshopSurfaceId = group.regionId;
+    return part(
+      geometry,
+      materials.walls,
+      new THREE.Matrix4(),
+      wallRegion(plan, group, primitive),
+    );
+  });
+}
+
+export function createWorkshopCompositionParts(recipe, { wallPlans = [] } = {}) {
   const composition = normalizeWorkshopComposition(recipe.composition);
+  const semanticWalls = wallPlanMap(wallPlans, composition);
   const materials = {
     walls: material('mortar', '#b69b70'),
     roof: material('roof', '#566864', { roughness: 0.82, vertexColors: true }),
@@ -157,7 +232,9 @@ export function createWorkshopCompositionParts(recipe) {
       ? rectangleParts(primitive, materials)
       : primitive.kind === 'circle'
         ? circleParts(primitive, materials)
-        : wallParts(primitive, materials)
+        : semanticWalls.has(primitive.id)
+          ? semanticWallParts(primitive, materials, semanticWalls.get(primitive.id))
+          : wallParts(primitive, materials)
   ));
   const roofResult = createSkeletonRoofParts({
     recipe,

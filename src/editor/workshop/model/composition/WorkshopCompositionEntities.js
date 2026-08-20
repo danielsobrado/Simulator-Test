@@ -4,6 +4,7 @@ import {
   resolveWallDefinitionRecords,
   serializeWallDefinition,
   wallDefinitionToLegacyPrimitive,
+  wallLegacyPrimitivesEquivalent,
 } from '../../geometry/wall/WallPath.js';
 import { WORKSHOP_RECIPE_ENTITY_ID } from '../../kernel/WorkshopKernelConstants.js';
 
@@ -51,11 +52,13 @@ export function createWorkshopCompositionEntities(input, parentId = WORKSHOP_REC
 }
 
 function primitiveForEntity(entity) {
-  if (entity.type === 'composition-wall') {
-    const wall = resolveWallDefinitionRecords(entity.properties?.wall, entity.properties?.primitive);
-    return wallDefinitionToLegacyPrimitive(wall);
-  }
-  return entity.properties.primitive;
+  if (entity.type !== 'composition-wall') return entity.properties.primitive;
+  const legacyPrimitive = entity.properties?.primitive;
+  const wall = resolveWallDefinitionRecords(entity.properties?.wall, legacyPrimitive);
+  const projected = wallDefinitionToLegacyPrimitive(wall);
+  return legacyPrimitive && wallLegacyPrimitivesEquivalent(projected, legacyPrimitive)
+    ? legacyPrimitive
+    : projected;
 }
 
 export function readWorkshopComposition(document, parentId = WORKSHOP_RECIPE_ENTITY_ID) {

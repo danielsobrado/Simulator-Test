@@ -110,7 +110,7 @@ function semanticWallDomains(beforeWall, afterWall) {
       continue;
     }
     if (field === 'style') {
-      ['STYLE', 'MATERIAL', 'SURFACE_LAYOUT'].forEach((domain) => domains.add(domain));
+      ['STYLE', 'MATERIAL'].forEach((domain) => domains.add(domain));
       continue;
     }
     if (field === 'height' || field === 'thickness' || field === 'elevation') {

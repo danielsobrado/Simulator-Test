@@ -28,16 +28,10 @@ function sectionJoin(samples, index, halfThickness, maxMiterRatio) {
   const sample = samples[index];
   const previous = index > 0 ? samples[index - 1] : null;
   const next = index + 1 < samples.length ? samples[index + 1] : null;
-  const currentNormal = normalForTangent(sample.tangent);
-  if (!previous || !next) return { normal: currentNormal, offset: halfThickness, miterRatio: 1 };
-
-  if (previous.segmentId === sample.segmentId && next.segmentId !== sample.segmentId) {
-    return miterJoin(sample.tangent, next.tangent, halfThickness, maxMiterRatio);
+  if (!previous || !next) {
+    return { normal: normalForTangent(sample.tangent), offset: halfThickness, miterRatio: 1 };
   }
-  if (previous.segmentId === sample.segmentId && next.segmentId === sample.segmentId) {
-    return miterJoin(previous.tangent, next.tangent, halfThickness, maxMiterRatio);
-  }
-  return { normal: currentNormal, offset: halfThickness, miterRatio: 1 };
+  return miterJoin(previous.tangent, next.tangent, halfThickness, maxMiterRatio);
 }
 
 export function resolveWallSectionOffsets(samples, thickness, {
@@ -65,30 +59,37 @@ export function resolveWallSectionOffsets(samples, thickness, {
   }));
 }
 
+function socketsNear(left, right, tolerance) {
+  return Math.hypot(
+    left.point[0] - right.point[0],
+    left.point[1] - right.point[1],
+  ) <= tolerance;
+}
+
 export function resolveWallEndpointJoins(
   plans,
   tolerance = WORKSHOP_GEOMETRY_TOLERANCE.position,
 ) {
   if (!Array.isArray(plans)) throw new Error('Wall endpoint joins require wall plans.');
   if (!Number.isFinite(tolerance) || tolerance <= 0) throw new Error('Wall endpoint join tolerance must be positive.');
-  const sockets = plans.flatMap((plan) => plan.endpointSockets ?? []).sort((left, right) => left.id.localeCompare(right.id));
+  const sockets = plans
+    .flatMap((plan) => plan.endpointSockets ?? [])
+    .sort((left, right) => left.id.localeCompare(right.id));
   const consumed = new Set();
   const joins = [];
-  for (let index = 0; index < sockets.length; index += 1) {
-    const socket = sockets[index];
+
+  for (const socket of sockets) {
     if (consumed.has(socket.id)) continue;
-    const members = [socket];
+    const members = [];
+    const pending = [socket];
     consumed.add(socket.id);
-    for (let candidateIndex = index + 1; candidateIndex < sockets.length; candidateIndex += 1) {
-      const candidate = sockets[candidateIndex];
-      if (consumed.has(candidate.id)) continue;
-      const distance = Math.hypot(
-        socket.point[0] - candidate.point[0],
-        socket.point[1] - candidate.point[1],
-      );
-      if (distance <= tolerance) {
-        members.push(candidate);
+    while (pending.length > 0) {
+      const member = pending.shift();
+      members.push(member);
+      for (const candidate of sockets) {
+        if (consumed.has(candidate.id) || !socketsNear(member, candidate, tolerance)) continue;
         consumed.add(candidate.id);
+        pending.push(candidate);
       }
     }
     if (members.length < 2) continue;

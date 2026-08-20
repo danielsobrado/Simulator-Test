@@ -30,20 +30,44 @@ function enumValue(value, allowed, field) {
   return value;
 }
 
-function sameLegacyPrimitive(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+function samePoint(left, right) {
+  return left?.[0] === right?.[0] && left?.[1] === right?.[1];
+}
+
+function compactLegacyPoints(points) {
+  const compact = [];
+  for (const point of points ?? []) {
+    if (compact.length === 0 || !samePoint(compact.at(-1), point)) compact.push(point);
+  }
+  return compact;
+}
+
+function comparableLegacyPrimitive(primitive) {
+  if (!primitive || primitive.kind !== 'wall') return primitive;
+  return {
+    ...primitive,
+    points: compactLegacyPoints(primitive.points).map((point) => [...point]),
+  };
+}
+
+export function wallLegacyPrimitivesEquivalent(left, right) {
+  return JSON.stringify(comparableLegacyPrimitive(left)) === JSON.stringify(comparableLegacyPrimitive(right));
 }
 
 export function createWallDefinitionFromLegacyPrimitive(primitive) {
   if (!primitive || primitive.kind !== 'wall') {
     throw new Error('Legacy wall conversion requires a wall composition primitive.');
   }
-  const points = primitive.points.map((position, index) => ({
+  const legacyPoints = compactLegacyPoints(primitive.points);
+  if (legacyPoints.length < 2) {
+    throw new Error('Legacy wall conversion requires at least two distinct points.');
+  }
+  const points = legacyPoints.map((position, index) => ({
     id: `p-${index + 1}`,
     position: [...position],
   }));
-  const segments = primitive.points.slice(0, -1).map((_, index) => ({
-    id: `s-${index + 1}`,
+  const segments = legacyPoints.slice(0, -1).map((_, index) => ({
+    id: `segment-${index + 1}`,
     kind: 'line',
     startId: points[index].id,
     endId: points[index + 1].id,
@@ -149,7 +173,7 @@ export function resolveWallDefinitionRecords(semanticInput, legacyPrimitive) {
   const semantic = normalizeWallDefinition(semanticInput);
   if (!legacyPrimitive) return semantic;
   const projected = wallDefinitionToLegacyPrimitive(semantic);
-  if (sameLegacyPrimitive(projected, legacyPrimitive)) return semantic;
+  if (wallLegacyPrimitivesEquivalent(projected, legacyPrimitive)) return semantic;
   const promoted = createWallDefinitionFromLegacyPrimitive(legacyPrimitive);
   return normalizeWallDefinition({ ...promoted, style: semantic.style });
 }

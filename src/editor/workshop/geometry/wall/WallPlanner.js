@@ -40,6 +40,7 @@ export function planWall(input, {
     return Object.freeze({
       distance,
       segmentId: evaluated.segmentId,
+      segmentDistance: evaluated.segmentDistance,
       segmentParameter: evaluated.segmentParameter,
       point: evaluated.point,
       tangent: evaluated.tangent,

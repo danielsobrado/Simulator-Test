@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { createWorkshopCompositionParts } from '../src/editor/workshop/ProceduralWorkshopCompositionGenerator.js';
 import { buildWallBufferGeometry, buildWallMeshData } from '../src/editor/workshop/geometry/wall/WallBuilder.js';
 import { registerWallCommands } from '../src/editor/workshop/geometry/wall/WallCommands.js';
-import { planWallEntity } from '../src/editor/workshop/geometry/wall/WallPlanner.js';
+import { planWall, planWallEntity } from '../src/editor/workshop/geometry/wall/WallPlanner.js';
 import { WorkshopCommandBus } from '../src/editor/workshop/kernel/WorkshopCommandBus.js';
 import {
   createWorkshopDocumentFromRecipe,
   resolveWorkshopRecipe,
 } from '../src/editor/workshop/kernel/WorkshopRecipeBridge.js';
+import { projectWorkshopComposition } from '../src/editor/workshop/model/composition/WorkshopCompositionProjection.js';
 import { workshopEntitySpatialBounds } from '../src/editor/workshop/spatial/WorkshopSpatialBounds.js';
 
 function curvedWall(entity) {
@@ -32,6 +34,15 @@ function curvedWall(entity) {
       }],
     },
   };
+}
+
+function disposeParts(parts) {
+  const materials = new Set();
+  for (const part of parts) {
+    part.geometry.dispose();
+    materials.add(part.material);
+  }
+  for (const material of materials) material.dispose();
 }
 
 test('curved semantic wall plans, invalidates, bounds, and renders through one pipeline', async () => {
@@ -77,11 +88,31 @@ test('curved semantic wall plans, invalidates, bounds, and renders through one p
   assert.ok(mesh.positions.length > 0);
   assert.ok(mesh.positions.every(Number.isFinite));
   assert.ok(mesh.indices.every(Number.isSafeInteger));
+  assert.ok(mesh.groups.some(({ regionId }) => regionId === 'curve-wall:s-1:bottom'));
+  assert.ok(Math.max(...mesh.uvs) > 5);
+
+  const coarseMesh = buildWallMeshData(planWall(entity.properties.wall, { sampleSpacing: 0.7 }));
+  assert.ok(Math.abs(Math.max(...mesh.uvs) - Math.max(...coarseMesh.uvs)) < 1e-9);
 
   const rendered = await buildWallBufferGeometry(plan);
   assert.equal(rendered.geometry.userData.workshopWallId, 'curve-wall');
   assert.ok(rendered.geometry.getAttribute('position').count > 0);
   rendered.geometry.dispose();
+
+  const projection = projectWorkshopComposition(bus.document);
+  const runtimeParts = createWorkshopCompositionParts(projection.recipe, {
+    wallPlans: projection.wallPlans,
+  });
+  try {
+    const semanticParts = runtimeParts.filter((part) => (
+      part.geometry.userData.workshopWallPlanId === 'curve-wall'
+    ));
+    assert.ok(semanticParts.length > 0);
+    assert.ok(semanticParts.some((part) => part.geometry.userData.workshopSurfaceId === 'curve-wall:s-1:top'));
+    assert.ok(semanticParts.some((part) => part.geometry.userData.workshopSurfaceId === 'curve-wall:s-1:bottom'));
+  } finally {
+    disposeParts(runtimeParts);
+  }
 
   const quadraticPlan = planWallEntity({
     id: 'composition:curve-wall',
@@ -111,6 +142,7 @@ test('curved semantic wall plans, invalidates, bounds, and renders through one p
   assert.equal(quadraticPlan.path.segments[0].kind, 'quadratic');
   assert.ok(buildWallMeshData(quadraticPlan).positions.every(Number.isFinite));
 
+  const beforeStyleProjection = projectWorkshopComposition(bus.document);
   const styleResult = bus.dispatch({
     type: 'wall.set-definition',
     entityId: 'composition:curve-wall',
@@ -119,4 +151,5 @@ test('curved semantic wall plans, invalidates, bounds, and renders through one p
   assert.ok(styleResult.dirty.domains.includes('STYLE'));
   assert.ok(styleResult.dirty.domains.includes('MATERIAL'));
   assert.equal(styleResult.dirty.domains.includes('TOPOLOGY'), false);
+  assert.notEqual(projectWorkshopComposition(bus.document).revisionKey, beforeStyleProjection.revisionKey);
 });

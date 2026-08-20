@@ -16,22 +16,26 @@ function wallBounds(wall, sections) {
 
 function surfaceFrame(wall, segment, side) {
   const evaluated = evaluateCurveSegment(segment, 0.5);
+  const tangent = [evaluated.tangent[0], 0, evaluated.tangent[1]];
   const normal2 = [-evaluated.tangent[1], evaluated.tangent[0]];
   const lateral = side === 'a' ? wall.thickness / 2 : side === 'b' ? -wall.thickness / 2 : 0;
+  const horizontal = side === 'top' || side === 'bottom';
   const y = side === 'top' ? wall.elevation + wall.height : wall.elevation;
   const normal = side === 'top'
     ? [0, 1, 0]
-    : side === 'a'
-      ? [normal2[0], 0, normal2[1]]
-      : [-normal2[0], 0, -normal2[1]];
+    : side === 'bottom'
+      ? [0, -1, 0]
+      : side === 'a'
+        ? [normal2[0], 0, normal2[1]]
+        : [-normal2[0], 0, -normal2[1]];
   return Object.freeze({
     origin: Object.freeze([
       evaluated.point[0] + normal2[0] * lateral,
       y,
       evaluated.point[1] + normal2[1] * lateral,
     ]),
-    tangent: Object.freeze([evaluated.tangent[0], 0, evaluated.tangent[1]]),
-    up: Object.freeze([0, 1, 0]),
+    tangent: Object.freeze(tangent),
+    up: Object.freeze(horizontal ? [normal2[0], 0, normal2[1]] : [0, 1, 0]),
     normal: Object.freeze(normal),
   });
 }
@@ -46,7 +50,6 @@ function surfaceRegions(wall) {
         wallId: wall.id,
         segmentId: segment.id,
         family: 'walls',
-        style: wall.style,
         side: 'a',
         frame: surfaceFrame(wall, segment, 'a'),
       },
@@ -55,7 +58,6 @@ function surfaceRegions(wall) {
         wallId: wall.id,
         segmentId: segment.id,
         family: 'walls',
-        style: wall.style,
         side: 'b',
         frame: surfaceFrame(wall, segment, 'b'),
       },
@@ -64,31 +66,28 @@ function surfaceRegions(wall) {
         wallId: wall.id,
         segmentId: segment.id,
         family: wall.topFamily === 'plain' ? 'stone' : 'roof',
-        style: wall.style,
         side: 'top',
         frame: surfaceFrame(wall, segment, 'top'),
+      },
+      {
+        id: `${prefix}:bottom`,
+        wallId: wall.id,
+        segmentId: segment.id,
+        family: 'walls',
+        side: 'bottom',
+        frame: surfaceFrame(wall, segment, 'bottom'),
       },
     );
   }
   return freezeArray(regions);
 }
 
-function rpgSemantics(wall, sections) {
-  const collisionSlabs = [];
-  const foundationContacts = [];
-  const coverSurfaces = [];
-  const sliceCounts = new Map();
-  for (let index = 0; index < sections.length - 1; index += 1) {
-    const current = sections[index];
-    const next = sections[index + 1];
-    const segmentId = current.segmentId === next.segmentId ? current.segmentId : next.segmentId;
-    const slice = (sliceCounts.get(segmentId) ?? 0) + 1;
-    sliceCounts.set(segmentId, slice);
-    const start = current.point;
-    const end = next.point;
-    const id = `${wall.id}:${segmentId}:slice-${slice}`;
-    collisionSlabs.push({
+function wallSlice(wall, segmentId, start, end, suffix = '') {
+  const id = `${wall.id}:${segmentId}${suffix}`;
+  return {
+    collision: {
       id,
+      primitiveId: wall.id,
       wallId: wall.id,
       segmentId,
       start,
@@ -97,26 +96,63 @@ function rpgSemantics(wall, sections) {
       height: wall.height,
       thickness: wall.thickness,
       gaps: Object.freeze([]),
-    });
-    foundationContacts.push({
+    },
+    foundation: {
       id: `${id}:contact`,
+      primitiveId: wall.id,
       wallId: wall.id,
       segmentId,
       start,
       end,
       thickness: wall.thickness,
       elevation: wall.elevation,
-    });
-    coverSurfaces.push({
+    },
+    cover: {
       id: `${id}:cover`,
+      primitiveId: wall.id,
       wallId: wall.id,
       segmentId,
       start,
       end,
       height: wall.elevation + wall.height,
       thickness: wall.thickness,
-    });
+    },
+  };
+}
+
+function rpgSemantics(wall, sections) {
+  const spansBySegment = new Map();
+  for (let index = 0; index < sections.length - 1; index += 1) {
+    const current = sections[index];
+    const next = sections[index + 1];
+    const segmentId = current.segmentId === next.segmentId ? current.segmentId : next.segmentId;
+    const spans = spansBySegment.get(segmentId) ?? [];
+    spans.push({ start: current.point, end: next.point });
+    spansBySegment.set(segmentId, spans);
   }
+
+  const collisionSlabs = [];
+  const foundationContacts = [];
+  const coverSurfaces = [];
+  for (const segment of wall.path.listSegments()) {
+    const spans = spansBySegment.get(segment.id) ?? [];
+    if (spans.length === 0) continue;
+    const slices = segment.kind === 'line'
+      ? [wallSlice(wall, segment.id, spans[0].start, spans.at(-1).end)]
+      : spans.map((span, index) => wallSlice(
+        wall,
+        segment.id,
+        span.start,
+        span.end,
+        `:slice-${index + 1}`,
+      ));
+    for (const slice of slices) {
+      collisionSlabs.push(slice.collision);
+      foundationContacts.push(slice.foundation);
+      coverSurfaces.push(slice.cover);
+    }
+  }
+
   return Object.freeze({
     collisionSlabs: freezeArray(collisionSlabs),
     walkableFloors: Object.freeze([]),
@@ -151,8 +187,12 @@ export function createWallGeometryPlan(wall, sections) {
     ]),
     modifiers,
     bounds: wallBounds(wall, sections),
-    revisionKey: JSON.stringify([serializedWall, sections.map(({ distance, point, tangent, miterRatio }) => (
-      [distance, point, tangent, miterRatio]
-    ))]),
+    revisionKey: JSON.stringify([serializedWall, sections.map(({
+      distance,
+      segmentDistance,
+      point,
+      tangent,
+      miterRatio,
+    }) => [distance, segmentDistance, point, tangent, miterRatio])]),
   });
 }

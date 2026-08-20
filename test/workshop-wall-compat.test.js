@@ -33,6 +33,7 @@ test('legacy wall recipe promotes to semantic paths without compatibility drift'
   assert.equal(entity.type, 'composition-wall');
   assert.equal(entity.properties.wall.id, 'keep-wall');
   assert.deepEqual(entity.properties.wall.path.segments.map(({ kind }) => kind), ['line', 'line']);
+  assert.deepEqual(entity.properties.wall.path.segments.map(({ id }) => id), ['segment-1', 'segment-2']);
   assert.deepEqual(resolveWorkshopRecipe(document), expected);
 
   const projection = projectWorkshopComposition(document);
@@ -51,6 +52,7 @@ test('legacy wall recipe promotes to semantic paths without compatibility drift'
     thickness: 0.6,
     gaps: [],
   })));
+  assert.equal(projection.wallPlans[0].rpg.collisionSlabs.length, 2);
 });
 
 test('legacy direct primitive wall edits re-promote instead of being shadowed by stale semantic data', () => {
@@ -77,4 +79,27 @@ test('legacy direct primitive wall edits re-promote instead of being shadowed by
     primitive.points,
   );
   assert.equal(projection.wallPlans[0].wall.height, 5);
+});
+
+test('redundant legacy wall points remain lossless while semantic planning removes zero-length segments', () => {
+  const redundant = {
+    ...recipe,
+    composition: {
+      version: 1,
+      primitives: [{
+        ...recipe.composition.primitives[0],
+        points: [[-4, 0], [0, 0], [0, 0], [4, 2]],
+      }],
+    },
+  };
+  const expected = normalizeProceduralRecipe(redundant);
+  const document = createWorkshopDocumentFromRecipe(redundant);
+  const entity = document.getEntity('composition:keep-wall');
+
+  assert.deepEqual(resolveWorkshopRecipe(document), expected);
+  assert.equal(entity.properties.wall.path.segments.length, 2);
+  assert.deepEqual(
+    projectWorkshopComposition(document).wallPlans[0].path.points.map(({ position }) => position),
+    [[-4, 0], [0, 0], [4, 2]],
+  );
 });

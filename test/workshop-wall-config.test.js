@@ -18,7 +18,21 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('Phase 5 wall config mirrors runtime constants', async () => {
+const REQUIRED_CONTRACTS = Object.freeze([
+  'stableWallIdentity',
+  'curveBackedWalls',
+  'lineArcQuadratic',
+  'deterministicJoins',
+  'semanticSurfaceFrames',
+  'rpgFromPlan',
+  'closedRendererMesh',
+  'tessellationInvariantUv',
+  'semanticRendererBridge',
+  'legacyPresetCompatibility',
+  'battlementsViaModifierAdapter',
+]);
+
+test('Phase 5 wall config mirrors runtime constants and required contracts', async () => {
   const config = yaml.load(await readFile(path.join(root, 'config', 'workshop-wall-kernel.yaml'), 'utf8'));
   assert.equal(config.version, 1);
   assert.equal(config.wallDefinitionVersion, WALL_DEFINITION_VERSION);
@@ -29,4 +43,6 @@ test('Phase 5 wall config mirrors runtime constants', async () => {
   assert.equal(config.planning.maxSections, MAX_WALL_PLAN_SECTIONS);
   assert.equal(config.legacyProjection.sampleSpacing, DEFAULT_WALL_LEGACY_SAMPLE_SPACING);
   assert.equal(config.legacyProjection.maxPoints, MAX_WALL_LEGACY_POINTS);
+  for (const contract of REQUIRED_CONTRACTS) assert.equal(config.contracts[contract], true, contract);
+  assert.equal(config.contracts.rendererMeshInspection, false);
 });

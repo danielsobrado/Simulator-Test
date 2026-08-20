@@ -13,16 +13,30 @@ function point3(input) {
   return input;
 }
 
+function surfaceSide(wall, coordinate, height, tolerance) {
+  const insideThickness = Math.abs(coordinate.lateral) <= wall.thickness / 2 + tolerance.position;
+  if (insideThickness && Math.abs(height - wall.height) <= tolerance.position) return 'top';
+  if (insideThickness && Math.abs(height) <= tolerance.position) return 'bottom';
+  if (Math.abs(coordinate.lateral) < tolerance.position) return 'center';
+  return coordinate.lateral > 0 ? 'a' : 'b';
+}
+
+function surfaceNormal(side, pathNormal) {
+  if (side === 'top') return Object.freeze([0, 1, 0]);
+  if (side === 'bottom') return Object.freeze([0, -1, 0]);
+  if (side === 'a') return Object.freeze([pathNormal[0], 0, pathNormal[1]]);
+  if (side === 'b') return Object.freeze([-pathNormal[0], 0, -pathNormal[1]]);
+  return null;
+}
+
 export function projectPointToWallSurface(wallInput, pointInput, tolerance = WORKSHOP_GEOMETRY_TOLERANCE) {
   const wall = normalizeWallDefinition(wallInput);
   const point = point3(pointInput);
   const coordinate = pointToPathCoordinate(wall.path, [point[0], point[2]], tolerance);
   const metrics = curvePathMetrics(wall.path, tolerance);
   const height = point[1] - wall.elevation;
-  const side = Math.abs(coordinate.lateral) < tolerance.position
-    ? 'center'
-    : coordinate.lateral > 0 ? 'a' : 'b';
-  const surfaceId = side === 'center' ? null : `${wall.id}:${coordinate.segmentId}:side-${side}`;
+  const side = surfaceSide(wall, coordinate, height, tolerance);
+  const surfaceId = side === 'center' ? null : `${wall.id}:${coordinate.segmentId}:${side === 'a' || side === 'b' ? `side-${side}` : side}`;
   return Object.freeze({
     wallId: wall.id,
     surfaceId,
@@ -38,6 +52,7 @@ export function projectPointToWallSurface(wallInput, pointInput, tolerance = WOR
     point: Object.freeze([...point]),
     tangent: coordinate.tangent,
     normal: coordinate.normal,
+    surfaceNormal: surfaceNormal(side, coordinate.normal),
   });
 }
 
