@@ -89,11 +89,44 @@ function changedFields(before = {}, after = {}) {
     .sort();
 }
 
+function semanticWallDomains(beforeWall, afterWall) {
+  if (!beforeWall && !afterWall) return [];
+  if (!beforeWall || !afterWall) return ['TOPOLOGY', ...GEOMETRY_DERIVED_DOMAINS, 'STYLE', 'MATERIAL'];
+  const domains = new Set();
+  for (const field of changedFields(beforeWall, afterWall)) {
+    if (field === 'version' || field === 'id') continue;
+    if (field === 'path') {
+      domains.add('TOPOLOGY');
+      GEOMETRY_DERIVED_DOMAINS.forEach((domain) => domains.add(domain));
+      continue;
+    }
+    if (field === 'profile') {
+      domains.add('TOPOLOGY');
+      GEOMETRY_DERIVED_DOMAINS.forEach((domain) => domains.add(domain));
+      continue;
+    }
+    if (field === 'topFamily') {
+      ['GEOMETRY', 'SURFACE_LAYOUT', 'MATERIAL', 'LOD', 'BOUNDS'].forEach((domain) => domains.add(domain));
+      continue;
+    }
+    if (field === 'style') {
+      ['STYLE', 'MATERIAL', 'SURFACE_LAYOUT'].forEach((domain) => domains.add(domain));
+      continue;
+    }
+    if (field === 'height' || field === 'thickness' || field === 'elevation') {
+      GEOMETRY_DERIVED_DOMAINS.forEach((domain) => domains.add(domain));
+      continue;
+    }
+    GEOMETRY_DERIVED_DOMAINS.forEach((domain) => domains.add(domain));
+  }
+  return [...domains];
+}
+
 function compositionDomains(before, after) {
   if (!before || !after) return orderedDomains(['TOPOLOGY', ...GEOMETRY_DERIVED_DOMAINS, 'MATERIAL']);
   const left = before.properties?.primitive ?? {};
   const right = after.properties?.primitive ?? {};
-  const domains = new Set();
+  const domains = new Set(semanticWallDomains(before.properties?.wall, after.properties?.wall));
   for (const field of changedFields(left, right)) {
     if (field === 'id') continue;
     if (field === 'kind') {

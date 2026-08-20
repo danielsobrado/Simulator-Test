@@ -1,0 +1,26 @@
+version: 1
+wallDefinitionVersion: 1
+profileKinds:
+  - rect
+topFamilies:
+  - plain
+  - battlements
+  - slate
+  - terracotta
+planning:
+  sampleSpacing: 0.35
+  maxMiterRatio: 4
+  maxSections: 512
+legacyProjection:
+  sampleSpacing: 0.75
+  maxPoints: 64
+contracts:
+  stableWallIdentity: true
+  curveBackedWalls: true
+  lineArcQuadratic: true
+  deterministicJoins: true
+  semanticSurfaceFrames: true
+  rpgFromPlan: true
+  legacyPresetCompatibility: true
+  battlementsViaModifierAdapter: true
+  rendererMeshInspection: false

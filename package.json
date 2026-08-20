@@ -48,6 +48,7 @@
     "qa:workshop:curves": "node --test test/workshop-curve-config.test.js test/workshop-curve-path.test.js test/workshop-curve-projection.test.js test/workshop-topology-remap.test.js test/workshop-curve-fuzz.test.js",
     "qa:workshop:interaction": "node --test test/workshop-interaction-config.test.js test/workshop-history-replay.test.js test/workshop-tool-interaction.test.js test/workshop-generated-commands.test.js test/workshop-legacy-edit-adapter.test.js test/workshop-live-component-controller.test.js",
     "qa:workshop:locality": "node --test test/workshop-locality-config.test.js test/workshop-composition-locality.test.js test/workshop-relationship-spatial.test.js test/workshop-invalidation-locality.test.js",
+    "qa:workshop:walls": "node --test test/workshop-wall-config.test.js test/workshop-wall-compat.test.js test/workshop-wall-curves.test.js test/workshop-wall-surface.test.js",
     "qa:inventory": "node scripts/run-inventory-qa.mjs",
     "qa:construction:joints": "node scripts/run-construction-joint-width-qa.mjs",
     "qa:construction:relief": "node scripts/run-construction-stone-relief-qa.mjs",

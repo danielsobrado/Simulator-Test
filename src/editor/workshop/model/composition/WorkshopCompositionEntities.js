@@ -1,4 +1,10 @@
 import { serializeWorkshopComposition } from '../../ProceduralWorkshopComposition.js';
+import {
+  createWallDefinitionFromLegacyPrimitive,
+  resolveWallDefinitionRecords,
+  serializeWallDefinition,
+  wallDefinitionToLegacyPrimitive,
+} from '../../geometry/wall/WallPath.js';
 import { WORKSHOP_RECIPE_ENTITY_ID } from '../../kernel/WorkshopKernelConstants.js';
 
 export const WORKSHOP_COMPOSITION_ENTITY_PREFIX = 'composition:';
@@ -25,15 +31,31 @@ export function isWorkshopCompositionEntity(entity) {
   );
 }
 
+function compositionProperties(primitive) {
+  const properties = { primitive: Object.freeze(primitive) };
+  if (primitive.kind === 'wall') {
+    properties.wall = Object.freeze(serializeWallDefinition(createWallDefinitionFromLegacyPrimitive(primitive)));
+  }
+  return Object.freeze(properties);
+}
+
 export function createWorkshopCompositionEntities(input, parentId = WORKSHOP_RECIPE_ENTITY_ID) {
   const composition = serializeWorkshopComposition(input);
   return Object.freeze(composition.primitives.map((primitive) => Object.freeze({
     id: workshopCompositionEntityId(primitive.id),
     type: `composition-${primitive.kind}`,
     parentId,
-    properties: Object.freeze({ primitive: Object.freeze(primitive) }),
+    properties: compositionProperties(primitive),
     dependsOn: Object.freeze([]),
   })));
+}
+
+function primitiveForEntity(entity) {
+  if (entity.type === 'composition-wall') {
+    const wall = resolveWallDefinitionRecords(entity.properties?.wall, entity.properties?.primitive);
+    return wallDefinitionToLegacyPrimitive(wall);
+  }
+  return entity.properties.primitive;
 }
 
 export function readWorkshopComposition(document, parentId = WORKSHOP_RECIPE_ENTITY_ID) {
@@ -42,6 +64,6 @@ export function readWorkshopComposition(document, parentId = WORKSHOP_RECIPE_ENT
   }
   const primitives = document.listEntities()
     .filter((entity) => entity.parentId === parentId && isWorkshopCompositionEntity(entity))
-    .map((entity) => entity.properties.primitive);
+    .map(primitiveForEntity);
   return serializeWorkshopComposition({ version: 1, primitives });
 }

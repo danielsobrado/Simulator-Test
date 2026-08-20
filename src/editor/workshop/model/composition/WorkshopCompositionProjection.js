@@ -1,4 +1,5 @@
 import { planWorkshopComposition } from '../../ProceduralWorkshopComposition.js';
+import { planWallEntity } from '../../geometry/wall/WallPlanner.js';
 import { resolveWorkshopRecipe } from '../../kernel/WorkshopRecipeBridge.js';
 import {
   isWorkshopCompositionEntity,
@@ -35,12 +36,20 @@ export function projectWorkshopComposition(document, dirtyEntityIds = []) {
     .sort();
   const recipe = resolveWorkshopRecipe(document);
   const plan = planWorkshopComposition(recipe, dirtyPrimitiveIds);
+  const wallPlans = entities
+    .filter(({ type, properties }) => type === 'composition-wall' && properties?.wall)
+    .map((entity) => planWallEntity(entity));
+  const wallPlanByEntity = new Map(wallPlans.map((wallPlan) => [
+    workshopCompositionEntityId(wallPlan.wallId),
+    wallPlan,
+  ]));
   const byEntity = entities.map((entity) => {
     const primitiveId = workshopCompositionPrimitiveId(entity.id);
     return Object.freeze({
       entityId: entity.id,
       primitiveId,
       primitive: entity.properties.primitive,
+      wallPlan: wallPlanByEntity.get(entity.id) ?? null,
       materialRegions: freezeItems(plan.materialRegions.filter((region) => region.primitiveId === primitiveId)),
       rpg: rpgForPrimitive(plan.rpg, primitiveId),
     });
@@ -55,6 +64,7 @@ export function projectWorkshopComposition(document, dirtyEntityIds = []) {
     structural: plan.structural,
     attachments: plan.attachments,
     rpg: plan.rpg,
+    wallPlans: Object.freeze(wallPlans.sort((left, right) => left.wallId.localeCompare(right.wallId))),
     byEntity: Object.freeze(byEntity.sort((left, right) => left.entityId.localeCompare(right.entityId))),
   });
 }
