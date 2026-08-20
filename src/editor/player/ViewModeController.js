@@ -5,6 +5,7 @@ import {
   PLAYER_MODE_WALK,
   PLAYER_MODES,
 } from './playerConstants.js';
+import { applyTerrainInspectionMode } from './ViewModeSurfacePolicy.js';
 
 export const CAMERA_VIEW_FIRST = 'first';
 export const CAMERA_VIEW_THIRD = 'third';
@@ -51,6 +52,7 @@ export class ViewModeController {
     this.unsubscribePlayer = playerController.subscribe(() => this.emit());
     this.editorCamera.setEnabled(true);
     this.playerController.setEnabled(false);
+    this.syncTerrainInspectionMode();
 
     this.boundHandlers = {
       pointerDown: (event) => this.onSpawnPointerDown(event),
@@ -90,6 +92,10 @@ export class ViewModeController {
       awaitingSpawn: this.awaitingSpawn,
       player: this.playerController.getStatus(),
     });
+  }
+
+  syncTerrainInspectionMode() {
+    applyTerrainInspectionMode(this.terrainView, this.mode === PLAYER_MODE_EDIT);
   }
 
   /**
@@ -194,6 +200,7 @@ export class ViewModeController {
 
     const focus = this.playerController.getFocusWorld();
     this.mode = PLAYER_MODE_EDIT;
+    this.syncTerrainInspectionMode();
     this.playerController.setEnabled(false);
     this.editorCamera.setEnabled(true);
     this.editorCamera.focusWorld(focus.x, focus.z);
@@ -223,6 +230,7 @@ export class ViewModeController {
     this.awaitingSpawn = false;
     this.spacePressed = false;
     this.mode = PLAYER_MODE_WALK;
+    this.syncTerrainInspectionMode();
     this.editorCamera.setEnabled(false);
     this.playerController.setEnabled(true, spawn);
     // The boom carries the last walk's pose; entering somewhere else entirely
