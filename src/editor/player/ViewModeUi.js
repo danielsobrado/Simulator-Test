@@ -22,21 +22,21 @@ export class ViewModeUi {
   constructor({ root, controller }) {
     this.root = root;
     this.controller = controller;
-    const topbar = root.querySelector('.topbar');
     const viewport = root.querySelector('[data-role="viewport"]');
-    if (!topbar || !viewport) {
-      throw new Error('View mode UI requires the editor topbar and viewport.');
+    if (!viewport) {
+      throw new Error('View mode UI requires the editor viewport.');
     }
 
     this.viewport = viewport;
     this.switcher = document.createElement('div');
     this.switcher.className = 'view-mode-switcher';
+    this.switcher.setAttribute('role', 'group');
     this.switcher.setAttribute('aria-label', 'Camera mode');
     this.switcher.innerHTML = `
-      <button type="button" data-view-mode="${PLAYER_MODE_EDIT}">Edit / Orbit</button>
-      <button type="button" data-view-mode="${PLAYER_MODE_WALK}">Player</button>
+      <button type="button" data-view-mode="${PLAYER_MODE_EDIT}" title="Edit / Orbit">Edit / Orbit</button>
+      <button type="button" data-view-mode="${PLAYER_MODE_WALK}" title="Enter player mode">Player</button>
     `;
-    topbar.prepend(this.switcher);
+    viewport.append(this.switcher);
 
     this.hud = document.createElement('div');
     this.hud.className = 'player-hud';
@@ -72,10 +72,11 @@ export class ViewModeUi {
 
     for (const button of this.switcher.querySelectorAll('[data-view-mode]')) {
       const isPlayerButton = button.dataset.viewMode === PLAYER_MODE_WALK;
-      button.classList.toggle(
-        'is-active',
-        isPlayerButton ? playerActive : button.dataset.viewMode === state.mode && !state.awaitingSpawn,
-      );
+      const active = isPlayerButton
+        ? playerActive
+        : button.dataset.viewMode === state.mode && !state.awaitingSpawn;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
 
     this.hud.hidden = !playerActive;
