@@ -1,21 +1,42 @@
 .view-mode-switcher {
+  position: absolute;
+  z-index: 7;
+  top: 12px;
+  left: 50%;
   display: inline-flex;
   gap: 3px;
+  max-width: calc(100% - 24px);
   padding: 3px;
-  border: 1px solid #3a4a3f;
-  border-radius: 7px;
-  background: #111713;
+  transform: translateX(-50%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 8px;
+  background: rgb(17 23 19 / 90%);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  user-select: none;
 }
 
 .view-mode-switcher button {
-  min-height: 26px;
-  padding: 4px 8px;
+  min-height: 28px;
+  padding: 4px 9px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: #aab8ad;
   cursor: pointer;
   font-size: 11px;
+  white-space: nowrap;
+}
+
+.view-mode-switcher button:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #e8f0ea;
+}
+
+.view-mode-switcher button:focus-visible {
+  outline: 2px solid #d4b65e;
+  outline-offset: 1px;
 }
 
 .view-mode-switcher button.is-active {
@@ -195,4 +216,16 @@
 
 [data-view-mode='player'][data-player-paused='true'] .player-hud__hint::after {
   content: ' — paused for editing';
+}
+
+@media (max-width: 560px) {
+  .view-mode-switcher {
+    top: 8px;
+    max-width: calc(100% - 16px);
+  }
+
+  .view-mode-switcher button {
+    min-height: 32px;
+    padding-inline: 10px;
+  }
 }
