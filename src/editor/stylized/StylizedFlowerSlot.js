@@ -2,51 +2,15 @@ import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { markAttributeRangeUpdated } from './attributeUpload.js';
+import { createFlowerCrossGeometry, setFlowerGeometryBounds } from './StylizedFlowerGeometry.js';
 import { createStylizedFlowerMaterial } from './StylizedFlowerMaterial.js';
 import { buildFlowerScatter } from './vegetationScatter.js';
 import { filterScatterByForest } from './forest/ForestFloor.js';
-
-function createCrossGeometry(maxInstances) {
-  const positions = new Float32Array([
-    -0.5, 0, 0, 0.5, 0, 0, -0.5, 1, 0, 0.5, 1, 0,
-    0, 0, -0.5, 0, 0.5, 0, 1, -0.5, 0, 1, 0.5,
-  ]);
-  const uvs = new Float32Array([
-    0, 0, 1, 0, 0, 1, 1, 1,
-    0, 0, 1, 0, 0, 1, 1, 1,
-  ]);
-  const indices = [0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7];
-  const geometry = new THREE.InstancedBufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.setAttribute(
-    'instanceBase',
-    new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 3), 3),
-  );
-  geometry.setAttribute(
-    'instanceParams',
-    new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4),
-  );
-  geometry.instanceCount = 0;
-  return geometry;
-}
 
 function densityForDistance(distance, radius, farDensity) {
   if (radius <= 0 || distance <= 0) return 1;
   const amount = Math.min(1, distance / radius);
   return 1 + (farDensity - 1) * amount;
-}
-
-function setGeometryBounds(geometry, chunkWorldSize, minimumHeight, maximumHeight, maximumSize) {
-  if (!Number.isFinite(minimumHeight) || !Number.isFinite(maximumHeight)) return;
-  const half = chunkWorldSize / 2 + maximumSize + 1;
-  geometry.boundingBox = new THREE.Box3(
-    new THREE.Vector3(-half, minimumHeight - 1, -half),
-    new THREE.Vector3(half, maximumHeight + maximumSize + 2, half),
-  );
-  geometry.boundingSphere = new THREE.Sphere();
-  geometry.boundingBox.getBoundingSphere(geometry.boundingSphere);
 }
 
 export class StylizedFlowerSlot {
@@ -62,7 +26,7 @@ export class StylizedFlowerSlot {
     this.maxInstances = config.flowers.perChunk;
     this.chunkCenter = uniform(new THREE.Vector2());
     this.time = uniform(0);
-    this.geometry = createCrossGeometry(this.maxInstances);
+    this.geometry = createFlowerCrossGeometry(this.maxInstances);
     this.material = createStylizedFlowerMaterial({
       textures,
       surfaceMaskTexture: terrainSlot.surfaceMaskTexture,
@@ -93,7 +57,7 @@ export class StylizedFlowerSlot {
       : Number.POSITIVE_INFINITY;
     const withinRadius = distance <= this.config.flowers.residentRadius;
     const active = Boolean(this.terrainSlot.mesh.visible && withinRadius && descriptor && this.terrainSlot.page);
-    this.mesh.visible = Boolean(active && this.readyKey === descriptor?.key);
+    this.mesh.visible = Boolean(active && this.readyKey === descriptor?.key && this.hasInstances());
     if (!active) {
       this.pendingRebuild = null;
       return;
@@ -131,9 +95,16 @@ export class StylizedFlowerSlot {
     this.readySampleLimit = job.sampleLimit;
     this.mesh.visible = Boolean(
       this.terrainSlot.mesh.visible
-      && this.terrainSlot.descriptor?.key === this.readyKey,
+      && this.terrainSlot.descriptor?.key === this.readyKey
+      && this.hasInstances(),
     );
     return true;
+  }
+
+  // A chunk of open sea scatters no flowers; drawing it would only cost a
+  // cull test and an empty draw.
+  hasInstances() {
+    return this.geometry.instanceCount > 0;
   }
 
   rebuild(page, descriptor, sampleLimit) {
@@ -172,13 +143,12 @@ export class StylizedFlowerSlot {
     this.geometry.instanceCount = scatter.count;
     markAttributeRangeUpdated(baseAttribute, scatter.count);
     markAttributeRangeUpdated(parameterAttribute, scatter.count);
-    setGeometryBounds(
-      this.geometry,
-      this.chunkWorldSize,
-      scatter.minimumHeight,
-      scatter.maximumHeight,
-      this.config.flowers.maxSize,
-    );
+    setFlowerGeometryBounds(this.geometry, {
+      chunkWorldSize: this.chunkWorldSize,
+      minimumHeight: scatter.minimumHeight,
+      maximumHeight: scatter.maximumHeight,
+      maximumSize: this.config.flowers.maxSize,
+    });
     PerfCounters.inc('flowerBufferUploadMs', performance.now() - uploadStartedAt);
     PerfCounters.set('flowerLastChunkInstances', scatter.count);
   }
