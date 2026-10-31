@@ -16,11 +16,6 @@
   animation: glade-rise-in 320ms ease both;
 }
 
-/* During a perf run the ribbon narrows to stay clear of the QA panel. */
-:root:has(.perf-qa-overlay) .hud-compass {
-  --compass-half: max(160px, min(320px, 50vw - 340px));
-}
-
 .hud-compass[hidden] {
   display: none;
 }
