@@ -217,6 +217,11 @@
 }
 
 @media (max-width: 760px) {
+  .hud-minimap {
+    top: var(--hud-phone-top);
+    bottom: auto;
+  }
+
   .hud-minimap__north {
     width: 14px;
     height: 14px;
@@ -224,7 +229,12 @@
     font-size: 7px;
   }
 
+  /* Hung from the dial's right edge: centred, a long biome name runs off the screen. */
   .hud-minimap__place {
+    right: 0;
+    left: auto;
+    max-width: 200px;
+    transform: none;
     padding: 2px 7px;
     font-size: 7px;
     letter-spacing: 0.1em;

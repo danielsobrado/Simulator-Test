@@ -36,6 +36,8 @@
   /* The vitals' bottom edge; the spell dock stands on top of them. */
   --hud-dock-bottom: 16px;
   --hud-vitals-height: 25px;
+  /* On a phone the dock and touch controls own the bottom; the HUD hangs from here. */
+  --hud-phone-top: 104px;
   --hud-parchment: linear-gradient(180deg, #ecdcb4, #cdb27a);
   --hud-ink: #eef4e8;
   --hud-ink-strong: #efe6d0;

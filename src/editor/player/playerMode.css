@@ -120,6 +120,13 @@
   color: var(--hud-leather);
 }
 
+/* On a phone the compass spans the width, so the tour button shares the switch's row. */
+@media (max-width: 760px) {
+  :is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .scenic-tour-button {
+    top: 14px;
+  }
+}
+
 @media (max-width: 560px) {
   .view-mode-switcher {
     top: 8px;

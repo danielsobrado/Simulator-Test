@@ -285,4 +285,7 @@
 @media(min-width:761px) and (max-width:1280px) {
   .hud-metrics { right: var(--hud-inset-x); bottom: calc(var(--hud-inset-y) + var(--minimap-size,160px) + 14px); }
 }
-@media(max-width:760px) { .hud-legend { max-width: calc(100vw - var(--minimap-size,96px) - 48px); } }
+@media(max-width:760px) {
+  .hud-legend { top: calc(var(--hud-phone-top) + var(--hud-vitals-height) + 8px); bottom: auto; padding: 5px 9px; max-width: calc(100vw - var(--minimap-size,96px) - 48px); }
+  .hud-metrics { top: calc(var(--hud-phone-top) + var(--minimap-size,96px) + 14px); right: var(--hud-inset-x); bottom: auto; }
+}

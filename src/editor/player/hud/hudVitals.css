@@ -84,10 +84,9 @@
   --vital-fill: linear-gradient(270deg, #a06a12, #f0c04f);
 }
 
-/* The dock takes the whole bottom edge on a phone, so the bars hang under the compass. */
 @media (max-width: 760px) {
   .hud-vitals {
-    top: 104px;
+    top: var(--hud-phone-top);
     bottom: auto;
     left: var(--hud-inset-x);
     width: 180px;

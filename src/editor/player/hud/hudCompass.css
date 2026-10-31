@@ -130,6 +130,13 @@
   top: 124px;
 }
 
+/* On a phone the status clears the vitals and minimap hanging under the ribbon. */
+@media (max-width: 760px) {
+  .player-hud[data-hud-phase='walking'] .hud-status {
+    top: calc(var(--hud-phone-top) + var(--minimap-size) + 16px);
+  }
+}
+
 /* Wide enough for the ribbon to clear the corner mode switch: it takes the top edge. */
 @media (min-width: 900px) {
   .hud-compass {
