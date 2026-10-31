@@ -21,8 +21,9 @@ const INSTANCE_ATTRIBUTES = Object.freeze([
 
 /**
  * A persistent small GPU page containing only completed, populated stems.
- * Repacking stays within each affected page. Unchanged tile ranges remain
- * resident; unused capacity never enters the draw. Stem ranks, local positions,
+ * Repacking stays within each affected page. Unchanged stems remain resident,
+ * a tile may span several runs, and unused capacity never enters the draw.
+ * Stem ranks, local positions,
  * wind data and publication fades are copied together without resampling.
  */
 export class MeadowBandBatch {
@@ -73,15 +74,16 @@ export class MeadowBandBatch {
     this.geometry.index = template.index;
   }
 
-  writeTile(start, tile, count, writeSource) {
-    if (writeSource) {
-      for (const [name, source, width] of INSTANCE_ATTRIBUTES) {
-        this.geometry.getAttribute(name).array.set(
-          tile.output[source].subarray(0, count * width), start * width,
-        );
-        this.markRange(name, start, count);
-      }
+  writeSource(tile, { start, count, offset }) {
+    for (const [name, source, width] of INSTANCE_ATTRIBUTES) {
+      this.geometry.getAttribute(name).array.set(
+        tile.output[source].subarray(offset * width, (offset + count) * width), start * width,
+      );
+      this.markRange(name, start, count);
     }
+  }
+
+  writeOrigins(tile, { start, count }) {
     const origins = this.geometry.getAttribute('instanceTile').array;
     for (let i = start; i < start + count; i += 1) {
       origins[i * 4] = tile.renderX;
@@ -117,10 +119,12 @@ export class MeadowBandBatch {
     this.order = plan.order;
     for (const tile of this.slots.keys()) if (!plan.present.has(tile)) this.slots.delete(tile);
     let changed = this.geometry.instanceCount !== plan.count;
-    for (const { tile, start, count, source, writeSource, metadata } of plan.writes) {
-      if (metadata) { this.writeTile(start, tile, count, writeSource); changed = true; }
+    for (const { tile, count, source, ranges, sourceRanges, metadata } of plan.writes) {
+      for (const range of sourceRanges) this.writeSource(tile, range);
+      for (const range of metadata ? ranges : sourceRanges) this.writeOrigins(tile, range);
+      changed ||= metadata;
       const slot = this.slots.get(tile) ?? {};
-      Object.assign(slot, { start, count, source, renderX: tile.renderX, renderZ: tile.renderZ,
+      Object.assign(slot, { ranges, count, source, renderX: tile.renderX, renderZ: tile.renderZ,
         revealTime: tile.revealTime, revealRank: tile.revealRank });
       this.slots.set(tile, slot);
     }

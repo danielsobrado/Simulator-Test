@@ -136,7 +136,7 @@ test('meadow pages bound buffer capacity and reuse storage through tile churn', 
   // the same slot, irrespective of which page owns it.
   for (const tile of tiles) {
     const page = band.slots.get(tile), slot = page.slots.get(tile);
-    const offset = slot.start;
+    const offset = slot.ranges[0].start;
     for (const [name, field, width] of [['instancePosition', 'position', 4],
       ['instanceRotation', 'rotation', 2], ['instanceData', 'data', 4]]) {
       assert.deepEqual(page.geometry.getAttribute(name).array.subarray(offset * width,
@@ -238,7 +238,7 @@ test('sparse growth adds bounded pages while retaining existing geometry and pen
   assert.equal(band.meshes.reduce((sum, mesh) => sum + mesh.geometry.instanceCount, 0), 33 * 5);
   assert.ok(band.pages.every(page => page.geometry.getAttribute('instancePosition').count === meadowPageTileCapacity(16) * 16));
   for (const tile of tiles) {
-    const page = band.slots.get(tile), start = page.slots.get(tile).start * 4;
+    const page = band.slots.get(tile), start = page.slots.get(tile).ranges[0].start * 4;
     assert.deepEqual(page.geometry.getAttribute('instancePosition').array.subarray(start, start + 20), tile.output.position);
   }
 });

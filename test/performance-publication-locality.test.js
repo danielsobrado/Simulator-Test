@@ -86,7 +86,8 @@ test('equal-size retirement rewrites one tail tile without fragmented or empty d
   assert.equal(page.slots.size, 15);
   for (const tile of tiles.slice(1)) {
     const slot = page.slots.get(tile);
-    assert.deepEqual(page.geometry.getAttribute('instancePosition').array.subarray(slot.start * 4, (slot.start + slot.count) * 4), tile.output.position);
+    const [{ start, count }] = slot.ranges;
+    assert.deepEqual(page.geometry.getAttribute('instancePosition').array.subarray(start * 4, (start + count) * 4), tile.output.position);
   }
   page.dispose(); template.dispose(); material.dispose();
 });

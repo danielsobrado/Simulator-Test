@@ -707,10 +707,33 @@ now share one `renderer.compute` call, and the cull is skipped while the view,
 origin and records are unchanged. `update` fell to 402–413 ms while moving
 (two runs per arm); the skip itself only pays while the camera is still.
 
-The larger cost is not in that review: `writeBuffer` took about 1.9 s of main-thread
-time, and meadow was 395 MB of 446 MB uploaded in the 12 s measurement. 276 MB of
-that is `meadowRepackBytes`: retiring a tile whose stem count differs from the
-page tail shifts every later tile in the page (`meadowPageUpdatePlan`).
+### Meadow stems no longer shift on retirement (2026-10-31)
+
+Retiring a tile whose stem count differed from the page tail rewrote every later
+tile. Each stem carries its tile in `instanceTile`, so a tile may now span several
+runs (`slot.ranges`): stems past the new draw count drop into the holes, and a
+resize leaves other tiles in place. No dead stems enter the draw.
+
+`chunk-cross --warmup 8 --duration 12 --settle --gpuTimings 1 --drain-seconds 8
+--grass-diagnostics`, two alternating runs per arm, measured counters:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| `meadowAttributeBytesUploaded` | 395, 377 MB | 196, 195 MB |
+| `meadowRepackBytes` | 277, 263 MB | 70, 69 MB |
+| `meadowOversizedPageBytes` | 189, 181 MB | 21, 22 MB |
+| `meadowPageCommitsDeferred` | 2139, 2055 | 577, 553 |
+
+Every run lost native focus, so these captures are void as frame-pacing evidence
+and no FPS gain is claimed. The counters above do not depend on focus. The gain
+is less deferred grass, not frame time: `writeBuffer` CPU stayed flat at about
+420 ms per third of the capture while moving, in both arms. Roughly 65% of its
+2.4–2.8 s falls in the first third of the capture, which is startup, so bytes
+are not what that time is paying for. An earlier reading blamed meadow uploads for it.
+
+After a live run, 359,461 stems on 17 pages had no holes and no stem with the
+wrong origin or source. 128 tiles were split, the worst into 10 runs; each run
+is a separate range upload, so watch that count if uploads ever become call-bound.
 
 ### Renderer GPU preference
 

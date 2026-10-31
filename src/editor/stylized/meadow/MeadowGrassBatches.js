@@ -179,11 +179,8 @@ export class MeadowGrassBatches {
     const batch = this.batches.get(band);
     const page = batch?.slots.get(tile);
     const slot = page?.slots.get(tile);
-    let count = output.count;
-    if (slot && slot.count !== count) {
-      for (const other of page.slots.values()) if (other.start > slot.start) count += other.count;
-    }
-    return count * 14 * 4;
+    // A shrinking tile also moves up to its lost stems from the page tail into its holes.
+    return (output.count + Math.max(0, (slot?.count ?? 0) - output.count)) * 14 * 4;
   }
 
   get meshes() {
