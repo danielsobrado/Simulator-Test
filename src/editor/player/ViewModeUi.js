@@ -124,6 +124,7 @@ export class ViewModeUi {
     if (!this.vitals.dead) return;
     this.vitals.revive();
     player.setPose(this.respawnPoint ?? player.state);
+    this.hud.announce('You fell. Back at your start.');
   }
 
   dispose() {

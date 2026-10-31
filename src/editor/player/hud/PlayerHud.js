@@ -6,6 +6,15 @@ import { HudStatus } from './HudStatus.js';
 import { HudVitals } from './HudVitals.js';
 import { HUD_PHASE, isPlayerEngaged, resolveHudPhase } from './hudState.js';
 
+const NOTICE_MS = 3000;
+
+function createNotice() {
+  const notice = document.createElement('p');
+  notice.className = 'hud-notice';
+  notice.setAttribute('role', 'status');
+  return notice;
+}
+
 function createReticle() {
   const reticle = document.createElement('span');
   reticle.className = 'hud-reticle';
@@ -42,6 +51,7 @@ export class PlayerHud {
 
     this.status = new HudStatus();
     this.reticle = createReticle();
+    this.notice = createNotice();
     this.compass = new HudCompass(minimap ?? {});
     this.vitals = new HudVitals();
     this.unsubscribeVitals = vitals?.subscribe((levels) => this.vitals.show(levels));
@@ -52,12 +62,22 @@ export class PlayerHud {
       this.compass.element,
       this.status.element,
       this.reticle,
+      this.notice,
       this.vitals.element,
       ...(this.minimap ? [this.minimap.element] : []),
       this.metrics.element,
       this.hints.element,
     );
     viewport.append(this.element);
+  }
+
+  /** Shows a line mid-screen for a moment; a new one restarts the fade. */
+  announce(text) {
+    this.notice.textContent = text;
+    this.notice.animate?.(
+      [{ opacity: 0 }, { opacity: 1, offset: 0.08 }, { opacity: 1, offset: 0.75 }, { opacity: 0 }],
+      { duration: NOTICE_MS, easing: 'ease-out' },
+    );
   }
 
   render(state) {

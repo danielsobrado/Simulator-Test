@@ -110,6 +110,20 @@
   animation: glade-spin 900ms linear infinite;
 }
 
+/* A passing event, such as a respawn. `PlayerHud.announce` fades it through. */
+.hud-notice {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  margin: 0;
+  color: #f3dfa2;
+  font: 600 22px/1.2 var(--hud-tome-font);
+  opacity: 0;
+  text-shadow: 0 1px 3px #000, 0 0 12px #000a;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 /* ── Reticle ─────────────────────────────────────────────────────────────── */
 
 .hud-reticle {
