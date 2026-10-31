@@ -165,6 +165,8 @@
   z-index: 4;
   transform: rotate(var(--hud-heading, 0rad));
   pointer-events: none;
+  /* Its own layer, so turning the masked ticks composites instead of repainting. */
+  will-change: transform;
 }
 
 /* Engraved bearing ticks, turning with north. */
