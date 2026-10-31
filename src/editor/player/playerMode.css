@@ -121,6 +121,14 @@
   color: var(--hud-leather);
 }
 
+:is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .scenic-tour-button {
+  border-radius: 3px;
+  background: var(--hud-plate);
+  box-shadow: 0 0 0 1px var(--hud-plate-line), 0 2px 6px #000a;
+  color: #f3dfa2;
+  font: 600 12px/1 var(--hud-tome-font);
+}
+
 /* On a phone the compass spans the width, so the tour button shares the switch's row. */
 @media (max-width: 760px), (max-height: 500px) {
   :is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .scenic-tour-button {

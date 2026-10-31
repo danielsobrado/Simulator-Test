@@ -10,10 +10,7 @@ const LOW_PERCENT = 25;
 
 /**
  * The vitals under the spell dock: horizontal life and mana bars, with thin
- * stamina and energy bars beneath them.
- *
- * shortcut: nothing in the game tracks these yet, so they sit full; call `set`
- * from the system that introduces them.
+ * stamina and energy bars beneath them. `PlayerVitals` feeds them through `show`.
  */
 export class HudVitals {
   constructor() {
@@ -33,6 +30,11 @@ export class HudVitals {
       return [id, bar];
     }));
     for (const { id } of VITALS) this.set(id, 1);
+  }
+
+  /** @param {Record<string, number>} levels */
+  show(levels) {
+    for (const [id, level] of Object.entries(levels)) this.set(id, level);
   }
 
   render(phase) {

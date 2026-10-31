@@ -32,9 +32,10 @@ test('failed casts flash as misses and do not emit cast audio', () => {
   assert.match(source, /return false;/);
 });
 
-test('an unavailable spell is a miss and never plays', () => {
-  assert.match(source, /&& button\.getAttribute\('aria-disabled'\) !== 'true'\s*&& descriptor\.play\(/);
-  assert.match(source, /setAvailable: \(spellId, available\) =>/);
+test('a spell on cooldown or beyond the mana is a miss and never plays', () => {
+  assert.match(source, /&& \(deps\.canCast\?\.\(descriptor\.castDurationMs\) \?\? true\)\s*&& descriptor\.play\(/);
+  assert.ok(source.indexOf("getAttribute('aria-pressed') === 'true'") < source.indexOf('const fired ='));
+  assert.ok(source.indexOf('deps.onCast?.(') > source.indexOf('if (!fired)'));
 });
 
 test('dragging keeps the spell menu inside the viewport', () => {

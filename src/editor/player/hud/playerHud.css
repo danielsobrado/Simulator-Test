@@ -281,6 +281,8 @@
 .hud-keys dd { color: #d2d9ce; font-size: 11px; line-height: 1.35; }
 .hud-metrics { gap: 10px; }
 .hud-metrics strong { color: #f2f1e8; }
+/* Keyboard hints mean nothing on a touch screen, and the stick needs the corner. */
+@media (pointer: coarse) { .hud-keys { display: none; } }
 @media(max-width:1023px) { .player-hud { --hud-inset-x: 16px; --hud-inset-y: 16px; } }
 @media(min-width:761px) and (max-width:1280px) and (min-height:501px) {
   .hud-metrics { right: var(--hud-inset-x); bottom: calc(var(--hud-inset-y) + var(--minimap-size,160px) + 14px); }

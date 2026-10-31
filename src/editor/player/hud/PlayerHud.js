@@ -28,11 +28,12 @@ export class PlayerHud {
    * @param {HTMLElement} options.viewport
    * @param {boolean} [options.canToggleCamera] whether V switches to third person
    * @param {ConstructorParameters<typeof HudMinimap>[0] | null} [options.minimap]
+   * @param {import('../PlayerVitals.js').PlayerVitals | null} [options.vitals]
    * @param {() => object | null} [options.getRenderer] for the FPS / TRIS / DRAWS readout
    * @param {() => string} [options.getSceneLabel] the legend's title (time of day)
    */
   constructor({
-    viewport, canToggleCamera = false, canBoost = false, minimap = null, getRenderer = () => null, getSceneLabel = () => '',
+    viewport, canToggleCamera = false, canBoost = false, minimap = null, vitals = null, getRenderer = () => null, getSceneLabel = () => '',
   }) {
     this.element = document.createElement('div');
     this.element.className = 'player-hud';
@@ -43,6 +44,7 @@ export class PlayerHud {
     this.reticle = createReticle();
     this.compass = new HudCompass(minimap ?? {});
     this.vitals = new HudVitals();
+    this.unsubscribeVitals = vitals?.subscribe((levels) => this.vitals.show(levels));
     this.minimap = minimap ? new HudMinimap(minimap) : null;
     this.hints = new HudKeyHints({ canToggleCamera, canBoost, getSceneLabel });
     this.metrics = new HudMetrics({ getRenderer });
@@ -81,6 +83,7 @@ export class PlayerHud {
   }
 
   dispose() {
+    this.unsubscribeVitals?.();
     this.compass.dispose();
     this.vitals.dispose();
     this.minimap?.dispose();

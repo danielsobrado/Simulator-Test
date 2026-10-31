@@ -68,6 +68,7 @@ import {
   raycastTerrainHeightfield,
 } from './editor/weather/weather_terrain_adapters.js';
 import { attachSpellHotkeys, createSpellRuntime } from './editor/spells/spell_runtime.js';
+import { PlayerVitals } from './editor/player/PlayerVitals.js';
 import { createBogVents } from './editor/stylized/bog/BogVents.js';
 import { GRASS_MARK } from './editor/stylized/meadow/MeadowInteractionMap.js';
 import { attachCaptureHotkey } from './editor/input/attachCaptureHotkey.js';
@@ -892,10 +893,12 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       ? 'Drusniel World'
       : label.replace(/\s*\(.*\)\s*$/, '');
   };
+  const playerVitals = new PlayerVitals();
   const viewModeUi = new ViewModeUi({
     root,
     controller: viewModeController,
     hud: {
+      vitals: playerVitals,
       minimap: createHudMinimapSource({
         ui, controller, tileMap, getBaseTerrain: () => worldMapController.getBaseTerrain(),
       }),
@@ -1271,6 +1274,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   const spellsEnabled = config.spells?.enabled !== false;
   const spellRuntime = spellsEnabled
     ? createSpellRuntime({
+      vitals: playerVitals,
       scene: terrainView.scene,
       getCamera: () => viewModeController.camera,
       isWalkMode: () => viewModeController.mode === PLAYER_MODE_WALK,

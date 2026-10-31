@@ -174,6 +174,8 @@ export function createSpellRuntime(deps) {
     root: deps.menuRoot,
     extraPages: grimoire ? GRIMOIRE_PAGES : [],
     castExtra: castGrimoire,
+    canCast: deps.vitals ? (castMs) => deps.vitals.canCast(castMs) : undefined,
+    onCast: deps.vitals ? (castMs) => deps.vitals.spendCast(castMs) : undefined,
     controller: {
       playFire: (durationMs) => cast('fire', durationMs),
       playWater: (durationMs) => cast('water', durationMs),
@@ -183,6 +185,8 @@ export function createSpellRuntime(deps) {
       playFireball: (durationMs) => cast('fireball', durationMs),
     },
   });
+
+  const unsubscribeVitals = deps.vitals?.subscribe(() => menu.syncAvailability());
 
   const menuEl = document.getElementById(config.menu.rootId);
   const syncMenuVisibility = () => {
@@ -270,6 +274,7 @@ export function createSpellRuntime(deps) {
         window.removeEventListener('keydown', onKeyDown, true);
       }
       unsubscribeMode?.();
+      unsubscribeVitals?.();
       unsubscribeOrigin?.();
       menu.dispose();
       vfx.dispose();

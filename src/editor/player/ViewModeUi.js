@@ -1,6 +1,9 @@
 import { PLAYER_MODE_EDIT, PLAYER_MODE_WALK, PLAYER_MODE_FLY } from './playerConstants.js';
 import { hudIcon } from './hud/hudIcons.js';
 import { PlayerHud } from './hud/PlayerHud.js';
+import { HUD_PHASE } from './hud/hudState.js';
+
+const MAX_VITALS_STEP_S = 0.1;
 
 /**
  * The Edit / Play / Fly switch and navigation hints.
@@ -15,7 +18,7 @@ export class ViewModeUi {
    * @param {object} options
    * @param {HTMLElement} options.root editor root holding the viewport
    * @param {import('./ViewModeController.js').ViewModeController} options.controller
-   * @param {{ minimap?: object, getRenderer?: Function, getSceneLabel?: Function }} [options.hud]
+   * @param {{ minimap?: object, vitals?: import('./PlayerVitals.js').PlayerVitals, getRenderer?: Function, getSceneLabel?: Function }} [options.hud]
    */
   constructor({ root, controller, hud = {} }) {
     this.root = root;
@@ -46,11 +49,15 @@ export class ViewModeUi {
     this.flightHints.textContent = 'Free flight · WASD move · Mouse look · Space / Ctrl rise / descend · Shift faster · F / Esc return';
     this.flightHints.hidden = true; viewport.append(this.flightHints);
 
+    this.vitals = hud.vitals ?? null;
+    this.frameStatus = {};
+    this.lastUpdateMs = null;
     this.hud = new PlayerHud({
       viewport,
       canToggleCamera: Boolean(controller.thirdPersonCamera),
       canBoost: controller.playerController.speedMode?.enabled ?? false,
       minimap: hud.minimap ?? null,
+      vitals: hud.vitals ?? null,
       getRenderer: hud.getRenderer,
       getSceneLabel: hud.getSceneLabel,
     });
@@ -89,8 +96,14 @@ export class ViewModeUi {
     this.hud.render(state);
   }
 
-  /** Per-frame: keeps the minimap turned with the camera. */
-  update() {
+  /** Per-frame: runs the vitals while walking and keeps the minimap turned with the camera. */
+  update(nowMs = performance.now()) {
+    const deltaSeconds = Math.min(MAX_VITALS_STEP_S, (nowMs - (this.lastUpdateMs ?? nowMs)) / 1000);
+    this.lastUpdateMs = nowMs;
+    if (this.vitals && this.hud.phase === HUD_PHASE.walking) {
+      this.controller.playerController.readFrameStatus(this.frameStatus);
+      this.vitals.update(deltaSeconds, this.frameStatus);
+    }
     this.hud.update(this.controller.getHeading());
   }
 

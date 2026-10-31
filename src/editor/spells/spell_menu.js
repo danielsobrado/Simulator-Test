@@ -139,6 +139,8 @@ function elementsPage(config, controller) {
  * @param {object} [deps.controller] elemental play methods
  * @param {Array<{ id: string, title: string, spells: Array<{ id: string, label: string, castMs: number }> }>} [deps.extraPages]
  * @param {(spellId: string) => boolean} [deps.castExtra] casts a spell from an extra page
+ * @param {(castMs: number) => boolean} [deps.canCast] whether the caster can pay for a cast
+ * @param {(castMs: number) => void} [deps.onCast] a cast started
  */
 export function createSpellMenu(deps = {}) {
   const config = deps.config ?? defaultSpellConfig;
@@ -194,9 +196,15 @@ export function createSpellMenu(deps = {}) {
     const button = buttons.get(descriptor.slotKey);
     if (!button) return false;
 
+    // A slot is on cooldown for as long as its sweep runs.
+    if (button.getAttribute('aria-pressed') === 'true') {
+      flashMiss(button);
+      return false;
+    }
+
     window.clearTimeout(resetTimers.get(descriptor.slotKey));
     const fired = typeof descriptor.play === 'function'
-      && button.getAttribute('aria-disabled') !== 'true'
+      && (deps.canCast?.(descriptor.castDurationMs) ?? true)
       && descriptor.play(descriptor.castDurationMs) !== false;
     if (!fired) {
       button.setAttribute('aria-pressed', 'false');
@@ -204,6 +212,7 @@ export function createSpellMenu(deps = {}) {
       return false;
     }
 
+    deps.onCast?.(descriptor.castDurationMs);
     button.setAttribute('aria-pressed', 'true');
     playCastFeedback(button, descriptor.castDurationMs);
     if (descriptor.audio) {
@@ -319,12 +328,12 @@ export function createSpellMenu(deps = {}) {
       return descriptor ? castSpell(descriptor) : false;
     },
     hasSlot: (index) => Boolean(pages[activePage].spells[index]),
-    /** Greys a spell out and makes casting it a miss, e.g. when mana runs short. */
-    setAvailable: (spellId, available) => {
-      for (const button of buttons.values()) {
-        if (button.dataset.spell !== spellId) continue;
-        if (available) button.removeAttribute('aria-disabled');
-        else button.setAttribute('aria-disabled', 'true');
+    /** Greys out the spells `deps.canCast` refuses; call when the resource changes. */
+    syncAvailability: () => {
+      for (const page of pages) {
+        for (const { slotKey, castDurationMs } of page.spells) {
+          buttons.get(slotKey).setAttribute('aria-disabled', String(!(deps.canCast?.(castDurationMs) ?? true)));
+        }
       }
     },
     cyclePage: (delta) => showPage(activePage + delta),
