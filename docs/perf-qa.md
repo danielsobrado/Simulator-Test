@@ -735,6 +735,38 @@ After a live run, 359,461 stems on 17 pages had no holes and no stem with the
 wrong origin or source. 128 tiles were split, the worst into 10 runs; each run
 is a separate range upload, so watch that count if uploads ever become call-bound.
 
+### Water distance blocks build across frames (2026-10-31)
+
+The worst CPU run while moving was one `WaterDistanceField` block built inside an
+aquatic candidate: 18–30 ms of `isOceanCell` scanning and chamfer sweeps. The block
+now advances per row under the scenery deadline (`prepare`), and the candidate
+returns `CANDIDATE_PENDING` to retry unchanged next step, so output is identical.
+All impostor batches also share one `renderer.compute` call instead of one per species.
+
+`chunk-cross --warmup 8 --duration 12 --settle --gpuTimings 1 --drain-seconds 8
+--grass-diagnostics`, focus-valid runs only, two per arm:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| dt p99 ms | 20.5, 32.1 | 17.9, 17.0 |
+| dt max ms | 37.8, 65.2 | 34.4, 34.8 |
+| Hitches | 5, 10 | 2, 3 |
+| `placementPreparation` max ms | 19.2, 30.0 | 4.5, 5.0 |
+| Longest app run ms | 18.0, 29.8 | 5.6, 6.0 |
+| Avg FPS | 113.6, 96.0 | 107.1, 110.1 |
+| dt p95 ms | 12.4, 15.8 | 12.9, 12.1 |
+| `StylizedTreeView.update` ms | 739, 803 | 593, 637 |
+
+Avg FPS and p95 overlap; the gain is in the tail. Ground detail 655, impostors 699,
+near trees 64 and tropical 98 match in every valid run. Two further change runs are
+void: one timed out, and one lost focus and fell to 47 FPS.
+
+Render submission is the largest remaining CPU cost: about 5.5 ms for 192 draws,
+with 11,505 uniforms re-checked per frame, 8,347 of them in the default object
+group. `renderGroup` does not help, because three clones non-shared groups per draw.
+`sharedUniformGroup` would, but it takes bind groups across every material, so it
+was left alone. GPU time is only about 2 ms, so GPU quality is not the limit here.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`

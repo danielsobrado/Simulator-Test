@@ -832,14 +832,18 @@ export class StylizedTreeView {
 
     const submitted = { cpu: 0, gpu: 0 };
     const known = { cpu: true, gpu: true };
+    // One encoder for every species; each `compute` call otherwise costs its own.
+    const renderer = this.terrainView.renderer;
+    const computeQueue = typeof renderer?.compute === 'function' ? [] : null;
     for (const batch of this.impostorBatches) {
-      const result = batch.update(camera, origin, timestamp);
+      const result = batch.update(camera, origin, timestamp, computeQueue);
       if (Number.isFinite(result.submitted)) {
         submitted[result.mode] += result.submitted;
       } else {
         known[result.mode] = false;
       }
     }
+    if (computeQueue?.length) renderer.compute(computeQueue);
     for (const mode of ['cpu', 'gpu']) {
       PerfCounters.set(`treeImpostorSubmittedKnown.${mode}`, known[mode] ? 1 : 0);
       if (known[mode]) PerfCounters.set(`treeImpostorSubmitted.${mode}`, submitted[mode]);

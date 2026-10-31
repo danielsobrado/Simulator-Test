@@ -127,10 +127,14 @@ function isMetadataObject(value) {
   return prototype === Object.prototype || prototype === null;
 }
 
-function evaluateCandidate(candidate, candidateEvaluator) {
+/** Returned by a candidateEvaluator that yielded: the same candidate runs again next step. */
+export const CANDIDATE_PENDING = Symbol('candidate pending');
+
+function evaluateCandidate(candidate, candidateEvaluator, shouldYield) {
   if (!candidateEvaluator) return candidate;
-  const metadata = candidateEvaluator(candidate);
+  const metadata = candidateEvaluator(candidate, shouldYield);
   if (!metadata) return null;
+  if (metadata === CANDIDATE_PENDING) return metadata;
   if (metadata === true) return candidate;
   if (!isMetadataObject(metadata)) {
     throw new Error('candidateEvaluator must return a plain object, true, or a falsy rejection.');
@@ -193,6 +197,7 @@ function createCandidate({
   randomChannelOffset,
   priorityChannel,
   candidateEvaluator,
+  shouldYield = null,
 }) {
   const random01 = (channel) => (
     scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + channel)
@@ -236,7 +241,7 @@ function createCandidate({
     priority: scatterRandom01(chunkX, chunkZ, index, priorityChannel),
   });
 
-  return evaluateCandidate(candidate, candidateEvaluator);
+  return evaluateCandidate(candidate, candidateEvaluator, shouldYield);
 }
 
 function completedBuilder(result) {
@@ -358,7 +363,9 @@ export function createStableChunkManifestBuilder({
           randomChannelOffset,
           priorityChannel,
           candidateEvaluator,
+          shouldYield: yieldRequested,
         });
+        if (candidate === CANDIDATE_PENDING) return null;
         if (candidate) candidates.push(candidate);
         advanceCandidate();
         workUnits += 1;

@@ -133,6 +133,10 @@ export class ProceduralWorldGenerator {
     return this.waterTerrainModel.sampleWater(cellX, cellZ);
   }
 
+  prepareWaterSample(cellX, cellZ, shouldYield = null) {
+    return this.waterTerrainModel.prepareWaterSample(cellX, cellZ, shouldYield);
+  }
+
   sampleWaterSurface(cellX, cellZ) {
     return this.waterTerrainModel.sampleWaterSurface(cellX, cellZ);
   }

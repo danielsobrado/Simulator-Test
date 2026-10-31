@@ -6,6 +6,7 @@ import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
 import { evaluateDetailSurfacePlacement } from './DetailSurfacePlacement.js';
+import { CANDIDATE_PENDING } from './StableScatterManifest.js';
 import { instanceCapacity } from './scatterMath.js';
 import { createStableChunkManifestBuilder } from './StableScatterManifest.js';
 import {
@@ -359,7 +360,7 @@ export class StylizedGroundDetailView {
       maxScale: this.layerConfig.maxScale,
       radiusForScale: (scale) => this.layerConfig.radius * scale,
       priorityChannel: this.priorityChannel,
-      candidateEvaluator: (candidate) => {
+      candidateEvaluator: (candidate, shouldYield) => {
         if (!acceptsStrategicDetailPlacement(
           candidate,
           this.prototypePlacementRules[candidate.prototypeIndex],
@@ -369,8 +370,9 @@ export class StylizedGroundDetailView {
           },
         )) return null;
 
-        const metadata = evaluateDetailSurfacePlacement(this, candidate, options.heightAt);
+        const metadata = evaluateDetailSurfacePlacement(this, candidate, options.heightAt, shouldYield);
         if (!metadata) return null;
+        if (metadata === CANDIDATE_PENDING) return metadata;
 
         const tileDensity = this.layerConfig.densityByTile?.[candidate.tileId] ?? 1;
         if (tileDensity < 1 && candidate.priority >= tileDensity) return null;

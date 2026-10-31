@@ -32,10 +32,10 @@ export class TreeImpostorBatch {
     });
   }
 
-  update(camera, origin, timestamp = 0) {
+  update(camera, origin, timestamp = 0, computeQueue = null) {
     return Object.freeze({
       mode: this.mode,
-      submitted: this.batch.update(camera, origin, timestamp),
+      submitted: this.batch.update(camera, origin, timestamp, computeQueue),
       accepted: this.acceptedRecords,
     });
   }

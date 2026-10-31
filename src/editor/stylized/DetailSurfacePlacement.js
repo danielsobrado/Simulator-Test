@@ -4,9 +4,10 @@ import { evaluateShoreHabitat } from './shoreHabitat.js';
 import { staticWaterContactAt } from '../water/StaticWaterSample.js';
 import { lakeWavePhases } from '../water/LakeSurfaceWaves.js';
 import { resolveWaterQualityFeatures } from '../water/WaterQuality.js';
+import { CANDIDATE_PENDING } from './StableScatterManifest.js';
 
 /** Surface ecology and anchoring, separate from instance rendering. */
-export function evaluateDetailSurfacePlacement(view, candidate, heightAt) {
+export function evaluateDetailSurfacePlacement(view, candidate, heightAt, shouldYield = null) {
   let metadata = null;
   if (view.layerName === 'aquaticPlant') {
     // Most candidates are on dry land. Establish identity before paying for
@@ -14,6 +15,10 @@ export function evaluateDetailSurfacePlacement(view, candidate, heightAt) {
     // canonical sample below, including flow, edits and animated surface rise.
     if (typeof view.terrainView.worldStore?.generator?.sampleWaterSurface === 'function'
         && !staticWaterContactAt(view.terrainView, candidate.x, candidate.z)?.kind) return null;
+    // A shoreline distance block costs tens of milliseconds; build it across frames.
+    const tileSize = view.terrainView.worldStore?.tileSize;
+    if (view.terrainView.worldStore?.generator?.prepareWaterSample?.(
+      candidate.x / tileSize, -candidate.z / tileSize, shouldYield) === false) return CANDIDATE_PENDING;
     const waterSample = view.terrainView.getCanonicalWater?.(candidate.x, candidate.z);
     metadata = evaluateAquaticPlacement({
       waterSample,

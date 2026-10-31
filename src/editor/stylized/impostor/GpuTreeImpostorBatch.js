@@ -214,7 +214,11 @@ export class GpuTreeImpostorBatch {
   }
 
   /** @returns {boolean} false when the work was dropped and must be submitted again */
-  submitComputes(nodes) {
+  submitComputes(nodes, computeQueue) {
+    if (computeQueue) {
+      computeQueue.push(...[nodes].flat());
+      return true;
+    }
     if (typeof this.renderer.compute === 'function') {
       this.renderer.compute(nodes);
       return true;
@@ -249,13 +253,14 @@ export class GpuTreeImpostorBatch {
     return changed;
   }
 
-  update(camera, origin, timestamp = 0) {
+  /** @param {?Array} [computeQueue] collects the passes for one shared `renderer.compute` */
+  update(camera, origin, timestamp = 0, computeQueue = null) {
     if (this.disposed) return null;
     updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.originUniform.value.set(origin.x, 0, origin.z);
     if (this.recordCount === 0) {
       if (this.indirectNeedsReset) {
-        this.indirectNeedsReset = !this.submitComputes(this.computeReset);
+        this.indirectNeedsReset = !this.submitComputes(this.computeReset, computeQueue);
       }
       return 0;
     }
@@ -264,7 +269,7 @@ export class GpuTreeImpostorBatch {
     this.updatePlanes(camera);
     // One array shares a command encoder; two calls would cost one encoder each.
     this.computeCull.dispatchSize = this.recordCount;
-    this.cullStale = !this.submitComputes(this.cullPass);
+    this.cullStale = !this.submitComputes(this.cullPass, computeQueue);
     return null;
   }
 

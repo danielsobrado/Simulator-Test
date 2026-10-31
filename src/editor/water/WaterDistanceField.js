@@ -33,6 +33,31 @@ export class WaterDistanceField {
     this.maxDistanceCells = maxDistanceCells;
     this.cacheLimit = cacheLimit;
     this.cache = new Map();
+    this.pendingBlocks = new Map();
+  }
+
+  /**
+   * Advance the block under a cell until it is built or `shouldYield` asks to stop.
+   * @returns {boolean} whether `sample` can now read that block without building it
+   */
+  prepare(cellX, cellZ, shouldYield = null) {
+    const blockX = floorDiv(Math.floor(cellX), this.blockSize);
+    const blockZ = floorDiv(Math.floor(cellZ), this.blockSize);
+    const key = `${blockX}:${blockZ}`;
+    if (this.cache.has(key)) return true;
+    let job = this.pendingBlocks.get(key);
+    if (!job) {
+      job = this.iterateBlock(blockX, blockZ);
+      this.pendingBlocks.set(key, job);
+    }
+    for (;;) {
+      if (shouldYield?.()) return false;
+      const step = job.next();
+      if (step.done) {
+        this.storeBlock(key, step.value);
+        return true;
+      }
+    }
   }
 
   sample(cellX, cellZ) {
@@ -57,15 +82,19 @@ export class WaterDistanceField {
       this.cache.set(key, cached);
       return cached;
     }
-    const block = this.buildBlock(blockX, blockZ);
+    this.prepare(blockX * this.blockSize, blockZ * this.blockSize);
+    return this.cache.get(key);
+  }
+
+  storeBlock(key, block) {
+    this.pendingBlocks.delete(key);
     this.cache.set(key, block);
     while (this.cache.size > this.cacheLimit) {
       this.cache.delete(this.cache.keys().next().value);
     }
-    return block;
   }
 
-  buildBlock(blockX, blockZ) {
+  *iterateBlock(blockX, blockZ) {
     const halo = this.maxDistanceCells + 2;
     const width = this.blockSize + halo * 2;
     const originX = blockX * this.blockSize - halo;
@@ -78,6 +107,7 @@ export class WaterDistanceField {
           ? DISTANCE_INFINITY
           : 0;
       }
+      yield;
     }
 
     for (let z = 0; z < width; z += 1) {
@@ -95,6 +125,7 @@ export class WaterDistanceField {
         distances[index] = distance;
       }
     }
+    yield;
 
     for (let z = width - 1; z >= 0; z -= 1) {
       for (let x = width - 1; x >= 0; x -= 1) {
@@ -111,6 +142,7 @@ export class WaterDistanceField {
         distances[index] = distance;
       }
     }
+    yield;
 
     const result = new Float32Array(this.blockSize * this.blockSize);
     for (let z = 0; z < this.blockSize; z += 1) {
@@ -126,5 +158,6 @@ export class WaterDistanceField {
 
   clear() {
     this.cache.clear();
+    this.pendingBlocks.clear();
   }
 }

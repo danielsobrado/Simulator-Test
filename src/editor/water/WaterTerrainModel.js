@@ -83,6 +83,21 @@ export class WaterTerrainModel {
       : null;
   }
 
+  /**
+   * Advance the distance blocks a water sample at this position reads.
+   * @returns {boolean} false when `shouldYield` stopped it; call again to resume
+   */
+  prepareWaterSample(cellX, cellZ, shouldYield = null) {
+    const x = Math.floor(cellX), z = Math.floor(cellZ);
+    for (const field of [this.oceanDistance, this.beachDistance]) {
+      if (!field) continue;
+      for (const [offsetX, offsetZ] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        if (!field.prepare(x + offsetX, z + offsetZ, shouldYield)) return false;
+      }
+    }
+    return true;
+  }
+
   isRiverCell(cellX, cellZ) {
     if (this.riverChannel?.containsCell(cellX, cellZ)) return true;
     return this.isBaseRiverCell?.(cellX, cellZ) ?? false;

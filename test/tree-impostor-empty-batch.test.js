@@ -47,6 +47,25 @@ test('reflection cameras recover off-screen impostors and restore the main selec
   } finally { owned.dispose(); atlas.albedo.dispose(); atlas.normal.dispose(); }
 });
 
+test('impostor batches can share one compute submission', () => {
+  const { batch, camera, atlas, computes } = createFixture(GpuTreeImpostorBatch);
+  try {
+    const queue = [];
+    batch.setRecords([record]);
+    batch.update(camera, { x: 0, z: 0 }, 0, queue);
+    assert.deepEqual(queue, [batch.computeReset, batch.computeCull]);
+    assert.equal(computes.length, 0);
+    batch.setRecords([]);
+    const reset = [];
+    batch.update(camera, { x: 0, z: 0 }, 0, reset);
+    assert.deepEqual(reset, [batch.computeReset]);
+  } finally {
+    batch.dispose();
+    atlas.albedo.dispose();
+    atlas.normal.dispose();
+  }
+});
+
 test('empty GPU impostor batches leave render traversal and can become populated again', () => {
   const { batch, scene, camera, atlas, computes } = createFixture(GpuTreeImpostorBatch);
   try {
