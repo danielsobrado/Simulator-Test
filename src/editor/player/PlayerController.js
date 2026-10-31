@@ -48,6 +48,7 @@ export class PlayerController {
     this.pitch = 0;
     this.enabled = false;
     this.harnessActive = false;
+    this.canRun = true;
     /** Walking is suspended for in-world editing; the pose is preserved. */
     this.paused = false;
     /** Set by the composition root; makes wall tops walkable. */
@@ -109,7 +110,7 @@ export class PlayerController {
       uiBlocked: this.uiBlocked,
       pointerLocked: this.pointerLocked,
       grounded: this.state.grounded,
-      running: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.mobile.running,
+      running: this.isRunning(),
       explorationBoost: this.speedMode.active,
       canBoost: this.speedMode.enabled,
       position: Object.freeze({ x: this.state.x, y: this.state.y, z: this.state.z }),
@@ -137,6 +138,23 @@ export class PlayerController {
     });
   }
 
+  isRunning() {
+    return this.canRun && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.mobile.running);
+  }
+
+  isMoving() {
+    return ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((code) => this.keys.has(code))
+      || this.mobile.forward !== 0 || this.mobile.right !== 0;
+  }
+
+  /** What the vitals can pay for: spent stamina stops the run, spent energy ends fast travel. */
+  applyExertion({ canRun, canBoost }) {
+    this.canRun = canRun;
+    if (canBoost || !this.speedMode.active) return;
+    this.speedMode.setActive(false);
+    this.emit();
+  }
+
   readFrameStatus(out) {
     const position = out.position ??= { x: 0, y: 0, z: 0 };
     out.enabled = this.enabled;
@@ -144,7 +162,8 @@ export class PlayerController {
     out.uiBlocked = this.uiBlocked;
     out.pointerLocked = this.pointerLocked;
     out.grounded = this.state.grounded;
-    out.running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.mobile.running;
+    out.running = this.isRunning();
+    out.moving = this.isMoving();
     out.explorationBoost = this.speedMode.active;
     out.canBoost = this.speedMode.enabled;
     position.x = this.state.x;
@@ -419,7 +438,7 @@ export class PlayerController {
         right: acceptsMovement
           ? Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA')) + this.mobile.right
           : 0,
-        running: acceptsMovement && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.mobile.running),
+        running: acceptsMovement && this.isRunning(),
         jump: acceptsMovement && this.jumpQueued,
         ascend,
         descend,

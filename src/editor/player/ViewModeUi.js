@@ -50,6 +50,10 @@ export class ViewModeUi {
     this.flightHints.hidden = true; viewport.append(this.flightHints);
 
     this.vitals = hud.vitals ?? null;
+    this.respawnPoint = null;
+    this.unsubscribeTeleport = controller.playerController?.subscribeTeleports?.((pose) => {
+      this.respawnPoint = { x: pose.x, z: pose.z };
+    });
     this.frameStatus = {};
     this.lastUpdateMs = null;
     this.hud = new PlayerHud({
@@ -76,6 +80,12 @@ export class ViewModeUi {
   }
 
   render(state) {
+    if (state.mode === PLAYER_MODE_WALK && !this.respawnPoint) {
+      const { x, z } = this.controller.playerController.state;
+      this.respawnPoint = { x, z };
+    } else if (state.mode !== PLAYER_MODE_WALK) {
+      this.respawnPoint = null;
+    }
     const playerActive = state.mode === PLAYER_MODE_WALK || state.awaitingSpawn;
     this.root.dataset.viewMode = state.awaitingSpawn
       ? 'player-spawn'
@@ -101,13 +111,23 @@ export class ViewModeUi {
     const deltaSeconds = Math.min(MAX_VITALS_STEP_S, (nowMs - (this.lastUpdateMs ?? nowMs)) / 1000);
     this.lastUpdateMs = nowMs;
     if (this.vitals && this.hud.phase === HUD_PHASE.walking) {
-      this.controller.playerController.readFrameStatus(this.frameStatus);
+      const player = this.controller.playerController;
+      player.readFrameStatus(this.frameStatus);
       this.vitals.update(deltaSeconds, this.frameStatus);
+      player.applyExertion(this.vitals);
+      this.respawnIfDead(player);
     }
     this.hud.update(this.controller.getHeading());
   }
 
+  respawnIfDead(player) {
+    if (!this.vitals.dead) return;
+    this.vitals.revive();
+    player.setPose(this.respawnPoint ?? player.state);
+  }
+
   dispose() {
+    this.unsubscribeTeleport?.();
     this.unsubscribe?.();
     this.switcher.removeEventListener('click', this.onClick);
     this.switcher.remove();
