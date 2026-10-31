@@ -6,6 +6,7 @@ const VITALS = Object.freeze([
   { id: 'stamina', label: 'Stamina' },
   { id: 'energy', label: 'Energy' },
 ]);
+const LOW_PERCENT = 25;
 
 /**
  * The vitals under the spell dock: horizontal life and mana bars, with thin
@@ -44,6 +45,8 @@ export class HudVitals {
     const bar = this.bars.get(id);
     bar.style.setProperty('--level', `${percent}%`);
     bar.setAttribute('aria-valuenow', String(percent));
+    bar.dataset.value = String(percent);
+    bar.classList.toggle('is-low', percent <= LOW_PERCENT);
   }
 
   dispose() {

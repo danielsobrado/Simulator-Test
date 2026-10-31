@@ -51,40 +51,92 @@
 .hud-vital i {
   position: absolute;
   inset: 1.5px;
-  background:
-    linear-gradient(180deg, #fff4 0 30%, #0000 45%, #0004) var(--vital-from) / var(--level, 100%) 100% no-repeat,
-    var(--vital-fill) var(--vital-from) / var(--level, 100%) 100% no-repeat,
-    var(--hud-leather);
+  overflow: hidden;
+  background: var(--hud-leather);
   clip-path: var(--vital-cut);
 }
 
-.hud-vital--life,
-.hud-vital--stamina {
-  --vital-from: left;
+/* Behind the fill, a pale trail lags on the way down, so a loss reads as a loss. */
+.hud-vital i::before,
+.hud-vital i::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--level, 100%);
+  content: '';
 }
 
-.hud-vital--mana,
-.hud-vital--energy {
-  --vital-from: right;
+.hud-vital i::before {
+  background: #f3dfa2b0;
+  transition: width 500ms ease 250ms;
+}
+
+.hud-vital i::after {
+  background:
+    linear-gradient(180deg, #fff4 0 30%, #0000 45%, #0004),
+    var(--vital-fill);
+  background-position: var(--vital-from);
+  transition: width 120ms ease;
+}
+
+.hud-vital--life i::before,
+.hud-vital--life i::after,
+.hud-vital--stamina i::before,
+.hud-vital--stamina i::after {
+  left: 0;
+}
+
+.hud-vital--mana i::before,
+.hud-vital--mana i::after,
+.hud-vital--energy i::before,
+.hud-vital--energy i::after {
+  right: 0;
+}
+
+/* The number only appears once it says something: a full bar stays quiet. */
+.hud-vital--life:not([data-value='100'])::after,
+.hud-vital--mana:not([data-value='100'])::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff3d8;
+  content: attr(data-value);
+  font: 700 10px/1 var(--hud-font);
+  text-shadow: 0 1px 2px #000;
+}
+
+.hud-vital.is-low i::after {
+  animation: hud-vital-low 900ms ease-in-out infinite alternate;
+}
+
+@keyframes hud-vital-low {
+  to {
+    opacity: 0.5;
+  }
 }
 
 .hud-vital--life {
   --vital-fill: linear-gradient(90deg, #6e0f18, #c9303a 70%, #e8505a);
+  --vital-from: left;
 }
 
 .hud-vital--mana {
   --vital-fill: linear-gradient(270deg, #16306f, #2f62c4 70%, #6ea4f2);
+  --vital-from: right;
 }
 
 .hud-vital--stamina {
   --vital-fill: linear-gradient(90deg, #1f6b43, #63c48a);
+  --vital-from: left;
 }
 
 .hud-vital--energy {
   --vital-fill: linear-gradient(270deg, #a06a12, #f0c04f);
+  --vital-from: right;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-height: 500px) {
   .hud-vitals {
     top: var(--hud-phone-top);
     bottom: auto;

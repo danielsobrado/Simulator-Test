@@ -32,6 +32,11 @@ test('failed casts flash as misses and do not emit cast audio', () => {
   assert.match(source, /return false;/);
 });
 
+test('an unavailable spell is a miss and never plays', () => {
+  assert.match(source, /&& button\.getAttribute\('aria-disabled'\) !== 'true'\s*&& descriptor\.play\(/);
+  assert.match(source, /setAvailable: \(spellId, available\) =>/);
+});
+
 test('dragging keeps the spell menu inside the viewport', () => {
   assert.match(source, /window\.innerWidth - root\.offsetWidth/);
   assert.match(source, /window\.innerHeight - root\.offsetHeight/);

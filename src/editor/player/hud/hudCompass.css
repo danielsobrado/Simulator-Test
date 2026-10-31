@@ -16,6 +16,11 @@
   animation: glade-rise-in 320ms ease both;
 }
 
+/* During a perf run the ribbon narrows to stay clear of the QA panel. */
+:root:has(.perf-qa-overlay) .hud-compass {
+  --compass-half: max(160px, min(320px, 50vw - 340px));
+}
+
 .hud-compass[hidden] {
   display: none;
 }
@@ -131,14 +136,14 @@
 }
 
 /* On a phone the status clears the vitals and minimap hanging under the ribbon. */
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-height: 500px) {
   .player-hud[data-hud-phase='walking'] .hud-status {
     top: calc(var(--hud-phone-top) + var(--minimap-size) + 16px);
   }
 }
 
 /* Wide enough for the ribbon to clear the corner mode switch: it takes the top edge. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 501px) {
   .hud-compass {
     top: 14px;
   }

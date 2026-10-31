@@ -1,0 +1,116 @@
+/*
+ * Touch controls in the HUD's leather and brass: the stick lower left, the action
+ * column on the right, clear of the spell dock. In landscape there is no height
+ * for a column, so the actions fold into two columns in the corner.
+ * No `backdrop-filter`: see loadingOverlay.css.
+ */
+.touch-stick {
+  position: absolute;
+  left: 28px;
+  bottom: 130px;
+  width: 120px;
+  height: 120px;
+  box-sizing: border-box;
+  border: 2px solid var(--hud-plate-line);
+  border-radius: 50%;
+  background: rgb(29 19 12 / 45%);
+  box-shadow: 0 2px 6px #000a;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-stick__knob {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: 60px;
+  height: 60px;
+  box-sizing: border-box;
+  border: 1px solid var(--hud-leather);
+  border-radius: 50%;
+  background: var(--hud-brass);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.touch-button {
+  position: absolute;
+  right: 50px;
+  min-width: 58px;
+  min-height: 44px;
+  border: 1px solid var(--hud-plate-line);
+  border-radius: 3px;
+  background: var(--hud-plate);
+  box-shadow: 0 2px 6px #000a;
+  color: #f3dfa2;
+  font: 600 12px/1 var(--hud-tome-font);
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-button:active {
+  background: var(--hud-brass);
+  color: var(--hud-leather);
+}
+
+.touch-button--round {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+}
+
+.touch-button--center {
+  bottom: 320px;
+  touch-action: manipulation;
+}
+
+.touch-button--run {
+  bottom: 250px;
+}
+
+.touch-button--jump {
+  bottom: 180px;
+}
+
+.touch-button--dive {
+  bottom: 115px;
+}
+
+/* On a tablet the minimap holds the lower-right corner, so the column stands beside it. */
+@media (pointer: coarse) and (min-width: 761px) and (min-height: 501px) {
+  .touch-button {
+    right: calc(clamp(84px, 19vmin, 184px) + 48px);
+  }
+}
+
+@media (max-height: 500px) {
+  .touch-stick {
+    bottom: 16px;
+  }
+
+  .touch-button {
+    right: 16px;
+  }
+
+  .touch-button--center {
+    bottom: 124px;
+  }
+
+  .touch-button--jump {
+    bottom: 70px;
+  }
+
+  .touch-button--run,
+  .touch-button--dive {
+    bottom: 16px;
+  }
+
+  .touch-button--run {
+    right: 102px;
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    min-height: 46px;
+  }
+}

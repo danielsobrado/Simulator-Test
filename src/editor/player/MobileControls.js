@@ -8,6 +8,12 @@ function applyCss(element, cssText) {
   return element;
 }
 
+function createControl(tag, className) {
+  const element = document.createElement(tag);
+  element.className = className;
+  return element;
+}
+
 export class MobileControls {
   constructor({ joystickRadius = 55, lookSensitivity = 0.015, onMove, onLook, onSprint, onRecenter, onAscend, onDescend, container = document.body }) {
     Object.assign(this, { container, onAscend, onDescend });
@@ -40,49 +46,11 @@ export class MobileControls {
     `);
     this.root.id = MOBILE_CONTROLS_ID;
 
-    this.moveBase = applyCss(document.createElement('div'), `
-      position: absolute;
-      left: 28px;
-      bottom: 130px;
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.12);
-      border: 2px solid rgba(255,255,255,.28);
-      box-sizing: border-box;
-      pointer-events: auto;
-      touch-action: none;
-      backdrop-filter: blur(15px);
-    `);
-    this.moveStick = applyCss(document.createElement('div'), `
-      position: absolute;
-      left: 30px;
-      top: 30px;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.28);
-      border: 2px solid rgba(255,255,255,.45);
-      box-sizing: border-box;
-      pointer-events: none;
-    `);
+    this.moveBase = createControl('div', 'touch-stick');
+    this.moveStick = createControl('div', 'touch-stick__knob');
     this.moveBase.appendChild(this.moveStick);
 
-    this.sprintButton = applyCss(document.createElement('button'), `
-      position: absolute;
-      right: 50px;
-      bottom: 250px;
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(255,255,255,.1);
-      color: #B9E66F;
-      font: 600 14px sans-serif;
-      pointer-events: auto;
-      touch-action: none;
-      backdrop-filter: blur(15px);
-    `);
+    this.sprintButton = createControl('button', 'touch-button touch-button--round touch-button--run');
     this.sprintButton.textContent = 'RUN';
 
     this.lookArea = applyCss(document.createElement('div'), `
@@ -93,34 +61,19 @@ export class MobileControls {
       background: transparent;
     `);
 
-    this.recenterButton = applyCss(document.createElement('button'), `
-      position: absolute;
-      right: 50px;
-      bottom: 320px;
-      min-width: 58px;
-      min-height: 44px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(0,0,0,.3);
-      color: white;
-      font: 600 12px sans-serif;
-      pointer-events: auto;
-      touch-action: manipulation;
-    `);
+    this.recenterButton = createControl('button', 'touch-button touch-button--center');
     this.recenterButton.textContent = 'CENTER';
     this.recenterButton.setAttribute('aria-label', 'Recenter camera behind player');
     this.recenterButton.addEventListener('click', () => this.onRecenter?.());
     this.root.append(this.lookArea, this.moveBase, this.sprintButton, this.recenterButton);
     this.container.appendChild(this.root);
-    this.#verticalButton('JUMP / UP', 180, this.onAscend);
-    this.#verticalButton('DIVE', 115, this.onDescend);
+    this.#verticalButton('JUMP / UP', 'touch-button--jump', this.onAscend);
+    this.#verticalButton('DIVE', 'touch-button--dive', this.onDescend);
     this.#bind();
   }
 
-  #verticalButton(label, bottom, callback) {
-    const button = applyCss(document.createElement('button'), `position:absolute;right:50px;bottom:${bottom}px;
-      min-width:58px;min-height:44px;border-radius:12px;pointer-events:auto;touch-action:none;
-      background:rgba(0,0,0,.4);color:white;border:1px solid #ffffff66;`);
+  #verticalButton(label, modifier, callback) {
+    const button = createControl('button', `touch-button ${modifier}`);
     button.textContent = label; button.setAttribute('aria-label', label);
     button.addEventListener('touchstart', event => { event.preventDefault(); callback?.(true); }, { passive:false });
     for (const type of ['touchend', 'touchcancel']) button.addEventListener(type, event => { event.preventDefault(); callback?.(false); }, { passive:false });

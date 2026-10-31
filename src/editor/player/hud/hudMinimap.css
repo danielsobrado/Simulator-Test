@@ -167,6 +167,17 @@
   pointer-events: none;
 }
 
+/* Engraved bearing ticks, turning with north. */
+.hud-minimap__compass::before {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -1deg, #f3dfa2 0 2deg, #0000 2deg 30deg);
+  content: '';
+  -webkit-mask-image: radial-gradient(closest-side, transparent 92%, #000 93%);
+  mask-image: radial-gradient(closest-side, transparent 92%, #000 93%);
+}
+
 .hud-minimap__north {
   position: absolute;
   top: 4px;
@@ -216,7 +227,7 @@
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-height: 500px) {
   .hud-minimap {
     top: var(--hud-phone-top);
     bottom: auto;

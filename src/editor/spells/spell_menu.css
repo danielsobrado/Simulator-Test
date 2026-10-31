@@ -237,6 +237,23 @@ body[data-player-mode="choosingSpawn"] .spell-dock {
   text-shadow: 0 1px 2px rgb(0 0 0 / 90%);
 }
 
+/* Falls away over the cast; rests hidden until `playCastFeedback` animates it. */
+.spell-slot__sweep {
+  position: absolute;
+  inset: 1px;
+  background: rgb(0 0 0 / 55%);
+  pointer-events: none;
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+.spell-slot[aria-disabled='true'] {
+  --spell-glow: 0%;
+
+  color: rgb(246 236 212 / 35%);
+  cursor: not-allowed;
+}
+
 .spell-slot__channel {
   position: absolute;
   inset: 0;
@@ -319,7 +336,7 @@ body[data-player-mode="choosingSpawn"] .spell-dock {
   60% { translate: 3px 0; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-height: 500px) {
   .spell-dock {
     bottom: max(16px, env(safe-area-inset-bottom));
     grid-template-areas: "tabs" "slots";

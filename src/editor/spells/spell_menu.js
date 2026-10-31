@@ -58,6 +58,7 @@ function createSpellButton({ id, key, label, glyph, onClick }) {
     <svg class="spell-slot__channel" viewBox="0 0 48 48" preserveAspectRatio="none" aria-hidden="true">
       <rect x="1" y="1" width="46" height="46" rx="2" pathLength="100"/>
     </svg>
+    <span class="spell-slot__sweep"></span>
     <kbd class="spell-slot__key">${key}</kbd>
     <span class="spell-slot__label"></span>
   `;
@@ -84,8 +85,13 @@ function createGrip(title) {
 function playCastFeedback(button, durationMs) {
   const ring = button.querySelector('.spell-slot__channel rect');
   const label = button.querySelector('.spell-slot__label');
+  const sweep = button.querySelector('.spell-slot__sweep');
   button.castAnimations?.forEach((animation) => animation.cancel());
   button.castAnimations = [
+    sweep?.animate?.(
+      [{ transform: 'scaleY(1)' }, { transform: 'scaleY(0)' }],
+      { duration: durationMs, easing: 'linear' },
+    ),
     ring?.animate?.(
       [{ strokeDashoffset: 0 }, { strokeDashoffset: 100 }],
       { duration: durationMs, easing: 'linear' },
@@ -190,6 +196,7 @@ export function createSpellMenu(deps = {}) {
 
     window.clearTimeout(resetTimers.get(descriptor.slotKey));
     const fired = typeof descriptor.play === 'function'
+      && button.getAttribute('aria-disabled') !== 'true'
       && descriptor.play(descriptor.castDurationMs) !== false;
     if (!fired) {
       button.setAttribute('aria-pressed', 'false');
@@ -312,6 +319,14 @@ export function createSpellMenu(deps = {}) {
       return descriptor ? castSpell(descriptor) : false;
     },
     hasSlot: (index) => Boolean(pages[activePage].spells[index]),
+    /** Greys a spell out and makes casting it a miss, e.g. when mana runs short. */
+    setAvailable: (spellId, available) => {
+      for (const button of buttons.values()) {
+        if (button.dataset.spell !== spellId) continue;
+        if (available) button.removeAttribute('aria-disabled');
+        else button.setAttribute('aria-disabled', 'true');
+      }
+    },
     cyclePage: (delta) => showPage(activePage + delta),
     get activePageId() {
       return pages[activePage].id;
