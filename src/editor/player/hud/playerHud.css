@@ -268,16 +268,16 @@
 [data-world-capture] [data-capture-ui] { visibility: hidden !important; pointer-events: none !important; }
 .player-hud { --hud-inset-x: 24px; --hud-inset-y: 24px; }
 .hud-legend, .hud-metrics {
-  background: rgba(16,24,22,0.82); color: #f2f1e8;
-  border: 1px solid rgba(242,241,232,0.14); border-radius: 8px;
+  background: var(--hud-plate); color: #f2f1e8;
+  border: 1px solid var(--hud-plate-line); border-radius: 3px;
   padding: 10px 12px; opacity: 1; text-shadow: none;
   backdrop-filter: none;
   font: 12px/1.3 var(--hud-font);
 }
-.hud-legend { gap: 10px; max-width: calc(50vw - 200px); box-sizing: border-box; }
-.hud-legend__scene strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.hud-legend { gap: 10px; max-width: calc(50vw - 250px); box-sizing: border-box; }
+.hud-legend__scene strong { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f3dfa2; font: 600 14px/1.2 var(--hud-tome-font); letter-spacing: 0.04em; }
 .hud-keys { gap: 16px; flex-wrap: wrap; row-gap: 8px; }
-.hud-keys dt { color: #f2f1e8; font-size: 12px; line-height: 1.3; }
+.hud-keys dt { color: #ead29c; font-size: 12px; line-height: 1.3; }
 .hud-keys dd { color: #d2d9ce; font-size: 11px; line-height: 1.35; }
 .hud-metrics { gap: 10px; }
 .hud-metrics strong { color: #f2f1e8; }

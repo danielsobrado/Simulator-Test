@@ -11,10 +11,6 @@ const HUD_ICONS = Object.freeze({
   mouse: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="3" width="11" height="18" rx="5.5"/><path d="M12 7v3.5"/></svg>',
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.5v11M15 6.5v11"/></svg>',
   warning: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2 20.8 19H3.2L12 4.2Z"/><path d="M12 10v4M12 16.8v.2"/></svg>',
-  mana: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c3.4 4 6 7.2 6 10.6a6 6 0 0 1-12 0c0-3.4 2.6-6.6 6-10.6Z"/></svg>',
-  stamina: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h5l2.5-6 3.5 12 2.5-6H21"/></svg>',
-  life: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
-  energy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 3 6 13.5h5.5L10.5 21 18 10.5h-5.5L13.5 3Z"/></svg>',
   spinner: '<svg class="hud-spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5a7.5 7.5 0 1 1-7.5 7.5"/></svg>',
 });
 

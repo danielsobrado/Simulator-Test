@@ -1,18 +1,15 @@
-import { hudIcon } from './hudIcons.js';
 import { HUD_PHASE } from './hudState.js';
 
 const VITALS = Object.freeze([
-  { id: 'stamina', label: 'Stamina' },
   { id: 'life', label: 'Life' },
   { id: 'mana', label: 'Mana' },
+  { id: 'stamina', label: 'Stamina' },
   { id: 'energy', label: 'Energy' },
 ]);
-/** The two main resources also get a tall phial, one on each side of the gems. */
-const PHIALS = Object.freeze(['life', 'mana']);
 
 /**
- * The vitals cluster on the left of the walking HUD: four equal gems in a diamond,
- * flanked by the life and mana phials, each filling from the bottom.
+ * The vitals under the spell dock: horizontal life and mana bars, with thin
+ * stamina and energy bars beneath them.
  *
  * shortcut: nothing in the game tracks these yet, so they sit full; call `set`
  * from the system that introduces them.
@@ -23,23 +20,16 @@ export class HudVitals {
     this.element.className = 'hud-vitals';
     this.element.hidden = true;
 
-    this.phials = new Map(PHIALS.map((id) => {
-      const phial = document.createElement('div');
-      phial.className = `hud-vitals__phial hud-vitals__phial--${id}`;
-      phial.append(document.createElement('i'));
-      this.element.append(phial);
-      return [id, phial];
-    }));
-    this.gems = new Map(VITALS.map(({ id, label }) => {
-      const gem = document.createElement('div');
-      gem.className = `hud-vital hud-vital--${id}`;
-      gem.setAttribute('role', 'meter');
-      gem.setAttribute('aria-label', label);
-      gem.setAttribute('aria-valuemin', '0');
-      gem.setAttribute('aria-valuemax', '100');
-      gem.innerHTML = `<i></i>${hudIcon(id)}`;
-      this.element.append(gem);
-      return [id, gem];
+    this.bars = new Map(VITALS.map(({ id, label }) => {
+      const bar = document.createElement('div');
+      bar.className = `hud-vital hud-vital--${id}`;
+      bar.setAttribute('role', 'meter');
+      bar.setAttribute('aria-label', label);
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
+      bar.append(document.createElement('i'));
+      this.element.append(bar);
+      return [id, bar];
     }));
     for (const { id } of VITALS) this.set(id, 1);
   }
@@ -51,10 +41,9 @@ export class HudVitals {
   /** @param {'mana' | 'stamina' | 'life' | 'energy'} id @param {number} level 0..1 */
   set(id, level) {
     const percent = Math.round(Math.min(1, Math.max(0, level)) * 100);
-    const gem = this.gems.get(id);
-    gem.style.setProperty('--level', `${percent}%`);
-    gem.setAttribute('aria-valuenow', String(percent));
-    this.phials.get(id)?.style.setProperty('--level', `${percent}%`);
+    const bar = this.bars.get(id);
+    bar.style.setProperty('--level', `${percent}%`);
+    bar.setAttribute('aria-valuenow', String(percent));
   }
 
   dispose() {

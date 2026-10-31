@@ -1,7 +1,7 @@
 /*
- * Compass ribbon under the mode switch, dressed as a tooled leather strap between
- * brass rails. `HudCompass` publishes --mark-at on each mark, -1 (left edge of the
- * field) to 1 (right edge), and the width lives here.
+ * Compass ribbon at the top, dressed as a tooled leather strap between brass rails.
+ * `HudCompass` publishes --mark-at on each mark, -1 (left edge of the field) to 1
+ * (right edge), and the width lives here.
  */
 .hud-compass {
   --compass-half: min(320px, 50vw - 24px);
@@ -128,4 +128,15 @@
 /* The status line sits below the ribbon and its place name while walking. */
 .player-hud[data-hud-phase='walking'] .hud-status {
   top: 124px;
+}
+
+/* Wide enough for the ribbon to clear the corner mode switch: it takes the top edge. */
+@media (min-width: 900px) {
+  .hud-compass {
+    top: 14px;
+  }
+
+  .player-hud[data-hud-phase='walking'] .hud-status {
+    top: 80px;
+  }
 }

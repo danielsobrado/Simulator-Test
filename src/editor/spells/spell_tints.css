@@ -1,0 +1,32 @@
+/* Each spell's element, as the RGB triplet behind its slot's glow, glyph and cast ring. */
+.spell-slot:is([data-spell='fire'], [data-spell='fireball'], [data-spell='meteorSwarm'], [data-spell='wallOfFire']) {
+  --spell-tint: 232 98 46;
+}
+
+.spell-slot:is([data-spell='water'], [data-spell='coneOfCold'], [data-spell='iceStorm']) {
+  --spell-tint: 70 150 232;
+}
+
+.spell-slot:is([data-spell='air'], [data-spell='thunderwave'], [data-spell='fogCloud']) {
+  --spell-tint: 170 214 214;
+}
+
+.spell-slot:is([data-spell='earth'], [data-spell='shatter']) {
+  --spell-tint: 176 124 70;
+}
+
+.spell-slot:is([data-spell='lightning'], [data-spell='lightningBolt'], [data-spell='sunbeam']) {
+  --spell-tint: 244 208 84;
+}
+
+.spell-slot:is([data-spell='acidSplash'], [data-spell='stinkingCloud']) {
+  --spell-tint: 138 196 62;
+}
+
+.spell-slot[data-spell='cureWounds'] {
+  --spell-tint: 96 200 140;
+}
+
+.spell-slot:is([data-spell='magicMissile'], [data-spell='moonbeam'], [data-spell='blight']) {
+  --spell-tint: 160 120 226;
+}

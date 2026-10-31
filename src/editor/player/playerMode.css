@@ -102,6 +102,24 @@
   color: var(--glade-cream);
 }
 
+/* While walking or flying nothing else sits up here, so the switch takes the corner. */
+:is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .view-mode-switcher {
+  top: 14px;
+  left: 16px;
+  transform: none;
+  background: var(--hud-plate);
+  box-shadow: 0 0 0 1px var(--hud-plate-line), 0 2px 6px #000a;
+}
+
+:is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .view-mode-switcher button {
+  color: #cdb27a;
+}
+
+:is([data-view-mode='player']:not([data-player-paused='true']), [data-view-mode='fly']) .view-mode-switcher button.is-active {
+  background: var(--hud-brass);
+  color: var(--hud-leather);
+}
+
 @media (max-width: 560px) {
   .view-mode-switcher {
     top: 8px;

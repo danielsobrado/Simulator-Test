@@ -1,25 +1,21 @@
 /*
- * Vitals on the left, above the legend: four equal cut gems in a diamond, with a
- * brass-bound phial standing on each side gem's outer point. `HudVitals` publishes
- * --level on every phial and gem; the fill is a background sized by it, inside a
- * clipped inner shape, so it never covers the brass rim.
+ * Vitals under the spell dock: life and mana meet at a brass diamond, stamina and
+ * energy run thin beneath them. Each bar is full toward the centre and drains
+ * outward. `HudVitals` publishes --level on every bar; the fill is a background
+ * sized by it, inside the brass rim, so it never covers the rim.
  */
 .hud-vitals {
-  --gem-size: 52px;
-  /* From a gem's centre to its neighbour's, on each axis: half a gem plus the gap. */
-  --gem-step: calc(var(--gem-size) / 2 + 2px);
-  --phial-width: 24px;
-  --vital-diamond: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  --vital-phial: polygon(
-    50% 0, 100% 20px, 100% calc(100% - 12px), 50% 100%, 0 calc(100% - 12px), 0 20px
-  );
+  --vital-cut: polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 5px 100%, 0 50%);
 
   position: absolute;
-  bottom: calc(var(--hud-inset-y) + 112px);
-  left: var(--hud-inset-x);
-  width: calc(var(--gem-step) * 2 + var(--gem-size) + var(--phial-width));
-  height: 256px;
-  filter: drop-shadow(0 2px 4px #000a);
+  bottom: var(--hud-dock-bottom);
+  left: 50%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 14px;
+  width: min(426px, 100% - 24px);
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 3px #000a);
   animation: glade-rise-in 320ms ease both;
 }
 
@@ -27,111 +23,74 @@
   display: none;
 }
 
-.hud-vitals__phial {
+.hud-vitals::before {
   position: absolute;
-  top: 0;
-  bottom: calc(var(--gem-step) + var(--gem-size) / 2 + 2px);
-  width: var(--phial-width);
+  top: 2px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
   background: var(--hud-brass);
-  clip-path: var(--vital-phial);
-}
-
-.hud-vitals__phial--life {
-  --phial-fill: linear-gradient(180deg, #ff9a8f, #b81f2c 55%, #5e0d14);
-
-  left: 0;
-}
-
-.hud-vitals__phial--mana {
-  --phial-fill: linear-gradient(180deg, #a9d2ff, #2f62c4 55%, #16306f);
-
-  right: 0;
-}
-
-.hud-vitals__phial i {
-  position: absolute;
-  inset: 2px;
-  background:
-    linear-gradient(90deg, #0003, #fff3 45%, #0003) bottom / 100% var(--level, 100%) no-repeat,
-    var(--phial-fill) bottom / 100% var(--level, 100%) no-repeat,
-    var(--hud-leather);
-  clip-path: var(--vital-phial);
+  box-shadow: 0 0 0 1px var(--hud-leather);
+  content: '';
+  rotate: 45deg;
 }
 
 .hud-vital {
-  position: absolute;
-  left: calc(var(--phial-width) / 2 + var(--gem-step) + var(--gem-x, 0) * var(--gem-step));
-  bottom: calc(var(--gem-step) + var(--gem-y, 0) * var(--gem-step));
-  display: grid;
-  place-items: center;
-  width: var(--gem-size);
-  height: var(--gem-size);
+  position: relative;
+  height: 8px;
   background: var(--hud-brass);
-  clip-path: var(--vital-diamond);
-  color: #f6ecd4;
+  clip-path: var(--vital-cut);
+}
+
+.hud-vital--life,
+.hud-vital--mana {
+  height: 14px;
 }
 
 .hud-vital i {
   position: absolute;
-  inset: 2px;
+  inset: 1.5px;
   background:
-    radial-gradient(circle at 50% 30%, var(--gem-light), var(--gem-color) 65%) bottom / 100% var(--level, 100%) no-repeat,
+    linear-gradient(180deg, #fff4 0 30%, #0000 45%, #0004) var(--vital-from) / var(--level, 100%) 100% no-repeat,
+    var(--vital-fill) var(--vital-from) / var(--level, 100%) 100% no-repeat,
     var(--hud-leather);
-  clip-path: var(--vital-diamond);
+  clip-path: var(--vital-cut);
 }
 
-/* The facets: four wedges of light over whatever the level has filled. */
-.hud-vital::after {
-  position: absolute;
-  inset: 2px;
-  background: conic-gradient(#fff3 0 90deg, #0000 90deg 180deg, #0004 180deg 270deg, #fff1 270deg);
-  clip-path: var(--vital-diamond);
-  content: '';
-}
-
-.hud-vital svg {
-  position: relative;
-  z-index: 1;
-  width: 42%;
-  height: 42%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 1px 1px #000c);
-}
-
+.hud-vital--life,
 .hud-vital--stamina {
-  --gem-y: 1;
-  --gem-color: #1f6b43;
-  --gem-light: #63c48a;
+  --vital-from: left;
+}
+
+.hud-vital--mana,
+.hud-vital--energy {
+  --vital-from: right;
 }
 
 .hud-vital--life {
-  --gem-x: -1;
-  --gem-color: #8d1420;
-  --gem-light: #e8505a;
+  --vital-fill: linear-gradient(90deg, #6e0f18, #c9303a 70%, #e8505a);
 }
 
 .hud-vital--mana {
-  --gem-x: 1;
-  --gem-color: #1e3f96;
-  --gem-light: #6ea4f2;
+  --vital-fill: linear-gradient(270deg, #16306f, #2f62c4 70%, #6ea4f2);
+}
+
+.hud-vital--stamina {
+  --vital-fill: linear-gradient(90deg, #1f6b43, #63c48a);
 }
 
 .hud-vital--energy {
-  --gem-y: -1;
-  --gem-color: #a06a12;
-  --gem-light: #f0c04f;
+  --vital-fill: linear-gradient(270deg, #a06a12, #f0c04f);
 }
 
+/* The dock takes the whole bottom edge on a phone, so the bars hang under the compass. */
 @media (max-width: 760px) {
   .hud-vitals {
-    top: 124px;
+    top: 104px;
     bottom: auto;
-    height: 200px;
-    scale: 0.7;
-    transform-origin: top left;
+    left: var(--hud-inset-x);
+    width: 180px;
+    transform: none;
   }
 }

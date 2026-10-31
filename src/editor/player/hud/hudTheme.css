@@ -30,6 +30,12 @@
   --hud-tome-font: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --hud-brass: linear-gradient(180deg, #f3dfa2, #b68a3e 45%, #6d4a1c 70%, #d8b76c);
   --hud-leather: #1d130c;
+  /* Every HUD surface is the compass strap: tooled leather bound in brass. */
+  --hud-plate: rgb(29 19 12 / 90%);
+  --hud-plate-line: #b68a3e;
+  /* The vitals' bottom edge; the spell dock stands on top of them. */
+  --hud-dock-bottom: 16px;
+  --hud-vitals-height: 25px;
   --hud-parchment: linear-gradient(180deg, #ecdcb4, #cdb27a);
   --hud-ink: #eef4e8;
   --hud-ink-strong: #efe6d0;
@@ -37,9 +43,9 @@
   --hud-ink-dim: rgb(239 246 232 / 55%);
   --hud-accent: #b9e84d;
   --hud-gold: #ead29c;
-  --hud-glass: #13211987;
-  --hud-glass-strong: #132119e0;
-  --hud-hairline: #e9e0cb38;
+  --hud-glass: var(--hud-plate);
+  --hud-glass-strong: var(--hud-plate);
+  --hud-hairline: rgb(182 138 62 / 55%);
   --hud-text-shadow: 0 1px 3px #000000a6, 0 0 16px #0a0f1499;
   --hud-inset-x: 36px;
   --hud-inset-y: clamp(26px, 3.6vh, 44px);
