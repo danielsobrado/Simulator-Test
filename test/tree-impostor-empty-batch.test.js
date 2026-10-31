@@ -53,19 +53,33 @@ test('empty GPU impostor batches leave render traversal and can become populated
     batch.setRecords([record]);
     batch.update(camera, { x: 0, z: 0 });
     assert.ok(isTraversed(scene, batch.mesh));
-    assert.equal(computes.length, 2);
+    assert.equal(computes.length, 1, 'reset and cull share one encoder');
+    assert.deepEqual(computes[0][0], [batch.computeReset, batch.computeCull]);
+    assert.equal(batch.computeCull.dispatchSize, 1);
 
     batch.setRecords([]);
     batch.update(camera, { x: 0, z: 0 });
     assert.equal(isTraversed(scene, batch.mesh), false);
-    assert.equal(computes.length, 3, 'the previous indirect instance count still resets');
+    assert.equal(computes.length, 2, 'the previous indirect instance count still resets');
     batch.update(camera, { x: 0, z: 0 });
-    assert.equal(computes.length, 3, 'an empty batch does not keep dispatching');
+    assert.equal(computes.length, 2, 'an empty batch does not keep dispatching');
 
     batch.setRecords([record]);
     batch.update(camera, { x: 0, z: 0 });
     assert.ok(isTraversed(scene, batch.mesh));
-    assert.equal(computes.length, 5);
+    assert.equal(computes.length, 3);
+
+    batch.update(camera, { x: 0, z: 0 });
+    assert.equal(computes.length, 3, 'an unchanged view keeps the last cull');
+    batch.update(camera, { x: 64, z: 0 });
+    assert.equal(computes.length, 4, 'an origin move culls again');
+    camera.position.x += 1; camera.updateMatrixWorld();
+    batch.update(camera, { x: 64, z: 0 });
+    assert.equal(computes.length, 5, 'a camera move culls again');
+    batch.setRecords([record, record]);
+    batch.update(camera, { x: 64, z: 0 });
+    assert.equal(computes.length, 6, 'new records cull again');
+    assert.equal(batch.computeCull.dispatchSize, 2);
   } finally {
     batch.dispose();
     atlas.albedo.dispose();

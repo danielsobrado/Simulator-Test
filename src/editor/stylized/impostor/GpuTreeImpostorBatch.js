@@ -17,6 +17,8 @@ import { createGpuTreeImpostorMaterial, updateImpostorCameraUniforms } from './T
 
 const WORKGROUP_SIZE = 64;
 const DEFAULT_APPEARANCE = Object.freeze([1, 1, 1, 1]);
+// View matrix, projection matrix, origin x and z.
+const VIEW_STATE_SIZE = 34;
 
 function createGeometry() {
   const geometry = new THREE.BufferGeometry();
@@ -51,6 +53,8 @@ export class GpuTreeImpostorBatch {
     this.recordCount = 0;
     this.computePending = null;
     this.indirectNeedsReset = false;
+    this.cullStale = true;
+    this.viewState = new Float64Array(VIEW_STATE_SIZE);
     this.disposed = false;
     this.frustum = new THREE.Frustum();
     this.projectionView = new THREE.Matrix4();
@@ -139,6 +143,7 @@ export class GpuTreeImpostorBatch {
     this.originUniform = originUniform;
     this.computeReset = computeReset;
     this.computeCull = computeCull;
+    this.cullPass = [computeReset, computeCull];
   }
 
   setRecords(records) {
@@ -165,6 +170,7 @@ export class GpuTreeImpostorBatch {
       appearances[offset + 3] = appearance[3];
     }
     this.recordCount = count;
+    this.cullStale = true;
     this.mesh.visible = count > 0;
     this.countUniform.value = count;
     this.indirectNeedsReset ||= previousCount > 0 && count === 0;
@@ -207,21 +213,40 @@ export class GpuTreeImpostorBatch {
     );
   }
 
-  submitComputes(jobs) {
+  /** @returns {boolean} false when the work was dropped and must be submitted again */
+  submitComputes(nodes) {
     if (typeof this.renderer.compute === 'function') {
-      for (const job of jobs) this.renderer.compute(job.node, job.dispatchSize);
-      return;
+      this.renderer.compute(nodes);
+      return true;
     }
-    if (this.computePending) return;
-    this.computePending = (async () => {
-      for (const job of jobs) {
-        await this.renderer.computeAsync(job.node, job.dispatchSize);
-      }
-    })().catch((error) => {
+    if (this.computePending) return false;
+    this.computePending = this.renderer.computeAsync(nodes).catch((error) => {
+      this.cullStale = true;
       console.error('GPU impostor culling failed.', error);
     }).finally(() => {
       this.computePending = null;
     });
+    return true;
+  }
+
+  /** The last cull stays valid in the indirect buffer until its inputs move. */
+  viewChanged(camera, origin) {
+    const state = this.viewState;
+    const view = camera.matrixWorldInverse.elements;
+    const projection = camera.projectionMatrix.elements;
+    let changed = false;
+    const write = (index, value) => {
+      if (state[index] === value) return;
+      state[index] = value;
+      changed = true;
+    };
+    for (let index = 0; index < 16; index += 1) {
+      write(index, view[index]);
+      write(index + 16, projection[index]);
+    }
+    write(32, origin.x);
+    write(33, origin.z);
+    return changed;
   }
 
   update(camera, origin, timestamp = 0) {
@@ -230,17 +255,16 @@ export class GpuTreeImpostorBatch {
     this.originUniform.value.set(origin.x, 0, origin.z);
     if (this.recordCount === 0) {
       if (this.indirectNeedsReset) {
-        this.submitComputes([{ node: this.computeReset, dispatchSize: 1 }]);
-        this.indirectNeedsReset = false;
+        this.indirectNeedsReset = !this.submitComputes(this.computeReset);
       }
       return 0;
     }
 
+    if (!this.viewChanged(camera, origin) && !this.cullStale) return null;
     this.updatePlanes(camera);
-    this.submitComputes([
-      { node: this.computeReset, dispatchSize: 1 },
-      { node: this.computeCull, dispatchSize: this.recordCount },
-    ]);
+    // One array shares a command encoder; two calls would cost one encoder each.
+    this.computeCull.dispatchSize = this.recordCount;
+    this.cullStale = !this.submitComputes(this.cullPass);
     return null;
   }
 

@@ -687,6 +687,31 @@ The cost left on these routes is `SettlementSite.prepare` (about 3.8 s on the
 approach, in resumable slices) and `buildChunkLodPlan`, which bushes rebuild
 every frame while rocks cache it.
 
+### Source review of `50760ba9` against profiles (2026-10-31)
+
+`chunk-cross --warmup 8 --duration 12 --settle --gpuTimings 1 --cpu-profile`,
+inclusive main-thread time over the whole capture. Only the first run kept native
+focus, so these are profile shares, not frame-pacing evidence.
+
+| Review claim | Measured | Outcome |
+|--------------|----------|---------|
+| Tree LOD publication spikes, ~57 ms | `iterateTreeLod` 51.5 ms over 59 rebuilds, ~1 ms each | The 57 ms note above is stale; left alone |
+| Ground-detail `reset()` churn | `detailVisibility: false` ships, so it never runs | Left alone |
+| Variant install can exceed the budget | 28 installs, 95–120 ms total; worst single 17–29 ms | `stylizedVariantApplyMaxMs` added; not staged yet |
+| Unbounded chunk tile cache | True, small sets | Capped at four scan windows |
+| Impostor culling is redundant | `GpuTreeImpostorBatch.update` 510–544 ms | Fixed below |
+| Contact shade rescans rocks | `paintContactShade` 2.7 ms | Left alone |
+
+Each populated impostor batch used two command encoders per frame. Reset and cull
+now share one `renderer.compute` call, and the cull is skipped while the view,
+origin and records are unchanged. `update` fell to 402–413 ms while moving
+(two runs per arm); the skip itself only pays while the camera is still.
+
+The larger cost is not in that review: `writeBuffer` took about 1.9 s of main-thread
+time, and meadow was 395 MB of 446 MB uploaded in the 12 s measurement. 276 MB of
+that is `meadowRepackBytes`: retiring a tile whose stem count differs from the
+page tail shifts every later tile in the page (`meadowPageUpdatePlan`).
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`

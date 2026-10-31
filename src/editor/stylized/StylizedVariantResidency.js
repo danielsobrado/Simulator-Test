@@ -83,6 +83,8 @@ export class StylizedVariantResidency {
       prefetchChunks,
     );
     this.chunkTileCache = new Map();
+    // Four scan windows, so a long exploration cannot grow it without limit.
+    this.chunkTileCacheLimit = 4 * (2 * this.scanRadiusChunks + 1) ** 2;
     this.requested = new Set();
     this.failed = new Set();
     this.pendingLoads = [];
@@ -142,7 +144,11 @@ export class StylizedVariantResidency {
         if (Number.isInteger(tileId)) tileIds.add(tileId);
       }
     }
+    // Refreshing a stale revision keeps its older position; that only evicts it sooner.
     this.chunkTileCache.set(cacheKey, { revision, tileIds });
+    if (this.chunkTileCache.size > this.chunkTileCacheLimit) {
+      this.chunkTileCache.delete(this.chunkTileCache.keys().next().value);
+    }
     return tileIds;
   }
 
@@ -221,7 +227,10 @@ export class StylizedVariantResidency {
         this.failed.add(job.id);
         console.warn(`Stylized variant ${job.definition.scene} could not be installed.`, error);
       }
-      PerfCounters.inc('stylizedVariantApplyMs', performance.now() - startedAt);
+      const elapsedMs = performance.now() - startedAt;
+      PerfCounters.inc('stylizedVariantApplyMs', elapsedMs);
+      PerfCounters.set('stylizedVariantApplyMaxMs',
+        Math.max(PerfCounters.get('stylizedVariantApplyMaxMs'), elapsedMs));
     }
   }
 
