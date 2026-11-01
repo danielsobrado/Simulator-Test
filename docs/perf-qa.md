@@ -825,9 +825,22 @@ Render CPU falls about 4%, separated in every run. Halving the checks saves far
 less than half of submission, so re-profile before chasing the remainder. Land and
 shore captures match once cloud position is allowed for: two baseline repeats
 differ from each other as much as from the change. `qa:water:acceptance --headed`
-passes on WebGPU with no browser errors. Without `--headed` it falls back to WebGL,
-where a fragment shader exceeds 16 texture units and the run exits 1, in the
-baseline too. Storm, dusk and snow transitions were not captured.
+passes on WebGPU with no browser errors. Storm, dusk and snow transitions were not
+captured.
+
+### Automatic WebGL fallback (2026-11-01)
+
+`terrainRendererProfile` keeps terrain inside WebGL's 16 texture units, but read only
+`forceWebGL`. A fallback found during `renderer.init()` came after materials were
+chosen, so terrain bound 24 textures and failed to link. On this machine headless
+Chromium finds an adapter and `requestDevice` then fails loading `dxil.dll`, so
+startup now opens and destroys a device (`canCreateWebGPUDevice`) and sets
+`forceWebGL` when it cannot. Headless `qa:water:acceptance` went from 8 shader errors
+and exit 1 to none and exit 0, on the WebGL backend. Headed stays on WebGPU and passes.
+
+Capture from a frozen export when other sessions share the checkout: an edit mid-run
+reloads Vite, and the runner dies with "Execution context was destroyed" or reads an
+undefined `__editor`, leaving any older report at its output path.
 
 ### Highfield meadow continuity and tour hitches (2026-11-01)
 

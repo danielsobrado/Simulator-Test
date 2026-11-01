@@ -9,6 +9,7 @@ import { kitTownsEnabled } from './editor/towns/townMode.js';
 import { SettlementAmbience } from './editor/audio/settlement_ambience.js';
 import { SettlementGroundBounce } from './editor/world/settlements/view/SettlementGroundBounce.js';
 import { RendererCreationDiagnostics } from './render/RendererCreationDiagnostics.js';
+import { canCreateWebGPUDevice } from './render/deviceLimits.js';
 import './render/installViewportFramebufferSourcePatch.js';
 import './editor/performance/frameRateDisplay.css';
 import './editor/performance/qa/perfQa.css';
@@ -208,6 +209,11 @@ async function initializeEditor(restoreState, resources, startup) {
   }
   const config = loadEditorConfig();
   if (restoreState?.backend) config.renderer.forceWebGL = restoreState.backend === 'webgl';
+  if (!config.renderer.forceWebGL
+      && !await canCreateWebGPUDevice({ powerPreference: config.renderer.powerPreference ?? 'high-performance' })) {
+    console.warn('No WebGPU device; starting on the WebGL renderer profile.');
+    config.renderer.forceWebGL = true;
+  }
   const postProcessingStore = createPostProcessingSettings(
     config.stylizedSurface.postProcessing,
   );
