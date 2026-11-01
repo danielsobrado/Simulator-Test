@@ -1,5 +1,6 @@
 import { classifyProceduralBiome } from './proceduralBiomeClassification.js';
 import { createBiomeBoundaryWarp } from './BiomeBoundaryWarp.js';
+import { landformRelief, landformShoreFade } from './TerrainLandforms.js';
 import {
   WORLD_DEFAULT_HEIGHT_SCALE,
   WORLD_DEFAULT_SEED,
@@ -91,9 +92,10 @@ export class ProceduralWorldGenerator {
     const continental = fractalNoise(vertexX / 420, vertexZ / 420, this.seed + 11);
     const hills = fractalNoise(vertexX / 96, vertexZ / 96, this.seed + 29);
     const detail = fractalNoise(vertexX / 28, vertexZ / 28, this.seed + 47);
-    return continental * this.heightScale
+    const height = continental * this.heightScale
       + hills * this.heightScale * 0.34
       + detail * this.heightScale * 0.08;
+    return height + landformRelief(vertexX, vertexZ, this.seed) * landformShoreFade(height - this.seaLevel);
   }
 
   sampleHeight(vertexX, vertexZ) {

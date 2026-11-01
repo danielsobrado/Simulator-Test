@@ -4,7 +4,7 @@ const row = (shortHeight,tallHeight,width,density,patchMeters,shape='slender',ar
   Object.freeze({shortHeight,tallHeight,width,density,patchMeters,shape,areaStyle});
 export const MEADOW_GROWTH_DEFAULTS = Object.freeze({
   0:row(0,0,0,0,12),1:row(0,0,0,0,12),2:row(0,0,0,0,12),
-  3:row(.25,.85,.050,.72,14),4:row(.24,.55,.045,.92,9),
+  3:row(.25,.85,.050,.72,14),4:row(.24,.82,.045,.92,17),
   5:row(.16,.50,.060,.85,11,'broadleaf',.6),6:row(.12,.38,.042,.85,10,'slender',.85),
   7:row(.14,.48,.065,.82,12,'broadleaf',.25),8:row(.18,.52,.062,.78,10,'broadleaf',.3),
   9:row(.10,.28,.050,.80,12,'slender',.7),10:row(.06,.16,.028,.28,7,'slender',.8),

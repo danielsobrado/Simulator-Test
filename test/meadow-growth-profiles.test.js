@@ -15,7 +15,7 @@ import { reconcileMeadowGrowth, meadowPageGrowthKey } from '../src/editor/styliz
 const surface=load(readFileSync(new URL('../editor.config.yaml',import.meta.url),'utf8')).stylizedSurface;
 const rows=[
  [0,0,0,0,12,'slender',1],[0,0,0,0,12,'slender',1],[0,0,0,0,12,'slender',1],
- [.25,.85,.050,.72,14,'slender',1],[.24,.55,.045,.92,9,'slender',1],[.16,.50,.060,.85,11,'broadleaf',.6],
+ [.25,.85,.050,.72,14,'slender',1],[.24,.82,.045,.92,17,'slender',1],[.16,.50,.060,.85,11,'broadleaf',.6],
  [.12,.38,.042,.85,10,'slender',.85],[.14,.48,.065,.82,12,'broadleaf',.25],[.18,.52,.062,.78,10,'broadleaf',.3],
  [.10,.28,.050,.80,12,'slender',.7],[.06,.16,.028,.28,7,'slender',.8],[0,0,0,0,12,'slender',1],[.14,.60,.045,.50,5,'reed',.2],
 ];
@@ -82,5 +82,5 @@ test('live profile updates preserve unaffected uniform slots and page revision k
  }
  assert.notEqual(meadowPageGrowthKey(Uint8Array.of(9),old,looks(old)),meadowPageGrowthKey(Uint8Array.of(9),next,looks(next)));
  const changedFallback=reconcileMeadowGrowth(old,resolveMeadowGrowth({byTileId:{4:{tallHeight:.7},32:{...MEADOW_GROWTH_DEFAULTS[4]}}}));
- assert.equal(changedFallback.table[254],0);assert.equal(changedFallback.profiles[changedFallback.table[32]].tallHeight,.55);
+ assert.equal(changedFallback.table[254],0);assert.equal(changedFallback.profiles[changedFallback.table[32]].tallHeight,.82);
 });

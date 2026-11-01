@@ -13,7 +13,7 @@ import { planTrim } from './SettlementTrim.js';
 import { planWallDressing } from './SettlementWallDressing.js';
 import { planRandom, planStreets } from './SettlementStreets.js';
 
-export const SETTLEMENT_PLAN_VERSION = 18;
+export const SETTLEMENT_PLAN_VERSION = 19;
 /** Part of every town's seed. Raising it redraws every town; the version above only invalidates caches. */
 const SETTLEMENT_LAYOUT_EPOCH = 14;
 

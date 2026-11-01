@@ -52,7 +52,14 @@ export class WaterDistanceField {
     }
     for (;;) {
       if (shouldYield?.()) return false;
-      const step = job.next();
+      let step;
+      try {
+        step = job.next();
+      } catch (error) {
+        // A thrown generator is finished: left pending, it would store `undefined` as this block.
+        this.pendingBlocks.delete(key);
+        throw error;
+      }
       if (step.done) {
         this.storeBlock(key, step.value);
         return true;

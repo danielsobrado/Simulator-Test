@@ -1015,7 +1015,7 @@ stylizedSurface:
           1: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           2: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.72, patchMeters: 14, shape: slender}
-          4: {shortHeight: 0.24, tallHeight: 0.55, width: 0.045, density: 0.92, patchMeters: 9, shape: slender}
+          4: {shortHeight: 0.24, tallHeight: 0.82, width: 0.045, density: 0.92, patchMeters: 17, shape: slender}
           5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
           6: {shortHeight: 0.12, tallHeight: 0.38, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
           7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.82, patchMeters: 12, shape: broadleaf, areaStyle: 0.25}
@@ -1642,7 +1642,7 @@ stylizedSurface:
     # grassland its hedgerow clumps, a taiga a thin shrub layer.
     densityByTile:
       3: 0.45
-      4: 0.6
+      4: 1
       9: 0.6
       14: 0.35
   groundDetails:
@@ -1865,10 +1865,10 @@ stylizedSurface:
   flowers:
     enabled: true
     residentRadius: 2
-    perChunk: 480
+    perChunk: 1440
     outerRingDensity: 0.5
     tileIds: [3, 4, 5, 6, 8, 12, 14]
-    colonies: { enabled: true, patchMeters: 18 }
+    colonies: { enabled: true, patchMeters: 26 }
     minSize: 0.45
     maxSize: 0.6
     dirtMax: 0.2

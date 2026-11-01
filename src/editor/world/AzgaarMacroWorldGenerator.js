@@ -4,6 +4,7 @@ import {
 } from '../import/AzgaarMacroWorldSource.js';
 import { WorldGuidanceField } from './WorldGuidanceField.js';
 import { ridgeHeight, validateMountainRidges } from './MountainRidges.js';
+import { landformRelief } from './TerrainLandforms.js';
 import { valueNoise } from './valueNoise2d.js';
 import { createBiomeBoundaryWarp } from './BiomeBoundaryWarp.js';
 import { TrailGrading, validateTrailGrading } from './TrailGrading.js';
@@ -19,6 +20,8 @@ const WATER_TILE_ID = 0;
 const PATH_TILE_ID = TILE_BY_KEY.get('road').id;
 const LAND_HEIGHT = 20;
 const MOUNTAIN_RUGGEDNESS = 0.25;
+/** Raw heights over which landforms rise from a coast: much of a map's lowland sits this close. */
+const LANDFORM_COAST_RAW = 2.5;
 const LEGACY_DETAIL_GUIDANCE = Object.freeze({
   baseScale: 0.75,
   mountainWeight: 0.35,
@@ -528,8 +531,10 @@ export class AzgaarMacroWorldGenerator {
       valueNoise(vertexX / 96, vertexZ / 96, this.seed + 1709) * 1.4
       + valueNoise(vertexX / 24, vertexZ / 24, this.seed + 1877) * 0.35
     );
+    // The far backdrop skips landforms: it sits heightBias under them, past their reach.
     return base
       + detail * coastFade * ruggedness * this.morphologyScale(vertexX, vertexZ)
+      + landformRelief(vertexX, vertexZ, this.seed) * clamp((rawHeight - LAND_HEIGHT) / LANDFORM_COAST_RAW, 0, 1)
       + this.ridgeRelief(vertexX, vertexZ, elevationFraction) * coastFade;
   }
 

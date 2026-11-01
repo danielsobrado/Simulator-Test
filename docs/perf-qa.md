@@ -935,6 +935,42 @@ Hitches and GPU average overlap. The change sits about 1% lower on average FPS a
 0.05 ms higher on GPU p95, which is within what five runs can separate. This route is
 one biome path, so it does not measure every floor pairing.
 
+### Landforms and the grassland benchmark (2026-11-01)
+
+`TerrainLandforms.js` adds warped swells, gullies and knolls to both generators,
+about ±6 m at p1/p99 and steepest near 0.64. Rivers and beaches read the finished
+height. Eldara's far backdrop skips landforms because `heightBias` keeps it below
+them. Biome 4 grass rises to 0.82 m tall in 17 m swaths, grassland bushes keep full
+cluster density and flower candidates triple. Existing settlement plans are stale,
+so `SETTLEMENT_PLAN_VERSION` is 19.
+
+Landforms use their own short coast fade in Eldara. The 10-raw-unit detail fade left
+them at 10% on the settlement route, because a quarter of that map's land is within
+3 units of the coast. Bringing them that close exposed a latent bug: a block build
+that threw stayed in `WaterDistanceField.pendingBlocks`, and the dead job then
+stored `undefined`. Failed builds are now dropped. The original throw was not
+identified; it did not recur over three settlement runs and one Eldara capture.
+
+Export of `d2ce9910` with the same two uncommitted device-limit files, against the
+change. `chunk-cross` from `original-04`, `--warmup 8 --duration 12 --settle
+--gpuTimings 1`, alternating arms, all settled, focused and free of browser errors:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| Avg FPS | 142.4, 144.7 | 118.7, 141.4 |
+| dt p95 ms | 10.2, 9.8 | 10.7, 10.3 |
+| dt p99 ms | 13.1, 13.2 | 18.3, 14.8 |
+| Hitches | 2, 2 | 10, 2 |
+| GPU avg ms | 2.69, 2.71 | 2.85, 2.84 |
+
+The first change run is an unexplained outlier, and only two pairs were taken on the
+final code. An earlier revision, three pairs with a smaller plain share, read 146.0,
+149.3, 134.3 → 141.8, 143.5, 137.4 FPS with GPU 2.70 → 2.81 ms and hitches 2, 1, 3 →
+2, 3, 5. Expect about 0.15 ms GPU and a few percent FPS; the arms were not split
+to attribute it. `settlement-approach`: baseline 99.9 FPS, 6 hitches; change 97.5
+and 97.4 FPS, 6 and 8 hitches, one baseline run. `qa:water:acceptance --headed`
+passed with the coast fade, before the distance-field fix.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`

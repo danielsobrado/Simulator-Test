@@ -52,3 +52,18 @@ test('a pending candidate is retried without changing the manifest', () => {
   assert.ok(pendingOnce.size > 0);
   assert.deepEqual(actual, expected);
 });
+
+test('a block whose build throws can be built again', () => {
+  let fail = true;
+  const field = new WaterDistanceField({
+    isWaterCell: () => {
+      if (fail) throw new Error('interrupted');
+      return false;
+    },
+    blockSize: 4,
+    maxDistanceCells: 2,
+  });
+  assert.throws(() => field.sample(0, 0), /interrupted/);
+  fail = false;
+  assert.equal(field.sample(0, 0), 0);
+});
