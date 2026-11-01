@@ -32,7 +32,7 @@ function luminance(hex) {
 }
 
 test('snow air cools the look relative to it, so night stays night', () => {
-  const day = resolveSkyLook(SKY, 'configured');
+  const day = { ...resolveSkyLook(SKY, 'configured'), sunElevation: 45 };
   assert.equal(snowCountryLook(day, 0), day);
   const alpine = snowCountryLook(day, 1);
   const fog = new THREE.Color(alpine.fogColor);
@@ -92,8 +92,16 @@ test('snow country listens to the ground underfoot and ignores open water', () =
   assert.equal(snowCountryWeight({ tiles: [10, 0], ...BAND, groundHeight: 100 }), 0.6, 'a tundra lake shore is tundra');
 });
 
+test('a low sun keeps its warm sky over snow and only half the stop-down', () => {
+  const golden = { ...resolveSkyLook(SKY, 'configured'), sunElevation: 7 };
+  const alpine = snowCountryLook(golden, 1);
+  assert.equal(alpine.lowColor, golden.lowColor);
+  assert.equal(alpine.highColor, golden.highColor);
+  assert.ok(Math.abs(alpine.exposure - (golden.exposure ?? 1) * 0.87) < 1e-9);
+});
+
 test('a daylit snow-country sky turns pale, not merely tinted', () => {
-  const day = resolveSkyLook(SKY, 'configured');
+  const day = { ...resolveSkyLook(SKY, 'configured'), sunElevation: 45 };
   const alpine = snowCountryLook(day, 1);
   const zenith = new THREE.Color(alpine.highColor);
   const summer = new THREE.Color(day.highColor);

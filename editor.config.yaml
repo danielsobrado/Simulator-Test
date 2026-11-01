@@ -181,8 +181,16 @@ stylizedSurface:
     baseRoughness: 0.7
     compactedRoughness: 0.4
     toneContrast: 0.06
-    cavityStrength: 0.8
+    # Fresh snow is clean: strong cavities read as marble or concrete.
+    cavityStrength: 0.2
     subsurfaceStrength: 0.12
+    # Share of the lit colour left in a drift's cast shadow, before its blue shade tint.
+    driftShadow: 0.18
+    # Share of the Snow007 grain and sastrugi slopes kept: a low sun rakes them into scratches.
+    fineNormal: 0.35
+    # How far snow normals lean to a low sun. At 7° real snow glows gold; plain
+    # N·L left it in the blue fill, and leaning keeps the shadow map, which emission would not.
+    lowSunWrap: 0.85
   # The trail a walking body cuts through deep snow (grass-test's SnowSurfWake):
   # a banked trench that widens and deepens with speed and settles flat within
   # 25 s. Terrain-only and gated on baked snow, on a live trail and on a circle
@@ -1074,6 +1082,10 @@ stylizedSurface:
         meltStart: 12
         meltEnd: 35
         meltFlatten: 0.25
+        # Lush hollows, pale dry sward and worn earth by area, on the terrain and
+        # the stems alike (meadow/meadowGroundStyle.js). 0 compiles it out.
+        groundStyle: 1
+        valueJitter: 0.5
       # Plants and gaps inside a stand (meadow/meadowTuftField.js): sub-metre
       # tufts share height, lean and value; short stems narrow with their height
       # instead of standing as broad wedges. Reshapes stems only — population,
@@ -1082,10 +1094,6 @@ stylizedSurface:
       tufts:
         height: 0.32
         lean: 0.55
-        # Lush hollows, pale dry sward and worn earth by area, on the terrain and
-        # the stems alike (meadow/meadowGroundStyle.js). 0 compiles it out.
-        groundStyle: 1
-        valueJitter: 0.5
         bendIsolated: 4
         bendCore: 1.25
         widthFloor: 0.5

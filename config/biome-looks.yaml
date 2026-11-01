@@ -52,11 +52,12 @@ biomeLooks:
       canopy: '#4a7a55'
       soil: '#3d3a2b'
       snow: { ground: 0.1, canopy: 0.7, grass: 0.35, air: 0.4, fall: 0.15 }
-    # A snow carpet broken by tussocks; trees wear full caps.
+    # A snow carpet, the odd tussock breaking it; trees wear full caps. At 0.8
+    # the drift noise left a wash of grass and heather through most of the snow.
     10:
       name: tundra
       canopy: '#8a9a62'
-      snow: { ground: 0.8, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
+      snow: { ground: 0.95, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
     11:
       name: glacier
       # No grass grows on the ice (grass.meadow.growth), so it takes no frost:

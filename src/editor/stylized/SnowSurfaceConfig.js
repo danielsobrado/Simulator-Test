@@ -10,8 +10,11 @@ export const SNOW_SURFACE_DEFAULTS = Object.freeze({
   baseRoughness: 0.7,
   compactedRoughness: 0.4,
   toneContrast: 0.06,
-  cavityStrength: 0.8,
+  cavityStrength: 0.2,
   subsurfaceStrength: 0.12,
+  driftShadow: 0.18,
+  fineNormal: 0.35,
+  lowSunWrap: 0.85,
 });
 
 export function resolveSnowSurfaceConfig(source = {}) {
@@ -20,7 +23,7 @@ export function resolveSnowSurfaceConfig(source = {}) {
   }
   const value = { ...SNOW_SURFACE_DEFAULTS, ...source };
   for (const key of ['calmCoverage', 'calmRelief', 'calmDetail', 'windward', 'pathCompaction',
-    'baseRoughness', 'compactedRoughness', 'toneContrast', 'cavityStrength', 'subsurfaceStrength']) {
+    'baseRoughness', 'compactedRoughness', 'toneContrast', 'cavityStrength', 'subsurfaceStrength', 'driftShadow', 'fineNormal', 'lowSunWrap']) {
     if (!Number.isFinite(value[key]) || value[key] < 0 || value[key] > 1) {
       throw new RangeError(`stylizedSurface.snowSurface.${key} must be within [0, 1].`);
     }

@@ -65,7 +65,9 @@ export function snowCountryLook(look, weight) {
   // The weight is a ring average, so a snowy forest broken by lakes or a
   // neighbouring biome sits near 0.3; the sky's colour leads it (an ease-out),
   // while exposure and density keep the plain weight.
-  const sky = 1 - (1 - w) ** 2;
+  // A low sun keeps its warm sky: only a daylit dome pales to winter blue.
+  const daylight = THREE.MathUtils.smoothstep(look.sunElevation ?? 90, 10, 30);
+  const sky = (1 - (1 - w) ** 2) * daylight;
   return {
     ...look,
     lowColor: wintered(tinted(look.lowColor, COOL_SKY, sky, PALING), WINTER_HORIZON, sky),
@@ -74,6 +76,7 @@ export function snowCountryLook(look, weight) {
     directionalColor: tinted(look.directionalColor, WARM_SUN, w),
     ambientIntensity: look.ambientIntensity * (1 + 0.15 * w),
     fogDensityScale: look.fogDensityScale * (1 + 0.35 * w),
-    exposure: (look.exposure ?? 1) * (1 + (SNOW_EXPOSURE - 1) * w),
+    // Low sun leaves snow well below clipping, so the camera stops down half as far.
+    exposure: (look.exposure ?? 1) * (1 + (SNOW_EXPOSURE - 1) * w * (0.5 + 0.5 * daylight)),
   };
 }

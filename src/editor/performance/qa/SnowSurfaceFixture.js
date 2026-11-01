@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { cameraPosition, color, float, mix, normalView, normalWorldGeometry, positionWorld, smoothstep, uniform, uv, vec2, vec4 } from 'three/tsl';
+import { cameraPosition, color, float, mix, normalView, normalWorldGeometry, positionWorld, smoothstep, normalize, uniform, uv, vec2, vec4 } from 'three/tsl';
 import bakeSource from '../../../../config/terrain-material-bake.yaml?compiled';
 import { createTerrainMaterialBakeConfig } from '../../materials/TerrainMaterialBakeConfig.js';
 import { createTerrainMaterialBakedSurface } from '../../materials/TerrainMaterialBakedNodes.js';
@@ -60,7 +60,8 @@ try {
   const makeMaterial = (settings, lighting = true, inputNormal = normalView) => {
     const material = new THREE.MeshStandardNodeMaterial();
     const detail = createSnowDetailNodes({ terrainUv, chunkWorldSize: 64, chunkCenter: center, snow,
-      material, groundHeight: positionWorld.y, pathMask: path, baseNormal: inputNormal, reliefEnabled: true, settings });
+      material, groundHeight: positionWorld.y, pathMask: path, baseNormal: inputNormal, reliefEnabled: true, settings,
+      sun: normalize(uniform(sun.position.clone().normalize())) });
     const baseNormal = detail.normal(inputNormal).toVar();
     const surface = createSnowSurfaceNodes({ terrainUv, chunkWorldSize: 64, chunkCenter: center, snow,
       stylizedConfig: { sky: {} }, sunDirection: sun.position.clone().normalize(), baseNormal, pathMask: path, settings });
@@ -68,7 +69,7 @@ try {
     material.colorNode = lighting ? surface.apply(detailedColor) : detailedColor;
     material.normalNode = baseNormal;
     material.roughnessNode = detail.roughness(float(0.78));
-    if (lighting) material.emissiveNode = surface.emissive;
+    if (lighting) material.emissiveNode = surface.emissive.add(detail.shade);
     return material;
   };
   const settings = resolveSnowSurfaceConfig();

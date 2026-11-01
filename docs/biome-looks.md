@@ -65,3 +65,21 @@ the field's `regionalMinCoverage`: on 54.3 / 49.0 fps (p50 11.7 / 12.9 ms),
 off 68.7 fps (p50 9.3 ms); the extra time was per-frame submission work, not
 draws (187 vs 192). Taiga's `fall` dropped to 0.15 so it no longer snows on
 its own; that change is not yet re-measured.
+
+## Snow under a low sun
+
+Snow takes none of the ground's pigment: macro tint, family atlas and lichen stop
+at the bake's snow weight, and the floor scan stays on bare ground. Most of what
+read as marble was those layers, not the snow maps.
+
+`SnowDriftShading.js` adds drifts a few metres across as analytic slopes plus a
+three-step march toward the sun. Collision and geometry stay flat. Their shade
+loses the sun's colour and takes `DRIFT_SKY_LIGHT` as emission, because a blue
+albedo under an orange sun still comes out brown. Below about 20° elevation
+snow normals lean to the sun (`lowSunWrap`) so the lit side glows, and the shadow
+map keeps working. `snowCountryLook` leaves a low sun's sky warm and stops the
+exposure down half as far.
+
+2026-11-01, `chunk-cross` from the glacier at (6929, 8891), `--warmup 8 --settle`,
+three alternating pairs, drift branch off → on: 128.3, 141.6, 125.6 → 133.5,
+135.4, 150.1 fps; hitches 5, 2, 4 → 0, 3, 1. No cost shows above run-to-run spread.

@@ -58,7 +58,8 @@ try {
   compare('origin rebase preserves the snow surface', 'open', 'rebased');
   compare('adjacent chunk coordinates preserve detail', 'detail', 'detail-adjacent-chunk');
   compare('authored snowy alpine trees are visible', 'open', 'biome', true);
-  compare('falling snow is visible against the snowy biome', 'biome', 'biome-snowfall', true);
+  // White flakes over clean snow: a smaller mean change than over the old mottled ground.
+  compare('falling snow is visible against the snowy biome', 'biome', 'biome-snowfall', true, 0.15);
   compare('falling flakes move over time', 'biome-snowfall', 'biome-snowfall-moving', true);
   // Fine ice grains occupy very few pixels; verify local contrast rather than
   // requiring them to change a broad area of the entire image like a snow puff.

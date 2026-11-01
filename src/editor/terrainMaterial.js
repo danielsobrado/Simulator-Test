@@ -11,11 +11,13 @@ import {
   float,
   max,
   mix,
+  normalize,
   oneMinus,
   positionLocal,
   positionWorld,
   sin,
   smoothstep,
+  uniform,
   uv,
   vec2,
   vec3,
@@ -379,6 +381,8 @@ export function createTerrainMaterial({
     const paintedSurface = pathPaint
       ? { ...bakedSurface, ...pathPaint.apply(bakedSurface.color, bakedRoughness) }
       : { ...bakedSurface, roughness: bakedRoughness };
+    // The floor scan is soil structure: under snow it read as bare rock.
+    if (pathPaint && bakedSurface.snow) paintedSurface.color = mix(paintedSurface.color, bakedSurface.color, bakedSurface.snow);
     const coastPatterns = coastPatternsTemplate && slotPatternOrigins('coastPatterns', coastPatternsTemplate);
     // The interpolated mesh height keeps narrow wash fronts smooth between
     // vertices; the nearest-filtered height texture would make texel terraces.
@@ -453,6 +457,7 @@ export function createTerrainMaterial({
     const snowDetail = bakedSurface.snow ? createSnowDetailNodes({
       terrainUv, chunkWorldSize, chunkCenter, snow: bakedSurface.snow, material,
       groundHeight: terrainHeight, pathMask: snowPressed, baseNormal: bakedSurface.normal, settings: snowSettings,
+      sun: sunDirection ? normalize(uniform(sunDirection)) : null,
       reliefEnabled: stylizedConfig.enhancements?.snowRelief === true,
     }) : null;
     const snowNormal = bakedSurface.normal && snowDetail
@@ -472,7 +477,7 @@ export function createTerrainMaterial({
       ? antialiasSpecularRoughness(surface.roughness, bakedSurface.normal)
       : surface.roughness;
     material.roughnessNode = filteredRoughness;
-    if (snowSurface) material.emissiveNode = snowSurface.emissive;
+    if (snowSurface) material.emissiveNode = snowDetail ? snowSurface.emissive.add(snowDetail.shade) : snowSurface.emissive;
     if (bakedSurface.normal) material.normalNode = bakedSurface.normal;
     if (snowDetail) {
       material.roughnessNode = snowDetail.roughness(filteredRoughness);

@@ -29,6 +29,9 @@ import {
   createTerrainWeatheringState,
 } from './TerrainMaterialWeatheringNodes.js';
 
+/** Share of a fully snowed point's pigment the bake leaves out. */
+const SNOW_ALBEDO_PURITY = 0.92;
+
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
 const PUBLISHED_BLEND_THRESHOLD = 0.999;
@@ -292,8 +295,10 @@ export function createTerrainMaterialBakedSurface({
   midColor = midColor
     .mul(float(1).sub(samples.wetnessShoreline.r.mul(render.wetDarkening)))
     .mul(heightShade);
+  // Macro tint, family atlas and lichen are ground pigment: on snow they read as dirty concrete.
+  midColor = mix(midColor, snowColor.mul(heightShade), weights.a.mul(SNOW_ALBEDO_PURITY));
 
-  const nearMacro = mix(vec3(1), macroMultiplier, render.nearMacroStrength);
+  const nearMacro =mix(vec3(1), macroMultiplier, render.nearMacroStrength);
   const nearFamily = mix(vec3(1), familyMultiplier, families.nearStrength);
   let nearProcedural = substrate.applyColor(proceduralColor,weights.g,pathMask)
     .mul(genome.colorMultiplier)

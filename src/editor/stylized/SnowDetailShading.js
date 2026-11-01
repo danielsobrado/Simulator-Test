@@ -9,7 +9,7 @@ import { createSnowSurfaceState, snowSurfacePoint } from './SnowSurfaceState.js'
 
 /** Snow007C's centered detail response, adapted to streamed terrain normals. */
 export function createSnowDetailNodes({ terrainUv, chunkWorldSize, chunkCenter, snow, material, groundHeight = float(0),
-  pathMask = float(0), baseNormal = null, reliefEnabled = false, settings = resolveSnowSurfaceConfig() }) {
+  pathMask = float(0), baseNormal = null, reliefEnabled = false, settings = resolveSnowSurfaceConfig(), sun = null }) {
   const maps = acquireSnowTextures();
   if (!maps) return null;
   const dispose = () => {
@@ -28,7 +28,7 @@ export function createSnowDetailNodes({ terrainUv, chunkWorldSize, chunkCenter, 
   const state = createSnowSurfaceState({ point: snowSurfacePoint(local, chunkCenter), snow, pathMask,
     worldNormal: worldBase, settings });
   const relief = reliefEnabled ? createSnowReliefNodes({ local, chunkCenter, snow, pathMask, worldNormal: worldBase,
-    settings, state }) : null;
+    settings, state, sun }) : null;
   const planar = smoothstep(0.45, 0.8, worldBase.y);
   const broadFade = smoothstep(0.1, 0.7, max(length(dx), length(dy)).mul(8)).oneMinus();
   const detail = Fn(() => {
@@ -40,7 +40,7 @@ export function createSnowDetailNodes({ terrainUv, chunkWorldSize, chunkCenter, 
       const cavity = mix(float(1), packed.r.div(0.944).mul(hollow),
         state.detailScale.mul(settings.cavityStrength).mul(planar).mul(broadFade));
       const tint = mix(vec3(1), vec3(0.55, 0.72, 1), cavity.oneMinus().max(0).mul(0.7));
-      result.assign(vec4(mix(vec3(1), pigment, state.detailScale.mul(planar).mul(broadFade)).mul(cavity).mul(tint),
+      result.assign(vec4(mix(vec3(1), pigment, state.detailScale.mul(settings.cavityStrength).mul(planar).mul(broadFade)).mul(cavity).mul(tint),
         packed.g.sub(0.714).mul(0.3).mul(state.detailScale).mul(broadFade)));
     });
     return result;
@@ -78,11 +78,12 @@ export function createSnowDetailNodes({ terrainUv, chunkWorldSize, chunkCenter, 
         });
       }
       // Project the detail onto the real surface tangent plane, preserving its tilt.
-      result.assign(offset.sub(worldBase.mul(offset.dot(worldBase))).mul(state.detailScale));
+      result.assign(offset.sub(worldBase.mul(offset.dot(worldBase))).mul(state.detailScale).mul(settings.fineNormal));
     });
     return result;
   })();
   return {
+    shade: relief?.shade ?? vec3(0),
     color(base) {
       const value = base.mul(mix(vec3(1), detail.rgb, amount));
       return mix(relief ? relief.color(value) : value, color(settings.pathColor), state.compressed.mul(snow));
