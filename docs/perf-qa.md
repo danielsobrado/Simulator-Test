@@ -767,6 +767,39 @@ group. `renderGroup` does not help, because three clones non-shared groups per d
 `sharedUniformGroup` would, but it takes bind groups across every material, so it
 was left alone. GPU time is only about 2 ms, so GPU quality is not the limit here.
 
+### Highfield meadow continuity and tour hitches (2026-11-01)
+
+The band at `original-04` stays with calm wind and stays on the same ground when
+the camera moves ±10 m, so it is the height step, not wind or a LOD ring. Far
+"chunks" were cards at full height swing: they vanish with a flat stand. Widening
+short stems made cones. `e9c00c17` → `447d773b` raises biome 4 `shortHeight` to
+0.24, keeps 35% of the swing on cards (`MEADOW_CARD_HEIGHT_CONTRAST`), and sets
+`rootBrightness` 1, `gradientPower` 1.4 and `bendIsolated` 4.
+
+`node scripts/run-highfield-tour-qa.mjs`, the 45 s loop from `original-04` with its
+points saved in each report, three alternating pairs, DOM focus only:
+
+| Lap | Metric | Baseline | Change |
+|-----|--------|----------|--------|
+| First | dt p95 ms | 10.1, 10.2, 14.2 | 12.4, 9.9, 10.4 |
+| First | dt p99 ms | 15.1, 16.0, 21.5 | 17.8, 13.8, 16.2 |
+| First | dt max ms | 78, 80, 100 | 96, 79, 79 |
+| First | Hitches | 8, 7, 9 | 10, 6, 9 |
+| Repeat | dt p95 ms | 8.8, 9.1, 9.4 | 9.7, 9.0, 9.1 |
+| Repeat | dt max ms | 49, 54, 55 | 45, 41, 53 |
+| Repeat | Hitches | 2, 1, 2 | 2, 2, 1 |
+
+Preparation took 3–10 ms. No run came near the old 37–44 hitches, and every lap
+stays under 0.2% hitches. The first lap's worst frames repeat in all six runs near
+(-8799, 7779) and (-8931, 7851), 76–100 ms after ordinary frames, with meadow batch
+commit and publication counters moving: first-visit preparation, gone on repeat.
+
+Every `chunk-cross` control lost native focus to another process, so they are void
+as pacing evidence; average FPS was 137–140 against 133–135. Treat that ~4% as a
+likely overdraw cost until re-measured. Tracked geometry bytes match at the fixed
+pose. The `lod` fixture fails the same three biome 10 pairs in both arms with zero
+coverage, so that failure predates this change.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`
