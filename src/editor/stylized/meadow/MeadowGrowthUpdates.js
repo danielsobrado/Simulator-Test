@@ -36,7 +36,8 @@ export function applyMeadowGrowth(field,next) {
   for(let i=0;i<16;i++) {
     const p=growth.profiles[i];
     field.uniforms.growth.dimensions.array[i].set(p.shortHeight,p.tallHeight,p.width,p.patchMeters);
-    field.uniforms.growth.density.array[i].set(...meadowGrowthResponse(p));
+    field.uniforms.growth.areaStyle.array[i]=p.areaStyle;
+field.uniforms.growth.density.array[i].set(...meadowGrowthResponse(p));
   }
   field.uniforms.growth.maxHeight=growth.maxHeight;field.uniforms.growth.maxWidth=growth.maxWidth;
   field.ground.setGrowth(growth,looks);

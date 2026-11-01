@@ -823,6 +823,27 @@ Removing cards pays for the march. These valid controls also overlap the void
 Checked only at `original-04`: other biomes and steep ground have not been
 reviewed, and the band past 90 m reads slightly paler than cards did.
 
+### Ground areas and floor scans (2026-11-01)
+
+The area field (`meadowGroundStyle.js`) adds three noise fields to terrain fragments
+and blade and card vertices. One array texture (`terrainGroundLayers.js`) replaces the
+path dirt, so the sampler count is unchanged, and near ground takes two taps instead
+of one. Its six 1K RGBA layers cost about 33 MB of GPU memory with mips, against about
+1.9 MB before. `chunk-cross --warmup 8 --duration 12 --settle --gpuTimings 1`,
+alternating arms, all settled with no browser errors:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| Avg FPS | 87.9, 94.1 | 99.3, 92.2 |
+| Hitches | 13, 9 | 2, 7 |
+| GPU avg ms | 2.51, 2.21 | 2.39, 2.55 |
+| GPU p95 ms | 3.30, 2.96 | 3.22, 3.18 |
+
+Every run lost native focus, so these are void as frame-pacing evidence. GPU time
+overlaps, but repeat this with the window foreground before calling it free. The
+change arm also carried another session's uncommitted snow work, and predates the
+per-biome `areaStyle` share.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`

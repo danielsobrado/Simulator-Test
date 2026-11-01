@@ -65,6 +65,8 @@ export const MEADOW_GRASS_DEFAULTS = Object.freeze({
     meltEnd: 35,
     /** Share of a melted stem's root-to-tip gradient replaced by the canopy colour. */
     meltFlatten: 0.5,
+    /** Share of the lush / dry / worn area field (meadowGroundStyle.js); 0 compiles it out. */
+    groundStyle: 0,
   }),
   /**
    * The far meadow: billboard cards past the blades, each a clump of stems
@@ -161,7 +163,7 @@ export function resolveMeadowGrassConfig(source) {
   for (const key of ['rootBrightness', 'gradientPower', 'groundTipMix', 'canopyDepth', 'valueJitter', 'backlight', 'fill', 'patchScale', 'lodThinning', 'lodCompensation', 'lodWidenMax', 'dryPatchScale']) {
     finite(appearance[key], d.appearance[key], `${path}.appearance.${key}`, { min: 0 });
   }
-  for (const key of ['canopyTipMix', 'canopyStrength', 'meltFlatten', 'dryStart', 'dryEnd', 'dryStrength']) {
+  for (const key of ['canopyTipMix', 'canopyStrength', 'meltFlatten', 'dryStart', 'dryEnd', 'dryStrength', 'groundStyle']) {
     finite(appearance[key], d.appearance[key], `${path}.appearance.${key}`, { min: 0, max: 1 });
   }
   finite(appearance.meltStart, d.appearance.meltStart, `${path}.appearance.meltStart`, { min: 0 });

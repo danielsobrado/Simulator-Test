@@ -1,4 +1,3 @@
-import * as THREE from 'three/webgpu';
 import {
   Fn,
   If,
@@ -12,6 +11,7 @@ import {
   floor,
   fract,
   fwidth,
+  int,
   mix,
   positionWorld,
   sin,
@@ -21,6 +21,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { GROUND_LAYER_MEAN, GROUND_LAYERS } from './groundLayerIds.js';
 
 /**
  * grass-test's path surface (`GroundMaterial`, cinematic style), on this
@@ -55,12 +56,6 @@ export const DEFAULT_PATH_PAINT = Object.freeze({
 
 const DONOR_UNITS_PER_METRE = 2.8;
 const NOISE_PERIOD_METRES = 1024;
-/**
- * The donor's `ground_0109` colour with its roughness packed into alpha: one
- * texture, one sampler. The terrain's fragment stage has none to spare (WebGPU
- * allows 16), so a second map for roughness would fail the pipeline.
- */
-const TEXTURE_FILE = 'assets/ground/path/ground_0109_color_roughness_1k.webp';
 /** The donor's `ground.antiTiling`. */
 const ANTI_TILING = Object.freeze({
   secondaryScale: 0.618,
@@ -90,21 +85,6 @@ export function resolvePathPaint(source) {
     }
   }
   return paint;
-}
-
-let sharedTextures = null;
-
-/** The dirt, loaded once and shared by every terrain material. */
-export function acquirePathTextures(baseUrl = import.meta.env?.BASE_URL ?? '/') {
-  if (sharedTextures) return sharedTextures;
-  const map = new THREE.TextureLoader().load(`${baseUrl}${TEXTURE_FILE}`);
-  map.wrapS = THREE.RepeatWrapping;
-  map.wrapT = THREE.RepeatWrapping;
-  // sRGB decodes the colour; alpha (roughness) is left linear.
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  sharedTextures = { colorRoughness: map };
-  return sharedTextures;
 }
 
 // The donor's GroundTurf noise: smooth random height with its analytic gradient.
@@ -159,11 +139,13 @@ function floorMod(value, period) {
  * @param {object} options.pathMask 0..1 path/road mask (the donor's path texture R)
  * @param {object} options.verge 0..1 verge band beside the tread
  * @param {object | null} options.settings resolvePathPaint()
- * @param {{ colorRoughness: object } | null} options.textures acquirePathTextures()
+ * @param {{ colorRoughness: object } | null} options.textures acquireGroundLayers()
+ * @param {{ layers: object, blend: object } | null} [options.floor] floor scans:
+ *   layers.xy are array indices, blend moves from x to y
  * @returns {{ apply: (color: object, roughness: object) => { color: object, roughness: object } } | null}
  */
 export function createTerrainPathPaint({
-  terrainUv, chunkWorldSize, chunkCenter, pathMask, verge, settings, textures,
+  terrainUv, chunkWorldSize, chunkCenter, pathMask, verge, settings, textures, floor: floorScan = null,
 }) {
   if (!settings || !textures) return null;
   const repeats = Math.max(1, Math.round(chunkWorldSize / settings.repeatMeters));
@@ -190,12 +172,16 @@ export function createTerrainPathPaint({
         const gradB = [dFdx(uvB).toVar(), dFdy(uvB).toVar()];
         const turfLayer = turfLayers(world);
         const result = vec4(baseColor, baseRoughness).toVar();
-        // Bare ground has no texture of its own: lend it the dirt's light and dark near the
-        // viewer, as grit and litter. Past 45 m the branch skips the tap.
+        // The ground has no texture of its own: lay a neutral scan over it near the
+        // viewer, so the palette keeps the hue and the scan brings the structure, with
+        // no brightness ring where it fades. Past 45 m the branch skips both taps.
         const floorFade = smoothstep(14, 45, distance(cameraPosition, positionWorld)).oneMinus().toVar();
         If(floorFade.greaterThan(0), () => {
-          const grit = dot(texture(textures.colorRoughness, uvA.mul(0.61)).grad(gradA[0].mul(0.61), gradA[1].mul(0.61)).rgb, vec3(0.3, 0.55, 0.15));
-          result.assign(vec4(result.xyz.mul(mix(float(1), grit.div(0.3).clamp(0.6, 1.6), floorFade.mul(0.85))), result.w));
+          const scan = (uv, grad, layer) => texture(textures.colorRoughness, uv).grad(...grad).depth(layer).rgb;
+          const layerA = floorScan ? floorScan.layers.x.round().toInt() : int(GROUND_LAYERS.grit);
+          const layerB = floorScan ? floorScan.layers.y.round().toInt() : layerA;
+          const detail = mix(scan(uvA, gradA, layerA), scan(uvB, gradB, layerB), floorScan?.blend ?? float(0));
+          result.assign(vec4(result.xyz.mul(mix(vec3(1), detail.div(GROUND_LAYER_MEAN).clamp(0.45, 1.8), floorFade.mul(0.85))), result.w));
         });
         const mask = pathMask.toVar();
         const vergeBand = verge.toVar();
@@ -213,8 +199,8 @@ export function createTerrainPathPaint({
             .mul(0.5).add(0.5).toVar();
           const tileBlend = macroTile.smoothstep(ANTI_TILING.blendStart, ANTI_TILING.blendEnd);
           const dirt = mix(
-            texture(textures.colorRoughness, uvA).grad(...gradA),
-            texture(textures.colorRoughness, uvB).grad(...gradB),
+            texture(textures.colorRoughness, uvA).grad(...gradA).depth(int(0)),
+            texture(textures.colorRoughness, uvB).grad(...gradB).depth(int(0)),
             tileBlend,
           ).toVar();
           // Broad damp hollows and sun-bleached runs, so no stretch of trail is one tone.

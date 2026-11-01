@@ -390,6 +390,13 @@ engine tints. The set each
 name maps to is recorded in
 `src/editor/world/settlements/surfaces/SettlementDressing.js`.
 
+## Ground layer textures
+
+CC0 1.0 Universal scans, neutralized and tiled by `scripts/bake-ground-layers.mjs`
+into `public/assets/ground/layers/`: `Grass004` and `Ground037` from ambientCG
+(https://ambientcg.com), `dry_decay_leaves` and `dry_ground_01` from Poly Haven
+(https://polyhaven.com). See `docs/licenses/ground-layers.md`.
+
 ## Procedural stone
 
 `@drusniel/procedural-stone` (https://github.com/danielsobrado/drusniel-procedural-stones),

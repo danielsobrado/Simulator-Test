@@ -52,7 +52,8 @@ import { applyJungleMist } from './stylized/ambient/jungleMistOutput.js';
 import { createValleyFogNodes } from './stylized/mist/ValleyFogShading.js';
 import { applyValleyFogOutput } from './stylized/mist/ValleyFogOutput.js';
 import { createFootprintShading } from './stylized/deformation/FootprintShading.js';
-import { acquirePathTextures, createTerrainPathPaint, resolvePathPaint } from './stylized/path/terrainPathPaint.js';
+import { acquireGroundLayers } from './stylized/path/terrainGroundLayers.js';
+import { createTerrainPathPaint, resolvePathPaint } from './stylized/path/terrainPathPaint.js';
 import { createSnowWakeShading } from './stylized/deformation/SnowWakeShading.js';
 import { snowWakeRecorder } from './stylized/deformation/SnowWakeRecorder.js';
 import { createMeadowGroundShading } from './stylized/meadow/MeadowGroundShading.js';
@@ -372,7 +373,8 @@ export function createTerrainMaterial({
       pathMask: pathMask.mul(oneMinus(bakedSurface.snow ?? float(0))),
       verge: pathWear.verge.mul(oneMinus(bakedSurface.snow ?? float(0))),
       settings: pathPaintSettings,
-      textures: pathPaintSettings ? acquirePathTextures() : null,
+      textures: pathPaintSettings ? acquireGroundLayers() : null,
+      floor: meadowGround?.floor ?? null,
     });
     const paintedSurface = pathPaint
       ? { ...bakedSurface, ...pathPaint.apply(bakedSurface.color, bakedRoughness) }

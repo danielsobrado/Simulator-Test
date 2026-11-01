@@ -23,6 +23,8 @@ export function createMeadowUniforms(settings, interaction = null, spellGround =
         return new THREE.Vector4(p.shortHeight,p.tallHeight,p.width,p.patchMeters);
       }),'vec4'),
       density: uniformArray(Array.from({length:16},(_,i)=>new THREE.Vector4(...meadowGrowthResponse(growth.profiles[i] ?? growth.profiles[0]))),'vec4'),
+      // How much of the area field each biome wears: a rainforest stays lush.
+      areaStyle: uniformArray(Array.from({length:16},(_,i)=>(growth.profiles[i] ?? growth.profiles[0]).areaStyle),'float'),
       maxHeight: growth.maxHeight, maxWidth: growth.maxWidth,
     },
     // The player's body stamp and its render-space window. The centre is the
@@ -45,6 +47,8 @@ export function createMeadowUniforms(settings, interaction = null, spellGround =
         active: uniform(0),
       }
       : null,
+    // Null compiles the area field out of the blades and cards entirely.
+    groundStyle: appearance.groundStyle > 0 ? uniform(appearance.groundStyle) : null,
     time: uniform(0),
     origin: uniform(new THREE.Vector2()),
     maxDistance: uniform(settings.maxDistance),

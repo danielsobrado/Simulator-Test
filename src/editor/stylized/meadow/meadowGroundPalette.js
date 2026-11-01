@@ -19,12 +19,14 @@ export function createMeadowGroundPalette(config) {
   const canopies = new Float32Array(256 * 4);
   // The ground as seen from afar, always at a grazing angle: the far bake's colour.
   const far = new Float32Array(256 * 3);
+  const areaStyles = new Float32Array(256);
   const colors = palette.palettes.map(({ base, tip }) => ({ base: linearColor(base), tip: linearColor(tip) }));
   const detail = resolveMeadowGroundDetail(source.groundDetail);
   const growth = resolveMeadowGrowth(source.growth);
   const soil = linearColor(config.dirt?.color ?? '#63513d');
   for (let id = 0; id < 256; id++) {
     const { base, tip } = colors[palette.table[id]];
+    areaStyles[id] = growth.profiles[growth.table[id]].areaStyle;
     for (let channel = 0; channel < 3; channel++) {
       roots[id * 3 + channel] = (base[channel] + (tip[channel] - base[channel]) * appearance.groundTipMix)
         * palette.brightness;
@@ -50,5 +52,5 @@ export function createMeadowGroundPalette(config) {
       far[id * 3 + channel] = root + (canopy[channel] - root) * weight;
     }
   }
-  return { roots, tips, canopies, far, appearance, brightness: palette.brightness };
+  return { roots, tips, canopies, far, areaStyles, appearance, brightness: palette.brightness };
 }

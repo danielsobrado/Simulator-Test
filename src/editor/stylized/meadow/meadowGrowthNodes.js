@@ -1,4 +1,5 @@
 import { mix,smoothstep } from 'three/tsl';
+import { meadowGroundStyle } from './meadowGroundStyle.js';
 import { meadowNoise } from './meadowNoise.js';
 import { meadowStandNodes } from './meadowStandNodes.js';
 import { MEADOW_CARD_HEIGHT_CONTRAST, MEADOW_SHORT_FLOOR, MEADOW_TALL_RAMP, MEADOW_TALL_TUFT_RELIEF } from './meadowTuftField.js';
@@ -14,7 +15,8 @@ export function meadowGrowthNodes(uniforms,instance,cards=false) {
   const share=cards?stemShare.sub(.5).mul(MEADOW_CARD_HEIGHT_CONTRAST).add(.5):stemShare;
   const response=uniforms.growth.density.element(instance.growth.toInt());
   const stand=cards?1.125:meadowStandNodes(instance.canonical,instance.rank).height;
-  return {height:mix(dimensions.x.mul(MEADOW_SHORT_FLOOR),dimensions.y,share).mul(stand),
+  const area=uniforms.groundStyle?meadowGroundStyle(instance.canonical,uniforms.groundStyle.mul(uniforms.growth.areaStyle.element(instance.growth.toInt()))).height:1;
+  return {height:mix(dimensions.x.mul(MEADOW_SHORT_FLOOR),dimensions.y,share).mul(stand).mul(area),
     tallHeight:dimensions.y,tuft,
     width:dimensions.z,density:response.x,wind:response.y,rest:response.z,curve:response.w};
 }

@@ -5,6 +5,7 @@ import { meadowCanopyColor, meadowCanopyView } from './meadowCanopy.js';
 import { meadowPatchColors } from './meadowColorNodes.js';
 import { applyGrassMarks } from './meadowGrassMarks.js';
 import { MEADOW_GRASS_DEFAULTS } from './meadowGrassConfig.js';
+import { applyMeadowGroundStyle, meadowGroundStyle } from './meadowGroundStyle.js';
 import { meadowStandNodes } from './meadowStandNodes.js';
 import { meadowTuftNodes } from './meadowTuftNodes.js';
 
@@ -62,6 +63,7 @@ export function meadowPigment({ uniforms, tuning, config, blade, marks = false, 
   const stand = meadowStandNodes(blade.canonical, blade.rank);
   root = root.mul(stand.rootTone);
   tip = mix(tip.mul(stand.tipTone), color(STRAW_SEED).mul(dot(tip, vec3(0.3, 0.59, 0.11)).mul(1.1).add(0.45)), stand.seedStem.mul(0.75));
+  if (uniforms.groundStyle) ({ root, tip } = applyMeadowGroundStyle(root, tip, meadowGroundStyle(blade.canonical, uniforms.groundStyle.mul(uniforms.growth.areaStyle.element(blade.growth.toInt())))));
   const tufts = uniforms.tufts;
   const occupancy = meadowTuftNodes(blade.canonical).occupancy;
   const melt = melted ? float(1) : smoothstep(appearance.meltStart, appearance.meltEnd, cameraPosition.distance(blade.base));

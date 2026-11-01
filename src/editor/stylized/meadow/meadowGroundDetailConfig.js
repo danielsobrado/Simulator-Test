@@ -1,3 +1,4 @@
+import { GROUND_LAYERS } from '../path/groundLayerIds.js';
 import { linearColor } from './meadowColorSpace.js';
 
 /**
@@ -18,7 +19,7 @@ export const MEADOW_GROUND_DETAIL_DEFAULTS = Object.freeze({
   fineEnd: 10,
   /** Overall weight, 0..1. */
   strength: 1,
-  default: Object.freeze({ litter: '#9a9156', litterAmount: 0.5, moss: 0.25, soil: 0.3, streaks: 0.6 }),
+  default: Object.freeze({ litter: '#9a9156', litterAmount: 0.5, moss: 0.25, soil: 0.3, streaks: 0.6, floor: Object.freeze(['grass', 'mossy']) }),
   byTileId: Object.freeze({}),
 });
 
@@ -37,13 +38,17 @@ function entry(source, fallback, path) {
     throw new Error(`Invalid editor configuration: ${path}.litter must be a #rrggbb colour.`);
   }
   for (const key of AMOUNTS) amount(merged[key], `${path}.${key}`);
+  if (!Array.isArray(merged.floor) || merged.floor.length !== 2 || merged.floor.some(name => !GROUND_LAYERS[name])) {
+    throw new Error(`Invalid editor configuration: ${path}.floor must name two of ${Object.keys(GROUND_LAYERS).join(', ')}.`);
+  }
   return merged;
 }
 
 /**
  * @param {object | undefined} source `grass.meadow.groundDetail`
- * @returns {null | { fadeStart, fadeEnd, fineEnd, strength, litter: Float32Array, amounts: Float32Array }}
- *   per tile id: linear litter colour + amount, and (moss, soil, streaks, 0)
+ * @returns {null | { fadeStart, fadeEnd, fineEnd, strength, litter: Float32Array, amounts: Float32Array, floors: Float32Array }}
+ *   per tile id: linear litter colour + amount, (moss, soil, streaks, 0), and the
+ *   floor scans' array layers (settled ground, dry or worn ground, 0, 0)
  */
 export function resolveMeadowGroundDetail(source) {
   const d = MEADOW_GROUND_DETAIL_DEFAULTS;
@@ -67,10 +72,12 @@ export function resolveMeadowGroundDetail(source) {
   }
   const litter = new Float32Array(256 * 4);
   const amounts = new Float32Array(256 * 4);
+  const floors = new Float32Array(256 * 4);
   for (let id = 0; id < 256; id += 1) {
     const e = byId.get(id) ?? base;
     litter.set([...linearColor(e.litter), e.litterAmount], id * 4);
     amounts.set([e.moss, e.soil, e.streaks, 0], id * 4);
+    floors.set([GROUND_LAYERS[e.floor[0]], GROUND_LAYERS[e.floor[1]], 0, 0], id * 4);
   }
-  return { fadeStart, fadeEnd, fineEnd, strength, litter, amounts };
+  return { fadeStart, fadeEnd, fineEnd, strength, litter, amounts, floors };
 }

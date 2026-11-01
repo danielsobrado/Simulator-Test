@@ -1008,15 +1008,15 @@ stylizedSurface:
           2: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.72, patchMeters: 14, shape: slender}
           4: {shortHeight: 0.24, tallHeight: 0.55, width: 0.045, density: 0.92, patchMeters: 9, shape: slender}
-          5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf}
-          6: {shortHeight: 0.12, tallHeight: 0.38, width: 0.042, density: 0.85, patchMeters: 10, shape: slender}
-          7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.82, patchMeters: 12, shape: broadleaf}
-          8: {shortHeight: 0.18, tallHeight: 0.52, width: 0.062, density: 0.78, patchMeters: 10, shape: broadleaf}
-          9: {shortHeight: 0.1, tallHeight: 0.28, width: 0.05, density: 0.8, patchMeters: 12, shape: slender}
-          10: {shortHeight: 0.06, tallHeight: 0.16, width: 0.028, density: 0.28, patchMeters: 7, shape: slender}
+          5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
+          6: {shortHeight: 0.12, tallHeight: 0.38, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
+          7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.82, patchMeters: 12, shape: broadleaf, areaStyle: 0.25}
+          8: {shortHeight: 0.18, tallHeight: 0.52, width: 0.062, density: 0.78, patchMeters: 10, shape: broadleaf, areaStyle: 0.3}
+          9: {shortHeight: 0.1, tallHeight: 0.28, width: 0.05, density: 0.8, patchMeters: 12, shape: slender, areaStyle: 0.7}
+          10: {shortHeight: 0.06, tallHeight: 0.16, width: 0.028, density: 0.28, patchMeters: 7, shape: slender, areaStyle: 0.8}
           11: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           # Bog: sedge tussocks on the islands, patchy over moss rather than a field.
-          12: {shortHeight: 0.14, tallHeight: 0.6, width: 0.045, density: 0.5, patchMeters: 5, shape: reed}
+          12: {shortHeight: 0.14, tallHeight: 0.6, width: 0.045, density: 0.5, patchMeters: 5, shape: reed, areaStyle: 0.2}
       bladeHeight: 0.64
       bladeWidth: 0.071
       heightScale: [0.72, 1.3]
@@ -1034,7 +1034,7 @@ stylizedSurface:
         # style. Unlisted biomes (grassland, deciduous, tropical seasonal — the
         # spawn) wear the donor's own. One uniform-array entry per distinct pair.
         byTileId:
-          3: { base: '#6a7a2c', tip: '#c9bd6a' }   # savanna: dry, golden tips
+          3: { base: '#6f6a2f', tip: '#c9bd6a' }   # savanna: dry, golden tips
           5: { base: '#4d6839', tip: '#9ab477' }   # open woodland: shared forest pigment
           6: { base: '#4d6839', tip: '#9ab477' }
           7: { base: '#3d6635', tip: '#86aa60' }   # humid broadleaf floor
@@ -1082,13 +1082,17 @@ stylizedSurface:
       tufts:
         height: 0.32
         lean: 0.55
+        # Lush hollows, pale dry sward and worn earth by area, on the terrain and
+        # the stems alike (meadow/meadowGroundStyle.js). 0 compiles it out.
+        groundStyle: 1
+        valueJitter: 0.5
         bendIsolated: 4
         bendCore: 1.25
         widthFloor: 0.5
         widthPower: 0.6
         windShort: 0.6
         rootLift: 0.60
-        valueSpread: 0.07
+        valueSpread: 0.16
       # The ground between stems (meadow/meadowGroundDetailConfig.js): litter
       # drifts, moss hollows, soil pockets and fallen-blade streaks, procedural on
       # the terrain's transition lattice (no sampler), fading to plain turf by
@@ -1098,16 +1102,22 @@ stylizedSurface:
         fadeEnd: 34
         fineEnd: 10
         strength: 1
-        default: { litter: '#9a9156', litterAmount: 0.65, moss: 0.25, soil: 0.35, streaks: 0.8 }
+        # floor: the neutral CC0 scans laid over settled ground and over dry or worn
+        # ground (stylized/path/terrainGroundLayers.js).
+        default: { litter: '#9a9156', litterAmount: 0.65, moss: 0.25, soil: 0.35, streaks: 0.8, floor: [grass, mossy] }
         byTileId:
-          3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7 }   # savanna: straw, warm earth
-          5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25 }
-          6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35 }
-          7: { litter: '#5e4c31', litterAmount: 0.5, moss: 0.45, soil: 0.2, streaks: 0.3 }   # tropical rainforest: leaf litter
-          8: { litter: '#5a4a30', litterAmount: 0.5, moss: 0.5, soil: 0.2, streaks: 0.3 }    # temperate rainforest
-          9: { litter: '#6b543a', litterAmount: 0.6, moss: 0.55, soil: 0.35, streaks: 0.5 }  # taiga: needle duff, moss
-          10: { litter: '#8f8d72', litterAmount: 0.45, moss: 0.3, soil: 0.5, streaks: 0.25 } # tundra: lichen, mineral soil
-          12: { litter: '#3f4429', litterAmount: 0.45, moss: 0.85, soil: 0.45, streaks: 0.3 } # wetland: moss, peat, dead sedge
+          0: { floor: [grit, grit] }       # ocean floor
+          1: { floor: [grit, cracked] }    # hot desert
+          2: { floor: [grit, cracked] }    # cold desert
+          11: { floor: [grit, grit] }      # glacier
+          3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, cracked] }   # savanna: straw, warm earth
+          5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25, floor: [litter, mossy] }
+          6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35, floor: [mossy, litter] }
+          7: { litter: '#5e4c31', litterAmount: 0.5, moss: 0.45, soil: 0.2, streaks: 0.3, floor: [litter, mossy] }   # tropical rainforest: leaf litter
+          8: { litter: '#5a4a30', litterAmount: 0.5, moss: 0.5, soil: 0.2, streaks: 0.3, floor: [mossy, litter] }    # temperate rainforest
+          9: { litter: '#6b543a', litterAmount: 0.6, moss: 0.55, soil: 0.35, streaks: 0.5, floor: [mossy, grit] }  # taiga: needle duff, moss
+          10: { litter: '#8f8d72', litterAmount: 0.45, moss: 0.3, soil: 0.5, streaks: 0.25, floor: [mossy, grit] } # tundra: lichen, mineral soil
+          12: { litter: '#3f4429', litterAmount: 0.45, moss: 0.85, soil: 0.45, streaks: 0.3, floor: [mossy, grit] } # wetland: moss, peat, dead sedge
       # Which silhouette each biome's grass wears (meadow/meadowGrassShapes.js).
       shapes:
         default: slender
