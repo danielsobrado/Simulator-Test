@@ -1007,7 +1007,7 @@ stylizedSurface:
           1: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           2: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.72, patchMeters: 14, shape: slender}
-          4: {shortHeight: 0.18, tallHeight: 0.55, width: 0.045, density: 0.92, patchMeters: 9, shape: slender}
+          4: {shortHeight: 0.24, tallHeight: 0.55, width: 0.045, density: 0.92, patchMeters: 9, shape: slender}
           5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf}
           6: {shortHeight: 0.12, tallHeight: 0.38, width: 0.042, density: 0.85, patchMeters: 10, shape: slender}
           7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.82, patchMeters: 12, shape: broadleaf}

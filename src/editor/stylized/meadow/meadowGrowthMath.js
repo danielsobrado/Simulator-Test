@@ -1,4 +1,4 @@
-import { MEADOW_SHORT_FLOOR, MEADOW_TALL_RAMP, MEADOW_TALL_TUFT_RELIEF, MEADOW_TUFT_DEFAULTS, MEADOW_TUFT_FIELD } from './meadowTuftField.js';
+import { MEADOW_CARD_HEIGHT_CONTRAST, MEADOW_SHORT_FLOOR, MEADOW_TALL_RAMP, MEADOW_TALL_TUFT_RELIEF, MEADOW_TUFT_DEFAULTS, MEADOW_TUFT_FIELD } from './meadowTuftField.js';
 export { meadowCoverageRoll, acceptsMeadowHabitat } from './meadowHabitat.js';
 const unit=v=>Math.max(0,Math.min(1,v));
 const smooth=(a,b,v)=>{const t=unit((v-a)/(b-a));return t*t*(3-2*t);};
@@ -28,7 +28,8 @@ export function meadowGrowthShare(patchNoise,occupancy,tuftHeight=MEADOW_TUFT_DE
   return unit(ramp*(1-weight)+occupancy*weight);
 }
 export function meadowGrowthHeight(profile,x,z,cards=false,tuftHeight=MEADOW_TUFT_DEFAULTS.height) {
-  const tall=meadowGrowthShare(meadowNoiseNumber(x/profile.patchMeters,z/profile.patchMeters),meadowTuftOccupancy(x,z),tuftHeight);
+  const share=meadowGrowthShare(meadowNoiseNumber(x/profile.patchMeters,z/profile.patchMeters),meadowTuftOccupancy(x,z),tuftHeight);
+  const tall=cards?.5+(share-.5)*MEADOW_CARD_HEIGHT_CONTRAST:share;
   const short=profile.shortHeight*MEADOW_SHORT_FLOOR;
   return (short+(profile.tallHeight-short)*tall)*(cards?1.125:1);
 }

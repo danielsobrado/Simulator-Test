@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { MEADOW_GROWTH_DEFAULTS, resolveMeadowGrowth } from '../src/editor/stylized/meadow/meadowGrowthProfiles.js';
 import { meadowGrowthHeight, acceptsMeadowHabitat } from '../src/editor/stylized/meadow/meadowGrowthMath.js';
-import { MEADOW_SHORT_FLOOR } from '../src/editor/stylized/meadow/meadowTuftField.js';
+import { MEADOW_CARD_HEIGHT_CONTRAST, MEADOW_SHORT_FLOOR } from '../src/editor/stylized/meadow/meadowTuftField.js';
 import { encodeLookTable } from '../src/editor/stylized/meadow/meadowPalettes.js';
 import { resolveMeadowGrassConfig } from '../src/editor/stylized/meadow/meadowGrassConfig.js';
 import { createMeadowUniforms } from '../src/editor/stylized/meadow/meadowUniforms.js';
@@ -61,7 +61,9 @@ test('10000 canonical candidates per biome retain specified height range, card r
   for(let i=0;i<10000;i++) {
    const x=-8000000+(i*13.7147)%2000,z=4000000-(i*71.213)%2000;
    const h=meadowGrowthHeight(p,x,z),card=meadowGrowthHeight(p,x,z,true);
-   assert.ok(h>=p.shortHeight*MEADOW_SHORT_FLOOR-1e-12&&h<=p.tallHeight+1e-12);assert.ok(Math.abs(card-h*1.125)<1e-12);
+   assert.ok(h>=p.shortHeight*MEADOW_SHORT_FLOOR-1e-12&&h<=p.tallHeight+1e-12);
+   const short=p.shortHeight*MEADOW_SHORT_FLOOR,mid=(short+p.tallHeight)/2;
+   assert.ok(Math.abs(card/1.125-mid)<=(p.tallHeight-short)/2*MEADOW_CARD_HEIGHT_CONTRAST+1e-12);assert.ok((card/1.125-mid)*(h-mid)>=-1e-12);
    const width=p.width*(.88+.24*(i/9999));assert.ok(width>=p.width*.88&&width<=p.width*1.12);
    if(acceptsMeadowHabitat(x,z,918273,1,p.density))accepted++;
   }

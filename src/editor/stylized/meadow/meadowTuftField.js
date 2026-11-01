@@ -40,6 +40,12 @@ export const MEADOW_SHORT_FLOOR = 0.85;
 export const MEADOW_TALL_RAMP = Object.freeze([0.4, 0.8]);
 
 /**
+ * Share of a stand's height swing a far card keeps around the mid height. Cards
+ * are clumps over a metre wide: at full swing, tall and short neighbours read as slabs.
+ */
+export const MEADOW_CARD_HEIGHT_CONTRAST = 0.35;
+
+/**
  * Share of the tuft weight a fully tall patch gives up, so a tall swath keeps
  * its silhouette while the short stand is the one the tufts reshape.
  */
