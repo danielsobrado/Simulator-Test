@@ -9,7 +9,7 @@ import { authoredTexture } from '../AuthoredTextureNode.js';
 import { orientedScreenDitherThreshold } from './screenDither.js';
 import { characterOcclusionKeep } from '../../character/CharacterOcclusion.js';
 import { setPreInstancePosition } from './preInstancePosition.js';
-import { applyCanopySnow, canopySnowCap, crownUpNode, trunkSnow } from '../forest/canopySnow.js';
+import { applyCanopySnow, canopySnowCap, canopySnowTransmission, crownUpNode, trunkSnow } from '../forest/canopySnow.js';
 
 export function createSourceOpacityNode(material) {
   if (material.opacityNode) return material.opacityNode;
@@ -107,7 +107,7 @@ export function createDitheredMaterial(sourceMaterial, {
         cap,
       });
       if (material.foliageTransmissionNode) {
-        material.foliageTransmissionNode = material.foliageTransmissionNode.mul(cap.oneMinus());
+        material.foliageTransmissionNode = canopySnowTransmission(material.foliageTransmissionNode, cap);
       }
       material.colorNode = snowed.color;
       material.emissiveNode = snowed.emissive;

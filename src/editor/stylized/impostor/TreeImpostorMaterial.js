@@ -8,6 +8,7 @@ import {
   cameraPosition,
   cameraViewMatrix,
   clamp,
+  float,
   cross,
   floor,
   fract,
@@ -31,7 +32,7 @@ import {
   TREE_COLOR_VARIATION_RANGE,
   unpackImpostorWidthNode,
 } from '../forest/TreeAppearance.js';
-import { applyCanopySnow, canopySnowCap } from '../forest/canopySnow.js';
+import { applyCanopySnow, canopySnowCap, canopySnowTransmission } from '../forest/canopySnow.js';
 import { foliageMaterialClass } from '../forest/FoliageNodeMaterial.js';
 import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
 import { assignTreeFoliageMaterialData } from '../../../render/postprocessing/PostProcessingMaterialData.js';
@@ -138,7 +139,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance, 
     emissive: atlas.foliageLighting ? treeFoliageEmission(crown).mul(foliageMask) : null,
     cap,
   });
-  if (atlas.foliageLighting) material.foliageTransmissionNode = foliageMask.mul(cap.oneMinus()).mul(0.8);
+  if (atlas.foliageLighting) material.foliageTransmissionNode = foliageMask.mul(canopySnowTransmission(float(0.8), cap));
   material.colorNode = snowed.color;
   material.emissiveNode = snowed.emissive;
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(worldNormal, 0)).xyz);

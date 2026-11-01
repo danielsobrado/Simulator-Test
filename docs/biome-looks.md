@@ -83,3 +83,10 @@ exposure down half as far.
 2026-11-01, `chunk-cross` from the glacier at (6929, 8891), `--warmup 8 --settle`,
 three alternating pairs, drift branch off → on: 128.3, 141.6, 125.6 → 133.5,
 135.4, 150.1 fps; hitches 5, 2, 4 → 0, 3, 1. No cost shows above run-to-run spread.
+
+Crowns carry frost on every needle (`FROST_SHARE`) and snow keeps the sun's
+transmission instead of cutting it (`canopySnowTransmission`), so a backlit crown
+glows through the same shadowed light as the leaf did. `chunk-cross` from the taiga
+at (-11219, 9187), four pairs with the order swapped halfway, off → on: 81.5, 78.1,
+77.9, 69.3 → 72.9, 70.3, 82.4, 75.8 fps; GPU 2.21–2.30 → 2.09–2.31 ms. Whichever
+arm ran first in a pair was slower, so order, not frost, set the gap.

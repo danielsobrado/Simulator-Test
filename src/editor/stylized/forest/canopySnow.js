@@ -22,6 +22,10 @@ const CAP_START = 0.05;
 const CAP_FULL = 0.55;
 /** How much the crown's overall shape, rather than each card, decides facing. */
 const CROWN_SHAPE = 0.65;
+/** Frost on every needle, flanks and underside included, as a share of the tree's snow. */
+const FROST_SHARE = 0.3;
+/** Against foliageLight.strength's 0.12: ice scatters far more sun through than a leaf. */
+const SNOW_TRANSMISSION = 7;
 
 /** @param {string} hex */
 export function setCanopySnowColor(hex) {
@@ -94,7 +98,12 @@ export function canopySnowCap(snow, up = normalWorld.y) {
   const lumps = local.x.mul(5.3).sin().mul(local.z.mul(4.7).add(local.y.mul(3.1)).sin()).mul(0.18);
   // More snow takes a shallower face: a heavy fall caps the flanks too.
   const start = float(CAP_START + 0.3).sub(snow.mul(0.3));
-  return smoothstep(start, start.add(CAP_FULL - CAP_START), up.add(lumps)).mul(snow);
+  return smoothstep(start, start.add(CAP_FULL - CAP_START), up.add(lumps)).mul(snow).max(snow.mul(FROST_SHARE));
+}
+
+/** A crown's sun transmission with snow taking over from the leaf, for frost that glows backlit. */
+export function canopySnowTransmission(leaf, cap) {
+  return mix(leaf, float(SNOW_TRANSMISSION), cap);
 }
 
 /**
