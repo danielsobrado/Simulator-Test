@@ -2095,6 +2095,7 @@ stylizedSurface:
       startDistance: 55
       fullDistance: 80
       height: 0.55
+      tipShare: 0.4
       steps: 6
       minGraze: 0.12
       plantMeters: 0.9

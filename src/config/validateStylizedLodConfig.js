@@ -379,6 +379,7 @@ function validateGroundCover(groundCover) {
   for (const name of ['startDistance', 'fullDistance', 'height', 'minGraze', 'plantMeters', 'stemMeters', 'stemFadeStart', 'stemFadeEnd']) {
     assertPositive(volume[name], `stylizedSurface.groundCover.volume.${name}`);
   }
+  assertUnitInterval(volume.tipShare, 'stylizedSurface.groundCover.volume.tipShare');
   if (volume.fullDistance <= volume.startDistance || volume.stemFadeEnd <= volume.stemFadeStart) {
     throw new Error('Invalid editor configuration: groundCover.volume distance ranges must increase.');
   }

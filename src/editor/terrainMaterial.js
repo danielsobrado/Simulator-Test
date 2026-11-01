@@ -349,7 +349,9 @@ export function createTerrainMaterial({
         worldXZ, cameraDistance, mask: volumeMask, settings: grassVolume,
         view: positionWorld.sub(cameraPosition).normalize(),
       });
-      const blades = mix(grassTint, meadowGround?.tip ?? colorNode(farCover.tipColor), volume.y).mul(heightShade);
+      // Most rays stop high in the layer: a linear tip ramp would pale the field past the cards.
+      const tipShare = volume.y.mul(volume.y).mul(grassVolume.tipShare);
+      const blades = mix(grassTint, meadowGround?.tip ?? colorNode(farCover.tipColor), tipShare).mul(heightShade);
       bakedSurface.color = mix(bakedSurface.color, blades, volumeMask.mul(volume.x));
     }
     if (transitionPatterns && bakedSurface.normal) {
