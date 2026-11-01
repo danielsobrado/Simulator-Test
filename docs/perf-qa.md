@@ -839,10 +839,26 @@ alternating arms, all settled with no browser errors:
 | GPU avg ms | 2.51, 2.21 | 2.39, 2.55 |
 | GPU p95 ms | 3.30, 2.96 | 3.22, 3.18 |
 
-Every run lost native focus, so these are void as frame-pacing evidence. GPU time
-overlaps, but repeat this with the window foreground before calling it free. The
-change arm also carried another session's uncommitted snow work, and predates the
-per-biome `areaStyle` share.
+Every run lost native focus, so these are void as frame-pacing evidence. The change
+arm also carried another session's uncommitted snow work, and predates the per-biome
+`areaStyle` share.
+
+The repeat compares clean exports of `50574994` and `dd331c47` on the same flags,
+ABBA order. Runs that lost native focus are dropped; all five kept runs passed it,
+settled and had no browser errors:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| Avg FPS | 149.1, 148.8 | 146.2, 150.0, 146.3 |
+| dt p95 ms | 9.7, 9.6 | 9.8, 9.7, 10.2 |
+| dt p99 ms | 12.7, 13.3 | 14.1, 12.8, 14.0 |
+| Hitches | 0, 2 | 1, 0, 0 |
+| GPU avg ms | 1.95, 1.95 | 1.97, 1.94, 1.99 |
+| GPU p95 ms | 2.21, 2.26 | 2.31, 2.25, 2.30 |
+
+Hitches and GPU average overlap. The change sits about 1% lower on average FPS and
+0.05 ms higher on GPU p95, which is within what five runs can separate. This route is
+one biome path, so it does not measure every floor pairing.
 
 ### Renderer GPU preference
 
