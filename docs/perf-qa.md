@@ -800,6 +800,29 @@ likely overdraw cost until re-measured. Tracked geometry bytes match at the fixe
 pose. The `lod` fixture fails the same three biome 10 pairs in both arms with zero
 coverage, so that failure predates this change.
 
+### Far grass volume replaces cards past 90 m (2026-11-01)
+
+`groundCover.volume` marches a 0.55 m grass layer, six steps, inside the terrain
+colour after the bake, because past `nearDistance` the procedural ground is not
+drawn. It uses noise only, no viewport textures, and is compiled out when disabled.
+`far.distance` fell from 180 to 90 m. `447d773b` → `ef6ff9c1`, three alternating
+pairs, all `chunk-cross` runs with valid native focus and `--gpuTimings 1`:
+
+| Metric | Cards to 180 m | Volume past 90 m |
+|--------|----------------|------------------|
+| `chunk-cross` avg FPS | 139.2, 135.6, 137.8 | 142.0, 140.3, 140.9 |
+| `chunk-cross` dt p95 ms | 10.3, 10.7, 10.1 | 10.0, 10.5, 10.3 |
+| `chunk-cross` dt p99 ms | 14.5, 17.1, 14.8 | 14.2, 14.7, 14.8 |
+| `chunk-cross` hitches | 0, 3, 0 | 0, 0, 0 |
+| GPU avg ms | 2.02, 2.07, 2.06 | 1.99, 2.00, 2.02 |
+| Tour first lap hitches | 6, 7, 9 | 7, 6, 8 |
+| Tour repeat dt p99 ms | 12.6, 11.6, 11.5 | 10.3, 10.4, 10.6 |
+
+Removing cards pays for the march. These valid controls also overlap the void
+`e9c00c17` figures above, so the ~4% FPS drop recorded there is not established.
+Checked only at `original-04`: other biomes and steep ground have not been
+reviewed, and the band past 90 m reads slightly paler than cards did.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`
