@@ -1048,9 +1048,9 @@ stylizedSurface:
         # Sparse roots approach the substrate value; dense stands keep depth
         # through persistent coverage-weighted ground shading. Both near and
         # far substrate use groundOcclusion, so this adds no distance ring.
-        rootBrightness: 0.8
+        rootBrightness: 1
         canopyDepth: 0.35
-        gradientPower: 2.35
+        gradientPower: 1.4
         groundTipMix: 0.08
         groundOcclusion: 0.14
         fill: 0.025
@@ -1082,7 +1082,7 @@ stylizedSurface:
       tufts:
         height: 0.32
         lean: 0.55
-        bendIsolated: 2.2
+        bendIsolated: 4
         bendCore: 1.25
         widthFloor: 0.5
         widthPower: 0.6
