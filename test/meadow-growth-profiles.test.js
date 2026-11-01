@@ -15,7 +15,7 @@ import { reconcileMeadowGrowth, meadowPageGrowthKey } from '../src/editor/styliz
 const surface=load(readFileSync(new URL('../editor.config.yaml',import.meta.url),'utf8')).stylizedSurface;
 const rows=[
  [0,0,0,0,12,'slender'],[0,0,0,0,12,'slender'],[0,0,0,0,12,'slender'],
- [.25,.85,.050,.72,14,'slender'],[.18,.55,.045,.92,9,'slender'],[.16,.50,.060,.85,11,'broadleaf'],
+ [.25,.85,.050,.72,14,'slender'],[.24,.55,.045,.92,9,'slender'],[.16,.50,.060,.85,11,'broadleaf'],
  [.12,.38,.042,.85,10,'slender'],[.14,.48,.065,.82,12,'broadleaf'],[.18,.52,.062,.78,10,'broadleaf'],
  [.10,.28,.050,.80,12,'slender'],[.06,.16,.028,.28,7,'slender'],[0,0,0,0,12,'slender'],[.14,.60,.045,.50,5,'reed'],
 ];
