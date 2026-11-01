@@ -24,6 +24,7 @@ import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessi
 import { createTerrainMaterialBakedSurface } from './materials/TerrainMaterialBakedNodes.js';
 import { antialiasSpecularRoughness } from './materials/TerrainMaterialSurfaceGradientNodes.js';
 import { terrainGrassCover } from './materials/TerrainGrassCoverNodes.js';
+import { terrainGrassVolume } from './materials/TerrainGrassVolumeNodes.js';
 import { createAridSubstrateNodes } from './materials/AridSubstrateNodes.js';
 import {
   attachTerrainMaterialBakeGpuState,
@@ -339,6 +340,18 @@ export function createTerrainMaterial({
       localXZ,
       transitionPatterns,
     });
+    const grassVolume = farCover?.enabled ? farCover.volume : null;
+    if (grassVolume?.enabled) {
+      // After the bake: past nearDistance the procedural ground above is no longer drawn.
+      const band = smoothstep(grassVolume.startDistance, grassVolume.fullDistance, cameraDistance);
+      const volumeMask = band.mul(grassCoverage).mul(oneMinus(forestFloor)).mul(oneMinus(dirt));
+      const volume = terrainGrassVolume({
+        worldXZ, cameraDistance, mask: volumeMask, settings: grassVolume,
+        view: positionWorld.sub(cameraPosition).normalize(),
+      });
+      const blades = mix(grassTint, meadowGround?.tip ?? colorNode(farCover.tipColor), volume.y).mul(heightShade);
+      bakedSurface.color = mix(bakedSurface.color, blades, volumeMask.mul(volume.x));
+    }
     if (transitionPatterns && bakedSurface.normal) {
       const arid = createAridSubstrateNodes({ tileId: tileSample.a.mul(255).round(),
         bare: oneMinus(grassCoverage).mul(oneMinus(bakedSurface.snow ?? float(0)))

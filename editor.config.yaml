@@ -1133,7 +1133,7 @@ stylizedSurface:
       far:
         tileSize: 64
         density: 1.3
-        distance: 180
+        distance: 90
         width: 1.2
         height: 0.72
         transitionStart: 0.8
@@ -2088,6 +2088,19 @@ stylizedSurface:
     # Share of the distant grass cover that survives under canopy. 0 restores the
     # old behaviour, where wooded ground past startDistance was drawn bare.
     forestRetention: 0.5
+    # Grass marched inside the terrain surface past the far cards. Compiled into
+    # the terrain material only when enabled: each step costs noise per fragment.
+    volume:
+      enabled: true
+      startDistance: 55
+      fullDistance: 80
+      height: 0.55
+      steps: 6
+      minGraze: 0.12
+      plantMeters: 0.9
+      stemMeters: 0.24
+      stemFadeStart: 45
+      stemFadeEnd: 110
   # Rain soaks exposed ground: it darkens and turns smooth enough to catch the
   # sun. Snow and canopy shelter it. Full rain soaks dry ground in wetSeconds;
   # it dries over drySeconds after the rain stops.

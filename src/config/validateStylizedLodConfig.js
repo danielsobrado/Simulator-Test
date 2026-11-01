@@ -372,6 +372,19 @@ function validateGroundCover(groundCover) {
   if (typeof groundCover.tipColor !== 'string' || groundCover.tipColor.length === 0) {
     throw new Error('Invalid editor configuration: groundCover.tipColor is required.');
   }
+  const volume = groundCover.volume;
+  if (!volume) return;
+  assertBoolean(volume.enabled, 'stylizedSurface.groundCover.volume.enabled');
+  if (!volume.enabled) return;
+  for (const name of ['startDistance', 'fullDistance', 'height', 'minGraze', 'plantMeters', 'stemMeters', 'stemFadeStart', 'stemFadeEnd']) {
+    assertPositive(volume[name], `stylizedSurface.groundCover.volume.${name}`);
+  }
+  if (volume.fullDistance <= volume.startDistance || volume.stemFadeEnd <= volume.stemFadeStart) {
+    throw new Error('Invalid editor configuration: groundCover.volume distance ranges must increase.');
+  }
+  if (!Number.isInteger(volume.steps) || volume.steps < 1 || volume.steps > 16) {
+    throw new Error('Invalid editor configuration: groundCover.volume.steps must be an integer in [1,16].');
+  }
 }
 
 /**
