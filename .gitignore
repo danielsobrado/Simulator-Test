@@ -15,3 +15,5 @@ docs/qa/
 # review_shots.py shader warm-up frame
 assets-src/medieval-town-kit/previews/**/_warm.png
 .vitest/
+.playwright-mcp/
+

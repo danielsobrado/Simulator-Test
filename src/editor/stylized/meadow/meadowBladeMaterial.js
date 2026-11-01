@@ -24,6 +24,19 @@ import { createMeadowBladePosition, meadowInstance } from './meadowBladeShape.js
 import { applyHandoff, applyPublicationFade } from './meadowFade.js';
 import { meadowPigment } from './meadowPigment.js';
 
+/** Rounded ribbon normal in the same XZ frame as createMeadowBladePosition. */
+export function meadowBladeWorldNormal(rotation, side, height) {
+  // instanceRotation packs (sin, cos). Width points along (cos, sin) and
+  // the local forward axis points along (-sin, cos), just like the vertices.
+  const widthAxis = vec3(rotation.y, 0, rotation.x);
+  const forwardAxis = vec3(rotation.x.negate(), 0, rotation.y);
+  const tip = smoothstep(0.15, 1, height);
+  const rooted = smoothstep(0, 0.12, height);
+  return normalize(vec3(0, 1, 0)
+    .add(widthAxis.mul(side).mul(mix(0.6, 0.25, tip)).mul(rooted))
+    .add(forwardAxis.mul(tip).mul(0.45)));
+}
+
 /**
  * One material for every band's batch.
  *
@@ -55,13 +68,7 @@ export function createMeadowBladeMaterial({
   // Rounded width at walking distance, with only the first 12% rooted to
   // terrain-up. A very weak, tip-only tilt made every stem a flat green strip.
   const side = attribute('bladeSide', 'float').clamp(-1, 1);
-  const sideDirection = vec3(blade.rotation.y, 0, blade.rotation.x.negate());
-  const forward = vec3(blade.rotation.x, 0, blade.rotation.y);
-  const tip = smoothstep(0.15, 1, height);
-  const rooted = smoothstep(0, .12, height);
-  const worldNormal = normalize(vec3(0, 1, 0)
-    .add(sideDirection.mul(side).mul(mix(.6, .25, tip)).mul(rooted))
-    .add(forward.mul(tip).mul(0.45)));
+  const worldNormal = meadowBladeWorldNormal(blade.rotation, side, height);
   material.normalNode = cameraViewMatrix.mul(vec4(worldNormal, 0)).xyz.normalize();
   const detailReach = cameraPosition.distance(blade.base).smoothstep(6, 14).oneMinus().toVarying('meadowBladeDetailReach');
   const edge = side.abs();

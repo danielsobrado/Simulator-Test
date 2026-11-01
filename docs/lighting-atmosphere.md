@@ -116,3 +116,8 @@ look changes and adds no render pass.
 Workshop and settlement buildings now use the same normal-map sample for
 surface lighting and specular filtering. The shader build test checks the
 generated WGSL for a single normal texture read on a representative wall.
+
+Meadow ribbon normals now use the same rotation as the stem vertices. With the
+old signs, a quarter turn carried the shaded edge to the opposite side of the
+blade, especially visible under a low sun. The material test turns roots, tips
+and both edges through known angles and compares them with the vertex rotation.

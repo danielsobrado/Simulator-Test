@@ -39,7 +39,7 @@ async function capture(id,metadata) {
  await new Promise(resolve=>{state.continue=resolve;});state.pendingCapture=null;
 }
 function inspect(field,border) {
- const result={blades:0,cards:0,ineligibleRoots:0,fullStrengthRoots:0,fullStrengthTooNear:0,minimumFullStrengthDistance:null};
+ const result={blades:0,cards:0,ineligibleRoots:0,overStrengthRoots:0,fullStrengthRoots:0,fullStrengthTooNear:0,minimumFullStrengthDistance:null};
  for(const [name,layer] of [['blades',field.blades],['cards',field.cards]])for(const tile of layer?.tiles.values()??[]) {
   const out=tile.output;if(!out)continue;
   for(let i=0;i<out.count;i++) {
@@ -50,10 +50,17 @@ function inspect(field,border) {
    if(x<border)result.ineligibleRoots++;
    const slot=field.ground.slotFor(...field.ground.chunkOf(x,z));
    const E=sampleSurfaceMaskChannel(slot.page.surfaceMaskPixels,32,32,x/2-slot.descriptor.originCellX,-z/2-slot.descriptor.originCellZ,1);
-   if(out.position[i*4+3]>=1-1e-6) {
+   const strength=out.position[i*4+3];
+   // A transition root can legitimately be 0.9999992. Test every root against
+   // its coverage cap, then apply the full-strength rule only to published ones.
+   if(strength > 0.30+0.70*E+1e-6) result.overStrengthRoots++;
+   if(strength===1) {
     result.fullStrengthRoots++;
     const d=x-border;result.minimumFullStrengthDistance=Math.min(result.minimumFullStrengthDistance??Infinity,d);
-    if(d<8-1e-5||E<1-1e-6)result.fullStrengthTooNear++;
+    if(d<8-1e-5||E<1-1e-6){
+     result.fullStrengthTooNear++;
+     result.firstViolation??={x,z,strength,coverage:E};
+    }
    }
   }
  }
@@ -90,7 +97,7 @@ try {
     field.uniforms.time.value=Math.max(...[...field.blades.tiles.values(),...field.cards.tiles.values()].map(t=>t.revealTime??0))+2;
     const counts=inspect(field,border),id=`border-${border}-distance-${distance}`;
     counts.visibleGrassPixels=await visibleGrassPixels(field);
-    state.report.checks.push({id,...counts,passed:counts.visibleGrassPixels>1000&&counts.blades>0&&counts.cards>0&&counts.ineligibleRoots===0&&counts.fullStrengthRoots>0&&counts.fullStrengthTooNear===0});
+    state.report.checks.push({id,...counts,passed:counts.visibleGrassPixels>1000&&counts.blades>0&&counts.cards>0&&counts.ineligibleRoots===0&&counts.overStrengthRoots===0&&counts.fullStrengthRoots>0&&counts.fullStrengthTooNear===0});
     await capture(id,{border,distance,eyeHeight:1.7,counts,readiness:field.getState(),wind:0});
    }
   }finally{field.dispose();scene.remove(floor);floor.geometry.dispose();floorMaterial.dispose();groundTexture.dispose();}

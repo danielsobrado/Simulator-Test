@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three/webgpu';
-import { diffuseColor, float, positionViewDirection, uniform, vec3 } from 'three/tsl';
+import { diffuseColor, float, positionViewDirection, uniform, vec2, vec3 } from 'three/tsl';
 import { evaluateShaderNode as evaluate } from './helpers/evaluateShaderNode.js';
 import { foliageLight, foliageSkyFill, syncFoliageLight } from '../src/editor/stylized/forest/foliageLight.js';
 import { foliageMaterialClass } from '../src/editor/stylized/forest/FoliageNodeMaterial.js';
@@ -11,6 +11,22 @@ import { filteredDetailSine } from '../src/editor/materials/TerrainMaterialMicro
 import { filterSpecularRoughness } from '../src/render/materials/specularAntialiasing.js';
 import { wetTownSurface, TOWN_WET_FAMILIES } from '../src/render/materials/townWetness.js';
 import { buildingWetnessUniform } from '../src/editor/weather/surfaceWetness.js';
+import { meadowBladeWorldNormal } from '../src/editor/stylized/meadow/meadowBladeMaterial.js';
+
+test('turning a meadow ribbon turns its shaded edge and tip with its vertices', () => {
+  for (const side of [-1, 0, 1]) {
+    for (const height of [0, 0.1, 0.5, 1]) {
+      const local = evaluate(meadowBladeWorldNormal(vec2(0, 1), float(side), float(height)));
+      for (const angle of [Math.PI / 2, -0.8, Math.PI]) {
+        const s = Math.sin(angle), c = Math.cos(angle);
+        const normal = evaluate(meadowBladeWorldNormal(vec2(s, c), float(side), float(height)));
+        // createMeadowBladePosition rotates local x and z with this basis.
+        const expected = [local[0] * c - local[2] * s, local[1], local[0] * s + local[2] * c];
+        normal.forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-6));
+      }
+    }
+  }
+});
 
 test('canopy fill follows linear sky colour and goes dark without sky illumination', () => {
   const hemisphere = new THREE.HemisphereLight('#ffffff', '#222222', 1);

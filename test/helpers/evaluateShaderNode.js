@@ -9,7 +9,7 @@ export function evaluateShaderNode(node, { values = new Map(), derivatives = {} 
   };
   if (node.isConstNode || node.isUniformNode) return node.value?.toArray ? node.value.toArray() : node.value;
   if (node.convertTo || node.isVarNode) return evaluate(node.node);
-  if (node.isJoinNode) return node.nodes.flatMap(evaluate);
+  if (node.type === 'JoinNode') return node.nodes.flatMap(evaluate);
   if (node.isSplitNode) {
     const value = evaluate(node.node);
     const result = [...node.components].map(c => value[('xyzw'.includes(c) ? 'xyzw' : 'rgba').indexOf(c)]);
@@ -32,6 +32,7 @@ export function evaluateShaderNode(node, { values = new Map(), derivatives = {} 
       smoothstep: (lo, hi, x) => { const t = clamp((x - lo) / (hi - lo), 0, 1); return t * t * (3 - 2 * t); },
     };
     if (node.method === 'dot') return a.reduce((sum, v, i) => sum + v * b[i], 0);
+    if (node.method === 'normalize') return a.map(value => value / Math.hypot(...a));
     if (functions[node.method]) return map(functions[node.method], a, b, c);
   }
   throw new Error(`Unsupported shader node ${node.constructor.name}:${node.method ?? node.op}`);
