@@ -1,4 +1,4 @@
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /**
  * Gust fronts sweeping a meadow, after grass-test's grass gust sheen: where a

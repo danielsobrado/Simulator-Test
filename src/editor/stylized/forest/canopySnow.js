@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { float, mix, normalize, normalWorld, positionGeometry, smoothstep, uniform, vec3 } from 'three/tsl';
+import { float, mix, normalize, normalWorld, positionGeometry, smoothstep, vec3 } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 import { foliageLight } from './foliageLight.js';
 import { blurTileValueAt } from '../../world/BiomeFieldBlur.js';
 

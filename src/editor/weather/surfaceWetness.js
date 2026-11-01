@@ -1,4 +1,4 @@
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 import { Vector3 } from 'three/webgpu';
 
 import { DEFAULT_SURFACE_WETNESS } from './surfaceWetnessConfig.js';

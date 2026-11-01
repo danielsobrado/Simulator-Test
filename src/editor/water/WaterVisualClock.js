@@ -1,4 +1,4 @@
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 
 /** One clock for ground swash, the water sheet and CPU surface queries. */
 export const waterVisualClock = uniform(0);

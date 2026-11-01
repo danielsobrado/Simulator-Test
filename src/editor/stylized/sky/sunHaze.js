@@ -14,8 +14,8 @@ import {
   pow,
   select,
   smoothstep,
-  uniform,
 } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /**
  * Sun-facing aerial perspective. Air scatters sunlight forward, so haze looking

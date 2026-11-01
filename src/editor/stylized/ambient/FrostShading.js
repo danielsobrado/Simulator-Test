@@ -1,4 +1,5 @@
-import { color, float, mix, uniform } from 'three/tsl';
+import { color, float, mix } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 import { stylizedFbm2 } from '../StylizedNoiseNodes.js';
 

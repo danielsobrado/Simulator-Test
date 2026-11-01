@@ -1,4 +1,5 @@
-import { attribute, color, fract, step, uniform } from 'three/tsl';
+import { attribute, color, fract, step } from 'three/tsl';
+import { frameUniform as uniform } from '../../../../render/FrameUniforms.js';
 
 import { glazeWindowRecess } from '../../../../render/materials/townGlass.js';
 

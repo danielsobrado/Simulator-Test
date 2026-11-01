@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { cameraViewMatrix, faceDirection, mix, normalViewGeometry, positionView, smoothstep, uniform, vec4 } from 'three/tsl';
+import { cameraViewMatrix, faceDirection, mix, normalViewGeometry, positionView, smoothstep, vec4 } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /** Share of a plant's normal bent to the sky, leaving a little authored form. */
 const SKYWARD_NORMAL = 0.72;

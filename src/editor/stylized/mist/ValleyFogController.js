@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 import { LocalGroundHeight } from '../ambient/LocalGroundHeight.js';
 import { resolveValleyFogConfig } from './valleyFogConfig.js';

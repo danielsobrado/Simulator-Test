@@ -1,4 +1,5 @@
-import { attribute, cos, positionLocal, sin, uniform, vec3 } from 'three/tsl';
+import { attribute, cos, positionLocal, sin, vec3 } from 'three/tsl';
+import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 
 /**
  * Water-plant sway, after grass-test's `plantMaterial`.

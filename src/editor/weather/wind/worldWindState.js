@@ -15,7 +15,8 @@
  */
 
 import * as THREE from 'three';
-import { dot, float, max, mix, smoothstep, texture, uniform, vec2 } from 'three/tsl';
+import { dot, float, max, mix, smoothstep, texture, vec2 } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 export const WIND_TEXTURE_SIZE = 128;
 /** Metres the texture spans. At 128 texels that is 3 m per texel. */

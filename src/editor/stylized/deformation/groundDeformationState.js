@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /**
  * Footprints in snow and sand (after grass-test's snow deformation field).

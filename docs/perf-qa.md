@@ -796,9 +796,38 @@ Render CPU falls 3–6%; GPU and hitches overlap. Saving scales with wet chunks,
 coastal routes should gain more, unmeasured. Six further runs timed out or lost
 focus. Shoreline captures at (238, 416), yaw 150 differ between repeats of the
 same build as much as between arms, and `qa:water:acceptance` passes. Underwater
-was gate-checked, not compared by eye. The next candidate is the 85 uniforms per
-terrain slot: any that do not vary per object could move to `frameUniform`, but
-which ones qualify has not been sorted yet.
+was gate-checked, not compared by eye.
+
+### World-state uniforms in the frame group (2026-11-01)
+
+Terrain's remaining 85 per-draw uniforms were about a third per-object; most of
+the rest were singletons shared by every lit material. Seventeen modules (cloud
+shadow, sky light and look, sun haze, wind, sea state, wetness, foliage light,
+valley fog, spell light and similar) now take `frameUniform`. A value there is
+read once per frame per material, so it must not change between two renders of
+one frame. Reflection captures only swap impostor and vegetation state, so that
+holds. Camera-dependent values (`VfxLightingUniforms`) and `TreeWindTime`, which
+is per config, stay in the object group.
+
+The uniform probe fell from about 9,880 to 4,050 object checks per frame, with
+frame checks up from 99 to 405. Export of `aec243b6` against the change, same
+flags as above, alternating arms, all eight runs clean with native focus:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| Avg FPS | 133.4, 135.4, 130.6, 132.7 | 135.0, 137.1, 136.9, 137.5 |
+| Render CPU avg ms | 4.70, 4.67, 4.77, 4.70 | 4.54, 4.50, 4.51, 4.51 |
+| dt p95 ms | 10.6, 10.4, 10.7, 10.8 | 10.7, 10.5, 10.4, 10.1 |
+| Hitches | 2, 0, 2, 2 | 3, 0, 2, 3 |
+| GPU avg ms | 2.14, 2.16, 2.19, 2.17 | 2.14, 2.13, 2.11, 2.11 |
+
+Render CPU falls about 4%, separated in every run. Halving the checks saves far
+less than half of submission, so re-profile before chasing the remainder. Land and
+shore captures match once cloud position is allowed for: two baseline repeats
+differ from each other as much as from the change. `qa:water:acceptance --headed`
+passes on WebGPU with no browser errors. Without `--headed` it falls back to WebGL,
+where a fragment shader exceeds 16 texture units and the run exits 1, in the
+baseline too. Storm, dusk and snow transitions were not captured.
 
 ### Highfield meadow continuity and tour hitches (2026-11-01)
 

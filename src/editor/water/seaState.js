@@ -1,4 +1,4 @@
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 import { resolveSeaSurf, sampleSeaHeightCpu } from './SeaSurf.js';
 import { seaExposure } from './WaterAppearance.js';
 import { updateWaterVisualClock } from './WaterVisualClock.js';

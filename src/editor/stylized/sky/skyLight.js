@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /**
  * Light for unlit materials (water, mist) that paint their own colours: how

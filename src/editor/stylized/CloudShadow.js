@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { float, positionWorld, smoothstep, uniform } from 'three/tsl';
+import { float, positionWorld, smoothstep } from 'three/tsl';
+import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 
 import { cloudMotionCoordinatesNode } from './AtmosphereMotion.js';
 import { cloudFbm2 } from './sky/cloudNoise.js';

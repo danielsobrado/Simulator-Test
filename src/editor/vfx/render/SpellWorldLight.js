@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { clamp, dot, float, Fn, If, length, max, uniform, vec3 } from 'three/tsl';
+import { clamp, dot, float, Fn, If, length, max, vec3 } from 'three/tsl';
+import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /**
  * The one spell light the world itself sees. Real point lights put every lit
