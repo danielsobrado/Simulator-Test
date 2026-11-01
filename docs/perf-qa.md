@@ -767,6 +767,39 @@ group. `renderGroup` does not help, because three clones non-shared groups per d
 `sharedUniformGroup` would, but it takes bind groups across every material, so it
 was left alone. GPU time is only about 2 ms, so GPU quality is not the limit here.
 
+### Water single pass and per-object textures (2026-11-01)
+
+A probe on `bindings.updateForRender` put most object-group checks in two shared
+materials. Water was a transparent `DoubleSide` material, so three submitted each
+wet chunk as a back pass and a front pass. Every per-object texture also carried
+an identity `mat3`, only so `TextureNode.setup` would keep its OBJECT update.
+Water now sets `forceSinglePass`, and `perObjectTexture` holds a marker uniform
+the shader never reads. Terrain fell from about 122 to 85 checked uniforms per
+draw, and each sample loses a matrix multiply.
+
+Clean export of `cd869141` against the change, `chunk-cross --warmup 8 --duration
+12 --settle --gpuTimings 1`, alternating arms. Only runs that exited 0 with native
+focus are kept; the first pair came from a faster session:
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| Draw calls, 14 wet chunks | 192 | 178 |
+| Render CPU avg ms, first pair | 4.68 | 4.42 |
+| Render CPU avg ms, repeat | 5.31, 5.30 | 5.19, 5.17, 5.14 |
+| Avg FPS, first pair | 137.4 | 142.3 |
+| Avg FPS, repeat | 116.9, 118.4 | 119.2, 119.1, 120.6 |
+| dt p95 ms, repeat | 12.3, 11.7 | 11.5, 11.7, 11.7 |
+| Hitches, repeat | 4, 2 | 3, 5, 3 |
+| GPU avg ms, repeat | 2.45, 2.47 | 2.42, 2.46, 2.46 |
+
+Render CPU falls 3–6%; GPU and hitches overlap. Saving scales with wet chunks, so
+coastal routes should gain more, unmeasured. Six further runs timed out or lost
+focus. Shoreline captures at (238, 416), yaw 150 differ between repeats of the
+same build as much as between arms, and `qa:water:acceptance` passes. Underwater
+was gate-checked, not compared by eye. The next candidate is the 85 uniforms per
+terrain slot: any that do not vary per object could move to `frameUniform`, but
+which ones qualify has not been sorted yet.
+
 ### Highfield meadow continuity and tour hitches (2026-11-01)
 
 The band at `original-04` stays with calm wind and stays on the same ground when

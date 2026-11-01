@@ -1,3 +1,4 @@
+import { Matrix3 } from 'three/webgpu';
 import { floor, fract, mix, texture, textureSize, uniform, vec2 } from 'three/tsl';
 
 import { getTerrainMaterialBakeGpuState } from './TerrainMaterialBakeGpu.js';
@@ -25,34 +26,33 @@ function slotData(object) {
   return object?.userData?.[TERRAIN_SLOT_KEY] ?? null;
 }
 
+// Never built into a shader; see perObjectTexture.
+const OBJECT_UPDATE_MARKER = uniform(new Matrix3());
+
 /**
  * A texture node updated per drawn object. TextureNode.setup resets
- * `updateType` to NONE unless the node carries a uv-matrix uniform, which
- * would silently drop `onObjectUpdate` — every slot would keep whichever
- * texture its binding first saw. `setUpdateMatrix(true)` keeps the node an
- * OBJECT update; the callback replaces the matrix update, so the uv matrix stays
- * the template's identity (one extra mat3 multiply per sample).
+ * `updateType` to NONE unless the node holds a uv-matrix uniform, which would
+ * silently drop `onObjectUpdate` — every slot would keep whichever texture its
+ * binding first saw. Holding a marker keeps the OBJECT update without
+ * `setUpdateMatrix(true)`, which would add an identity mat3 per read: one more
+ * uniform for every draw to check, and a multiply per sample.
  */
-function perObjectTexture(template, uvNode, read) {
-  return texture(template, uvNode)
-    .setUpdateMatrix(true)
-    .onObjectUpdate(({ object }) => read(object) ?? template);
+export function perObjectTexture(template, uvNode, read, node = texture(template, uvNode)) {
+  node.setUpdateMatrix(false).onObjectUpdate(({ object }) => read(object) ?? template);
+  node._matrixUniform = OBJECT_UPDATE_MARKER;
+  return node;
 }
 
 /**
  * A texture read without a sampler: `textureLoad` at the four texels round
  * `uvNode`, filtered by hand; with `read`, per drawn object like perObjectTexture. WebGPU gives a fragment stage 16 samplers
  * however many textures it may bind, and the terrain uses every one; a smooth
- * bake read this way frees one for the path dirt (stylized/path). The texel
- * coordinates pass through the node's identity uv matrix as whole numbers, which
- * is what keeps `onObjectUpdate` alive (see perObjectTexture).
+ * bake read this way frees one for the path dirt (stylized/path).
  */
 export function bilinearLoad(template, uvNode, read = null, transform = null) {
   const node = (coords) => {
     const load = texture(template, coords).setSampler(false);
-    return read
-      ? load.setUpdateMatrix(true).onObjectUpdate(({ object }) => read(object) ?? template)
-      : load;
+    return read ? perObjectTexture(template, null, read, load) : load;
   };
   // Only its size is read; without `setSampler(false)` it would still bind one.
   const size = vec2(textureSize(node(null)));

@@ -618,6 +618,9 @@ export function createStylizedWaterMaterial({
     depthWrite: false,
     // Side is assigned by StylizedWaterSlot (DoubleSide) so the surface stays
     // visible from underwater. Do not set FrontSide here.
+    // The default back-then-front pair would submit every wet chunk twice for
+    // a height field that shows one face at any pixel.
+    forceSinglePass: true,
   });
   if (sea?.release) {
     const dispose = () => {

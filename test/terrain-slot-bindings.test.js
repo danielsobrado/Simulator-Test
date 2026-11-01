@@ -30,8 +30,10 @@ test('slot textures follow the drawn mesh and stay per-object updates', () => {
   const own = dataTexture();
   const node = slotTexture('heightTexture', template, uv());
   // TextureNode.setup resets updateType unless a uv-matrix uniform exists;
-  // keeping updateMatrix on is what keeps the per-object update alive.
-  assert.equal(node.updateMatrix, true);
+  // holding one the shader never reads keeps the per-object update alive.
+  assert.equal(node.updateMatrix, false);
+  assert.notEqual(node._matrixUniform, null);
+  assert.equal(new THREE.TextureNode(template)._matrixUniform, null, 'three still names this field');
   assert.equal(node.updateType, 'object');
 
   node.update({ object: slotMesh({ heightTexture: own }) });
