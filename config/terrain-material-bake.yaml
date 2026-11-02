@@ -44,7 +44,7 @@ classification:
   # Eldara's relief: land median ~75 m, tundra ~400-650 m, glacier ~650-1550 m.
   snowLine: 700
   snowFade: 250
-  snowSlopeMax: 0.55
+  snowSlopeMax: 0.85
   # Snow at any height by terrain tile comes from config/biome-looks.yaml
   # (snow.ground), which the far terrain reads as well.
   # Drifts break the snow edge; windward faces lose snow, hollows gain it.
@@ -213,7 +213,7 @@ render:
   shorelineStrength: 0.12
   canopyStrength: 0.30
   fallbackRoughness: 0.90
-  rockColor: '#8d9195'
+  rockColor: '#5f6975'
   snowColor: '#e8eef2'
   shorelineColor: '#59604f'
 

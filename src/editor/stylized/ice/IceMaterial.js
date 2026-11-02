@@ -34,7 +34,7 @@ export function createIceMaterial({ sunDirection, seaLevel }) {
   const frost = smoothstep(0.42, 0.78, clouds.add(rim.mul(0.45))).toVar();
   const cap = smoothstep(0.62, 0.86, normal.y.add(clouds.sub(0.5).mul(0.5))).toVar();
   const ice = mix(body, color(FROST), frost.mul(0.8));
-  const wet = smoothstep(seaLevel + 1.6, seaLevel + 0.3, positionWorld.y).mul(cap.oneMinus());
+  const wet = smoothstep(seaLevel + 0.3, seaLevel + 1.6, positionWorld.y).oneMinus().mul(cap.oneMinus());
   material.colorNode = mix(mix(ice, ice.mul(color(CLEAR)), wet), color(SNOW), cap);
   material.roughnessNode = mix(mix(float(0.14), float(0.62), frost), float(0.82), cap);
   // Ice carries blue through itself, most of all toward a backlighting sun.

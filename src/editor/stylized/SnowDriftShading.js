@@ -1,5 +1,5 @@
 import { Fn, If, float, length, max, normalize, smoothstep, vec2, vec3 } from 'three/tsl';
-import { noise2, noised } from './SnowNoiseNodes.js';
+import { noise2, noised, snowWarp } from './SnowNoiseNodes.js';
 import { skyLightUniforms } from './sky/skyLight.js';
 
 /**
@@ -27,8 +27,9 @@ export function createSnowDriftNodes({ point, snow, footprint, weight, sun = nul
   const fields = Fn(() => {
     const result = vec3(0).toVar();
     If(snow.greaterThan(0.002).and(amount.greaterThan(0)), () => {
-      const broad = noised(point.div(BROAD_METERS)).toVar();
-      const fine = noised(point.div(FINE_METERS).add(FINE_OFFSET)).toVar();
+      const q = snowWarp(point).toVar();
+      const broad = noised(q.div(BROAD_METERS)).toVar();
+      const fine = noised(q.div(FINE_METERS).add(FINE_OFFSET)).toVar();
       const slope = broad.yz.mul(BROAD_HEIGHT / BROAD_METERS).add(fine.yz.mul(FINE_HEIGHT / FINE_METERS));
       let blocked = float(0);
       if (sun) {
@@ -37,7 +38,7 @@ export function createSnowDriftNodes({ point, snow, footprint, weight, sun = nul
         const toward = normalize(sun.xz);
         const rise = sun.y.div(across).toVar();
         for (const step of SHADOW_STEPS_METERS) {
-          blocked = max(blocked, heightAt(point.add(toward.mul(step))).sub(here).sub(rise.mul(step)));
+          blocked = max(blocked, heightAt(snowWarp(point.add(toward.mul(step)))).sub(here).sub(rise.mul(step)));
         }
       }
       result.assign(vec3(slope, blocked));

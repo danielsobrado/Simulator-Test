@@ -11,6 +11,7 @@ import {
   uniform,
 } from 'three/tsl';
 import { isAzgaarMacroWorldSource } from '../import/AzgaarMacroWorldSource.js';
+import { createFarAlpineSurface } from './FarAlpineSurface.js';
 import { settlementPreparationFor } from './settlements/SettlementPreparation.js';
 
 const DEFAULT_RADIUS_METERS = 10000;
@@ -110,6 +111,10 @@ export class MacroFarTerrainView {
     // every floating-origin snap. X/Z never change, so only height is rewritten.
     this.pendingPositions = new Float32Array(vertexCount * 3);
     this.pendingColors = new Float32Array(vertexCount * 3);
+    this.pendingSnow = new Float32Array(vertexCount);
+    this.pendingNormals = new Float32Array(vertexCount * 3);
+    this.normals = new Float32Array(vertexCount * 3);
+    this.snow = new Float32Array(vertexCount);
     this.pendingHeights = new Float32Array(vertexCount);
     this.pendingTileIds = new Int32Array(vertexCount);
     this.pendingForest = new Float32Array(vertexCount);
@@ -117,6 +122,8 @@ export class MacroFarTerrainView {
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    this.geometry.setAttribute('snowCover', new THREE.BufferAttribute(this.snow, 1));
+    this.geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
     this.geometry.setIndex(this.buildIndices());
 
     this.material = this.createMaterial(config);
@@ -138,14 +145,20 @@ export class MacroFarTerrainView {
    * so it tracks the camera between origin snaps.
    */
   createMaterial(config) {
-    const aerial = config.stylizedSurface?.sky?.aerial;
-    if (!aerial || !(aerial.strength > 0)) {
-      return new THREE.MeshLambertNodeMaterial({ vertexColors: true, fog: true, side: THREE.DoubleSide });
-    }
-
     // colorNode replaces the built-in vertex-colour path, so the attribute is
     // read explicitly and vertexColors stays off to avoid applying it twice.
     const material = new THREE.MeshLambertNodeMaterial({ fog: true, side: THREE.DoubleSide });
+    this.alpine = createFarAlpineSurface({
+      vertexColor: attribute('color', 'vec3'),
+      snowCover: attribute('snowCover', 'float'),
+      snowColor: this.snowColor,
+    });
+    const ground = this.alpine.color;
+    material.colorNode = ground;
+    material.normalNode = this.alpine.normal;
+    const aerial = config.stylizedSurface?.sky?.aerial;
+    if (!aerial || !(aerial.strength > 0)) return material;
+
     // A uniform so the haze follows the sky's look (setFogColor).
     this.horizonBase = new THREE.Color(
       aerial.horizonColor ?? config.stylizedSurface?.sky?.fogColor ?? '#8ecef2',
@@ -171,7 +184,7 @@ export class MacroFarTerrainView {
       0,
       1,
     );
-    material.colorNode = mix(attribute('color', 'vec3'), horizon, haze);
+    material.colorNode = mix(ground, horizon, haze);
     return material;
   }
 
@@ -314,6 +327,26 @@ export class MacroFarTerrainView {
    * radial spacing grows toward the rim, so a raw difference would read the far
    * field as flat.
    */
+  /** Smooth normal from ring and spoke neighbours: without one, every triangle lit as a flat facet. */
+  writeNormal(job, ring, spoke, index) {
+    const spokes = this.angularResolution;
+    const position = (r, sp) => {
+      const i = r * spokes + (sp + spokes) % spokes;
+      return [this.pendingPositions[i * 3], job.heights[i], this.pendingPositions[i * 3 + 2]];
+    };
+    const [ax, ay, az] = position(ring, spoke + 1), [bx, by, bz] = position(ring, spoke - 1);
+    const [cx, cy, cz] = position(Math.min(ring + 1, this.radialResolution - 1), spoke);
+    const [dx, dy, dz] = position(Math.max(ring - 1, 0), spoke);
+    const ux = ax - bx, uy = ay - by, uz = az - bz, vx = cx - dx, vy = cy - dy, vz = cz - dz;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz) * (ny < 0 ? -1 : 1) || 1;
+    nx /= length; ny /= length; nz /= length;
+    const offset = index * 3;
+    this.pendingNormals[offset] = nx;
+    this.pendingNormals[offset + 1] = ny;
+    this.pendingNormals[offset + 2] = nz;
+  }
+
   slopeAt(job, ring, spoke) {
     const spokes = this.angularResolution;
     const rings = this.radialResolution;
@@ -353,19 +386,14 @@ export class MacroFarTerrainView {
       green += (this.rockColor.g - green) * rockAmount;
       blue += (this.rockColor.b - blue) * rockAmount;
 
-      // Snow settles above the snow line, and on snowy biomes at any height, but
-      // not on faces too steep to hold it.
+      // Snow settles above the snow line and on snowy biomes at any height; the
+      // shader decides per pixel which faces hold it (createMaterial).
       const altitude = Math.max(
         Math.min(1, Math.max(0, (height - this.snowLine) / this.snowFade)),
         this.snowBiomeCover[job.tileIds[index]] ?? 0,
       );
-      const snowAmount = altitude * Math.min(1, Math.max(
-        0,
-        1 - slope / this.snowSlopeMax,
-      ));
-      red += (this.snowColor.r - red) * snowAmount;
-      green += (this.snowColor.g - green) * snowAmount;
-      blue += (this.snowColor.b - blue) * snowAmount;
+      this.pendingSnow[index] = altitude;
+      this.writeNormal(job, ring, spoke, index);
 
       // The forest reads the ring's own tile, height and slope: at this spacing
       // they are what the backdrop draws, and the fine terrain is five queries
@@ -417,8 +445,13 @@ export class MacroFarTerrainView {
     if (shouldYield?.()) return false;
     this.positions.set(this.pendingPositions);
     this.colors.set(this.pendingColors);
+    this.snow.set(this.pendingSnow);
+    this.normals.set(this.pendingNormals);
+    this.alpine?.setOrigin(this.floatingOrigin.getState());
     this.geometry.getAttribute('position').needsUpdate = true;
     this.geometry.getAttribute('color').needsUpdate = true;
+    this.geometry.getAttribute('snowCover').needsUpdate = true;
+    this.geometry.getAttribute('normal').needsUpdate = true;
     // The backdrop is never frustum-culled, so recomputing bounds here only
     // adds a full-vertex pass to the origin-snap publication frame.
     this.builtOriginX = job.originX;

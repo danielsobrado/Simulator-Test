@@ -24,6 +24,12 @@ export const hash22 = Fn(([p]) => {
   return fract(vec2(p3.x, p3.x).add(vec2(p3.y, p3.z)).mul(vec2(p3.z, p3.y)));
 }).setLayout({ name: 'snowHash22', type: 'vec2', inputs: [{ name: 'p', type: 'vec2' }] });
 
+/** Off the noise lattice: a grazing view otherwise lines broad noise up into rows of dashes. */
+export const snowWarp = (p) => {
+  const q = vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
+  return q.add(vec2(p.y.div(23).sin(), p.x.div(29).sin()).mul(5));
+};
+
 /** Perlin-style gradient noise with a quintic fade; roughly [-0.7, 0.7]. */
 export const noise2 = Fn(([p]) => {
   const cell = p.floor();

@@ -1,3 +1,4 @@
+import { applyTerrainRockDetail } from './materials/TerrainRockDetail.js';
 import { createSnowDetailNodes } from './stylized/SnowDetailShading.js';
 import { resolveSnowSurfaceConfig } from './stylized/SnowSurfaceConfig.js';
 import * as THREE from 'three/webgpu';
@@ -364,6 +365,13 @@ export function createTerrainMaterial({
         patterns: transitionPatterns, localXZ, cameraDistance });
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));
     }
+    if (bakedSurface.rock && bakedSurface.normal) {
+      bakedSurface.color = applyTerrainRockDetail({
+        color: bakedSurface.color, rock: bakedSurface.rock, normal: bakedSurface.normal,
+        local: vec2(terrainUv.x.sub(0.5), float(0.5).sub(terrainUv.y)).mul(chunkWorldSize),
+        chunkCenter, height: terrainHeight, textures: acquireGroundLayers(),
+      });
+    }
     // grass-test's path surface over the baked ground: textured dirt with a
     // broken contour and a worn verge (stylized/path/terrainPathPaint.js).
     const bakedRoughness = bakedSurface.roughness
@@ -381,8 +389,10 @@ export function createTerrainMaterial({
     const paintedSurface = pathPaint
       ? { ...bakedSurface, ...pathPaint.apply(bakedSurface.color, bakedRoughness) }
       : { ...bakedSurface, roughness: bakedRoughness };
-    // The floor scan is soil structure: under snow it read as bare rock.
-    if (pathPaint && bakedSurface.snow) paintedSurface.color = mix(paintedSurface.color, bakedSurface.color, bakedSurface.snow);
+    // The floor scan is soil structure: it read as bare rock under snow and as moss on stone.
+    if (pathPaint && bakedSurface.snow) {
+      paintedSurface.color = mix(paintedSurface.color, bakedSurface.color, max(bakedSurface.snow, bakedSurface.rock));
+    }
     const coastPatterns = coastPatternsTemplate && slotPatternOrigins('coastPatterns', coastPatternsTemplate);
     // The interpolated mesh height keeps narrow wash fronts smooth between
     // vertices; the nearest-filtered height texture would make texel terraces.

@@ -5,8 +5,8 @@
 export const ICEBERG_CELL_METERS = 320;
 export const ICEBERG_KINDS = 3;
 const SHARE_OF_CELLS = 0.45;
-const MIN_SCALE = 14;
-const MAX_SCALE = 46;
+const MIN_SCALE = 26;
+const MAX_SCALE = 110;
 /** Open water this many berg radii out, so none grounds on a beach. */
 const CLEARANCE_RADII = 1.6;
 const CLEARANCE_DIRECTIONS = 8;

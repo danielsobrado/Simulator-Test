@@ -9,6 +9,7 @@ const FILES = Object.freeze([
   'assets/ground/layers/mossy.webp',
   'assets/ground/layers/litter.webp',
   'assets/ground/layers/cracked.webp',
+  'assets/textures/settlement/stone-rock-color.webp',
 ]);
 
 async function loadLayer(url, data, layer) {

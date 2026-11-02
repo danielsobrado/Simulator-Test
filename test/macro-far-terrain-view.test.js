@@ -99,6 +99,8 @@ test('the far ring reads the forest from its own tile, height and slope', () => 
     pendingHeights: new Float32Array(16),
     pendingTileIds: new Int32Array(16),
     pendingForest: new Float32Array(16),
+    pendingSnow: new Float32Array(16),
+    pendingNormals: new Float32Array(16 * 3),
     generator: { sampleMacroColumn: (cellX) => ({ height: cellX > 0 ? 40 : 10, tileId: cellX > 0 ? 6 : 4 }) },
     colorForTile: () => ({ r: 0.5, g: 0.5, b: 0.5 }),
     rockSlopeStart: 10, rockSlopeFull: 20, screeColor: { r: 0, g: 0, b: 0 }, rockColor: { r: 0, g: 0, b: 0 },

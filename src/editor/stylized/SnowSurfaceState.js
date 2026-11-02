@@ -1,5 +1,5 @@
 import { Fn, If, dot, float, mix, smoothstep, vec2, vec3 } from 'three/tsl';
-import { noise2 } from './SnowNoiseNodes.js';
+import { noise2, snowWarp } from './SnowNoiseNodes.js';
 import { worldWindUniforms } from '../weather/wind/worldWindState.js';
 
 /** Bounded canonical coordinates, independent of chunk assignment and camera rebases. */
@@ -19,8 +19,9 @@ export function createSnowSurfaceState({ point, snow, pathMask, worldNormal, set
       const exposure = broad.mul(0.6).add(0.5).add(windward.mul(settings.windward * 2.5)).clamp(0, 1);
       let calm = float(0);
       if (settings.calmCoverage > 0) {
-        const powder = noise2(point.div(settings.calmScale)).mul(0.65)
-          .add(noise2(point.div(settings.calmScale * 0.37).add(vec2(17.3, -4.1))).mul(0.35));
+        const warped = snowWarp(point);
+        const powder = noise2(warped.div(settings.calmScale)).mul(0.65)
+          .add(noise2(warped.div(settings.calmScale * 0.37).add(vec2(17.3, -4.1))).mul(0.35));
         const threshold = (0.5 - settings.calmCoverage) * 0.5;
         calm = smoothstep(threshold - 0.1, threshold + 0.1, powder)
           .mul(smoothstep(0.7, 0.95, exposure).oneMinus());

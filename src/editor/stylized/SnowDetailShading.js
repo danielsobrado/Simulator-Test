@@ -57,7 +57,7 @@ export function createSnowDetailNodes({ terrainUv, chunkWorldSize, chunkCenter, 
     If(amount.greaterThan(0.002).and(steep.greaterThanEqual(0)).and(dx.x.equal(dx.x)).and(dy.x.equal(dy.x))
       .and(xyDx.x.equal(xyDx.x)).and(xyDy.x.equal(xyDy.x)).and(zyDx.x.equal(zyDx.x)).and(zyDy.x.equal(zyDy.x)), () => {
       let combined = vec2(0);
-      for (const [frequency, strength] of (reliefEnabled ? [[4, 1.6], [1, 0.65], [0.25, 0.28]] : [[1, 1.6]])) {
+      for (const [frequency, strength] of (reliefEnabled ? [[4, 1.6], [1, 0.65]] : [[1, 1.6]])) {
         const sample = repeatMipTextureLoad(maps.normal, point.mul(frequency), dx.mul(frequency), dy.mul(frequency));
         const normal = sample.xyz.mul(2).sub(1);
         const fade = smoothstep(0.35, 0.9, max(length(dx), length(dy)).mul(frequency)).oneMinus();

@@ -24,6 +24,7 @@ import { BIOME_BLUR_CELLS, blurTileField, blurTileValueAt } from '../world/Biome
 const PREVAILING_WIND = Object.freeze([0.8, 0.6]);
 /** Offset of the snow drift noise from the bake's macro seed. */
 const SNOW_PATCH_SEED = 53;
+const SLOPE_BREAKUP = 0.8;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -81,7 +82,8 @@ export function snowAccumulation({ height, slope, dx, dz, curvature, tileId, bio
   const wind = exposure * classification.snowWindShift;
   const hollow = Math.max(-0.25, Math.min(0.25, curvature * classification.snowConcavity));
   const patches = (patch - 0.5) * classification.snowPatchStrength;
-  const hold = 1 - smoothstep(classification.snowSlopeMax * 0.7, classification.snowSlopeMax, slope);
+  // The same drifts decide how steep snow clings, so it runs in tongues down the rock.
+  const hold = 1 - smoothstep(classification.snowSlopeMax * 0.7, classification.snowSlopeMax, slope - patches * SLOPE_BREAKUP);
   return clamp01(base - wind + hollow + patches * (1 - Math.abs(base * 2 - 1) * 0.5)) * hold;
 }
 

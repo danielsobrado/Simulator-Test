@@ -105,6 +105,16 @@ export class StylizedSurfaceView {
       ? new StylizedSkyView({ terrainView, config })
       : null;
     const sunDirection = this.skyView?.sunDirection ?? vec3(0.35, 0.85, 0.25);
+    this.icebergView = this.enabled && !this.impostorBakeMode && this.skyView && config.icebergs?.enabled !== false
+      ? new IcebergView({
+        scene: terrainView.scene,
+        worldStore: terrainView.worldStore,
+        floatingOrigin: terrainView.floatingOrigin,
+        seaLevel: terrainView.worldStore.generator?.seaLevel ?? 0,
+        sunDirection: this.skyView.sunDirectionValue,
+        snowGroundByTile: config.biomeLooks?.snow.ground ?? [],
+      })
+      : null;
     this.rockView = this.enabled && !this.impostorBakeMode
       ? new StylizedRockView({
         terrainView,

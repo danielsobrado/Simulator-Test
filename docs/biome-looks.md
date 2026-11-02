@@ -90,3 +90,23 @@ glows through the same shadowed light as the leaf did. `chunk-cross` from the ta
 at (-11219, 9187), four pairs with the order swapped halfway, off → on: 81.5, 78.1,
 77.9, 69.3 → 72.9, 70.3, 82.4, 75.8 fps; GPU 2.21–2.30 → 2.09–2.31 ms. Whichever
 arm ran first in a pair was slower, so order, not frost, set the gap.
+
+## Alpine recipe
+
+Everything here keys on height, slope and the biome table, so it applies to any
+imported world. Eldara's Shuzanbund (-3350000, -560000) is the acceptance view.
+
+- `import.azgaarRidges` rose from 90 to 280 m so flanks reach rock. A world keeps
+  the ridges it was imported with: re-import a saved map to get them.
+- The far mesh had no normals, so every triangle lit as a flat facet. It now
+  carries smooth ones, and `FarAlpineSurface.js` puts triplanar stone, strata and
+  snow on ledges per pixel. Resolution stays at 160 × 256: 240 × 512 cost
+  85 → 52 fps on the settlement approach, in a run void for lost focus.
+- Near cliffs take the rock scan from the ground-layer array
+  (`TerrainRockDetail.js`), three taps behind a rock branch, no new sampler.
+- Icebergs (`stylized/ice/`) sit on a jittered 320 m grid over open sea within
+  1.8 km of tundra or glacier. Opaque: `IceMaterial` fakes depth along the view
+  ray and uses no viewport texture. They have no collision yet.
+
+2026-11-02, HEAD against this change, valid runs: settlement approach 84.5, 85.0 →
+84.1 fps, GPU 3.79 → 3.88 ms; `chunk-cross` 137.3 → 136.5 fps, GPU 2.26 → 2.27 ms.

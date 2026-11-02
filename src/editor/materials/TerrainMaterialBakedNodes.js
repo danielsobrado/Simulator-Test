@@ -31,6 +31,8 @@ import {
 
 /** Share of a fully snowed point's pigment the bake leaves out. */
 const SNOW_ALBEDO_PURITY = 0.92;
+const ALPINE_ROCK_HEIGHT = 300;
+const ALPINE_ROCK_PURITY = 0.8;
 
 const MIN_WEIGHT_SUM = 0.0001;
 const DEBUG_CURVATURE_SCALE = 8;
@@ -297,6 +299,9 @@ export function createTerrainMaterialBakedSurface({
     .mul(heightShade);
   // Macro tint, family atlas and lichen are ground pigment: on snow they read as dirty concrete.
   midColor = mix(midColor, snowColor.mul(heightShade), weights.a.mul(SNOW_ALBEDO_PURITY));
+  // High rock is bare: lichen and the macro tint turned alpine faces mossy green.
+  const alpine = smoothstep(ALPINE_ROCK_HEIGHT, ALPINE_ROCK_HEIGHT + 200, terrainHeight);
+  midColor = mix(midColor, rockColor.mul(heightShade), weights.b.mul(alpine).mul(ALPINE_ROCK_PURITY));
 
   const nearMacro =mix(vec3(1), macroMultiplier, render.nearMacroStrength);
   const nearFamily = mix(vec3(1), familyMultiplier, families.nearStrength);
@@ -342,6 +347,8 @@ export function createTerrainMaterialBakedSurface({
     }),
     roughness: readyRoughness,
     normal: readyNormal,
+    /** 0..1 baked rock, for the stone laid over it (TerrainRockDetail.js). */
+    rock: select(gpuState.ready.greaterThan(0.5), weights.b, float(0)),
     /** 0..1 baked snow cover, for snow-only shading on top. */
     snow: select(gpuState.ready.greaterThan(0.5), weights.a, float(0)),
     /** 0..1 baked canopy over the ground, which shelters it from rain. */
