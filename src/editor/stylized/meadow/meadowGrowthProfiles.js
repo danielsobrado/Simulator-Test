@@ -7,7 +7,7 @@ export const MEADOW_GROWTH_DEFAULTS = Object.freeze({
   3:row(.25,.85,.050,.72,14),4:row(.24,.82,.045,.92,17),
   5:row(.16,.50,.060,.85,11,'broadleaf',.6),6:row(.16,.44,.042,.85,10,'slender',.85),
   7:row(.14,.48,.065,.82,12,'broadleaf',.25),8:row(.18,.52,.062,.78,10,'broadleaf',.3),
-  9:row(.10,.28,.050,.80,12,'slender',.7),10:row(.06,.16,.028,.28,7,'slender',.8),
+  9:row(.13,.34,.050,.80,12,'slender',.7),10:row(.06,.16,.028,.28,7,'slender',.8),
   11:row(0,0,0,0,12),12:row(.14,.60,.045,.50,5,'reed',.2),
 });
 function validate(source,path) {
