@@ -631,6 +631,7 @@ stylizedSurface:
       - scene: /assets/ground/stylized-grass/clump-01.glb
         motion: grass-tuft
         scale: 1
+        materialRoles: { GrassGrass_MAT: foliage }
         weight: 1.2
         tileIds: [4, 6, 8, 9, 14]
         character: meadow
@@ -640,6 +641,7 @@ stylizedSurface:
       - scene: /assets/ground/stylized-grass/clump-02.glb
         motion: grass-tuft
         scale: 1
+        materialRoles: { GrassGrass_MAT: foliage }
         weight: 1.2
         tileIds: [4, 6, 14]
         character: meadow
@@ -649,6 +651,7 @@ stylizedSurface:
       - scene: /assets/ground/stylized-grass/clump-03.glb
         motion: grass-tuft
         scale: 1
+        materialRoles: { GrassGrass_MAT: foliage }
         weight: 1.2
         tileIds: [4, 6, 8]
         character: meadow
@@ -660,6 +663,7 @@ stylizedSurface:
       - scene: /assets/ground/stylized-grass/source-01.glb
         motion: grass-tuft
         scale: 1
+        materialRoles: { GrassGrass_MAT: foliage }
         weight: 1.4
         tileIds: [2, 7, 8, 9, 10]
         character: forest
@@ -669,6 +673,7 @@ stylizedSurface:
       - scene: /assets/ground/stylized-grass/source-02.glb
         motion: grass-tuft
         scale: 1
+        materialRoles: { GrassGrass_MAT: foliage }
         weight: 1.1
         tileIds: [2, 4, 5, 6, 7, 9, 10, 14]
         prototypeGroups:
@@ -707,6 +712,16 @@ stylizedSurface:
           - [swamp-fern-01]
       - scene: /assets/ground/swamp/swamp-log-01.glb
         motion: rigid
+      # The same fern in dry woods, on the forest grade rather than the bog's.
+      - scene: /assets/ground/swamp/swamp-fern-01.glb
+        materialRoles: { Swamp fern: foliage }
+        motion: grass-tuft
+        scale: 1.7
+        weight: 2.6
+        tileIds: [6, 5, 7, 8, 9]
+        canopy: core
+        prototypeGroups:
+          - [swamp-fern-01]
         scale: 1
         weight: 0.35
         tileIds: [12, 5, 6, 7, 8, 9]
@@ -714,7 +729,7 @@ stylizedSurface:
         sway: false
         # The bark texture is painted for bog gloom and reads as charcoal on a
         # lit forest floor.
-        colorScale: 3
+        colorScale: 5
         prototypeGroups:
           - [swamp-log-01]
       - scene: /assets/ground/swamp/swamp-stump-01.glb
@@ -724,7 +739,7 @@ stylizedSurface:
         tileIds: [12, 5, 6, 7, 8, 9]
         canopy: core
         sway: false
-        colorScale: 3
+        colorScale: 5
         prototypeGroups:
           - [swamp-stump-01]
       - scene: /assets/ground/swamp/swamp-knees-01.glb
@@ -1653,7 +1668,7 @@ stylizedSurface:
     densityByTile:
       3: 0.45
       4: 1
-      9: 0.6
+      9: 0.9
       14: 0.35
   groundDetails:
     enabled: true
@@ -1692,7 +1707,7 @@ stylizedSurface:
       1: 0.12
       2: 0.16
       3: 0.55
-      9: 0.45
+      9: 0.8
       10: 0.2
       13: 0.4
     minScale: 0.82

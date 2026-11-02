@@ -957,6 +957,10 @@ to another window, so treat these as indicative, including the FPS figures:**
 The 47.1 run has a 3.4 s frame that no other forest run shows, cause unknown. GPU
 time is the steadier signal: about +0.6 ms in closed forest, nothing at spawn.
 
+A follow-up adds to that unmeasured cost: bushes in a wood no longer pass the
+regional scrub channel (1302 to 1903 placements at one temperate core), taiga bush
+and ground-detail shares rise, and dry woods grow a fern. Run the A/B on this state.
+
 ### Landforms and the grassland benchmark (2026-11-01)
 
 `TerrainLandforms.js` adds warped swells, gullies and knolls to both generators,

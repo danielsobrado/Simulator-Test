@@ -256,22 +256,27 @@ export class StylizedBushView {
       const cluster = this.clusterField.sample(candidate.x, candidate.z);
       const forestField = this.forestFieldProvider?.();
       const habitat = forestField?.sample(candidate.x, candidate.z) ?? null;
-      const clusterDensity = understoryClusterDensity(cluster.density, habitat, bushes.understoryDensity);
+      const regionalScrub = this.regionalCharacterField?.sampleChannel(
+        candidate.x,
+        candidate.z,
+        'scrub',
+      ) ?? 1;
+      // Scrub districts thin thickets, not the shrub layer of a wood.
+      const clusterDensity = understoryClusterDensity(
+        cluster.density * regionalScrub,
+        habitat,
+        bushes.understoryDensity,
+      );
       if (clusterDensity <= 0) return null;
       const canopy = habitat
         ? forestFloorDensity(habitat, 'bush', forestFloorConfig)
         : 1;
       // Fringes are the densest band: cluster edge and forest edge both add.
       const fringe = 1 + edgeAffinity * Math.max(cluster.edge, habitat?.patchEdge ?? 0);
-      const regionalScrub = this.regionalCharacterField?.sampleChannel(
-        candidate.x,
-        candidate.z,
-        'scrub',
-      ) ?? 1;
       // How thick a biome's undergrowth runs: a rainforest floor is a thicket,
       // a taiga's is thin, a savanna's is scattered scrub.
       const biome = bushes.densityByTile?.[candidate.tileId] ?? 1;
-      const density = Math.min(1, clusterDensity * canopy * fringe * regionalScrub * biome);
+      const density = Math.min(1, clusterDensity * canopy * fringe * biome);
       if (candidate.priority >= density) return null;
       return {
         clusterId: cluster.clusterId,

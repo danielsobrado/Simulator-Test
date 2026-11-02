@@ -23,18 +23,23 @@ export function fallingLeafPalette(config = {}, tileId = null) {
   return [base.clone().lerp(tip, 0.35), base.clone().lerp(tip, 0.75), tip];
 }
 
+function understoryRamp(sample, palette) {
+  const luminance = dot(sample, vec3(0.2126, 0.7152, 0.0722));
+  return mix(vec3(...palette.base.toArray()), vec3(...palette.tip.toArray()),
+    smoothstep(0.025, 0.8, luminance.mul(palette.exposure)));
+}
+
 /** Keep painted veins, stems and blossoms while grading green foliage. */
 export function gradeUnderstory(sample, palette) {
-  const luminance = dot(sample, vec3(0.2126, 0.7152, 0.0722));
   const green = smoothstep(0.005, 0.06, sample.g.sub(max(sample.r, sample.b)));
-  const ramp = mix(vec3(...palette.base.toArray()), vec3(...palette.tip.toArray()),
-    smoothstep(0.025, 0.8, luminance.mul(palette.exposure)));
-  return mix(sample, ramp, green.mul(0.9));
+  return mix(sample, understoryRamp(sample, palette), green.mul(0.9));
 }
 
 /** Explicit parts protect yellow petals from the foliage green-pixel mask. */
 export function gradePlantPart(sample, palette, role = 'auto') {
   if (role === 'auto' || role === 'leaf') return gradeUnderstory(sample, palette);
+  // A whole plant painted off-green (teal roots) has no pixels worth protecting.
+  if (role === 'foliage') return mix(sample, understoryRamp(sample, palette), .9);
   if (role === 'stem') return mix(sample, vec3(...palette.base.toArray()), .65);
   if (role === 'petal' || role === 'center') {
     const luminance = dot(sample, vec3(.2126, .7152, .0722));
