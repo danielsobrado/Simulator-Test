@@ -3,6 +3,9 @@
  * Narrow trunks and low branches do not establish a broad, surrounding plate.
  */
 export function prototypeRootSeat(parts) {
+  // Grown roots are built on the bole's foot and dive below it on purpose: their
+  // lowest tips are not a plate standing above the soil.
+  if (parts.some(p => p.kind === 'trunk' && p.bole)) return { seat: 0, reach: 0 };
   const positions = parts.filter(p => p.kind === 'trunk').map(p => p.geometry.getAttribute('position')).filter(Boolean);
   let minimum = Infinity, maximum = -Infinity;
   for (const attribute of positions) for (let i = 0; i < attribute.count; i++) {

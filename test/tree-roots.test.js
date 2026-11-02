@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { attachTreeRoots } from '../src/editor/stylized/StylizedTreePrototypes.js';
 import { createTreeRootGeometry, measureStem } from '../src/editor/stylized/forest/treeRoots.js';
 import { ForestSpeciesRegistry } from '../src/editor/stylized/forest/ForestSpeciesRegistry.js';
+import { rootProfileForSpecies } from '../src/editor/stylized/StylizedTreeView.js';
 
 function trunk(radius = 0.3) {
   const geometry = new THREE.CylinderGeometry(radius, radius, 10, 12, 20);
@@ -40,6 +41,43 @@ test('roots merge into an indexed or a de-indexed trunk and keep its attributes'
     assert.ok(parts[0].geometry.getAttribute('uv'));
   }
   assert.equal(attachTreeRoots([{ kind: 'leaf', geometry: trunk() }], 'tree-1'), false);
+});
+
+test('a wide-footed stem keeps its roots inside its crown', () => {
+  // The savanna oak: an authored flare at the foot once measured as the stem and
+  // threw roots four times wider than its canopy.
+  const flared = new THREE.CylinderGeometry(0.3, 1.6, 6, 12, 24);
+  flared.translate(0, 3, 0);
+  const crown = new THREE.SphereGeometry(2.5, 8, 6);
+  crown.translate(0, 5, 0);
+  const parts = [{ kind: 'trunk', geometry: flared }, { kind: 'leaf', geometry: crown }];
+  assert.equal(attachTreeRoots(parts, 'oak'), true);
+  parts[0].geometry.computeBoundingBox();
+  const box = parts[0].geometry.boundingBox;
+  assert.ok(box.max.x - box.min.x < 5, `roots span ${box.max.x - box.min.x} m under a 5 m crown`);
+});
+
+test('the foot swells into the roots and the bole above it does not', () => {
+  const geometry = trunk(0.3);
+  const parts = [{ kind: 'trunk', geometry }, { kind: 'leaf', geometry: new THREE.SphereGeometry(3) }];
+  attachTreeRoots(parts, 'tree-1', 'conifer');
+  const position = parts[0].geometry.getAttribute('position');
+  let foot = 0;
+  let bole = 0;
+  for (let index = 0; index < position.count; index += 1) {
+    const radius = Math.hypot(position.getX(index) - 2, position.getZ(index) + 1);
+    if (Math.abs(position.getY(index)) < 1e-4 && radius < 0.6) foot = Math.max(foot, radius);
+    if (Math.abs(position.getY(index) - 5) < 0.3) bole = Math.max(bole, radius);
+  }
+  assert.ok(foot > 0.33, `foot radius ${foot}`);
+  assert.ok(Math.abs(bole - 0.3) < 0.01, `bole radius ${bole}`);
+});
+
+test('species pick their root profile', () => {
+  assert.equal(rootProfileForSpecies(['conifer_narrow', 'conifer_wide']), 'conifer');
+  assert.equal(rootProfileForSpecies('wetland_sparse'), 'buttress');
+  assert.equal(rootProfileForSpecies(['broadleaf_round', 'tropical_tall']), 'broadleaf');
+  assert.equal(rootProfileForSpecies(undefined), 'broadleaf');
 });
 
 test('broadleaf crowns take distinct forms, conifers keep their own, and a tree keeps its form', () => {

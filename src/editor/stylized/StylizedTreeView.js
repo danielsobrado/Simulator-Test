@@ -4,7 +4,6 @@ import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList, normalizeBaseUrl, resolveAssetUrl } from '../assets/assetUrl.js';
 import {
-  attachRootCollar,
   attachTreeRoots,
   extractPrototypeParts,
   extractPrototypePartsFromRoots,
@@ -89,6 +88,14 @@ function inferTreeMaterials(scene, definition) {
     leafMaterial,
     species: definition.species ?? 'broadleaf_round',
   };
+}
+
+/** Conifers spread shallow roots; wetland stands rise on plank buttresses. */
+export function rootProfileForSpecies(species) {
+  const ids = Array.isArray(species) ? species : [species ?? 'broadleaf_round'];
+  if (ids.some((id) => id?.startsWith('conifer'))) return 'conifer';
+  if (ids.includes('wetland_sparse')) return 'buttress';
+  return 'broadleaf';
 }
 
 function configureBarkTexture(texture, colorSpace) {
@@ -303,6 +310,8 @@ export class StylizedTreeView {
       gradeLeaf: Boolean(primaryLeaf),
       leafGain: primaryLeaf?.gain,
       leafAlphaTest: primaryLeaf?.alphaTest,
+      // The primary scene is the dark spruces.
+      rootProfile: 'conifer',
     });
     if (primaryCount === 0) {
       throw new Error('No pine prototype contains both configured trunk and leaf materials.');
@@ -351,6 +360,7 @@ export class StylizedTreeView {
         prototypeGroups: definition.prototypeGroups,
         sourceLabel: `Tree variant ${definition.scene}`,
         pivot: definition.pivot,
+        rootProfile: rootProfileForSpecies(definition.species),
       });
       if (count === 0) {
         throw new Error(
@@ -428,6 +438,7 @@ export class StylizedTreeView {
       prototypeGroups = null,
       sourceLabel = 'Tree prototype',
       pivot = 'bounds',
+      rootProfile = 'broadleaf',
     } = {},
   ) {
     scene.updateMatrixWorld(true);
@@ -452,7 +463,7 @@ export class StylizedTreeView {
           }
         }
         if (pivot === 'trunk') pivotOnTrunkBase(baked);
-        if (preserveSourceAppearance) attachTreeRoots(baked, `${sourceLabel}:${this.prototypes.length}`);
+        attachTreeRoots(baked, `${sourceLabel}:${this.prototypes.length}`, rootProfile);
         const sway = this.treeSway(baked);
         const parts = baked.map((part) => {
           const source = firstMaterial(
@@ -503,12 +514,9 @@ export class StylizedTreeView {
             material,
             kind: part.kind,
             sourceMap,
+            bole: part.bole,
           };
         });
-        // Imported variants already include their authored trunk base. The generic
-        // collar is sized from all trunk/branch bounds, which can turn a spreading
-        // broadleaf into a conspicuous polygonal plinth.
-        if (!preserveSourceAppearance) attachRootCollar(parts);
         if (parts.length > 0) this.prototypes.push(this.withCloudShadow(parts));
       }
     }
@@ -569,8 +577,7 @@ export class StylizedTreeView {
             sway,
           }),
       }));
-      // No attachRootCollar here: these prototypes already carry a root flare,
-      // and the collar it merges is indexed while these are de-indexed.
+      // No attachTreeRoots here: these prototypes already carry a root flare.
       this.prototypes.push(this.withCloudShadow(parts));
     }
     return generated.map((prototype) => prototype.speciesId);

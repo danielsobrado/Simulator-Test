@@ -36,6 +36,17 @@ const config = Object.freeze({
   prototypeOverrides: Object.freeze({}),
 });
 
+test('a trunk grown roots stands on the bole it was grown from, not on its roots', () => {
+  // Roots fanning to 2 m through the lower band would otherwise read as the trunk.
+  const trunk = part('trunk', [...ring(0, 2), ...ring(1, 1.4), ...ring(2, 0.5), [0, 10, 0]]);
+  trunk.bole = { x: 0.1, z: -0.2, radius: 0.4 };
+  const profile = deriveTreeCollisionProfile({ parts: [trunk], prototypeIndex: 0, config });
+  assert.equal(profile.radius, 0.4);
+  assert.equal(profile.centerX, 0.1);
+  assert.equal(profile.centerZ, -0.2);
+  assert.equal(profile.height, 10);
+});
+
 test('tree profile derives from lower trunk and ignores leaves and high branches', () => {
   const trunk = [
     [0, 0, 0],

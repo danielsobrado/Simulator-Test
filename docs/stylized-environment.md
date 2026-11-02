@@ -122,8 +122,13 @@ stylizedSurface:
   `forestDebris.canopyGate` keeps each candidate by canopy coverage, so it thins with
   the wood. Short stands (`MEADOW_SHORT_STAND`) drop their stragglers between tufts
   (`tufts.gapCut`) and are not painted as all root, which is what read as black spikes.
-- **Trees meet the ground and the sky.** `forest/treeRoots.js` grows buttress roots onto
-  authored bark at load, sized from the stem. `treeSwayField` carries each tree's
+- **Trees meet the ground and the sky.** `forest/treeRoots.js` grows buttress fins onto
+  every authored bark at load, the primary spruces included, and swells the foot of
+  the bole into them. The stem is measured on cross-sections of the bark, capped by
+  the tree's height and crown, and the root profile (`conifer`, `broadleaf`,
+  `buttress`) comes from the variant's species. The measured bole stays on the trunk
+  part: collision stands on it and the root seat ignores the diving root tips, since
+  sampling the merged bark would take the roots for the trunk. `treeSwayField` carries each tree's
   curved bole and tilted crown, so bark and leaves stay together, and
   `ForestSpeciesRegistry` picks a crown form through the instance morphology, which
   the far impostors carry too. Bark takes the understory's moss and the floor's litter

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { createTreeRootGeometry } from './forest/treeRoots.js';
+import {
+  ROOT_PROFILES, createTreeRootGeometry, measureStem, rootHeadings, swellTrunkBase,
+} from './forest/treeRoots.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { materialList } from '../assets/assetUrl.js';
 import {
@@ -237,31 +239,6 @@ export function splitDisconnectedTreeParts(parts) {
   return groups.map((group) => recenterPrototypeParts(group.parts));
 }
 
-export function createRootCollarGeometry(parts) {
-  const trunkParts = parts.filter((part) => part.kind === 'trunk');
-  if (trunkParts.length === 0) return null;
-  let radius = 0;
-  for (const part of trunkParts) {
-    part.geometry.computeBoundingBox();
-    const box = part.geometry.boundingBox;
-    radius = Math.max(
-      radius,
-      Math.abs(box.min.x),
-      Math.abs(box.max.x),
-      Math.abs(box.min.z),
-      Math.abs(box.max.z),
-    );
-  }
-  radius = Math.max(0.16, radius * 0.32);
-  const height = Math.max(0.18, radius * 0.7);
-  const geometry = new THREE.CylinderGeometry(radius * 1.45, radius, height, 7, 1);
-  geometry.translate(0, height * 0.42, 0);
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
 function matchAttributeStorage(attribute, template) {
   if (
     attribute.array.constructor === template.array.constructor
@@ -284,14 +261,41 @@ function matchAttributeStorage(attribute, template) {
   return converted;
 }
 
-export function attachRootCollar(parts) {
-  return mergeIntoTrunk(parts, createRootCollarGeometry(parts));
-}
-
-/** Grows authored bark its buttress roots, on the same merge the collar takes. */
-export function attachTreeRoots(parts, seed) {
+/**
+ * Grows bark its roots and swells its foot into them, on the trunk merge.
+ * Reach is held inside the crown, so a stem whose base is wide anyway does not
+ * throw roots past its own canopy.
+ */
+export function attachTreeRoots(parts, seed, profileName = 'broadleaf') {
   const trunkPart = parts.find((part) => part.kind === 'trunk');
-  return Boolean(trunkPart) && mergeIntoTrunk(parts, createTreeRootGeometry(trunkPart.geometry, seed));
+  if (!trunkPart) return false;
+  const measured = measureStem(trunkPart.geometry);
+  if (!measured) return false;
+  const profile = ROOT_PROFILES[profileName] ?? ROOT_PROFILES.broadleaf;
+  let crownRadius = 0;
+  for (const part of parts) {
+    if (part.kind !== 'leaf') continue;
+    part.geometry.computeBoundingBox();
+    const box = part.geometry.boundingBox;
+    if (box.isEmpty()) continue;
+    crownRadius = Math.max(
+      crownRadius,
+      box.max.x - measured.x, measured.x - box.min.x, box.max.z - measured.z, measured.z - box.min.z,
+    );
+  }
+  // Some authored barks are the whole branch frame, which no band can tell from
+  // the stem: no real bole is wider than this share of its tree.
+  const stem = {
+    ...measured,
+    radius: Math.min(measured.radius, measured.height * 0.05, crownRadius > 0 ? crownRadius * 0.15 : Infinity),
+  };
+  const maxReach = Math.min(stem.height * 0.12, crownRadius > 0 ? crownRadius * 0.45 : Infinity);
+  const roots = createTreeRootGeometry(trunkPart.geometry, seed, { profile, maxReach, stem });
+  swellTrunkBase(trunkPart.geometry, stem, rootHeadings(seed, profile), profile);
+  if (!mergeIntoTrunk(parts, roots)) return false;
+  // What collision stands the trunk on, since the bark now includes its roots.
+  trunkPart.bole = { x: stem.x, z: stem.z, radius: stem.radius };
+  return true;
 }
 
 function mergeIntoTrunk(parts, root) {

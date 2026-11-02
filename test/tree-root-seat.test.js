@@ -48,3 +48,9 @@ test('root seating retains the slope plane, sink bound and true overhang failure
   const clipped = fitRootGround(() => 0, 0, 0, 2, settings, .6);
   assert.equal(clipped.sink, -.4); assert.ok(Math.abs(clipped.overhang - .2) < 1e-10);
 });
+
+test('a trunk grown roots is seated at its bole, not raised on its diving tips', () => {
+  const parts = prototype();
+  parts[0].bole = { x: 0, z: 0, radius: 0.2 };
+  assert.deepEqual(prototypeRootSeat(parts), { seat: 0, reach: 0 });
+});

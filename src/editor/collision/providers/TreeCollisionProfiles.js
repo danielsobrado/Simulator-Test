@@ -146,6 +146,18 @@ function deriveLowerTrunk(parts) {
 
   const height = bounds.maxY - bounds.minY;
   if (!(height > 0)) throw new Error('Tree trunk collision height must be positive.');
+  // Grown roots and a swollen foot are merged into the bark, so the bole they were
+  // grown from is the measurement; sampling the mesh would take the roots for it.
+  const bole = parts.find((part) => part?.kind === 'trunk' && part.bole)?.bole;
+  if (bole) {
+    return {
+      bounds,
+      height,
+      selected: { centerX: bole.x, centerZ: bole.z, radius: bole.radius },
+      fallbackCenterX: bole.x,
+      fallbackCenterZ: bole.z,
+    };
+  }
   const bandMinimum = bounds.minY + height * TREE_COLLISION_LOWER_BAND_START_RATIO;
   const bandMaximum = bounds.minY + height * TREE_COLLISION_LOWER_BAND_END_RATIO;
   const slices = Array.from({ length: TREE_COLLISION_SLICE_COUNT }, createSlice);

@@ -124,7 +124,7 @@ test('pine prototypes bake upright through world matrices', async () => {
   const { readFileSync } = await import('node:fs');
   const THREE = await import('three');
   const {
-    attachRootCollar,
+    attachTreeRoots,
     extractPrototypeParts,
     findPrototypeRoots,
   } = await import('../src/editor/stylized/StylizedTreePrototypes.js');
@@ -168,9 +168,9 @@ test('pine prototypes bake upright through world matrices', async () => {
     );
     assert.ok(size.y < 20, `world bake should keep demo scale, got height ${size.y}`);
     assert.equal(
-      attachRootCollar(parts),
+      attachTreeRoots(parts, 'pine', 'conifer'),
       true,
-      'quantized authored attributes must merge with the procedural root collar',
+      'quantized authored attributes must merge with the procedural roots',
     );
   }
 });

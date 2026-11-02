@@ -21,6 +21,17 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const manifestPath = path.join(directory, 'manifest.json');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'impostor-ktx2-'));
+// Windows scanners and indexers briefly hold files just written beside these.
+async function writeRetrying(file, data) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await writeFile(file, data);
+    } catch (error) {
+      if (attempt >= 5 || !['EBUSY', 'EPERM', 'UNKNOWN'].includes(error.code)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
+}
 const run = args => new Promise((resolve, reject) => {
   const child = spawn(encoder, args, { stdio: ['ignore', 'ignore', 'inherit'] });
   child.once('error', reject);
@@ -48,13 +59,13 @@ try {
       '--threads', '1', '--assign_oetf', 'srgb', '--assign_primaries', 'bt709',
       '--', encoderPath(output), ...mipFiles]);
     const bytes = await readFile(output);
-    await writeFile(path.join(directory, outputName), bytes);
+    await writeRetrying(path.join(directory, outputName), bytes);
     prototype.albedoKtx2 = prototype.albedo.replace(filename, outputName);
     prototype.albedoKtx2Metadata = { encoder: version, sourceSha256: hash(source), sha256: hash(bytes),
       width: info.width, height: info.height, levels: levels.length, alphaCutoff: FOLIAGE_KTX2_ALPHA_CUTOFF };
     console.log(`Encoded ${outputName}: ${bytes.length} bytes, ${levels.length} mip levels.`);
   }
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeRetrying(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

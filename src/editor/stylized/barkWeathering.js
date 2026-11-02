@@ -47,9 +47,13 @@ const SHADED_SIDE = Object.freeze([0, 0, -1]);
 const MOSS_REACH = 6;
 const WET_DARKENING = 0.45;
 const BASE_TINT = Object.freeze([0.62, 0.58, 0.5]);
-/** Metres of bark, and of root, that turn to the soil they run into. */
-const SOIL_REACH = 0.45;
-const SOIL_SHARE = 0.85;
+/**
+ * Metres of bark, and of root, that turn to the soil they run into. Only the
+ * contact: buttress fins mostly stand below half a metre, and painted as soil
+ * they vanish into the floor they are meant to grip.
+ */
+const SOIL_REACH = 0.15;
+const SOIL_SHARE = 0.7;
 const DEFAULT_SOIL = '#6e5435';
 
 export const DEFAULT_BARK_WEATHERING = Object.freeze({
