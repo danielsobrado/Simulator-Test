@@ -266,6 +266,9 @@ function validateBushes(bushes) {
   if (bushes.edgeAffinity !== undefined) {
     assertFinite(bushes.edgeAffinity, 'stylizedSurface.bushes.edgeAffinity');
   }
+  if (bushes.understoryDensity !== undefined) {
+    assertUnitInterval(bushes.understoryDensity, 'stylizedSurface.bushes.understoryDensity');
+  }
   if (!Array.isArray(bushes.tileIds) || bushes.tileIds.length === 0) {
     throw new Error('Invalid editor configuration: stylizedSurface.bushes.tileIds must be a non-empty array.');
   }

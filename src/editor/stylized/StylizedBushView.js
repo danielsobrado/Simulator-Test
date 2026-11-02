@@ -15,7 +15,7 @@ import {
 import { drawnRepresentations, ScatterInstanceRows } from './lod/ScatterInstanceRows.js';
 import { InstanceAnchor } from './lod/InstanceAnchor.js';
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
-import { forestFloorDensity } from './forest/ForestFloor.js';
+import { forestFloorDensity, understoryClusterDensity } from './forest/ForestFloor.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 import { createPathClearanceField } from './TreeManifestStore.js';
 import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
@@ -254,9 +254,10 @@ export class StylizedBushView {
     return (candidate) => {
       if (blocksPath?.(candidate)) return null;
       const cluster = this.clusterField.sample(candidate.x, candidate.z);
-      if (cluster.density <= 0) return null;
       const forestField = this.forestFieldProvider?.();
       const habitat = forestField?.sample(candidate.x, candidate.z) ?? null;
+      const clusterDensity = understoryClusterDensity(cluster.density, habitat, bushes.understoryDensity);
+      if (clusterDensity <= 0) return null;
       const canopy = habitat
         ? forestFloorDensity(habitat, 'bush', forestFloorConfig)
         : 1;
@@ -270,7 +271,7 @@ export class StylizedBushView {
       // How thick a biome's undergrowth runs: a rainforest floor is a thicket,
       // a taiga's is thin, a savanna's is scattered scrub.
       const biome = bushes.densityByTile?.[candidate.tileId] ?? 1;
-      const density = Math.min(1, cluster.density * canopy * fringe * regionalScrub * biome);
+      const density = Math.min(1, clusterDensity * canopy * fringe * regionalScrub * biome);
       if (candidate.priority >= density) return null;
       return {
         clusterId: cluster.clusterId,

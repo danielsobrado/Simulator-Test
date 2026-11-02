@@ -113,6 +113,10 @@ stylizedSurface:
   effect of saplings at patch edges, which left glades bare. Boulders are hard blockers;
   trees deliberately are not — reading the tree manifest would make bush acceptance depend
   on whether that manifest happened to be cached.
+- **A wood keeps a shrub layer.** Inside a stand, `bushes.understoryDensity` lifts
+  the cluster density by canopy coverage (`understoryClusterDensity`), so shrubs do
+  not stop where the cluster field's thickets do. Forest biomes keep their cover
+  through meadow districts with `regionalForestFloor`.
 - Pine foliage preserves the source alpha silhouette, applies the source color
   treatment and uses the same wind clock as the grass.
 - Water tiles get a cel-shaded Voronoi overlay (F1 − SmoothF1) with world-anchored

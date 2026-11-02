@@ -6,6 +6,8 @@ import {
   ForestHabitatField,
   createForestPlacementEvaluator,
 } from '../src/editor/stylized/forest/ForestHabitatField.js';
+import { createForestBiomeProfiles } from '../src/editor/stylized/forest/ForestBiomeProfiles.js';
+import { understoryClusterDensity } from '../src/editor/stylized/forest/ForestFloor.js';
 import {
   resolveForestCandidateBudget,
   resolveForestSeed,
@@ -250,6 +252,26 @@ test('tree manifest integration uses the active generator seed', () => {
 
   assert.equal(store.forestField.seed, 918273);
   store.dispose();
+});
+
+test('a wood keeps a shrub layer where the cluster field has none', () => {
+  assert.equal(understoryClusterDensity(0, { patchCoverage: 1 }, 0.9), 0.9);
+  assert.equal(understoryClusterDensity(0, { patchCoverage: 0.5 }, 0.8), 0.4);
+  assert.equal(understoryClusterDensity(0.95, { patchCoverage: 1 }, 0.9), 0.95);
+  assert.equal(understoryClusterDensity(0.3, null, 0.9), 0.3);
+  assert.equal(understoryClusterDensity(0, { patchCoverage: 1 }), 0);
+});
+
+test('forest biomes stay wooded through meadow districts', () => {
+  const profiles = createForestBiomeProfiles({ 6: { regionalForestFloor: 0.85 } });
+  const field = new ForestHabitatField({
+    tileSize: 2,
+    tileAt: () => 6,
+    heightAt: () => 5,
+    regionalCharacterField: { signature: 'meadow', sampleChannel: () => 0.2 },
+    config: { profiles: { 6: profiles.get(6) } },
+  });
+  assert.equal(field.sampleCoarse(0, 0).regionalForest, 0.85);
 });
 
 test('forest candidate budgets are finite and bounded', () => {

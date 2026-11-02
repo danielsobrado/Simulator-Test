@@ -34,8 +34,9 @@ const DETAIL_SCRATCH = {
   yaw: new THREE.Quaternion(),
 };
 
-function cloneDetailMaterial(source, { wind = null, height = 0, motion = 'woody-shrub', foliageConfig = null, tileId = null, role = 'auto', ambientEffects = null } = {}) {
+function cloneDetailMaterial(source, { wind = null, height = 0, motion = 'woody-shrub', foliageConfig = null, tileId = null, role = 'auto', ambientEffects = null, colorScale = 1 } = {}) {
   const material = cloneAuthoredNodeMaterial(source, { lit: !!foliageConfig });
+  material.color?.multiplyScalar(colorScale);
   if (foliageConfig) applyUnderstoryPalette(material, foliageConfig, tileId, role);
   // Swayed with the meadow's own wave, so a tuft is not a rigid patch in a moving
   // sward (groundDetailWind.js).
@@ -201,6 +202,7 @@ export class StylizedGroundDetailView {
                 ? this.config : null,
               tileId: definition.tileIds?.[0],
               ambientEffects: this.config.ambientEffects,
+              colorScale: definition.colorScale,
             }),
             kind: 'detail',
           };

@@ -695,7 +695,8 @@ stylizedSurface:
       # geometry. Green stays full height as reeds; dry is scaled to tuft height.
       # --- Bog floor (tools/blender/swamp_trees/build_swamp_understory.py):
       # ferns under the swamp giants, fallen mossy logs, broken stumps, cypress
-      # knees standing out of the mud and glowing fungi. Grukmar's bogs only.
+      # knees standing out of the mud and glowing fungi. Grukmar's bogs only,
+      # except the logs and stumps, which are the deadwood of every closed forest.
       - scene: /assets/ground/swamp/swamp-fern-01.glb
         motion: grass-tuft
         scale: 1
@@ -708,16 +709,22 @@ stylizedSurface:
         motion: rigid
         scale: 1
         weight: 0.35
-        tileIds: [12]
+        tileIds: [12, 5, 6, 7, 8, 9]
+        canopy: core
         sway: false
+        # The bark texture is painted for bog gloom and reads as charcoal on a
+        # lit forest floor.
+        colorScale: 3
         prototypeGroups:
           - [swamp-log-01]
       - scene: /assets/ground/swamp/swamp-stump-01.glb
         motion: rigid
         scale: 1
         weight: 0.3
-        tileIds: [12]
+        tileIds: [12, 5, 6, 7, 8, 9]
+        canopy: core
         sway: false
+        colorScale: 3
         prototypeGroups:
           - [swamp-stump-01]
       - scene: /assets/ground/swamp/swamp-knees-01.glb
@@ -1616,7 +1623,7 @@ stylizedSurface:
   bushes:
     enabled: true
     residentRadius: 2
-    perChunk: 96
+    perChunk: 180
     # The bog (12) grows ferns and deadwood (groundDetails), not shrubs.
     tileIds: [3, 4, 5, 6, 7, 8, 9, 14]
     minScale: 0.7
@@ -1627,6 +1634,9 @@ stylizedSurface:
     colorFern: '#628e52'
     # Bushes thicken toward cluster and forest fringes.
     edgeAffinity: 0.5
+    # Cluster density a wood's interior keeps at full canopy, wherever the cluster
+    # field has no thicket: a closed forest has a shrub layer throughout.
+    understoryDensity: 0.9
     clusterSupercellSize: 74
     clusterSampleSpacing: 5
     clusterDensity: 0.88
@@ -1919,7 +1929,9 @@ stylizedSurface:
       tint: 0.9
     enabled: true
     residentRadius: 2
-    perChunk: 12
+    # Without habitat this is the tree count; with it, candidates cap at 8× this,
+    # so 12 had been holding candidateBudgetPerChunk to 96.
+    perChunk: 28
     clearRadius: 3.5
     tileIds: [3, 4, 5, 6, 7, 8, 9, 10, 12]
     # Bark weathering, after grass-test's barkWeathering: moss on a trunk's shaded
@@ -1949,8 +1961,8 @@ stylizedSurface:
       # Closed forest needs real density; the patch field keeps glades open, so
       # raising these thickens cores rather than filling the world evenly.
       # Spacing uses a bucket index, so cost is linear in candidates, not squared.
-      candidateBudgetPerChunk: 144
-      maxAcceptedPerChunk: 72
+      candidateBudgetPerChunk: 220
+      maxAcceptedPerChunk: 110
       patchSupercellSize: 384
       patchSampleSpacing: 12
       # Convert broad low-probability habitat into compact stands: coverage
@@ -1966,8 +1978,15 @@ stylizedSurface:
       waterRangeMeters: 80
       # Imported Azgaar alpine biomes sit hundreds of metres above sea level.
       # Snowy conifers fade into a sparse treeline below the 700 m snow band.
+      #
+      # regionalForestFloor keeps a forest biome wooded through the regional
+      # field's meadow districts; without it 43% of a temperate forest was lawn.
       profiles:
-        9: { elevationMax: 550, elevationFade: 100 }
+        5: { regionalForestFloor: 0.8 }
+        6: { regionalForestFloor: 0.85 }
+        7: { regionalForestFloor: 0.9 }
+        8: { regionalForestFloor: 0.9 }
+        9: { elevationMax: 550, elevationFade: 100, regionalForestFloor: 0.8 }
         10: { elevationMax: 620, elevationFade: 80 }
         # Grukmar's bogs are closed swamp forest standing in their own water, not
         # stands hugging a distant shore; imported lowland bogs sit 10-60 m up.
@@ -1992,7 +2011,7 @@ stylizedSurface:
       flowerEdgeDensity: 0.48
       # Raised from 0.28 so a wood's interior keeps a shaded shrub layer; the
       # shade-tolerant variant (canopy: core) is what grows there.
-      bushCoreDensity: 0.42
+      bushCoreDensity: 0.6
       bushEdgeDensity: 0.95
       # Tint the ground takes under canopy. The old '#273c25' at 0.68 landed the
       # wood interior near black once Lambert shading and canopy shadow stacked on

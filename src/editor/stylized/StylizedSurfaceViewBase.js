@@ -1,3 +1,4 @@
+import { IcebergView } from './ice/IcebergView.js';
 import { SharedWaterMaterials } from './SharedWaterMaterials.js';
 import { WaterObstacleUpdates } from './WaterObstacleUpdates.js';
 import { WaterReflectionController } from '../../render/reflections/WaterReflectionController.js';
@@ -744,6 +745,10 @@ export class StylizedSurfaceView {
     }
     this.meadowGrass?.updateFrame(timestamp, camera, body);
     this.rockView?.update(timestamp, camera);
+    if (this.icebergView && camera) {
+      const origin = this.terrainView.floatingOrigin.getState();
+      this.icebergView.update({ x: camera.position.x + origin.x, z: camera.position.z + origin.z });
+    }
     syncViewRebuildQueue(this.rockBuildQueue, [this.rockView]);
     const rockPlacements = this.rockView?.getPlacements() ?? [];
     this.treeView?.update(timestamp, camera, this.rockView);
@@ -1019,6 +1024,7 @@ export class StylizedSurfaceView {
     this.bushView?.dispose();
     this.treeView?.dispose();
     this.rockView?.dispose();
+    this.icebergView?.dispose();
     if (this.sharedScenePath) {
       this.sceneAssets?.release(this.sharedScenePath);
       this.sharedScenePath = null;

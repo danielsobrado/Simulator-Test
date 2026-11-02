@@ -935,6 +935,28 @@ Hitches and GPU average overlap. The change sits about 1% lower on average FPS a
 0.05 ms higher on GPU p95, which is within what five runs can separate. This route is
 one biome path, so it does not measure every floor pairing.
 
+### Forest understory (2026-11-02, **focus-clean A/B outstanding**)
+
+Forest biomes were mostly lawn: at the procedural world's sampled points, 43% of
+temperate forest had coverage under 0.2, because `regionalForest` scaled coverage
+before `coverageContrast`. And `candidateBudgetPerChunk` was silently clamped to
+8 × `trees.perChunk`, so 144 meant 96. Biomes 5–9 now set `regionalForestFloor`,
+`trees.perChunk` is 28 with a budget of 220 and 110 accepted, bushes keep
+`understoryDensity` under canopy, and the bog's logs and stumps also grow in
+forests. Tree placements roughly doubled (2.4× at the visual-QA poses).
+
+`chunk-cross`, warmup 8, `--settle`, 20 s, from `x=2005 z=2941` (biome 7), clean
+export of `db67556f` against the change. **Every run lost native foreground focus
+to another window, so treat these as indicative, including the FPS figures:**
+
+| Run | Base FPS | Change FPS | Base GPU avg ms | Change GPU avg ms |
+|-----|----------|------------|-----------------|-------------------|
+| Forest | 119.9, 94.3, 104.7 | 99.0, 96.0, 47.1 | 2.36, 2.68, 2.48 | 2.83, 3.13, 3.43 |
+| Spawn | 95.2, 101.8 | 113.5, 105.2 | 2.31, 2.73 | 2.25, 2.22 |
+
+The 47.1 run has a 3.4 s frame that no other forest run shows, cause unknown. GPU
+time is the steadier signal: about +0.6 ms in closed forest, nothing at spawn.
+
 ### Landforms and the grassland benchmark (2026-11-01)
 
 `TerrainLandforms.js` adds warped swells, gullies and knolls to both generators,

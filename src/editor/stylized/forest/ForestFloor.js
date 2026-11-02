@@ -53,6 +53,14 @@ export function forestFloorDensity(habitat, kind, config = {}) {
 }
 
 /**
+ * A shrub layer does not stop where the cluster field's thickets do: a wood keeps
+ * `understory` of a thicket's density across its interior, scaled by coverage.
+ */
+export function understoryClusterDensity(clusterDensity, habitat, understory = 0) {
+  return Math.max(clusterDensity, understory * clamp01(habitat?.patchCoverage ?? 0));
+}
+
+/**
  * Bilinear canopy suppression over one chunk, as a `(localX, localZ) => 0..1`
  * sampler, or null when this chunk has nothing to suppress.
  *
