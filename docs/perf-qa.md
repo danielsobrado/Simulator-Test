@@ -961,6 +961,11 @@ A follow-up adds to that unmeasured cost: bushes in a wood no longer pass the
 regional scrub channel (1302 to 1903 placements at one temperate core), taiga bush
 and ground-detail shares rise, and dry woods grow a fern. Run the A/B on this state.
 
+A second follow-up adds more unmeasured per-frame work: the `forestDebris` layer
+(up to 256 candidates a chunk in the three nearest rows, 72 leaves a litter drift),
+and `groundDetail.fadeEnd` from 34 m to 56 m, which runs five more noise octaves
+on terrain pixels out to that distance.
+
 ### Landforms and the grassland benchmark (2026-11-01)
 
 `TerrainLandforms.js` adds warped swells, gullies and knolls to both generators,

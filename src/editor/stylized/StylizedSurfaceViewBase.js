@@ -26,6 +26,7 @@ import { StylizedChunkRevisionTracker } from './StylizedChunkRevisionTracker.js'
 import { StylizedFlowerView } from './StylizedFlowerView.js';
 import { StylizedGroundDetailView } from './StylizedGroundDetailView.js';
 import { createShoreLifePrototypes } from './shoreLifePrototypes.js';
+import { createForestDebrisPrototypes } from './forest/forestDebrisPrototypes.js';
 import { createAquaticFloraPrototypes } from './aquaticFloraPrototypes.js';
 import { advancePlantSway } from './plantSway.js';
 import { contactShadeRadius, paintContactShade, resolveContactShade } from './contactShade.js';
@@ -241,6 +242,20 @@ export class StylizedSurfaceView {
       this.shoreLifeView,
       this.tropicalKitView,
     ].filter(Boolean);
+    this.forestDebrisView = this.enabled
+      && !this.impostorBakeMode
+      && config.forestDebris?.enabled
+      ? new StylizedGroundDetailView({
+        terrainView,
+        config,
+        revisionTracker: this.revisionTracker,
+        layerConfig: config.forestDebris,
+        layerName: 'forestDebris',
+        priorityChannel: 46,
+        forestFieldProvider: () => this.treeView?.manifestStore?.forestField ?? null,
+      })
+      : null;
+    this.forestDebrisView?.appendProceduralPrototypes(createForestDebrisPrototypes(config.forestDebris));
     this.wildlifeView = this.enabled
       && !this.impostorBakeMode
       && config.wildlife?.enabled
@@ -248,6 +263,7 @@ export class StylizedSurfaceView {
         terrainView,
         config: {
           ...config.wildlife,
+      this.forestDebrisView,
           variants: config.assets.wildlifeVariants ?? [],
         },
         baseUrl,

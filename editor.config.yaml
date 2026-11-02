@@ -702,8 +702,7 @@ stylizedSurface:
       # geometry. Green stays full height as reeds; dry is scaled to tuft height.
       # --- Bog floor (tools/blender/swamp_trees/build_swamp_understory.py):
       # ferns under the swamp giants, fallen mossy logs, broken stumps, cypress
-      # knees standing out of the mud and glowing fungi. Grukmar's bogs only,
-      # except the logs and stumps, which are the deadwood of every closed forest.
+      # knees standing out of the mud and glowing fungi. Grukmar's bogs only.
       - scene: /assets/ground/swamp/swamp-fern-01.glb
         motion: grass-tuft
         scale: 1
@@ -726,22 +725,16 @@ stylizedSurface:
         motion: rigid
         scale: 1
         weight: 0.35
-        tileIds: [12, 5, 6, 7, 8, 9]
-        canopy: core
+        tileIds: [12]
         sway: false
-        # The bark texture is painted for bog gloom and reads as charcoal on a
-        # lit forest floor.
-        colorScale: 5
         prototypeGroups:
           - [swamp-log-01]
       - scene: /assets/ground/swamp/swamp-stump-01.glb
         motion: rigid
         scale: 1
         weight: 0.3
-        tileIds: [12, 5, 6, 7, 8, 9]
-        canopy: core
+        tileIds: [12]
         sway: false
-        colorScale: 5
         prototypeGroups:
           - [swamp-stump-01]
       - scene: /assets/ground/swamp/swamp-knees-01.glb
@@ -1041,10 +1034,10 @@ stylizedSurface:
           3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.72, patchMeters: 14, shape: slender}
           4: {shortHeight: 0.24, tallHeight: 0.82, width: 0.045, density: 0.92, patchMeters: 17, shape: slender}
           5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
-          6: {shortHeight: 0.12, tallHeight: 0.38, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
+          6: {shortHeight: 0.16, tallHeight: 0.44, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
           7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.82, patchMeters: 12, shape: broadleaf, areaStyle: 0.25}
           8: {shortHeight: 0.18, tallHeight: 0.52, width: 0.062, density: 0.78, patchMeters: 10, shape: broadleaf, areaStyle: 0.3}
-          9: {shortHeight: 0.1, tallHeight: 0.28, width: 0.05, density: 0.8, patchMeters: 12, shape: slender, areaStyle: 0.7}
+          9: {shortHeight: 0.13, tallHeight: 0.34, width: 0.05, density: 0.8, patchMeters: 12, shape: slender, areaStyle: 0.7}
           10: {shortHeight: 0.06, tallHeight: 0.16, width: 0.028, density: 0.28, patchMeters: 7, shape: slender, areaStyle: 0.8}
           11: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           # Bog: sedge tussocks on the islands, patchy over moss rather than a field.
@@ -1120,19 +1113,22 @@ stylizedSurface:
         lean: 0.55
         bendIsolated: 4
         bendCore: 1.25
-        widthFloor: 0.5
+        widthFloor: 0.4
         widthPower: 0.6
         windShort: 0.6
         rootLift: 0.60
         valueSpread: 0.16
       # The ground between stems (meadow/meadowGroundDetailConfig.js): litter
+        # Share of a short stand's stragglers that drop out between tufts, so a
+        # forest floor grows plants over litter rather than an even speckle.
+        gapCut: 0.9
       # drifts, moss hollows, soil pockets and fallen-blade streaks, procedural on
       # the terrain's transition lattice (no sampler), fading to plain turf by
       # fadeEnd so the mid-distance bake still matches.
       groundDetail:
-        fadeStart: 14
-        fadeEnd: 34
-        fineEnd: 10
+        fadeStart: 24
+        fadeEnd: 56
+        fineEnd: 14
         strength: 1
         # floor: the neutral CC0 scans laid over settled ground and over dry or worn
         # ground (stylized/path/terrainGroundLayers.js).
@@ -1144,7 +1140,7 @@ stylizedSurface:
           11: { floor: [grit, grit] }      # glacier
           3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, cracked] }   # savanna: straw, warm earth
           5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25, floor: [litter, mossy] }
-          6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35, floor: [mossy, litter] }
+          6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35, floor: [litter, mossy] }
           7: { litter: '#5e4c31', litterAmount: 0.5, moss: 0.45, soil: 0.2, streaks: 0.3, floor: [litter, mossy] }   # tropical rainforest: leaf litter
           8: { litter: '#5a4a30', litterAmount: 0.5, moss: 0.5, soil: 0.2, streaks: 0.3, floor: [mossy, litter] }    # temperate rainforest
           9: { litter: '#6b543a', litterAmount: 0.6, moss: 0.55, soil: 0.35, streaks: 0.5, floor: [mossy, grit] }  # taiga: needle duff, moss
@@ -1719,6 +1715,27 @@ stylizedSurface:
     colorVariation: 0.14
     castShadow: false
   # The tropical kit's understory (assets.tropicalKitVariants): jungle grasses and
+  # The floor of a wood: deadwood, leaf drifts and moss (forest/forestDebrisGeometry.js),
+  # all built in code. Each candidate survives by canopy coverage, so it thins out
+  # with the wood instead of spilling onto open biome ground.
+  forestDebris:
+    enabled: true
+    residentRadius: 1
+    perChunk: 256
+    tileIds: [5, 6, 7, 8, 9]
+    canopyGate: true
+    minScale: 0.8
+    maxScale: 1.3
+    radius: 0.5
+    heightOffset: 0
+    colorVariation: 0.16
+    castShadow: false
+    variants:
+      leafLitter: { weight: 6, tileIds: [5, 6, 7, 8] }
+      mossMound: { weight: 1.5 }
+      fallenBranch: { weight: 1 }
+      fallenLog: { weight: 0.2 }
+      stump: { weight: 0.14 }
   # groundcover in tropical seasonal forest and rainforest. At 324-1 960 triangles
   # an instance it is a heavier job than the 350-triangle ground-detail accents, so
   # it keeps its own, smaller candidate budget, casts no shadow and stays in the
@@ -1933,7 +1950,7 @@ stylizedSurface:
   trees:
     # Lift painted black crevices as reflectance, preserving actual shadows and
     # authored bark structure. Baked impostors use the identical material grade.
-    barkGrade: { enabled: true, contrast: 0.65, pivot: 0.18, saturation: 0.88, strength: 0.55 }
+    barkGrade: { enabled: true, contrast: 0.5, pivot: 0.2, saturation: 0.82, strength: 0.8 }
     # grass-test's canopy grade (stylized/forest/canopyGrade.js): textured authored
     # crowns are re-coloured by their luminance onto one shade->light green ramp,
     # the donor's `canopyShadow`/`canopyLight`/`canopyTint`. It is what makes its
@@ -1941,8 +1958,8 @@ stylizedSurface:
     # vertex-painted (alpine snow) crowns are left alone.
     canopyGrade:
       enabled: true
-      shadow: '#286746'
-      light: '#8cb75a'
+      shadow: '#1d5a42'
+      light: '#a8c566'
       tint: 0.9
     enabled: true
     residentRadius: 2
@@ -1964,12 +1981,12 @@ stylizedSurface:
     # rather than invented.
     weathering:
       enabled: true
-      moss: 0.7
+      moss: 1
       wet: 0.8
       snow: 0.8
       tint: 0.12
-      base: 0.25
-      baseHeight: 1.2
+      base: 0.4
+      baseHeight: 1.8
     # Species whose bare, lattice crowns must never merge into the far band's
     # rounded canopy clusters; they stand as their own impostors instead.
     unclusteredSpecies: [wetland_sparse]
@@ -2014,10 +2031,10 @@ stylizedSurface:
       # as litter. Open meadows retain the default population.
       byTileId:
         5: { grassCoreDensity: 0.24, flowerCoreDensity: 0.06 }
-        6: { grassCoreDensity: 0.25, flowerCoreDensity: 0.08 }
+        6: { grassCoreDensity: 0.45, flowerCoreDensity: 0.08 }
         7: { grassCoreDensity: 0.18, flowerCoreDensity: 0.04 }
         8: { grassCoreDensity: 0.5, flowerCoreDensity: 0.06 }   # rainforest floor: moss and grass islands
-        9: { grassCoreDensity: 0.24, flowerCoreDensity: 0.04 }
+        9: { grassCoreDensity: 0.4, flowerCoreDensity: 0.04 }
         12: { grassCoreDensity: 0.22, flowerCoreDensity: 0.04 }
       # Core densities are how much ground cover survives under closed canopy.
       # Forest overrides leave room for the shared litter/moss substrate and

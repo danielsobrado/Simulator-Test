@@ -52,8 +52,17 @@ export const MEADOW_CARD_HEIGHT_CONTRAST = 0.35;
 export const MEADOW_TALL_TUFT_RELIEF = 0.6;
 
 /**
+ * A profile's tall height across which a stand stops being "short": stems this
+ * low have no sward to shade their roots and no height to fill a gap with.
+ */
+export const MEADOW_SHORT_STAND = Object.freeze([0.45, 0.7]);
+
+/** Occupancy across which a short stand's stragglers fade out to leave plants. */
+export const MEADOW_GAP_RAMP = Object.freeze([0.12, 0.42]);
+
+/**
  * `grass.meadow.tufts`: how strongly the field shapes stems. All live uniforms.
- * Zero `height`, `lean`, `rootLift` and `valueSpread` with both bends at 1,
+ * Zero `height`, `lean`, `rootLift`, `gapCut` and `valueSpread` with both bends at 1,
  * `widthFloor` 1 and `windShort` 1 restores the untufted stand.
  */
 export const MEADOW_TUFT_DEFAULTS = Object.freeze({
@@ -73,4 +82,6 @@ export const MEADOW_TUFT_DEFAULTS = Object.freeze({
   rootLift: 0.28,
   /** ± value shared by a tuft's stems, so plants read as one pigment. */
   valueSpread: 0.07,
+  /** Share of a short stand's stragglers dropped between tufts (0..1). */
+  gapCut: 0.9,
 });

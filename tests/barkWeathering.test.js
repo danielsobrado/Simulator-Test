@@ -25,7 +25,7 @@ test('the shipped config resolves, and takes the terrain snow band it is handed'
   const band = shippedSnowBand();
   const settings = resolveBarkWeathering(surface, { snow: band });
   assert.equal(settings.enabled, true);
-  assert.equal(settings.moss, 0.7);
+  assert.equal(settings.moss, 1);
   // Snow on a trunk has to start where snow on the ground does. The band lives in
   // the world's configuration, so it is handed down rather than restated here —
   // there is exactly one snow line in the project.
@@ -40,7 +40,7 @@ test('with no band handed down, the snow term is off rather than guessed', () =>
   // white trunks on a green hillside.
   const settings = resolveBarkWeathering(shippedSurface());
   assert.equal(settings.snowBand, null);
-  assert.equal(settings.moss, 0.7, 'the rest of the weathering still applies');
+  assert.equal(settings.moss, 1, 'the rest of the weathering still applies');
 });
 
 test('a config may override the snow band, and cannot invent one', () => {

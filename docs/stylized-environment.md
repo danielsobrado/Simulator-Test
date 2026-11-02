@@ -117,6 +117,11 @@ stylizedSurface:
   the cluster density by canopy coverage (`understoryClusterDensity`), so shrubs do
   not stop where the cluster field's thickets do. Forest biomes keep their cover
   through meadow districts with `regionalForestFloor`.
+- **Forest floors are their own layer.** `forest/forestDebrisGeometry.js` builds logs,
+  stumps, branches, leaf drifts and moss in code with per-vertex colour, and
+  `forestDebris.canopyGate` keeps each candidate by canopy coverage, so it thins with
+  the wood. Short stands (`MEADOW_SHORT_STAND`) drop their stragglers between tufts
+  (`tufts.gapCut`) and are not painted as all root, which is what read as black spikes.
 - Pine foliage preserves the source alpha silhouette, applies the source color
   treatment and uses the same wind clock as the grass.
 - Water tiles get a cel-shaded Voronoi overlay (F1 − SmoothF1) with world-anchored

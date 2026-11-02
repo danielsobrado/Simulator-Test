@@ -34,9 +34,8 @@ const DETAIL_SCRATCH = {
   yaw: new THREE.Quaternion(),
 };
 
-function cloneDetailMaterial(source, { wind = null, height = 0, motion = 'woody-shrub', foliageConfig = null, tileId = null, role = 'auto', ambientEffects = null, colorScale = 1 } = {}) {
+function cloneDetailMaterial(source, { wind = null, height = 0, motion = 'woody-shrub', foliageConfig = null, tileId = null, role = 'auto', ambientEffects = null } = {}) {
   const material = cloneAuthoredNodeMaterial(source, { lit: !!foliageConfig });
-  material.color?.multiplyScalar(colorScale);
   if (foliageConfig) applyUnderstoryPalette(material, foliageConfig, tileId, role);
   // Swayed with the meadow's own wave, so a tuft is not a rigid patch in a moving
   // sward (groundDetailWind.js).
@@ -202,7 +201,6 @@ export class StylizedGroundDetailView {
                 ? this.config : null,
               tileId: definition.tileIds?.[0],
               ambientEffects: this.config.ambientEffects,
-              colorScale: definition.colorScale,
             }),
             kind: 'detail',
           };
@@ -371,6 +369,10 @@ export class StylizedGroundDetailView {
             tileAt: (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ),
           },
         )) return null;
+
+        // A layer of woodland floor lives under canopy, thinning out with it.
+        if (this.layerConfig.canopyGate
+          && candidate.priority >= (forestField?.sample(candidate.x, candidate.z).patchCoverage ?? 0)) return null;
 
         const metadata = evaluateDetailSurfacePlacement(this, candidate, options.heightAt, shouldYield);
         if (!metadata) return null;

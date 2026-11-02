@@ -5,6 +5,7 @@ import { meadowCanopyColor, meadowCanopyView } from './meadowCanopy.js';
 import { meadowPatchColors } from './meadowColorNodes.js';
 import { applyGrassMarks } from './meadowGrassMarks.js';
 import { MEADOW_GRASS_DEFAULTS } from './meadowGrassConfig.js';
+import { meadowShortStand } from './meadowGrowthNodes.js';
 import { applyMeadowGroundStyle, meadowGroundStyle } from './meadowGroundStyle.js';
 import { meadowStandNodes } from './meadowStandNodes.js';
 import { meadowTuftNodes } from './meadowTuftNodes.js';
@@ -79,10 +80,14 @@ export function meadowPigment({ uniforms, tuning, config, blade, marks = false, 
   tip = tipData.xyz;
   const melting = tipData.w;
   const canopy = meadowCanopyColor(root, tip, appearance.canopyTipMix);
-  const pigment = mix(mix(root, tip, pow(height, appearance.gradientPower)), canopy, melting.mul(appearance.meltFlatten));
+  // A short stem has no sward over its root: the whole blade is lit, so painting
+  // most of it as root is what turned it into a black spike on sunlit ground.
+  const short = meadowShortStand(uniforms.growth.dimensions.element(blade.growth.toInt()).y).toVarying('meadowShortStand');
+  const gradient = mix(pow(height, appearance.gradientPower), height.sqrt(), short);
+  const pigment = mix(mix(root, tip, gradient), canopy, melting.mul(appearance.meltFlatten));
   // Contact darkening belongs to dense interiors; an isolated stem's foot stays
   // near the ground's own value instead of punching a dark dot into it.
-  const rootFloor = mix(appearance.rootBrightness, float(1), float(1).sub(rootData.w).mul(tufts.rootLift));
+  const rootFloor = mix(appearance.rootBrightness, float(1), float(1).sub(rootData.w).mul(tufts.rootLift).max(short));
   const rootShade = mix(mix(rootFloor, 1, smoothstep(0, appearance.canopyDepth.max(0.01), height)), float(1), melting);
   // The foot meets the ground as the terrain shows it from this view
   // (MeadowGroundShading's root): soil-side from above, canopy when grazing.

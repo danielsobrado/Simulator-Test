@@ -116,11 +116,11 @@ export const MEADOW_GRASS_DEFAULTS = Object.freeze({
 
 const TUFT_LIMITS = Object.freeze({
   height: [0, 1], lean: [0, 1], bendIsolated: [0, 6], bendCore: [0, 6],
-  widthFloor: [0.05, 1], widthPower: [0, 2], windShort: [0, 1], rootLift: [0, 1], valueSpread: [0, 0.5],
+  widthFloor: [0.05, 1], widthPower: [0, 2], windShort: [0, 1], rootLift: [0, 1], valueSpread: [0, 0.5], gapCut: [0, 1],
 });
 /** The settings that leave stems as they stood before tufts. */
 const UNTUFTED = Object.freeze({
-  height: 0, lean: 0, bendIsolated: 1, bendCore: 1, widthFloor: 1, windShort: 1, rootLift: 0, valueSpread: 0,
+  height: 0, lean: 0, bendIsolated: 1, bendCore: 1, widthFloor: 1, windShort: 1, rootLift: 0, valueSpread: 0, gapCut: 0,
 });
 
 function resolveTufts(source, path) {
