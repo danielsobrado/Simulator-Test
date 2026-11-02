@@ -5,6 +5,7 @@ import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList, normalizeBaseUrl, resolveAssetUrl } from '../assets/assetUrl.js';
 import {
   attachRootCollar,
+  attachTreeRoots,
   extractPrototypeParts,
   extractPrototypePartsFromRoots,
   findPrototypeRoots,
@@ -451,6 +452,7 @@ export class StylizedTreeView {
           }
         }
         if (pivot === 'trunk') pivotOnTrunkBase(baked);
+        if (preserveSourceAppearance) attachTreeRoots(baked, `${sourceLabel}:${this.prototypes.length}`);
         const sway = this.treeSway(baked);
         const parts = baked.map((part) => {
           const source = firstMaterial(
@@ -474,6 +476,9 @@ export class StylizedTreeView {
                 maxY: part.geometry.boundingBox.max.y,
               },
               treeTopY: sway.topY,
+              crownRadius: Math.max(
+                ...['min', 'max'].flatMap((end) => ['x', 'z'].map((axis) => Math.abs(part.geometry.boundingBox[end][axis]))),
+              ),
               time: this.time,
               config: this.config,
               preserveSourceColor: gradeLeaf,

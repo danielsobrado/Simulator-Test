@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createTreeRootGeometry } from './forest/treeRoots.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { materialList } from '../assets/assetUrl.js';
 import {
@@ -284,10 +285,21 @@ function matchAttributeStorage(attribute, template) {
 }
 
 export function attachRootCollar(parts) {
+  return mergeIntoTrunk(parts, createRootCollarGeometry(parts));
+}
+
+/** Grows authored bark its buttress roots, on the same merge the collar takes. */
+export function attachTreeRoots(parts, seed) {
   const trunkPart = parts.find((part) => part.kind === 'trunk');
-  const root = createRootCollarGeometry(parts);
+  return Boolean(trunkPart) && mergeIntoTrunk(parts, createTreeRootGeometry(trunkPart.geometry, seed));
+}
+
+function mergeIntoTrunk(parts, root) {
+  const trunkPart = parts.find((part) => part.kind === 'trunk');
   if (!trunkPart || !root) return false;
   const trunk = trunkPart.geometry;
+  if (trunk.index && !root.index) root.setIndex([...Array(root.getAttribute('position').count).keys()]);
+  if (!trunk.index && root.index) root = root.toNonIndexed();
   for (const name of Object.keys(root.attributes)) {
     if (!trunk.getAttribute(name)) root.deleteAttribute(name);
   }
@@ -308,7 +320,7 @@ export function attachRootCollar(parts) {
   trunk.dispose();
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
-  merged.computeVertexNormals();
+  if (!trunk.getAttribute('normal')) merged.computeVertexNormals();
   trunkPart.geometry = merged;
   return true;
 }

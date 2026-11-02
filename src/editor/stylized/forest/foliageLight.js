@@ -1,13 +1,21 @@
 import * as THREE from 'three/webgpu';
-import { cameraViewMatrix, faceDirection, mix, normalViewGeometry, positionView, smoothstep, vec4 } from 'three/tsl';
+import { cameraViewMatrix, faceDirection, float, mix, normalViewGeometry, normalWorld, positionGeometry, positionView, smoothstep, vec4 } from 'three/tsl';
 import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
 
 /** Share of a plant's normal bent to the sky, leaving a little authored form. */
 const SKYWARD_NORMAL = 0.72;
 /** Crown in-scatter: metres over which it ramps, and its share of the sky fill. */
-const CROWN_AIR_START = 25;
-const CROWN_AIR_END = 240;
-const CROWN_AIR = 0.32;
+const CROWN_AIR_START = 14;
+const CROWN_AIR_END = 220;
+const CROWN_AIR = 0.42;
+/** Share of the sky fill a crown's and a trunk's shaded faces take. */
+const CROWN_FILL = 0.55;
+const BARK_FILL = 0.6;
+/** Share of the ground's bounce light a downward face takes. */
+const CROWN_BOUNCE = 0.5;
+const BARK_BOUNCE = 0.7;
+/** Metres up a trunk over which the bounce off the ground fades. */
+const BOUNCE_REACH = 5;
 
 /**
  * A restrained sky fill shared by crowns and understory, updated once a frame.
@@ -19,6 +27,8 @@ export const foliageLight = Object.freeze({
   /** Sky fill lifting the canopy's shaded interior. */
   fill: uniform(0.3),
   skyColor: uniform(new THREE.Color('#ffffff')),
+  /** The hemisphere's ground colour: light coming back up off the forest floor. */
+  groundColor: uniform(new THREE.Color('#000000')),
 });
 
 /**
@@ -30,6 +40,8 @@ export function syncFoliageLight(sky) {
   const hemisphere = sky?.hemisphere;
   if (hemisphere) foliageLight.skyColor.value.copy(hemisphere.color);
   else foliageLight.skyColor.value.setRGB(0, 0, 0);
+  if (hemisphere) foliageLight.groundColor.value.copy(hemisphere.groundColor);
+  else foliageLight.groundColor.value.setRGB(0, 0, 0);
   foliageLight.fill.value = Math.min(Math.max(hemisphere?.intensity ?? 0, 0) * 0.35, 0.7);
   // Light intensity and colour are already included in the lighting model.
   foliageLight.strength.value = sky?.directional ? 0.12 : 0;
@@ -56,7 +68,27 @@ export function applySkywardNormal(material) {
  * The added air lifts shaded leaves toward the sky behind them: exp² fog is still
  * near zero at the treeline, where crowns otherwise cut out of the sky.
  */
-export function treeFoliageEmission(crown) {
-  const air = smoothstep(CROWN_AIR_START, CROWN_AIR_END, positionView.length()).mul(CROWN_AIR);
-  return foliageSkyFill(crown, 0.4).add(foliageLight.skyColor.mul(foliageLight.fill).mul(air));
+export function treeFoliageEmission(crown, skyEdge = null) {
+  const air = treeAir();
+  const edge = skyEdge ?? float(0);
+  const underside = normalWorld.y.negate().max(0);
+  return foliageSkyFill(crown, CROWN_FILL)
+    .add(crown.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(underside).mul(CROWN_BOUNCE))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(air.add(edge)));
+}
+
+function treeAir() {
+  return smoothstep(CROWN_AIR_START, CROWN_AIR_END, positionView.length()).mul(CROWN_AIR);
+}
+
+/**
+ * The same air and fill on bark, and the floor's own light on its lower faces: lit
+ * only by the sun and a thin ambient, a shaded trunk is a black bar in a green wood.
+ */
+export function treeBarkEmission(bark) {
+  const low = smoothstep(0, BOUNCE_REACH, positionGeometry.y).oneMinus();
+  const facing = normalWorld.y.negate().mul(0.5).add(0.5);
+  return foliageSkyFill(bark, BARK_FILL)
+    .add(bark.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(low).mul(BARK_BOUNCE))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
 }

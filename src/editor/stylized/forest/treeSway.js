@@ -1,9 +1,14 @@
 import {
-  attribute, cos, float, modelWorldMatrix, positionGeometry, positionLocal, sin, uniform, vec3, vec4,
+  atan, attribute, cos, float, modelWorldMatrix, positionGeometry, positionLocal, sin, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import { canonicalFromRender, sampleWorldWind, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
 
 const TWO_PI = Math.PI * 2;
+/** Share of a tree's height its bole sweeps off plumb at the top, and wanders. */
+const BOLE_SWEEP = 0.05;
+const BOLE_WANDER = 0.018;
+/** Share of a tree's height one side of its crown rides above the other. */
+const CROWN_TILT = 0.045;
 
 /**
  * The slow, whole-tree layer of tree wind, shared by bark and crown so the crown
@@ -46,7 +51,20 @@ export function treeSwayField({ config, time, rootY = 0, topY = 1 }) {
     cos(bend).sub(1).mul(height).mul(r),
     field.direction.y.mul(reach),
   );
-  return { offset, r, height, field, gust, phase, world };
+  // Each tree's standing form, shared by bark and crown so branches stay in their
+  // leaves. It is small enough that an impostor, which cannot carry it, still fits.
+  const sweepDirection = vec2(cos(phase.mul(3)), sin(phase.mul(3)));
+  const sweep = height.mul(BOLE_SWEEP).mul(r).mul(r);
+  const wander = height.mul(BOLE_WANDER).mul(r).mul(sin(r.mul(7.5).add(phase)));
+  const outward = smoothstep(0.03, 0.3, positionGeometry.xz.length().div(height));
+  const tilt = height.mul(CROWN_TILT).mul(outward).mul(r)
+    .mul(sin(atan(positionGeometry.z, positionGeometry.x).add(phase.mul(2))));
+  const form = vec3(
+    sweepDirection.x.mul(sweep).sub(sweepDirection.y.mul(wander)),
+    tilt,
+    sweepDirection.y.mul(sweep).add(sweepDirection.x.mul(wander)),
+  );
+  return { offset: offset.add(form), r, height, field, gust, phase, world };
 }
 
 export function treeBendPosition(options) {

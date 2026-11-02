@@ -966,6 +966,10 @@ A second follow-up adds more unmeasured per-frame work: the `forestDebris` layer
 and `groundDetail.fadeEnd` from 34 m to 56 m, which runs five more noise octaves
 on terrain pixels out to that distance.
 
+Tree roots add about 280 triangles a tree, and bark and crowns gained emissive and
+edge terms, so that A/B also needs running on this state with baked atlases present.
+`87ba800b` to the following commit had no atlases at all (`atlasCount` 0).
+
 ### Landforms and the grassland benchmark (2026-11-01)
 
 `TerrainLandforms.js` adds warped swells, gullies and knolls to both generators,

@@ -122,6 +122,17 @@ stylizedSurface:
   `forestDebris.canopyGate` keeps each candidate by canopy coverage, so it thins with
   the wood. Short stands (`MEADOW_SHORT_STAND`) drop their stragglers between tufts
   (`tufts.gapCut`) and are not painted as all root, which is what read as black spikes.
+- **Trees meet the ground and the sky.** `forest/treeRoots.js` grows buttress roots onto
+  authored bark at load, sized from the stem. `treeSwayField` carries each tree's
+  curved bole and tilted crown, so bark and leaves stay together, and
+  `ForestSpeciesRegistry` picks a crown form through the instance morphology, which
+  the far impostors carry too. Bark takes the understory's moss and the floor's litter
+  at its foot, with sky fill and ground bounce (`treeBarkEmission`). `forest/crownEdge.js`
+  dissolves a crown into the sky with the stable alpha cut intact: outer leaves thin,
+  and leaf rims take the sky's colour. Any change to `trees.*` outside
+  `RUNTIME_TREE_FIELDS`, or to tree geometry, rejects the baked atlases and every tree
+  falls back to proxies: run `npm run bake:impostors` and check
+  `assetIntegrity.atlasCount`.
 - Pine foliage preserves the source alpha silhouette, applies the source color
   treatment and uses the same wind clock as the grass.
 - Water tiles get a cel-shaded Voronoi overlay (F1 − SmoothF1) with world-anchored

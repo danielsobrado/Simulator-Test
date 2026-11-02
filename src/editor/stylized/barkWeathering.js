@@ -15,6 +15,7 @@ import {
 } from 'three/tsl';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
 import { surfaceWetnessUniform } from '../weather/surfaceWetness.js';
+import { resolveFoliagePalette } from './forest/foliagePalette.js';
 
 /**
  * Bark weathering — after grass-test's `barkWeathering`.
@@ -39,8 +40,6 @@ import { surfaceWetnessUniform } from '../weather/surfaceWetness.js';
  *   drift across its LOD levels.
  */
 
-const MOSS_LIGHT = '#7d9a3a';
-const MOSS_DARK = '#4a6123';
 // Moss favours the shaded side of a trunk. North is -Z here, the same convention
 // the sun and the terrain shading use.
 const SHADED_SIDE = Object.freeze([0, 0, -1]);
@@ -48,6 +47,10 @@ const SHADED_SIDE = Object.freeze([0, 0, -1]);
 const MOSS_REACH = 6;
 const WET_DARKENING = 0.45;
 const BASE_TINT = Object.freeze([0.62, 0.58, 0.5]);
+/** Metres of bark, and of root, that turn to the soil they run into. */
+const SOIL_REACH = 0.45;
+const SOIL_SHARE = 0.85;
+const DEFAULT_SOIL = '#6e5435';
 
 export const DEFAULT_BARK_WEATHERING = Object.freeze({
   enabled: true,
@@ -74,6 +77,12 @@ export function resolveBarkWeathering(surface, { snow = null } = {}) {
   const configured = surface?.trees?.weathering;
   if (configured?.enabled === false) return null;
   const settings = { ...DEFAULT_BARK_WEATHERING, ...(configured ?? {}) };
+  // Moss is the understory's own green and soil the floor's own litter, so a trunk
+  // wears the ground it stands on rather than a palette of its own.
+  const { base, tip } = resolveFoliagePalette(surface);
+  settings.mossDark = `#${base.getHexString()}`;
+  settings.mossLight = `#${tip.getHexString()}`;
+  settings.soilColor = surface?.trees?.forestFloor?.litterColor ?? DEFAULT_SOIL;
   for (const key of ['moss', 'wet', 'snow', 'tint', 'base']) {
     const value = Number(settings[key]);
     if (!Number.isFinite(value) || value < 0 || value > 1) {
@@ -137,13 +146,17 @@ export function applyBarkWeathering(material, { settings }) {
   // whitens at.
   const moss = facing.mul(patches).mul(low).mul(snowLine.oneMinus())
     .mul(settings.moss).clamp(0, 1);
-  const mossColor = mix(color(MOSS_DARK), color(MOSS_LIGHT), fract(seed.mul(3.1)))
+  const mossColor = mix(color(settings.mossDark), color(settings.mossLight), fract(seed.mul(3.1)))
     .mul(dot(bark, vec3(0.3, 0.59, 0.11)).mul(1.2).add(0.6));
   const mossy = mix(tinted, mossColor, moss);
 
   // Soil splashes and damp wick up from the ground.
   const baseShade = smoothstep(0, settings.baseHeight, local.y).oneMinus().mul(settings.base);
-  const grounded = mix(mossy, mossy.mul(vec3(BASE_TINT[0], BASE_TINT[1], BASE_TINT[2])), baseShade);
+  const shaded = mix(mossy, mossy.mul(vec3(BASE_TINT[0], BASE_TINT[1], BASE_TINT[2])), baseShade);
+  // The foot of the tree, and every root running out from it, ends in the floor
+  // in broken patches instead of a line where bark meets ground.
+  const soil = smoothstep(0, SOIL_REACH, local.y.add(patches.sub(0.5).mul(0.3))).oneMinus().mul(SOIL_SHARE);
+  const grounded = mix(shaded, color(settings.soilColor), soil);
 
   // Rain runs down in streaks, so the bark darkens unevenly rather than as one
   // flat soak.

@@ -23,7 +23,8 @@ import { authoredTexture } from './AuthoredTextureNode.js';
 import { stylizedFbm } from './StylizedNoiseNodes.js';
 import { registerTreeWindTime } from './forest/TreeWindTime.js';
 import { gradeCanopy, resolveCanopyGrade } from './forest/canopyGrade.js';
-import { treeFoliageEmission } from './forest/foliageLight.js';
+import { crownEdgeNodes } from './forest/crownEdge.js';
+import { treeBarkEmission, treeFoliageEmission } from './forest/foliageLight.js';
 import { foliageMaterialClass } from './forest/FoliageNodeMaterial.js';
 import { foliageWindPosition } from './forest/foliageWind.js';
 import { treeBendPosition } from './forest/treeSway.js';
@@ -57,6 +58,9 @@ export function createStylizedLeafMaterial({
   leafMap,
   bounds,
   treeTopY = bounds.maxY,
+  // Metres from the trunk axis to the crown's outside; with it, the crown's edge
+  // dissolves into the sky (crownEdge.js).
+  crownRadius = 0,
   time,
   config,
   palette = null,
@@ -129,8 +133,17 @@ export function createStylizedLeafMaterial({
     // noise variation — on a crown of flat cards both key to each card's own
     // facing and paint it in cream and dark-green camouflage patches.
     const crown = authoredColor.mul(paletteValue(palette, config, 'brightness'));
-    material.colorNode = crown;
-    material.emissiveNode = treeFoliageEmission(crown);
+    const edge = crownRadius > 0
+      ? crownEdgeNodes(authoredTexture(map).a, {
+        cut: alphaTest > 0 ? alphaTest : (source?.alphaTest ?? config.trees.cardAlphaTest ?? 0.32),
+        radius: crownRadius,
+        height: normalizedHeight,
+      })
+      : null;
+    // Lit less as it takes the sky on, or a sunlit rim would out-shine the sky.
+    material.colorNode = edge ? crown.mul(edge.sky.oneMinus()) : crown;
+    material.emissiveNode = treeFoliageEmission(crown, edge?.sky);
+    material.userData.crownOpacity = edge?.opacity ?? null;
     // Its biome and autumn tints are ratios against the grade, not the palette.
     material.userData.gradedCanopy = canopyGrade;
   } else {
@@ -140,7 +153,7 @@ export function createStylizedLeafMaterial({
     if (authoredColor) material.emissiveNode = treeFoliageEmission(leafColor);
   }
   if (map) {
-    material.opacityNode = authoredTexture(map).a;
+    material.opacityNode = material.userData.crownOpacity ?? authoredTexture(map).a;
     material.alphaTest = alphaTest > 0
       ? alphaTest
       : (source?.alphaTest > 0
@@ -172,6 +185,12 @@ function withTrunkSway(material, sway) {
   return material;
 }
 
+/** After weathering, so moss and soil take the same fill as the bark. */
+function withBarkLight(material) {
+  material.emissiveNode = treeBarkEmission(material.colorNode);
+  return material;
+}
+
 export function createAuthoredTrunkMaterial({
   source,
   sourceMap = null,
@@ -190,7 +209,7 @@ export function createAuthoredTrunkMaterial({
       ? authoredTexture(sourceMap).rgb.mul(baseColor)
       : baseColor;
     material.colorNode = gradeBark(albedo, resolveBarkGrade(barkGrade));
-    return withTrunkSway(applyBarkWeathering(material, { settings: barkWeathering }), sway);
+    return withBarkLight(withTrunkSway(applyBarkWeathering(material, { settings: barkWeathering }), sway));
   }
 
   const albedoHeight = triplanarTexture(
@@ -217,7 +236,7 @@ export function createAuthoredTrunkMaterial({
   material.normalNode = bumpNormal(albedoHeight.a.mul(0.045));
   material.roughnessNode = normalRoughness.b;
   material.metalness = 0;
-  return withTrunkSway(applyBarkWeathering(material, { settings: barkWeathering }), sway);
+  return withBarkLight(withTrunkSway(applyBarkWeathering(material, { settings: barkWeathering }), sway));
 }
 
 export function createStylizedTrunkMaterial({ textures, config, palette = null, sway = null }) {

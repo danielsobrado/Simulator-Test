@@ -44,6 +44,18 @@ const DEFAULT_PALETTES = Object.freeze({
 });
 
 /**
+ * Standing forms of a broadleaf: tall and narrow, broad and spreading, and two
+ * nearer the mean. A multiplier on crown width and aspect, because the instance
+ * morphology is what the far impostors carry too.
+ */
+const BROADLEAF_FORMS = Object.freeze([
+  Object.freeze({ width: 0.74, aspect: 1.2 }),
+  Object.freeze({ width: 1.24, aspect: 0.82 }),
+  Object.freeze({ width: 1, aspect: 1 }),
+  Object.freeze({ width: 0.9, aspect: 1.08 }),
+]);
+
+/**
  * Fraction of trees that ignore their grove's dominant species. Real stands are
  * not monocultures, but they are not uniform mixes either — a birch grove reads
  * as birch precisely because the odd spruce in it is the exception.
@@ -74,7 +86,8 @@ function weightedAge(edge, coverage, random) {
   const coreBias = Math.min(1, Math.max(0, coverage - edgeBias * 0.35));
   if (random < 0.025) return 'dead';
   if (random < 0.12 + edgeBias * 0.28) return 'sapling';
-  if (random < 0.34 + edgeBias * 0.35) return 'young';
+  // Young trees fill the subcanopy of a mature stand, not only its fringe.
+  if (random < 0.46 + edgeBias * 0.25) return 'young';
   if (random > 0.93 && coreBias > 0.65) return 'ancient';
   return 'mature';
 }
@@ -227,13 +240,18 @@ export class ForestSpeciesRegistry {
       speciesId,
       habitat,
     });
+    const form = speciesId.startsWith('conifer')
+      ? BROADLEAF_FORMS[2]
+      : BROADLEAF_FORMS[Math.floor(stableUnit(candidate.stableId, 89) * BROADLEAF_FORMS.length)];
     const crownScale = age.crown
       * (0.92 + stableUnit(candidate.stableId, 59) * 0.16)
-      * morphology.crownWidth;
+      * morphology.crownWidth
+      * form.width;
     const trunkScale = age.trunk
       * (0.94 + stableUnit(candidate.stableId, 61) * 0.12)
       * morphology.rootFlare;
-    const crownAspect = species.crownAspect * morphology.crownFlattening;
+    const crownFlattening = morphology.crownFlattening * form.aspect;
+    const crownAspect = species.crownAspect * crownFlattening;
     const spacingRadius = species.spacing * age.spacing * crownScale;
     return Object.freeze({
       speciesId,
@@ -248,7 +266,7 @@ export class ForestSpeciesRegistry {
       crownAspect,
       // Authored species meshes already contain their narrow/wide silhouette.
       // Apply ecological variation once instead of narrowing a narrow pine twice.
-      crownAspectScale: this.prototypeIndexBySpecies ? morphology.crownFlattening : crownAspect,
+      crownAspectScale: this.prototypeIndexBySpecies ? crownFlattening : crownAspect,
       leanX: morphology.leanX,
       leanZ: morphology.leanZ,
       branchDroop: morphology.branchDroop,
