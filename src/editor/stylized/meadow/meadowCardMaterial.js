@@ -8,11 +8,13 @@ import {
   cos,
   dot,
   floor,
+  mix,
   normalize,
   positionLocal,
   positionWorld,
   pow,
   sin,
+  smoothstep,
   sqrt,
   texture,
   uv,
@@ -25,7 +27,8 @@ import { assignGrassMaterialData } from '../../../render/postprocessing/PostProc
 import { applyJungleMist } from '../ambient/jungleMistOutput.js';
 import { applyCloudShadow } from '../CloudShadow.js';
 import { spellLightIrradiance, spellWorldEnabled } from '../../vfx/render/SpellWorldLight.js';
-import { sampleWorldWindCanonical, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
+import { sampleWorldWindCanonical, windWaveCoordinates, worldWindUniforms } from '../../weather/wind/worldWindState.js';
+import { grassGustSheenUniforms } from '../ambient/GrassGustSheen.js';
 import { meadowInstance } from './meadowBladeShape.js';
 import { applyHandoff, applyPublicationFade } from './meadowFade.js';
 import { meadowGrowthNodes } from './meadowGrowthNodes.js';
@@ -71,15 +74,15 @@ export function createMeadowCardMaterial({ uniforms, tuning, config, sunDirectio
       local.x.assign(positionLocal.x.mul(toward.y).mul(width));
       local.z.assign(positionLocal.x.mul(toward.x.negate()).mul(width));
       local.y.assign(positionLocal.y.mul(height));
-      // The gust leans the clump's top with the blades in front of it.
-      const wind = sampleWorldWindCanonical(card.canonical);
-      const along = windWaveCoordinates(card.canonical).along;
-      const sway = sin(along.mul(tuning.windFrequency).add(uniforms.time.mul(tuning.windSpeed)).add(card.phase));
-      const angle = tuning.windLean.add(sway.mul(tuning.windStrength))
-        .mul(wind.envelope.clamp(0.35, 3.5)).mul(profile.wind).mul(2).clamp(-1.2, 1.2).mul(pow(r, 3));
+      // A standing lean with the prevailing wind only. A card is a few pixels of
+      // alpha-cut edges, so any per-frame motion flips those pixels across the cut
+      // and the far meadow sparkles; gusts show through the sheen below instead.
+      const { prevailing, prevailingStrength, referenceStrength } = worldWindUniforms;
+      const angle = tuning.windLean.mul(prevailingStrength.div(referenceStrength.max(1e-4)).clamp(0.35, 3.5))
+        .mul(profile.wind).mul(2).clamp(-1.2, 1.2).mul(pow(r, 3));
       const reach = height.mul(sin(angle));
-      local.x.addAssign(wind.direction.x.mul(reach));
-      local.z.addAssign(wind.direction.y.mul(reach));
+      local.x.addAssign(prevailing.x.mul(reach));
+      local.z.addAssign(prevailing.y.mul(reach));
       local.y.subAssign(abs(height.mul(cos(angle).sub(1)).mul(r)));
       local.assign(local.add(card.base));
     });
@@ -105,9 +108,20 @@ export function createMeadowCardMaterial({ uniforms, tuning, config, sunDirectio
   material.normalNode = cameraViewMatrix.mul(vec4(0, 1, 0, 0)).xyz.normalize();
   const view = normalize(cameraPosition.sub(positionWorld));
   const transmission = pow(dot(view.negate(), normalize(sunDirection)).max(0), tuning.translucencyPower);
+  // Gust fronts rolling across the far meadow, as the blades' sheen: shading moves,
+  // the alpha cut does not.
+  const wind = sampleWorldWindCanonical(card.canonical);
+  const wave = sin(windWaveCoordinates(card.canonical).along.mul(tuning.windFrequency)
+    .add(uniforms.time.mul(tuning.windSpeed)).add(card.phase));
+  const gust = smoothstep(0.2, 1, wave.mul(0.5).add(0.5))
+    .mul(wind.envelope.clamp(0, 2).mul(0.5)).toVarying('meadowCardGust');
+  const sheen = mix(pigment, vec3(1, 1, 0.86), 0.55)
+    .mul(uniforms.sunColor.add(uniforms.skyColor.mul(0.5)))
+    .mul(gust).mul(height.mul(height)).mul(grassGustSheenUniforms.weight);
   const emissive = pigment.mul(uniforms.sunColor).mul(transmission)
     .mul(uniforms.appearance.backlight).mul(tuning.translucencyStrength).mul(0.6).mul(height)
-    .add(pigment.mul(uniforms.skyColor).mul(uniforms.appearance.fill));
+    .add(pigment.mul(uniforms.skyColor).mul(uniforms.appearance.fill))
+    .add(sheen);
   material.emissiveNode = spellWorldEnabled
     ? emissive.add(albedo.mul(spellLightIrradiance(positionWorld, vec3(0, 1, 0))))
     : emissive;
