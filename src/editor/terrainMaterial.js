@@ -369,7 +369,7 @@ export function createTerrainMaterial({
       bakedSurface.color = applyTerrainRockDetail({
         color: bakedSurface.color, rock: bakedSurface.rock, normal: bakedSurface.normal,
         local: vec2(terrainUv.x.sub(0.5), float(0.5).sub(terrainUv.y)).mul(chunkWorldSize),
-        chunkCenter, height: terrainHeight, textures: acquireGroundLayers(),
+        chunkCenter, height: positionWorld.y, textures: acquireGroundLayers(),
       });
     }
     // grass-test's path surface over the baked ground: textured dirt with a

@@ -3,7 +3,7 @@ import {
   hasGuidanceField,
 } from '../import/AzgaarMacroWorldSource.js';
 import { WorldGuidanceField } from './WorldGuidanceField.js';
-import { ridgeHeight, validateMountainRidges } from './MountainRidges.js';
+import { ridgeFineHeight, ridgeHeight, validateMountainRidges } from './MountainRidges.js';
 import { landformRelief } from './TerrainLandforms.js';
 import { valueNoise } from './valueNoise2d.js';
 import { createBiomeBoundaryWarp } from './BiomeBoundaryWarp.js';
@@ -22,6 +22,7 @@ const LAND_HEIGHT = 20;
 const MOUNTAIN_RUGGEDNESS = 0.25;
 /** Raw heights over which landforms rise from a coast: much of a map's lowland sits this close. */
 const LANDFORM_COAST_RAW = 2.5;
+const ridgeHeightWithFine = (...args) => ridgeHeight(...args) + ridgeFineHeight(...args);
 const LEGACY_DETAIL_GUIDANCE = Object.freeze({
   baseScale: 0.75,
   mountainWeight: 0.35,
@@ -535,7 +536,7 @@ export class AzgaarMacroWorldGenerator {
     return base
       + detail * coastFade * ruggedness * this.morphologyScale(vertexX, vertexZ)
       + landformRelief(vertexX, vertexZ, this.seed) * clamp((rawHeight - LAND_HEIGHT) / LANDFORM_COAST_RAW, 0, 1)
-      + this.ridgeRelief(vertexX, vertexZ, elevationFraction) * coastFade;
+      + this.ridgeRelief(vertexX, vertexZ, elevationFraction, ridgeHeightWithFine) * coastFade;
   }
 
   /**
@@ -543,7 +544,7 @@ export class AzgaarMacroWorldGenerator {
    * (`import.azgaarRidges`). Mountainness guidance, where a world has it,
    * sharpens true ranges and softens high plateaus.
    */
-  ridgeRelief(vertexX, vertexZ, elevationFraction) {
+  ridgeRelief(vertexX, vertexZ, elevationFraction, relief = ridgeHeight) {
     const ridges = this.source.terrain.ridges;
     if (!ridges) return 0;
     let scale = 1;
@@ -552,7 +553,7 @@ export class AzgaarMacroWorldGenerator {
         .sampleContinuous('mountainness', vertexX - 0.5, vertexZ - 0.5) ?? 0.5;
       scale = 0.6 + clamp(mountainness, 0, 1) * 0.6;
     }
-    return ridgeHeight(vertexX, vertexZ, this.seed, elevationFraction, ridges, scale);
+    return relief(vertexX, vertexZ, this.seed, elevationFraction, ridges, scale);
   }
 
   sampleMacroColumn(cellX, cellZ) {

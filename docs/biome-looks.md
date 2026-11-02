@@ -110,3 +110,15 @@ imported world. Eldara's Shuzanbund (-3350000, -560000) is the acceptance view.
 
 2026-11-02, HEAD against this change, valid runs: settlement approach 84.5, 85.0 →
 84.1 fps, GPU 3.79 → 3.88 ms; `chunk-cross` 137.3 → 136.5 fps, GPU 2.26 → 2.27 ms.
+
+Near ground and props. `ridgedField` warps off its lattice, and `fineMeters` adds
+broken faces on near terrain only: the far mesh's spacing would alias them.
+`stylized/alpine/` grows crags on steep high ground and boulder clusters on the
+flats, from a 32 m grid within 224 m, one instanced draw per shape, no collision.
+Rock strata use interpolated `positionWorld.y`: `terrainHeight` comes from a
+nearest-filtered texture and turned the bands into quads.
+
+2026-11-02, with crags and fine relief: settlement approach 86.8 fps, GPU 3.79 ms;
+`chunk-cross` 144.7 fps, GPU 2.30 ms. Single runs, against 84–85 and 137 fps on the
+previous commit, on a busy machine. Neither route reaches alpine ground, so the
+crags' own draw cost is unmeasured.

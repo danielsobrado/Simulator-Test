@@ -30,6 +30,7 @@ import:
     fullRelief: 0.65
     couloirMeters: 45
     notchMeters: 40
+    fineMeters: 16
   # Azgaar roads and trails graded into walkable paths (world/TrailGrading.js):
   # the ground along each is cut and filled toward a profile no steeper than
   # maxGrade, within maxCut/maxFill, with banks that widen with the cut.
@@ -1118,10 +1119,10 @@ stylizedSurface:
         windShort: 0.6
         rootLift: 0.60
         valueSpread: 0.16
-      # The ground between stems (meadow/meadowGroundDetailConfig.js): litter
         # Share of a short stand's stragglers that drop out between tufts, so a
         # forest floor grows plants over litter rather than an even speckle.
         gapCut: 0.9
+      # The ground between stems (meadow/meadowGroundDetailConfig.js): litter
       # drifts, moss hollows, soil pockets and fallen-blade streaks, procedural on
       # the terrain's transition lattice (no sampler), fading to plain turf by
       # fadeEnd so the mid-distance bake still matches.
@@ -1583,7 +1584,7 @@ stylizedSurface:
     # Boulders gather into scree groups rather than scattering evenly, so the
     # per-chunk budget is raised while clear ground stays genuinely clear.
     perChunk: 72
-    tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15]
+    tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15]
     minScale: 0.9
     maxScale: 1.5
     radius: 1.8
@@ -1714,7 +1715,6 @@ stylizedSurface:
     heightOffset: 0.015
     colorVariation: 0.14
     castShadow: false
-  # The tropical kit's understory (assets.tropicalKitVariants): jungle grasses and
   # The floor of a wood: deadwood, leaf drifts and moss (forest/forestDebrisGeometry.js),
   # all built in code. Each candidate survives by canopy coverage, so it thins out
   # with the wood instead of spilling onto open biome ground.
@@ -1736,6 +1736,7 @@ stylizedSurface:
       fallenBranch: { weight: 1 }
       fallenLog: { weight: 0.2 }
       stump: { weight: 0.14 }
+  # The tropical kit's understory (assets.tropicalKitVariants): jungle grasses and
   # groundcover in tropical seasonal forest and rainforest. At 324-1 960 triangles
   # an instance it is a heavier job than the 350-triangle ground-detail accents, so
   # it keeps its own, smaller candidate budget, casts no shadow and stays in the
@@ -1981,7 +1982,7 @@ stylizedSurface:
     # rather than invented.
     weathering:
       enabled: true
-      moss: 1
+      moss: 0.75
       wet: 0.8
       snow: 0.8
       tint: 0.12

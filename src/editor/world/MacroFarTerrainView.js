@@ -327,24 +327,34 @@ export class MacroFarTerrainView {
    * radial spacing grows toward the rim, so a raw difference would read the far
    * field as flat.
    */
-  /** Smooth normal from ring and spoke neighbours: without one, every triangle lit as a flat facet. */
+  /**
+   * Smooth normal, the mean of the four faces round the vertex. Differencing the
+   * neighbours alone never reads the vertex's own height, which lets odd and even
+   * vertices drift apart into a checkerboard.
+   */
   writeNormal(job, ring, spoke, index) {
     const spokes = this.angularResolution;
-    const position = (r, sp) => {
-      const i = r * spokes + (sp + spokes) % spokes;
-      return [this.pendingPositions[i * 3], job.heights[i], this.pendingPositions[i * 3 + 2]];
-    };
-    const [ax, ay, az] = position(ring, spoke + 1), [bx, by, bz] = position(ring, spoke - 1);
-    const [cx, cy, cz] = position(Math.min(ring + 1, this.radialResolution - 1), spoke);
-    const [dx, dy, dz] = position(Math.max(ring - 1, 0), spoke);
-    const ux = ax - bx, uy = ay - by, uz = az - bz, vx = cx - dx, vy = cy - dy, vz = cz - dz;
-    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const length = Math.hypot(nx, ny, nz) * (ny < 0 ? -1 : 1) || 1;
-    nx /= length; ny /= length; nz /= length;
     const offset = index * 3;
-    this.pendingNormals[offset] = nx;
-    this.pendingNormals[offset + 1] = ny;
-    this.pendingNormals[offset + 2] = nz;
+    const px = this.pendingPositions[offset], py = job.heights[index], pz = this.pendingPositions[offset + 2];
+    const edge = (r, sp) => {
+      const i = r * spokes + (sp + spokes) % spokes;
+      return [this.pendingPositions[i * 3] - px, job.heights[i] - py, this.pendingPositions[i * 3 + 2] - pz];
+    };
+    const around = [
+      edge(ring, spoke + 1), edge(Math.min(ring + 1, this.radialResolution - 1), spoke),
+      edge(ring, spoke - 1), edge(Math.max(ring - 1, 0), spoke),
+    ];
+    let nx = 0, ny = 0, nz = 0;
+    for (let i = 0; i < 4; i += 1) {
+      const [ax, ay, az] = around[i], [bx, by, bz] = around[(i + 1) % 4];
+      const fx = ay * bz - az * by, fy = az * bx - ax * bz, fz = ax * by - ay * bx;
+      const flip = fy < 0 ? -1 : 1;
+      nx += fx * flip; ny += fy * flip; nz += fz * flip;
+    }
+    const length = Math.hypot(nx, ny, nz) || 1;
+    this.pendingNormals[offset] = nx / length;
+    this.pendingNormals[offset + 1] = ny / length;
+    this.pendingNormals[offset + 2] = nz / length;
   }
 
   slopeAt(job, ring, spoke) {

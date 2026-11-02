@@ -26,7 +26,7 @@ function valueNoise(x, y, z, seed) {
 }
 
 /** Sharp crests, for the shattered faces of calved ice. */
-function ridged(x, y, z, seed) {
+export function ridgedNoise3(x, y, z, seed) {
   let sum = 0, amplitude = 0.5, frequency = 1;
   for (let octave = 0; octave < 4; octave += 1) {
     const n = 1 - Math.abs(valueNoise(x * frequency, y * frequency, z * frequency, seed + octave) * 2 - 1);
@@ -54,7 +54,7 @@ export function createIcebergGeometry(kind) {
   const positions = geometry.attributes.position;
   for (let i = 0; i < positions.count; i += 1) {
     const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
-    const crack = ridged(x * 1.9, y * 1.9, z * 1.9, seed);
+    const crack = ridgedNoise3(x * 1.9, y * 1.9, z * 1.9, seed);
     const radius = 1 + (crack - 0.45) * ridge;
     const waist = y > 0 ? 1 - taper * y * y : 1;
     const crown = Math.min(y * radius, top + (crack - 0.45) * 0.12);

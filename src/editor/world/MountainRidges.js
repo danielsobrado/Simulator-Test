@@ -24,6 +24,13 @@ const OCTAVES = Object.freeze([
 ]);
 /** The largest sum OCTAVES can reach, for normalizing to 0..1. */
 const PEAK = OCTAVES.reduce((sum, octave) => sum + octave.amplitude, 0);
+const WARP_CELLS = 170;
+const WARP_REACH_CELLS = 48;
+/** Broken faces for near terrain only: at the far mesh's spacing they would alias. */
+const FINE_OCTAVES = Object.freeze([
+  { cells: 26, amplitude: 1, seed: 9011 },
+  { cells: 11, amplitude: 0.35, seed: 9103 },
+]);
 
 /*
  * Couloirs. One ridged octave finer than the crests, on a lattice rotated 37°
@@ -61,6 +68,8 @@ export const DEFAULT_MOUNTAIN_RIDGES = Object.freeze({
   couloirMeters: 8,
   /** Crest-notch depth below the ridge line at full strength, metres. 0 turns them off. */
   notchMeters: 9,
+  /** Height of the broken faces on near ground, metres. 0 turns them off. */
+  fineMeters: 0,
 });
 
 function smoothstep(edge0, edge1, value) {
@@ -70,10 +79,13 @@ function smoothstep(edge0, edge1, value) {
 
 /** 0 at the gully floor … 1 on the sharpest crest. */
 export function ridgedField(x, z, seed) {
+  // Off the lattice: folded value noise otherwise creases along straight cell lines.
+  const warpedX = x + valueNoise(x / WARP_CELLS, z / WARP_CELLS, seed + 5101) * WARP_REACH_CELLS;
+  const warpedZ = z + valueNoise(x / WARP_CELLS, z / WARP_CELLS, seed + 5233) * WARP_REACH_CELLS;
   let sum = 0;
   let weight = 1;
   for (const octave of OCTAVES) {
-    const folded = 1 - Math.abs(valueNoise(x / octave.cells, z / octave.cells, seed + octave.seed));
+    const folded = 1 - Math.abs(valueNoise(warpedX / octave.cells, warpedZ / octave.cells, seed + octave.seed));
     const crest = folded * folded * weight;
     sum += crest * octave.amplitude;
     weight = Math.min(1, crest * 2);
@@ -159,6 +171,22 @@ export function ridgeHeight(x, z, seed, reliefFraction, ridges, scale = 1) {
   const notchMeters = ridges.notchMeters ?? 0;
   if (notchMeters > 0) relief += notchRelief(x, z, seed, ridge) * notchMeters;
   return relief * strength;
+}
+
+/**
+ * Crags and ledges over the massif, for near terrain only, so a face is broken
+ * rather than one plane between ridge lines. Centred, like the ridges.
+ */
+export function ridgeFineHeight(x, z, seed, reliefFraction, ridges, scale = 1) {
+  const strength = ridgeStrength(reliefFraction, ridges) * scale;
+  const depth = ridges.fineMeters ?? 0;
+  if (strength <= 0 || depth <= 0) return 0;
+  let relief = 0;
+  for (const octave of FINE_OCTAVES) {
+    const folded = 1 - Math.abs(valueNoise(x / octave.cells, z / octave.cells, seed + octave.seed));
+    relief += (folded * folded - 0.45) * octave.amplitude;
+  }
+  return relief * depth * strength;
 }
 
 /** The import setting, resolved; null keeps ridges off. */

@@ -1,3 +1,4 @@
+import { AlpineRockView } from './alpine/AlpineRockView.js';
 import { IcebergView } from './ice/IcebergView.js';
 import { SharedWaterMaterials } from './SharedWaterMaterials.js';
 import { WaterObstacleUpdates } from './WaterObstacleUpdates.js';
@@ -25,8 +26,8 @@ import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import { StylizedChunkRevisionTracker } from './StylizedChunkRevisionTracker.js';
 import { StylizedFlowerView } from './StylizedFlowerView.js';
 import { StylizedGroundDetailView } from './StylizedGroundDetailView.js';
-import { createShoreLifePrototypes } from './shoreLifePrototypes.js';
 import { createForestDebrisPrototypes } from './forest/forestDebrisPrototypes.js';
+import { createShoreLifePrototypes } from './shoreLifePrototypes.js';
 import { createAquaticFloraPrototypes } from './aquaticFloraPrototypes.js';
 import { advancePlantSway } from './plantSway.js';
 import { contactShadeRadius, paintContactShade, resolveContactShade } from './contactShade.js';
@@ -114,6 +115,14 @@ export class StylizedSurfaceView {
         seaLevel: terrainView.worldStore.generator?.seaLevel ?? 0,
         sunDirection: this.skyView.sunDirectionValue,
         snowGroundByTile: config.biomeLooks?.snow.ground ?? [],
+      })
+      : null;
+    this.alpineRockView = this.enabled && !this.impostorBakeMode && this.skyView
+      ? new AlpineRockView({
+        scene: terrainView.scene,
+        terrainView,
+        snowGroundByTile: config.biomeLooks?.snow.ground ?? [],
+        seaLevel: terrainView.worldStore.generator?.seaLevel ?? 0,
       })
       : null;
     this.rockView = this.enabled && !this.impostorBakeMode
@@ -233,15 +242,6 @@ export class StylizedSurfaceView {
         createShoreLifePrototypes(config.shoreLife),
       );
     }
-    // Every per-chunk detail layer, authored or procedural, is rebuilt and disposed
-    // the same way; the array is what keeps a new layer from having to be added to
-    // three separate places.
-    this.detailViews = [
-      this.groundDetailView,
-      this.aquaticPlantView,
-      this.shoreLifeView,
-      this.tropicalKitView,
-    ].filter(Boolean);
     this.forestDebrisView = this.enabled
       && !this.impostorBakeMode
       && config.forestDebris?.enabled
@@ -256,6 +256,16 @@ export class StylizedSurfaceView {
       })
       : null;
     this.forestDebrisView?.appendProceduralPrototypes(createForestDebrisPrototypes(config.forestDebris));
+    // Every per-chunk detail layer, authored or procedural, is rebuilt and disposed
+    // the same way; the array is what keeps a new layer from having to be added to
+    // three separate places.
+    this.detailViews = [
+      this.groundDetailView,
+      this.aquaticPlantView,
+      this.shoreLifeView,
+      this.forestDebrisView,
+      this.tropicalKitView,
+    ].filter(Boolean);
     this.wildlifeView = this.enabled
       && !this.impostorBakeMode
       && config.wildlife?.enabled
@@ -263,7 +273,6 @@ export class StylizedSurfaceView {
         terrainView,
         config: {
           ...config.wildlife,
-      this.forestDebrisView,
           variants: config.assets.wildlifeVariants ?? [],
         },
         baseUrl,
@@ -771,9 +780,11 @@ export class StylizedSurfaceView {
     }
     this.meadowGrass?.updateFrame(timestamp, camera, body);
     this.rockView?.update(timestamp, camera);
-    if (this.icebergView && camera) {
+    if (camera) {
       const origin = this.terrainView.floatingOrigin.getState();
-      this.icebergView.update({ x: camera.position.x + origin.x, z: camera.position.z + origin.z });
+      const cameraWorld = { x: camera.position.x + origin.x, z: camera.position.z + origin.z };
+      this.icebergView?.update(cameraWorld);
+      this.alpineRockView?.update(cameraWorld);
     }
     syncViewRebuildQueue(this.rockBuildQueue, [this.rockView]);
     const rockPlacements = this.rockView?.getPlacements() ?? [];
@@ -1051,6 +1062,7 @@ export class StylizedSurfaceView {
     this.treeView?.dispose();
     this.rockView?.dispose();
     this.icebergView?.dispose();
+    this.alpineRockView?.dispose();
     if (this.sharedScenePath) {
       this.sceneAssets?.release(this.sharedScenePath);
       this.sharedScenePath = null;

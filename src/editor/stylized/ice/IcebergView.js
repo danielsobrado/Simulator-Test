@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { CellResidency } from '../lod/CellResidency.js';
 import { InstanceAnchor } from '../lod/InstanceAnchor.js';
 import { ICEBERG_CELL_METERS, ICEBERG_KINDS, icebergCandidate, icebergHasRoom } from './icebergField.js';
 import { createIcebergGeometry } from './icebergGeometry.js';
@@ -29,10 +30,8 @@ export class IcebergView {
     scene.add(this.root);
     this.anchor = new InstanceAnchor();
     this.meshes = [];
-    this.cells = new Map();
-    this.focusKey = null;
-    this.pending = [];
-    this.dirty = false;
+    this.residency = new CellResidency({ cellMeters: ICEBERG_CELL_METERS, reachCells: REACH_CELLS, cellsPerFrame: CELLS_PER_FRAME });
+    this.resolve = (cellX, cellZ) => this.resolveCell(cellX, cellZ);
     this.isSea = (x, z) => this.tileAt(x, z) === WATER_TILE;
   }
 
@@ -71,32 +70,9 @@ export class IcebergView {
     }
   }
 
-  refocus(cameraX, cameraZ) {
-    const focusX = Math.floor(cameraX / ICEBERG_CELL_METERS);
-    const focusZ = Math.floor(cameraZ / ICEBERG_CELL_METERS);
-    const key = `${focusX}:${focusZ}`;
-    if (key === this.focusKey) return;
-    this.focusKey = key;
-    const wanted = new Set();
-    this.pending.length = 0;
-    for (let x = focusX - REACH_CELLS; x <= focusX + REACH_CELLS; x += 1) {
-      for (let z = focusZ - REACH_CELLS; z <= focusZ + REACH_CELLS; z += 1) {
-        const cell = `${x}:${z}`;
-        wanted.add(cell);
-        if (!this.cells.has(cell)) this.pending.push([x, z, cell]);
-      }
-    }
-    for (const cell of this.cells.keys()) {
-      if (wanted.has(cell)) continue;
-      if (this.cells.get(cell)) this.dirty = true;
-      this.cells.delete(cell);
-    }
-  }
-
   write() {
-    this.dirty = false;
     this.anchor.follow(this.floatingOrigin.getState());
-    const bergs = [...this.cells.values()].filter(Boolean);
+    const bergs = this.residency.values();
     if (bergs.length) this.ensureMeshes();
     for (const mesh of this.meshes) mesh.count = 0;
     for (const berg of bergs) {
@@ -114,14 +90,8 @@ export class IcebergView {
 
   /** @param {{ x: number, z: number }} cameraWorld canonical metres */
   update(cameraWorld) {
-    this.refocus(cameraWorld.x, cameraWorld.z);
-    for (let i = 0; i < CELLS_PER_FRAME && this.pending.length; i += 1) {
-      const [x, z, cell] = this.pending.pop();
-      const berg = this.resolveCell(x, z);
-      this.cells.set(cell, berg);
-      if (berg) this.dirty = true;
-    }
-    if (this.dirty && !this.pending.length) this.write();
+    this.residency.refocus(cameraWorld.x, cameraWorld.z);
+    if (this.residency.step(this.resolve)) this.write();
     this.anchor.place(this.root, this.floatingOrigin.getState());
   }
 

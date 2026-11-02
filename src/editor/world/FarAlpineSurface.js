@@ -25,7 +25,7 @@ const HOLD_CRACKS = 0.35;
 
 let shared = null;
 
-function acquireRockTextures() {
+export function acquireRockTextures() {
   if (shared) return shared;
   // CPU-only callers have no image decoder.
   if (typeof document === 'undefined') return { color: new THREE.Texture(), normal: new THREE.Texture() };
