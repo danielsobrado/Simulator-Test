@@ -29,7 +29,7 @@ test('terrain keeps the procedural material as fallback while delegating baked L
   // and the computed lighting normal.
   assert.match(terrainSource, /antialiasSpecularRoughness\(surface\.roughness,\s*bakedSurface\.normal\)/);
   assert.match(terrainSource, /material\.roughnessNode = filteredRoughness;/);
-  assert.match(terrainSource, /material\.normalNode = bakedSurface\.normal;/);
+  assert.match(terrainSource, /material\.normalNode = footprints\.relief\(bakedSurface\.normal\);/);
   assert.doesNotMatch(terrainSource, /material\.normalNode = vec3\(/);
 });
 

@@ -114,6 +114,9 @@ export function waterySphere(fx, ctx) {
     kind: 'disk', center: addScaled(center, UP, -radius * 0.95), radius: radius * 0.6, height: 0, lift: [-1, 0], spread: 0.1,
   });
   holdFlat(fx, ground, 2.2, rise * 0.5, rise + hold, 0.5, 0.5);
+  // Its shade on the ground or the pool bed below; the light pool adds the glow.
+  fx.stream('water.shadow', rise * 0.6, rise + hold, 14, { kind: 'point', center: addScaled(ground, UP, 0.06) },
+    { sizeScale: radius * 2.4 });
   // The mass crashes back down.
   fx.at(rise + hold + collapse * 0.7, () => fx.spawn('tidalOrbImpact', { ...ctx, target: copy(ground) }));
 }

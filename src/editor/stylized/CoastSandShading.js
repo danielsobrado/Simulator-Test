@@ -17,7 +17,9 @@ export function createCoastSandNodes({ localXZ, patterns, groundHeight, sandMask
   const height = groundHeight.sub(seaStateUniforms.seaLevel);
   const bedDepth = height.negate();
   const beach = oneMinus(smoothstep(1.8, 2.8, height)).mul(smoothstep(-0.6, 0, height)).mul(sandMask);
-  const bed = smoothstep(0.1, 0.7, bedDepth).mul(oneMinus(smoothstep(10, 16, bedDepth))).mul(waterCoverage);
+  // The bed is a 2 m triangle mesh, so depth contours are straight segments:
+  // a 0.6 m ramp drew the pale seabed as hard-edged polygons under the water.
+  const bed = smoothstep(0.1, 1.6, bedDepth).mul(oneMinus(smoothstep(10, 16, bedDepth))).mul(waterCoverage);
   const amount = beach.max(bed).mul(oceanMask);
   // Noise, shelf mottling and caustics execute only in the coastal band.
   return {
@@ -29,7 +31,11 @@ export function createCoastSandNodes({ localXZ, patterns, groundHeight, sandMask
           const phase = name => patterns.wavePhase(name, localXZ);
           const meso = sin(phase('sandMesoX').add(sin(phase('sandMesoWarp'))))
             .mul(sin(phase('sandMesoZ'))).mul(0.5).add(0.5);
-          const ripples = sin(phase('sandRippleX').add(sin(phase('sandRippleWarp')).mul(0.8))).mul(0.025).add(1);
+          const ripplePhase = phase('sandRippleX').add(sin(phase('sandRippleWarp')).mul(0.8));
+          // Faded out once a ripple is finer than a couple of pixels: sampled
+          // there, the sine aliased into curved white moiré lines on the sand.
+          const resolved = oneMinus(smoothstep(.6, 2.4, ripplePhase.fwidth()));
+          const ripples = sin(ripplePhase).mul(resolved).mul(0.025).add(1);
           const warm = mix(colorNode(settings.dryDark), colorNode(settings.dryLight), macro);
           const gravel = mix(colorNode('#686f6b'), colorNode('#a8aaa1'), macro);
           const mud = mix(colorNode('#424a36'), colorNode('#82785b'), macro);

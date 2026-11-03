@@ -107,7 +107,7 @@ test('family projection consumes baked shape as a colour multiplier only, while 
     /createTerrainSurfaceNormal\(\{encodedNormal: samples\.farNormal,/,
   );
   assert.match(bakedSource, /normal: readyNormal,/);
-  assert.match(terrainSource, /material\.normalNode = bakedSurface\.normal;/);
+  assert.match(terrainSource, /material\.normalNode = footprints\.relief\(bakedSurface\.normal\);/);
   assert.doesNotMatch(terrainSource, /material\.normalNode = vec3\(/);
 });
 

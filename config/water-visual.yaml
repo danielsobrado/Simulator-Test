@@ -14,11 +14,12 @@ water:
     shallowColor: '#246d70'
     deepColor: '#164e52'
     underwaterColor: '#10303d'
-    absorptionDensity: 0.42
+    # Pools read deeper toward the middle instead of one flat turquoise.
+    absorptionDensity: 0.55
     minimumOpacity: 0.08
     maximumOpacity: 0.94
     shallowDepth: 0.2
-    deepDepth: 6
+    deepDepth: 3.5
     maximumOpticalDistance: 14
     minimumViewCosine: 0.22
     surfaceTransitionDepth: 0.75
@@ -153,28 +154,35 @@ water:
       dryDark: '#b39a72'
       dryLight: '#d6be96'
       seabedColor: '#efe6cf'
-      seabedColorWeight: 0.55
+      seabedColorWeight: 0.3
       reefColor: '#426356'
       reefRockColor: '#6d7b68'
       reefStrength: 0.55
-      causticStrength: 0.65
+      # Light on the bed, not wire: at 0.65 the lattice read as white lines
+      # across every wet beach.
+      causticStrength: 0.25
     # Seconds per wave, and how far above still water it runs up the sand.
     period: 7.5
     runupHeight: 0.5
     # Depth in the shallows where the foam line forms.
     breakDepth: 0.5
-    frontBand: 0.08
+    # Height over which the wash's edge fades. At 8 cm the film filled every
+    # hollow of gently rippled sand and skipped the crests: glinting stripes.
+    frontBand: 0.22
     foamCore: 0.02
     foamWidth: 0.12
-    foamCoreMeters: 0.025
-    foamWidthMeters: 0.24
+    # A soft band, not a contour wire.
+    foamCoreMeters: 0.08
+    foamWidthMeters: 0.55
     breakupStrength: 0.8
     # How fast the wash memory of earlier waves dries, and the always-damp band.
     washDecay: 4
     dampHeight: 0.9
     wetDarkening: 0.5
-    wetRoughness: 0.42
-    filmRoughness: 0.3
+    # Satin, not mirror: at 0.42 / 0.3 the sun glinted off each stepped wash
+    # front as a sharp white stripe across the sand.
+    wetRoughness: 0.75
+    filmRoughness: 0.6
     filmTint: '#8ccad0'
     filmTintStrength: 0.18
     foamColor: '#edf8fb'

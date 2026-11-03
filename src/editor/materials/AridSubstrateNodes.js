@@ -1,5 +1,6 @@
 import { Color } from 'three/webgpu';
-import { Fn, If, bool, float, fract, mix, oneMinus, positionView, select, sin, smoothstep, vec3, vec4 } from 'three/tsl';
+import { Fn, If, bool, float, fract, mix, oneMinus, select, sin, smoothstep, vec2, vec3, vec4 } from 'three/tsl';
+import { heightRelief } from './heightRelief.js';
 import { DEFAULT_DUNE } from '../biomes/BiomeSurfaceLooks.js';
 import { periodicFbm2, periodicNoise } from '../stylized/PeriodicNoiseNodes.js';
 import { PATTERN_PERIOD } from '../stylized/PatternOrigins.js';
@@ -11,12 +12,30 @@ const pigment = hex => { const color = new Color(hex); return vec3(color.r, colo
 const anyOf = (tileId, ids) => ids.map((id) => tileId.equal(id)).reduce((a, b) => a.or(b), bool(false));
 
 const duneVector = (dune) => vec4(dune.a, dune.b, dune.height, dune.sharpness);
+/** Lattice cells per metre of the terrain's `broad` frame (TerrainTransitionNodes). */
+const BROAD_LATTICE_SCALE = 0.35;
+/** Metres between the long dune swells that carry a desert past the fine ripples' reach. */
+const SWELL_METRES = 14;
+
+/**
+ * The swell's frequency on the broad lattice, across the same wind as the
+ * ripples. Multiples of 1/PATTERN_PERIOD still close over the pattern's wrap.
+ */
+function swellVector(dune) {
+  const length = Math.hypot(dune.a, dune.b) || 1;
+  const cycles = 1 / (BROAD_LATTICE_SCALE * SWELL_METRES);
+  const snap = (value) => Math.round(value * cycles * PATTERN_PERIOD) / PATTERN_PERIOD;
+  return vec2(snap(dune.a / length), snap(dune.b / length));
+}
+
+/** A per-sand-tile choice between vectors, the default for every other tile. */
+function perDune(tileId, dunes, vector) {
+  return Object.entries(dunes).reduce((chosen, [id, dune]) => select(tileId.equal(Number(id)), vector(dune), chosen),
+    vector(DEFAULT_DUNE));
+}
 
 /** Each sand tile's dune (biome-looks `dunes`) as vec4(lattice a, lattice b, height, sharpness). */
-function duneAt(tileId, dunes) {
-  return Object.entries(dunes).reduce((chosen, [id, dune]) => select(tileId.equal(Number(id)), duneVector(dune), chosen),
-    duneVector(DEFAULT_DUNE));
-}
+const duneAt = (tileId, dunes) => perDune(tileId, dunes, duneVector);
 
 /**
  * A wind ripple: a gentle windward slope up to a crest and a steep lee face
@@ -57,26 +76,26 @@ export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, came
       const direction = smoothstep(.3, .7, drift);
       const ripple = mix(duneProfile(phase, dune.w), sin(secondaryPhase), direction)
         .mul(mix(float(.2), float(1), smoothstep(.22, .64, macro))).mul(filtered).mul(dune.z);
+      // Long swells across the same wind, kept to ~300 m where the ripples stop at 30.
+      const broad = patterns.latticePoint('broad', localXZ);
+      const swellPhase = broad.dot(perDune(tileId, dunes, swellVector)).mul(Math.PI * 2).add(macro.sub(.5).mul(3));
+      const swell = duneProfile(swellPhase, dune.w).mul(dune.z.min(1.5))
+        .mul(oneMinus(smoothstep(160, 320, cameraDistance))).mul(oneMinus(smoothstep(.6, 2.4, swellPhase.fwidth())));
       const sandMean = mix(pigment('#b39a72'), pigment('#d6be96'), .5);
       const mineralMean = mix(pigment('#787b76'), pigment('#b6b7a5'), .5);
       const sand = mix(pigment('#b39a72'), pigment('#d6be96'), macro).div(sandMean)
-        .mul(ripple.mul(.055).add(1));
+        .mul(ripple.mul(.055).add(1)).mul(swell.mul(.06).add(1));
       const mineral = mix(pigment('#787b76'), pigment('#b6b7a5'), macro).div(mineralMean)
         .mul(grain.sub(.5).mul(.18).mul(reach).add(1));
-      const color = mix(vec3(1), hot.select(sand, mineral), oneMinus(smoothstep(80, 240, cameraDistance)));
-      const height = hot.select(ripple.mul(.004), smoothstep(.58, .8, grain).mul(.006).mul(reach));
+      const color = mix(vec3(1), hot.select(sand, mineral), oneMinus(smoothstep(160, 320, cameraDistance)));
+      const height = hot.select(ripple.mul(.004).add(swell.mul(.12)), smoothstep(.58, .8, grain).mul(.006).mul(reach));
       result.assign(vec4(color, height));
     });
     return result;
   })().toVar();
   return {
     apply(color, roughness, normal) {
-      // Derivatives perturb the existing terrain normal; no new texture or mesh.
-      const dx = positionView.dFdx(), dy = positionView.dFdy();
-      const tangentX = dy.cross(normal), tangentY = normal.cross(dx);
-      const determinant = dx.dot(tangentX);
-      const gradient = sample.a.dFdx().mul(tangentX).add(sample.a.dFdy().mul(tangentY)).mul(determinant.sign());
-      const relief = normal.mul(determinant.abs().max(1e-8)).sub(gradient).normalize();
+      const relief = heightRelief(normal, sample.a);
       // Mean-preserving gains retain the shared CPU far-color palette.
       return { color: color.mul(mix(vec3(1), sample.rgb, amount)),
         roughness: mix(roughness, hot.select(float(.93), float(.9)), amount),

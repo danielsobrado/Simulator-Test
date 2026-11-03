@@ -39,10 +39,13 @@ export function createSeaSurfNodes({ swell, waterDepth, localXZ, patterns, time,
   const roll = smoothstep(0.92, 0.985, age).mul(smoothstep(0.5, 0.8, lace));
   const trail = exp(age.mul(-settings.trail))
     .mul(smoothstep(age.mul(0.5).add(0.45), age.mul(0.5).add(0.7), lace));
+  // Over a gently shelving bed the depth term crowds crests closer than a
+  // pixel; drawn there they aliased into white fingerprint whorls.
+  const resolved = oneMinus(smoothstep(0.35, 1.1, phase.fwidth()));
   return {
     foamNoise: lace,
     height: mix(near, swell.height, offshore),
     offshore,
-    foam: max(roll, trail).mul(zone).mul(float(settings.strength)),
+    foam: max(roll, trail).mul(zone).mul(resolved).mul(float(settings.strength)),
   };
 }

@@ -114,7 +114,8 @@ export class HudCompass {
 function placeMark(mark, heading) {
   const bearing = relativeBearing(mark.worldDx, mark.worldDz, heading);
   const visible = Math.abs(bearing) <= FIELD_DEGREES;
-  mark.element.style.visibility = visible ? 'visible' : 'hidden';
+  // Inherit when shown: an explicit 'visible' outlived the HUD's capture-hide.
+  mark.element.style.visibility = visible ? '' : 'hidden';
   if (visible) mark.element.style.setProperty('--mark-at', (bearing / FIELD_DEGREES).toFixed(4));
   return bearing;
 }

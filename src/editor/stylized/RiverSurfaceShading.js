@@ -194,7 +194,10 @@ export function createRiverSurfaceNodes({
   const riverTilt = across.mul(slope.x).add(downstream.mul(slope.y));
   const lakeTilt = vec3(slope.x.negate(), 0, slope.y.negate());
   const tilt = mix(lakeTilt, riverTilt, current);
-  const normal = normalize(baseNormal.add(ripple ? tilt.sub(vec3(ripple.x, 0, ripple.y)) : tilt)).toVar('riverDetailNormal');
+  // Level water shades level: the sheet's per-triangle tilt near a bank (its
+  // lift tapering to the waterline) otherwise showed as faceted reflections.
+  const shadingBase = normalize(mix(vec3(0, 1, 0), baseNormal, smoothstep(.03, .12, gradient)));
+  const normal = normalize(shadingBase.add(ripple ? tilt.sub(vec3(ripple.x, 0, ripple.y)) : tilt)).toVar('riverDetailNormal');
 
   const facing = max(dot(normal, viewDirection), 0);
   const fresnel = pow(oneMinus(facing), 5).mul(0.98).add(0.02).mul(0.85);
@@ -223,6 +226,7 @@ export function createRiverSurfaceNodes({
     .mul(smoothstep(0.48, 0.82, foamNoise)).mul(0.22);
   const foam = riverShore.add(bankFoam).mul(oneMinus(fall)).clamp(0, 0.94);
 
-  return { fresnel, sky, glint, foam, foamNoise, reflected, normal, baseNormal,
+  // Callers measure the ripple's tilt from the level base, not from the facets.
+  return { fresnel, sky, glint, foam, foamNoise, reflected, normal, baseNormal: shadingBase,
     roughness: energy.mul(.15).add(.12), visualSpeed, energy };
 }

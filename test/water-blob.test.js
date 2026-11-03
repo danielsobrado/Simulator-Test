@@ -43,3 +43,20 @@ test('Watery Sphere raises one blob, stirs the ground under it and crashes into 
   assert.ok(presses > 40, 'the surface under it stays stirred');
   assert.ok(played.includes('tidalOrbImpact'), 'it ends in a splash');
 });
+
+test('biome surface spots sit inside the biome and face nearby water', async () => {
+  const { findBiomeSurfacePose } = await import('../src/editor/performance/qa/WorldVisualSurfaceDemo.js');
+  // Desert (1) west of x = 0 cells, a lake east of cell x = 6 inside it.
+  const generator = {
+    source: { bounds: { minCellX: -40, minCellZ: -40, widthCells: 80, heightCells: 80 } },
+    sampleTile: (x) => (x < 20 ? 1 : 4),
+    sampleWater: (x) => ({ kind: x >= 6 && x < 20 ? 2 : 0 }),
+  };
+  const spot = findBiomeSurfacePose(generator, 2, 1, { attempts: 200000 });
+  assert.ok(spot.water, 'a shore spot was found');
+  assert.equal(generator.sampleTile(Math.floor(spot.x / 2), 0), 1);
+  const ahead = { x: spot.x - Math.sin(spot.yaw) * 10, z: spot.z - Math.cos(spot.yaw) * 10 };
+  assert.ok(generator.sampleWater(ahead.x / 2).kind > 0, 'the camera faces the water');
+  assert.deepEqual(findBiomeSurfacePose(generator, 2, 1, { attempts: 200000 }), spot, 'the same spot every run');
+  assert.equal(findBiomeSurfacePose(generator, 2, 9, { attempts: 5000 }), null, 'an absent biome has no spot');
+});

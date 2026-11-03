@@ -87,7 +87,8 @@
     "qa:exploration": "node scripts/run-exploration-qa.mjs",
     "lint": "eslint .",
     "qa:recovery": "node scripts/run-renderer-recovery-qa.mjs",
-    "qa:world:visual": "node scripts/run-world-visual-qa.mjs"
+    "qa:world:visual": "node scripts/run-world-visual-qa.mjs",
+    "qa:biome-surface": "node scripts/run-biome-surface-qa.mjs"
   },
   "dependencies": {
     "@drusniel/procedural-stone": "github:danielsobrado/drusniel-procedural-stones#94a51a3",

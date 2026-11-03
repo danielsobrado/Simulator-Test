@@ -188,7 +188,10 @@ export function createStylizedWaterMaterial({
   const noiseFac = surfaceNoise.x.add(surfaceNoise.y).mul(0.5);
   // Wakes, drops and spells (water/RippleField.js), on the river and sea normals alike.
   const ripple = water.interaction?.enabled !== false && rippleOrigin
-    ? rippleFieldSlope(rippleOrigin, vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize)).mul(waterlineFade).toVar('waterRippleSlope')
+    // Faded out over the last half metre of depth: on the film over a beach
+    // the rings otherwise drew as bright arcs across the wet sand.
+    ? rippleFieldSlope(rippleOrigin, vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize))
+      .mul(smoothstep(0.1, 0.5, waterDepth)).toVar('waterRippleSlope')
     : null;
   const sea = water.sea?.enabled && quality.flow && seaPhaseOrigin && sunDirection
     ? createSeaSurfaceNodes({
@@ -439,8 +442,11 @@ export function createStylizedWaterMaterial({
     const distortedViewDistance = linearDepth(
       viewportDepthTexture(distortedViewportUv),
     ).mul(depthRange).add(cameraNear);
-    const validDepth = step(
+    // A soft hand-over: a hard step flipped whole pixels between the bent and
+    // straight lookups along the bed's triangle edges, drawing straight seams.
+    const validDepth = smoothstep(
       waterViewDistance.add(refraction.depthBiasMeters),
+      waterViewDistance.add(refraction.depthBiasMeters + 0.4),
       distortedViewDistance,
     );
     const acceptedViewportUv = mix(
@@ -531,7 +537,7 @@ export function createStylizedWaterMaterial({
   if (sea) color = sea.shade(color);
   // Looking straight down the Fresnel barely moves, so ring faces also catch a
   // little light of their own: the rings still read from a bridge or a cliff.
-  if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.5).clamp(0, 0.3)));
+  if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.25).clamp(0, 0.1)));
 
   if (water.rainRipples?.enabled && quality.flow && rippleOrigin) {
     const ripple = createRainRippleNode({

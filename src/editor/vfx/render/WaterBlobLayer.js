@@ -3,7 +3,7 @@ import { createWaterBlobMaterial, WATER_BLOB_LOBES } from './WaterBlobMaterial.j
 
 const RENDER_ORDER = 4400;
 /** How far the lobes and ripples reach past the body, in body radii. */
-const BOUNDS_RADII = 2.3;
+const BOUNDS_RADII = 2.6;
 
 const smooth = (t) => t * t * (3 - 2 * t);
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
@@ -85,12 +85,13 @@ export function createWaterBlobLayer({ scene, lighting }) {
       // Lobes circle the body on their own slow orbits, bobbing as they go.
       lobes.forEach((lobe, index) => {
         const phase = clock * (0.7 + index * 0.23) + index * (Math.PI * 2 / (WATER_BLOB_LOBES - 1));
-        const reach = pose.radius * (0.75 + 0.15 * Math.sin(clock * 1.3 + index));
+        // Far enough out that each lobe bulges past the body's silhouette.
+        const reach = pose.radius * (1.05 + 0.2 * Math.sin(clock * 1.3 + index));
         lobe.set(
           pose.x + Math.cos(phase) * reach,
-          pose.y - pose.radius * 0.35 + Math.sin(clock * 1.9 + index * 2.1) * pose.radius * 0.25,
+          pose.y - pose.radius * 0.2 + Math.sin(clock * 1.9 + index * 2.1) * pose.radius * 0.45,
           pose.z + Math.sin(phase) * reach,
-          pose.radius * (0.5 + 0.08 * Math.sin(clock * 2.3 + index)),
+          pose.radius * (0.58 + 0.1 * Math.sin(clock * 2.3 + index)),
         );
       });
     },

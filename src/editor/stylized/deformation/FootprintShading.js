@@ -10,7 +10,10 @@ import {
 import { seaStateUniforms } from '../../water/seaState.js';
 import { groundDeformationNode } from './groundDeformationNode.js';
 import { groundDeformationUniforms } from './groundDeformationState.js';
+import { heightRelief } from '../../materials/heightRelief.js';
 
+/** How deep a full print dents bare ground, metres. */
+const PRINT_RELIEF_METRES = 0.03;
 /** Height above the sea that still counts as beach sand for prints. */
 const BEACH_TOP = 1.8;
 
@@ -42,6 +45,14 @@ export function createFootprintShading({ terrainUv, chunkWorldSize, chunkCenter,
   const pressed = depth.mul(surface);
   return {
     pressed,
+    /**
+     * Pressed sand and mud dent the normal: a hollow with a lip round its edge.
+     * Snow carries its own relief (SnowDetail), so `snow` hands it back.
+     */
+    relief(normal) {
+      const height = pressed.negate().add(pressed.mul(oneMinus(pressed)).mul(1.2)).mul(PRINT_RELIEF_METRES);
+      return mix(heightRelief(normal, height), normal, snow).normalize();
+    },
     apply(color) {
       const tint = mix(vec3(groundDeformationUniforms.tint), vec3(0.8, 0.88, 1), snow);
       return mix(color, color.mul(tint), pressed.mul(float(0.85)));

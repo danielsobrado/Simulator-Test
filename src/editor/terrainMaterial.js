@@ -435,7 +435,7 @@ export function createTerrainMaterial({
       color: coastSurface.color,
       roughness: coastSurface.roughness ?? float(stylizedConfig.materialBake.render.fallbackRoughness),
       tileId: tileSample.a.mul(255).round(),
-      wet: waterContext?.wet,
+      wet: waterContext?.damp,
     });
     // Rain darkens and slicks exposed ground; snow and canopy shelter it.
     const surface = createRainWetnessShading({
@@ -492,7 +492,7 @@ export function createTerrainMaterial({
       : surface.roughness;
     material.roughnessNode = filteredRoughness;
     if (snowSurface) material.emissiveNode = snowDetail ? snowSurface.emissive.add(snowDetail.shade) : snowSurface.emissive;
-    if (bakedSurface.normal) material.normalNode = bakedSurface.normal;
+    if (bakedSurface.normal) material.normalNode = footprints.relief(bakedSurface.normal);
     if (snowDetail) {
       material.roughnessNode = snowDetail.roughness(filteredRoughness);
       if (snowNormal) material.normalNode = snowNormal;

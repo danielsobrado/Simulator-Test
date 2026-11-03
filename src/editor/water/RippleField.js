@@ -27,7 +27,7 @@ export const RIPPLE_TEXEL_METRES = RIPPLE_WINDOW_METRES / RIPPLE_TEXELS;
 export const RIPPLE_REACH_METRES = Object.freeze([11, 14.5]);
 export const RIPPLE_IMPULSE_CAPACITY = 16;
 /** Height clamp, metres: keeps a pile of spells from blowing the field up. */
-const MAX_HEIGHT = 0.08;
+const MAX_HEIGHT = 0.03;
 /** c² above this makes the explicit scheme unstable. */
 const MAX_COURANT_SQUARED = 0.45;
 

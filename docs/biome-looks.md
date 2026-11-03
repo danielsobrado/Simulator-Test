@@ -44,6 +44,14 @@ the dirt between a desert's tussocks prints; the share is regional (the blend
 round the player), so it has no tile edges. Dunes still need bare `arid: sand`
 ground: letting them through grass exposed hard tile borders.
 
+Screenshots: `npm run qa:biome-surface -- --url http://localhost:5174` (dev
+server running, headed WebGPU) finds a gentle spot inside every biome — the
+twelve standard ones in the procedural world, the bog and Stonehold Badlands in
+Eldara — facing water where there is some, stages prints, a crater, ripples and
+Watery Sphere there, and saves `<biome>-ground.png` and `<biome>-spell.png` with
+a `report.json` into `docs/qa/biome-surface/<YYYY-MM-DD>/` (git-ignored, like
+the rest of `docs/qa`). `--only 1,11,32` limits the run.
+
 What it buys: an oasis carries a Tidal Orb's ring across the pool, glacier
 slush swallows it within a metre, bog water never stops stippling; desert
 prints blow back in within half a minute while a glacier keeps them for six.

@@ -34,10 +34,23 @@ export function createTerrainWaterContext(terrainUv, groundHeight, fieldSize) {
       const height = groundHeight.sub(field.g.add(origin));
       If(height.greaterThan(-16).and(height.lessThan(2.8)), () => {
         result.assign(vec4(filtered.r, filtered.g, filtered.b,
-          smoothstep(-.1, .85, height).oneMinus().mul(filtered.a)));
+          // Damp up to 35 cm above the water: 85 cm smeared a dark ring
+          // some 13 m wide round every gently shelving pool.
+          smoothstep(-.05, .35, height).oneMinus().mul(filtered.a)));
       });
     });
     return result;
   })().toVar();
-  return { ocean: context.r, organic: context.g, cold: context.b, wet: context.a };
+  // The bog's mud keeps the wide margin round its pools.
+  const damp = Fn(() => {
+    const result = float(0).toVar();
+    If(wet.greaterThan(0), () => {
+      const height = groundHeight.sub(field.g.add(origin));
+      If(height.greaterThan(-16).and(height.lessThan(2.8)), () => {
+        result.assign(smoothstep(-.1, .85, height).oneMinus().mul(filtered.a));
+      });
+    });
+    return result;
+  })().toVar();
+  return { ocean: context.r, organic: context.g, cold: context.b, wet: context.a, damp };
 }

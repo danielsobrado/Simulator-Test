@@ -103,8 +103,12 @@ export function createCoastFoamBreakup(patterns, localXZ, clock, strength) {
     .add(vec2(clock.mul(.025).mod(512), clock.mul(-.017).mod(512)));
   const lace = periodicFbm2(point);
   const threshold = strength * .625;
-  const filter = lace.fwidth().min(.15);
-  return smoothstep(float(threshold - .1).sub(filter), float(threshold + .1).add(filter), lace);
+  const footprint = lace.fwidth();
+  const filter = footprint.min(.15);
+  const laced = smoothstep(float(threshold - .1).sub(filter), float(threshold + .1).add(filter), lace);
+  // Once the lace is finer than a pixel, thresholding it only draws a dotted
+  // moiré along the shore: hand over to its average coverage instead.
+  return mix(laced, float(0.5), smoothstep(.08, .25, footprint));
 }
 
 /**
@@ -150,7 +154,9 @@ export function createCoastSwashNodes({
   const foam = oneMinus(smoothstep(config.foamCoreMeters ?? DEFAULT_COAST_SWASH.foamCoreMeters,
     max(float(config.foamWidthMeters ?? DEFAULT_COAST_SWASH.foamWidthMeters), contact.footprint), contact.distance))
     .mul(foamBreakup)
-    .mul(film.max(0.3))
+    // Only where the wash actually runs: on nearly flat sand the foam contour
+    // otherwise crossed dry ground several times, drawing parallel white wires.
+    .mul(film)
     .mul(band);
   let memory = film;
   for (const cyclesAgo of MEMORY_CYCLES) {

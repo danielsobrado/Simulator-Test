@@ -1,7 +1,7 @@
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
-  Break, Discard, Fn, If, Loop, abs, cameraPosition, clamp, dot, float, length, max, mix, normalize, positionWorld,
-  pow, reflect, sin, smoothstep, uniform, uniformArray, vec3, vec4,
+  Break, Discard, Fn, If, Loop, abs, cameraPosition, clamp, dot, float, length, max, min, mix, normalize, positionWorld,
+  pow, reflect, refract, sin, smoothstep, uniform, uniformArray, vec3, vec4,
 } from 'three/tsl';
 import * as THREE from 'three';
 
@@ -75,13 +75,26 @@ export function createWaterBlobMaterial(lighting) {
     const view = direction.negate();
     const facing = clamp(dot(n, view), 0, 1);
     const fresnel = pow(float(1).sub(facing), 5).mul(0.96).add(0.04);
-    const reflected = reflect(direction, n);
-    const sky = mix(SKY_LOW, SKY_HIGH, smoothstep(-0.1, 0.8, reflected.y)).mul(lighting.ambientSky.mul(2.2).add(0.15));
+    const skyLight = lighting.ambientSky.mul(2.2).add(0.15);
+    const skyAlong = (ray) => mix(SKY_LOW, SKY_HIGH, smoothstep(-0.1, 0.8, ray.y)).mul(skyLight);
+    const sky = skyAlong(reflect(direction, n));
     const sun = normalize(lighting.sunDirection);
     const diffuse = lighting.ambientSky.add(lighting.sunColor.mul(max(dot(n, sun), 0)));
-    // Light focused through the body: bright veins that crawl with the surface.
-    const veins = pow(abs(sin(dot(point.sub(lobes.element(0).xyz), vec3(5.1, 3.7, 4.3)).add(n.y.mul(4)).add(time.mul(1.4)))), 12);
-    const body = WATER.mul(diffuse.mul(0.45).add(0.3)).add(GLOW.mul(0.18)).add(GLOW.mul(veins).mul(0.3));
+    // What the bent ray sees behind the body: sky above the horizon, sunlit
+    // ground below it. The flipped horizon inside the globe reads as a water
+    // lens without sampling the screen (a viewport texture costs every frame).
+    const refracted = refract(direction, n, 1 / 1.33);
+    const groundTone = lighting.ambientGround.mul(1.6).add(lighting.sunColor.mul(0.35));
+    const behind = mix(groundTone, skyAlong(refracted), smoothstep(-0.08, 0.08, refracted.y));
+    // Light focused through the body: two warped wave families crossing into a
+    // caustic net, not parallel bands.
+    const local = point.sub(lobes.element(0).xyz).add(n.mul(0.35));
+    const warp = sin(dot(local, vec3(2.3, -4.1, 1.7)).add(time.mul(0.9))).mul(1.3);
+    const waveA = sin(dot(local, vec3(5.1, 3.7, 4.3)).add(time.mul(1.4)).add(warp));
+    const waveB = sin(dot(local, vec3(-3.9, 4.6, 2.2)).sub(time.mul(1.1)).sub(warp.mul(0.7)));
+    const veins = pow(float(1).sub(min(abs(waveA), abs(waveB))), 9);
+    const body = mix(behind, WATER.mul(diffuse.mul(0.45).add(0.3)), 0.55)
+      .add(GLOW.mul(0.15)).add(GLOW.mul(veins).mul(0.4));
     const specular = pow(max(dot(reflect(sun.negate(), n), view), 0), 90).mul(lighting.sunColor).mul(2.5);
     // The reflection never drowns the body: a magic water reads saturated even edge-on.
     const color = mix(body, sky, fresnel.mul(0.4)).add(specular);

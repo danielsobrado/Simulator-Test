@@ -7,6 +7,7 @@ import { treeImpostorIntegrity } from '../../stylized/impostor/TreeImpostorInteg
 import { worldVisualNeighborhood } from './WorldVisualNeighborhood.js';
 import { setWaterTimeOverride } from '../../water/WaterVisualClock.js';
 import { WorldVisualLayerControls, worldVisualVegetation } from './WorldVisualVegetation.js';
+import { findBiomeSurfacePose, stageSurfaceDemo } from './WorldVisualSurfaceDemo.js';
 const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
 /** Dev-only browser adapter. Navigation uses the engine's transaction, never private predictor fields. */
@@ -99,6 +100,12 @@ export class WorldVisualQa {
     await e.stylizedSurface.skyView.environment.ready;
   }
   setWaterTime(seconds = null) { setWaterTimeOverride(seconds); }
+  findBiomeSurfacePose(tileId, options) {
+    const store=this.editor.terrainView.worldStore;
+    return findBiomeSurfacePose(store.generator,store.tileSize??this.editor.config.map.tileSize,tileId,options);
+  }
+  stageSurfaceDemo(options) { return stageSurfaceDemo(this.editor, options); }
+  look({yaw,pitch}) { this.editor.playerController.setPose({yaw,pitch}); return this.diagnostics(); }
   neighborhood() { return worldVisualNeighborhood(this.editor); }
   vegetation(options) { return worldVisualVegetation(this.editor, options); }
   setLayers(values) { return this.layers.set(values); }

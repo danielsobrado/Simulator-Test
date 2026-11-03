@@ -40,6 +40,11 @@ export const WATER_TYPES = Object.freeze({
     sizeEase: 'outCubic', heat: 0.4, heatEnd: 0.15, emissive: 1, additive: 0.3, tint: FOAM, opacity: 0.8,
     fadeIn: 0, fadeOut: 0.6,
   },
+  // The shade a hanging blob casts: re-emitted under it while it holds.
+  'water.shadow': {
+    tiles: [TILE.GLOW, TILE.GLOW], orient: 'plane', lit: 1, life: 0.3, size: 1, heat: 0, emissive: 0, additive: 0,
+    tint: [0.02, 0.04, 0.06], opacity: 0.4, fadeIn: 0.3, fadeOut: 0.3, cameraFade: false,
+  },
   // Rain Call: a low, heavy cloud and the streaks falling out of it.
   'water.cloud': {
     tiles: [TILE.FOG_BANK, TILE.FOG_BANK], lit: 1, life: [5, 7], size: [4, 6], sizeEnd: 1.25, sizeEase: 'outQuad',
