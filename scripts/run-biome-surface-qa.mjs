@@ -77,10 +77,14 @@ try {
       { minimumMs: 8000 });
     entry.diagnostics = await page.evaluate(() => window.__worldVisualQa.diagnostics());
     await page.evaluate(() => window.__worldVisualQa.setCaptureUi(true));
-    // On a shore the prints go on the dry side, behind the camera; the spell goes on the water.
-    const groundYaw = spot.water ? spot.yaw + Math.PI : spot.yaw;
+    // The player's own body and shadow would otherwise sit in every ground shot.
+    await page.evaluate(() => window.__worldVisualQa.setAvatarVisible(false));
+    // The prints go on dry ground away from the spell; the spell goes on the water if any.
+    // Re-checked against the loaded water, which also knows bog pools.
+    const groundYaw = await page.evaluate(({ yaw, groundYaw }) => window.__worldVisualQa.liveDryHeading(yaw, groundYaw), spot);
+    entry.groundYaw = groundYaw;
     entry.stage = await page.evaluate((options) => window.__worldVisualQa.stageSurfaceDemo(options), { water: spot.water, groundYaw });
-    for (const [shot, seconds, yaw, pitch] of [['ground', GROUND_SHOT_S, groundYaw, -0.5], ['spell', SPELL_SHOT_S, spot.yaw, -0.02]]) {
+    for (const [shot, seconds, yaw, pitch] of [['ground', GROUND_SHOT_S, groundYaw, -0.42], ['spell', SPELL_SHOT_S, spot.yaw, -0.02]]) {
       await page.evaluate((pose) => window.__worldVisualQa.look(pose), { yaw, pitch });
       await page.waitForTimeout((seconds - (shot === 'spell' ? GROUND_SHOT_S : 0)) * 1000);
       const file = `${biome.name}-${shot}.png`;
@@ -88,6 +92,7 @@ try {
       entry.files.push(file);
     }
     await page.evaluate(() => window.__worldVisualQa.setCaptureUi(false));
+    await page.evaluate(() => window.__worldVisualQa.setAvatarVisible(true));
   }
 } catch (error) {
   report.failure = error.stack;

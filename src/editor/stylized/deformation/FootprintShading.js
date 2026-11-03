@@ -54,8 +54,12 @@ export function createFootprintShading({ terrainUv, chunkWorldSize, chunkCenter,
       return mix(heightRelief(normal, height), normal, snow).normalize();
     },
     apply(color) {
-      const tint = mix(vec3(groundDeformationUniforms.tint), vec3(0.8, 0.88, 1), snow);
-      return mix(color, color.mul(tint), pressed.mul(float(0.85)));
+      // Pressed snow takes a cool blue shade, strong enough to read from eye height.
+      const tint = mix(vec3(groundDeformationUniforms.tint), vec3(0.6, 0.69, 0.84), snow);
+      const printed = mix(color, color.mul(tint), pressed.mul(float(0.85)));
+      // Sand and mud pushed up round the edge of a print catch a little light.
+      const rim = pressed.mul(oneMinus(pressed)).mul(4).mul(oneMinus(snow));
+      return printed.mul(rim.mul(0.12).add(1));
     },
   };
 }

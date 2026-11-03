@@ -410,7 +410,8 @@ export function createTerrainMaterial({
     });
     const beachSurface = sand ? sand.apply(paintedSurface.color, paintedSurface.roughness) : paintedSurface;
     if (waterContext) {
-      const wet = waterContext.wet.mul(oneMinus(grassCoverage).max(.15));
+      // Snow lying at the waterline stays snow: a damp brown ring on it read as mud.
+      const wet = waterContext.wet.mul(oneMinus(grassCoverage).max(.15)).mul(oneMinus(bakedSurface.snow ?? float(0)));
       beachSurface.color = beachSurface.color.mul(float(1).sub(wet.mul(.22)));
       // Damp sediment retains a broad, quiet highlight. The former universal
       // 0.38 override erased substrate roughness and amplified bank-normal bands.
@@ -428,9 +429,11 @@ export function createTerrainMaterial({
       shorelineFadeDepth: stylizedConfig.water?.optics?.shorelineFadeDepth ?? 0.35,
       oceanMask,
     });
-    const coastSurface = swash
-      ? swash.apply(beachSurface.color, beachSurface.roughness)
-      : beachSurface;
+    const swashed = swash ? swash.apply(beachSurface.color, beachSurface.roughness) : null;
+    const coastSurface = swashed ? {
+      color: mix(swashed.color, beachSurface.color, bakedSurface.snow ?? float(0)),
+      roughness: mix(swashed.roughness, beachSurface.roughness, bakedSurface.snow ?? float(0)),
+    } : beachSurface;
     const shoreSurface = applyBogGround({
       color: coastSurface.color,
       roughness: coastSurface.roughness ?? float(stylizedConfig.materialBake.render.fallbackRoughness),

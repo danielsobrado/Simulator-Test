@@ -7,7 +7,7 @@ import { treeImpostorIntegrity } from '../../stylized/impostor/TreeImpostorInteg
 import { worldVisualNeighborhood } from './WorldVisualNeighborhood.js';
 import { setWaterTimeOverride } from '../../water/WaterVisualClock.js';
 import { WorldVisualLayerControls, worldVisualVegetation } from './WorldVisualVegetation.js';
-import { findBiomeSurfacePose, stageSurfaceDemo } from './WorldVisualSurfaceDemo.js';
+import { findBiomeSurfacePose, liveDryHeading, stageSurfaceDemo } from './WorldVisualSurfaceDemo.js';
 const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
 /** Dev-only browser adapter. Navigation uses the engine's transaction, never private predictor fields. */
@@ -105,6 +105,12 @@ export class WorldVisualQa {
     return findBiomeSurfacePose(store.generator,store.tileSize??this.editor.config.map.tileSize,tileId,options);
   }
   stageSurfaceDemo(options) { return stageSurfaceDemo(this.editor, options); }
+  liveDryHeading(awayFrom, fallback) { return liveDryHeading(this.editor, awayFrom, fallback); }
+  /** The player's own body (and its shadow) out of a capture, or back. */
+  setAvatarVisible(visible) {
+    const view=this.editor.characterView;if(!view)return false;
+    view.captureHidden=!visible;view.setVisible(visible);return true;
+  }
   look({yaw,pitch}) { this.editor.playerController.setPose({yaw,pitch}); return this.diagnostics(); }
   neighborhood() { return worldVisualNeighborhood(this.editor); }
   vegetation(options) { return worldVisualVegetation(this.editor, options); }

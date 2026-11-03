@@ -12,6 +12,8 @@ const WATER_REACH = [8, 14];
 const DIRECTIONS = 8;
 /** Candidates of the right biome tried for a shore before settling for dry ground. */
 const SHORE_TRIES = 3000;
+/** Metres ahead the ground shot looks at, which must be dry. */
+const GROUND_REACH = [2, 4, 6];
 /** The procedural world has no bounds; search the span the visual manifests use. */
 const PROCEDURAL_SPAN = Object.freeze({ minCellX: -8000, minCellZ: -8000, widthCells: 16000, heightCells: 16000 });
 
@@ -27,11 +29,34 @@ function gentle(generator, cellX, cellZ) {
     Math.abs(generator.sampleHeight(cellX + dx * SLOPE_CELLS, cellZ + dz * SLOPE_CELLS) - here) <= MAX_RISE);
 }
 
+/** The camera looks down −z at yaw 0. */
+const yawToward = (dx, dz) => Math.atan2(-dx, -dz);
+
+/**
+ * A heading for the ground shot: dry for the first few metres and as far from
+ * the spell's heading as possible, so prints are on land and the blob is out
+ * of frame. Null when every heading runs into water.
+ */
+function dryHeading(generator, tileSize, x, z, awayFrom) {
+  let best = null;
+  for (let index = 0; index < DIRECTIONS; index += 1) {
+    const angle = index / DIRECTIONS * Math.PI * 2;
+    const dx = Math.cos(angle), dz = Math.sin(angle);
+    const dry = GROUND_REACH.every((reach) => !hasWater(generator, (x + dx * reach) / tileSize, -(z + dz * reach) / tileSize));
+    if (!dry) continue;
+    const yaw = yawToward(dx, dz);
+    const spread = Math.abs(Math.atan2(Math.sin(yaw - awayFrom), Math.cos(yaw - awayFrom)));
+    if (!best || spread > best.spread) best = { yaw, spread };
+  }
+  return best?.yaw ?? null;
+}
+
 /**
  * A canonical pose inside `tileId`, facing water within ~14 m when there is
- * some; the same pose every run for the same world and seed.
+ * some, with a dry `groundYaw` for the ground shot; the same pose every run
+ * for the same world and seed.
  *
- * @returns {{ x: number, z: number, yaw: number, water: boolean, sampled: number } | null}
+ * @returns {{ x: number, z: number, yaw: number, groundYaw: number, water: boolean, sampled: number } | null}
  */
 export function findBiomeSurfacePose(generator, tileSize, tileId, { seed = 20261103, attempts = 2000000 } = {}) {
   const span = generator.source?.bounds ?? PROCEDURAL_SPAN;
@@ -53,9 +78,16 @@ export function findBiomeSurfacePose(generator, tileSize, tileId, { seed = 20261
       const dx = Math.cos(angle), dz = Math.sin(angle);
       const wet = WATER_REACH.every((reach) => hasWater(generator, (x + dx * reach) / tileSize, -(z + dz * reach) / tileSize));
       // The camera looks down −z at yaw 0.
-      if (wet) return { x, z, yaw: Math.atan2(-dx, -dz), water: true, sampled };
+      if (!wet) continue;
+      const yaw = yawToward(dx, dz);
+      const groundYaw = dryHeading(generator, tileSize, x, z, yaw);
+      if (groundYaw !== null) return { x, z, yaw, groundYaw, water: true, sampled };
     }
-    dry ??= { x, z, yaw: next() * Math.PI * 2, water: false, sampled };
+    if (!dry) {
+      const yaw = next() * Math.PI * 2;
+      const groundYaw = dryHeading(generator, tileSize, x, z, yaw);
+      if (groundYaw !== null) dry = { x, z, yaw, groundYaw, water: false, sampled };
+    }
     matches += 1;
     if (matches >= SHORE_TRIES) return dry;
   }
@@ -99,7 +131,8 @@ export function stageSurfaceDemo(editor, { spell = 'waterySphere', water = false
       field.splash(drop.x, drop.z, -0.04, { width: 0.4 });
     }
   }
-  const target = at(water ? 11 : 7, 0);
+  // Far enough out on dry ground that the hanging blob stays in frame.
+  const target = at(water ? 11 : 10, 0);
   const groundY = editor.terrainView.getWorldHeight(target.x, target.z);
   const played = editor.spellRuntime?.effects?.play(spell, {
     origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
@@ -111,4 +144,27 @@ export function stageSurfaceDemo(editor, { spell = 'waterySphere', water = false
     caster: { x: camera.position.x, y: camera.position.y - 1.7, z: camera.position.z },
   }) ?? false;
   return { played, prints: 10, water, region: structuredClone(editor.biomeSurface?.current ?? null) };
+}
+
+/**
+ * The ground-shot heading checked against the loaded water field, which also
+ * knows water the generator does not (bog pools): the dry heading furthest
+ * from `awayFrom`, or `fallback` when every heading is wet.
+ */
+export function liveDryHeading(editor, awayFrom, fallback) {
+  const camera = editor.viewModeController.camera;
+  const origin = editor.terrainView.floatingOrigin.getState();
+  const x = camera.position.x + origin.x, z = camera.position.z + origin.z;
+  let best = null;
+  for (let index = 0; index < 16; index += 1) {
+    const angle = index / 16 * Math.PI * 2;
+    const dx = Math.cos(angle), dz = Math.sin(angle);
+    const dry = [...GROUND_REACH, 8].every((reach) =>
+      !((editor.terrainView.getCanonicalWater(x + dx * reach, z + dz * reach)?.coverage ?? 0) > 0.1));
+    if (!dry) continue;
+    const yaw = yawToward(dx, dz);
+    const spread = Math.abs(Math.atan2(Math.sin(yaw - awayFrom), Math.cos(yaw - awayFrom)));
+    if (!best || spread > best.spread) best = { yaw, spread };
+  }
+  return best?.yaw ?? fallback;
 }

@@ -102,7 +102,8 @@ export function waterySphere(fx, ctx) {
   fx.at(0, () => {
     fx.sound('cast-water', ground);
     fx.waterBlob({ from: copy(ground), center, radius, rise, hold, collapse });
-    fx.light({ position: center, ramp: RAMP.FROST, intensity: 45, range: 9, attack: 0.8, hold: hold, decay: 1 });
+    // A faint glow: brighter, its ground pool read as white haze under the blob.
+    fx.light({ position: center, ramp: RAMP.FROST, intensity: 14, range: 6, attack: 0.8, hold: hold, decay: 1 });
   });
   // The water drawn up into it, and the spray of its going.
   fx.stream('water.drop', 0, rise, 110, {
@@ -116,7 +117,7 @@ export function waterySphere(fx, ctx) {
   holdFlat(fx, ground, 2.2, rise * 0.5, rise + hold, 0.5, 0.5);
   // Its shade on the ground or the pool bed below; the light pool adds the glow.
   fx.stream('water.shadow', rise * 0.6, rise + hold, 14, { kind: 'point', center: addScaled(ground, UP, 0.06) },
-    { sizeScale: radius * 2.4 });
+    { sizeScale: radius * 3 });
   // The mass crashes back down.
   fx.at(rise + hold + collapse * 0.7, () => fx.spawn('tidalOrbImpact', { ...ctx, target: copy(ground) }));
 }

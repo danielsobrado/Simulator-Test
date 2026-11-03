@@ -57,6 +57,8 @@ test('biome surface spots sit inside the biome and face nearby water', async () 
   assert.equal(generator.sampleTile(Math.floor(spot.x / 2), 0), 1);
   const ahead = { x: spot.x - Math.sin(spot.yaw) * 10, z: spot.z - Math.cos(spot.yaw) * 10 };
   assert.ok(generator.sampleWater(ahead.x / 2).kind > 0, 'the camera faces the water');
+  const back = { x: spot.x - Math.sin(spot.groundYaw) * 4, z: spot.z - Math.cos(spot.groundYaw) * 4 };
+  assert.equal(generator.sampleWater(back.x / 2).kind, 0, 'the ground shot looks at dry land');
   assert.deepEqual(findBiomeSurfacePose(generator, 2, 1, { attempts: 200000 }), spot, 'the same spot every run');
   assert.equal(findBiomeSurfacePose(generator, 2, 9, { attempts: 5000 }), null, 'an absent biome has no spot');
 });

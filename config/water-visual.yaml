@@ -186,7 +186,9 @@ water:
     filmTint: '#8ccad0'
     filmTintStrength: 0.18
     foamColor: '#edf8fb'
-    foamStrength: 0.55
+    # Wash foam is a hint at the waterline; at 0.55 it whitened small pools
+    # edge to edge.
+    foamStrength: 0.3
   # grass-test's lake and river surface (`WaterMaterial`, inland branch): its detail
   # normals advected along the current, its Fresnel against its sky, its sun glint
   # (pow 170 × 1.8 + pow 20 × 0.08), and its foam — noise foam in the 0.02–0.75 m

@@ -7,7 +7,8 @@ import * as THREE from 'three';
 
 /** Spheres merged into one blob: a body and the lobes that orbit it. */
 export const WATER_BLOB_LOBES = 5;
-const MARCH_STEPS = 40;
+// Grazing rays along the lobes need the extra steps, or the silhouette faceted.
+const MARCH_STEPS = 64;
 const HIT_EPSILON = 0.004;
 
 const WATER = vec3(0.05, 0.42, 0.85);
@@ -75,7 +76,7 @@ export function createWaterBlobMaterial(lighting) {
     const view = direction.negate();
     const facing = clamp(dot(n, view), 0, 1);
     const fresnel = pow(float(1).sub(facing), 5).mul(0.96).add(0.04);
-    const skyLight = lighting.ambientSky.mul(2.2).add(0.15);
+    const skyLight = lighting.ambientSky.mul(1.6).add(0.1);
     const skyAlong = (ray) => mix(SKY_LOW, SKY_HIGH, smoothstep(-0.1, 0.8, ray.y)).mul(skyLight);
     const sky = skyAlong(reflect(direction, n));
     const sun = normalize(lighting.sunDirection);
@@ -92,9 +93,11 @@ export function createWaterBlobMaterial(lighting) {
     const warp = sin(dot(local, vec3(2.3, -4.1, 1.7)).add(time.mul(0.9))).mul(1.3);
     const waveA = sin(dot(local, vec3(5.1, 3.7, 4.3)).add(time.mul(1.4)).add(warp));
     const waveB = sin(dot(local, vec3(-3.9, 4.6, 2.2)).sub(time.mul(1.1)).sub(warp.mul(0.7)));
-    const veins = pow(float(1).sub(min(abs(waveA), abs(waveB))), 9);
-    const body = mix(behind, WATER.mul(diffuse.mul(0.45).add(0.3)), 0.55)
-      .add(GLOW.mul(0.15)).add(GLOW.mul(veins).mul(0.4));
+    const veins = pow(float(1).sub(min(abs(waveA), abs(waveB))), 16);
+    // Mostly its own deep water, a little of the bent world behind: the earlier
+    // even mix read milky against bright skies.
+    const body = mix(behind, WATER.mul(diffuse.mul(0.4).add(0.28)), 0.72)
+      .add(GLOW.mul(0.12)).add(GLOW.mul(veins).mul(0.22));
     const specular = pow(max(dot(reflect(sun.negate(), n), view), 0), 90).mul(lighting.sunColor).mul(2.5);
     // The reflection never drowns the body: a magic water reads saturated even edge-on.
     const color = mix(body, sky, fresnel.mul(0.4)).add(specular);

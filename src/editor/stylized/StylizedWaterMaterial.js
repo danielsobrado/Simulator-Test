@@ -537,7 +537,7 @@ export function createStylizedWaterMaterial({
   if (sea) color = sea.shade(color);
   // Looking straight down the Fresnel barely moves, so ring faces also catch a
   // little light of their own: the rings still read from a bridge or a cliff.
-  if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.25).clamp(0, 0.1)));
+  if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.12).clamp(0, 0.05)));
 
   if (water.rainRipples?.enabled && quality.flow && rippleOrigin) {
     const ripple = createRainRippleNode({

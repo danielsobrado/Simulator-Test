@@ -27,5 +27,10 @@ export function rippleFieldSlope(originMeters, localMeters) {
     .div(2 * RIPPLE_TEXEL_METRES);
   const reach = oneMinus(smoothstep(RIPPLE_REACH_METRES[0], RIPPLE_REACH_METRES[1],
     positionWorld.xz.sub(rippleFieldUniforms.player).length()));
-  return slope.mul(reach.mul(rippleFieldUniforms.strength));
+  // The field has no mips: once a texel is smaller than a pixel the rings
+  // alias into dotted whorls in the reflections. Measured on the unwrapped
+  // local coordinate, so the window's wrap cannot flash a seam.
+  const texelsPerPixel = localCanonical.fwidth().length().div(RIPPLE_TEXEL_METRES);
+  const resolved = oneMinus(smoothstep(0.35, 1, texelsPerPixel));
+  return slope.mul(reach.mul(resolved).mul(rippleFieldUniforms.strength));
 }

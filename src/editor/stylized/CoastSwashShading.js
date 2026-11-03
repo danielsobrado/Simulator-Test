@@ -105,7 +105,8 @@ export function createCoastFoamBreakup(patterns, localXZ, clock, strength) {
   const threshold = strength * .625;
   const footprint = lace.fwidth();
   const filter = footprint.min(.15);
-  const laced = smoothstep(float(threshold - .1).sub(filter), float(threshold + .1).add(filter), lace);
+  // A wide band: at ±0.1 the lace's threshold drew a dotted line along the shore up close.
+  const laced = smoothstep(float(threshold - .22).sub(filter), float(threshold + .22).add(filter), lace);
   // Once the lace is finer than a pixel, thresholding it only draws a dotted
   // moiré along the shore: hand over to its average coverage instead.
   return mix(laced, float(0.5), smoothstep(.08, .25, footprint));

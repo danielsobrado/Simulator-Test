@@ -1686,7 +1686,8 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     if (characterView) {
       const walking = viewModeController.mode === PLAYER_MODE_WALK
         && !viewModeController.paused;
-      const wantVisible = walking
+      // `captureHidden`: a visual QA capture keeps the player's body and shadow out of frame.
+      const wantVisible = walking && !characterView.captureHidden
         && (viewModeController.isThirdPerson || characterInFirstPerson);
       if (characterView.visible !== wantVisible) characterView.setVisible(wantVisible);
       if (wantVisible) {
