@@ -179,10 +179,10 @@ water:
     washDecay: 4
     dampHeight: 0.9
     wetDarkening: 0.5
-    # Satin, not mirror: at 0.42 / 0.3 the sun glinted off each stepped wash
-    # front as a sharp white stripe across the sand.
-    wetRoughness: 0.75
-    filmRoughness: 0.6
+    # Near matte, darkened rather than glossy: at 0.42 / 0.3 (and still faintly
+    # at 0.75 / 0.6) the sun glinted off each stepped wash front as a white line.
+    wetRoughness: 0.85
+    filmRoughness: 0.8
     filmTint: '#8ccad0'
     filmTintStrength: 0.18
     foamColor: '#edf8fb'

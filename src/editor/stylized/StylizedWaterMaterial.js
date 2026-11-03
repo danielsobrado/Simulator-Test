@@ -622,12 +622,16 @@ export function createStylizedWaterMaterial({
   // occludes the rest per pixel and the bank follows the contour, not the grid.
   let surfaceHeight = waterField.g.add(waterSurfaceOrigin)
     .add(float(water.heightOffset).mul(waterlineFade));
-  if (sea) surfaceHeight = surfaceHeight.add(sea.displacement);
+  // Waves die out over the last metre of depth. A vertex just off the bank
+  // otherwise bobbed while its dry neighbour sat at water level, and the flat
+  // triangle between them rose over the sand as a pale, straight-edged wedge.
+  const swing = smoothstep(0.25, 1.2, waterDepth);
+  if (sea) surfaceHeight = surfaceHeight.add(sea.displacement.mul(swing));
   if (water.riverSurface?.enabled && quality.flow) {
     const phases = LAKE_WAVES.map((_, i) => surfacePatterns.wavePhase(`lakeWave${i}`, localXZ));
     surfaceHeight = surfaceHeight.add(lakeWaveRise(phases, time)
       .mul(oneMinus(clamp(currentStrength.mul(4), 0, 1)))
-      .mul(sea ? oneMinus(sea.mask) : float(1)).mul(waterlineFade));
+      .mul(sea ? oneMinus(sea.mask) : float(1)).mul(swing));
   }
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
