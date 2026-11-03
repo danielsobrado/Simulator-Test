@@ -23,8 +23,9 @@ export function rippleFieldSlope(originMeters, localMeters) {
   const uv = fract(floorMod(originCanonical, RIPPLE_WINDOW_METRES).add(localCanonical).div(RIPPLE_WINDOW_METRES));
   const step = 1 / RIPPLE_TEXELS;
   const height = (dx, dz) => texture(rippleFieldTexture, uv.add(vec2(dx * step, dz * step))).r;
-  const slope = vec2(height(1, 0).sub(height(-1, 0)), height(0, 1).sub(height(0, -1)))
-    .div(2 * RIPPLE_TEXEL_METRES);
+  // Two texels either side: blind to the grid-scale mode a 1-texel stencil sees.
+  const slope = vec2(height(2, 0).sub(height(-2, 0)), height(0, 2).sub(height(0, -2)))
+    .div(4 * RIPPLE_TEXEL_METRES);
   const reach = oneMinus(smoothstep(RIPPLE_REACH_METRES[0], RIPPLE_REACH_METRES[1],
     positionWorld.xz.sub(rippleFieldUniforms.player).length()));
   // The field has no mips: once a texel is smaller than a pixel the rings

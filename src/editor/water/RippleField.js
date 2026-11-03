@@ -28,8 +28,10 @@ export const RIPPLE_REACH_METRES = Object.freeze([11, 14.5]);
 export const RIPPLE_IMPULSE_CAPACITY = 16;
 /** Height clamp, metres: keeps a pile of spells from blowing the field up. */
 const MAX_HEIGHT = 0.03;
+/** Per-step diffusion of the height: kills the Nyquist mode, barely touches metre-scale rings. */
+const VISCOSITY = 0.04;
 /** c² above this makes the explicit scheme unstable. */
-const MAX_COURANT_SQUARED = 0.45;
+const MAX_COURANT_SQUARED = 0.42;
 
 function wrap(value, period) {
   const wrapped = value % period;
@@ -102,7 +104,10 @@ function waveStep(source, target, inject) {
     const at = (dx, dz) => textureLoad(source, ivec2(x.add(dx + RIPPLE_TEXELS).mod(n), z.add(dz + RIPPLE_TEXELS).mod(n))).r;
     const here = textureLoad(source, ivec2(x, z));
     const laplacian = at(-1, 0).add(at(1, 0)).add(at(0, -1)).add(at(0, 1)).sub(here.r.mul(4));
-    const height = here.r.mul(2).sub(here.g).add(laplacian.mul(step.c2)).mul(step.damping).toVar();
+    // A touch of viscosity damps the grid-scale (checkerboard) mode, which the
+    // reflections otherwise drew as dotted whorls; real ripples are far wider.
+    const height = here.r.mul(2).sub(here.g).add(laplacian.mul(step.c2))
+      .add(laplacian.mul(VISCOSITY)).mul(step.damping).toVar();
     const texel = vec2(float(x).add(0.5), float(z).add(0.5));
     if (inject) {
       Loop(step.count, ({ i }) => {

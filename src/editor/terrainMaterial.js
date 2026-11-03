@@ -419,6 +419,10 @@ export function createTerrainMaterial({
       const bankRoughness = mix(float(.64), float(.74), waterContext.organic)
         .max(waterContext.cold.mul(.68));
       beachSurface.roughness = mix(beachSurface.roughness, bankRoughness, wet);
+      // Under cold water the bed is grey glacial silt: the plain soil showing
+      // through clear shallows drew a brown band between pool and snow.
+      const silt = waterContext.cold.mul(surfaceMask.b.max(waterContext.wet));
+      beachSurface.color = mix(beachSurface.color, colorNode('#6f7a7e'), silt.mul(.85));
     }
     // Swash, foam and wet sand where the ground meets the sea.
     const swash = coastPatternsTemplate && createCoastSwashNodes({

@@ -28,6 +28,8 @@ const BIOMES = Object.freeze([
 /** Seconds after staging: the prints and ripples have settled, then the sphere hangs. */
 const GROUND_SHOT_S = 0.8;
 const SPELL_SHOT_S = 3.4;
+/** Spots tried per biome before settling for one without a dry ground heading. */
+const SPOT_ATTEMPTS = 6;
 
 function parseArguments(argv) {
   const result = { url: 'http://localhost:5173', only: null, out: null };
@@ -70,18 +72,26 @@ try {
     console.log(`Biome surface QA: ${biome.name}`);
     const entry = { ...biome, files: [] };
     report.biomes.push(entry);
-    const spot = await page.evaluate((id) => window.__worldVisualQa.findBiomeSurfacePose(id), biome.id);
+    // Water the generator cannot see (bog pools) can ring a spot: then the
+    // loaded field has no dry heading for the ground shot, and the next seed is tried.
+    let spot = null;
+    let groundYaw = null;
+    for (let attempt = 0; attempt < SPOT_ATTEMPTS && groundYaw === null; attempt += 1) {
+      spot = await page.evaluate(({ id, seed }) => window.__worldVisualQa.findBiomeSurfacePose(id, { seed }), { id: biome.id, seed: 20261103 + attempt * 7919 });
+      if (!spot) break;
+      await prepareVisualPose(page, { x: spot.x, z: spot.z, yaw: spot.yaw, pitch: -0.42, mode: 'player', heightAboveGround: 1.7 },
+        { minimumMs: 8000 });
+      groundYaw = await page.evaluate(({ yaw }) => window.__worldVisualQa.liveDryHeading(yaw, null), spot);
+      entry.attempts = attempt + 1;
+    }
     if (!spot) { entry.skipped = 'no spot of this biome in the world'; continue; }
+    groundYaw ??= spot.groundYaw;
     entry.spot = spot;
-    await prepareVisualPose(page, { x: spot.x, z: spot.z, yaw: spot.yaw, pitch: -0.42, mode: 'player', heightAboveGround: 1.7 },
-      { minimumMs: 8000 });
     entry.diagnostics = await page.evaluate(() => window.__worldVisualQa.diagnostics());
     await page.evaluate(() => window.__worldVisualQa.setCaptureUi(true));
     // The player's own body and shadow would otherwise sit in every ground shot.
     await page.evaluate(() => window.__worldVisualQa.setAvatarVisible(false));
     // The prints go on dry ground away from the spell; the spell goes on the water if any.
-    // Re-checked against the loaded water, which also knows bog pools.
-    const groundYaw = await page.evaluate(({ yaw, groundYaw }) => window.__worldVisualQa.liveDryHeading(yaw, groundYaw), spot);
     entry.groundYaw = groundYaw;
     entry.stage = await page.evaluate((options) => window.__worldVisualQa.stageSurfaceDemo(options), { water: spot.water, groundYaw });
     for (const [shot, seconds, yaw, pitch] of [['ground', GROUND_SHOT_S, groundYaw, -0.42], ['spell', SPELL_SHOT_S, spot.yaw, -0.02]]) {

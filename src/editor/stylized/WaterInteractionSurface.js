@@ -7,11 +7,18 @@ const WAKE_DEPTH = 0.014;
 const WAKE_WIDTH = 0.3;
 /** One ambient drop: an insect, a drip off the canopy. */
 const DROP_DEPTH = 0.004;
-const DROP_WIDTH = 0.1;
+// At least two texels wide, so a drop never excites the grid-scale mode.
+const DROP_WIDTH = 0.25;
 /** Metres a spell's press pushes the surface down at full strength. */
 const PRESS_DEPTH = 0.007;
 /** A press held at one radius (a puddle, a rune) stirs its rim this much as hard. */
 const HELD_SHARE = 0.2;
+/**
+ * Seconds between stirs of a held press. Spells refresh holds every 0.1 s;
+ * forcing the water at 10 Hz made ripples ~11 cm long, under a texel, which
+ * drew fingerprint whorls in the reflections.
+ */
+const HELD_STIR_SECONDS = 0.7;
 
 /**
  * The player's and spells' disturbances of the water, fed to the ripple field
@@ -25,7 +32,7 @@ export class WaterInteractionSurface {
     this.random = random;
     this.state = new WaterInteractionState(); this.status = {}; this.origin = {}; this.canonical = {}; this.render = {};
     this.generator = terrainView.worldStore.generator;
-    this.lastSeconds = null; this.splashed = new WeakSet(); this.dropDebt = 0; this.lastPress = null;
+    this.lastSeconds = null; this.lastStir = -Infinity; this.splashed = new WeakSet(); this.dropDebt = 0; this.lastPress = null;
     this.settings = { speed: 1.4, fade: 3, splash: 1, drops: 0 };
     this.release = player.subscribeWaterEvents(event => {
       if (!this.enabled || !this.active) return;
@@ -45,6 +52,8 @@ export class WaterInteractionSurface {
     const origin = this.view.floatingOrigin.readState(this.origin);
     const held = this.lastPress && Math.abs(this.lastPress.radius - radius) < 0.05
       && Math.hypot(this.lastPress.x - x, this.lastPress.z - z) < 0.05;
+    if (held && this.lastSeconds - this.lastStir < HELD_STIR_SECONDS) return;
+    this.lastStir = this.lastSeconds ?? 0;
     this.lastPress = { x, z, radius };
     const depth = PRESS_DEPTH * strength * this.settings.splash * (held ? HELD_SHARE : 1);
     this.field.splash(x + origin.x, z + origin.z, -depth, { ring: radius * inner, width: radius * (1 - inner) * 0.5 + 0.2 });
