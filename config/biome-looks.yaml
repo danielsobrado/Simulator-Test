@@ -56,8 +56,8 @@ biomeLooks:
       name: hot desert
       arid: sand
       ripples: { speed: 1.1, fade: 6, splash: 1.2 }
-      prints: { ground: 0.9, lifetime: 30, tint: '#a8927a' }
-      dunes: { wavelength: 0.22, wind: 18, height: 1.5, sharpness: 0.75 }
+      prints: { ground: 0.9, lifetime: 30, tint: '#8c7458' }
+      dunes: { wavelength: 0.22, wind: 18, height: 2, sharpness: 0.75 }
     # Cold steppe: bare ground with snow lying in the hollows.
     2:
       name: cold desert
@@ -125,5 +125,5 @@ biomeLooks:
       snow: { ground: 0.05, air: 0.2 }
       # Coarse grey canyon sand: short, choppy ripples across the wind.
       ripples: { speed: 1.3, fade: 4 }
-      prints: { ground: 0.85, lifetime: 45, tint: '#9a9081' }
-      dunes: { wavelength: 0.14, wind: -35, height: 0.8, sharpness: 0.45 }
+      prints: { ground: 0.85, lifetime: 45, tint: '#7e7466' }
+      dunes: { wavelength: 0.14, wind: -35, height: 1.3, sharpness: 0.45 }

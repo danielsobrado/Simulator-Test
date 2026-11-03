@@ -8,6 +8,7 @@ import { createDecalLayer } from './render/DecalLayer.js';
 import { createEffectLightPool } from './render/EffectLightPool.js';
 import { createParticleRenderer } from './render/ParticleRenderer.js';
 import { createVfxLightingUniforms } from './render/VfxLightingUniforms.js';
+import { createWaterBlobLayer } from './render/WaterBlobLayer.js';
 import { createSpellParticleTypes } from './types/index.js';
 
 const MAX_STEP_S = 1 / 20;
@@ -54,6 +55,7 @@ export function createVfxSystem(deps) {
   const simulator = createParticleSimulator({ types, groundHeight, capacity });
   const renderer = createParticleRenderer({ scene, atlas, lighting, capacity });
   const decals = createDecalLayer({ scene, atlas, lighting, groundHeight });
+  const blobs = createWaterBlobLayer({ scene, lighting });
   // No real scene lights by default: one costs every lit pixel every frame,
   // even dimmed (see EffectLightPool). Light pools on the ground stand in.
   const lights = createEffectLightPool({ scene, lighting, sceneLights: deps.sceneLights ?? 0 });
@@ -75,6 +77,7 @@ export function createVfxSystem(deps) {
     types,
     lights,
     decals,
+    blobs,
     shake,
     sound: deps.sound,
     groundHeight,
@@ -165,6 +168,7 @@ export function createVfxSystem(deps) {
       lights.update(dt, time);
       emitLightPools();
       decals.update(dt);
+      blobs.update(dt);
       shake.update(dt, camera);
       renderer.update(simulator, camera);
       deps.sound?.setListener?.(camera);
@@ -178,6 +182,7 @@ export function createVfxSystem(deps) {
     shiftOrigin(shiftX, shiftZ) {
       simulator.shiftOrigin(shiftX, shiftZ);
       decals.shiftOrigin(shiftX, shiftZ);
+      blobs.shiftOrigin(shiftX, shiftZ);
       lights.shiftOrigin(shiftX, shiftZ);
     },
     /** Compiles the particle and decal pipelines so the first cast never hitches. */
@@ -187,11 +192,14 @@ export function createVfxSystem(deps) {
       const compileScene = new THREE.Scene();
       const restoreParticles = renderer.prepareForCompile();
       const restoreDecals = decals.prepareForCompile();
+      const restoreBlobs = blobs.prepareForCompile();
       const particleProxy = new THREE.Mesh(renderer.mesh.geometry, renderer.mesh.material);
       const decalProxy = new THREE.Mesh(decals.mesh.geometry, decals.mesh.material);
+      const blobProxy = new THREE.Mesh(blobs.mesh.geometry, blobs.mesh.material);
       particleProxy.frustumCulled = false;
       decalProxy.frustumCulled = false;
-      compileScene.add(particleProxy, decalProxy);
+      blobProxy.frustumCulled = false;
+      compileScene.add(particleProxy, decalProxy, blobProxy);
       try {
         await compile.call(webgpuRenderer, compileScene, camera);
         return true;
@@ -201,6 +209,7 @@ export function createVfxSystem(deps) {
       } finally {
         restoreParticles();
         restoreDecals();
+        restoreBlobs();
       }
     },
     stats() {
@@ -216,7 +225,7 @@ export function createVfxSystem(deps) {
       };
     },
     /** For QA: the raw atlas texture and subsystems. */
-    internals: { atlas, simulator, renderer, decals, lights, lighting, types, get lastPlayed() { return lastPlayed; } },
+    internals: { atlas, simulator, renderer, decals, blobs, lights, lighting, types, get lastPlayed() { return lastPlayed; } },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -224,6 +233,7 @@ export function createVfxSystem(deps) {
       simulator.clear();
       renderer.dispose();
       decals.dispose();
+      blobs.dispose();
       lights.dispose();
       atlas.dispose();
     },

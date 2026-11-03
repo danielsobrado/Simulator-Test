@@ -1,5 +1,5 @@
 import { RAMP } from '../atlas/ParticleAtlasLayout.js';
-import { blastWave, markGrass } from '../effects/groundPress.js';
+import { blastWave, holdFlat, markGrass } from '../effects/groundPress.js';
 import { launchProjectile } from '../effects/projectile.js';
 import { addScaled, copy, onGround, UP } from '../effects/vec.js';
 
@@ -85,4 +85,35 @@ export function rainCall(fx, ctx) {
     fx.press(time, time + 0.02, () => ({ x: at.x, z: at.z, radius: 0.3 + fx.random() * 0.2, strength: 0.55, inner: 0.15 }));
   });
   markGrass(fx, ground, radius, 'bloom', 1, duration, { strength: 0.7, grow: 3 });
+}
+
+/**
+ * Watery Sphere: a mass of water is drawn up out of the ground (or the pool)
+ * at the target and hangs there, rippling, its lobes rolling round it, while
+ * drips stir the water or grass beneath; then it crashes back down.
+ */
+export function waterySphere(fx, ctx) {
+  const ground = onGround(fx, ctx.target, 0);
+  const radius = 1.1;
+  const rise = 1.3;
+  const hold = 5.5;
+  const collapse = 0.55;
+  const center = addScaled(ground, UP, 2.8);
+  fx.at(0, () => {
+    fx.sound('cast-water', ground);
+    fx.waterBlob({ from: copy(ground), center, radius, rise, hold, collapse });
+    fx.light({ position: center, ramp: RAMP.FROST, intensity: 45, range: 9, attack: 0.8, hold: hold, decay: 1 });
+  });
+  // The water drawn up into it, and the spray of its going.
+  fx.stream('water.drop', 0, rise, 110, {
+    kind: 'disk', center: ground, radius: 1.3, ground: fx.groundHeight, height: 0.1, lift: [3.5, 6.5], spread: 0.35,
+  }, { sizeScale: 0.8 });
+  fx.stream('water.spray', 0, rise, 8, { kind: 'disk', center: ground, radius: 1.4, ground: fx.groundHeight, height: 0.2, lift: [0.4, 1] });
+  // Hanging there: drips fall from its belly and keep the surface below stirred.
+  fx.stream('water.drop', rise, rise + hold, 16, {
+    kind: 'disk', center: addScaled(center, UP, -radius * 0.95), radius: radius * 0.6, height: 0, lift: [-1, 0], spread: 0.1,
+  });
+  holdFlat(fx, ground, 2.2, rise * 0.5, rise + hold, 0.5, 0.5);
+  // The mass crashes back down.
+  fx.at(rise + hold + collapse * 0.7, () => fx.spawn('tidalOrbImpact', { ...ctx, target: copy(ground) }));
 }

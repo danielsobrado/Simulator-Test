@@ -8,7 +8,7 @@ import { coneOfCold, iceStorm } from './frostRecipes.js';
 import { moonbeam, sunbeam } from './radianceRecipes.js';
 import { lightningBolt, thunderwave } from './stormRecipes.js';
 import { bogGasFlame } from './bogRecipes.js';
-import { rainCall, tidalOrb, tidalOrbImpact } from './waterRecipes.js';
+import { rainCall, tidalOrb, tidalOrbImpact, waterySphere } from './waterRecipes.js';
 
 /** Every recipe by id, including the impacts that projectiles spawn. */
 export const EFFECT_RECIPES = Object.freeze({
@@ -35,4 +35,5 @@ export const EFFECT_RECIPES = Object.freeze({
   tidalOrb,
   tidalOrbImpact,
   rainCall,
+  waterySphere,
 });

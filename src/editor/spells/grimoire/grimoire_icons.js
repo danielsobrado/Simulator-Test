@@ -9,6 +9,11 @@ const GRIMOIRE_GLYPHS = Object.freeze({
     <circle class="glyph-fill" cx="12" cy="9.5" r="5.6"/>
     <path class="glyph-light" d="M9.4 7.6a3.2 3.2 0 0 1 3.4-1.9"/>
   </svg>`,
+  waterySphere: `<svg viewBox="0 0 24 24" aria-hidden="true">
+    <path class="glyph-line glyph-line--soft" d="M4 20.5c2.6-1.2 5.3-1.2 8 0s5.4 1.2 8 0"/>
+    <path class="glyph-fill" d="M12 3.2c3.6 0 6 2.5 5.6 5.4 1.8.6 2.4 2.8 1 4-1.4 1.3-3.4.9-4.2 2-1.2 1.4-3.6 1.4-4.8 0-.8-1.1-2.8-.7-4.2-2-1.4-1.2-.8-3.4 1-4C6 5.7 8.4 3.2 12 3.2Z"/>
+    <path class="glyph-light" d="M9.6 6.4a3 3 0 0 1 3-1.2"/>
+  </svg>`,
   rainCall: `<svg viewBox="0 0 24 24" aria-hidden="true">
     <path class="glyph-fill" d="M6.5 12a3.8 3.8 0 0 1 .4-7.6 5.3 5.3 0 0 1 10 1.4 3.1 3.1 0 0 1 .6 6.2Z"/>
     <path class="glyph-line" d="M8 15l-1.2 3.6M12 15l-1.2 4.6M16 15l-1.2 3.6"/>

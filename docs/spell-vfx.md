@@ -74,7 +74,13 @@ hidden under the grass:
   a shallow crater in the footprint field — stamped at most every 0.12 s and
   once per held disc, capped at 4 m. How either reads is the biome's
   (`ripples`, `prints` in [biome looks](biome-looks.md)). The Tides page's
-  Tidal Orb and Rain Call are built to show it off.
+  Tidal Orb, Rain Call and Watery Sphere are built to show it off.
+- **Water blob.** Watery Sphere's floating mass is the one effect outside the
+  particle draw: `render/WaterBlobLayer.js`, a box mesh whose material
+  raymarches five smoothly merged, rippling spheres (40 steps) and shades them
+  from the VFX sun and sky uniforms — no scene light, no viewport texture. One
+  blob at a time; hidden and free when no spell holds it; precompiled with the
+  particle pipelines.
 
 Measured on 2026-10-12 (headed Chromium, vsync off, Fireballs cast every 1.5 s):
 ~4 % FPS while a spell is lit (≈0.25 ms: half the world light, half the spell

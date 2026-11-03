@@ -93,6 +93,10 @@ export function createEffectDirector(services) {
       decal(spec) {
         return services.decals.spawn(spec);
       },
+      /** A floating mass of water (WaterBlobLayer); null where nothing draws one. */
+      waterBlob(spec) {
+        return services.blobs?.spawn(spec) ?? null;
+      },
       shake(amount, origin, radius) {
         services.shake.add(amount, origin, services.getListener(), radius);
       },

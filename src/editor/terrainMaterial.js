@@ -452,8 +452,9 @@ export function createTerrainMaterial({
       chunkCenter,
       groundHeight: terrainHeight,
       snow: bakedSurface.snow ?? float(0),
-      // Bare ground in a biome that takes prints: desert sand, bog mud.
-      bare: oneMinus(grassCoverage).mul(oneMinus(pathMask)).mul(oneMinus(surfaceMask.b)),
+      // Any dry ground in a biome that takes prints (desert sand, bog mud): the
+      // dirt between sparse tussocks prints too, so grass cover does not gate it.
+      ground: oneMinus(surfaceMask.b),
     });
     // The trail a body cuts through deep snow, over the prints it leaves there.
     // Disabled or snowless, it compiles to nothing.

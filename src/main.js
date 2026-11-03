@@ -101,6 +101,8 @@ import { classifyFootstepSurface } from './editor/audio/footstep_surface.js';
 import { snowAtPoint, snowBiomeCoverAt } from './editor/materials/SnowAccumulation.js';
 import { terrainBakeMacroSeed } from './editor/materials/TerrainBakeNoise.js';
 import {
+  groundDeformationUniforms,
+  readDeformationTexel,
   setGroundDeformationRegion,
   stampDisc,
   stampFootprint,
@@ -1441,7 +1443,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       fallingLeaves,
       snowPowder,
       worldAmbience,
-      groundDeformation: { stampFootprint, stampDisc },
+      groundDeformation: { stampFootprint, stampDisc, readDeformationTexel, groundDeformationUniforms },
       waterInteraction,
       biomeSurface,
       weatherSettings,

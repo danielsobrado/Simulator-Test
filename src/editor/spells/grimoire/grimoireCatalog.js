@@ -44,6 +44,7 @@ export const GRIMOIRE_PAGES = Object.freeze([
     spells: Object.freeze([
       { id: 'tidalOrb', label: 'Tidal Orb', recipe: 'tidalOrb', targeting: 'ground', rangeM: 40, castMs: 1800 },
       { id: 'rainCall', label: 'Rain Call', recipe: 'rainCall', targeting: 'ground', rangeM: 40, castMs: 2600 },
+      { id: 'waterySphere', label: 'Watery Sphere', recipe: 'waterySphere', targeting: 'ground', rangeM: 30, castMs: 2200 },
     ].map(Object.freeze)),
   }),
 ]);

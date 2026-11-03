@@ -17,7 +17,7 @@ const BEACH_TOP = 1.8;
 /**
  * Footprints on the terrain: pressed snow goes a shade darker and cooler, sand
  * a shade darker and wetter-looking. Where the ground is snow (the baked snow
- * weight), beach (just above the sea), or bare ground in a biome whose
+ * weight), beach (just above the sea), or dry ground in a biome whose
  * `prints.ground` takes them (desert sand, bog mud); elsewhere nothing shows.
  *
  * @param {object} options
@@ -26,9 +26,9 @@ const BEACH_TOP = 1.8;
  * @param {object} options.chunkCenter vec2 uniform, canonical chunk centre (whole metres)
  * @param {object} options.groundHeight world height of the ground
  * @param {object} options.snow 0..1 baked snow weight
- * @param {object} [options.bare] 0..1 bare ground (no grass, path or water)
+ * @param {object} [options.ground] 0..1 dry ground in a biome that takes prints
  */
-export function createFootprintShading({ terrainUv, chunkWorldSize, chunkCenter, groundHeight, snow, bare = float(0) }) {
+export function createFootprintShading({ terrainUv, chunkWorldSize, chunkCenter, groundHeight, snow, ground = float(0) }) {
   const localMeters = vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize);
   // The chunk's corner in whole metres on cell axes (canonical z runs the other way).
   const originMeters = vec2(
@@ -38,7 +38,7 @@ export function createFootprintShading({ terrainUv, chunkWorldSize, chunkCenter,
   const depth = groundDeformationNode(originMeters, localMeters);
   const above = groundHeight.sub(seaStateUniforms.seaLevel);
   const beach = smoothstep(-0.2, 0.1, above).mul(oneMinus(smoothstep(BEACH_TOP - 0.4, BEACH_TOP, above)));
-  const surface = max(max(snow, beach), bare.mul(groundDeformationUniforms.ground));
+  const surface = max(max(snow, beach), ground.mul(groundDeformationUniforms.ground));
   const pressed = depth.mul(surface);
   return {
     pressed,

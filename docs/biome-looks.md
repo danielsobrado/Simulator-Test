@@ -39,6 +39,11 @@ its slope within ~14 m of the player. No viewport textures. Wakes, swim strokes,
 ambient drops (plus rain) and spell presses (`EffectDirector.press`) feed it.
 WebGL has no storage textures, so there the field stays off.
 
+Prints in a biome's `ground` share apply to any dry ground, grass or not, so
+the dirt between a desert's tussocks prints; the share is regional (the blend
+round the player), so it has no tile edges. Dunes still need bare `arid: sand`
+ground: letting them through grass exposed hard tile borders.
+
 What it buys: an oasis carries a Tidal Orb's ring across the pool, glacier
 slush swallows it within a metre, bog water never stops stippling; desert
 prints blow back in within half a minute while a glacier keeps them for six.
