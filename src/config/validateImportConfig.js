@@ -1,3 +1,4 @@
+import { validateRegionalBiomes } from '../editor/import/AzgaarRegionalBiomes.js';
 import { resolveMountainRidges } from '../editor/world/MountainRidges.js';
 import { resolveTrailGrading } from '../editor/world/TrailGrading.js';
 
@@ -126,5 +127,6 @@ export function validateImportConfig(config) {
   } catch (error) {
     throw new Error(`Invalid editor configuration: ${error.message}`);
   }
+  validateRegionalBiomes(importConfig.azgaarRegionalBiomes);
   return importConfig;
 }

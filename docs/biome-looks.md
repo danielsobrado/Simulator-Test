@@ -122,3 +122,19 @@ nearest-filtered texture and turned the bands into quads.
 `chunk-cross` 144.7 fps, GPU 2.30 ms. Single runs, against 84–85 and 137 fps on the
 previous commit, on a busy machine. Neither route reaches alpine ground, so the
 crags' own draw cost is unmeasured.
+
+## Canyon country
+
+`import.azgaarRegionalBiomes` carves custom biomes out of a map at import
+(`import/AzgaarRegionalBiomes.js`): Stonehold's dry lowland pockets (Ironpeak
+taiga, tundra and wetland with precipitation ≤ 15, 77 of its 329 cells) become
+"Stonehold Badlands", tile 32. The map file is untouched; re-import to apply.
+
+`relief: canyon` stamps the biome's source id into `terrain.canyonBiomes`, and
+the generator lays `world/CanyonRelief.js` over it in place of the ridges:
+three flat terraces with sheer risers, flat-bottomed canyons and wind-ribbed
+dunes on the floors, eased across one atlas texel at the border. Fins on the
+cliffs and the dunes are near terrain only. The biome's look row gives sand
+ripples on bare ground (`arid: sand`), crags and boulders at any height and
+bare grey rock on its cliffs (`crags: true`); the `badlands` keyword keeps it
+free of grass and trees.

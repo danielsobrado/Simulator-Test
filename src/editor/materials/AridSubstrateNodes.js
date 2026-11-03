@@ -1,13 +1,17 @@
 import { Color } from 'three/webgpu';
-import { Fn, If, float, mix, oneMinus, positionView, sin, smoothstep, vec3, vec4 } from 'three/tsl';
+import { Fn, If, bool, float, mix, oneMinus, positionView, sin, smoothstep, vec3, vec4 } from 'three/tsl';
 import { periodicFbm2, periodicNoise } from '../stylized/PeriodicNoiseNodes.js';
 import { PATTERN_PERIOD } from '../stylized/PatternOrigins.js';
 
+const DEFAULT_ARID = Object.freeze({ sand: [1], mineral: [2] });
 const pigment = hex => { const color = new Color(hex); return vec3(color.r, color.g, color.b); };
 
 /** Loose sand and frost-broken mineral ground; canonical IDs remain unchanged. */
-export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, cameraDistance }) {
-  const hot = tileId.equal(1), cold = tileId.equal(2);
+const anyOf = (tileId, ids) => ids.map((id) => tileId.equal(id)).reduce((a, b) => a.or(b), bool(false));
+
+/** `arid` lists the sand and mineral tiles (biome-looks `arid`); Azgaar's hot and cold deserts by default. */
+export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, cameraDistance, arid = DEFAULT_ARID }) {
+  const hot = anyOf(tileId, arid.sand ?? []), cold = anyOf(tileId, arid.mineral ?? []);
   const amount = hot.or(cold).select(bare.clamp(0, 1), float(0));
   const reach = oneMinus(smoothstep(8, 30, cameraDistance));
   const sample = Fn(() => {

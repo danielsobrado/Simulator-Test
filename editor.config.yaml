@@ -35,6 +35,20 @@ import:
   # the ground along each is cut and filled toward a profile no steeper than
   # maxGrade, within maxCut/maxFill, with banks that widen with the cut.
   # Stamped at import like the ridges; remove the block to import ungraded.
+  # Regional biomes carved out of the map at import (import/AzgaarRegionalBiomes.js):
+  # cells of the named states, wearing one of fromBiomes and no wetter than
+  # maxPrecipitation, become a custom biome (terrain id 32 up, in the order
+  # listed after the map's own). `relief: canyon` raises mesas, cuts canyons and
+  # lays dunes there (world/CanyonRelief.js). Stamped at import: re-import to apply.
+  azgaarRegionalBiomes:
+    # Stonehold's dry lowland pockets: bare grey stone and wind-blown sand
+    # between its taiga and glaciers, about a quarter of the realm.
+    - name: Stonehold Badlands
+      color: '#a8a090'
+      states: [Ironpeak]
+      fromBiomes: [9, 10, 12]
+      maxPrecipitation: 15
+      relief: canyon
   azgaarTrails:
     roadWidthMeters: 6
     trailWidthMeters: 3

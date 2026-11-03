@@ -362,7 +362,7 @@ export function createTerrainMaterial({
       const arid = createAridSubstrateNodes({ tileId: tileSample.a.mul(255).round(),
         bare: oneMinus(grassCoverage).mul(oneMinus(bakedSurface.snow ?? float(0)))
           .mul(oneMinus(pathMask)).mul(oneMinus(surfaceMask.b)),
-        patterns: transitionPatterns, localXZ, cameraDistance });
+        patterns: transitionPatterns, localXZ, cameraDistance, arid: stylizedConfig.biomeLooks?.arid });
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));
     }
     if (bakedSurface.rock && bakedSurface.normal) {

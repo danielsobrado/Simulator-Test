@@ -3,6 +3,7 @@ import * as THREE from 'three/webgpu';
 import { terrainMaterialAnalysisChannels } from './TerrainMaterialAnalysisTexture.js';
 import {
   Fn,
+  bool,
   clamp,
   faceDirection,
   float,
@@ -300,7 +301,11 @@ export function createTerrainMaterialBakedSurface({
   // Macro tint, family atlas and lichen are ground pigment: on snow they read as dirty concrete.
   midColor = mix(midColor, snowColor.mul(heightShade), weights.a.mul(SNOW_ALBEDO_PURITY));
   // High rock is bare: lichen and the macro tint turned alpine faces mossy green.
-  const alpine = smoothstep(ALPINE_ROCK_HEIGHT, ALPINE_ROCK_HEIGHT + 200, terrainHeight);
+  // Crag biomes (biome-looks `crags`) are bare at any height: lower down their
+  // cliffs took the soil's tint and read as sand banks.
+  const craggyIds = [...(stylizedConfig.biomeLooks?.crags ?? [])].flatMap((flag, id) => (flag ? [id] : []));
+  const craggy = craggyIds.reduce((any, id) => any.or(tileId.equal(id)), bool(false));
+  const alpine = craggy.select(float(1), smoothstep(ALPINE_ROCK_HEIGHT, ALPINE_ROCK_HEIGHT + 200, terrainHeight));
   midColor = mix(midColor, rockColor.mul(heightShade), weights.b.mul(alpine).mul(ALPINE_ROCK_PURITY));
 
   const nearMacro =mix(vec3(1), macroMultiplier, render.nearMacroStrength);

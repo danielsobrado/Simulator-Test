@@ -122,6 +122,7 @@ export class StylizedSurfaceView {
         scene: terrainView.scene,
         terrainView,
         snowGroundByTile: config.biomeLooks?.snow.ground ?? [],
+        cragsByTile: config.biomeLooks?.crags ?? [],
         seaLevel: terrainView.worldStore.generator?.seaLevel ?? 0,
       })
       : null;

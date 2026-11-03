@@ -1,3 +1,4 @@
+import { canyonBiomeSourceIds } from './AzgaarRegionalBiomes.js';
 import { azgaarYToAtlas } from './azgaarAtlasY.js';
 import { createAzgaarBiomeDefinitions } from '../AzgaarBiomeCatalog.js';
 import { deriveAzgaarWorldGuidance } from './AzgaarWorldGuidance.js';
@@ -547,6 +548,7 @@ export function createAzgaarMacroWorldSource(document, config, options = {}) {
       ridges: resolveMountainRidges(config.import?.azgaarRidges),
       trails: resolveTrailGrading(config.import?.azgaarTrails),
       guidanceDetail: terrainGuidanceDetail(guidanceConfig),
+      canyonBiomes: canyonBiomeSourceIds(biomeDefinitions, config.import?.azgaarRegionalBiomes),
     },
     biomes: biomeDefinitions,
     rivers,

@@ -20,6 +20,10 @@
 #                 soundscape (stylized/sky/SnowCountryWeight.js).
 #   snow.fall     regional snowfall (weather-effects.yaml `snowfall`), which
 #                 starts at its `regionalMinCoverage`.
+#   arid          bare ground dressed as rippled `sand` or frost-broken
+#                 `mineral` (materials/AridSubstrateNodes.js).
+#   crags         true grows crags and boulder clusters at any height, not only
+#                 on high or snowy ground (stylized/alpine/AlpineRockView.js).
 #
 # Above the terrain's snow line (terrain-material-bake.yaml) every snow column
 # reaches 1 whatever the biome. Values are 0..1; unlisted columns are 0.
@@ -31,8 +35,9 @@ biomeLooks:
     # frosted stand still reads as grass.
     frost: '#d9e0e2'
   byTileId:
+    1: { name: hot desert, arid: sand }
     # Cold steppe: bare ground with snow lying in the hollows.
-    2: { name: cold desert, snow: { ground: 0.2, air: 0.3, fall: 0.3 } }
+    2: { name: cold desert, arid: mineral, snow: { ground: 0.2, air: 0.3, fall: 0.3 } }
     3: { name: savanna, canopy: '#aeae5a' }
     4: { name: grassland, canopy: '#86b04a' }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
@@ -66,3 +71,12 @@ biomeLooks:
     # Swamp giants: dark, olive-black leaves under the bog overcast.
     # Peat and moss between the sedge, not the map's bright marsh green.
     12: { name: wetland, canopy: '#3f5434', soil: '#2c3120' }
+    # Stonehold Badlands, the first custom biome of an Eldara import
+    # (import.azgaarRegionalBiomes): grey mesas and canyons, pale wind-blown sand
+    # on the floors, frost in the hollows of a cold realm.
+    32:
+      name: stonehold badlands
+      soil: '#b3a68c'
+      arid: sand
+      crags: true
+      snow: { ground: 0.05, air: 0.2 }

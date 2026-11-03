@@ -1,3 +1,4 @@
+import { applyRegionalBiomes } from './AzgaarRegionalBiomes.js';
 import {
   INFINITE_WORLD_FORMAT_VERSION,
   WORLD_MAX_SAFE_CELL_COORDINATE,
@@ -230,7 +231,10 @@ function waterDomainMetadata(config) {
 
 export function importAzgaarFullJson(document, config, options = {}) {
   assertAzgaarDocument(document);
-  const sourceDocument = normalizeBiomeSource(document);
+  const sourceDocument = applyRegionalBiomes(
+    normalizeBiomeSource(document),
+    config.import?.azgaarRegionalBiomes,
+  );
   const chunkSize = config.world.chunkSize;
   const summary = buildAzgaarImportSummary(sourceDocument, config, options);
   assertSafeWorldBounds(summary, config);

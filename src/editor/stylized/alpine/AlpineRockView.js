@@ -9,7 +9,7 @@ import { createAlpineRockMaterial } from './AlpineRockMaterial.js';
 const REACH_CELLS = 7;
 const CELLS_PER_FRAME = 10;
 const CAPACITY = 220;
-/** Ground below this height needs a snowy biome to grow these. */
+/** Ground below this height needs a snowy or craggy biome (biome-looks `crags`) to grow these. */
 const ALPINE_HEIGHT = 550;
 const COLD_GROUND_SNOW = 0.5;
 const SLOPE_STEP_METERS = 3;
@@ -22,10 +22,11 @@ const spin = new THREE.Quaternion();
 
 /** Crags and boulder clusters round the player: one instanced draw per shape, nothing until one is near. */
 export class AlpineRockView {
-  constructor({ scene, terrainView, snowGroundByTile, seaLevel }) {
+  constructor({ scene, terrainView, snowGroundByTile, cragsByTile = [], seaLevel }) {
     this.terrainView = terrainView;
     this.floatingOrigin = terrainView.floatingOrigin;
     this.snowGroundByTile = snowGroundByTile;
+    this.cragsByTile = cragsByTile;
     this.seaLevel = seaLevel;
     this.root = new THREE.Group();
     this.root.name = 'alpine-rocks';
@@ -41,8 +42,9 @@ export class AlpineRockView {
     const view = this.terrainView;
     const height = view.getCanonicalHeight(x, z);
     const size = view.worldStore.tileSize;
-    const snowy = (this.snowGroundByTile[view.worldStore.getTile(Math.floor(x / size), Math.floor(-z / size))] ?? 0) >= COLD_GROUND_SNOW;
-    const allowed = height > this.seaLevel + 1 && (height >= ALPINE_HEIGHT || snowy);
+    const tile = view.worldStore.getTile(Math.floor(x / size), Math.floor(-z / size));
+    const rocky = (this.snowGroundByTile[tile] ?? 0) >= COLD_GROUND_SNOW || this.cragsByTile[tile] === 1;
+    const allowed = height > this.seaLevel + 1 && (height >= ALPINE_HEIGHT || rocky);
     if (!allowed) return { allowed, slope: 0, height };
     const dx = (view.getCanonicalHeight(x + SLOPE_STEP_METERS, z) - height) / SLOPE_STEP_METERS;
     const dz = (view.getCanonicalHeight(x, z + SLOPE_STEP_METERS) - height) / SLOPE_STEP_METERS;

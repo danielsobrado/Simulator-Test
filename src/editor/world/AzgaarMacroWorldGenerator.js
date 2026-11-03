@@ -5,6 +5,7 @@ import {
 import { WorldGuidanceField } from './WorldGuidanceField.js';
 import { ridgeFineHeight, ridgeHeight, validateMountainRidges } from './MountainRidges.js';
 import { landformRelief } from './TerrainLandforms.js';
+import { canyonRelief } from './CanyonRelief.js';
 import { valueNoise } from './valueNoise2d.js';
 import { createBiomeBoundaryWarp } from './BiomeBoundaryWarp.js';
 import { TrailGrading, validateTrailGrading } from './TrailGrading.js';
@@ -188,6 +189,11 @@ function validateTerrainMetadata(terrain, oceanTransitionCells) {
   if (terrain.trails !== undefined && terrain.trails !== null) {
     validateTrailGrading(terrain.trails, 'Azgaar macro source terrain trails');
   }
+  if (terrain.canyonBiomes !== undefined
+      && (!Array.isArray(terrain.canyonBiomes)
+        || terrain.canyonBiomes.some((id) => !Number.isInteger(id) || id < 0 || id > 255))) {
+    throw new Error('Azgaar macro source terrain canyonBiomes must list biome source ids.');
+  }
   const detail = terrain.guidanceDetail;
   if (detail === undefined) return;
   if (!detail || GUIDANCE_DETAIL_FIELDS.some((name) => !Number.isFinite(detail[name]))) {
@@ -292,6 +298,11 @@ export class AzgaarMacroWorldGenerator {
     // Per texel: 0 unknown, 1 its land neighbours share its biome (no border in
     // warp reach, so the warp is skipped), 2 a border is within reach.
     this.biomeTexelMixed = this.biomeWarp ? new Uint8Array(source.atlas.width * source.atlas.height) : null;
+    // 1 where a texel's biome asks for canyon relief; null when none does, so other worlds skip it.
+    const canyonBiomes = new Set(source.terrain.canyonBiomes ?? []);
+    this.canyonMask = canyonBiomes.size && this.biomeAtlas.some((id) => canyonBiomes.has(id))
+      ? Uint8Array.from(this.biomeAtlas, (id) => (canyonBiomes.has(id) ? 1 : 0))
+      : null;
     this.riverIndex = createRiverIndex(
       source.rivers,
       source.atlas.width,
@@ -368,6 +379,15 @@ export class AzgaarMacroWorldGenerator {
   }
 
   sampleRawHeight(cellX, cellZ) {
+    return this.sampleAtlasBilinear(this.heights, cellX, cellZ);
+  }
+
+  /** 0..1, how far a vertex lies inside canyon country, eased across one atlas texel. */
+  canyonWeight(cellX, cellZ) {
+    return this.canyonMask ? this.sampleAtlasBilinear(this.canyonMask, cellX, cellZ) : 0;
+  }
+
+  sampleAtlasBilinear(values, cellX, cellZ) {
     const { width, height } = this.source.atlas;
     const position = this.toAtlasPosition(cellX, cellZ);
     const fx = clamp(position.x - 0.5, 0, width - 1);
@@ -377,13 +397,13 @@ export class AzgaarMacroWorldGenerator {
     const x1 = Math.min(width - 1, x0 + 1);
     const y1 = Math.min(height - 1, y0 + 1);
     const north = lerp(
-      this.heights[this.atlasIndex(x0, y0)],
-      this.heights[this.atlasIndex(x1, y0)],
+      values[this.atlasIndex(x0, y0)],
+      values[this.atlasIndex(x1, y0)],
       fx - x0,
     );
     const south = lerp(
-      this.heights[this.atlasIndex(x0, y1)],
-      this.heights[this.atlasIndex(x1, y1)],
+      values[this.atlasIndex(x0, y1)],
+      values[this.atlasIndex(x1, y1)],
       fx - x0,
     );
     return lerp(north, south, fy - y0);
@@ -532,11 +552,14 @@ export class AzgaarMacroWorldGenerator {
       valueNoise(vertexX / 96, vertexZ / 96, this.seed + 1709) * 1.4
       + valueNoise(vertexX / 24, vertexZ / 24, this.seed + 1877) * 0.35
     );
+    // Mesas replace the crests: ridged noise over a flat top reads as hills again.
+    const canyon = this.canyonWeight(vertexX, vertexZ);
     // The far backdrop skips landforms: it sits heightBias under them, past their reach.
     return base
       + detail * coastFade * ruggedness * this.morphologyScale(vertexX, vertexZ)
       + landformRelief(vertexX, vertexZ, this.seed) * clamp((rawHeight - LAND_HEIGHT) / LANDFORM_COAST_RAW, 0, 1)
-      + this.ridgeRelief(vertexX, vertexZ, elevationFraction, ridgeHeightWithFine) * coastFade;
+      + this.ridgeRelief(vertexX, vertexZ, elevationFraction, ridgeHeightWithFine) * coastFade * (1 - canyon)
+      + (canyon > 0 ? canyonRelief(vertexX, vertexZ, this.seed) * canyon * coastFade : 0);
   }
 
   /**
@@ -567,7 +590,9 @@ export class AzgaarMacroWorldGenerator {
     } else if (rawHeight >= LAND_HEIGHT) {
       // The far backdrop carries the same crests, so ranges keep their shape
       // where near terrain hands over to it.
-      height += this.ridgeRelief(cellX, cellZ, landReliefFraction(rawHeight, this.source.terrain));
+      const canyon = this.canyonWeight(cellX, cellZ);
+      height += this.ridgeRelief(cellX, cellZ, landReliefFraction(rawHeight, this.source.terrain)) * (1 - canyon)
+        + (canyon > 0 ? canyonRelief(cellX, cellZ, this.seed, false) * canyon : 0);
     }
     return { height, tileId: this.sampleTile(cellX, cellZ) };
   }
