@@ -362,7 +362,8 @@ export function createTerrainMaterial({
       const arid = createAridSubstrateNodes({ tileId: tileSample.a.mul(255).round(),
         bare: oneMinus(grassCoverage).mul(oneMinus(bakedSurface.snow ?? float(0)))
           .mul(oneMinus(pathMask)).mul(oneMinus(surfaceMask.b)),
-        patterns: transitionPatterns, localXZ, cameraDistance, arid: stylizedConfig.biomeLooks?.arid });
+        patterns: transitionPatterns, localXZ, cameraDistance, arid: stylizedConfig.biomeLooks?.arid,
+        dunes: stylizedConfig.biomeLooks?.surface?.dunes });
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));
     }
     if (bakedSurface.rock && bakedSurface.normal) {
@@ -451,6 +452,8 @@ export function createTerrainMaterial({
       chunkCenter,
       groundHeight: terrainHeight,
       snow: bakedSurface.snow ?? float(0),
+      // Bare ground in a biome that takes prints: desert sand, bog mud.
+      bare: oneMinus(grassCoverage).mul(oneMinus(pathMask)).mul(oneMinus(surfaceMask.b)),
     });
     // The trail a body cuts through deep snow, over the prints it leaves there.
     // Disabled or snowless, it compiles to nothing.

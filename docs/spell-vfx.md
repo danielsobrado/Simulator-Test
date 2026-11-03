@@ -68,6 +68,14 @@ hidden under the grass:
   0.25 s; `holdFlat` refreshes every 0.1 s. Restamping every frame cost ~0.2 ms
   of CPU per spell. Recipes pass mark names; `main.js` maps them to kinds.
 
+- **Water and craters.** Every press also reaches `spells/spellSurfacePress.js`:
+  the ripple field near the player takes it as a ring wave (a growing blast as
+  a wave racing out, a held disc as a stirring rim), and snow, sand and mud take
+  a shallow crater in the footprint field — stamped at most every 0.12 s and
+  once per held disc, capped at 4 m. How either reads is the biome's
+  (`ripples`, `prints` in [biome looks](biome-looks.md)). The Tides page's
+  Tidal Orb and Rain Call are built to show it off.
+
 Measured on 2026-10-12 (headed Chromium, vsync off, Fireballs cast every 1.5 s):
 ~4 % FPS while a spell is lit (≈0.25 ms: half the world light, half the spell
 map), nothing idle — `qa:perf chunk-cross` with and without `?spellWorld=0`

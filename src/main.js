@@ -91,6 +91,9 @@ import { updateCharacterOcclusion } from './editor/character/CharacterOcclusion.
 import { WorldWindPass } from './editor/weather/wind/WorldWindPass.js';
 import { WaterfallMist } from './editor/stylized/mist/WaterfallMist.js';
 import { WaterInteractionSurface } from './editor/stylized/WaterInteractionSurface.js';
+import { RippleField } from './editor/water/RippleField.js';
+import { BiomeSurfaceResponse } from './editor/biomes/BiomeSurfaceResponse.js';
+import { createSpellSurfacePress } from './editor/spells/spellSurfacePress.js';
 import { createRiverFallSiteSource } from './editor/water/RiverFallSites.js';
 import { resolveWaterQualityFeatures } from './editor/water/WaterQuality.js';
 import { configureSea, updateSeaState } from './editor/water/seaState.js';
@@ -98,6 +101,8 @@ import { classifyFootstepSurface } from './editor/audio/footstep_surface.js';
 import { snowAtPoint, snowBiomeCoverAt } from './editor/materials/SnowAccumulation.js';
 import { terrainBakeMacroSeed } from './editor/materials/TerrainBakeNoise.js';
 import {
+  setGroundDeformationRegion,
+  stampDisc,
   stampFootprint,
   updateGroundDeformation,
 } from './editor/stylized/deformation/groundDeformationState.js';
@@ -1004,6 +1009,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   };
   const surfaceWetness = new SurfaceWetness(config.stylizedSurface.wetness);
   let lastWetnessSeconds = null;
+  let lastBiomeSurfaceSeconds = null;
   // Time of day, greyed by the weather; the far haze follows the fog colour.
   const skyLooks = stylizedSurface.skyView
     ? new SkyLookController({
@@ -1094,7 +1100,21 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   });
   resources.own(worldSoundscape);
   const waterInteraction = resources.own(new WaterInteractionSurface({ terrainView,
-    player: playerController, config: config.stylizedSurface.water }));
+    player: playerController, config: config.stylizedSurface.water,
+    rippleField: new RippleField({ renderer: terrainView.renderer }) }));
+  // How the region's water ripples and its ground takes prints (biome-looks `ripples`, `prints`).
+  const biomeSurface = new BiomeSurfaceResponse({
+    surface: config.stylizedSurface.biomeLooks.surface,
+    getTile: (cellX, cellZ) => worldStore.getTile(cellX, cellZ),
+    getTileSize: () => config.map.tileSize,
+  });
+  const biomeSurfaceOrigin = {};
+  const pressSpellSurface = createSpellSurfacePress({
+    water: waterInteraction,
+    getOrigin: () => terrainView.floatingOrigin.readState(biomeSurfaceOrigin),
+    stampDisc,
+    now: () => performance.now() / 1000,
+  });
   const weatherController = weatherEnabled
     ? createWeatherController({
       scene: terrainView.scene,
@@ -1290,9 +1310,11 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       // The grimoire's procedural VFX: terrain contact, origin snaps, sun and caster.
       groundHeight: (x, z) => terrainView.getWorldHeight(x, z),
       subscribeOriginShift: (listener) => terrainView.floatingOrigin.subscribe(listener),
-      pressGround: (x, z, radius, strength, inner) => (
-        stylizedSurface.meadowGrass?.spellGround?.pressDisc(x, z, radius, strength, inner)
-      ),
+      pressGround: (x, z, radius, strength, inner) => {
+        stylizedSurface.meadowGrass?.spellGround?.pressDisc(x, z, radius, strength, inner);
+        // Beyond the meadow: a ring wave on nearby water, a crater in snow and sand.
+        pressSpellSurface(x, z, radius, strength, inner);
+      },
       // Scorched, frosted or withered blades: the meadow carries the spell's mark.
       markGround: (x, z, radius, mark, strength, inner) => {
         const kind = GRASS_MARK[String(mark).toUpperCase()];
@@ -1419,7 +1441,9 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       fallingLeaves,
       snowPowder,
       worldAmbience,
-      groundDeformation: { stampFootprint },
+      groundDeformation: { stampFootprint, stampDisc },
+      waterInteraction,
+      biomeSurface,
       weatherSettings,
       weatherController,
       spellRuntime,
@@ -1799,7 +1823,17 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       rain: frameWeatherAudio.rain,
       seaLevel: worldStore.generator?.seaLevel,
     });
-    waterInteraction.update(frameTimestamp / 1000, viewModeController.mode === PLAYER_MODE_WALK && !viewModeController.paused);
+    const surfaceSeconds = frameTimestamp / 1000;
+    const surfaceDelta = lastBiomeSurfaceSeconds === null ? 0 : Math.min(1, surfaceSeconds - lastBiomeSurfaceSeconds);
+    lastBiomeSurfaceSeconds = surfaceSeconds;
+    const surfaceLook = biomeSurface.update(surfaceDelta, {
+      x: viewModeController.camera.position.x + frameOrigin.x,
+      z: viewModeController.camera.position.z + frameOrigin.z,
+    });
+    setGroundDeformationRegion(surfaceLook.prints);
+    // Rain stipples every pool on top of the biome's own drops.
+    waterInteraction.update(surfaceSeconds, viewModeController.mode === PLAYER_MODE_WALK && !viewModeController.paused,
+      { ...surfaceLook.ripples, drops: surfaceLook.ripples.drops + frameWeatherAudio.rain * 24 });
     worldSoundscape.update(frameTimestamp / 1000, viewModeController.camera);
     const frameSeconds = frameTimestamp / 1000;
     const frameDelta = lastWetnessSeconds === null ? 0 : Math.min(1, frameSeconds - lastWetnessSeconds);

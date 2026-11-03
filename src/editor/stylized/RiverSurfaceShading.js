@@ -133,6 +133,8 @@ export function createRiverSurfaceNodes({
   waterDepth,
   shoreDistance,
   obstacles = vec2(0),
+  // Slope of the ripple field (water/rippleFieldNode.js), world x/z.
+  ripple = null,
   time,
   sunDirection,
   viewDirection,
@@ -191,7 +193,8 @@ export function createRiverSurfaceNodes({
   const across = normalize(downstream.cross(baseNormal));
   const riverTilt = across.mul(slope.x).add(downstream.mul(slope.y));
   const lakeTilt = vec3(slope.x.negate(), 0, slope.y.negate());
-  const normal = normalize(baseNormal.add(mix(lakeTilt, riverTilt, current))).toVar('riverDetailNormal');
+  const tilt = mix(lakeTilt, riverTilt, current);
+  const normal = normalize(baseNormal.add(ripple ? tilt.sub(vec3(ripple.x, 0, ripple.y)) : tilt)).toVar('riverDetailNormal');
 
   const facing = max(dot(normal, viewDirection), 0);
   const fresnel = pow(oneMinus(facing), 5).mul(0.98).add(0.02).mul(0.85);

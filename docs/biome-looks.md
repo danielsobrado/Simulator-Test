@@ -15,7 +15,33 @@ columns out before the layers' own validators run.
 | `snow.air` | `SnowCountryWeight.value` | cooler, paler sky and haze (`snowCountryLook.js`), exposure, ambient snow region, frost, breath, soundscape |
 | `snow.fall` | `SnowCountryWeight.snowfall` | regional snowfall (`weather/snow_system.js`, one instanced draw) |
 
+| `ripples` | water ripple field (`water/RippleField.js`) | wave speed, fade time, splash gain, ambient drops |
+| `prints` | footprints and spell craters (`deformation/FootprintShading.js`) | bare-ground share, lifetime, pressed tint |
+| `dunes` | sand wind ripples (`materials/AridSubstrateNodes.js`) | wavelength and wind snapped to the pattern lattice, height, crest sharpness |
+
 Above the terrain's snow line every snow column reaches 1 whatever the biome.
+
+## Surface response
+
+`ripples` and `prints` describe the region round the player, not a spot on the
+map: `BiomeSurfaceResponse` samples the tile underfoot and a ring at 24 m every
+half second, ignores open water (tile 0, so a lake takes the land round it),
+and eases toward the blend over ~1.5 s. Their defaults sit under
+`biomeLooks.surface`. `dunes` is spatial, resolved per sand tile in the terrain
+shader; a wavelength snaps to whole lattice frequencies so the pattern still
+closes over its 512-cell period.
+
+The ripple field is a damped wave equation on a 256² RGBA16F torus, 32 m
+across, 12.5 cm a texel, addressed by canonical position modulo the window like
+the footprint field. Two compute dispatches a frame (A→B with the frame's
+impulses, B→A), none once the water has settled; the river and sea normals add
+its slope within ~14 m of the player. No viewport textures. Wakes, swim strokes,
+ambient drops (plus rain) and spell presses (`EffectDirector.press`) feed it.
+WebGL has no storage textures, so there the field stays off.
+
+What it buys: an oasis carries a Tidal Orb's ring across the pool, glacier
+slush swallows it within a metre, bog water never stops stippling; desert
+prints blow back in within half a minute while a glacier keeps them for six.
 
 ## Canopy snow
 

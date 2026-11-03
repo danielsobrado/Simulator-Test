@@ -57,6 +57,7 @@ import { skyLightUniforms } from './sky/skyLight.js';
 import { LAKE_WAVES, lakeWaveRise } from '../water/LakeSurfaceWaves.js';
 import { bilinearLoad } from '../materials/TerrainSlotBindings.js';
 import { createWaterAppearanceNodes } from './WaterAppearanceNodes.js';
+import { rippleFieldSlope } from '../water/rippleFieldNode.js';
 
 const CAUSTIC_RING_RADIUS = 0.4;
 const CAUSTIC_AA_SCALE = 1.25;
@@ -185,6 +186,10 @@ export function createStylizedWaterMaterial({
     ))),
   );
   const noiseFac = surfaceNoise.x.add(surfaceNoise.y).mul(0.5);
+  // Wakes, drops and spells (water/RippleField.js), on the river and sea normals alike.
+  const ripple = water.interaction?.enabled !== false && rippleOrigin
+    ? rippleFieldSlope(rippleOrigin, vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize)).mul(waterlineFade).toVar('waterRippleSlope')
+    : null;
   const sea = water.sea?.enabled && quality.flow && seaPhaseOrigin && sunDirection
     ? createSeaSurfaceNodes({
       terrainUv,
@@ -200,6 +205,7 @@ export function createStylizedWaterMaterial({
       sunDirection,
       oceanMask: appearance?.ocean,
       exposure: appearance?.exposure,
+      ripple,
       config: water.sea,
     })
     : null;
@@ -217,6 +223,7 @@ export function createStylizedWaterMaterial({
       shoreDistance,
       obstacles: waterObstacleTexture && water.riverSurface.obstacles !== false
         ? sampleTexture('waterObstacleTexture', waterObstacleTexture, fieldUv).rg : vec2(0),
+      ripple,
       time,
       sunDirection: normalize(sunDirection),
       viewDirection: normalize(cameraPosition.sub(positionWorld)),
@@ -522,6 +529,9 @@ export function createStylizedWaterMaterial({
   }
 
   if (sea) color = sea.shade(color);
+  // Looking straight down the Fresnel barely moves, so ring faces also catch a
+  // little light of their own: the rings still read from a bridge or a cliff.
+  if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.5).clamp(0, 0.3)));
 
   if (water.rainRipples?.enabled && quality.flow && rippleOrigin) {
     const ripple = createRainRippleNode({

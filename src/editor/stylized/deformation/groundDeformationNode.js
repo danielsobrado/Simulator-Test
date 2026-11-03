@@ -12,7 +12,6 @@ import {
   DEFORMATION_WINDOW_METRES,
   groundDeformationTexture,
   groundDeformationUniforms,
-  PRINT_LIFETIME_SECONDS,
   TIME_PERIOD,
   WINDOW_ID_PERIOD,
 } from './groundDeformationState.js';
@@ -46,6 +45,7 @@ export function groundDeformationNode(originMeters, localMeters) {
   );
   const sameWindow = step(abs(texel.b.sub(windowId.x)), 0.5).mul(step(abs(texel.a.sub(windowId.y)), 0.5));
   const age = floorMod(groundDeformationUniforms.time.sub(texel.g), TIME_PERIOD);
-  const fade = float(1).sub(smoothstep(PRINT_LIFETIME_SECONDS * 0.4, PRINT_LIFETIME_SECONDS, age));
+  const lifetime = groundDeformationUniforms.lifetime;
+  const fade = float(1).sub(smoothstep(lifetime.mul(0.4), lifetime, age));
   return texel.r.mul(fade).mul(sameWindow);
 }

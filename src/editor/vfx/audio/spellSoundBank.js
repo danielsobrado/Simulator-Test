@@ -48,6 +48,19 @@ export const SPELL_SOUNDS = Object.freeze({
     noise(ctx, out, when, { filter: 'lowpass', freq: 300, gain: 0.35, attack: 0.8, hold: duration - 1.5, decay: 1, tremolo: 0.7 });
     crackle(ctx, out, when + 0.45, { duration: duration - 0.6, density: 90, freq: 2500, q: 2, gain: 0.3, decay: 0.04 });
   },
+  'cast-water'(ctx, out, when) {
+    tone(ctx, out, when, { type: 'sine', freq: 260, freqEnd: 620, gain: 0.22, attack: 0.04, decay: 0.45 });
+    noise(ctx, out, when, { filter: 'bandpass', freq: 600, freqEnd: 1400, q: 1.5, gain: 0.22, attack: 0.08, decay: 0.5, tremolo: 9 });
+  },
+  splash(ctx, out, when, { size = 1 } = {}) {
+    tone(ctx, out, when, { type: 'sine', freq: 180, freqEnd: 60, gain: 0.45 * size, attack: 0.004, decay: 0.35 });
+    noise(ctx, out, when, { filter: 'lowpass', freq: 2600, freqEnd: 500, gain: 0.6, attack: 0.004, decay: 0.9 * size });
+    crackle(ctx, out, when + 0.15, { duration: 1.2, density: 30, freq: 1800, q: 3, gain: 0.12, decay: 0.05 });
+  },
+  rain(ctx, out, when, { duration = 6 } = {}) {
+    noise(ctx, out, when, { filter: 'bandpass', freq: 2200, q: 0.7, gain: 0.3, attack: 1, hold: duration - 2, decay: 1.2 });
+    crackle(ctx, out, when + 0.6, { duration: duration - 0.8, density: 60, freq: 3000, q: 2, gain: 0.1, decay: 0.03 });
+  },
   'cast-acid'(ctx, out, when) {
     tone(ctx, out, when, { type: 'sine', freq: 520, freqEnd: 140, gain: 0.35, attack: 0.01, decay: 0.25 });
     noise(ctx, out, when, { filter: 'bandpass', freq: 900, q: 2, gain: 0.2, attack: 0.02, decay: 0.3 });

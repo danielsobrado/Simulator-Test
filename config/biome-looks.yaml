@@ -24,6 +24,18 @@
 #                 `mineral` (materials/AridSubstrateNodes.js).
 #   crags         true grows crags and boulder clusters at any height, not only
 #                 on high or snowy ground (stylized/alpine/AlpineRockView.js).
+#   ripples       how water near the player answers wading, swimming and spells
+#                 (water/RippleField.js): wave `speed` m/s, `fade` seconds for a
+#                 ring to die, `splash` gain, ambient `drops` per second.
+#   prints        footprints and spell craters (stylized/deformation): the share
+#                 of bare `ground` taking them besides snow and beach, their
+#                 `lifetime` in seconds and the `tint` pressed ground takes.
+#   dunes         wind ripples on `arid: sand` ground: `wavelength` m (snapped
+#                 to the pattern lattice), `wind` degrees, relief `height`,
+#                 crest `sharpness` 0 (sine) .. 1 (steep lee face).
+#   Ripples and prints follow the biomes round the player and blend over a
+#   second or two (biomes/BiomeSurfaceResponse.js); `surface` holds their
+#   defaults. Columns resolve in biomes/BiomeSurfaceLooks.js.
 #
 # Above the terrain's snow line (terrain-material-bake.yaml) every snow column
 # reaches 1 whatever the biome. Values are 0..1; unlisted columns are 0.
@@ -34,16 +46,32 @@ biomeLooks:
     # The frost the meadow's tips lean toward, a little warmer than snow so a
     # frosted stand still reads as grass.
     frost: '#d9e0e2'
+  surface:
+    ripples: { speed: 1.4, fade: 3, splash: 1, drops: 0 }
+    prints: { ground: 0, lifetime: 90, tint: '#b8ada3' }
   byTileId:
-    1: { name: hot desert, arid: sand }
+    # Erg: long, sharp-crested ripples; an oasis's still water carries a ring
+    # far and slow. Prints blow back in within half a minute.
+    1:
+      name: hot desert
+      arid: sand
+      ripples: { speed: 1.1, fade: 6, splash: 1.2 }
+      prints: { ground: 0.9, lifetime: 30, tint: '#a8927a' }
+      dunes: { wavelength: 0.22, wind: 18, height: 1.5, sharpness: 0.75 }
     # Cold steppe: bare ground with snow lying in the hollows.
-    2: { name: cold desert, arid: mineral, snow: { ground: 0.2, air: 0.3, fall: 0.3 } }
+    2:
+      name: cold desert
+      arid: mineral
+      snow: { ground: 0.2, air: 0.3, fall: 0.3 }
+      ripples: { speed: 1.6, fade: 1.8 }
+      prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
     3: { name: savanna, canopy: '#aeae5a' }
     4: { name: grassland, canopy: '#86b04a' }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
     6: { name: temperate deciduous forest, canopy: '#6da03c' }
-    7: { name: tropical rainforest, canopy: '#3f8f34' }
-    8: { name: temperate rainforest, canopy: '#4c9142' }
+    # Canopy drip keeps rainforest pools stippled with rings.
+    7: { name: tropical rainforest, canopy: '#3f8f34', ripples: { drops: 6, fade: 2.2 } }
+    8: { name: temperate rainforest, canopy: '#4c9142', ripples: { drops: 4, fade: 2.4 } }
     # Boreal forest in its winter: peat and needle litter, snow only in the
     # hollows, along the tops of the crowns and as frost on the grass. Ground
     # snow at 0.3 lay as a thin grey film over the map colour, reading as bare
@@ -57,20 +85,35 @@ biomeLooks:
       canopy: '#4a7a55'
       soil: '#3d3a2b'
       snow: { ground: 0.1, canopy: 0.7, grass: 0.35, air: 0.4, fall: 0.15 }
+      ripples: { speed: 1.5, fade: 2 }
+      prints: { ground: 0.35, lifetime: 150, tint: '#9c9488' }
     # A snow carpet, the odd tussock breaking it; trees wear full caps. At 0.8
     # the drift noise left a wash of grass and heather through most of the snow.
     10:
       name: tundra
       canopy: '#8a9a62'
       snow: { ground: 0.95, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
+      # Near-freezing meltwater: thick, quick to still.
+      ripples: { speed: 0.8, fade: 0.9, splash: 0.7 }
+      prints: { lifetime: 240 }
     11:
       name: glacier
       # No grass grows on the ice (grass.meadow.growth), so it takes no frost:
       # a frosted palette would spend one of the meadow's eight for nothing.
       snow: { ground: 1, canopy: 1, air: 1, fall: 1 }
+      # Slush: a splash barely spreads before the ice-laden water swallows it,
+      # and a print in the snowfield stays for minutes.
+      ripples: { speed: 0.45, fade: 0.5, splash: 0.5 }
+      prints: { lifetime: 360, tint: '#b4c4d8' }
     # Swamp giants: dark, olive-black leaves under the bog overcast.
     # Peat and moss between the sedge, not the map's bright marsh green.
-    12: { name: wetland, canopy: '#3f5434', soil: '#2c3120' }
+    # Sluggish bog water, always stippled by insects and gas; deep mud prints.
+    12:
+      name: wetland
+      canopy: '#3f5434'
+      soil: '#2c3120'
+      ripples: { speed: 0.9, fade: 1.6, splash: 0.8, drops: 10 }
+      prints: { ground: 0.8, lifetime: 200, tint: '#6e665a' }
     # Stonehold Badlands, the first custom biome of an Eldara import
     # (import.azgaarRegionalBiomes): grey mesas and canyons, pale wind-blown sand
     # on the floors, frost in the hollows of a cold realm.
@@ -80,3 +123,7 @@ biomeLooks:
       arid: sand
       crags: true
       snow: { ground: 0.05, air: 0.2 }
+      # Coarse grey canyon sand: short, choppy ripples across the wind.
+      ripples: { speed: 1.3, fade: 4 }
+      prints: { ground: 0.85, lifetime: 45, tint: '#9a9081' }
+      dunes: { wavelength: 0.14, wind: -35, height: 0.8, sharpness: 0.45 }

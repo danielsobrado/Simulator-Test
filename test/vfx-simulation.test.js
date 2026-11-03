@@ -149,7 +149,7 @@ test('every grimoire spell names a recipe', () => {
   for (const spell of GRIMOIRE_SPELLS) {
     assert.equal(typeof EFFECT_RECIPES[spell.recipe], 'function', `${spell.id} has no recipe`);
   }
-  assert.equal(GRIMOIRE_SPELLS.length, 16);
+  assert.equal(GRIMOIRE_SPELLS.length, 18);
 });
 
 for (const spell of GRIMOIRE_SPELLS) {

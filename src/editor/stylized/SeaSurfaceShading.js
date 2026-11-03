@@ -71,6 +71,8 @@ export function createSeaSurfaceNodes({
   config,
   oceanMask = null,
   exposure = float(1),
+  // Slope of the ripple field (water/rippleFieldNode.js), world x/z.
+  ripple = null,
 }) {
   const { storm } = seaStateUniforms;
   // Metres from the chunk centre on canonical axes, matching the chunk's world position.
@@ -103,7 +105,8 @@ export function createSeaSurfaceNodes({
   const height = (surf?.height ?? swell.height).toVarying('seaSwellHeight');
   const swellSlope = swell.slope.mul(amplitude).toVarying('seaSwellSlope');
   const slope = surf ? mix(displacedSurfaceSlope(), swellSlope, surf.offshore) : swellSlope;
-  const surfaceSlope = detail ? slope.add(detail.slope) : slope;
+  const detailed = detail ? slope.add(detail.slope) : slope;
+  const surfaceSlope = ripple ? detailed.add(ripple) : detailed;
   const normal = normalize(vec3(surfaceSlope.x.negate(), 1, surfaceSlope.y.negate()));
   const sun = normalize(sunDirection);
   const lit = dot(normal, sun).sub(sun.y);

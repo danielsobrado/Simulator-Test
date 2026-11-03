@@ -4,6 +4,15 @@
  * `glyph-shine`), so the dock styles them identically.
  */
 const GRIMOIRE_GLYPHS = Object.freeze({
+  tidalOrb: `<svg viewBox="0 0 24 24" aria-hidden="true">
+    <path class="glyph-line glyph-line--soft" d="M3 19.5c2-1.4 4-1.4 6 0s4 1.4 6 0 4-1.4 6 0"/>
+    <circle class="glyph-fill" cx="12" cy="9.5" r="5.6"/>
+    <path class="glyph-light" d="M9.4 7.6a3.2 3.2 0 0 1 3.4-1.9"/>
+  </svg>`,
+  rainCall: `<svg viewBox="0 0 24 24" aria-hidden="true">
+    <path class="glyph-fill" d="M6.5 12a3.8 3.8 0 0 1 .4-7.6 5.3 5.3 0 0 1 10 1.4 3.1 3.1 0 0 1 .6 6.2Z"/>
+    <path class="glyph-line" d="M8 15l-1.2 3.6M12 15l-1.2 4.6M16 15l-1.2 3.6"/>
+  </svg>`,
   fireball: `<svg viewBox="0 0 24 24" aria-hidden="true">
     <path class="glyph-line glyph-line--soft" d="M9.4 12.9 4 18.3M11.2 15.2 7.4 19M7.6 10.8l-3.3 3.3"/>
     <circle class="glyph-fill" cx="14.6" cy="9.4" r="5.4"/>

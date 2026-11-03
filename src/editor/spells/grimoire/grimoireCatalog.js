@@ -37,6 +37,15 @@ export const GRIMOIRE_PAGES = Object.freeze([
       { id: 'sunbeam', label: 'Sunbeam', recipe: 'sunbeam', targeting: 'ray', rangeM: 18, castMs: 1400 },
     ].map(Object.freeze)),
   }),
+  // Water magic reads differently in every biome: see vfx/recipes/waterRecipes.js.
+  Object.freeze({
+    id: 'tides',
+    title: 'Tides',
+    spells: Object.freeze([
+      { id: 'tidalOrb', label: 'Tidal Orb', recipe: 'tidalOrb', targeting: 'ground', rangeM: 40, castMs: 1800 },
+      { id: 'rainCall', label: 'Rain Call', recipe: 'rainCall', targeting: 'ground', rangeM: 40, castMs: 2600 },
+    ].map(Object.freeze)),
+  }),
 ]);
 
 export const GRIMOIRE_SPELLS = Object.freeze(GRIMOIRE_PAGES.flatMap((page) => page.spells));

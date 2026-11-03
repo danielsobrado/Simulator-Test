@@ -7,6 +7,8 @@
  * resolve to dense `Float32Array(256)` tables so a per-instance or per-sample
  * lookup is an index, not a map read.
  */
+import { resolveBiomeSurfaceLooks } from './BiomeSurfaceLooks.js';
+
 export const BIOME_SNOW_COLUMNS = Object.freeze(['ground', 'canopy', 'grass', 'air', 'fall']);
 /** Bare ground the terrain dresses as rippled sand or frost-broken mineral (AridSubstrateNodes.js). */
 export const BIOME_ARID_KINDS = Object.freeze(['sand', 'mineral']);
@@ -55,6 +57,7 @@ function tileId(key, path) {
  *   snow: Readonly<Record<string, Float32Array>>,
  *   arid: Readonly<Record<string, readonly number[]>>,
  *   crags: Uint8Array,
+ *   surface: ReturnType<typeof resolveBiomeSurfaceLooks>,
  * }>}
  */
 export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
@@ -67,10 +70,12 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
   const arid = Object.fromEntries(BIOME_ARID_KINDS.map((kind) => [kind, []]));
   const crags = new Uint8Array(256);
   const snow = Object.fromEntries(BIOME_SNOW_COLUMNS.map((column) => [column, new Float32Array(256)]));
+  const surfaceRows = [];
   for (const [key, row] of Object.entries(source.byTileId ?? {})) {
     const path = `${PATH}.byTileId.${key}`;
     const id = tileId(key, `${PATH}.byTileId`);
     if (!isRecord(row)) fail(path, 'must be an object');
+    surfaceRows.push([id, row, path]);
     if (row.name !== undefined) names[id] = String(row.name);
     if (row.canopy !== undefined) canopy[id] = hex(row.canopy, `${path}.canopy`);
     if (row.soil !== undefined) soil[id] = hex(row.soil, `${path}.soil`);
@@ -98,6 +103,7 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
     snow: Object.freeze(snow),
     arid: Object.freeze(Object.fromEntries(Object.entries(arid).map(([kind, ids]) => [kind, Object.freeze(ids)]))),
     crags,
+    surface: resolveBiomeSurfaceLooks(source.surface, surfaceRows),
   });
 }
 
