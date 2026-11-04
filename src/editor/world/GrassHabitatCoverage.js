@@ -1,7 +1,12 @@
 /** Derived field; canonical terrain IDs and the RGBA mask layout stay unchanged. */
-export const GRASS_COVERAGE_RECIPE_REVISION = 3;
-/** Metres over which grass thins toward water, snow, or anything it cannot grow on. */
-export const GRASS_HABITAT_EDGE_METERS = 8;
+export const GRASS_COVERAGE_RECIPE_REVISION = 4;
+/**
+ * Metres over which grass thins toward water, snow, or anything it cannot grow
+ * on. At 8 m, with the fade starting half a cell inland, every pond sat in a
+ * bare ring several metres wide (docs/qa/biome-surface, 2026-11-04): a bank
+ * keeps its grass to the water's edge.
+ */
+export const GRASS_HABITAT_EDGE_METERS = 3;
 /**
  * Metres over which a sward dissolves into barren land — desert, glacier, bare
  * biomes. Wider than the shore fade: at 8 m a grassland met a desert at a line
@@ -16,8 +21,9 @@ export function grassHabitatHaloCells(tileSize) {
 export function grassHabitatEligible({tileId, snow = 0, water = 0}, tileIds) {
   return tileIds.has(tileId) && snow < .5 && water < 1;
 }
-export function grassHabitatEdge(distance, tileSize, edgeMeters = GRASS_HABITAT_EDGE_METERS) {
-  const t = Math.max(0, Math.min(1, Math.max(0, distance - .5) * tileSize / edgeMeters));
+/** `inset` cells of bare ground before the fade starts: half a cell toward barren land, none at a bank. */
+export function grassHabitatEdge(distance, tileSize, edgeMeters = GRASS_HABITAT_EDGE_METERS, inset = .5) {
+  const t = Math.max(0, Math.min(1, Math.max(0, distance - inset) * tileSize / edgeMeters));
   return t * t * (3 - 2 * t);
 }
 /** Two-pass eight-neighbour chamfer distance from every seed cell. */
@@ -56,7 +62,7 @@ export function grassHabitatCoverage(eligible, width, height, tileSize, barren =
   const land = barren ? chamferFromSeeds((i) => barren[i] === 1, width, height) : null;
   return Uint8Array.from(any, (d, i) => {
     if (!eligible[i]) return 0;
-    const edge = grassHabitatEdge(d, tileSize);
+    const edge = grassHabitatEdge(d, tileSize, GRASS_HABITAT_EDGE_METERS, 0);
     return Math.round((land ? Math.min(edge, grassHabitatEdge(land[i], tileSize, GRASS_BARREN_EDGE_METERS)) : edge) * 255);
   });
 }

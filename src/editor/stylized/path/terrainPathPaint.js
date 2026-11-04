@@ -177,7 +177,12 @@ export function createTerrainPathPaint({
         // no brightness ring where it fades. Past 45 m the branch skips both taps.
         const floorFade = smoothstep(14, 45, distance(cameraPosition, positionWorld)).oneMinus().toVar();
         If(floorFade.greaterThan(0), () => {
-          const scan = (uv, grad, layer) => texture(textures.colorRoughness, uv).grad(...grad).depth(layer).rgb;
+          // The cracked-mud scan's plates came out ~0.6 m across, triple real
+          // dried mud: that layer alone is drawn at twice the frequency.
+          const scan = (uv, grad, layer) => {
+            const scale = layer.equal(int(GROUND_LAYERS.cracked)).select(float(2), float(1));
+            return texture(textures.colorRoughness, uv.mul(scale)).grad(grad[0].mul(scale), grad[1].mul(scale)).depth(layer).rgb;
+          };
           const layerA = floorScan ? floorScan.layers.x.round().toInt() : int(GROUND_LAYERS.grit);
           const layerB = floorScan ? floorScan.layers.y.round().toInt() : layerA;
           const detail = mix(scan(uvA, gradA, layerA), scan(uvB, gradB, layerB), floorScan?.blend ?? float(0));
@@ -217,7 +222,11 @@ export function createTerrainPathPaint({
           const macro = sin(world.x.mul(0.037).add(sin(world.y.mul(0.053)))).mul(sin(world.y.mul(0.071)))
             .mul(0.5).add(0.5);
           const turf = turfPigment(turfLayer);
-          const soilEdge = smoothstep(0.12, 0.88, mask.add(turf.mul(0.09)).add(macro.sub(0.5).mul(0.06))).toVar();
+          // A metre-scale wander as well: with only fibre and the 10 m wave the
+          // edge followed the path mask's 2 m triangles as a straight line.
+          const wander = turfNoise(world.mul(0.26).add(vec2(13.1, 5.7)));
+          const soilEdge = smoothstep(0.12, 0.88, mask.add(turf.mul(0.09)).add(macro.sub(0.5).mul(0.06))
+            .add(wander.mul(0.2))).toVar();
           // The ground as the terrain painted it, read from the variable: naming
           // `baseColor` here would re-emit its whole graph inside the branch.
           const grass = result.xyz;

@@ -1,3 +1,4 @@
+import { GRASS_MARK } from '../../stylized/meadow/MeadowInteractionMap.js';
 /**
  * Biome surface-response captures (scripts/run-biome-surface-qa.mjs): a
  * deterministic spot inside each biome, and a staged scene in front of the
@@ -124,13 +125,18 @@ export function stageSurfaceDemo(editor, { spell = 'waterySphere', water = false
   const facing = Math.atan2(ground.forward.x, ground.forward.z);
   // Where grass covers the ground the prints alone are hidden under it, so the
   // trail and the crater also press the blades flat, as a walker and a blast do.
+  // A trampled path reads as one continuous strip, bruised a little darker:
+  // separate 0.3 m discs splayed the blades into random tufts instead.
   const grass = editor.stylizedSurface?.meadowGrass?.spellGround;
   const presses = [];
   for (let step = 0; step < 10; step += 1) {
-    const local = ground.at(1.6 + step * 0.42, -0.9 + (step % 2 ? 0.13 : -0.13));
-    const print = canonical(local);
+    const print = canonical(ground.at(1.6 + step * 0.42, -0.9 + (step % 2 ? 0.13 : -0.13)));
     stampFootprint(print.x, print.z, facing);
-    presses.push([local.x, local.z, 0.32, 1, 0.5]);
+  }
+  for (let along = 1.4; along <= 5.8; along += 0.3) {
+    const local = ground.at(along, -0.9);
+    presses.push([local.x, local.z, 0.45, 1, 0.6]);
+    grass?.markDisc(local.x, local.z, 0.5, GRASS_MARK.WITHER, 0.35, 0.6);
   }
   const craterLocal = ground.at(3.6, 1.5);
   const crater = canonical(craterLocal);

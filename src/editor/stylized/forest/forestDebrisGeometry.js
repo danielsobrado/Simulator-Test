@@ -17,6 +17,8 @@ const MOSS_LIGHT = new THREE.Color('#5f7a34');
 const LEAVES = Object.freeze(['#8a5a2b', '#a8742f', '#6e4a2a', '#94542a', '#b08a3e', '#5c4426'])
   .map((hex) => new THREE.Color(hex));
 const SCRATCH = new THREE.Color();
+/** What a fallen leaf rots toward: one palette colour per leaf read as flat orange decals. */
+const DECAYED = new THREE.Color('#463b2b');
 
 function createRandom(seed) {
   let state = seed >>> 0;
@@ -224,7 +226,10 @@ export function createLeafLitterGeometry({ radius = 1.7, leaves = 72, seed = 0x5
     const x = Math.cos(place) * distance;
     const z = Math.sin(place) * distance;
     const y = 0.015 + random() * 0.03;
-    const color = LEAVES[Math.floor(random() * LEAVES.length)];
+    // Each leaf its own value and a random share of decay, so a drift settles
+    // into the litter instead of lying on it as one bright tone.
+    const color = LEAVES[Math.floor(random() * LEAVES.length)].clone()
+      .lerp(DECAYED, random() * 0.65).multiplyScalar(0.8 + random() * 0.35);
     const along = [Math.cos(yaw) * size, Math.sin(yaw) * size];
     const across = [-along[1] * 0.55, along[0] * 0.55];
     const first = builder.positions.length / 3;

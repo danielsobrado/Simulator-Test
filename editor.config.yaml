@@ -1153,7 +1153,8 @@ stylizedSurface:
           1: { floor: [grit, cracked] }    # hot desert
           2: { floor: [grit, cracked] }    # cold desert
           11: { floor: [grit, grit] }      # glacier
-          3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, cracked] }   # savanna: straw, warm earth
+          # Savanna earth is dry grit under straw: the cracked-mud scan read as oversized plates in the grass.
+          3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, grit] }   # savanna: straw, warm earth
           5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25, floor: [litter, mossy] }
           6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35, floor: [litter, mossy] }
           7: { litter: '#5e4c31', litterAmount: 0.5, moss: 0.45, soil: 0.2, streaks: 0.3, floor: [litter, mossy] }   # tropical rainforest: leaf litter
