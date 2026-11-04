@@ -31,7 +31,7 @@ const SPELL_SHOT_S = 3.4;
 /** Spots tried per biome before settling for one without a dry ground heading. */
 const SPOT_ATTEMPTS = 6;
 /** Layers left out of the ground close-up (WorldVisualLayerControls names). */
-const GROUND_SHOT_HIDDEN = Object.freeze({ bushes: false, rocks: false });
+const GROUND_SHOT_HIDDEN = Object.freeze({ bushes: false, rocks: false, crags: false });
 
 function parseArguments(argv) {
   const result = { url: 'http://localhost:5173', only: null, out: null };
@@ -101,7 +101,12 @@ try {
       // The ground shot is a close-up of the prints: a bush or boulder at the
       // player's feet would fill it, so those layers sit out for that frame only.
       await page.evaluate((layers) => window.__worldVisualQa.setLayers(layers), shot === 'ground' ? GROUND_SHOT_HIDDEN : {});
-      await page.waitForTimeout((seconds - (shot === 'spell' ? GROUND_SHOT_S : 0)) * 1000);
+      const waitMs = (seconds - (shot === 'spell' ? GROUND_SHOT_S : 0)) * 1000;
+      // Hold the staged grass down up to the ground frame; the meadow springs back otherwise.
+      for (let held = 0; held < waitMs; held += 200) {
+        if (shot === 'ground') await page.evaluate(() => window.__worldVisualQa.holdStagedGrass());
+        await page.waitForTimeout(Math.min(200, waitMs - held));
+      }
       const file = `${biome.name}-${shot}.png`;
       await captureWorldCanvas(page, path.join(out, file));
       entry.files.push(file);

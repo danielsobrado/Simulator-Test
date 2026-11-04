@@ -2,7 +2,8 @@ import { Vector3 } from 'three/webgpu';
 import { prototypeRootSeat } from '../../stylized/forest/treeRootSeat.js';
 
 const LAYERS = Object.freeze({ grass: 'meadowGrass', trees: 'treeView', rocks: 'rockView',
-  bushes: 'bushView', flowers: 'flowerView', details: 'groundDetailView', tropical: 'tropicalKitView' });
+  bushes: 'bushView', flowers: 'flowerView', details: 'groundDetailView', tropical: 'tropicalKitView',
+  crags: 'alpineRockView' });
 
 function renderRoots(view) {
   if (!view) return [];

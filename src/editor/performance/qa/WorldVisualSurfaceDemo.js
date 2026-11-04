@@ -110,6 +110,10 @@ function frameAt(camera, yaw) {
  * shore), ripples where the water starts and `spell` cast at the water (or
  * the ground) along the camera's own heading.
  */
+/** Re-presses the staged grass; the meadow springs back within about a second. */
+let holdGrass = null;
+export function holdStagedGrass() { holdGrass?.(); }
+
 export function stageSurfaceDemo(editor, { spell = 'waterySphere', water = false, groundYaw = null } = {}) {
   const camera = editor.viewModeController.camera;
   const origin = editor.terrainView.floatingOrigin.getState();
@@ -118,12 +122,22 @@ export function stageSurfaceDemo(editor, { spell = 'waterySphere', water = false
   const canonical = (point) => ({ x: point.x + origin.x, z: point.z + origin.z });
   const { stampFootprint, stampDisc } = editor.groundDeformation;
   const facing = Math.atan2(ground.forward.x, ground.forward.z);
+  // Where grass covers the ground the prints alone are hidden under it, so the
+  // trail and the crater also press the blades flat, as a walker and a blast do.
+  const grass = editor.stylizedSurface?.meadowGrass?.spellGround;
+  const presses = [];
   for (let step = 0; step < 10; step += 1) {
-    const print = canonical(ground.at(1.6 + step * 0.42, -0.9 + (step % 2 ? 0.13 : -0.13)));
+    const local = ground.at(1.6 + step * 0.42, -0.9 + (step % 2 ? 0.13 : -0.13));
+    const print = canonical(local);
     stampFootprint(print.x, print.z, facing);
+    presses.push([local.x, local.z, 0.32, 1, 0.5]);
   }
-  const crater = canonical(ground.at(3.6, 1.5));
+  const craterLocal = ground.at(3.6, 1.5);
+  const crater = canonical(craterLocal);
   stampDisc(crater.x, crater.z, 1.2, 0.8, 0.5);
+  presses.push([craterLocal.x, craterLocal.z, 1.3, 1, 0.55]);
+  holdGrass = grass ? () => { for (const press of presses) grass.pressDisc(...press); } : null;
+  holdGrass?.();
   const field = editor.waterInteraction?.field;
   if (water && field) {
     for (const [ahead, side] of [[10, -2], [11, 1.5], [12.5, 0]]) {

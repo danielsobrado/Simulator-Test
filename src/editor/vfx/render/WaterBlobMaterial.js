@@ -97,7 +97,8 @@ export function createWaterBlobMaterial(lighting) {
     // Mostly its own deep water, a little of the bent world behind: the earlier
     // even mix read milky against bright skies.
     const body = mix(behind, WATER.mul(diffuse.mul(0.4).add(0.28)), 0.72)
-      .add(GLOW.mul(0.12)).add(GLOW.mul(veins).mul(0.22));
+      // Faint: stronger, the veins read as cracks in glass rather than light in water.
+      .add(GLOW.mul(0.12)).add(GLOW.mul(veins).mul(0.1));
     const specular = pow(max(dot(reflect(sun.negate(), n), view), 0), 90).mul(lighting.sunColor).mul(2.5);
     // The reflection never drowns the body: a magic water reads saturated even edge-on.
     const color = mix(body, sky, fresnel.mul(0.4)).add(specular);
