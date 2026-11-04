@@ -66,6 +66,7 @@ class MeshBuilder:
         self.verts, self.faces, self.uvs, self.colors = [], [], [], []
         self.face_mats, self.face_smooth = [], []
         self._mat_names = []
+        self.cutouts = []
 
     # -- primitives -----------------------------------------------------
     def poly(self, pts, mat, outward=None, uvs=None, smooth=False, grain_dir=None, tone=1.0):
@@ -212,6 +213,8 @@ class MeshBuilder:
         """Shift everything built so far (UVs keep the module-space mapping they had)."""
         off = Vector(offset)
         self.verts = [v + off for v in self.verts]
+        for cutout in self.cutouts:
+            cutout['vertices'] = [tuple(Vector(v) + off) for v in cutout['vertices']]
         # Shading was baked in the old frame; it stays as baked.
         return self
 

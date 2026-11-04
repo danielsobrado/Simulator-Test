@@ -1,0 +1,257 @@
+{
+  "lod": 1,
+  "modules": {
+    "Stonehold_Ledge_Small": {
+      "triangles": 3500,
+      "vertices": 5938,
+      "repeatVerified": true,
+      "materials": 21,
+      "buildSeconds": 0.34,
+      "bounds": [
+        [
+          -8.37759780883789,
+          8.685527801513672
+        ],
+        [
+          -9.757499694824219,
+          7.725071430206299
+        ],
+        [
+          -0.08999999612569809,
+          12.587199211120605
+        ]
+      ]
+    },
+    "Stonehold_Ledge_Large": {
+      "triangles": 6593,
+      "vertices": 11597,
+      "repeatVerified": true,
+      "materials": 21,
+      "buildSeconds": 0.52,
+      "bounds": [
+        [
+          -11.403851509094238,
+          12.132564544677734
+        ],
+        [
+          -10.619998931884766,
+          9.102066993713379
+        ],
+        [
+          -0.08999999612569809,
+          15.749999046325684
+        ]
+      ]
+    },
+    "Stonehold_Twin_Outcrop": {
+      "triangles": 11712,
+      "vertices": 20048,
+      "repeatVerified": true,
+      "materials": 21,
+      "buildSeconds": 0.77,
+      "bounds": [
+        [
+          -15.362104415893555,
+          15.426399230957031
+        ],
+        [
+          -9.06877613067627,
+          8.713854789733887
+        ],
+        [
+          -0.08999999612569809,
+          15.899999618530273
+        ]
+      ]
+    },
+    "Stonehold_Vent_Crater": {
+      "triangles": 2444,
+      "vertices": 3645,
+      "repeatVerified": true,
+      "materials": 17,
+      "buildSeconds": 0.35,
+      "bounds": [
+        [
+          -9.716102600097656,
+          9.004985809326172
+        ],
+        [
+          -9.713580131530762,
+          9.769736289978027
+        ],
+        [
+          0.11474289745092392,
+          9.605999946594238
+        ]
+      ]
+    },
+    "Stonehold_Caldera_Basin": {
+      "triangles": 4275,
+      "vertices": 7072,
+      "repeatVerified": true,
+      "materials": 21,
+      "buildSeconds": 0.38,
+      "bounds": [
+        [
+          -11.911563873291016,
+          11.431584358215332
+        ],
+        [
+          -11.052499771118164,
+          10.818744659423828
+        ],
+        [
+          0.08269181847572327,
+          13.645000457763672
+        ]
+      ]
+    },
+    "Stonehold_Fang_Shrine": {
+      "triangles": 3442,
+      "vertices": 5500,
+      "repeatVerified": true,
+      "materials": 15,
+      "buildSeconds": 0.35,
+      "bounds": [
+        [
+          -10.44460391998291,
+          9.614681243896484
+        ],
+        [
+          -9.465651512145996,
+          8.23739242553711
+        ],
+        [
+          0.07232688367366791,
+          16.74307632446289
+        ]
+      ]
+    },
+    "Stonehold_Cavern_Maw": {
+      "triangles": 4202,
+      "vertices": 5908,
+      "repeatVerified": true,
+      "materials": 17,
+      "buildSeconds": 0.45,
+      "bounds": [
+        [
+          -12.013744354248047,
+          12.878559112548828
+        ],
+        [
+          -12.928086280822754,
+          11.940197944641113
+        ],
+        [
+          -0.021503321826457977,
+          23.587200164794922
+        ]
+      ]
+    },
+    "Stonehold_Horned_Sanctum": {
+      "triangles": 8033,
+      "vertices": 13259,
+      "repeatVerified": true,
+      "materials": 21,
+      "buildSeconds": 0.57,
+      "bounds": [
+        [
+          -14.960765838623047,
+          15.149497032165527
+        ],
+        [
+          -14.008336067199707,
+          12.804349899291992
+        ],
+        [
+          -0.08999999612569809,
+          26.487197875976562
+        ]
+      ]
+    },
+    "Mine_Vent_Stack": {
+      "triangles": 692,
+      "vertices": 1124,
+      "repeatVerified": true,
+      "materials": 6,
+      "buildSeconds": 0.21,
+      "bounds": [
+        [
+          -1.6135568618774414,
+          1.545202374458313
+        ],
+        [
+          -1.4138497114181519,
+          1.542854905128479
+        ],
+        [
+          0.0,
+          3.799999952316284
+        ]
+      ]
+    },
+    "Mountain_Cliff_Wall": {
+      "triangles": 1523,
+      "vertices": 1382,
+      "repeatVerified": true,
+      "materials": 4,
+      "buildSeconds": 0.25,
+      "bounds": [
+        [
+          -5.411231517791748,
+          5.23897123336792
+        ],
+        [
+          -2.23344087600708,
+          2.2696123123168945
+        ],
+        [
+          -0.20000000298023224,
+          17.03179359436035
+        ]
+      ]
+    },
+    "Mountain_Gate_Massif": {
+      "triangles": 1526,
+      "vertices": 1484,
+      "repeatVerified": true,
+      "materials": 8,
+      "buildSeconds": 0.26,
+      "bounds": [
+        [
+          -7.683164119720459,
+          7.838288307189941
+        ],
+        [
+          -2.467013359069824,
+          3.4213807582855225
+        ],
+        [
+          -0.20000000298023224,
+          21.243999481201172
+        ]
+      ]
+    },
+    "Mountain_Cavern_Vault": {
+      "triangles": 1070,
+      "vertices": 1456,
+      "repeatVerified": true,
+      "materials": 7,
+      "buildSeconds": 0.22,
+      "bounds": [
+        [
+          -7.912621974945068,
+          7.475863933563232
+        ],
+        [
+          -6.723607063293457,
+          6.4336442947387695
+        ],
+        [
+          6.820000171661377,
+          22.76799964904785
+        ]
+      ]
+    }
+  }
+}

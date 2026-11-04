@@ -40,6 +40,12 @@ def _split_rock(obj, mat):
             bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
         bm.to_mesh(me)
         bm.free()
+    # Remesh emits material slot zero. Isolate the rock material before remeshing,
+    # rather than relying on which material the authored recipe happened to add first.
+    rock_me.materials.clear()
+    rock_me.materials.append(materials.get(mat))
+    for poly in rock_me.polygons:
+        poly.material_index = 0
     rock = bpy.data.objects.new(f'{obj.name}_rock', rock_me)
     bpy.context.scene.collection.objects.link(rock)
     return rock
@@ -105,6 +111,24 @@ def _drop_islands(rock, min_faces):
     bmesh.ops.delete(bm, geom=drop, context='FACES')
     bm.to_mesh(rock.data)
     bm.free()
+
+
+def _cut_openings(rock, cutouts):
+    """Subtract authored aperture volumes after remesh, so voxel fusion cannot seal them."""
+    for volume in cutouts:
+        mesh = bpy.data.meshes.new('RockAperture')
+        mesh.from_pydata(volume['vertices'], [], volume['faces'])
+        cutter = bpy.data.objects.new('RockAperture', mesh)
+        bpy.context.scene.collection.objects.link(cutter)
+        try:
+            modifier = rock.modifiers.new('AuthoredAperture', 'BOOLEAN')
+            modifier.operation = 'DIFFERENCE'
+            modifier.solver = 'EXACT'
+            modifier.object = cutter
+            _apply(rock, modifier)
+        finally:
+            bpy.data.objects.remove(cutter, do_unlink=True)
+            bpy.data.meshes.remove(mesh)
 
 
 def _drop_underside(rock):
@@ -193,7 +217,7 @@ def _join(obj, rock):
         bpy.ops.object.join()
 
 
-def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cliff'):
+def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cliff', cutouts=()):
     """Replace obj's blockout rock with sculpted rock within the budgets above; returns
     (blockout_tris, sculpted_tris) for the build's budget report."""
     mats = obj.data.materials
@@ -211,6 +235,8 @@ def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cl
     voxel = max(0.045 if detailed() else 0.08, size / (110 if detailed() else 45))
     k = max(1.0, voxel / 0.045)
     _shape(rock, seed, voxel)
+    assert len(rock.data.materials) == 1 and rock.data.materials[0] == materials.get(mat), obj.name
+    _cut_openings(rock, cutouts)
     _drop_islands(rock, 400 if detailed() else 60)
     _drop_underside(rock)
     _decimate(rock, budget)

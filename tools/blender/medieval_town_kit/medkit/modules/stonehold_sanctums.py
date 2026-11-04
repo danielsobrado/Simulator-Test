@@ -238,15 +238,18 @@ def stonehold_cavern_maw():
         for rx in (-0.38, -0.19, 0.0, 0.19, 0.38):
             b.box((rx - 0.035, -0.12, 2.06), (rx + 0.035, -0.08, 2.14), 'glow', bevel=0)
 
-    # Glowing triangular cavern portal & warm forge/magma throat inside the cleft (unobstructed!)
-    b.box((-0.54, 0.32, 0.44), (0.54, 0.62, 2.12), 'stone_basalt', skip=('-y', '-z'), bevel=0)
-    b.extrude([(-0.44, 0.24, 0.46), (0.44, 0.24, 0.46), (0.0, 0.24, 1.96)],
-              (0, 0.10, 0), 'glow')
+    # Shadowed triangular throat with a recessed forge, rather than a luminous flat door.
+    b.box((-0.54, 0.32, 0.44), (0.54, 1.18, 2.12), 'stone_basalt', skip=('-y', '-z'), bevel=0)
+    b.extrude([(-0.44, 1.02, 0.46), (0.44, 1.02, 0.46), (0.0, 1.02, 1.96)],
+              (0, 0.10, 0), 'shadow')
+    b.box((-0.28, 0.28, 0.46), (0.28, 0.39, 0.56), 'firelight', bevel=0)
+    b.box((0.15, 0.25, 0.54), (0.27, 0.28, 0.90), 'firelight', bevel=0)
+    b.box((0.18, 0.23, 0.55), (0.23, 0.25, 0.74), 'glow', bevel=0)
     b.extrude([(-0.56, 0.12, 0.46), (-0.38, 0.12, 0.46), (-0.04, 0.12, 2.02), (-0.22, 0.12, 2.10)],
               (0, 0.14, 0), 'firelight')
     b.extrude([(0.38, 0.12, 0.46), (0.56, 0.12, 0.46), (0.22, 0.12, 2.10), (0.04, 0.12, 2.02)],
               (0, 0.14, 0), 'firelight')
-    b.box((-0.40, -0.14, 0.45), (0.40, 0.26, 0.50), 'glow', bevel=0)
+    b.box((-0.40, -0.14, 0.45), (0.40, 0.26, 0.50), 'hold_warm_stone', bevel=0)
 
     # Twin sweeping dark-rock summit horns
     rock_spire(b, (-0.75, 0.72, 2.25), (-0.98, 0.52, 4.48), 0.58, 0.48,
@@ -278,6 +281,12 @@ def stonehold_cavern_maw():
     mini_pine(b, -1.48, -0.42, 0.32, height=0.40, seed=745)
     mini_pine(b, 1.48, -0.38, 0.32, height=0.38, seed=746)
     _talus_skirt(b, 0.0, 0.2, 0.0, 1.85, 1.55, 14, 0.16, 0.32, seed=750)
+    # Authored aperture volume: the sculpted rock must respect the entrance.
+    section = [(-0.44, 0.44), (0.44, 0.44), (0.0, 1.98)]
+    b.cutouts.append({
+        'vertices': [(x, y, z) for y in (-0.32, 1.04) for x, z in section],
+        'faces': [(0, 1, 2), (5, 4, 3), (3, 4, 1, 0), (4, 5, 2, 1), (5, 3, 0, 2)],
+    })
     return b
 
 

@@ -69,6 +69,10 @@ def main():
         assert all(math.isfinite(c) for v in mesh.vertices for c in v.co), name
         assert len(mesh.loop_triangles) <= (12000 if config.LOD else 48000), name
         assert all(t.area > 1e-12 for t in mesh.loop_triangles), f'{name}: degenerate triangle'
+        if name == 'Stonehold_Cavern_Maw':
+            hit, point, _, face = obj.ray_cast(Vector((0, -10, 8.5)), Vector((0, 1, 0)))
+            surface = mesh.materials[mesh.polygons[face].material_index].name if hit else None
+            assert hit and point.y >= 4.8, f'{name}: {surface} seals the authored entrance at {point}'
         obj.location = (0, 0, 0)
         report['modules'][name] = {'triangles': len(mesh.loop_triangles), 'vertices': len(mesh.vertices), 'repeatVerified': args.repeat,
                                    'materials': len(mesh.materials), 'buildSeconds': round(time.monotonic() - start, 2),

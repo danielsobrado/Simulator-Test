@@ -47,8 +47,7 @@ def _raise_on_bluff(b, h, bluffs, falls=()):
     """Lift everything built so far by `h` onto tall columnar cliffs, so the citadel tiers read
     as crowning a mountain rather than stacked on the ground; `falls` (x, y_top, y_foot, width)
     continue a waterfall from its old pool out over the new cliff edge to the ground."""
-    for v in b.verts:
-        v.z += h
+    b.translate((0, 0, h))
     for cx, cy, rx, ry, seed in bluffs:
         jagged_cliff_tier(b, cx, cy, 0.0, h, rx, ry, seed=seed, ribs=28)
         _talus_skirt(b, cx, cy, 0.0, rx * 1.02, ry * 1.02, 12, 0.12, 0.30, seed=seed + 7)
@@ -84,7 +83,8 @@ def build_module(kit, name, fn):
     obj = kit.define(name, 'nature', b)
     if name in BLUFFS:
         centres = [(cx, cy) for cx, cy, _, _, _ in BLUFFS[name][1]]
-        blockout, sculpted = sculpt_rock(obj, seed=len(name) * 131 + sum(map(ord, name)), centres=centres)
+        blockout, sculpted = sculpt_rock(obj, seed=len(name) * 131 + sum(map(ord, name)), centres=centres,
+                                       cutouts=b.cutouts)
         for v in obj.data.vertices:
             v.co *= FORMATION_SCALE
         for poly in obj.data.polygons:
@@ -94,6 +94,7 @@ def build_module(kit, name, fn):
                 obj.data.uv_layers.active.data[li].uv *= FORMATION_SCALE
         obj['kit_landmark'] = True
         obj['kit_authoring_metres'] = FORMATION_SCALE
+        obj['kit_cutout_count'] = len(b.cutouts)
         print(f'[kit] sculpted {name}: rock {blockout} -> {sculpted} tris')
     elif name in MOUNTAIN_SCULPT:
         centres, floor = MOUNTAIN_SCULPT[name]
