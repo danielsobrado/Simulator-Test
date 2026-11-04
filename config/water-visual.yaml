@@ -209,8 +209,9 @@ water:
     # for: turbulence streaks start at 0.7.
     fullCurrentSpeed: 3
     # Scales the donor's shore, bank and turbulence foam on inland water, apart
-    # from `foam.intensity`, which is tuned for the sea's bands.
-    foamStrength: 1
+    # from `foam.intensity`, which is tuned for the sea's bands. At 1 the shore
+    # band drew long white streaks across still ponds (biome-surface review).
+    foamStrength: 0.45
     # Metres from the bank over which the bank foam fades out (donor 0.1–1.15).
     bankFoamWidth: 1.15
   # Rain rings on every water surface, as dense and bright as the rain is heavy.
