@@ -1,0 +1,270 @@
+{
+  "recordedAt": "2026-11-04T16:01:00.813Z",
+  "scope": "One paired 12-second streamed movement capture and the final 24-variant asset review. Movement contains no town instances; Stonehold drawing is checked in the separate viewer. Both movement arms retain occasional streaming hitches. A single pair does not establish a speedup.",
+  "movement": {
+    "baseline": {
+      "sourceReport": "tmp/stonehold-aaa/world-before-approved.json",
+      "sourceReportSha256": "7cbf93f6cefa7ea21ab9d191e2638d9b3150b900f9a517b26c469ad6dc8f1c64",
+      "settled": true,
+      "foregroundRetained": true,
+      "webgpu": true,
+      "browserErrors": 0,
+      "collisionGatePassed": true,
+      "frameCount": 938,
+      "durationMs": 11985.7,
+      "avgFps": 78.26,
+      "dt": {
+        "minMs": 0.8,
+        "p50Ms": 12.1,
+        "p95Ms": 21,
+        "p99Ms": 32.13,
+        "maxMs": 36,
+        "meanMs": 12.787
+      },
+      "hitchCount": 8,
+      "hitchRate": 0.0085,
+      "gpuRender": {
+        "samples": 104,
+        "avgMs": 3.2280615384615405,
+        "p50Ms": 2.642944,
+        "p95Ms": 5.296128,
+        "maxMs": 5.648384000000001
+      },
+      "terrainCommit": {
+        "totalMs": 7.6,
+        "avgMs": 0.008,
+        "p95Ms": 0.1,
+        "maxMs": 0.4
+      },
+      "stylized": {
+        "totalMs": 1531.7,
+        "avgMs": 1.633,
+        "p95Ms": 3.1,
+        "maxMs": 7.3
+      },
+      "townInstances": 0
+    },
+    "upgraded": {
+      "sourceReport": "tmp/stonehold-aaa/world-after-approved.json",
+      "sourceReportSha256": "ba547aad89fd7813feaf05bc0a47bc67a60219225a5c251fb3e581afd02b0f78",
+      "settled": true,
+      "foregroundRetained": true,
+      "webgpu": true,
+      "browserErrors": 0,
+      "collisionGatePassed": true,
+      "frameCount": 1048,
+      "durationMs": 11984.8,
+      "avgFps": 87.44,
+      "dt": {
+        "minMs": 0.4,
+        "p50Ms": 10.7,
+        "p95Ms": 15,
+        "p99Ms": 33.053,
+        "maxMs": 74.3,
+        "meanMs": 11.445
+      },
+      "hitchCount": 10,
+      "hitchRate": 0.0095,
+      "gpuRender": {
+        "samples": 117,
+        "avgMs": 3.172281435897437,
+        "p50Ms": 2.7402239999999995,
+        "p95Ms": 5.300224000000002,
+        "maxMs": 5.709824000000001
+      },
+      "terrainCommit": {
+        "totalMs": 12.3,
+        "avgMs": 0.012,
+        "p95Ms": 0.1,
+        "maxMs": 4.7
+      },
+      "stylized": {
+        "totalMs": 1446.9,
+        "avgMs": 1.381,
+        "p95Ms": 2.5,
+        "maxMs": 6.2
+      },
+      "townInstances": 0
+    }
+  },
+  "assets": {
+    "medieval_kit.glb": {
+      "baselineSha256": "d7167fdd8dbb17e6942f6d881e7145fc089cf711d40e205c24fb5a8f6b9507a3",
+      "upgradedSha256": "58f309906621ce9836b9c36b5666c99edff951066cd6fa15a85965221b9cfce1",
+      "bytes": 57745276
+    },
+    "medieval_kit_lod1.glb": {
+      "baselineSha256": "5160b3827add047c3907436f8e9cb32b81a9eff984cec797484389c09a2c3ab5",
+      "upgradedSha256": "dab804dcf08e82cf544a43866d87b256b2f5675bd2a4261562adb9154f6a40f2",
+      "bytes": 10140584
+    },
+    "medieval_kit_prefabs.json": {
+      "baselineSha256": "ae5cfb5540f925f195cc044bc853e8790e75144316238d1f72c47547a00618a7",
+      "upgradedSha256": "db174d238fe8f1cb8198d32496819421eb3a1c3af389118eab8239bab76469e2",
+      "bytes": 3151497
+    }
+  },
+  "assetViewer": {
+    "sourceReport": "tmp/stonehold-aaa/runtime-approved/report.json",
+    "sourceReportSha256": "22f81336046ef4c3edbb7d9871e205d028fec67b8a098f518239a5c11847cc37",
+    "adapter": {
+      "vendor": "nvidia",
+      "architecture": "lovelace",
+      "fallback": false
+    },
+    "foregroundRetained": true,
+    "browserErrors": 0,
+    "frames": {
+      "count": 4393,
+      "p95": 2.5999999940395355,
+      "mean": 1.1438652401547917,
+      "authoritative": true
+    },
+    "measurements": [
+      {
+        "module": "Stonehold_Ledge_Small",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 21481
+      },
+      {
+        "module": "Stonehold_Ledge_Small",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 3500
+      },
+      {
+        "module": "Stonehold_Ledge_Large",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 30534
+      },
+      {
+        "module": "Stonehold_Ledge_Large",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 6593
+      },
+      {
+        "module": "Stonehold_Twin_Outcrop",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 47331
+      },
+      {
+        "module": "Stonehold_Twin_Outcrop",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 11712
+      },
+      {
+        "module": "Stonehold_Vent_Crater",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 17236
+      },
+      {
+        "module": "Stonehold_Vent_Crater",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 2444
+      },
+      {
+        "module": "Stonehold_Caldera_Basin",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 23520
+      },
+      {
+        "module": "Stonehold_Caldera_Basin",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 4275
+      },
+      {
+        "module": "Stonehold_Fang_Shrine",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 21012
+      },
+      {
+        "module": "Stonehold_Fang_Shrine",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 3442
+      },
+      {
+        "module": "Stonehold_Cavern_Maw",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 23065
+      },
+      {
+        "module": "Stonehold_Cavern_Maw",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 4202
+      },
+      {
+        "module": "Stonehold_Horned_Sanctum",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 37337
+      },
+      {
+        "module": "Stonehold_Horned_Sanctum",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 8033
+      },
+      {
+        "module": "Mine_Vent_Stack",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 3366
+      },
+      {
+        "module": "Mine_Vent_Stack",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 692
+      },
+      {
+        "module": "Mountain_Cliff_Wall",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 16926
+      },
+      {
+        "module": "Mountain_Cliff_Wall",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 1523
+      },
+      {
+        "module": "Mountain_Gate_Massif",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 16731
+      },
+      {
+        "module": "Mountain_Gate_Massif",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 1526
+      },
+      {
+        "module": "Mountain_Cavern_Vault",
+        "lod": 0,
+        "copies": 1,
+        "triangles": 10488
+      },
+      {
+        "module": "Mountain_Cavern_Vault",
+        "lod": 1,
+        "copies": 1,
+        "triangles": 1070
+      }
+    ]
+  }
+}

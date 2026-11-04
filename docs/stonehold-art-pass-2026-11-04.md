@@ -25,8 +25,10 @@ existing metre scale.
   `assets-src/medieval-town-kit/previews/stonehold-aaa/`.
 - Geometry and repeatability evidence: `metrics-lod0.json` and `metrics-lod1.json`
   in that directory.
-- Runtime screenshots and all 24 near/far checks:
-  `tmp/stonehold-aaa/runtime-final/report.json`.
+- Accepted movement and asset-viewer evidence, including frozen export hashes:
+  `runtime-summary.json` in that directory.
+- Final runtime screenshots and all 24 near/far checks:
+  `tmp/stonehold-aaa/runtime-approved/report.json`.
 - Original review previews and unrelated checkout changes were preserved.
 
 ## Validation
@@ -40,15 +42,37 @@ existing metre scale.
 - Both public kit GLBs validate with zero glTF errors. Near-kit warnings concern
   generated tangent space; `TownKitGeometry` computes those tangents when repacking
   modules. The far kit has zero validation warnings.
-- Hardware WebGPU review loads all twelve objects at both detail levels, with
-  no browser errors, on NVIDIA Lovelace. A prior asset-viewer revision retained
-  native foreground focus at 2.4 ms p95; the final aperture export lost focus,
-  so its timing is not accepted. Neither is a whole-world performance claim.
-- Frozen movement A/B runs completed on hardware WebGPU with no browser errors,
-  but their native foreground checks failed when another Chrome window took
-  focus. They are not accepted frame-pacing evidence. Valid movement comparison
-  remains outstanding. The temporary frozen builds enable the development QA
-  exports because the movement runner reads `window.__editor`.
+- Hardware WebGPU review passes all twelve final objects at both detail levels,
+  with no browser errors, on NVIDIA Lovelace. Native foreground focus is retained;
+  the asset viewer records 2.6 ms p95 over five seconds.
+- The final frozen movement A/B captures retain native foreground focus, settle
+  successfully, pass collision readiness and timing, and have no browser errors.
+  Earlier captures interrupted by another Chrome window remain rejected.
+
+## Accepted movement comparison
+
+Both frozen builds run `chunk-cross` from the same default pose with an eight
+second warmup, readiness settling, twelve measured seconds and WebGPU timestamp
+sampling. Both snapshots were built from the same checkout with the baseline's
+town sources restored through a Vite loader. The temporary builds enable the
+development QA exports because the movement runner reads `window.__editor`.
+Their kit files match the saved baseline and final public exports respectively;
+`runtime-summary.json` records their SHA-256 hashes and source report hashes.
+
+| Measurement | Baseline | Upgraded |
+| --- | ---: | ---: |
+| Average FPS | 78.26 | 87.44 |
+| Frame p95 | 21.0 ms | 15.0 ms |
+| Frame p99 | 32.13 ms | 33.05 ms |
+| Hitches over 33.3 ms | 8 (0.85%) | 10 (0.95%) |
+| Sampled GPU average | 3.23 ms | 3.17 ms |
+| Terrain commit p95 | 0.1 ms | 0.1 ms |
+| Stylized phase p95 | 3.1 ms | 2.5 ms |
+
+This is one paired capture, insufficient to establish a speedup. Occasional
+streaming hitches remain in both builds. The route contains zero town instances;
+the separate asset viewer covers Stonehold drawing and all 24 LOD variants.
+Dense settlement frame pacing and the full performance matrix were not measured.
 
 ## Generator corrections
 
