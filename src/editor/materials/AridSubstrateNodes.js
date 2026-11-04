@@ -68,14 +68,18 @@ export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, came
       const drift = periodicNoise(p.div(8).add(7.3), PATTERN_PERIOD / 8);
       // Integer lattice frequencies close over PatternOrigins' 512-cell wrap.
       const dune = duneAt(tileId, dunes).toVar();
-      const phase = p.x.mul(dune.x).add(p.y.mul(dune.y)).mul(Math.PI * 2).add(warp.mul(2));
-      const filtered = oneMinus(smoothstep(.6, 2.4, phase.fwidth())).mul(reach);
+      // A coarser warp too, so crests wander and fork instead of running ruler-straight.
+      const bend = periodicNoise(p.div(4).add(41.9), PATTERN_PERIOD / 4);
+      const phase = p.x.mul(dune.x).add(p.y.mul(dune.y)).mul(Math.PI * 2).add(warp.mul(2)).add(bend.mul(5));
+      // Fine ripples hand over to the swells by ~20 m: further out a full-strength
+      // sine reads as zebra stripes across the whole middle distance.
+      const filtered = oneMinus(smoothstep(.6, 2.4, phase.fwidth())).mul(oneMinus(smoothstep(6, 20, cameraDistance)));
       const secondaryPhase = p.x.mul(3).sub(p.y.mul(2)).mul(Math.PI * 2).add(warp.mul(1.7));
       // Two coherent ripple districts with quiet ground between them. Integer
       // lattice frequencies preserve the bounded pattern's chunk/rebase seams.
       const direction = smoothstep(.3, .7, drift);
       const ripple = mix(duneProfile(phase, dune.w), sin(secondaryPhase), direction)
-        .mul(mix(float(.2), float(1), smoothstep(.22, .64, macro))).mul(filtered).mul(dune.z);
+        .mul(mix(float(.1), float(1), smoothstep(.3, .7, macro))).mul(filtered).mul(dune.z);
       // Long swells across the same wind, kept to ~300 m where the ripples stop at 30.
       const broad = patterns.latticePoint('broad', localXZ);
       const swellPhase = broad.dot(perDune(tileId, dunes, swellVector)).mul(Math.PI * 2).add(macro.sub(.5).mul(3));

@@ -1,5 +1,6 @@
 import { applyJungleMist } from './ambient/jungleMistOutput.js';
-import { cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
+import { authoredFoliageColor, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
+import { rockShadeEmission } from './forest/foliageLight.js';
 import { cachedLodPlan } from './lod/CachedLodPlan.js';
 import { ITERATOR_PENDING } from './ResumableIterator.js';
 import { stepViewRebuild } from './StagedViewRebuild.js';
@@ -68,6 +69,7 @@ export function createStylizedRockMaterial(mesh, config, weathering) {
       localWater: true,
     });
   }
+  material.emissiveNode = rockShadeEmission(material.colorNode ?? authoredFoliageColor(material));
   applyJungleMist(material, config?.ambientEffects);
   material.needsUpdate = true;
   return material;

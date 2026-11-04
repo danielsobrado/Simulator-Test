@@ -14,6 +14,12 @@ const BARK_FILL = 0.6;
 /** Share of the ground's bounce light a downward face takes. */
 const CROWN_BOUNCE = 0.5;
 const BARK_BOUNCE = 0.7;
+/**
+ * Stone takes several times bark's share: under this scene's thin ambient a backlit
+ * boulder (atlas albedo ~0.25) otherwise renders as a black lump on bright ground.
+ */
+const ROCK_FILL = 3.5;
+const ROCK_BOUNCE = 4;
 /** Metres up a trunk over which the bounce off the ground fades. */
 const BOUNCE_REACH = 5;
 
@@ -90,5 +96,13 @@ export function treeBarkEmission(bark) {
   const facing = normalWorld.y.negate().mul(0.5).add(0.5);
   return foliageSkyFill(bark, BARK_FILL)
     .add(bark.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(low).mul(BARK_BOUNCE))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+}
+
+/** Sky fill and floor bounce for scattered stones, which sit wholly in the bounce. */
+export function rockShadeEmission(stone) {
+  const facing = normalWorld.y.negate().mul(0.5).add(0.5);
+  return foliageSkyFill(stone, ROCK_FILL)
+    .add(stone.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(ROCK_BOUNCE))
     .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
 }

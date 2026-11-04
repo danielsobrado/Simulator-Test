@@ -247,7 +247,7 @@ export function createLeafLitterGeometry({ radius = 1.7, leaves = 72, seed = 0x5
 }
 
 /** A soft cushion of moss, lobed so it does not read as half a ball. */
-export function createMossMoundGeometry({ radius = 0.85, height = 0.24 } = {}) {
+export function createMossMoundGeometry({ radius = 0.5, height = 0.18 } = {}) {
   const builder = new MeshBuilder();
   const sides = 12;
   const rings = 4;
@@ -255,7 +255,7 @@ export function createMossMoundGeometry({ radius = 0.85, height = 0.24 } = {}) {
     const t = ring / (rings - 1);
     for (let side = 0; side < sides; side += 1) {
       const angle = (side / sides) * Math.PI * 2;
-      const lobe = 1 + 0.2 * Math.sin(angle * 3 + 0.4) + 0.1 * Math.sin(angle * 5);
+      const lobe = 1 + 0.22 * Math.sin(angle * 3 + 0.4) + 0.14 * Math.sin(angle * 5) + 0.08 * Math.sin(angle * 7 + 1.3);
       const reach = radius * lobe * Math.cos(t * Math.PI * 0.46);
       SCRATCH.copy(MOSS).lerp(MOSS_LIGHT, mottle(angle * 3, t * 5) * (0.35 + t * 0.65));
       builder.vertex(Math.cos(angle) * reach, -0.03 + Math.sin(t * Math.PI * 0.5) * height, Math.sin(angle) * reach, SCRATCH);

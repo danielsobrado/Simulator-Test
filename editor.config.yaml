@@ -1153,6 +1153,8 @@ stylizedSurface:
           1: { floor: [grit, cracked] }    # hot desert
           2: { floor: [grit, cracked] }    # cold desert
           11: { floor: [grit, grit] }      # glacier
+          # Stonehold Badlands: grey canyon sand. Unlisted, it fell back to the grass scan.
+          32: { floor: [grit, grit] }
           # Savanna earth is dry grit under straw: the cracked-mud scan read as oversized plates in the grass.
           3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, grit] }   # savanna: straw, warm earth
           5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25, floor: [litter, mossy] }
