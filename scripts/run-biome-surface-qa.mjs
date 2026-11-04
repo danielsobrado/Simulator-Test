@@ -30,6 +30,8 @@ const GROUND_SHOT_S = 0.8;
 const SPELL_SHOT_S = 3.4;
 /** Spots tried per biome before settling for one without a dry ground heading. */
 const SPOT_ATTEMPTS = 6;
+/** Layers left out of the ground close-up (WorldVisualLayerControls names). */
+const GROUND_SHOT_HIDDEN = Object.freeze({ bushes: false, rocks: false });
 
 function parseArguments(argv) {
   const result = { url: 'http://localhost:5173', only: null, out: null };
@@ -96,6 +98,9 @@ try {
     entry.stage = await page.evaluate((options) => window.__worldVisualQa.stageSurfaceDemo(options), { water: spot.water, groundYaw });
     for (const [shot, seconds, yaw, pitch] of [['ground', GROUND_SHOT_S, groundYaw, -0.42], ['spell', SPELL_SHOT_S, spot.yaw, -0.02]]) {
       await page.evaluate((pose) => window.__worldVisualQa.look(pose), { yaw, pitch });
+      // The ground shot is a close-up of the prints: a bush or boulder at the
+      // player's feet would fill it, so those layers sit out for that frame only.
+      await page.evaluate((layers) => window.__worldVisualQa.setLayers(layers), shot === 'ground' ? GROUND_SHOT_HIDDEN : {});
       await page.waitForTimeout((seconds - (shot === 'spell' ? GROUND_SHOT_S : 0)) * 1000);
       const file = `${biome.name}-${shot}.png`;
       await captureWorldCanvas(page, path.join(out, file));

@@ -9,7 +9,7 @@ function fixture() {
   const calls=[];const record=name=>()=>calls.push(name);
   const surface=Object.assign(Object.create(StylizedSurfaceView.prototype),{
     enabled:true,beginFrame:record('collision'),syncSceneryQueue:syncViewRebuildQueue,
-    terrainView:{floatingOrigin:{toCanonical:()=>({x:0,z:0})}},
+    terrainView:{floatingOrigin:{toCanonical:()=>({x:0,z:0}),getState:()=>({x:0,z:0})}},
     config:{rocks:{radius:1,falloff:1}},objectMap:{list:()=>[]},slots:[],detailViews:[],
     waterSlots:[{update:record('water')}],skyView:{update:record('sky')},
     waterObstacleUpdates:{schedule:record('water obstacle schedule'),flush:record('water obstacle work')},

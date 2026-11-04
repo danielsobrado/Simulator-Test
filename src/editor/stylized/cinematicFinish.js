@@ -21,7 +21,8 @@ import {
  * (`CinematicPipeline#grade` and its bloom): a filmic grade in linear light
  * ahead of the tone mapper, and a restrained bloom.
  *
- *  - saturation, then contrast around mid-grey (0.18) so the exposure holds;
+ *  - saturation, then a power contrast through mid-grey (0.18) so the exposure
+ *    holds and dark tones are compressed, never clipped;
  *  - a lift/gain split that cools the shadows and warms the highlights;
  *  - highlight desaturation, so sunlit grass bleaches toward white, not neon;
  *  - a soft vignette and a fine animated grain.
@@ -101,7 +102,10 @@ export function createFinishUniforms(settings) {
 export function gradeNode(input, grade) {
   const saturated = mix(vec3(dot(input, LUMA)), input, grade.saturation);
   const pivot = float(0.18);
-  const contrasted = saturated.sub(pivot).mul(grade.contrast).add(pivot).max(0);
+  // A power curve through the pivot, not a linear stretch: (v − 0.18)·c + 0.18
+  // clipped every linear value under ~0.02 to black, which blacked out the
+  // whole floor of a dim bog. Same pivot, same midtone slope, darks stay dark.
+  const contrasted = saturated.max(1e-6).div(pivot).pow(grade.contrast).mul(pivot);
   const shaped = contrasted.mul(grade.gain).add(grade.lift.mul(contrasted.oneMinus().max(0)));
   const shapedLuma = dot(shaped, LUMA);
   const rolled = mix(shaped, vec3(shapedLuma), smoothstep(0.55, 1.4, shapedLuma).mul(grade.highlightDesaturation));

@@ -34,7 +34,7 @@
     "validate:impostors:required": "node scripts/validate-impostors.mjs --required",
     "validate:assets": "node scripts/validate-assets.mjs && npm run validate:gods-end-assets && npm run validate:extracted-assets && npm run validate:runtime-assets && npm run validate:wildlife-assets && npm run validate:character-assets && npm run validate:forest-assets && npm run validate:impostors && npm run validate:resident-lods",
     "validate:assets:production": "node scripts/validate-assets.mjs && npm run validate:gods-end-assets && npm run validate:extracted-assets && npm run validate:runtime-assets && npm run validate:wildlife-assets && npm run validate:character-assets && npm run validate:forest-assets && npm run validate:impostors:required && npm run validate:resident-lods",
-    "test": "node --test",
+    "test": "node --test \"test/**/*.test.js\" \"tests/**/*.test.js\"",
     "qa:perf": "node scripts/run-perf-qa.mjs",
     "qa:perf:windows": "node scripts/run-perf-qa-windows.mjs",
     "qa:perf:matrix": "node scripts/run-perf-matrix.mjs",
