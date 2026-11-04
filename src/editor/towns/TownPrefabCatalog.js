@@ -148,9 +148,21 @@ const PROP_CLUSTERS = Object.freeze({
   mountain_vault: [[['Mountain_Cavern_Vault', 0, 0, 0, 0]]],
 });
 
+/** Conservative world-space reservations for inhabited cliff landmarks (metres). */
+export const STONEHOLD_LANDMARKS = Object.freeze([
+  { kind: 'stonehold_ledge', variant: 0, w: 20, d: 22 },
+  { kind: 'stonehold_ledge', variant: 1, w: 26, d: 25 },
+  { kind: 'stonehold_ledge', variant: 2, w: 36, d: 26 },
+  { kind: 'stonehold_crater', variant: 0, w: 21, d: 22 },
+  { kind: 'stonehold_crater', variant: 1, w: 28, d: 28 },
+  { kind: 'stonehold_shrine', variant: 0, w: 24, d: 25 },
+  { kind: 'stonehold_shrine', variant: 1, w: 30, d: 30 },
+  { kind: 'stonehold_shrine', variant: 2, w: 38, d: 35 },
+].map(Object.freeze));
+
 /** Kit modules that only ever stand as props, not the massifs a town is seen by. */
 const PROP_MODULES = new Set(Object.entries(PROP_CLUSTERS)
-  .filter(([kind]) => !kind.startsWith('mountain_'))
+  .filter(([kind]) => !kind.startsWith('mountain_') && !kind.startsWith('stonehold_'))
   .flatMap(([, variants]) => variants.flat().map(([module]) => module)));
 PROP_MODULES.add('Wall_Lantern');
 

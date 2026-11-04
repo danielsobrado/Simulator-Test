@@ -667,15 +667,15 @@ class GeneratedVillage:
                         self.PROPS.append(('Mountain_Cavern_Vault', vx, vy, 0))
             # 5. Outer mountainside formations & mine ventilation stacks on Terrace 1 and perimeter
             outer_formations = [
-                ('Stonehold_Fang_Shrine', gate_x - 3.6, 0.8, 25),
+                ('Stonehold_Fang_Shrine', -9.0, -6.0, 25),
                 ('Stonehold_Ward_Pillar', gate_x - 1.8, self.b1 - 1.5, 0),
                 ('Stonehold_Ward_Pillar', gate_x + 2.8, self.b1 - 1.5, 0),
                 ('Mine_Vent_Stack', 2.2, 1.2, 15),
-                ('Stonehold_Twin_Outcrop', self.W - 2.6, 1.4, -20),
-                ('Stonehold_Ledge_Large', -1.6, 2.5, 65),
-                ('Stonehold_Ledge_Large', self.W + 1.6, 2.8, -65),
-                ('Stonehold_Horned_Sanctum', 1.8, self.b1 - 0.2, 15),
-                ('Stonehold_Cavern_Maw', self.W - 2.2, self.b1 - 0.2, -15),
+                ('Stonehold_Twin_Outcrop', self.W + 12.0, -5.0, -20),
+                ('Stonehold_Ledge_Large', -10.0, self.H * 0.45, 65),
+                ('Stonehold_Ledge_Large', self.W + 10.0, self.H * 0.45, -65),
+                ('Stonehold_Horned_Sanctum', -12.0, self.H + 8.0, 15),
+                ('Stonehold_Cavern_Maw', self.W + 12.0, self.H + 8.0, -15),
             ]
             for fmod, fx, fy, frot in outer_formations:
                 self.PROPS.append((fmod, fx, fy, frot))

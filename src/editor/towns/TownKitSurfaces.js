@@ -14,7 +14,7 @@
  * Pure data.
  */
 
-export const ROLE = Object.freeze({ other: 0, stone: 1, timber: 2, roof: 3, plaster: 4, banner: 5, paving: 6, cobble: 7 });
+export const ROLE = Object.freeze({ other: 0, stone: 1, timber: 2, roof: 3, plaster: 4, banner: 5, paving: 6, cobble: 7, water: 8, foam: 9, mist: 10 });
 
 const DEFAULT = Object.freeze({ role: ROLE.other, normal: 1, cavity: 0.2, parallax: 0, gain: 1 });
 
@@ -26,12 +26,18 @@ export const SURFACES = Object.freeze({
   // Stonehold granite and basalt read near-black on shaded faces at their authored
   // albedo; lifted so dark stone still shows its courses out of the sun.
   M_stone_granite: { role: ROLE.stone, normal: 2.2, cavity: 0.62, parallax: 0.028, gain: 1.35 },
-  M_stone_basalt: { role: ROLE.stone, normal: 1.8, cavity: 0.6, parallax: 0.018, gain: 1.3 },
+  M_stone_basalt: { role: ROLE.stone, normal: 0.9, cavity: 0.3, parallax: 0.006, gain: 1.1 },
   M_brick: { role: ROLE.stone, normal: 2.2, cavity: 0.72, parallax: 0.024 },
   // Own role: a small repeating scan, so the material lays it in ground space (TownKitMaterial).
   M_cobble: { role: ROLE.cobble, normal: 2.15, cavity: 0.72, parallax: 0.032 },
   // Stonehold: columnar cliff basalt (moss and rain streaks as stone) and terrace flagstones.
-  M_rock_cliff: { role: ROLE.stone, normal: 2.4, cavity: 0.75, parallax: 0.03 },
+  M_rock_cliff: { role: ROLE.stone, normal: 1.15, cavity: 0.38, parallax: 0.012 },
+  M_hold_wet_rock: { role: ROLE.stone, normal: 0.9, cavity: 0.3, parallax: 0.008 },
+  M_hold_water: { role: ROLE.water, normal: 0.75, cavity: 0, parallax: 0, gain: 1 },
+  M_hold_foam: { role: ROLE.foam, normal: 0.5, cavity: 0, parallax: 0, gain: 1 },
+  M_hold_bronze: { role: ROLE.other, normal: 0.45, cavity: 0.15, parallax: 0 },
+  M_hold_mist: { role: ROLE.mist, normal: 0, cavity: 0, parallax: 0 },
+  M_hold_warm_stone: { role: ROLE.stone, normal: 0.8, cavity: 0.25, parallax: 0.006 },
   // Natural crags and boulders (sculpted, scanned rock_face_03).
   M_rock: { role: ROLE.stone, normal: 2.2, cavity: 0.7, parallax: 0.026 },
   M_stone_flag: { role: ROLE.paving, normal: 1.6, cavity: 0.6, parallax: 0.016 },

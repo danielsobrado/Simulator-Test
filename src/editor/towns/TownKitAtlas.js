@@ -65,13 +65,31 @@ export class TownKitAtlas {
       }
       return byImage.get(image);
     };
+    // Roughness uses the spare normal alpha channel: no new array or shader tap.
+    // Deduplicate pairs, since two materials can share normals but differ in finish.
+    const surfaceLayer = (material) => {
+      const normal = material.normalMap?.image;
+      const roughness = material.roughnessMap?.image;
+      if (!normal && !roughness) return 0;
+      let finishes = normalByImage.get(normal);
+      if (!finishes) { finishes = new Map(); normalByImage.set(normal, finishes); }
+      if (!finishes.has(roughness)) {
+        const pixels = normal ? new Uint8Array(readPixels(normal, NORMAL_SIZE))
+          : solidLayer(NORMAL_SIZE, [128, 128, 255, 255]);
+        const rough = roughness ? readPixels(roughness, NORMAL_SIZE) : null;
+        for (let i = 3; i < pixels.length; i += 4) pixels[i] = rough ? rough[i - 2] : 255;
+        finishes.set(roughness, normalLayers.length);
+        normalLayers.push(pixels);
+      }
+      return finishes.get(roughness);
+    };
     for (const material of materials) {
       if (this.entries.has(material.name)) continue;
       const row = Object.freeze({
         index: this.rows.length,
         name: material.name,
         albedoLayer: layerFor(material.map, albedoByImage, albedoLayers, ALBEDO_SIZE),
-        normalLayer: layerFor(material.normalMap, normalByImage, normalLayers, NORMAL_SIZE),
+        normalLayer: surfaceLayer(material),
         color: material.color ? material.color.toArray() : [1, 1, 1],
         roughness: material.roughness ?? 0.9,
         metalness: material.metalness ?? 0,

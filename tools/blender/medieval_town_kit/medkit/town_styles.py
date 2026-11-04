@@ -199,14 +199,14 @@ STYLES = {
         street='Tile_Flagstone', grass='Tile_Earth', wall='Terrace_Wall_Granite',
         pillar='Terrace_Wall_Granite_Pillar', coping='Terrace_Coping_Granite', railing='Railing_Parapet',
         stairs='Stairs_Granite', lamp='Brazier_Pillar', lamp_light=1.5,
-        trees=('Stonehold_Ledge_Small', 'Stonehold_Vent_Crater', 'Boulder_Cluster'),
+        trees=('Boulder_Cluster', 'Tree_Pine', 'Boulder_Cluster'),
         yard=(
             'Mine_Cart_Track', 'Smelter_Stack', 'Stonehold_Ward_Pillar', 'Armorer_Stand',
             'Cargo_Pile', 'Crate', 'Barrel', 'Grindstone', 'Brazier_Pillar', 'Guard_Post',
             'Tavern_Table_Set',
         ),
         arches=('Street_Arch_Granite', 'Street_Arch_Granite', 'Street_Arch_Stone'),
-        centerpieces=('Stonehold_Caldera_Basin', 'Statue_Plinth', 'Stonehold_Ward_Pillar'),
+        centerpieces=('Ore_Crane', 'Statue_Plinth', 'Stonehold_Ward_Pillar'),
         stalls=(
             'Smelter_Stack', 'Mine_Cart_Track', 'Armorer_Stand', 'Ore_Crane',
             'Stonehold_Ward_Pillar', 'Cargo_Pile', 'Market_Stall_Cream', 'Notice_Board',
@@ -226,7 +226,6 @@ STYLES = {
         extras=(
             ('Mine_Cart_Track', 3), ('Smelter_Stack', 2), ('Stonehold_Ward_Pillar', 3),
             ('Ore_Crane', 2), ('Armorer_Stand', 2), ('Mine_Vent_Stack', 2),
-            ('Stonehold_Fang_Shrine', 1), ('Stonehold_Twin_Outcrop', 1), ('Stonehold_Ledge_Large', 2),
         ),
         formations=(
             'Stonehold_Horned_Sanctum', 'Stonehold_Cavern_Maw', 'Stonehold_Fang_Shrine',

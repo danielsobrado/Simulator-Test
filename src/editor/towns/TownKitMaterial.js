@@ -128,6 +128,7 @@ export function createTownKitMaterial(atlas, look) {
   const material = new THREE.MeshStandardNodeMaterial({ name: `TownKit ${look.key}` });
   // The kit has open panes (lunettes, oriel facets, roof cheeks) authored one-sided.
   material.side = THREE.DoubleSide;
+  material.alphaHash = atlas.row('M_hold_mist') !== null;
   material.userData.townKit = { layers, tints, kinds, relief, snow };
   writeLook(material, atlas, look);
 
@@ -141,6 +142,10 @@ export function createTownKitMaterial(atlas, look) {
   const isRole = (value) => float(1).sub(clamp(role.sub(value).abs(), 0, 1));
   const seed = seedChannels();
   const place = positionLocal;
+  const mist = isRole(ROLE.mist);
+  const mistEdge = float(1).sub(uv().sub(vec2(0.5)).length().mul(2)).clamp(0, 1);
+  const mistDrift = sin(time.mul(1.2).add(place.x.mul(2)).add(place.y)).mul(0.25).add(0.75);
+  material.opacityNode = mix(float(1), mistEdge.mul(mistEdge).mul(mistDrift).mul(0.16), mist);
 
   material.positionNode = positionLocal.add(wobble(positionLocal)).add(swayOffset(data.y));
   // Shadow cascades re-run the vertex stage for every town vertex: they get the
@@ -153,7 +158,9 @@ export function createTownKitMaterial(atlas, look) {
   const isCobble = isRole(ROLE.cobble);
   const base = mix(uv(), place.xz, isCobble);
   const reliefHeight = dot(texture(atlas.albedo, base).depth(row.x).rgb, vec3(0.3, 0.55, 0.15));
-  const st = base.sub(parallaxDirection.xy.mul(reliefHeight.sub(0.45).mul(surface.z).mul(townKitShared.reliefScale)));
+  const flow = isRole(ROLE.water).add(isRole(ROLE.foam));
+  const st = base.sub(parallaxDirection.xy.mul(reliefHeight.sub(0.45).mul(surface.z).mul(townKitShared.reliefScale)))
+    .add(vec2(0, time.mul(-0.6)).mul(flow));
   const laid = texture(atlas.albedo, st).depth(row.x).rgb;
   // A second tap of the same stones, turned and rescaled, blended by noise (as
   // SettlementPavingMaterial): no two stretches of a street are alike.
@@ -164,7 +171,8 @@ export function createTownKitMaterial(atlas, look) {
   const secondTap = mix(turned, st.add(vec2(0.37, 0)), isStone);
   const stoneMix = smoothstep(-0.28, 0.28, mx_noise_float(place.mul(0.31))).mul(isCobble.add(isStone));
   const sample = mix(laid, texture(atlas.albedo, secondTap).depth(row.x).rgb, stoneMix);
-  const normalSample = texture(atlas.normal, st).depth(row.y).rgb;
+  const surfaceSample = texture(atlas.normal, st).depth(row.y);
+  const normalSample = surfaceSample.rgb;
   // Crevices from the normal map: the further a texel tilts, the deeper the joint.
   const crevice = smoothstep(0.97, 0.72, normalSample.z).mul(surface.y);
   const luma = dot(sample, vec3(0.3, 0.55, 0.15));
@@ -210,7 +218,7 @@ export function createTownKitMaterial(atlas, look) {
   const wetAmount = (key) => [[ROLE.stone, 'stone'], [ROLE.plaster, 'plaster'], [ROLE.timber, 'timber'],
     [ROLE.roof, 'roof'], [ROLE.paving, 'stone'], [ROLE.cobble, 'stone']]
     .reduce((sum, [value, family]) => sum.add(isRole(value).mul(TOWN_WET_FAMILIES[family][key])), float(0));
-  const wet = wetTownSurface(colour, row.z, up, {
+  const wet = wetTownSurface(colour, row.z.mul(surfaceSample.a), up, {
     wetness: wetAmount('wetness'), darkening: wetAmount('darkening'), roughness: wetAmount('roughness'),
   });
   colour = wet.color;

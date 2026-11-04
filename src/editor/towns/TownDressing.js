@@ -1,6 +1,7 @@
 import { drainJob } from '../world/settlements/SettlementArrayJobs.js';
 import { rect, rectHitsPolyline, rectsOverlap } from '../world/settlements/SettlementGeometry.js';
 import { townHash as hash } from './townHash.js';
+import { STONEHOLD_LANDMARKS } from './TownPrefabCatalog.js';
 
 /**
  * Lived-in clutter round every house, and stone paving on town streets.
@@ -140,14 +141,8 @@ export function* planDressingJob({ plan, seed, placed, family = null }) {
       { kind: loreRealm === 'umbrakor' ? 'brazier' : 'planter', lx: beside(1, 1.0), lz: d / 2 - 0.4, w: 1.0, d: 0.6, turn: 0 },
       { kind: loreRealm === 'stonehold' ? 'cargo' : 'woodpile', lx: beside(1, 1.2), lz: -0.4, w: 1.3, d: 1.2, turn: Math.PI / 2 },
       { kind: 'barrels', variant: 1, lx: beside(-1, 1.0), lz: -d / 2 + 0.8, w: 1.0, d: 1.0, turn: 0.3 },
-      { kind: loreRealm === 'umbrakor' ? 'shrine' : loreRealm === 'stonehold' ? 'stonehold_ledge' : 'bush', lx: beside(-1, 1.2), lz: 0.3, w: 1.2, d: 1.2, turn: 0 },
+      { kind: loreRealm === 'umbrakor' ? 'shrine' : loreRealm === 'stonehold' ? 'ward_pillar' : 'bush', lx: beside(-1, 1.4), lz: 0.3, w: 1.4, d: 1.4, turn: 0 },
     ];
-    if (loreRealm === 'stonehold') {
-      candidates.push(
-        { kind: 'stonehold_crater', variant: roll(5) < 0.5 ? 0 : 1, lx: beside(1, 2.5), lz: -d / 2 - 0.8, w: 2.5, d: 2.4, turn: 0 },
-        { kind: 'stonehold_shrine', variant: Math.floor(roll(6) * 3) % 3, lx: beside(-1, 2.8), lz: -d / 2 - 1.2, w: 2.8, d: 2.6, turn: 0 },
-      );
-    }
     const yardWork = YARD_WORK[buildingFamily || building.kitFamily];
     if (yardWork && ['smithy', 'warehouse'].includes(building.kind)) {
       candidates.push({ kind: yardWork, lx: beside(-1, 2.4), lz: -d / 2 - 1.6, w: 2.4, d: 2.4, turn: 0 });
@@ -205,6 +200,23 @@ export function* planDressingJob({ plan, seed, placed, family = null }) {
   // For Stonehold / Dwarven settlements, roof the inner city (core + mid zones) inside a
   // hollow mountain cavern massif, leaving only the small outer edge buildings outside.
   const isStoneholdTown = family === 'Stonehold' || plan.profile?.identity?.loreRealm === 'stonehold';
+  if (isStoneholdTown) {
+    // Inhabited formations belong outside the street grid, with room for their cliffs.
+    const count = (plan.profile?.rank ?? 0) >= 2 ? 4 : 2;
+    for (let i = 0; i < 8 && out.filter(prop => prop.kind.startsWith('stonehold_')).length < count; i += 1) {
+      const landmark = STONEHOLD_LANDMARKS[Math.floor(hash(seed, i, 941) * STONEHOLD_LANDMARKS.length)];
+      const angle = (i + 0.5) * Math.PI / 4;
+      const radius = (plan.profile?.radius ?? 48) + Math.hypot(landmark.w, landmark.d) / 2 + 8;
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius;
+      const box = rect(x, z, landmark.w, landmark.d, angle + Math.PI);
+      if (occupancy.fits(box)) {
+        occupancy.claim(box);
+        out.push({ kind: landmark.kind, variant: landmark.variant, x, z, yaw: angle + Math.PI });
+      }
+      yield;
+    }
+  }
   if (isStoneholdTown && (plan.profile?.rank ?? 0) >= 1) {
     const mountainRadius = (plan.profile?.radius ?? 48) * 0.68;
     for (let x = -mountainRadius * 0.75; x <= mountainRadius * 0.75; x += 11.2) {

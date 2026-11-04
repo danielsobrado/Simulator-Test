@@ -23,6 +23,7 @@ class Spec:
     normal: float = 1.0
     color: tuple = (0.8, 0.8, 0.8)
     glow_tint: tuple = None  # emission colour multiplier; None emits the albedo itself
+    opacity: float = 1.0
 
 
 SPEC = {
@@ -79,7 +80,7 @@ SPEC = {
     'sod': Spec('sod', 2.0, 0.96, normal=1.8),
     # Stonehold: mined granite courses, charcoal basalt dressings, dulled bronze.
     'stone_granite': Spec('granite', 3.0, 0.84, normal=2.2),
-    'stone_basalt': Spec('granite', 1.6, 0.78, normal=1.6, tint=(0.64, 0.64, 0.68)),
+    'stone_basalt': Spec('hold_basalt', 1.2, 0.88, normal=0.85),
     'bronze': Spec(color=(0.26, 0.22, 0.14), rough=0.55, metal=0.85),
     # Regional ground and greenery: packed earth lanes, frost-bitten grass, dark conifers.
     'earth': Spec('earth', 2.0, 0.95, normal=1.8),
@@ -101,8 +102,15 @@ SPEC = {
     'rock': Spec('crag', 4.0, 0.9, normal=2.2, tint=(0.70, 0.74, 0.86)),
     'rock_land': Spec('rock', 17.0, 0.92, normal=1.6),
     # Stonehold columnar cliff basalt, dark so the pale terrace decks read above it.
-    'rock_cliff': Spec('basalt', 1.6, 0.86, normal=2.6, tint=(0.78, 0.84, 0.98)),
-    'stone_flag': Spec('flagstone', 1.1, 0.82, normal=1.4),
+    'rock_cliff': Spec('basalt', 1.6, 0.95, normal=1.05, tint=(0.98, 1.02, 1.10)),
+    'stone_flag': Spec('flagstone', 1.1, 0.90, normal=0.95),
+    'hold_bronze': Spec('hold_bronze', 0.65, 0.86, metal=0.78, normal=0.45),
+    'hold_water': Spec('hold_water', 0.6, 0.65, normal=0.75),
+    'hold_foam': Spec('hold_foam', 0.4, 0.95, normal=0.5),
+    'hold_wet_rock': Spec('basalt', 2.0, 0.32, normal=0.9, tint=(0.70, 0.79, 0.82)),
+    'hold_soot': Spec(color=(0.08, 0.075, 0.065), rough=1.0),
+    'hold_mist': Spec(color=(0.58, 0.70, 0.73), rough=1.0, fit=True, opacity=0.10),
+    'hold_warm_stone': Spec('dressed', 1.2, 0.85, tint=(1.0, 0.72, 0.42), emission=0.16, normal=0.8),
     'foliage_pine': Spec('foliage', 1.5, 0.9, tint=(0.52, 0.66, 0.60)),
     # Plain blown glass for frontier and hold windows (the lattice pane is a lowland look).
     'glass_clear': Spec(color=(0.11, 0.12, 0.12), rough=0.1, emission=0.35, glow_tint=(1.0, 0.62, 0.30)),
@@ -144,10 +152,19 @@ def _build(name, spec, images):
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     bsdf.inputs['Roughness'].default_value = spec.rough
     bsdf.inputs['Metallic'].default_value = spec.metal
+    bsdf.inputs['Alpha'].default_value = spec.opacity
     color_out = None
     emit_out = None
     if spec.tex:
-        albedo, normal = images[spec.tex]
+        albedo, normal, *surface = images[spec.tex]
+        if surface:
+            rough = nodes.new('ShaderNodeTexImage')
+            rough.image = surface[0]
+            factor = nodes.new('ShaderNodeMath')
+            factor.operation = 'MULTIPLY'
+            links.new(rough.outputs['Color'], factor.inputs[0])
+            factor.inputs[1].default_value = spec.rough
+            links.new(factor.outputs[0], bsdf.inputs['Roughness'])
         tex = nodes.new('ShaderNodeTexImage')
         tex.image = albedo
         color_out = tex.outputs['Color']
@@ -189,6 +206,8 @@ def _build(name, spec, images):
 
 
 def build(images):
+    from .stonehold_surfaces import extend
+    images = extend(images)
     for name, spec in SPEC.items():
         _MATERIALS[name] = _build(name, spec, images)
 

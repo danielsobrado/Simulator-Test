@@ -140,13 +140,14 @@ function primitivesByModule(gltf) {
 
 /** The atlas copied their pixels; release the source textures (but keep the glass map). */
 function disposeSourceMaterials(materials) {
+  const textures = new Set();
+  const images = new Set();
   for (const material of materials) {
-    for (const map of [material.map, material.normalMap]) {
-      map?.image?.close?.();
-      map?.dispose();
-    }
+    for (const map of [material.map, material.normalMap, material.roughnessMap, material.metalnessMap]) if (map) textures.add(map);
     material.dispose();
   }
+  for (const map of textures) { if (map.image) images.add(map.image); map.dispose(); }
+  for (const image of images) image.close?.();
 }
 
 async function defaultFetchJson(url) {

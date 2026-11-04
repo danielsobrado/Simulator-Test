@@ -13,7 +13,7 @@ from .modules import foundations as F
 from .modules.palisade import CHAMBER, PAD_H, TOWER
 from .modules.walls_stonehold import FACE, GATE_D, GATE_H, GATE_W, GRANITE_WINDOW, PASSAGE
 from .modules.walls_frontier import PORCH_DEPTH, PORCH_POSTS
-from .modules.stonehold_formations import BLUFFS
+from .modules.stonehold_formations import BLUFFS, FORMATION_SCALE
 
 
 def _panel(hole):
@@ -237,7 +237,8 @@ def _on_bluff(name, boxes):
     h, ellipses, _ = BLUFFS[name]
     cliff = [((cx - rx * 0.8, cy - ry * 0.8, 0), (cx + rx * 0.8, cy + ry * 0.8, h))
              for cx, cy, rx, ry, _ in ellipses]
-    return cliff + [((x0, y0, z0 + h), (x1, y1, z1 + h)) for (x0, y0, z0), (x1, y1, z1) in boxes]
+    raised = cliff + [((x0, y0, z0 + h), (x1, y1, z1 + h)) for (x0, y0, z0), (x1, y1, z1) in boxes]
+    return [(tuple(v * FORMATION_SCALE for v in lo), tuple(v * FORMATION_SCALE for v in hi)) for lo, hi in raised]
 
 COLLIDERS.update({
     'Stonehold_Ledge_Small': _centred(2.4, 2.2, 1.0),

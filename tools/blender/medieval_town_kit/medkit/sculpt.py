@@ -64,9 +64,9 @@ def _shape(rock, seed, voxel):
     k = max(1.0, voxel / 0.045)  # big pieces (mountains) get proportionally bigger fractures
     space = bpy.data.objects.new(f'{rock.name}_space', None)
     bpy.context.scene.collection.objects.link(space)
-    space.scale = (1.0, 1.0, 3.2)
+    space.scale = (1.0, 1.0, 2.4)
     space.location = (random.Random(seed).uniform(-9, 9), 0.0, 0.0)
-    for tex_type, size, strength in (('VORONOI', 0.22, 0.075), ('STUCCI', 0.06, 0.018)):
+    for tex_type, size, strength in (('VORONOI', 0.48, 0.050), ('STUCCI', 0.10, 0.009)):
         tex = bpy.data.textures.new(f'{rock.name}_{tex_type}', tex_type)
         tex.noise_scale = size * k
         if tex_type == 'VORONOI':
@@ -135,26 +135,22 @@ def _decimate(rock, budget):
 
 
 def _wrap_uvs(rock, centres, mat, k=1.0):
-    """Side faces wrap round the nearest bluff centre (u = arc length, v = height); ledges
-    and tops take a plan projection. Matches the blockout's wrapped rock UVs."""
-    scale = materials.SPEC[mat].scale * k  # big rocks: big texture, like their fractures
+    """Dominant-plane UVs preserve physical texel density on overhangs and concave cliffs."""
+    scale = materials.SPEC[mat].scale * min(k, 1.5)
     me = rock.data
     uv = me.uv_layers.get('UVMap') or me.uv_layers.new(name='UVMap')
     for poly in me.polygons:
-        loops = list(poly.loop_indices)
-        pts = [me.vertices[me.loops[li].vertex_index].co for li in loops]
-        if abs(poly.normal.z) > 0.55:  # slopes too: a wrap stretches v on them
-            for li, p in zip(loops, pts):
-                uv.data[li].uv = (p.x / scale, p.y / scale)
-            continue
-        c = poly.center
-        cx, cy = min(centres, key=lambda k: (c.x - k[0]) ** 2 + (c.y - k[1]) ** 2)
-        a0 = math.atan2(pts[0].y - cy, pts[0].x - cx)
-        for li, p in zip(loops, pts):
-            a = math.atan2(p.y - cy, p.x - cx)
-            a += round((a0 - a) / (2 * math.pi)) * 2 * math.pi  # no wrap seam inside a face
-            r = math.hypot(p.x - cx, p.y - cy)
-            uv.data[li].uv = (a * max(r, 0.3) / scale, p.z / scale)
+        n = poly.normal
+        axis = max(range(3), key=lambda i: abs(n[i]))
+        for li in poly.loop_indices:
+            p = me.vertices[me.loops[li].vertex_index].co
+            if axis == 2:
+                u, v = p.x * (1 if n.z >= 0 else -1), p.y
+            elif axis == 1:
+                u, v = p.x * (-1 if n.y >= 0 else 1), p.z
+            else:
+                u, v = p.y * (1 if n.x >= 0 else -1), p.z
+            uv.data[li].uv = (u / scale, v / scale)
 
 
 def _bake_occlusion(rock, samples):
@@ -179,7 +175,7 @@ def _bake_occlusion(rock, samples):
     scene.world.light_settings.distance = ao_distance
     for d in col.data:
         ao = d.color[0]
-        v = 0.42 + 0.58 * ao
+        v = 0.60 + 0.40 * ao
         d.color = (v, v, v, 1.0)
 
 
@@ -198,7 +194,10 @@ def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cl
     rock = _split_rock(obj, mat)
     if rock is None:
         return 0, 0
-    budget = max(blockout, floor if detailed() else blockout)
+    limit = MODULE_TRIS if detailed() else MODULE_TRIS_LOD1
+    architecture = sum(len(p.vertices) - 2 for p in obj.data.polygons)
+    assert architecture < limit - 1000, f'{obj.name}: architecture alone exhausts {limit} triangles'
+    budget = min(max(blockout, floor if detailed() else blockout), limit - architecture - 64)
     # Voxel scales with the rock (a 20 m mountain wall would otherwise remesh into millions).
     size = Vector(rock.dimensions).length
     voxel = max(0.045 if detailed() else 0.08, size / (110 if detailed() else 45))
@@ -213,6 +212,5 @@ def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cl
     assert sculpted <= budget * 1.02, f'{obj.name}: sculpted rock {sculpted} > budget {budget}'
     _join(obj, rock)
     total = sum(len(p.vertices) - 2 for p in obj.data.polygons)
-    limit = MODULE_TRIS if detailed() else MODULE_TRIS_LOD1
     assert total <= limit, f'{obj.name}: {total} tris > {limit}'
     return blockout, sculpted
