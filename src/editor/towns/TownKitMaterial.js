@@ -16,6 +16,7 @@ import {
   parallaxDirection,
   positionGeometry,
   positionLocal,
+  screenCoordinate,
   sin,
   smoothstep,
   step,
@@ -128,7 +129,7 @@ export function createTownKitMaterial(atlas, look) {
   const material = new THREE.MeshStandardNodeMaterial({ name: `TownKit ${look.key}` });
   // The kit has open panes (lunettes, oriel facets, roof cheeks) authored one-sided.
   material.side = THREE.DoubleSide;
-  material.alphaHash = atlas.row('M_hold_mist') !== null;
+  material.alphaToCoverage = true;
   material.userData.townKit = { layers, tints, kinds, relief, snow };
   writeLook(material, atlas, look);
 
@@ -142,10 +143,8 @@ export function createTownKitMaterial(atlas, look) {
   const isRole = (value) => float(1).sub(clamp(role.sub(value).abs(), 0, 1));
   const seed = seedChannels();
   const place = positionLocal;
-  const mist = isRole(ROLE.mist);
   const mistEdge = float(1).sub(uv().sub(vec2(0.5)).length().mul(2)).clamp(0, 1);
   const mistDrift = sin(time.mul(1.2).add(place.x.mul(2)).add(place.y)).mul(0.25).add(0.75);
-  material.opacityNode = mix(float(1), mistEdge.mul(mistEdge).mul(mistDrift).mul(0.16), mist);
 
   material.positionNode = positionLocal.add(wobble(positionLocal)).add(swayOffset(data.y));
   // Shadow cascades re-run the vertex stage for every town vertex: they get the
@@ -161,7 +160,19 @@ export function createTownKitMaterial(atlas, look) {
   const flow = isRole(ROLE.water).add(isRole(ROLE.foam));
   const st = base.sub(parallaxDirection.xy.mul(reliefHeight.sub(0.45).mul(surface.z).mul(townKitShared.reliefScale)))
     .add(vec2(0, time.mul(-0.6)).mul(flow));
-  const laid = texture(atlas.albedo, st).depth(row.x).rgb;
+  const albedoSample = texture(atlas.albedo, st).depth(row.x);
+  const laid = albedoSample.rgb;
+  const flame = isRole(ROLE.flame);
+  const flicker = sin(time.mul(7).add(place.x.mul(3)).add(place.y.mul(2))).mul(0.12).add(0.88);
+  // Only spray pixels pay for dithering. Opaque town walls avoid a global alpha-hash pass.
+  material.opacityNode = Fn(() => {
+    If(role.equal(ROLE.mist), () => {
+      const threshold = sin(screenCoordinate.x.mul(12.9898).add(screenCoordinate.y.mul(78.233))).mul(43758.5453).fract();
+      mistEdge.mul(mistEdge).mul(mistDrift).mul(0.16).lessThan(threshold).discard();
+    });
+    If(role.equal(ROLE.flame), () => { albedoSample.a.lessThan(0.12).discard(); });
+    return mix(float(1), albedoSample.a, flame);
+  })();
   // A second tap of the same stones, turned and rescaled, blended by noise (as
   // SettlementPavingMaterial): no two stretches of a street are alike.
   const turned = vec2(st.x.mul(0.8).sub(st.y.mul(0.6)), st.x.mul(0.6).add(st.y.mul(0.8))).mul(0.73).add(vec2(0.37, 0.71));
@@ -231,7 +242,7 @@ export function createTownKitMaterial(atlas, look) {
   const roughness = mix(wet.roughness, float(0.62), snowCover).add(wear.mul(0.05)).add(crevice.mul(0.08));
   material.roughnessNode = filterSpecularRoughness(roughness, normalSample.mul(2).sub(1).mul(vec3(strength, strength, 1)));
   material.metalnessNode = mix(row.w, float(0), snowCover);
-  material.emissiveNode = sample.mul(tint.rgb).mul(tint.w);
+  material.emissiveNode = sample.mul(tint.rgb).mul(tint.w).mul(mix(float(1), flicker, flame));
   return material;
 }
 

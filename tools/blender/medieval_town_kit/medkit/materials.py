@@ -111,6 +111,7 @@ SPEC = {
     'hold_soot': Spec(color=(0.08, 0.075, 0.065), rough=1.0),
     'hold_mist': Spec(color=(0.58, 0.70, 0.73), rough=1.0, fit=True, opacity=0.10),
     'hold_warm_stone': Spec('dressed', 1.2, 0.85, tint=(1.0, 0.72, 0.42), emission=0.16, normal=0.8),
+    'hold_flame': Spec('hold_flame', 1.0, 1.0, emission=3.2, normal=0, fit=True),
     'foliage_pine': Spec('foliage', 1.5, 0.9, tint=(0.52, 0.66, 0.60)),
     # Plain blown glass for frontier and hold windows (the lattice pane is a lowland look).
     'glass_clear': Spec(color=(0.11, 0.12, 0.12), rough=0.1, emission=0.35, glow_tint=(1.0, 0.62, 0.30)),
@@ -192,6 +193,8 @@ def _build(name, spec, images):
         nmap.inputs['Strength'].default_value = spec.normal
         links.new(ntex.outputs['Color'], nmap.inputs['Color'])
         links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
+        if name == 'hold_flame':
+            links.new(tex.outputs['Alpha'], bsdf.inputs['Alpha'])
     else:
         solid = nodes.new('ShaderNodeRGB')
         solid.outputs[0].default_value = _linear(spec.color)

@@ -113,6 +113,45 @@ colours are tints (`baseColorFactor`) over one cloth texture.
 
 ## Levels of detail
 
+### Stonehold art review
+
+Open `/stonehold-qa.html` on the running app for the actual WebGPU town material,
+near/far models, daylight/dusk and an orbitable close view. Run its hardware check:
+
+```
+node scripts/run-stonehold-qa.mjs --headed
+```
+
+The twelve Stonehold recipes live in `stonehold_citadels.py`,
+`stonehold_sanctums.py` and `stonehold_mountains.py`; `stonehold_formations.py`
+owns their registry, shared scale and derived assembly. Shared rock, architecture,
+water, fire and dressing builders keep generated detail inside each module mesh.
+The eight inhabited formations use 5 metres per authoring unit, including their
+UV density and semantic collision. They are reserved as outskirts landmarks,
+not placed as small yard props. Mountain shell pieces already use metres.
+
+`medkit/stonehold_surfaces.py` writes the shared weathered bronze, dressed basalt,
+flow, foam, flame and roughness maps. The runtime stores roughness in the existing
+normal array's alpha channel. Spray dithering is restricted to spray fragments;
+the water does not sample scene depth or require a refraction copy.
+
+For deterministic geometry checks and matching photographs (Blender executable
+as in the build command above):
+
+```
+blender -b --factory-startup --python-exit-code 1 --python tools/blender/medieval_town_kit/stonehold_review.py -- --repeat
+blender -b --factory-startup --python-exit-code 1 --python tools/blender/medieval_town_kit/stonehold_review.py -- --lod1 --no-render
+```
+
+The review checks finite, nondegenerate geometry and the 48k near / 12k far
+triangle limits. `--repeat` compares geometry, UVs and baked vertex shading.
+`--baseline <original-kit.glb>` adds matching before photographs of the Twin
+Outcrop and Horned Sanctum. Previews and metrics go to
+`assets-src/medieval-town-kit/previews/stonehold-aaa`; scratch GLBs and Blender
+files go to `tmp/stonehold-aaa`. Rebuild both public kits with the normal build
+commands after changing recipes. GLBs remain generated files under the existing
+repository ignore policy.
+
 `-- --lod1` builds the kit again with `config.LOD = 1` and writes only
 `medieval_kit_lod1.glb`, without images. The far kit has the same module names,
 but no chamfers, brackets, voussoirs, lantern finials or flower detail, and its

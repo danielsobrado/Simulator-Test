@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stonehold asset review</title>
+  <link rel="icon" href="data:," />
+  <style>
+    body { margin:0; background:#27323e; color:#ece6d8; font:14px system-ui,sans-serif; }
+    canvas { display:block; width:100vw; height:100vh; }
+    form { position:fixed; left:20px; top:20px; display:flex; gap:12px; flex-wrap:wrap; padding:16px; background:#17212be8; border:1px solid #65727a; border-radius:8px; }
+    label { display:flex; gap:6px; align-items:center; }
+    select { color:inherit; background:#27323e; padding:6px; border:1px solid #65727a; border-radius:4px; }
+    output { position:fixed; bottom:20px; left:20px; padding:10px; background:#17212be8; }
+  </style>
+</head>
+<body>
+  <form aria-label="Asset review controls">
+    <label>Object <select id="module"></select></label>
+    <label>Detail <select id="lod"><option value="0">Near</option><option value="1">Far</option></select></label>
+    <label>Light <select id="light"><option value="day">Mountain daylight</option><option value="dusk">Forge dusk</option></select></label>
+    <label>View <select id="view"><option value="hero">Overview</option><option value="front">Front</option><option value="detail">Close view</option></select></label>
+  </form>
+  <output id="status">Loading Stonehold…</output>
+  <script type="module" src="/src/editor/performance/qa/StoneholdAssetQa.js"></script>
+</body>
+</html>

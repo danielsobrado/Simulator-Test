@@ -1,8 +1,8 @@
 """Turns a module's blockout rock into sculpted, game-budget rock (Stonehold AAA pass).
 
 The procedural crag blocks (stonehold_parts) are the blockout. Their faces are split off,
-voxel-remeshed into one solid, displaced with columnar fracture noise, decimated back to
-no more triangles than the blockout rock had, smoothed by angle, wrapped with the tiled
+voxel-remeshed into one solid, displaced with columnar fracture noise, decimated into
+the module's triangle budget, smoothed by angle, wrapped with the tiled
 rock texture, given baked ambient occlusion in the shared 'Col' vertex shading, and joined
 back. The game multiplies 'Col' into the colour (TownKitMaterial data.x), so the baked
 occlusion ships without per-asset textures.
@@ -17,8 +17,7 @@ from mathutils import Vector
 from . import materials
 from .config import detailed
 
-# Triangle budgets: sculpted rock gets at least ROCK_FLOOR at LOD0 (never fewer than the
-# blockout had); a whole formation stays under MODULE_TRIS (LOD0) / MODULE_TRIS_LOD1.
+# Prefer ROCK_FLOOR for near rock; the complete module's budget takes precedence.
 ROCK_FLOOR = 12000
 MODULE_TRIS = 48000  # LOD0 only: bevels, lanterns and ribbons are not built at LOD1
 MODULE_TRIS_LOD1 = 12000
@@ -153,7 +152,7 @@ def _wrap_uvs(rock, centres, mat, k=1.0):
             uv.data[li].uv = (u / scale, v / scale)
 
 
-def _bake_occlusion(rock, samples):
+def _bake_occlusion(rock, samples, architecture):
     """Cycles AO into the 'Col' vertex shading, remapped so open faces stay near 1."""
     me = rock.data
     for attr in list(me.color_attributes):
@@ -168,11 +167,20 @@ def _bake_occlusion(rock, samples):
     # Short rays: crevices and deck overhangs only, never neighbouring catalog modules.
     ao_distance = scene.world.light_settings.distance
     scene.world.light_settings.distance = 0.35
-    with bpy.context.temp_override(active_object=rock, object=rock, selected_objects=[rock],
-                                   selected_editable_objects=[rock]):
-        bpy.ops.object.bake(type='AO', target='VERTEX_COLORS')
-    scene.render.engine = engine
-    scene.world.light_settings.distance = ao_distance
+    # Catalog modules share the origin until layout. They must never occlude one another.
+    hidden = {obj: obj.hide_render for obj in scene.objects if obj.type == 'MESH' and obj not in (rock, architecture)}
+    for obj in hidden:
+        obj.hide_render = True
+    try:
+        with bpy.context.temp_override(active_object=rock, object=rock, selected_objects=[rock],
+                                       selected_editable_objects=[rock]):
+            result = bpy.ops.object.bake(type='AO', target='VERTEX_COLORS')
+            assert result == {'FINISHED'}, f'{rock.name}: AO bake failed'
+    finally:
+        for obj, hide in hidden.items():
+            obj.hide_render = hide
+        scene.render.engine = engine
+        scene.world.light_settings.distance = ao_distance
     for d in col.data:
         ao = d.color[0]
         v = 0.60 + 0.40 * ao
@@ -207,7 +215,7 @@ def sculpt_rock(obj, seed, centres=((0.0, 0.0),), floor=ROCK_FLOOR, mat='rock_cl
     _drop_underside(rock)
     _decimate(rock, budget)
     _wrap_uvs(rock, centres, mat, k)
-    _bake_occlusion(rock, 16 if detailed() else 4)
+    _bake_occlusion(rock, 16 if detailed() else 4, obj)
     sculpted = sum(len(p.vertices) - 2 for p in rock.data.polygons)
     assert sculpted <= budget * 1.02, f'{obj.name}: sculpted rock {sculpted} > budget {budget}'
     _join(obj, rock)

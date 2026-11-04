@@ -20,6 +20,7 @@ export default defineConfig({
       input: {
         app: path.resolve(root, 'index.html'),
         workshopQa: path.resolve(root, 'workshop-qa.html'),
+        stoneholdQa: path.resolve(root, 'stonehold-qa.html'),
       },
     },
   },

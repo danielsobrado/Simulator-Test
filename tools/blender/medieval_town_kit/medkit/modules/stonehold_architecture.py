@@ -7,6 +7,7 @@ from mathutils import Matrix, Vector
 from ..config import detailed
 from ..mesh import MeshBuilder
 from .stonehold_rock import STONE_BEVEL, ring_pts, loft_rings, jagged_cliff_tier, _angle_in_ranges
+from .stonehold_fire import flame
 
 def dwarven_terrace_deck(b, cx, cy, z0, z_deck, rx, ry, seed=1, sides=8,
                          parapet=True, gold_trim=True, buttresses=True,
@@ -123,11 +124,7 @@ def dwarven_brazier(b, cx, cy, z0, scale=1.0, tall=False):
           (cx + r_bowl, cy + r_bowl, z0 + h_ped + 0.034 * s), 'iron', bevel=0)
     b.box((cx - r_ped, cy - r_ped, z0 + h_ped + 0.025 * s),
           (cx + r_ped, cy + r_ped, z0 + h_ped + 0.052 * s), 'firelight', bevel=0)
-    b.blob((cx, cy, z0 + h_ped + 0.075 * s), 0.042 * s, 'glow',
-           subdiv=1, squash=(0.75, 0.75, 1.85), jitter=0.25, seed=int(abs(cx * 100 + cy * 37)) + 11)
-    if detailed():
-        b.blob((cx + 0.018 * s, cy - 0.014 * s, z0 + h_ped + 0.065 * s), 0.028 * s, 'firelight',
-               subdiv=1, squash=(0.7, 0.7, 1.6), jitter=0.2, seed=int(abs(cx * 73 + cy * 19)) + 17)
+    flame(b, (cx, cy, z0 + h_ped + 0.04 * s), 0.06 * s, 0.14 * s)
 
 
 def dwarven_stair_flight(b, p_start, p_end, width=0.38, steps=8, cheek_walls=True,
@@ -154,8 +151,14 @@ def dwarven_stair_flight(b, p_start, p_end, width=0.38, steps=8, cheek_walls=Tru
         horiz = Vector((p1.x - p0.x, p1.y - p0.y, 0.0))
     b.beam(p0 - Vector((0, 0, 0.07)), p1 - Vector((0, 0, 0.07)),
            right, (-hw, hw), 0.12, 'stone_basalt', bevel=0)
+    # A load-bearing retaining wedge anchors the flight into the host cliff below.
+    foundation_z = max(0, min(p0.z, p1.z) - 0.50)
+    side = right * (hw * 0.78)
+    a, c = p0 - side, p1 - side
+    b.extrude([(a.x, a.y, foundation_z), (a.x, a.y, a.z - 0.04),
+               (c.x, c.y, c.z - 0.04), (c.x, c.y, foundation_z)], right * (hw * 1.56), 'stone_basalt')
     for landing in (p0, p1):
-        b.box((landing.x - hw * 1.15, landing.y - hw * 1.15, max(0, landing.z - 0.16)),
+        b.box((landing.x - hw * 1.15, landing.y - hw * 1.15, max(0, landing.z - 0.05)),
               (landing.x + hw * 1.15, landing.y + hw * 1.15, landing.z + 0.01), 'stone_basalt', bevel=STONE_BEVEL)
     for i in range(n_steps):
         t0 = i / n_steps
@@ -398,6 +401,13 @@ def summit_citadel_hall(b, cx, cy, z0, height=0.62, rx=0.60, ry=0.54, seed=1,
         px = cx + math.sin(dyaw) * (rx * 0.92)
         py = cy - math.cos(dyaw) * (ry * 0.92)
         cliff_portal_alcove(b, px, py, z0 + 0.05, yaw=dyaw, width=0.34, height=min(0.48, height * 0.76))
+    # Exhaust and inspection access make the hall read as inhabited mountain industry.
+    if detailed():
+        vy = cy + ry * 0.48
+        vz = z0 + height * 1.05
+        b.box((cx - 0.07, vy - 0.06, vz), (cx + 0.07, vy + 0.06, vz + 0.20), 'stone_basalt', bevel=0.007)
+        b.box((cx - 0.047, vy - 0.064, vz + 0.12), (cx + 0.047, vy - 0.06, vz + 0.17), 'shadow', bevel=0)
+        b.box((cx - 0.085, vy - 0.075, vz + 0.20), (cx + 0.085, vy + 0.075, vz + 0.23), 'stone_dressed', bevel=0.005)
 
 
 def summit_beacon_fort(b, cx, cy, z0, height=0.34, radius=0.50, seed=1):
@@ -461,16 +471,6 @@ def summit_beacon_fort(b, cx, cy, z0, height=0.34, radius=0.50, seed=1):
     # Multi-tongued roaring signal fire (warm ember base + sharp flickering tongues)
     b.blob((cx, cy, z_deck + 0.14), r_pit * 0.48, 'firelight',
            subdiv=1, squash=(1.0, 1.0, 1.1), jitter=0.25, seed=seed + 300)
-    b.blob((cx, cy, z_deck + 0.20), r_pit * 0.36, 'glow',
-           subdiv=1, squash=(0.72, 0.72, 1.95), jitter=0.28, seed=seed + 301)
-    if detailed():
-        for k, (ox, oy, sc) in enumerate((
-            (-0.045, -0.03, 0.28),
-            (0.045, 0.025, 0.26),
-            (0.0, 0.048, 0.25),
-            (-0.02, 0.035, 0.22),
-        )):
-            b.blob((cx + ox, cy + oy, z_deck + 0.18), r_pit * sc, 'glow',
-                   subdiv=1, squash=(0.68, 0.68, 2.0), jitter=0.25, seed=seed + 310 + k)
+    flame(b, (cx, cy, z_deck + 0.12), r_pit * 0.65, r_pit * 1.8)
 
 

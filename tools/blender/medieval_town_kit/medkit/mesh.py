@@ -251,7 +251,8 @@ class MeshBuilder:
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
             weld = {v for f in bm.faces if f.smooth for v in f.verts}
-            bmesh.ops.remove_doubles(bm, verts=list(weld), dist=1e-4)
+            # Stable weld order avoids float-rounding drift from BMVert's address hash.
+            bmesh.ops.remove_doubles(bm, verts=sorted(weld, key=lambda v: v.index), dist=1e-4)
             bm.to_mesh(mesh)
             bm.free()
         mesh.validate()

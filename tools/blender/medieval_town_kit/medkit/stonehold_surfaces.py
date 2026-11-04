@@ -9,7 +9,7 @@ from .texture_patterns import fbm, normal_from_height, smooth
 from .textures import _save
 
 
-VERSION = 2
+VERSION = 4
 
 
 def _rgb(image):
@@ -75,4 +75,19 @@ def extend(images):
         _image('hold_foam_normal', normal_from_height(grain * 0.2, 0.25)),
         _image('hold_foam_roughness', 0.85 + grain * 0.15),
     )
+    # A feathered emission/alpha sheet, not a solid faceted flame mesh.
+    x = u * 2 - 1
+    flame_width = np.maximum(0.001, (1 - v) ** 0.72 * (0.75 + np.sin(v * 17) * 0.12))
+    alpha = smooth(flame_width, flame_width * 0.65, np.abs(x)) * smooth(0, 0.06, v) * smooth(1, 0.94, v)
+    core = smooth(0.65, 0.08, np.abs(x) + v * 0.55)
+    flame_colour = np.zeros((n, n, 3), np.float32) + (0.95, 0.15, 0.012)
+    flame_colour = flame_colour * (1 - core[..., None]) + np.array((1.0, 0.82, 0.27)) * core[..., None]
+    path = os.path.join(TEXTURE_DIR, f'hold_flame_albedo_v{VERSION}.png')
+    flame = bpy.data.images.new('T_hold_flame', n, n, alpha=True)
+    flame.colorspace_settings.name = 'sRGB'
+    flame.pixels.foreach_set(np.concatenate((flame_colour, alpha[..., None]), axis=2).astype(np.float32).ravel())
+    flame.filepath_raw, flame.file_format = path, 'PNG'
+    flame.save()
+    flat = np.zeros((n, n, 3), np.float32) + (0.5, 0.5, 1.0)
+    images['hold_flame'] = (flame, _image('hold_flame_normal', flat))
     return images

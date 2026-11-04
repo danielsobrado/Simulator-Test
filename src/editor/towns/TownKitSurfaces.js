@@ -14,7 +14,7 @@
  * Pure data.
  */
 
-export const ROLE = Object.freeze({ other: 0, stone: 1, timber: 2, roof: 3, plaster: 4, banner: 5, paving: 6, cobble: 7, water: 8, foam: 9, mist: 10 });
+export const ROLE = Object.freeze({ other: 0, stone: 1, timber: 2, roof: 3, plaster: 4, banner: 5, paving: 6, cobble: 7, water: 8, foam: 9, mist: 10, flame: 11 });
 
 const DEFAULT = Object.freeze({ role: ROLE.other, normal: 1, cavity: 0.2, parallax: 0, gain: 1 });
 
@@ -38,6 +38,7 @@ export const SURFACES = Object.freeze({
   M_hold_bronze: { role: ROLE.other, normal: 0.45, cavity: 0.15, parallax: 0 },
   M_hold_mist: { role: ROLE.mist, normal: 0, cavity: 0, parallax: 0 },
   M_hold_warm_stone: { role: ROLE.stone, normal: 0.8, cavity: 0.25, parallax: 0.006 },
+  M_hold_flame: { role: ROLE.flame, normal: 0, cavity: 0, parallax: 0, gain: 1 },
   // Natural crags and boulders (sculpted, scanned rock_face_03).
   M_rock: { role: ROLE.stone, normal: 2.2, cavity: 0.7, parallax: 0.026 },
   M_stone_flag: { role: ROLE.paving, normal: 1.6, cavity: 0.6, parallax: 0.016 },
