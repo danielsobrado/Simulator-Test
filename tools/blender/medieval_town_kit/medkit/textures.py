@@ -253,6 +253,14 @@ def _save(name, rgb, path, non_color):
     return img
 
 
+def _load_cached(name, path, non_color):
+    """Load a previously baked texture PNG instead of regenerating it."""
+    img = bpy.data.images.load(path, check_existing=True)
+    img.name = name
+    img.colorspace_settings.name = 'Non-Color' if non_color else 'sRGB'
+    return img
+
+
 def generate(out_dir, seed=7):
     """Returns {pattern: (albedo_image, normal_image)}. A scanned surface (scans.py)
     replaces the procedural pattern of the same name when its files are present;
@@ -263,7 +271,17 @@ def generate(out_dir, seed=7):
     # Appended last so the earlier patterns keep their seeds.
     patterns.update(REGIONAL_PATTERNS)
     images = {}
+    rebake = os.environ.get('MEDKIT_REBAKE_TEXTURES') == '1'
     for i, (name, (fn, size)) in enumerate(patterns.items()):
+        p_albedo = os.path.join(out_dir, f'{name}_albedo.png')
+        p_normal = os.path.join(out_dir, f'{name}_normal.png')
+        if not rebake and os.path.exists(p_albedo) and os.path.exists(p_normal):
+            images[name] = (
+                _load_cached(f'T_{name}_albedo', p_albedo, False),
+                _load_cached(f'T_{name}_normal', p_normal, True),
+            )
+            print(f'[kit] texture {name} cached')
+            continue
         p_seed = seed + i * 101
         scanned = scans.load(name)
         if scanned:
