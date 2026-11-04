@@ -306,7 +306,10 @@ export function buildSurfaceMaskPixels({
         const density = blurredDensity[haloIndex] * (grass / 255);
         grass = Math.round(grass * grassPatchCover(originX + localX + 0.5, originZ + localZ + 0.5, density, worldSeed));
       }
-      mask[offset + 1] = grass;
+      // A bank cell partly under water keeps grass by its dry share: the habitat
+      // edge alone grew blades out across the shallows of a gently shelving bank.
+      const dry = 1 - habitat.water[haloIndex];
+      mask[offset + 1] = Math.round(grass * dry * dry);
       mask[offset + 2] = Math.round(habitat.water[haloIndex] * 255);
       mask[offset + 3] = 255;
       if (snowCoverOut) snowCoverOut[cellIndex] = Math.round((snowCover?.[haloIndex] ?? 0) * 255);
