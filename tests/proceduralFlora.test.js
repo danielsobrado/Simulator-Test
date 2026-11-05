@@ -102,3 +102,10 @@ test('geometry is deterministic, so a chunk rebuilds identically', () => {
     second.dispose();
   }
 });
+
+test('driftwood lies along the ground, bedded in, instead of arching over it', () => {
+  const radius = 0.05;
+  const box = bounds(createDriftwoodGeometry({ length: 1.6, radius, bend: 0.18 }));
+  assert.ok(box.min.y < -radius * 0.3 && box.min.y > -radius, `bedded: bottom at ${box.min.y}`);
+  assert.ok(box.max.y < radius * 1.5, `no arch: top at ${box.max.y}`);
+});

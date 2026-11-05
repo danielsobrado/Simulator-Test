@@ -22,13 +22,17 @@ import * as THREE from 'three/webgpu';
 /** Deterministic small-twig geometry: a tube along a bent curve, as the donor's. */
 export function createDriftwoodGeometry({ length = 2.4, radius = 0.055, bend = 0.18 } = {}) {
   const half = length / 2;
+  // Bent along the ground only: lifting the middle by the bend arched the log a
+  // hand's breadth over the sand, a stick floating between its two ends.
   const curve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-half, 0, 0),
-    new THREE.Vector3(-half * 0.35, bend * 0.4, bend),
-    new THREE.Vector3(half * 0.35, bend * 0.6, -bend * 0.6),
+    new THREE.Vector3(-half * 0.35, 0, bend),
+    new THREE.Vector3(half * 0.35, 0, -bend * 0.6),
     new THREE.Vector3(half, 0, 0),
   ]);
   const geometry = new THREE.TubeGeometry(curve, 8, radius, 5, false);
+  // Bedded a third of its thickness into the sand rather than balanced on it.
+  geometry.translate(0, radius * 0.35, 0);
   geometry.computeBoundingSphere();
   return geometry;
 }
