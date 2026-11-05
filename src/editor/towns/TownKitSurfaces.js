@@ -22,11 +22,14 @@ export const SURFACES = Object.freeze({
   M_stone: { role: ROLE.stone, normal: 2.35, cavity: 0.78, parallax: 0.036 },
   M_stone_ashlar: { role: ROLE.stone, normal: 2.0, cavity: 0.65, parallax: 0.024 },
   // One tooled block per piece: its chamfer, chisel striations, and pits draw it.
-  M_stone_dressed: { role: ROLE.stone, normal: 1.85, cavity: 0.45, parallax: 0.008 },
+  // Kept below 1: at full gain the albedo lift pushed it into the tone curve's shoulder,
+  // where every piece clipped to the same cream and the per-piece tones vanished.
+  M_stone_dressed: { role: ROLE.stone, normal: 1.85, cavity: 0.45, parallax: 0.008, gain: 0.8 },
   // Stonehold granite and basalt read near-black on shaded faces at their authored
   // albedo; lifted so dark stone still shows its courses out of the sun.
   M_stone_granite: { role: ROLE.stone, normal: 2.2, cavity: 0.62, parallax: 0.028, gain: 1.35 },
-  M_stone_basalt: { role: ROLE.stone, normal: 0.9, cavity: 0.3, parallax: 0.006, gain: 1.1 },
+  // Basalt shares the granite courses, tinted dark: the same relief so its joints read.
+  M_stone_basalt: { role: ROLE.stone, normal: 2.2, cavity: 0.62, parallax: 0.028, gain: 1.2 },
   M_brick: { role: ROLE.stone, normal: 2.2, cavity: 0.72, parallax: 0.024 },
   // Own role: a small repeating scan, so the material lays it in ground space (TownKitMaterial).
   M_cobble: { role: ROLE.cobble, normal: 2.15, cavity: 0.72, parallax: 0.032 },

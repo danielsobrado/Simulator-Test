@@ -130,7 +130,7 @@ The eight inhabited formations use 5 metres per authoring unit, including their
 UV density and semantic collision. They are reserved as outskirts landmarks,
 not placed as small yard props. Mountain shell pieces already use metres.
 
-`medkit/stonehold_surfaces.py` writes the shared weathered bronze, dressed basalt,
+`medkit/stonehold_surfaces.py` writes the shared weathered bronze,
 flow, foam, flame and roughness maps. The runtime stores roughness in the existing
 normal array's alpha channel. Spray dithering is restricted to spray fragments;
 the water does not sample scene depth or require a refraction copy.

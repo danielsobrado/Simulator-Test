@@ -176,7 +176,7 @@ def dwarven_stair_flight(b, p_start, p_end, width=0.38, steps=8, cheek_walls=Tru
         pts_top = [Vector((p.x, p.y, z_step)) for p in pts_bot]
         loft_rings(b, pts_bot, pts_top, 'stone_dressed',
                    cap_bot=True, cap_top=True, cap_mat='stone_dressed',
-                   tone=0.92 + 0.04 * (i % 3))
+                   tone=0.80 + 0.06 * ((i * 5) % 4))  # no two neighbouring treads match
 
     if cheek_walls:
         cw = 0.032

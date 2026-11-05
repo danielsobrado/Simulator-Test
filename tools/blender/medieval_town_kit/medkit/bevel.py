@@ -16,7 +16,7 @@ DEFAULT_BEVEL = {'timber': 0.022, 'wood_trim': 0.014, 'stone': 0.03, 'stone_dres
                  'timber_dark': 0.03, 'log': 0.05, 'stone_dark': 0.035, 'stone_granite': 0.03,
                  'stone_basalt': 0.03}
 TONED = {'timber': (0.82, 1.08), 'wood_trim': (0.88, 1.06), 'carved_wood': (0.9, 1.06),
-         'stone': (0.84, 1.08), 'stone_dressed': (0.84, 1.06), 'brick': (0.86, 1.08),
+         'stone': (0.84, 1.08), 'stone_dressed': (0.76, 1.06), 'brick': (0.86, 1.08),
          'planks': (0.86, 1.06), 'roof': (0.92, 1.05), 'roof_terracotta': (0.90, 1.06),
          'clapboard': (0.86, 1.05), 'bark': (0.85, 1.05),
          'thatch': (0.8, 1.08), 'hide': (0.82, 1.1), 'bone': (0.88, 1.04),

@@ -80,7 +80,9 @@ SPEC = {
     'sod': Spec('sod', 2.0, 0.96, normal=1.8),
     # Stonehold: mined granite courses, charcoal basalt dressings, dulled bronze.
     'stone_granite': Spec('granite', 3.0, 0.84, normal=2.2),
-    'stone_basalt': Spec('hold_basalt', 1.2, 0.88, normal=0.85),
+    # Basalt is laid in smaller, darker courses of the same masonry: a jointless face
+    # read as grey plastic at gameplay distance.
+    'stone_basalt': Spec('granite', 2.0, 0.86, normal=2.2, tint=(0.58, 0.62, 0.70)),
     'bronze': Spec(color=(0.26, 0.22, 0.14), rough=0.55, metal=0.85),
     # Regional ground and greenery: packed earth lanes, frost-bitten grass, dark conifers.
     'earth': Spec('earth', 2.0, 0.95, normal=1.8),

@@ -52,13 +52,6 @@ def extend(images):
         _image('hold_bronze_normal', normal_from_height(grain * 0.12, 0.18)),
         _image('hold_bronze_roughness', 0.62 + patina * 0.25 + grain * 0.1),
     )
-    # Dressed basalt has tooling, not the mortared granite courses of a wall texture.
-    dressed, normal, rough = images['dressed']
-    col = _rgb(dressed)
-    lum = col @ np.array((0.3, 0.55, 0.15))
-    basalt = lum[..., None] * np.array((0.47, 0.51, 0.56))
-    images['hold_basalt'] = (_image('hold_basalt_albedo', basalt, False), normal, rough)
-
     # UV v follows the flow. Long fine ripples move in the runtime's existing opaque pass.
     ripple = np.sin(2 * np.pi * (u * 16 + 0.25 * np.sin(v * 2 * np.pi))) * 0.12
     ripple += np.sin(2 * np.pi * (u * 29 - v * 3)) * 0.05
