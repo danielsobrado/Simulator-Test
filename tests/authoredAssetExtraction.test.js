@@ -95,3 +95,25 @@ test('the heavy rooted aquatic plants are confined to wetland', async () => {
     assert.deepEqual(variant.tileIds, [12], `${variant.scene} must stay wetland-only`);
   }
 });
+
+test('biome understory kits differentiate all land biomes and regional character districts', async () => {
+  const config = yaml.load(await readFile(path.join(ROOT, 'editor.config.yaml'), 'utf8'));
+  const variants = config.stylizedSurface.assets.groundDetailVariants;
+  const groundTileIds = new Set(config.stylizedSurface.groundDetails.tileIds);
+
+  for (const requiredBiome of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 32]) {
+    assert.ok(groundTileIds.has(requiredBiome), `groundDetails.tileIds must include biome ${requiredBiome}`);
+    const matching = variants.filter((v) => Array.isArray(v.tileIds) && v.tileIds.includes(requiredBiome));
+    assert.ok(matching.length >= 2, `biome ${requiredBiome} must have at least 2 dedicated understory variants`);
+  }
+
+  for (const kitDir of ['arid', 'meadow', 'forest', 'tropical', 'boreal', 'swamp']) {
+    const kitVariants = variants.filter((v) => v.scene.startsWith(`/assets/ground/${kitDir}/`));
+    assert.ok(kitVariants.length >= 3, `understory kit ${kitDir} must publish at least 3 runtime variants`);
+  }
+
+  const characters = new Set(variants.map((v) => v.character).filter(Boolean));
+  for (const district of ['meadow', 'forest', 'scrub', 'rocky']) {
+    assert.ok(characters.has(district), `regional district character '${district}' must be represented in groundDetailVariants`);
+  }
+});

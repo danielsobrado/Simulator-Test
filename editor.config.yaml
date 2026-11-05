@@ -880,6 +880,234 @@ stylizedSurface:
           - [SM_Rocks_07]
           - [SM_Rocks_10]
           - [SM_Rocks_11]
+      # --- Authored biome understory kits (tools/blender/biome_understory/) ----
+      # Arid & Stonehold Badlands kit (biomes 1, 2, 32): cacti, agave, sagebrush
+      # and weathered sandstone deadwood separated by regional character district.
+      - scene: /assets/ground/arid/desert-prickly-pear-01.glb
+        motion: woody-shrub
+        scale: 1.05
+        weight: 0.95
+        tileIds: [1, 32]
+        character: scrub
+        characterStrength: 1.8
+        canopy: open
+        sway: false
+        prototypeGroups:
+          - [desert-prickly-pear-01]
+      - scene: /assets/ground/arid/desert-agave-01.glb
+        motion: woody-shrub
+        scale: 1.1
+        weight: 0.9
+        tileIds: [1, 2, 3, 32]
+        character: rocky
+        characterStrength: 1.8
+        canopy: open
+        prototypeGroups:
+          - [desert-agave-01]
+      - scene: /assets/ground/arid/desert-sagebrush-01.glb
+        motion: woody-shrub
+        scale: 1.15
+        weight: 1.35
+        tileIds: [1, 2, 32]
+        character: scrub
+        characterStrength: 2.0
+        canopy: any
+        prototypeGroups:
+          - [desert-sagebrush-01]
+      - scene: /assets/ground/arid/badlands-deadwood-01.glb
+        motion: rigid
+        scale: 1.15
+        weight: 0.85
+        tileIds: [1, 2, 32]
+        character: rocky
+        characterStrength: 2.2
+        canopy: any
+        sway: false
+        prototypeGroups:
+          - [badlands-deadwood-01]
+      # Savanna & Meadow kit (biomes 3, 4, 6, 14): torch-lily aloes, wild lupines,
+      # moorland heather hummocks, and rocky lichen fieldstones with Scotch thistles.
+      - scene: /assets/ground/meadow/savanna-aloe-01.glb
+        motion: flexible-stem
+        scale: 1.15
+        weight: 1.1
+        tileIds: [3]
+        character: meadow
+        characterStrength: 1.9
+        canopy: open
+        prototypeGroups:
+          - [savanna-aloe-01]
+      - scene: /assets/ground/meadow/meadow-lupine-01.glb
+        motion: flexible-stem
+        scale: 1.15
+        weight: 0.95
+        tileIds: [4, 6, 14]
+        character: meadow
+        characterStrength: 2.0
+        canopy: open
+        prototypeGroups:
+          - [meadow-lupine-01]
+      - scene: /assets/ground/meadow/meadow-heather-01.glb
+        motion: woody-shrub
+        scale: 1.15
+        weight: 1.1
+        tileIds: [4, 6, 9, 14]
+        character: scrub
+        characterStrength: 1.9
+        canopy: edge
+        prototypeGroups:
+          - [meadow-heather-01]
+      - scene: /assets/ground/meadow/meadow-thistle-stone-01.glb
+        motion: woody-shrub
+        scale: 1.1
+        weight: 0.75
+        tileIds: [3, 4, 6, 14]
+        character: rocky
+        characterStrength: 2.2
+        canopy: open
+        prototypeGroups:
+          - [meadow-thistle-stone-01]
+      # Temperate & Rainforest floor kit (biomes 6, 8, 9): bracken crowns, fly-agaric
+      # & chanterelle nurse logs, peeling birch logs, and arching berry brambles.
+      - scene: /assets/ground/forest/forest-bracken-01.glb
+        motion: fern-frond
+        scale: 1.25
+        weight: 1.35
+        tileIds: [6, 8, 9]
+        character: forest
+        characterStrength: 1.8
+        canopy: core
+        prototypeGroups:
+          - [forest-bracken-01]
+      - scene: /assets/ground/forest/forest-mushrooms-01.glb
+        motion: rigid
+        scale: 1.1
+        weight: 0.7
+        tileIds: [6, 8, 9]
+        character: forest
+        characterStrength: 2.0
+        canopy: core
+        sway: false
+        prototypeGroups:
+          - [forest-mushrooms-01]
+      - scene: /assets/ground/forest/forest-birch-log-01.glb
+        motion: rigid
+        scale: 0.95
+        weight: 0.4
+        tileIds: [6, 8, 9]
+        character: forest
+        characterStrength: 1.8
+        canopy: core
+        sway: false
+        prototypeGroups:
+          - [forest-birch-log-01]
+      - scene: /assets/ground/forest/forest-berry-bramble-01.glb
+        motion: woody-shrub
+        scale: 1.15
+        weight: 1.05
+        tileIds: [4, 6, 8]
+        character: scrub
+        characterStrength: 1.8
+        canopy: edge
+        prototypeGroups:
+          - [forest-berry-bramble-01]
+      # Tropical rainforest & seasonal kit (biomes 5, 7): scarlet bromeliad rosettes,
+      # lobster-claw heliconia ginger blooms, and fenestrated Monstera clusters.
+      - scene: /assets/ground/tropical/tropical-bromeliad-01.glb
+        motion: broadleaf
+        scale: 1.2
+        weight: 1.15
+        tileIds: [5, 7]
+        character: forest
+        characterStrength: 1.8
+        canopy: core
+        prototypeGroups:
+          - [tropical-bromeliad-01]
+      - scene: /assets/ground/tropical/tropical-heliconia-01.glb
+        motion: broadleaf
+        scale: 1.25
+        weight: 1.1
+        tileIds: [5, 7]
+        character: meadow
+        characterStrength: 1.8
+        canopy: edge
+        prototypeGroups:
+          - [tropical-heliconia-01]
+      - scene: /assets/ground/tropical/tropical-monstera-01.glb
+        motion: broadleaf
+        scale: 1.25
+        weight: 1.3
+        tileIds: [5, 7, 8]
+        character: forest
+        characterStrength: 1.9
+        canopy: core
+        prototypeGroups:
+          - [tropical-monstera-01]
+      # Boreal Taiga & Arctic Tundra kit (biomes 9, 10): reindeer-lichen & lingonberry
+      # cushions, frosted granite deadfall, purple saxifrage cushions, and dwarf willow.
+      - scene: /assets/ground/boreal/taiga-berry-moss-01.glb
+        motion: woody-shrub
+        scale: 1.15
+        weight: 1.3
+        tileIds: [9, 10]
+        character: forest
+        characterStrength: 1.8
+        canopy: any
+        prototypeGroups:
+          - [taiga-berry-moss-01]
+      - scene: /assets/ground/boreal/taiga-deadfall-01.glb
+        motion: rigid
+        scale: 1.1
+        weight: 0.75
+        tileIds: [9, 10]
+        character: rocky
+        characterStrength: 2.1
+        canopy: any
+        sway: false
+        prototypeGroups:
+          - [taiga-deadfall-01]
+      - scene: /assets/ground/boreal/tundra-cushion-01.glb
+        motion: flexible-stem
+        scale: 1.15
+        weight: 1.25
+        tileIds: [10]
+        character: meadow
+        characterStrength: 1.9
+        canopy: open
+        prototypeGroups:
+          - [tundra-cushion-01]
+      - scene: /assets/ground/boreal/tundra-dwarf-willow-01.glb
+        motion: woody-shrub
+        scale: 1.2
+        weight: 1.35
+        tileIds: [9, 10]
+        character: scrub
+        characterStrength: 2.0
+        canopy: open
+        prototypeGroups:
+          - [tundra-dwarf-willow-01]
+      # Wetland / Grukmar Bog additions (biome 12): carnivorous Sarracenia pitcher
+      # plant trumpets and glossy marsh marigold clusters.
+      - scene: /assets/ground/swamp/swamp-pitcher-01.glb
+        motion: flexible-stem
+        scale: 1.15
+        weight: 1.1
+        tileIds: [12]
+        character: meadow
+        characterStrength: 1.8
+        canopy: open
+        prototypeGroups:
+          - [swamp-pitcher-01]
+      - scene: /assets/ground/swamp/swamp-marigold-01.glb
+        motion: broadleaf
+        scale: 1.15
+        weight: 1.2
+        tileIds: [12]
+        character: scrub
+        characterStrength: 1.7
+        canopy: edge
+        prototypeGroups:
+          - [swamp-marigold-01]
       # The tropical kit does not belong here: this layer is capped at 350
       # triangles an entry (tests/authoredAssetExtraction.test.js) and the jungle
       # grasses are 1 540-1 960. It is a layer of its own — `tropicalKitVariants`
@@ -1711,21 +1939,23 @@ stylizedSurface:
     # sits inside that spread — the layer rebuilds once per chunk window and is
     # cached, so the extra candidates cost placement work, not per-frame work.
     perChunk: 240
-    # Deserts (1, 2) and tundra (10) join the layer so they stop being bare
-    # ground; densityByTile is what keeps them looking like deserts and tundra.
+    # Deserts (1, 2), Stonehold badlands (32), and tundra (10) join the layer so
+    # they stop being bare ground; densityByTile is what keeps them looking like
+    # deserts, badlands, and tundra.
     # Paths (13) grow only the donor's pebbles (groundDetailVariants).
-    tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14]
+    tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 32]
     # Share of the per-chunk candidate budget a biome keeps. Absent means 1.
     # `tileIds` on each variant decides *what* grows; this decides *how much*,
     # which is the other half of a biome reading as itself — a taiga floor is
     # thin, a desert is nearly bare, a grassland is full.
     densityByTile:
-      1: 0.12
-      2: 0.16
+      1: 0.14
+      2: 0.18
       3: 0.55
       9: 0.8
-      10: 0.2
+      10: 0.24
       13: 0.4
+      32: 0.22
     minScale: 0.82
     maxScale: 1.24
     radius: 0.34
