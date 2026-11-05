@@ -100,6 +100,7 @@ export function createSurfaceMaskConfig(stylizedConfig, { tileSize = null } = {}
     blendCells: Math.max(0.5, stylizedConfig?.path?.blendCells ?? 2.5),
     roadTileId: stylizedConfig?.path?.tileId ?? 13,
     waterTileId: stylizedConfig?.water?.tileId ?? 0,
+    aridTileIds: Object.values(stylizedConfig?.biomeLooks?.arid ?? {}).flat(),
     grassTileIds: [...(stylizedConfig?.grass?.tileIds ?? [3, 4, 5, 6, 7, 8, 9, 10, 12, 14])],
     // Depth at which a cell counts as fully wet for surface classification.
     // Roughly a grass blade's height: shallower than this and blades still
@@ -270,13 +271,23 @@ export function buildSurfaceMaskPixels({
     const share = blurTileField(halo, haloSize, (t) => (blends(t) ? 1 : 0));
     const channels = [0, 1, 2].map((channel) => blurTileField(halo, haloSize,
       (t) => (blends(t) ? tileColor(t)[channel] : 0)));
+    // Bare ground near a desert is the desert's sand: blended with the grass
+    // swatch it drew a grey-brown verge round every erg, under the thinning sward.
+    const arid = new Set(maskConfig.aridTileIds ?? []);
+    const aridShare = halo.some((t) => arid.has(t)) ? blurTileField(halo, haloSize, (t) => (arid.has(t) ? 1 : 0)) : null;
+    const aridChannels = aridShare && [0, 1, 2].map((channel) => blurTileField(halo, haloSize,
+      (t) => (arid.has(t) ? tileColor(t)[channel] : 0)));
     for (let localZ = 0; localZ < chunkSize; localZ += 1) {
       for (let localX = 0; localX < chunkSize; localX += 1) {
         const cellIndex = localZ * chunkSize + localX;
         const haloIndex = (localZ + searchRadius) * haloSize + (localX + searchRadius);
         if (!blends(tiles[cellIndex]) || share[haloIndex] < 1e-6) continue;
+        const sandy = aridShare && aridShare[haloIndex] > 1e-6
+          ? smoothstep(0, 0.5, aridShare[haloIndex]) * (1 - coverage[haloIndex] / 255) : 0;
         for (let channel = 0; channel < 3; channel += 1) {
-          tilePixelsOut[cellIndex * 4 + channel] = Math.round(channels[channel][haloIndex] / share[haloIndex]);
+          const blended = channels[channel][haloIndex] / share[haloIndex];
+          const sand = sandy > 0 ? aridChannels[channel][haloIndex] / aridShare[haloIndex] : blended;
+          tilePixelsOut[cellIndex * 4 + channel] = Math.round(blended + (sand - blended) * sandy);
         }
       }
     }

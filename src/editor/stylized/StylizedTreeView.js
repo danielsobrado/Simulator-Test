@@ -110,6 +110,15 @@ function disposeTextures(textures) {
   for (const texture of textures) texture?.dispose();
 }
 
+/**
+ * With no far-terrain backdrop (procedural worlds), a tree past the streamed
+ * terrain stood in the sky over the horizon: its chunk counts as out of range.
+ */
+export function groundedChunkDistance(terrainView, distance) {
+  if (terrainView.macroFarTerrain?.isActive?.() || typeof terrainView.isChunkDrawn !== 'function') return distance;
+  return (chunkX, chunkZ) => (terrainView.isChunkDrawn(chunkX, chunkZ) ? distance(chunkX, chunkZ) : Infinity);
+}
+
 function lodSettings(config) {
   const tree = config.lod?.tree ?? {};
   const meshRadius = tree.meshRadius ?? config.trees.residentRadius;
@@ -782,7 +791,8 @@ export class StylizedTreeView {
         timestamp,
         transitionMs: settings.transitionMs,
         positionForChunk: (chunkX, chunkZ) => this.manifestStore.lodAnchor(chunkX, chunkZ),
-        distanceForChunk: createCameraChunkDistance(camera, origin, this.terrainView.chunkWorldSize),
+        distanceForChunk: groundedChunkDistance(this.terrainView,
+          createCameraChunkDistance(camera, origin, this.terrainView.chunkWorldSize)),
         onTransition: ({ from, to, durationMs }) => {
           this.terrainView.postProcessing?.notifyReactive(
             from === 'impostor' || to === 'impostor'

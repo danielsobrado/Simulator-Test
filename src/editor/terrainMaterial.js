@@ -57,6 +57,7 @@ import { createValleyFogNodes } from './stylized/mist/ValleyFogShading.js';
 import { applyValleyFogOutput } from './stylized/mist/ValleyFogOutput.js';
 import { createFootprintShading } from './stylized/deformation/FootprintShading.js';
 import { acquireGroundLayers } from './stylized/path/terrainGroundLayers.js';
+import { GROUND_LAYERS } from './stylized/path/groundLayerIds.js';
 import { createTerrainPathPaint, resolvePathPaint } from './stylized/path/terrainPathPaint.js';
 import { createSnowWakeShading } from './stylized/deformation/SnowWakeShading.js';
 import { snowWakeRecorder } from './stylized/deformation/SnowWakeRecorder.js';
@@ -360,6 +361,12 @@ export function createTerrainMaterial({
       const blades = mix(grassTint, meadowGround?.tip ?? colorNode(farCover.tipColor), tipShare).mul(heightShade);
       bakedSurface.color = mix(bakedSurface.color, blades, volumeMask.mul(volume.x));
     }
+    // A desert's dried crust lies in patches with rippled sand between them: as a
+    // half-blend under everything, the cracks ran beneath every ripple.
+    const crackedFloor = meadowGround?.floor
+      ? float(meadowGround.floor.layers.y.round().equal(GROUND_LAYERS.cracked)) : float(0);
+    const floorBlend = meadowGround?.floor
+      ? mix(meadowGround.floor.blend, meadowGround.floor.blend.smoothstep(0.45, 0.75), crackedFloor) : float(0);
     if (transitionPatterns && bakedSurface.normal) {
       // The ecotone nudge carries the water tile up to 2.8 m onto a dry bank, and
       // the ripples stopped on that lobe in a hard, dotted curve: there the
@@ -373,7 +380,8 @@ export function createTerrainMaterial({
         bare: oneMinus(grassCoverage).mul(oneMinus(bakedSurface.snow ?? float(0)))
           .mul(oneMinus(pathMask)).mul(oneMinus(smoothstep(0, 0.5, surfaceMask.b))),
         patterns: transitionPatterns, localXZ, cameraDistance, arid: stylizedConfig.biomeLooks?.arid,
-        dunes: stylizedConfig.biomeLooks?.surface?.dunes });
+        dunes: stylizedConfig.biomeLooks?.surface?.dunes,
+        crust: floorBlend.mul(crackedFloor) });
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));
     }
     if (bakedSurface.rock && bakedSurface.normal) {
@@ -398,7 +406,7 @@ export function createTerrainMaterial({
       // Wet ground and the bed under water wear grit whatever their tile: per-tile
       // scans switched along the cell grid at every waterline in straight steps.
       floor: meadowGround?.floor
-        ? { ...meadowGround.floor, wet: max(bakedSurface.wetness ?? float(0), surfaceMask.b).smoothstep(0.05, 0.45) }
+        ? { ...meadowGround.floor, blend: floorBlend, wet: max(bakedSurface.wetness ?? float(0), surfaceMask.b).smoothstep(0.05, 0.45) }
         : null,
     });
     const paintedSurface = pathPaint

@@ -1069,6 +1069,12 @@ export class InfiniteTerrainView {
     return worldToCell(canonical.x, canonical.z, this.worldStore.tileSize);
   }
 
+  /** Whether a streamed slot currently draws this chunk's ground. */
+  isChunkDrawn(chunkX, chunkZ) {
+    return this.slots.some((slot) => slot.mesh.visible
+      && slot.descriptor?.chunkX === chunkX && slot.descriptor?.chunkZ === chunkZ);
+  }
+
   getWorldHeight(renderX, renderZ) {
     const canonical = this.floatingOrigin.toCanonical(renderX, renderZ);
     return this.getCanonicalHeight(canonical.x, canonical.z);
