@@ -327,6 +327,9 @@ export function createStylizedWaterMaterial({
     );
     let depthColor = seaOptics ? mix(inlandColor, seaOptics.color, oceanWeight) : inlandColor;
     if (appearance) depthColor = appearance.color(depthColor, waterDepth);
+    // The region's water colour (biome-looks `water`): greyed, then tinted.
+    const regionTint = seaStateUniforms.waterTint;
+    depthColor = mix(depthColor, vec3(dot(depthColor, vec3(0.2126, 0.7152, 0.0722))), regionTint.w).mul(regionTint.xyz);
     bodyColor = mix(
       depthColor,
       colorNode(optics.underwaterColor),

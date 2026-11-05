@@ -1834,6 +1834,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       z: viewModeController.camera.position.z + frameOrigin.z,
     });
     setGroundDeformationRegion(surfaceLook.prints);
+    updateSeaState({ water: surfaceLook.water });
     // Rain stipples every pool on top of the biome's own drops.
     waterInteraction.update(surfaceSeconds, viewModeController.mode === PLAYER_MODE_WALK && !viewModeController.paused,
       { ...surfaceLook.ripples, drops: surfaceLook.ripples.drops + frameWeatherAudio.rain * 24 });

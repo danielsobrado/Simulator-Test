@@ -31,6 +31,9 @@
 #   ripples       how water near the player answers wading, swimming and spells
 #                 (water/RippleField.js): wave `speed` m/s, `fade` seconds for a
 #                 ring to die, `splash` gain, ambient `drops` per second.
+#   water         the region's water, sea and inland: `desaturate` (0..1) greys
+#                 its colour toward its own luminance, then `tint` multiplies it.
+#                 Cold country takes the tropical cyan out of its pools.
 #   prints        footprints and spell craters (stylized/deformation): the share
 #                 of bare `ground` taking them besides snow and beach, their
 #                 `lifetime` in seconds and the `tint` pressed ground takes.
@@ -76,6 +79,8 @@ biomeLooks:
       # Frost-shattered stone; moss read as a green wash on a dry steppe. At tone
       # 1.1 the stones read near-white against the ground.
       rock: { tint: '#d6cbb8', tone: 0.95, moss: 0 }
+      # Steel-grey meltwater: the lagoon cyan read as a tropical oasis.
+      water: { tint: '#c6d2d8', desaturate: 0.5 }
       snow: { ground: 0.2, air: 0.3, fall: 0.3 }
       ripples: { speed: 1.6, fade: 1.8 }
       prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
@@ -98,6 +103,7 @@ biomeLooks:
       name: taiga
       canopy: '#4a7a55'
       soil: '#3d3a2b'
+      water: { tint: '#bccaca', desaturate: 0.35 }
       snow: { ground: 0.1, canopy: 0.7, grass: 0.35, air: 0.4, fall: 0.15 }
       ripples: { speed: 1.5, fade: 2 }
       prints: { ground: 0.35, lifetime: 150, tint: '#9c9488' }
@@ -107,6 +113,7 @@ biomeLooks:
       name: tundra
       canopy: '#8a9a62'
       rock: { tint: '#d6d8d4', tone: 1, moss: 0.35 }
+      water: { tint: '#c8d6de', desaturate: 0.45 }
       snow: { ground: 0.95, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
       # Near-freezing meltwater: thick, quick to still.
       ripples: { speed: 0.8, fade: 0.9, splash: 0.7 }
@@ -114,6 +121,7 @@ biomeLooks:
     11:
       name: glacier
       rock: { tint: '#d4dbe2', tone: 1.05, moss: 0 }
+      water: { tint: '#d0dee8', desaturate: 0.4 }
       # No grass grows on the ice (grass.meadow.growth), so it takes no frost:
       # a frosted palette would spend one of the meadow's eight for nothing.
       snow: { ground: 1, canopy: 1, air: 1, fall: 1 }
@@ -129,6 +137,8 @@ biomeLooks:
       canopy: '#3f5434'
       soil: '#2c3120'
       rock: { moss: 1.5 }
+      # Peat-stained bog water.
+      water: { tint: '#b0a68c', desaturate: 0.4 }
       ripples: { speed: 0.9, fade: 1.6, splash: 0.8, drops: 10 }
       prints: { ground: 0.8, lifetime: 200, tint: '#6e665a' }
     # Stonehold Badlands, the first custom biome of an Eldara import
@@ -141,6 +151,7 @@ biomeLooks:
       crags: true
       # Grey canyon stone, dusted pale; nothing grows on it.
       rock: { tint: '#cfc8bc', tone: 1.05, moss: 0 }
+      water: { tint: '#c8c4b8', desaturate: 0.4 }
       snow: { ground: 0.05, air: 0.2 }
       # Coarse grey canyon sand: short, choppy ripples across the wind.
       ripples: { speed: 1.3, fade: 4 }

@@ -141,8 +141,9 @@ test('a turned grove keeps its autumn colour instead of compounding with the bio
 
 test('biomes outside the table and unknown species stay untinted', () => {
   const table = createForestLeafTintTable({ config: config(0) });
-  // Deserts, glacier, road and farm keep their species palette untouched.
-  for (const tileId of [0, 1, 2, 11, 13, 14]) {
+  // Hot desert, glacier, road and farm keep their species palette untouched; the
+  // cold desert has a dusty canopy of its own (biome-looks.yaml).
+  for (const tileId of [0, 1, 11, 13, 14]) {
     assert.equal(table.tintFor('broadleaf_round', 0.5, tileId), FOREST_LEAF_TINT_UNTINTED);
   }
   assert.equal(table.tintFor('not_a_species', 0.5, 6), FOREST_LEAF_TINT_UNTINTED);

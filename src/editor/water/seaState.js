@@ -1,3 +1,4 @@
+import { Vector4 } from 'three';
 import { frameUniform as uniform } from '../../render/FrameUniforms.js';
 import { resolveSeaSurf, sampleSeaHeightCpu } from './SeaSurf.js';
 import { seaExposure } from './WaterAppearance.js';
@@ -17,6 +18,8 @@ export const seaStateUniforms = Object.freeze({
   seaLevel: uniform(-1.5),
   /** 0 dry .. 1 downpour: rain rings on every water surface. */
   rain: uniform(0),
+  /** The region's water colour (biome-looks `water`): rgb multiplier, w = desaturation. */
+  waterTint: uniform(new Vector4(1, 1, 1, 0)),
 });
 
 let seaConfig = null;
@@ -28,7 +31,8 @@ export function configureSea(config) {
   surfSettings = resolveSeaSurf(config?.surf);
 }
 
-export function updateSeaState({ timeSeconds, storm, seaLevel, rain }) {
+export function updateSeaState({ timeSeconds, storm, seaLevel, rain, water }) {
+  if (water) seaStateUniforms.waterTint.value.set(water.tint[0], water.tint[1], water.tint[2], water.desaturate);
   if (Number.isFinite(rain)) seaStateUniforms.rain.value = Math.max(0, Math.min(1, rain));
   if (Number.isFinite(timeSeconds)) seaTime = updateWaterVisualClock(timeSeconds);
   if (Number.isFinite(storm)) seaStateUniforms.storm.value = Math.max(0, Math.min(1, storm));

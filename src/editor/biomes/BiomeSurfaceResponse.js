@@ -19,6 +19,7 @@ export function blendBiomeSurface(surface, tiles, weights) {
   let total = 0;
   const ripples = Object.fromEntries(RIPPLE_KEYS.map((key) => [key, 0]));
   const prints = { ground: 0, lifetime: 0, tint: [0, 0, 0] };
+  const water = { tint: [0, 0, 0], desaturate: 0 };
   tiles.forEach((tile, index) => {
     if (tile === WATER_TILE || !Number.isInteger(tile) || tile < 0 || tile > 255) return;
     const weight = weights[index] ?? 1;
@@ -27,18 +28,22 @@ export function blendBiomeSurface(surface, tiles, weights) {
     prints.ground += surface.prints.ground[tile] * weight;
     prints.lifetime += surface.prints.lifetime[tile] * weight;
     for (let c = 0; c < 3; c += 1) prints.tint[c] += surface.prints.tint[tile * 3 + c] * weight;
+    for (let c = 0; c < 3; c += 1) water.tint[c] += surface.water.tint[tile * 3 + c] * weight;
+    water.desaturate += surface.water.desaturate[tile] * weight;
   });
   if (total === 0) return null;
   for (const key of RIPPLE_KEYS) ripples[key] /= total;
   prints.ground /= total;
   prints.lifetime /= total;
   prints.tint = prints.tint.map((value) => value / total);
-  return { ripples, prints };
+  water.tint = water.tint.map((value) => value / total);
+  water.desaturate /= total;
+  return { ripples, prints, water };
 }
 
 /**
  * The region's surface response round the player: how its water ripples and
- * how its ground takes prints, eased in as the player crosses into a biome so
+ * is coloured and how its ground takes prints, eased in as the player crosses into a biome so
  * nothing snaps at a border.
  */
 export class BiomeSurfaceResponse {
@@ -82,6 +87,8 @@ export class BiomeSurfaceResponse {
     this.current.prints.ground = ease(this.current.prints.ground, this.target.prints.ground);
     this.current.prints.lifetime = ease(this.current.prints.lifetime, this.target.prints.lifetime);
     this.current.prints.tint = this.current.prints.tint.map((value, c) => ease(value, this.target.prints.tint[c]));
+    this.current.water.tint = this.current.water.tint.map((value, c) => ease(value, this.target.water.tint[c]));
+    this.current.water.desaturate = ease(this.current.water.desaturate, this.target.water.desaturate);
     return this.current;
   }
 }

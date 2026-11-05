@@ -92,6 +92,8 @@ export class StylizedGroundDetailView {
     this.prototypeIndicesByAsset = new Map();
     this.prototypes = [];
     this.prototypeHeightOffsets = [];
+    // Lying deadwood (`conform: true`) tilts to the slope under it, or one end floats.
+    this.prototypeConform = [];
     this.prototypePlacementRules = [];
     this.prototypeWaterRules = [];
     this.prototypeStrandRules = [];
@@ -122,15 +124,26 @@ export class StylizedGroundDetailView {
     const index = placement.prototypeIndex;
     const height = Number.isFinite(placement.waterPlacementHeight)
       ? placement.waterPlacementHeight : placement.height;
+    const groundNormal = placement.groundNormal
+      ?? (this.prototypeConform[index] ? this.slopeNormal(placement.x, placement.z) : null);
     return new THREE.Matrix4().compose(
       DETAIL_SCRATCH.position.set(placement.x, height + (this.prototypeHeightOffsets[index] ?? 0), placement.z),
-      placement.groundNormal
+      groundNormal
         ? DETAIL_SCRATCH.quaternion.setFromUnitVectors(DETAIL_UP,
-          DETAIL_SCRATCH.normal.fromArray(placement.groundNormal)).multiply(
+          DETAIL_SCRATCH.normal.fromArray(groundNormal)).multiply(
           DETAIL_SCRATCH.yaw.setFromAxisAngle(DETAIL_UP, placement.rotationY))
         : DETAIL_SCRATCH.quaternion.setFromAxisAngle(DETAIL_UP, placement.rotationY),
       DETAIL_SCRATCH.scale.setScalar(placement.scale),
     );
+  }
+
+  /** Terrain normal from central differences one metre apart. */
+  slopeNormal(x, z) {
+    const h = (px, pz) => this.terrainView.getCanonicalHeight(px, pz);
+    const nx = h(x - 0.5, z) - h(x + 0.5, z);
+    const nz = h(x, z - 0.5) - h(x, z + 0.5);
+    const length = Math.hypot(nx, 1, nz);
+    return [nx / length, 1 / length, nz / length];
   }
 
   placementAppearance(placement) {
@@ -153,6 +166,7 @@ export class StylizedGroundDetailView {
         label: `${this.layerName} variant ${definition.scene}`,
       });
       extracted.forEach((parts, groupIndex) => {
+        this.prototypeConform.push(definition.conform === true);
         this.prototypeHeightOffsets.push(
           definition.prototypeHeightOffsets?.[groupIndex]
             ?? definition.heightOffset
@@ -262,6 +276,7 @@ export class StylizedGroundDetailView {
       this.prototypeHeightOffsets.push(
         definition.heightOffset ?? this.layerConfig.heightOffset ?? 0,
       );
+      this.prototypeConform.push(definition.conform === true);
       this.prototypePlacementRules.push(definition.placement ?? null);
       this.prototypeWaterRules.push(definition.water ?? null);
       this.prototypeStrandRules.push(
@@ -484,6 +499,7 @@ export class StylizedGroundDetailView {
     }
     this.prototypes.length = 0;
     this.prototypeHeightOffsets.length = 0;
+    this.prototypeConform.length = 0;
     this.prototypePlacementRules.length = 0;
     this.prototypeWaterRules.length = 0;
     this.prototypeStrandRules.length = 0;

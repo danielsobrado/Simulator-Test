@@ -9,6 +9,9 @@
  *   prints   footprints and spell craters (stylized/deformation): how much of
  *            the biome's bare `ground` takes them besides snow and beach, how
  *            long they stay (`lifetime`, s) and the `tint` pressed ground takes.
+ *   water    the colour of the region's water, sea and inland alike
+ *            (stylized/StylizedWaterMaterial.js): `desaturate` greys its depth
+ *            colour toward its own luminance (0 keeps it), then `tint` multiplies it.
  *   dunes    the wind ripples on `arid: sand` ground (materials/AridSubstrateNodes.js):
  *            `wavelength` (m), `wind` (degrees from +x toward +z), relief
  *            `height` and crest `sharpness` (0 a sine, 1 a steep lee face).
@@ -29,6 +32,7 @@ const DEFAULT_SURFACE = Object.freeze({
 });
 const RIPPLE_LIMITS = Object.freeze({ speed: [0.05, 4], fade: [0.1, 30], splash: [0, 4], drops: [0, 60] });
 const PRINT_LIMITS = Object.freeze({ ground: [0, 1], lifetime: [1, 600] });
+const WATER_LIMITS = Object.freeze({ desaturate: [0, 1] });
 const DUNE_LIMITS = Object.freeze({ wavelength: [0.05, 2], wind: [-360, 360], height: [0, 3], sharpness: [0, 1] });
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -91,8 +95,12 @@ export function resolveBiomeSurfaceLooks(defaults, rows) {
   };
   const baseTint = tint(base.prints.tint, 'biomeLooks.surface.prints.tint');
   for (let id = 0; id < 256; id += 1) prints.tint.set(baseTint, id * 3);
+  const water = { tint: new Float32Array(256 * 3).fill(1), desaturate: table(0) };
   const dunes = {};
   for (const [id, row, path] of rows) {
+    const look = record(row.water, `${path}.water`, WATER_LIMITS, ['tint']);
+    if (look.desaturate !== undefined) water.desaturate[id] = look.desaturate;
+    if (look.tint !== undefined) water.tint.set(tint(look.tint, `${path}.water.tint`), id * 3);
     for (const [key, value] of Object.entries(record(row.ripples, `${path}.ripples`, RIPPLE_LIMITS))) ripples[key][id] = value;
     const print = record(row.prints, `${path}.prints`, PRINT_LIMITS, ['tint']);
     if (print.ground !== undefined) prints.ground[id] = print.ground;
@@ -106,5 +114,5 @@ export function resolveBiomeSurfaceLooks(defaults, rows) {
       dunes[id] = Object.freeze({ ...frequency, height: dune.height ?? 1, sharpness: dune.sharpness ?? 0 });
     }
   }
-  return Object.freeze({ ripples: Object.freeze(ripples), prints: Object.freeze(prints), dunes: Object.freeze(dunes) });
+  return Object.freeze({ ripples: Object.freeze(ripples), prints: Object.freeze(prints), water: Object.freeze(water), dunes: Object.freeze(dunes) });
 }

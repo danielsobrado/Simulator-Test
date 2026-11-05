@@ -22,6 +22,7 @@ import { aggregateCanopyClusters } from './lod/canopyCluster.js';
 import { ForestSpeciesRegistry } from './forest/ForestSpeciesRegistry.js';
 import { ForestEditStore } from './forest/ForestEditStore.js';
 import { PathClearanceField } from './forest/PathClearanceField.js';
+import { combineExclusions, createBarrenEdgeExclusion } from './forest/barrenEdgeExclusion.js';
 
 const FOREST_STAT_KEYS = Object.freeze([
   'builds',
@@ -376,7 +377,8 @@ export class TreeManifestStore {
         candidateEvaluator: createForestPlacementEvaluator(this.forestField, counters, {
           speciesRegistry: this.speciesRegistry,
           editStore: this.editStore,
-          exclusionAt: this.pathClearance.exclusion(),
+          exclusionAt: combineExclusions(this.pathClearance.exclusion(), createBarrenEdgeExclusion(
+            this.config.trees.barrenEdge, (cellX, cellZ) => this.terrainView.tileMap.get(cellX, cellZ), this.terrainView.worldStore.tileSize)),
         }),
       }),
     };

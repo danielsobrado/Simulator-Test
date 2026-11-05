@@ -124,3 +124,16 @@ test('wades, swim strokes and ambient drops each splash the field once', () => {
   surface.update(2.2, true, { speed: 1, fade: 1, splash: 1, drops: 20 });
   assert.ok(splashes.length >= 4, 'a quarter second of 20 drops a second');
 });
+
+test('the region greys and tints its water by the land round it, never by open water', () => {
+  const looks = resolveBiomeLooks({ snow: SNOW, byTileId: { 2: { water: { tint: '#808080', desaturate: 0.5 } }, 4: {} } });
+  const cold = blendBiomeSurface(looks.surface, [2], [1]);
+  assert.deepEqual(cold.water.tint.map((v) => Math.round(v * 100) / 100), [0.5, 0.5, 0.5]);
+  assert.equal(cold.water.desaturate, 0.5);
+  const border = blendBiomeSurface(looks.surface, [2, 4, 0], [1, 1, 5]);
+  assert.equal(border.water.desaturate, 0.25, 'open water (tile 0) has no say');
+  assert.deepEqual(blendBiomeSurface(looks.surface, [4], [1]).water, { tint: [1, 1, 1], desaturate: 0 }, 'unlisted biomes keep their water');
+  assert.throws(() => resolveBiomeLooks({ snow: SNOW, byTileId: { 2: { water: { desaturate: 2 } } } }), /water\.desaturate/);
+  assert.throws(() => resolveBiomeLooks({ snow: SNOW, byTileId: { 2: { water: { tint: 'grey' } } } }), /water\.tint/);
+  assert.ok(loadBiomeLooks().surface.water.desaturate[2] > 0, 'the shipped cold desert greys its pools');
+});
