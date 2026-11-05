@@ -43,13 +43,18 @@ test('ocean bathymetry preserves coastline classification and deepens offshore',
     ...config.ocean,
     shoreDistanceMeters: config.shoreDistanceMeters,
   });
+  let previousSlope = null;
   for (let distance = 0.25; distance <= config.shoreDistanceMeters; distance += 0.25) {
     const current = oceanDepthProfile(distance, {
       ...config.ocean,
       shoreDistanceMeters: config.shoreDistanceMeters,
     });
-    assert.ok((current - previous) / 0.25 <= config.ocean.maximumBedSlope + 1e-9);
+    const slope = (current - previous) / 0.25;
+    assert.ok(slope <= config.ocean.maximumBedSlope + 1e-9);
+    // No kink at the shelf break: it drew a hard dark contour round every pool.
+    if (previousSlope !== null) assert.ok(Math.abs(slope - previousSlope) < 0.05, `slope jumps at ${distance} m`);
     previous = current;
+    previousSlope = slope;
   }
 });
 

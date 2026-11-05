@@ -15,12 +15,19 @@ function smoothstep(value) {
 
 export function oceanDepthProfile(distanceMeters, config) {
   const distance = clamp(distanceMeters, 0, config.shoreDistanceMeters);
-  if (distance <= config.coastalShelfMeters) {
-    return config.shelfDepth * distance / config.coastalShelfMeters;
+  const shelf = config.coastalShelfMeters, deepRun = config.shoreDistanceMeters - shelf;
+  const shelfSlope = config.shelfDepth / shelf;
+  const deepSlope = (config.maximumDepth - config.shelfDepth) / deepRun;
+  // A quadratic fillet rounds the shelf break: the slope jumped there, and the
+  // water darkened along one hard contour round every pool.
+  const fillet = Math.min(shelf, deepRun) * 0.5;
+  const offset = distance - shelf;
+  if (Math.abs(offset) < fillet) {
+    return config.shelfDepth + shelfSlope * offset
+      + (deepSlope - shelfSlope) * (offset + fillet) ** 2 / (4 * fillet);
   }
-  const deepAmount = (distance - config.coastalShelfMeters)
-    / (config.shoreDistanceMeters - config.coastalShelfMeters);
-  return lerp(config.shelfDepth, config.maximumDepth, deepAmount);
+  if (distance <= shelf) return shelfSlope * distance;
+  return lerp(config.shelfDepth, config.maximumDepth, offset / deepRun);
 }
 
 export function sampleOceanBed({
