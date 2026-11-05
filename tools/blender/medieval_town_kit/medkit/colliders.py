@@ -282,3 +282,19 @@ COLLIDERS.update({name: _on_bluff(name, COLLIDERS[name]) for name in BLUFFS})
 
 def for_module(name):
     return COLLIDERS.get(name, [])
+
+
+COLLIDERS.update({
+    'Frostgard_Glacier_Spire': _centred(2.8, 2.8, 4.8),
+    'Frostgard_Rime_Cairn': _centred(2.6, 2.6, 3.8),
+    'Orc_Fang_Crag': _centred(3.0, 3.0, 5.0),
+    'Orc_Skull_Altar_Mound': _centred(2.8, 2.6, 2.6),
+    'Goblin_Bog_Idol_Mound': _centred(2.6, 2.4, 3.8),
+    'Goblin_Stilt_Watch_Roost': _centred(2.4, 2.4, 3.9),
+    'Nordic_Runestone_Mound': _centred(2.8, 2.8, 3.4),
+    'Nordic_Pine_Crag': _centred(2.6, 2.6, 4.8),
+    'Tudor_Wayside_Ruins': _centred(2.7, 1.5, 3.6),
+    'Tudor_Hedgerow_Standing_Stone': _centred(2.8, 1.2, 3.3),
+    'Med_Classical_Ruins': _centred(2.9, 1.7, 3.8),
+    'Med_Cypress_Terrace_Shrine': _centred(2.5, 1.5, 3.8),
+})

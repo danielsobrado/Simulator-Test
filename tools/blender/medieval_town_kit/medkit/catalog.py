@@ -3,13 +3,14 @@ from mathutils import Vector
 
 from .kit import Kit
 from .modules import (accents, city_street_life, defences, floors, foundations, goblin, goblin_props, interior,
-                      interior_trade, nature, palisade, props, roof_shapes, roofs, roofs_regional,
+                      interior_trade, nature, palisade, props, regional_formations, roof_shapes, roofs, roofs_regional,
                       props_regional, terrain, terrain_regional, towers, walls, walls_frontier,
                       walls_regional, walls_stonehold, towers_regional)
 
 FAMILIES = (walls, walls_regional, foundations, floors, roofs, roof_shapes, terrain, defences, towers, props,
             city_street_life, nature, interior, interior_trade, accents, goblin, goblin_props,
-            walls_frontier, roofs_regional, palisade, walls_stonehold, terrain_regional, props_regional, towers_regional)
+            walls_frontier, roofs_regional, palisade, walls_stonehold, terrain_regional, props_regional,
+            towers_regional, regional_formations)
 CATALOG_ORIGIN = Vector((0.0, -24.0, 0.0))
 # Modules only seen from inside a building; the game draws them only near the viewer.
 INTERIOR = {

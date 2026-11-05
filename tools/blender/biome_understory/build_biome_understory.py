@@ -36,9 +36,36 @@ from understory_common import (
     tube,
 )
 from textures import build_all_materials
+from textures_extra import build_extra_materials
+from builders_extra import (
+    build_alpine_edelweiss_stone,
+    build_bush_arid_ocotillo,
+    build_bush_boreal_juniper,
+    build_bush_meadow_gorse,
+    build_bush_savanna_thorn,
+    build_bush_swamp_buttonbush,
+    build_bush_tropical_hibiscus,
+    build_coastal_dune_oats,
+    build_coastal_shipwreck_ribs,
+    build_coastal_tidepool_coral,
+    build_farmland_poppy_wheat,
+    build_glacier_ice_spires,
+    build_glacier_moraine_cairn,
+    build_savanna_desert_rose,
+    build_savanna_sunbleached_ribcage,
+    build_savanna_termite_mound,
+    build_steppe_feathergrass,
+    build_structure_bog_fetish_totem,
+    build_structure_dwarven_cairn,
+    build_structure_rainforest_idol,
+    build_structure_roadside_milestone,
+    build_structure_ruined_column,
+    build_structure_waystone_shrine,
+)
 
 ROOT = os.path.abspath(os.path.join(THIS_DIR, '..', '..', '..'))
 OUT_BASE = os.path.join(ROOT, 'assets', 'runtime-sources', 'ground')
+OUT_BUSHES = os.path.join(ROOT, 'assets', 'runtime-sources', 'bushes')
 PREVIEW_DIR = os.path.join(ROOT, 'tmp', 'understory', 'blender')
 TEX_DIR = os.path.join(ROOT, 'tmp', 'understory', 'textures')
 
@@ -764,58 +791,107 @@ def save_contact_sheet(preview_paths, out_path, cols=5):
 
 
 def main():
-    for d in (OUT_BASE, PREVIEW_DIR, TEX_DIR):
+    for d in (OUT_BASE, OUT_BUSHES, PREVIEW_DIR, TEX_DIR):
         os.makedirs(d, exist_ok=True)
     setup_scene()
-    mats = build_all_materials(TEX_DIR)
+    only_extra = '--only-extra' in argv
+    mats = {}
+    if not only_extra:
+        mats.update(build_all_materials(TEX_DIR))
+    mats.update(build_extra_materials(TEX_DIR))
 
-    specs = [
-        # (subdir, builder_fn, mat_key, cam_dist, look_z)
-        ('arid', build_desert_prickly_pear, 'cactus', 2.2, 0.45),
-        ('arid', build_desert_agave, 'agave', 2.3, 0.45),
-        ('arid', build_desert_sagebrush, 'sagebrush', 2.0, 0.35),
-        ('arid', build_badlands_deadwood, 'badlands_deadwood', 2.3, 0.35),
+    base_specs = [
+        # (out_dir, subdir, builder_fn, mat_key, cam_dist, look_z)
+        (OUT_BASE, 'arid', build_desert_prickly_pear, 'cactus', 2.2, 0.45),
+        (OUT_BASE, 'arid', build_desert_agave, 'agave', 2.3, 0.45),
+        (OUT_BASE, 'arid', build_desert_sagebrush, 'sagebrush', 2.0, 0.35),
+        (OUT_BASE, 'arid', build_badlands_deadwood, 'badlands_deadwood', 2.3, 0.35),
 
-        ('meadow', build_savanna_aloe, 'savanna_aloe', 2.2, 0.45),
-        ('meadow', build_meadow_lupine, 'meadow_lupine', 2.1, 0.45),
-        ('meadow', build_meadow_heather, 'meadow_heather', 1.9, 0.30),
-        ('meadow', build_meadow_thistle_stone, 'thistle_stone', 2.0, 0.35),
+        (OUT_BASE, 'meadow', build_savanna_aloe, 'savanna_aloe', 2.2, 0.45),
+        (OUT_BASE, 'meadow', build_meadow_lupine, 'meadow_lupine', 2.1, 0.45),
+        (OUT_BASE, 'meadow', build_meadow_heather, 'meadow_heather', 1.9, 0.30),
+        (OUT_BASE, 'meadow', build_meadow_thistle_stone, 'thistle_stone', 2.0, 0.35),
 
-        ('forest', build_forest_bracken, 'forest_bracken', 2.2, 0.32),
-        ('forest', build_forest_mushrooms, 'forest_mushrooms', 1.8, 0.22),
-        ('forest', build_forest_birch_log, 'birch_log', 4.2, 0.25),
-        ('forest', build_forest_berry_bramble, 'berry_bramble', 2.1, 0.32),
+        (OUT_BASE, 'forest', build_forest_bracken, 'forest_bracken', 2.2, 0.32),
+        (OUT_BASE, 'forest', build_forest_mushrooms, 'forest_mushrooms', 1.8, 0.22),
+        (OUT_BASE, 'forest', build_forest_birch_log, 'birch_log', 4.2, 0.25),
+        (OUT_BASE, 'forest', build_forest_berry_bramble, 'berry_bramble', 2.1, 0.32),
 
-        ('tropical', build_tropical_bromeliad, 'tropical_bromeliad', 1.9, 0.28),
-        ('tropical', build_tropical_heliconia, 'tropical_heliconia', 2.4, 0.50),
-        ('tropical', build_tropical_monstera, 'tropical_monstera', 2.2, 0.35),
+        (OUT_BASE, 'tropical', build_tropical_bromeliad, 'tropical_bromeliad', 1.9, 0.28),
+        (OUT_BASE, 'tropical', build_tropical_heliconia, 'tropical_heliconia', 2.4, 0.50),
+        (OUT_BASE, 'tropical', build_tropical_monstera, 'tropical_monstera', 2.2, 0.35),
 
-        ('boreal', build_taiga_berry_moss, 'taiga_berry_moss', 1.7, 0.20),
-        ('boreal', build_taiga_deadfall, 'taiga_deadfall', 2.2, 0.25),
-        ('boreal', build_tundra_cushion, 'tundra_cushion', 1.7, 0.20),
-        ('boreal', build_tundra_dwarf_willow, 'tundra_willow', 1.9, 0.18),
+        (OUT_BASE, 'boreal', build_taiga_berry_moss, 'taiga_berry_moss', 1.7, 0.20),
+        (OUT_BASE, 'boreal', build_taiga_deadfall, 'taiga_deadfall', 2.2, 0.25),
+        (OUT_BASE, 'boreal', build_tundra_cushion, 'tundra_cushion', 1.7, 0.20),
+        (OUT_BASE, 'boreal', build_tundra_dwarf_willow, 'tundra_willow', 1.9, 0.18),
 
-        ('swamp', build_swamp_pitcher, 'swamp_pitcher', 1.9, 0.35),
-        ('swamp', build_swamp_marigold, 'swamp_marigold', 1.9, 0.26),
+        (OUT_BASE, 'swamp', build_swamp_pitcher, 'swamp_pitcher', 1.9, 0.35),
+        (OUT_BASE, 'swamp', build_swamp_marigold, 'swamp_marigold', 1.9, 0.26),
     ]
 
+    extra_specs = [
+        # Coastal & Shoreline Kit (Biome 0, 12)
+        (OUT_BASE, 'coastal', build_coastal_dune_oats, 'coastal_oats', 2.1, 0.38),
+        (OUT_BASE, 'coastal', build_coastal_tidepool_coral, 'coastal_tidepool', 1.9, 0.22),
+        (OUT_BASE, 'coastal', build_coastal_shipwreck_ribs, 'coastal_shipwreck', 2.4, 0.35),
+
+        # Glacier, High Alpine & Cold Steppe Kit (Biomes 11, 2, 10)
+        (OUT_BASE, 'alpine', build_glacier_ice_spires, 'glacier_ice', 2.3, 0.48),
+        (OUT_BASE, 'alpine', build_glacier_moraine_cairn, 'glacier_moraine', 2.0, 0.32),
+        (OUT_BASE, 'alpine', build_steppe_feathergrass, 'steppe_feathergrass', 2.1, 0.35),
+        (OUT_BASE, 'alpine', build_alpine_edelweiss_stone, 'alpine_edelweiss', 1.8, 0.24),
+
+        # Savanna & Farmland Kit (Biomes 3, 5, 4, 14)
+        (OUT_BASE, 'savanna', build_savanna_termite_mound, 'savanna_termite', 2.5, 0.55),
+        (OUT_BASE, 'savanna', build_savanna_desert_rose, 'savanna_desert_rose', 2.1, 0.42),
+        (OUT_BASE, 'savanna', build_savanna_sunbleached_ribcage, 'savanna_ribcage', 2.2, 0.28),
+        (OUT_BASE, 'savanna', build_farmland_poppy_wheat, 'farmland_poppy', 2.0, 0.42),
+
+        # Biome Micro-Structures, Shrines & Ruins Kit (`ground/structures/`)
+        (OUT_BASE, 'structures', build_structure_waystone_shrine, 'structure_waystone', 2.6, 0.65),
+        (OUT_BASE, 'structures', build_structure_ruined_column, 'structure_column', 2.2, 0.30),
+        (OUT_BASE, 'structures', build_structure_roadside_milestone, 'structure_milestone', 2.4, 0.55),
+        (OUT_BASE, 'structures', build_structure_dwarven_cairn, 'structure_dwarven', 2.4, 0.55),
+        (OUT_BASE, 'structures', build_structure_bog_fetish_totem, 'structure_bog_totem', 2.5, 0.60),
+        (OUT_BASE, 'structures', build_structure_rainforest_idol, 'structure_idol', 2.4, 0.55),
+
+        # Authored Biome Shrubs (`bushes/`)
+        (OUT_BUSHES, '', build_bush_arid_ocotillo, 'bush_ocotillo', 2.8, 0.65),
+        (OUT_BUSHES, '', build_bush_savanna_thorn, 'bush_savanna', 2.8, 0.65),
+        (OUT_BUSHES, '', build_bush_meadow_gorse, 'bush_gorse', 2.6, 0.58),
+        (OUT_BUSHES, '', build_bush_boreal_juniper, 'bush_juniper', 2.5, 0.50),
+        (OUT_BUSHES, '', build_bush_tropical_hibiscus, 'bush_hibiscus', 2.9, 0.68),
+        (OUT_BUSHES, '', build_bush_swamp_buttonbush, 'bush_buttonbush', 2.6, 0.58),
+    ]
+
+    specs = extra_specs if only_extra else (base_specs + extra_specs)
     preview_paths = []
-    for subdir, build_fn, mat_key, dist, look_z in specs:
+    extra_preview_paths = []
+    extra_set = {s[2] for s in extra_specs}
+    for out_root, subdir, build_fn, mat_key, dist, look_z in specs:
         mesh, tris = build_fn(mats[mat_key])
         name = mesh.name
         assert tris <= MAX_TRIANGLES, f'{name} has {tris} triangles > {MAX_TRIANGLES}'
-        glb_path = os.path.join(OUT_BASE, subdir, f'{name}.glb')
+        glb_path = os.path.join(out_root, subdir, f'{name}.glb') if subdir else os.path.join(out_root, f'{name}.glb')
         root = place_and_export(name, mesh, glb_path)
-        print(f'[{subdir}] {name}: {tris} tris -> {glb_path}')
+        tag = subdir if subdir else 'bushes'
+        print(f'[{tag}] {name}: {tris} tris -> {glb_path}')
         if RENDER:
             png_path = os.path.join(PREVIEW_DIR, f'{name}.png')
             render_preview(root, png_path, dist, look_z)
             preview_paths.append(png_path)
+            if build_fn in extra_set:
+                extra_preview_paths.append(png_path)
 
-    if RENDER and preview_paths:
+    if RENDER and extra_preview_paths:
+        extra_sheet = os.path.join(PREVIEW_DIR, 'biome-structures-and-bushes-contact-sheet.png')
+        save_contact_sheet(extra_preview_paths, extra_sheet, cols=5)
+        print(f'Saved extra contact sheet -> {extra_sheet}')
+    if RENDER and not only_extra and preview_paths:
         sheet_path = os.path.join(PREVIEW_DIR, 'biome-understory-contact-sheet.png')
-        save_contact_sheet(preview_paths, sheet_path, cols=5)
-        print(f'Saved contact sheet -> {sheet_path}')
+        save_contact_sheet(preview_paths, sheet_path, cols=6)
+        print(f'Saved full contact sheet -> {sheet_path}')
 
 
 if __name__ == '__main__':

@@ -60,6 +60,7 @@ DEFAULT = TownStyle(
         ('Tavern_Table_Set', 2), ('Bake_Oven_Outdoor', 1), ('Armorer_Stand', 1),
         ('Alchemist_Stall', 1), ('Guard_Post', 1), ('Pillory_Stocks', 1),
     ),
+    formations=('Tudor_Wayside_Ruins', 'Tudor_Hedgerow_Standing_Stone'),
 )
 
 STYLES = {
@@ -97,6 +98,7 @@ STYLES = {
             ('Tavern_Table_Set', 2), ('Armorer_Stand', 2), ('Guard_Post', 1),
             ('Bake_Oven_Outdoor', 1), ('Woodpile', 2),
         ),
+        formations=('Nordic_Runestone_Mound', 'Nordic_Pine_Crag'),
     ),
 
     # Contia / Mediterranean: sun-warmed stucco & arcaded stone piazzas, fountains, bronze
@@ -129,6 +131,7 @@ STYLES = {
             ('Tavern_Table_Set', 3), ('Alchemist_Stall', 2), ('Statue_Plinth', 1),
             ('Bake_Oven_Outdoor', 1), ('Wayside_Shrine', 1),
         ),
+        formations=('Med_Classical_Ruins', 'Med_Cypress_Terrace_Shrine'),
     ),
 
     # Grukmar upland ridge-hold: earth lanes, dark stone terraces, stake edges, a palisade
@@ -157,6 +160,7 @@ STYLES = {
             ('Guard_Post', 2), ('Clan_Hearth', 1),
         ),
         towers=(('Watchtower_Orc', 4),),
+        formations=('Orc_Fang_Crag', 'Orc_Skull_Altar_Mound'),
     ),
 
     # Frostgard: trodden snow lanes and snowfields, rugged granite terraces, split-log edges, a
@@ -188,6 +192,7 @@ STYLES = {
             ('Bake_Oven_Outdoor', 1), ('Guard_Post', 1), ('Rune_Stone', 2),
         ),
         towers=(('Watchtower_Frost', 3),),
+        formations=('Frostgard_Glacier_Spire', 'Frostgard_Rime_Cairn'),
     ),
 
     # Stonehold (Vondari Dwarven & Gnome mountain-hold citadel): flagged basalt/granite streets,
@@ -261,6 +266,7 @@ STYLES = {
             ('Cauldron_Fire', 3), ('Goblin_Totem', 3), ('Spike_Barricade', 2),
             ('Goblin_Skiff', 2), ('Drying_Rack', 2),
         ),
+        formations=('Goblin_Bog_Idol_Mound', 'Goblin_Stilt_Watch_Roost'),
     ),
 }
 

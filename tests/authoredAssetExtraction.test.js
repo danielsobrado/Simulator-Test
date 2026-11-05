@@ -101,16 +101,20 @@ test('biome understory kits differentiate all land biomes and regional character
   const variants = config.stylizedSurface.assets.groundDetailVariants;
   const groundTileIds = new Set(config.stylizedSurface.groundDetails.tileIds);
 
-  for (const requiredBiome of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 32]) {
+  for (const requiredBiome of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32]) {
     assert.ok(groundTileIds.has(requiredBiome), `groundDetails.tileIds must include biome ${requiredBiome}`);
     const matching = variants.filter((v) => Array.isArray(v.tileIds) && v.tileIds.includes(requiredBiome));
     assert.ok(matching.length >= 2, `biome ${requiredBiome} must have at least 2 dedicated understory variants`);
   }
 
-  for (const kitDir of ['arid', 'meadow', 'forest', 'tropical', 'boreal', 'swamp']) {
+  for (const kitDir of ['arid', 'meadow', 'forest', 'tropical', 'boreal', 'swamp', 'coastal', 'alpine', 'savanna', 'structures']) {
     const kitVariants = variants.filter((v) => v.scene.startsWith(`/assets/ground/${kitDir}/`));
     assert.ok(kitVariants.length >= 3, `understory kit ${kitDir} must publish at least 3 runtime variants`);
   }
+
+  const bushVariants = config.stylizedSurface.assets.bushVariants;
+  const authoredBiomeBushes = bushVariants.filter((b) => b.scene.startsWith('/assets/bushes/bush-'));
+  assert.ok(authoredBiomeBushes.length >= 6, 'bushVariants must include at least 6 authored biome shrubs');
 
   const characters = new Set(variants.map((v) => v.character).filter(Boolean));
   for (const district of ['meadow', 'forest', 'scrub', 'rocky']) {
