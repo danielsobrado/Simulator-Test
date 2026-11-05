@@ -24,6 +24,10 @@
 #                 `mineral` (materials/AridSubstrateNodes.js).
 #   crags         true grows crags and boulder clusters at any height, not only
 #                 on high or snowy ground (stylized/alpine/AlpineRockView.js).
+#   rock          the boulders and stones (stylized/rockWeathering.js): `tint`
+#                 multiplies their albedo, `tone` brightens (>1) or darkens it
+#                 (0.25..2), `moss` scales the configured moss (0 bare .. 2).
+#                 Unlisted biomes keep the authored stone and the moss as set.
 #   ripples       how water near the player answers wading, swimming and spells
 #                 (water/RippleField.js): wave `speed` m/s, `fade` seconds for a
 #                 ring to die, `splash` gain, ambient `drops` per second.
@@ -55,6 +59,8 @@ biomeLooks:
     1:
       name: hot desert
       arid: sand
+      # Sun-bleached, sand-scoured stone: no moss survives the erg.
+      rock: { tint: '#e6cfa8', tone: 1.1, moss: 0 }
       ripples: { speed: 1.1, fade: 6, splash: 1.2 }
       prints: { ground: 0.9, lifetime: 30, tint: '#8c7458' }
       dunes: { wavelength: 0.22, wind: 18, height: 2, sharpness: 0.75 }
@@ -62,16 +68,18 @@ biomeLooks:
     2:
       name: cold desert
       arid: mineral
+      # Pale, frost-shattered stone; moss read as a green wash on a dry steppe.
+      rock: { tint: '#d6cbb8', tone: 1.1, moss: 0 }
       snow: { ground: 0.2, air: 0.3, fall: 0.3 }
       ripples: { speed: 1.6, fade: 1.8 }
       prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
-    3: { name: savanna, canopy: '#aeae5a' }
+    3: { name: savanna, canopy: '#aeae5a', rock: { tint: '#e8d6b8', tone: 1.1, moss: 0.3 } }
     4: { name: grassland, canopy: '#86b04a' }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
     6: { name: temperate deciduous forest, canopy: '#6da03c' }
     # Canopy drip keeps rainforest pools stippled with rings.
-    7: { name: tropical rainforest, canopy: '#3f8f34', ripples: { drops: 6, fade: 2.2 } }
-    8: { name: temperate rainforest, canopy: '#4c9142', ripples: { drops: 4, fade: 2.4 } }
+    7: { name: tropical rainforest, canopy: '#3f8f34', rock: { moss: 1.4 }, ripples: { drops: 6, fade: 2.2 } }
+    8: { name: temperate rainforest, canopy: '#4c9142', rock: { moss: 1.4 }, ripples: { drops: 4, fade: 2.4 } }
     # Boreal forest in its winter: peat and needle litter, snow only in the
     # hollows, along the tops of the crowns and as frost on the grass. Ground
     # snow at 0.3 lay as a thin grey film over the map colour, reading as bare
@@ -92,12 +100,14 @@ biomeLooks:
     10:
       name: tundra
       canopy: '#8a9a62'
+      rock: { tint: '#d6d8d4', tone: 1, moss: 0.35 }
       snow: { ground: 0.95, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
       # Near-freezing meltwater: thick, quick to still.
       ripples: { speed: 0.8, fade: 0.9, splash: 0.7 }
       prints: { lifetime: 240 }
     11:
       name: glacier
+      rock: { tint: '#d4dbe2', tone: 1.05, moss: 0 }
       # No grass grows on the ice (grass.meadow.growth), so it takes no frost:
       # a frosted palette would spend one of the meadow's eight for nothing.
       snow: { ground: 1, canopy: 1, air: 1, fall: 1 }
@@ -112,6 +122,7 @@ biomeLooks:
       name: wetland
       canopy: '#3f5434'
       soil: '#2c3120'
+      rock: { moss: 1.5 }
       ripples: { speed: 0.9, fade: 1.6, splash: 0.8, drops: 10 }
       prints: { ground: 0.8, lifetime: 200, tint: '#6e665a' }
     # Stonehold Badlands, the first custom biome of an Eldara import
@@ -122,6 +133,8 @@ biomeLooks:
       soil: '#b3a68c'
       arid: sand
       crags: true
+      # Grey canyon stone, dusted pale; nothing grows on it.
+      rock: { tint: '#cfc8bc', tone: 1.05, moss: 0 }
       snow: { ground: 0.05, air: 0.2 }
       # Coarse grey canyon sand: short, choppy ripples across the wind.
       ripples: { speed: 1.3, fade: 4 }

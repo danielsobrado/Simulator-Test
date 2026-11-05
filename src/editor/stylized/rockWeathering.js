@@ -98,12 +98,15 @@ export function resolveRockWeathering(configured) {
  * @param {object} options
  * @param {object} options.settings resolved weathering settings
  * @param {number|null} [options.seaLevel] world sea level, for the splash line
+ * @param {boolean} [options.biomeLook] read the per-instance `instanceRockLook`
+ *   (rgb albedo multiplier, moss scale) the rock view writes from each stone's biome
  */
-export function applyRockWeathering(material, { settings, seaLevel = null, localWater = false }) {
+export function applyRockWeathering(material, { settings, seaLevel = null, localWater = false, biomeLook = false }) {
   if (!settings?.enabled) return material;
   const sourceMap = material.map ?? null;
   const world = positionWorld;
   const pattern = patternPosition();
+  const look = biomeLook ? attribute('instanceRockLook', 'vec4') : null;
   const donor = pattern.mul(DONOR_UNITS_PER_METRE);
   const donorXZ = donor.xz;
 
@@ -117,6 +120,7 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
     .mul(color(material.color.getHex()))
     .mul(settings.toning)
     .mul(mix(0.74, 1.06, tone));
+  const biomeAlbedo = look ? albedo.mul(look.rgb) : albedo;
 
   // Moss in broken patches on whatever faces up.
   const patches = sin(donorXZ.x.mul(0.9).add(sin(donorXZ.y.mul(0.7)).mul(1.8)))
@@ -125,12 +129,14 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   const up = normalWorld.y;
   const mossMask = up.smoothstep(0.35, 0.85)
     .mul(patches.smoothstep(0.25, 0.7))
-    .mul(settings.moss);
-  const shade = dot(albedo, vec3(0.3, 0.59, 0.11)).mul(0.9).add(0.55);
+    .mul(settings.moss)
+    .mul(look ? look.w : float(1))
+    .clamp(0, 1);
+  const shade = dot(biomeAlbedo, vec3(0.3, 0.59, 0.11)).mul(0.9).add(0.55);
   const mossColor = mix(color(MOSS_DARK), color(MOSS_LIGHT), patches).mul(shade);
   // Keep a modest contact cue; Lambert lighting and scene AO supply the shade.
   const underside = mix(float(1 - settings.undersideShade), float(1), up.smoothstep(-0.7, 0.15));
-  let weathered = mix(albedo, mossColor, mossMask).mul(underside);
+  let weathered = mix(biomeAlbedo, mossColor, mossMask).mul(underside);
   let roughness = material.roughnessMap
     ? authoredTexture(material.roughnessMap).g.mul(material.roughness ?? 1).max(mossMask.mul(0.95))
     : float(material.roughness ?? 0.85).max(mossMask.mul(0.95));
