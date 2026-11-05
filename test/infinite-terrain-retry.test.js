@@ -122,3 +122,27 @@ test('reset completions publish through the frame budget, nearest first, and dis
   }
   assert.deepEqual(published, [[0, 1], [1, 1], [3, 1]]);
 });
+
+test('a moving terrain backlog publishes one page per frame and keeps nearest-first priority', async t => {
+  const { view } = createView(t, (x, z) => Promise.resolve({ key: `${x}:${z}` }));
+  view.maxCommitsPerFrameMoving = 1;
+  view.maxCommitsPerFrameIdle = 4;
+  view.focusVelocity = { x: 0, z: -7 };
+  view.slots = [3, 0, 2, 1].map((chunkX, slotIndex) => ({
+    slotIndex, token: 0, loading: false, mesh: { visible: false },
+    descriptor: createTerrainChunkDescriptor({ chunkX, chunkZ: 0, chunkSize: 8, tileSize: 2 }),
+  }));
+  const published = [];
+  view.commitPage = slot => published.push(slot.descriptor.chunkX);
+  view.onWorldChange({ kind: 'reset' });
+  await Promise.all(view.pendingFetches);
+  for (let frame = 0; frame < 2; frame++) {
+    const result = view.flushUploadQueue({ budgetMs: Infinity });
+    assert.equal(result.committed, 1, 'a backlog must not grant the idle upload burst during movement');
+    assert.equal(published.length, frame + 1);
+  }
+  assert.deepEqual(published, [0, 1]);
+  view.focusVelocity = { x: 0, z: 0 };
+  assert.equal(view.flushUploadQueue({ budgetMs: Infinity }).committed, 2, 'idle can drain the remaining queue');
+  assert.deepEqual(published, [0, 1, 2, 3]);
+});

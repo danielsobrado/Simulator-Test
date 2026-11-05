@@ -891,17 +891,13 @@ export class InfiniteTerrainView {
 
   /**
    * Per-frame commit budget adapts to motion and backlog: stay conservative
-   * while the player is moving with no backlog (protect frame time), but drain
-   * faster when idle or when a chunk-boundary burst has queued several pages.
-   * The queue's `commitBudgetMs` still bounds wall-time per frame either way.
+   * while moving, including a chunk-boundary backlog. CPU copy time does not
+   * include the GPU uploads and new draws that publication triggers later.
    */
   adaptiveCommitBudget() {
     const speed = Math.hypot(this.focusVelocity.x, this.focusVelocity.z);
     const moving = speed > TERRAIN_MOVING_SPEED_EPSILON;
-    if (!moving || this.commitQueue.size > this.maxCommitsPerFrameMoving) {
-      return this.maxCommitsPerFrameIdle;
-    }
-    return this.maxCommitsPerFrameMoving;
+    return moving ? this.maxCommitsPerFrameMoving : this.maxCommitsPerFrameIdle;
   }
 
   flushUploadQueue(options = {}) {
