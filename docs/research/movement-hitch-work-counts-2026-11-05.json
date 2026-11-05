@@ -1,0 +1,60 @@
+{
+  "recordedAt": "2026-11-05T16:25:24.329Z",
+  "scope": "Terrain upload scheduling and functional recovery. These captures lost native foreground focus; no frame-pacing or recovery-latency improvement is established.",
+  "runtimeFixCommit": "97a5003d",
+  "frozenSourceParity": {
+    "chunks": 40,
+    "scope": "All top-level emitted JavaScript chunks match after normalizing emitted filename hashes and the adaptiveCommitBudget method.",
+    "sourceRecord": "tmp/hitches/snapshot-parity.json",
+    "sha256": "ef93a9d5c64ee81aad0d17efc45d99230db8d5c6b6621f645c6d163415dc78e5"
+  },
+  "validation": {
+    "nodeTests": 4093,
+    "failed": 0,
+    "changedFilesEslint": "passed"
+  },
+  "captures": {
+    "before": {
+      "sourceReport": "tmp/hitches/current-before-2.json",
+      "sha256": "c6ee18c9c71332dd7b7834db1ae5ad86956272ad0637585022bbd4fe69e82fcb",
+      "maxTerrainPublicationsPerMovementFrame": 4,
+      "backend": {
+        "webgpu": true,
+        "webgl2": false,
+        "reason": null
+      },
+      "browserErrors": 0,
+      "settled": true,
+      "collisionGatePassed": true,
+      "recovery": {
+        "ready": true,
+        "grassReady": true,
+        "missingInViewTiles": 0,
+        "underDensityInViewTiles": 0
+      },
+      "nativeForegroundPassed": false,
+      "timingAccepted": false
+    },
+    "after": {
+      "sourceReport": "tmp/hitches/current-after-2.json",
+      "sha256": "418d634aa4b1434fd2c150cd2cc17eb03c63771904a86a04e8156be897b60ca7",
+      "maxTerrainPublicationsPerMovementFrame": 1,
+      "backend": {
+        "webgpu": true,
+        "webgl2": false,
+        "reason": null
+      },
+      "browserErrors": 0,
+      "settled": true,
+      "collisionGatePassed": true,
+      "recovery": {
+        "ready": true,
+        "grassReady": true,
+        "missingInViewTiles": 0,
+        "underDensityInViewTiles": 0
+      },
+      "nativeForegroundPassed": false,
+      "timingAccepted": false
+    }
+  }
+}

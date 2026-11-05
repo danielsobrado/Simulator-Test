@@ -145,6 +145,10 @@ const fs = require('fs');
     page.setDefaultTimeout(${timeoutMs});
     const { createBrowserErrorMonitor } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'scripts/lib/perf-browser-errors.mjs')).href)});
     const browserErrors = createBrowserErrorMonitor(page);
+    page.on('crash', () => {
+      console.error('Perf QA aborted: the browser page crashed.');
+      void browser.close();
+    });
     page.on('pageerror', error => console.error('Perf QA browser error:', error.stack ?? error.message));
     const { focusPerfBrowser } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'scripts/lib/perf-browser-focus.mjs')).href)});
     // Activate the owned blank window before cold renderer work can block it.
@@ -305,7 +309,6 @@ const fs = require('fs');
         if (!hold && Object.hasOwn(window, '__perfGrassAtStop')) return window.__perfGrassAtStop;
         const field = window.__editor.stylizedSurface.meadowGrass;
         if (!field) return null;
-        const { MeadowTileLayer } = await import('/src/editor/stylized/meadow/MeadowTileLayer.js');
         const result = { state: field.getState(), batches: ['blades', 'cards'].flatMap(name => {
           const layer = field[name];
           if (!layer) return [];
@@ -322,7 +325,7 @@ const fs = require('fs');
         }), pending: ['blades', 'cards'].flatMap(name => {
           const layer = field[name];
           if (!layer) return [];
-          return [...layer.tiles.values()].filter(tile => MeadowTileLayer.isStale(tile)).slice(0, 24).map(tile => ({
+          return [...layer.tiles.values()].filter(tile => layer.constructor.isStale(tile)).slice(0, 24).map(tile => ({
             layer: name, key: tile.key, band: tile.band, preparationBand: tile.preparationBand,
             inView: tile.inView,
             builtBand: tile.builtBand, revision: tile.revision, builtRevision: tile.builtRevision,
@@ -344,7 +347,6 @@ const fs = require('fs');
     }
     // Separate from measured movement: finish() has already released the keys.
     async function observeRecovery() { return page.evaluate(async seconds => {
-        const { PerfCounters } = await import('/src/editor/performance/qa/PerfCounters.js');
         const surface = window.__editor.stylizedSurface;
         const observedAt = performance.now();
         const lastMovementFrame = window.__perfQa.getReport()?.samples?.at(-1)?.timestamp;
@@ -360,8 +362,9 @@ const fs = require('fs');
         let nextSampleMs = 0;
         while (performance.now() - started < seconds * 1000 && readyFrames < 60) {
           await new Promise(resolve => requestAnimationFrame(resolve));
-          const missing = PerfCounters.get('meadowInViewMissingTiles');
-          const lag = PerfCounters.get('meadowInViewCapacityLagTiles');
+          const counters = window.__perfQa.counters();
+          const missing = counters.meadowInViewMissingTiles ?? 0;
+          const lag = counters.meadowInViewCapacityLagTiles ?? 0;
           if (missing === 0 && lag === 0) {
             grassFirstReadyMs ??= performance.now() - started;
             grassReadyFrames++;
@@ -372,8 +375,8 @@ const fs = require('fs');
               fields: status.fields, meadow: status.meadow, staged: status.staged,
               queues: Object.fromEntries(Object.entries(status.queues ?? {}).map(([name, queue]) =>
                 [name, { depth: queue.depth, completed: queue.completed, advanced: queue.advanced }])),
-              deferredMs: PerfCounters.get('frameDeferredCpuMs'),
-              pressureFloorMs: PerfCounters.get('frameDeferredPressureFloorMs') });
+              deferredMs: counters.frameDeferredCpuMs ?? 0,
+              pressureFloorMs: counters.frameDeferredPressureFloorMs ?? 0 });
             nextSampleMs += 250;
           }
           if (status.ready) {
@@ -386,7 +389,7 @@ const fs = require('fs');
           observerDelayMs: observedAt - started,
           grass: { ready: grassReadyFrames >= 60, firstReadyMs: grassFirstReadyMs },
           waitedMs: performance.now() - started, start,
-          end: surface.getPreparationStatus(), counters: PerfCounters.snapshot() };
+          end: surface.getPreparationStatus(), counters: window.__perfQa.counters() };
     }, ${drainSeconds}); }
     if (${drainSeconds} > 0) report.recovery = recovery;
     if (${hasFlag('revisit')}) {
