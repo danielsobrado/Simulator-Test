@@ -14,6 +14,8 @@ const COLD_DIRECTIONS = 6;
 /** Ground snow that makes a shore cold enough to calve: tundra and glacier do. */
 const COLD_GROUND_SNOW = 0.5;
 const WATER_TILE = 0;
+/** Share of the land in reach that must be snow country. */
+const COLD_LAND_SHARE = 0.6;
 const scratch = new THREE.Object3D();
 
 /** Icebergs off cold coasts: one instanced draw per shape, and nothing built until one is near. */
@@ -41,15 +43,23 @@ export class IcebergView {
     return this.worldStore.getTile(Math.floor(x / size), Math.floor(-z / size));
   }
 
+  /**
+   * Most of the land round the berg is snow country. Any one snowy tile in reach
+   * was enough before, and a compact world floated bergs off temperate meadows.
+   */
   isColdCoast(x, z) {
+    let land = 0;
+    let cold = 0;
     for (const ring of COLD_RINGS_METERS) {
       for (let i = 0; i < COLD_DIRECTIONS; i += 1) {
         const angle = (i / COLD_DIRECTIONS) * Math.PI * 2;
         const tile = this.tileAt(x + Math.cos(angle) * ring, z + Math.sin(angle) * ring);
-        if ((this.snowGroundByTile[tile] ?? 0) >= COLD_GROUND_SNOW) return true;
+        if (tile === WATER_TILE) continue;
+        land += 1;
+        if ((this.snowGroundByTile[tile] ?? 0) >= COLD_GROUND_SNOW) cold += 1;
       }
     }
-    return false;
+    return land > 0 && cold / land >= COLD_LAND_SHARE;
   }
 
   resolveCell(cellX, cellZ) {

@@ -131,7 +131,7 @@ export function createCoastSwashNodes({
 }) {
   if (!config.enabled) return null;
   const height = groundHeight.sub(seaStateUniforms.seaLevel);
-  const band = smoothstep(-config.breakDepth - 0.2, -config.breakDepth, height)
+  const band = smoothstep(-config.breakDepth - 0.8, -config.breakDepth + 0.1, height)
     .mul(oneMinus(smoothstep(config.runupHeight + 0.2, config.runupHeight + config.dampHeight + 0.4, height)))
     .mul(oceanMask);
   // Slow drift of the wave timing along the shore.
@@ -164,7 +164,12 @@ export function createCoastSwashNodes({
     memory = max(memory, coverageAt(phase.sub(TAU * cyclesAgo)).mul(Math.exp(-cyclesAgo * config.washDecay)));
   }
   const damp = oneMinus(smoothstep(0, config.dampHeight, height));
-  const wet = max(memory, damp).mul(band);
+  // Ground under the water stays wet all the way down. Gated by `band`, the damp
+  // stopped half a metre under, and over a carved bed's near-planar ramp that
+  // cut drew a pale patch bounded by long straight contours.
+  const above = oneMinus(smoothstep(config.runupHeight + 0.2, config.runupHeight + config.dampHeight + 0.4, height))
+    .mul(oceanMask);
+  const wet = max(memory.mul(band), damp.mul(above));
   const filmTint = colorNode(config.filmTint);
   const foamColor = colorNode(config.foamColor);
   // The same foam front crosses sand and water. The ground owns the portion

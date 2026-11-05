@@ -70,7 +70,7 @@ export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, came
       const dune = duneAt(tileId, dunes).toVar();
       // A coarser warp too, so crests wander and fork instead of running ruler-straight.
       const bend = periodicNoise(p.div(4).add(41.9), PATTERN_PERIOD / 4);
-      const phase = p.x.mul(dune.x).add(p.y.mul(dune.y)).mul(Math.PI * 2).add(warp.mul(2)).add(bend.mul(5));
+      const phase = p.x.mul(dune.x).add(p.y.mul(dune.y)).mul(Math.PI * 2).add(warp.mul(2)).add(bend.mul(1.2));
       // Fine ripples hand over to the swells by ~20 m: further out a full-strength
       // sine reads as zebra stripes across the whole middle distance.
       const filtered = oneMinus(smoothstep(.6, 2.4, phase.fwidth())).mul(oneMinus(smoothstep(6, 20, cameraDistance)));

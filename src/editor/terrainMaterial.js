@@ -385,7 +385,11 @@ export function createTerrainMaterial({
       verge: pathWear.verge.mul(oneMinus(bakedSurface.snow ?? float(0))),
       settings: pathPaintSettings,
       textures: pathPaintSettings ? acquireGroundLayers() : null,
-      floor: meadowGround?.floor ?? null,
+      // Wet ground and the bed under water wear grit whatever their tile: per-tile
+      // scans switched along the cell grid at every waterline in straight steps.
+      floor: meadowGround?.floor
+        ? { ...meadowGround.floor, wet: max(bakedSurface.wetness ?? float(0), surfaceMask.b).smoothstep(0.05, 0.45) }
+        : null,
     });
     const paintedSurface = pathPaint
       ? { ...bakedSurface, ...pathPaint.apply(bakedSurface.color, bakedRoughness) }

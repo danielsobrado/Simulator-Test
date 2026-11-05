@@ -5,6 +5,9 @@ import { seaStateUniforms } from '../water/seaState.js';
 import { godsEndCausticLattice } from '../water/GodsEndWaterPatterns.js';
 import { resolveCoastSand } from '../water/CoastSandConfig.js';
 
+/** Metres of height by which the sand's band edges wander. */
+const BAND_NOISE_METRES = 0.7;
+
 function colorNode(value) {
   const c = new Color(value); return vec3(c.r, c.g, c.b);
 }
@@ -15,18 +18,25 @@ export function createCoastSandNodes({ localXZ, patterns, groundHeight, sandMask
   const settings = resolveCoastSand(config);
   if (!settings.enabled) return null;
   const height = groundHeight.sub(seaStateUniforms.seaLevel);
-  const bedDepth = height.negate();
-  const beach = oneMinus(smoothstep(1.8, 2.8, height)).mul(smoothstep(-0.6, 0, height)).mul(sandMask);
-  // The bed is a 2 m triangle mesh, so depth contours are straight segments:
-  // a 0.6 m ramp drew the pale seabed as hard-edged polygons under the water.
-  const bed = smoothstep(0.1, 1.6, bedDepth).mul(oneMinus(smoothstep(10, 16, bedDepth))).mul(waterCoverage);
-  const amount = beach.max(bed).mul(oceanMask);
+  // Widest reach of the bands below once the noise has moved them, for the branch.
+  const reach = smoothstep(-16 - BAND_NOISE_METRES, -15.9 - BAND_NOISE_METRES, height)
+    .mul(oneMinus(smoothstep(2.8 + BAND_NOISE_METRES, 2.9 + BAND_NOISE_METRES, height)))
+    .mul(sandMask.max(waterCoverage)).mul(oceanMask);
   // Noise, shelf mottling and caustics execute only in the coastal band.
   return {
     apply(color, roughness) {
       const result = Fn(() => {
         const response = vec4(color, roughness).toVar();
-        If(amount.greaterThan(0.001), () => {
+        If(reach.greaterThan(0.001), () => {
+          // Every band edge wanders by up to BAND_NOISE_METRES of height. The bed is
+          // a 2 m triangle mesh, often near planar where it was carved, so a band
+          // keyed on plain height drew its contours as long straight lines.
+          const wander = periodicFbm2(patterns.latticePoint('sandReef', localXZ)).sub(0.5).mul(BAND_NOISE_METRES * 2);
+          const banded = height.add(wander);
+          const bedDepth = banded.negate();
+          const beach = oneMinus(smoothstep(1.8, 2.8, banded)).mul(smoothstep(-1.6, 0.2, banded)).mul(sandMask);
+          const bed = smoothstep(0.1, 1.6, bedDepth).mul(oneMinus(smoothstep(10, 16, bedDepth))).mul(waterCoverage);
+          const amount = beach.max(bed).mul(oceanMask);
           const macro = periodicFbm2(patterns.latticePoint('sandMacro', localXZ));
           const phase = name => patterns.wavePhase(name, localXZ);
           const meso = sin(phase('sandMesoX').add(sin(phase('sandMesoWarp'))))

@@ -32,6 +32,9 @@ export function rippleFieldSlope(originMeters, localMeters) {
   // alias into dotted whorls in the reflections. Measured on the unwrapped
   // local coordinate, so the window's wrap cannot flash a seam.
   const texelsPerPixel = localCanonical.fwidth().length().div(RIPPLE_TEXEL_METRES);
-  const resolved = oneMinus(smoothstep(0.35, 1, texelsPerPixel));
+  // Rings are only a few texels across, and squashed further at a grazing view, so
+  // they break into dotted arcs well before a texel reaches a pixel: they fade from
+  // eight pixels a texel and are gone by three (docs/qa/biome-surface, hot desert).
+  const resolved = oneMinus(smoothstep(0.12, 0.33, texelsPerPixel));
   return slope.mul(reach.mul(resolved).mul(rippleFieldUniforms.strength));
 }

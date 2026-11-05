@@ -141,7 +141,7 @@ function floorMod(value, period) {
  * @param {object | null} options.settings resolvePathPaint()
  * @param {{ colorRoughness: object } | null} options.textures acquireGroundLayers()
  * @param {{ layers: object, blend: object } | null} [options.floor] floor scans:
- *   layers.xy are array indices, blend moves from x to y
+ *   layers.xy are array indices, blend moves from x to y, wet (optional) toward grit
  * @returns {{ apply: (color: object, roughness: object) => { color: object, roughness: object } } | null}
  */
 export function createTerrainPathPaint({
@@ -185,7 +185,8 @@ export function createTerrainPathPaint({
           };
           const layerA = floorScan ? floorScan.layers.x.round().toInt() : int(GROUND_LAYERS.grit);
           const layerB = floorScan ? floorScan.layers.y.round().toInt() : layerA;
-          const detail = mix(scan(uvA, gradA, layerA), scan(uvB, gradB, layerB), floorScan?.blend ?? float(0));
+          const own = mix(scan(uvA, gradA, layerA), scan(uvB, gradB, layerB), floorScan?.blend ?? float(0));
+          const detail = floorScan?.wet ? mix(own, scan(uvA, gradA, int(GROUND_LAYERS.grit)), floorScan.wet) : own;
           result.assign(vec4(result.xyz.mul(mix(vec3(1), detail.div(GROUND_LAYER_MEAN).clamp(0.45, 1.8), floorFade.mul(0.85))), result.w));
         });
         const mask = pathMask.toVar();

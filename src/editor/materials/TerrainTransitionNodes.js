@@ -51,7 +51,10 @@ export function createTerrainTransitionState({ weights, shoreline, path, cameraD
         const rawRock = weights.b.div(weights.a.oneMinus().max(1e-4)).clamp(0, 1);
         const rock = heightBlend(rawRock, groundHeight, rockHeight, options).toVar();
         const snowOnRock = heightBlend(weights.a, rockHeight, float(0.55), options);
-        const snow = mix(weights.a, snowOnRock, rock).toVar();
+        // Thin snow on soil settles into its hollows too: blended raw, a half-snowed
+        // field read as litter under a white veil (docs/qa/biome-surface, tundra).
+        const snowOnGround = heightBlend(weights.a, groundHeight, float(0.5), options);
+        const snow = mix(snowOnGround, snowOnRock, rock).toVar();
         const dirt = weights.g.div(weights.r.add(weights.g).max(1e-4)).clamp(0, 1);
         const soil = heightBlend(dirt, groundHeight, broad.mul(0.3).add(0.35), options).toVar();
         const ground = rock.oneMinus().mul(snow.oneMinus());
