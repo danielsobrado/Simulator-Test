@@ -16,6 +16,7 @@ import {
   oneMinus,
   positionLocal,
   positionWorld,
+  select,
   sin,
   smoothstep,
   uniform,
@@ -70,6 +71,7 @@ import { resolveSurfaceWetnessConfig } from './weather/surfaceWetnessConfig.js';
 import {
   createSlotBakeGpuState,
   slotPatternOrigins,
+  slotTexel,
   slotTexture,
   slotVector2,
 } from './materials/TerrainSlotBindings.js';
@@ -359,9 +361,17 @@ export function createTerrainMaterial({
       bakedSurface.color = mix(bakedSurface.color, blades, volumeMask.mul(volume.x));
     }
     if (transitionPatterns && bakedSurface.normal) {
-      const arid = createAridSubstrateNodes({ tileId: tileSample.a.mul(255).round(),
+      // The ecotone nudge carries the water tile up to 2.8 m onto a dry bank, and
+      // the ripples stopped on that lobe in a hard, dotted curve: there the
+      // ripples read the pixel's own cell instead. A water cell is never sand, so
+      // they are gone by half occupancy, which the bilinear mask always reaches at
+      // that cell's edge: fading by plain occupancy they stopped there, dotted.
+      const ecotoneTileId = tileSample.a.mul(255).round();
+      const aridTileId = select(ecotoneTileId.equal(stylizedConfig.water?.tileId ?? 0),
+        slotTexel('tileTexture', tileTexture, terrainUv, width).a.mul(255).round(), ecotoneTileId);
+      const arid = createAridSubstrateNodes({ tileId: aridTileId,
         bare: oneMinus(grassCoverage).mul(oneMinus(bakedSurface.snow ?? float(0)))
-          .mul(oneMinus(pathMask)).mul(oneMinus(surfaceMask.b)),
+          .mul(oneMinus(pathMask)).mul(oneMinus(smoothstep(0, 0.5, surfaceMask.b))),
         patterns: transitionPatterns, localXZ, cameraDistance, arid: stylizedConfig.biomeLooks?.arid,
         dunes: stylizedConfig.biomeLooks?.surface?.dunes });
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));

@@ -1,5 +1,4 @@
-const DIAGONAL_COST = Math.SQRT2;
-const DISTANCE_INFINITY = 1e9;
+const SQUARED_INFINITY = 0x3fffffff;
 
 function floorDiv(value, divisor) {
   return Math.floor(value / divisor);
@@ -106,48 +105,57 @@ export class WaterDistanceField {
     const width = this.blockSize + halo * 2;
     const originX = blockX * this.blockSize - halo;
     const originZ = blockZ * this.blockSize - halo;
-    const distances = new Float32Array(width * width);
+    // Each cell carries the offset to its nearest land cell (8SSEDT), so the
+    // distance is Euclidean. A chamfer distance drew every depth contour of the
+    // sea bed as an octagon: deep water read as a dark, straight-sided diamond.
+    const offsetX = new Int16Array(width * width);
+    const offsetZ = new Int16Array(width * width);
+    // Squared, in whole cells: exact in integers, and no root per comparison.
+    const squared = new Int32Array(width * width);
 
     for (let z = 0; z < width; z += 1) {
       for (let x = 0; x < width; x += 1) {
-        distances[gridIndex(x, z, width)] = this.isWaterCell(originX + x, originZ + z)
-          ? DISTANCE_INFINITY
-          : 0;
+        squared[gridIndex(x, z, width)] = this.isWaterCell(originX + x, originZ + z) ? SQUARED_INFINITY : 0;
       }
       yield;
     }
 
+    // Take the neighbour's nearest land if it is nearer from here.
+    const relax = (index, x, z, stepX, stepZ) => {
+      const nx = x - stepX, nz = z - stepZ;
+      if (nx < 0 || nz < 0 || nx >= width || nz >= width) return;
+      const neighbor = gridIndex(nx, nz, width);
+      if (squared[neighbor] === SQUARED_INFINITY) return;
+      const candidateX = offsetX[neighbor] + stepX, candidateZ = offsetZ[neighbor] + stepZ;
+      const candidate = candidateX * candidateX + candidateZ * candidateZ;
+      if (candidate < squared[index]) {
+        offsetX[index] = candidateX;
+        offsetZ[index] = candidateZ;
+        squared[index] = candidate;
+      }
+    };
+
     for (let z = 0; z < width; z += 1) {
       for (let x = 0; x < width; x += 1) {
         const index = gridIndex(x, z, width);
-        let distance = distances[index];
-        if (x > 0) distance = Math.min(distance, distances[index - 1] + 1);
-        if (z > 0) distance = Math.min(distance, distances[index - width] + 1);
-        if (x > 0 && z > 0) {
-          distance = Math.min(distance, distances[index - width - 1] + DIAGONAL_COST);
-        }
-        if (x + 1 < width && z > 0) {
-          distance = Math.min(distance, distances[index - width + 1] + DIAGONAL_COST);
-        }
-        distances[index] = distance;
+        relax(index, x, z, 1, 0);
+        relax(index, x, z, 1, 1);
+        relax(index, x, z, 0, 1);
+        relax(index, x, z, -1, 1);
       }
+      for (let x = width - 1; x >= 0; x -= 1) relax(gridIndex(x, z, width), x, z, -1, 0);
     }
     yield;
 
     for (let z = width - 1; z >= 0; z -= 1) {
       for (let x = width - 1; x >= 0; x -= 1) {
         const index = gridIndex(x, z, width);
-        let distance = distances[index];
-        if (x + 1 < width) distance = Math.min(distance, distances[index + 1] + 1);
-        if (z + 1 < width) distance = Math.min(distance, distances[index + width] + 1);
-        if (x + 1 < width && z + 1 < width) {
-          distance = Math.min(distance, distances[index + width + 1] + DIAGONAL_COST);
-        }
-        if (x > 0 && z + 1 < width) {
-          distance = Math.min(distance, distances[index + width - 1] + DIAGONAL_COST);
-        }
-        distances[index] = distance;
+        relax(index, x, z, -1, 0);
+        relax(index, x, z, -1, -1);
+        relax(index, x, z, 0, -1);
+        relax(index, x, z, 1, -1);
       }
+      for (let x = 0; x < width; x += 1) relax(gridIndex(x, z, width), x, z, 1, 0);
     }
     yield;
 
@@ -156,7 +164,7 @@ export class WaterDistanceField {
       for (let x = 0; x < this.blockSize; x += 1) {
         result[gridIndex(x, z, this.blockSize)] = Math.min(
           this.maxDistanceCells,
-          distances[gridIndex(x + halo, z + halo, width)],
+          Math.sqrt(squared[gridIndex(x + halo, z + halo, width)]),
         );
       }
     }

@@ -76,6 +76,13 @@ export function slotTexture(name, template, uvNode) {
   return perObjectTexture(template, uvNode, (object) => slotData(object)?.[name]);
 }
 
+/** The drawn slot's texel of texture `name` holding `uvNode`, read without a sampler. */
+export function slotTexel(name, template, uvNode, size) {
+  const coords = floor(uvNode.mul(size)).clamp(vec2(0), vec2(size - 1));
+  return perObjectTexture(template, null, (object) => slotData(object)?.[name],
+    texture(template, coords).setSampler(false));
+}
+
 /** A vec2 uniform following the drawn slot's own uniform `name`. */
 export function slotVector2(name, template) {
   return uniform(template.value.clone())

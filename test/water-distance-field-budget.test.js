@@ -67,3 +67,15 @@ test('a block whose build throws can be built again', () => {
   fail = false;
   assert.equal(field.sample(0, 0), 0);
 });
+
+test('distances are Euclidean, so depth contours round a lake instead of faceting it', () => {
+  const inLake = (x, z) => Math.hypot(x - 32, z - 32) < 20;
+  const field = new WaterDistanceField({ isWaterCell: inLake, maxDistanceCells: 30 });
+  for (const [x, z] of [[32, 32], [40, 40], [25, 38], [45, 30]]) {
+    let nearest = Infinity;
+    for (let zz = 0; zz < 64; zz += 1) for (let xx = 0; xx < 64; xx += 1) {
+      if (!inLake(xx, zz)) nearest = Math.min(nearest, Math.hypot(xx - x, zz - z));
+    }
+    assert.ok(Math.abs(field.sample(x, z) - nearest) < 1e-4, `${x},${z}`);
+  }
+});
