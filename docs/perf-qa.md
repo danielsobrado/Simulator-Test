@@ -1006,6 +1006,31 @@ to attribute it. `settlement-approach`: baseline 99.9 FPS, 6 hitches; change 97.
 and 97.4 FPS, 6 and 8 hitches, one baseline run. `qa:water:acceptance --headed`
 passed with the coast fade, before the distance-field fix.
 
+### Shore bands, snow on soil, cliff strata and ripple fade (2026-11-05)
+
+A/B of `ee75bf3a` against `bb74ec08`, each a clean `git archive` export served on
+its own Vite port (no other app tab open), arms alternated. The change adds one
+fbm inside the coastal-band branch (`CoastSandShading.js`), one grit tap on wet
+ground within 45 m (`terrainPathPaint.js`), a height blend inside the existing
+transition branch, and a few sines on rock faces; the ripple fade only removes
+work. `--warmup 8 --duration 12 --settle --gpuTimings 1`, all settled:
+
+| Route | Metric | Baseline | Change |
+|-------|--------|----------|--------|
+| `chunk-cross` | GPU avg ms | 2.246, 2.282 | 2.271, 2.251 |
+| | GPU p95 ms | 2.555, 2.605 | 2.685, 2.570 |
+| | Avg FPS | 139.6, 127.2 | 136.0, 144.4 |
+| | Hitches | 1, 4 | 5, 2 |
+| `move --x -5815 --z 11 --yaw 45 --speed walk` (hot-desert pond, 11–14 refractive chunks) | GPU avg ms | 1.388, 1.449 | 1.442, 1.386 |
+| | GPU p95 ms | 1.507, 1.657 | 1.755, 1.578 |
+| | Avg FPS | 158.7, 166.8 | 167.7, 165.4 |
+| | Hitches | 5, 4 | 3, 4 |
+
+GPU time is level on both routes (pond means 1.419 → 1.414 ms). Seven of the eight
+runs lost native foreground focus (`capture.focus.native.passed` false; only one
+pond baseline passed), so the FPS and hitch rows are void as frame-pacing
+evidence; the GPU timestamp rows are the result.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`
