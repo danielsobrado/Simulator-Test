@@ -67,9 +67,15 @@ biomeLooks:
     # Cold steppe: bare ground with snow lying in the hollows.
     2:
       name: cold desert
+      # Grey-buff steppe gravel and dusty sage crowns: the map's ochre and the
+      # species' summer green read as a hot desert (2026-11-05 review). Graded
+      # crowns follow the canopy at ratio^0.3, so the target sits well past sage.
+      canopy: '#7f8466'
+      soil: '#9a9282'
       arid: mineral
-      # Pale, frost-shattered stone; moss read as a green wash on a dry steppe.
-      rock: { tint: '#d6cbb8', tone: 1.1, moss: 0 }
+      # Frost-shattered stone; moss read as a green wash on a dry steppe. At tone
+      # 1.1 the stones read near-white against the ground.
+      rock: { tint: '#d6cbb8', tone: 0.95, moss: 0 }
       snow: { ground: 0.2, air: 0.3, fall: 0.3 }
       ripples: { speed: 1.6, fade: 1.8 }
       prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
