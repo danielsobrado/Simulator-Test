@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { attribute, dot, float, mix, vec3 } from 'three/tsl';
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { gradePlantPart, resolveFoliagePalette } from './forest/foliagePalette.js';
-import { foliageSkyFill } from './forest/foliageLight.js';
+import { understoryShadeEmission } from './forest/foliageLight.js';
 import { foliageMaterialClass } from './forest/FoliageNodeMaterial.js';
 import { applyCloudShadow } from './CloudShadow.js';
 
@@ -55,8 +55,8 @@ export function applyUnderstoryPalette(material, config, tileId = null, role = '
   const color = biomeLook ? biomeUnderstoryColor(graded) : graded;
   material.colorNode = color;
   const blossom = role === 'petal' || role === 'center';
-  const fill = foliageSkyFill(color, blossom ? .1 : .14);
-  material.foliageTransmissionNode = float(blossom ? .18 : .25);
+  const fill = understoryShadeEmission(color, { blossom });
+  material.foliageTransmissionNode = float(blossom ? .16 : .22);
   // Retain any authored emission (e.g. flower centres).
   material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(fill) : fill;
   return applyCloudShadow(material, config.sky);

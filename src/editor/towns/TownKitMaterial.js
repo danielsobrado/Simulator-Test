@@ -33,6 +33,7 @@ import {
 import { WEATHER_FAMILIES, treadPaving, weatherTownSurface } from '../../render/materials/townWeathering.js';
 import { TOWN_WET_FAMILIES, wetTownSurface } from '../../render/materials/townWetness.js';
 import { filterSpecularRoughness } from '../../render/materials/specularAntialiasing.js';
+import { buildingShadeEmission } from '../stylized/forest/foliageLight.js';
 import { sampleWorldWind } from '../weather/wind/worldWindState.js';
 import { KIT_DATA_ATTRIBUTE } from './TownKitGeometry.js';
 import { RENDER_PALETTE, ROLE, surfaceOf } from './TownKitSurfaces.js';
@@ -40,25 +41,9 @@ import { RENDER_PALETTE, ROLE, surfaceOf } from './TownKitSurfaces.js';
 /**
  * The one material every opaque town surface draws with.
  *
- * Each vertex names its kit material (TownKitGeometry's kitData.z); the shader
- * looks that row up in small uniform tables and samples the atlas's albedo and
- * normal array layers. A town's look (skin, render finish, banner colour, snow,
- * ashlar or thatch swaps) only changes table values, so every look shares one
- * pipeline.
- *
- * On top of the authored kit:
- *  - per building, from the instance seed (instanceColor, 0.9..1 per channel):
- *    render tone picked from a warm palette, darker or paler timber, roof tone;
- *  - relief (TownKitSurfaces): strengthened normal maps, crevices darkened from
- *    the normal maps, and parallax so stones and slates stand proud;
- *  - per place, from town-space noise: broad tone drift, render worn back to
- *    the stone beneath, and the shared town weathering (render/materials/
- *    townWeathering): moss on ledges and slates, rain runs down faces;
- *  - snow on sky-facing stone, timber and roof in frost towns;
- *  - banners and awnings sway in the world wind;
- *  - a few centimetres of town-space wobble, so long ridges, beams and walls are
- *    never ruler-straight. It is continuous across modules because it depends on
- *    position only.
+ * Harmonised with the stylized rock and terrain pipeline: restrained relief,
+ * muted painterly saturation, warm limestone dust weathering, and shared
+ * sky-fill + ground-bounce + distance air in-scatter (`buildingShadeEmission`).
  */
 
 const SNOW = vec3(0.9, 0.93, 0.98);
@@ -67,13 +52,11 @@ export const townKitShared = Object.freeze({
   /** Sun elevation in radians, written each frame by the town runtime. */
   sunElevation: uniform(0.7),
   /** Albedo grade over the scans: brightness lift, saturation, crevice depth, relief. */
-  // Tuned in-game at Wyle under the storybook sky (tmp/town-grade-tune.mjs):
-  // the scans are photographed flat and dim; this lifts them to the reference's
-  // sunlit stone while the crevices keep the joints deep.
-  albedoLift: uniform(1.3),
-  saturation: uniform(1.1),
-  creviceDepth: uniform(0.45),
-  reliefScale: uniform(1.25),
+  albedoLift: uniform(1.18),
+  // Neutral: a town's own render, timber and roof colours are its character.
+  saturation: uniform(1),
+  creviceDepth: uniform(0.32),
+  reliefScale: uniform(0.92),
 });
 
 /** Decodes TownModuleInstances.seedColour; `grounded` is 1 on a ground-floor piece. */
@@ -207,23 +190,28 @@ export function createTownKitMaterial(atlas, look) {
     renderTint = mix(renderTint, vec3(...RENDER_PALETTE[i]), float(1).sub(clamp(pick.sub(i).abs(), 0, 1)));
   }
   const houseTint = mix(vec3(1), renderTint, isRole(ROLE.plaster))
-    .mul(mix(float(1), mix(float(0.82), float(1.1), seed.y), isRole(ROLE.timber)))
-    .mul(mix(float(1), mix(float(0.9), float(1.1), seed.z), isRole(ROLE.roof)))
+    .mul(mix(float(1), mix(float(0.86), float(1.08), seed.y), isRole(ROLE.timber)))
+    .mul(mix(float(1), mix(float(0.92), float(1.08), seed.z), isRole(ROLE.roof)))
     // Masons' stone came from more than one bed: each building its own tone.
-    .mul(mix(vec3(1), mix(vec3(0.84, 0.83, 0.81), vec3(1.1, 1.07, 1.02), seed.y), isStone));
+    .mul(mix(vec3(1), mix(vec3(0.88, 0.86, 0.82), vec3(1.08, 1.05, 1.0), seed.y), isStone));
   // Broad drift so long walls and roofs are never one flat tone.
   const drift = mx_noise_float(place.mul(0.09)).mul(0.08).add(1);
   colour = colour.mul(houseTint).mul(drift).mul(data.x);
 
   const up = normalWorld.y;
-  // The same weather as SettlementView's houses: moss on ledges and slates, rain runs down faces.
+  // The same weather as SettlementView's houses: moss on ledges and slates, rain runs down faces, warm dust on tops.
   const amount = (key) => [[ROLE.stone, 'stone'], [ROLE.plaster, 'plaster'], [ROLE.timber, 'timber'], [ROLE.roof, 'roof']]
     .reduce((sum, [value, family]) => sum.add(isRole(value).mul(WEATHER_FAMILIES[family][key])), float(0));
   // A ground-floor piece's own origin is its foot, so its height is the wall's;
   // the band is for walls, not the floors and steps at the same height.
   const wall = smoothstep(0.7, 0.3, up.abs());
   const height = mix(float(99), positionGeometry.y, seed.grounded.mul(wall));
-  colour = weatherTownSurface(colour, { place, up, height, family: { moss: amount('moss'), streaks: amount('streaks'), damp: amount('damp') } });
+  colour = weatherTownSurface(colour, {
+    place,
+    up,
+    height,
+    family: { moss: amount('moss'), streaks: amount('streaks'), damp: amount('damp'), dust: amount('dust') },
+  });
   // Setts as SettlementView's streets are: trodden grime that also hides the tile repeat.
   colour = mix(colour, treadPaving(colour, place.xz), isRole(ROLE.paving).add(isCobble));
   const wetAmount = (key) => [[ROLE.stone, 'stone'], [ROLE.plaster, 'plaster'], [ROLE.timber, 'timber'],
@@ -242,7 +230,9 @@ export function createTownKitMaterial(atlas, look) {
   const roughness = mix(wet.roughness, float(0.62), snowCover).add(wear.mul(0.05)).add(crevice.mul(0.08));
   material.roughnessNode = filterSpecularRoughness(roughness, normalSample.mul(2).sub(1).mul(vec3(strength, strength, 1)));
   material.metalnessNode = mix(row.w, float(0), snowCover);
-  material.emissiveNode = sample.mul(tint.rgb).mul(tint.w).mul(mix(float(1), flicker, flame));
+  const selfEmissive = sample.mul(tint.rgb).mul(tint.w).mul(mix(float(1), flicker, flame));
+  const shadeEmissive = buildingShadeEmission(colour).mul(float(1).sub(flame));
+  material.emissiveNode = selfEmissive.add(shadeEmissive);
   return material;
 }
 

@@ -177,10 +177,10 @@ function farmstead(size) {
   ));
 
   return [
-    box(size * 2.7, size * 0.08, size * 2.7, 'soil', null, [0, size * 0.04, 0]),
+    box( size * 2.7, size * 0.08, size * 2.7, 'soil', null, [0, size * 0.04, 0]),
     ...rows,
     box(barnWidth * 1.06, size * 0.1, barnDepth * 1.06, 'rubble', null, [barnX, size * 0.05, barnZ]),
-    box(barnWidth, barnWall, barnDepth, 'plank', '#a8492f', [barnX, size * 0.1 + barnWall / 2, barnZ]),
+    box(barnWidth, barnWall, barnDepth, 'plank', '#966d4b', [barnX, size * 0.1 + barnWall / 2, barnZ]),
     ...gableRoof({
       width: barnWidth,
       depth: barnDepth,
@@ -259,13 +259,13 @@ function tower(size) {
 
   return [
     cylinder(radius * 1.16, radius * 1.24, plinth, 14, 'rubble', null, [0, plinth / 2, 0]),
-    cylinder(radius * 0.9, radius, body, 14, 'stoneBlock', '#9fa0a6', [0, plinth + body / 2, 0]),
-    cylinder(radius * 1.12, radius * 1.12, size * 0.12, 14, 'stoneBlock', '#8d8f95', [0, bodyTop - size * 0.42, 0]),
-    cone(radius * 1.22, size * 1.05, 12, 'roofTile', '#6a49a8', [0, bodyTop + size * 0.52, 0]),
-    box(size * 0.3, size * 0.54, size * 0.08, 'plank', '#4d3428', [0, plinth + size * 0.27, radius * 0.98]),
-    box(size * 0.22, size * 0.26, size * 0.08, 'window', '#9db8ff', [0, plinth + body * 0.42, radius * 0.94]),
-    box(size * 0.22, size * 0.26, size * 0.08, 'window', '#9db8ff', [radius * 0.9, plinth + body * 0.72, 0], [0, Math.PI / 2, 0]),
-    blob(size * 0.19, 'window', '#b58bff', [0, bodyTop + size * 1.2, 0], [1, 1.5, 1]),
+    cylinder(radius * 0.9, radius, body, 14, 'stoneBlock', '#b6b0a2', [0, plinth + body / 2, 0]),
+    cylinder(radius * 1.12, radius * 1.12, size * 0.12, 14, 'stoneBlock', '#a29c8e', [0, bodyTop - size * 0.42, 0]),
+    cone(radius * 1.22, size * 1.05, 12, 'roofTile', '#72655a', [0, bodyTop + size * 0.52, 0]),
+    box(size * 0.3, size * 0.54, size * 0.08, 'plank', '#5c4332', [0, plinth + size * 0.27, radius * 0.98]),
+    box(size * 0.22, size * 0.26, size * 0.08, 'window', '#b8c4cc', [0, plinth + body * 0.42, radius * 0.94]),
+    box(size * 0.22, size * 0.26, size * 0.08, 'window', '#b8c4cc', [radius * 0.9, plinth + body * 0.72, 0], [0, Math.PI / 2, 0]),
+    blob(size * 0.19, 'bronze', '#b89b6a', [0, bodyTop + size * 1.2, 0], [1, 1.5, 1]),
   ];
 }
 
@@ -452,12 +452,12 @@ function chapel(size) {
       overhang: size * 0.14,
       yaw: Math.PI / 2,
     }),
-    box(size * 0.72, towerHeight, size * 0.72, 'stoneBlock', '#a5a399', [0, plinth + towerHeight / 2, -depth * 0.36]),
-    cone(size * 0.56, size * 0.78, 4, 'roofTile', '#4d5f6e', [0, plinth + towerHeight + size * 0.39, -depth * 0.36], [0, Math.PI / 4, 0]),
-    box(size * 0.36, size * 0.6, size * 0.08, 'timber', '#4f3520', [0, plinth + size * 0.3, depth / 2]),
-    box(size * 0.24, size * 0.44, size * 0.07, 'window', '#c9a8ff', [0, plinth + wallHeight * 0.68, depth / 2]),
-    box(size * 0.2, size * 0.42, size * 0.07, 'window', '#c9a8ff', [width / 2, plinth + wallHeight * 0.6, depth * 0.16], [0, Math.PI / 2, 0]),
-    box(size * 0.2, size * 0.42, size * 0.07, 'window', '#c9a8ff', [-width / 2, plinth + wallHeight * 0.6, depth * 0.16], [0, Math.PI / 2, 0]),
+    box(size * 0.72, towerHeight, size * 0.72, 'stoneBlock', '#aca69a', [0, plinth + towerHeight / 2, -depth * 0.36]),
+    cone(size * 0.56, size * 0.78, 4, 'roofTile', '#686058', [0, plinth + towerHeight + size * 0.39, -depth * 0.36], [0, Math.PI / 4, 0]),
+    box(size * 0.36, size * 0.6, size * 0.08, 'timber', '#5c422c', [0, plinth + size * 0.3, depth / 2]),
+    box(size * 0.24, size * 0.44, size * 0.07, 'window', '#d8c8a8', [0, plinth + wallHeight * 0.68, depth / 2]),
+    box(size * 0.2, size * 0.42, size * 0.07, 'window', '#d8c8a8', [width / 2, plinth + wallHeight * 0.6, depth * 0.16], [0, Math.PI / 2, 0]),
+    box(size * 0.2, size * 0.42, size * 0.07, 'window', '#d8c8a8', [-width / 2, plinth + wallHeight * 0.6, depth * 0.16], [0, Math.PI / 2, 0]),
     box(size * 0.08, size * 0.4, size * 0.08, 'bronze', null, [0, plinth + towerHeight + size * 0.98, -depth * 0.36]),
     box(size * 0.26, size * 0.08, size * 0.08, 'bronze', null, [0, plinth + towerHeight + size * 1.02, -depth * 0.36]),
   ];

@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 import { disposeModelParts } from './assets/modelParts.js';
 import { createObjectModelParts } from './ObjectModelLibrary.js';
 import { ObjectLodController } from './ObjectLodController.js';
@@ -121,8 +121,12 @@ export class ObjectView {
     this.selectionOverlay = this.createOverlay(SELECTION_COLOR, 0.24);
     terrainView.scene.add(this.footprintPreview, this.selectionOverlay);
 
-    const hemisphere = new THREE.HemisphereLight('#dce8ff', '#293326', 1.45);
-    const sun = new THREE.DirectionalLight('#fff1cf', 2.1);
+    const hasSkyLighting = Boolean(
+      terrainView.skyView
+      || terrainView.scene.children.some((child) => child.isDirectionalLight || child.isHemisphereLight),
+    );
+    const hemisphere = new THREE.HemisphereLight('#dce8ff', '#293326', hasSkyLighting ? 0 : 1.45);
+    const sun = new THREE.DirectionalLight('#fff1cf', hasSkyLighting ? 0 : 2.1);
     sun.position.set(80, 120, 60);
     hemisphere.userData.fallbackLighting = true;
     sun.userData.fallbackLighting = true;
@@ -170,11 +174,15 @@ export class ObjectView {
       capacity: 0,
       foundationGeometry: hasFoundation ? new THREE.BoxGeometry(1, 1, 1) : null,
       foundationMaterial: hasFoundation
-        ? new THREE.MeshStandardMaterial({
-          color: definition.foundation.color,
-          roughness: 0.96,
-          metalness: 0,
-        })
+        ? (() => {
+          const baseColor = new THREE.Color(definition.foundation.color);
+          return new THREE.MeshStandardMaterial({
+            color: baseColor,
+            emissive: baseColor.clone().multiplyScalar(0.18),
+            roughness: 0.96,
+            metalness: 0,
+          });
+        })()
         : null,
       foundationMesh: null,
       foundationCapacity: 0,

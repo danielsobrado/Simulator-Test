@@ -20,6 +20,12 @@ const BARK_BOUNCE = 0.7;
  */
 const ROCK_FILL = 3.5;
 const ROCK_BOUNCE = 4;
+const UNDERSTORY_FILL = 1.65;
+const UNDERSTORY_BOUNCE = 2.1;
+const BLOSSOM_FILL = 1.15;
+const BLOSSOM_BOUNCE = 1.4;
+const BUILDING_FILL = 2.2;
+const BUILDING_BOUNCE = 2.6;
 /** Metres up a trunk over which the bounce off the ground fades. */
 const BOUNCE_REACH = 5;
 
@@ -104,5 +110,30 @@ export function rockShadeEmission(stone) {
   const facing = normalWorld.y.negate().mul(0.5).add(0.5);
   return foliageSkyFill(stone, ROCK_FILL)
     .add(stone.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(ROCK_BOUNCE))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+}
+
+/**
+ * Sky fill, ground-colour bounce and distance air in-scatter for understory plants,
+ * shrubs and bush proxies so they sit in the same light and horizon haze as stones.
+ */
+export function understoryShadeEmission(plant, { blossom = false } = {}) {
+  const fill = blossom ? BLOSSOM_FILL : UNDERSTORY_FILL;
+  const bounce = blossom ? BLOSSOM_BOUNCE : UNDERSTORY_BOUNCE;
+  const facing = normalWorld.y.negate().mul(0.5).add(0.5);
+  return foliageSkyFill(plant, fill)
+    .add(plant.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(bounce))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+}
+
+/**
+ * Shared sky fill, warm ground bounce and distance air in-scatter for settlements,
+ * workshop buildings and placed structures so masonry, plaster, timber and roofs
+ * share the soft-shaded atmospheric integration of the terrain's boulders.
+ */
+export function buildingShadeEmission(surface, { fill = BUILDING_FILL, bounce = BUILDING_BOUNCE } = {}) {
+  const facing = normalWorld.y.negate().mul(0.5).add(0.5);
+  return foliageSkyFill(surface, fill)
+    .add(surface.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(bounce))
     .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
 }

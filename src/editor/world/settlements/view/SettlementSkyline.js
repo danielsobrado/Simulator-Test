@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
+import { vertexColor } from 'three/tsl';
 import { stagedDrawPublication, WAIT_FOR_DRAW_PREPARATION } from '../../../../render/preparation/StagedDrawPublication.js';
 import { PerfCounters } from '../../../performance/qa/PerfCounters.js';
+import { buildingShadeEmission } from '../../../stylized/forest/foliageLight.js';
 
 export const SETTLEMENT_SKYLINE = Object.freeze({ radius: 3200, near: 560, maxTowns: 8 });
 
@@ -16,8 +18,9 @@ export class SettlementSkyline {
     this.root = new THREE.Group(); this.root.name = 'settlement-skylines'; scene.add(this.root);
     this.isDrawn = isDrawn;
     this.getDrawPreparation = getDrawPreparation;
-    this.material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1, metalness: 0,
+    this.material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.94, metalness: 0,
       side: THREE.DoubleSide, flatShading: true });
+    this.material.emissiveNode = buildingShadeEmission(vertexColor().rgb);
     this.material.name = 'settlement-skyline';
     this.towns = new Map(); this.expected = new Map(); this.jobs = new Map(); this.failed = new Map();
     this.staged = new Map();

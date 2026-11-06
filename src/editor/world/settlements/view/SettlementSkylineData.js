@@ -6,14 +6,17 @@ import { settlementSkylineArrays } from './SettlementSkylineGeometry.js';
 const linear = ([red, green, blue]) => [red / 255, green / 255, blue / 255];
 
 export function skylineColors(style) {
+  // Each town's own stone and roof, seen from afar: a skyline is how two towns are told apart.
   const stone = linear((STONE_PALETTES[style.style] ?? STONE_PALETTES.granite).base);
-  const roof = linear((ROOF_PALETTES[style.topStyle] ?? ROOF_PALETTES.slate).ramp[0]).map((channel) => channel * 0.55);
+  const roof = linear((ROOF_PALETTES[style.topStyle] ?? ROOF_PALETTES.slate).ramp[0]).map((channel) => channel * 0.76);
   return {
     stone,
     roof,
     walls: (building) => {
       const finish = style.finishes[finishIndexFor(building.kind, building.variant) % style.finishes.length];
-      return finish === 'masonry' ? stone : linear(PLASTER_PALETTES[finish].base).map((channel) => channel * 0.82);
+      return finish === 'masonry'
+        ? stone
+        : linear(PLASTER_PALETTES[finish].base).map((channel) => channel * 0.84);
     },
   };
 }

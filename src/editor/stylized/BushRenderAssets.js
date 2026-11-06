@@ -12,21 +12,21 @@ import { assignBushFoliageMaterialData } from '../../render/postprocessing/PostP
 import { applyUnderstoryPalette, authoredFoliageColor, biomeUnderstoryColor, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { applyPlantMotion } from './PlantMotionNodes.js';
 import { resolveFoliagePalette } from './forest/foliagePalette.js';
-import { applySkywardNormal } from './forest/foliageLight.js';
+import { applySkywardNormal, understoryShadeEmission } from './forest/foliageLight.js';
 import { applyCloudShadow } from './CloudShadow.js';
 
 export const BUSH_CAST_SHADOW = false;
 export const BUSH_PROXY_TRIANGLES = 60;
 
-const DEFAULT_PROXY_COLOR = '#6d9a5d';
+const DEFAULT_PROXY_COLOR = '#6d8a58';
 const MIN_PROXY_EXTENT = 0.05;
 const PROXY_FIT_MARGIN = 2e-7;
 const WHITE_THRESHOLD = 0.92;
 const WHITE_SPREAD = 0.05;
 const PROXY_LOBES = Object.freeze([
-  Object.freeze([-0.24, -0.08, 0.02, 0.62, 0.76, 0.72]),
-  Object.freeze([0.24, -0.06, -0.04, 0.62, 0.8, 0.72]),
-  Object.freeze([0, 0.16, 0.06, 0.68, 0.78, 0.62]),
+  Object.freeze([-0.26, -0.14, 0.04, 0.68, 0.64, 0.76]),
+  Object.freeze([0.26, -0.12, -0.05, 0.68, 0.68, 0.76]),
+  Object.freeze([0, 0.08, 0.04, 0.74, 0.66, 0.68]),
 ]);
 
 function usesCutout(material) {
@@ -46,6 +46,7 @@ export function cloneBushMaterial(source, { config = null, height = 0, tileId = 
   }
   material.colorNode = authoredFoliageColor(material);
   if (config) applyUnderstoryPalette(material, config, tileId, 'auto', { biomeLook });
+  else material.emissiveNode = understoryShadeEmission(material.colorNode);
   applyPlantMotion(material, { wind: config?.wind, height, profile: motion });
   if (config) applySkywardNormal(material);
   material.side = THREE.DoubleSide;
@@ -131,8 +132,8 @@ export function createBushProxyMaterial(sourceMaterial, {
 } = {}) {
   const value = proxyColor(sourceMaterial, color);
   const palette = config ? resolveFoliagePalette(config, tileId) : null;
-  const bottom = palette?.base ?? value.clone().multiplyScalar(0.72);
-  const top = palette?.tip ?? value.clone().lerp(new THREE.Color('#d7ef9a'), 0.22);
+  const bottom = (palette?.base ?? value.clone().multiplyScalar(0.72)).clone();
+  const top = (palette?.tip ?? value.clone().lerp(new THREE.Color('#c8d48c'), 0.2)).clone();
   const height = Math.max(MIN_PROXY_EXTENT, maximumHeight - minimumHeight);
   const heightMix = clamp(positionGeometry.y.sub(float(minimumHeight)).div(float(height)), 0, 1);
   const material = new THREE.MeshLambertNodeMaterial({ flatShading: true });
@@ -141,7 +142,9 @@ export function createBushProxyMaterial(sourceMaterial, {
     vec3(top.r, top.g, top.b),
     heightMix,
   );
-  material.colorNode = biomeLook ? biomeUnderstoryColor(ramp) : ramp;
+  const shadedColor = biomeLook ? biomeUnderstoryColor(ramp) : ramp;
+  material.colorNode = shadedColor;
+  material.emissiveNode = understoryShadeEmission(shadedColor);
   material.transparent = false;
   material.depthWrite = true;
   applyPlantMotion(material, { wind: config?.wind, height, profile: motion });

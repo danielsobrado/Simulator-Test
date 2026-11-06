@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SURFACE_PROPERTIES, createSurfaceTexturePixels } from './proceduralTexturePixels.js';
 import { HOUSE_SURFACE_ALIASES, createHouseSurfaceTextures, houseSurfaceProperties } from './godsEnd/houseSurfaces.js';
 
+
 /**
  * Shared procedural surface textures and materials.
  *
@@ -75,18 +76,27 @@ export function getSurfaceMaterial(kind, tint = null) {
   }
 
   const textures = getSurfaceTextures(kind);
+  const gradedColor = new THREE.Color(color);
+  const hsl = { h: 0, s: 0, l: 0 };
+  gradedColor.getHSL(hsl);
+  gradedColor.setHSL(hsl.h, hsl.s * 0.82, Math.min(0.92, hsl.l * 1.04));
+
   const material = new THREE.MeshStandardMaterial({
-    color,
+    color: gradedColor,
     map: textures.map,
     normalMap: textures.normalMap,
     roughnessMap: textures.roughnessMap,
     roughness: properties.roughness ?? 1,
     metalness: properties.metalness,
   });
-  material.normalScale.set(properties.normalStrength, properties.normalStrength);
+  const normalScale = (properties.normalStrength ?? 1) * 0.78;
+  material.normalScale.set(normalScale, normalScale);
   if (properties.emissive) {
     material.emissive = new THREE.Color(properties.emissive);
     material.emissiveIntensity = properties.emissiveIntensity;
+  } else {
+    material.emissive = gradedColor.clone().multiplyScalar(0.18);
+    material.emissiveIntensity = 1.0;
   }
   material.userData.sharedSurface = true;
 

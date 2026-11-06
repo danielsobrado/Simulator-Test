@@ -17,7 +17,8 @@
 /**
  * Set name → its source and the metres one repeat spans on paving.
  *
- * `source` is a Poly Haven asset id. `neutralMean` sets are stored desaturated
+ * `source` is a Poly Haven asset id. `brightness` lifts a dark photograph toward
+ * the other sets without taking its hue or pattern. `neutralMean` sets are stored desaturated
  * at that mean brightness: they are surfaces a material tints (a wall finish, a
  * stone palette, a timber tone). `repeat` scales the workshop's own projected
  * UVs for building surfaces.
@@ -35,20 +36,24 @@
  */
 /**
  * Seen from a stride away — walls, roofs, the setts underfoot — a set keeps 1K
- * colour and normals and its photographic detail rather than the painterly
- * 512 px default (scripts/fetch-settlement-textures.mjs).
+ * colour and normals, painted like the rest of the world: a median over a 7 px
+ * window at 1K, the 512 px default's softening at twice the resolution
+ * (scripts/fetch-settlement-textures.mjs). Photographic grain read as a
+ * different game beside the painted rocks, trees and grass.
  */
-const CLOSE_UP = Object.freeze({ size: 1024, median: 0 });
+const CLOSE_UP = Object.freeze({ size: 1024, median: 7 });
 
 export const SETTLEMENT_SURFACE_SETS = Object.freeze({
   'cobble-grey': Object.freeze({ source: 'cobblestone_floor_08', tileMetres: 1.9, ...CLOSE_UP }),
   'cobble-mossy': Object.freeze({ source: 'cobblestone_floor_04', tileMetres: 2.2, ...CLOSE_UP }),
-  'cobble-dark': Object.freeze({ source: 'cobblestone_05', tileMetres: 1.7, ...CLOSE_UP }),
+  'cobble-dark': Object.freeze({ source: 'cobblestone_05', tileMetres: 1.7, brightness: 1.12, ...CLOSE_UP }),
   // The medieval kit's own setts (medkit/scans.py), so both town renderers pave alike.
   'cobble-kit': Object.freeze({ source: 'cobblestone_floor_01', tileMetres: 1.6, ...CLOSE_UP }),
   'flag-slate': Object.freeze({ source: 'stone_tiles_02', tileMetres: 1.7, ...CLOSE_UP }),
   // Irregular old flags with deep joints: what a medieval square is laid in.
-  'flag-monastery': Object.freeze({ source: 'monastery_stone_floor', tileMetres: 2.6, saturation: 0.3, ...CLOSE_UP }),
+  // Lifted toward the other sets' brightness: at its photograph's luma (88 of 255)
+  // a square paved in it read as a black hole beside the painted world.
+  'flag-monastery': Object.freeze({ source: 'monastery_stone_floor', tileMetres: 2.6, saturation: 0.3, brightness: 1.45, ...CLOSE_UP }),
   // Rough, worn field cobbles for back lanes.
   'cobble-old': Object.freeze({ source: 'cobblestone_floor_13', tileMetres: 2.2, saturation: 0.9, ...CLOSE_UP }),
   // The photograph is an orange clay; a town's trodden ground is duller than its setts.

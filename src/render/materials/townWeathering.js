@@ -5,23 +5,25 @@ import { float, mix, mx_noise_float, smoothstep, vec3 } from 'three/tsl';
  * (SettlementView's workshop houses and the medieval kit), so a street reads
  * as one place whichever draws it.
  *
- * The target is lived-in northern stonework: green growth where rain and
- * debris settle on sky-facing ledges and slates, dark streaks where water runs
- * down a face from what is above it, and a damp band where a wall meets the
- * ground. Fragment work only and two gradient noises — the vertex stage
- * re-runs for every shadow cascade, so none of it belongs there.
+ * Weathered the way the terrain's boulders are (rockWeathering.js): moss where
+ * rain settles, dust on what faces the sky, a soft damp foot, faint runs. The
+ * dust is each surface's own colour bleached by the sun, not one shared tint,
+ * so a rose-rendered town and a slate-and-granite one stay themselves.
  */
 
-export const WEATHER_MOSS = Object.freeze([0.2, 0.25, 0.1]);
-export const WEATHER_DAMP = Object.freeze([0.2, 0.19, 0.14]);
+export const WEATHER_MOSS = Object.freeze([0.30, 0.39, 0.14]);
+export const WEATHER_DAMP = Object.freeze([0.31, 0.27, 0.21]);
+/** How far sun-bleached dust lifts a surface toward pale, and how much of its hue it keeps. */
+const DUST_LIFT = 0.42;
+const DUST_HUE_KEEP = 0.7;
 
 /** Per material family: how much of each the surface takes. */
 export const WEATHER_FAMILIES = Object.freeze({
-  stone: Object.freeze({ moss: 0.55, streaks: 1, damp: 1 }),
-  plaster: Object.freeze({ moss: 0.15, streaks: 0.8, damp: 0.9 }),
-  mortar: Object.freeze({ moss: 0.3, streaks: 0.6, damp: 1 }),
-  timber: Object.freeze({ moss: 0.2, streaks: 0.5, damp: 0.7 }),
-  roof: Object.freeze({ moss: 0.45, streaks: 0, damp: 0 }),
+  stone: Object.freeze({ moss: 0.48, streaks: 0.65, damp: 0.75, dust: 0.34 }),
+  plaster: Object.freeze({ moss: 0.14, streaks: 0.5, damp: 0.65, dust: 0.28 }),
+  mortar: Object.freeze({ moss: 0.26, streaks: 0.45, damp: 0.75, dust: 0.32 }),
+  timber: Object.freeze({ moss: 0.18, streaks: 0.35, damp: 0.55, dust: 0.24 }),
+  roof: Object.freeze({ moss: 0.38, streaks: 0, damp: 0, dust: 0.32 }),
 });
 
 /**
@@ -32,7 +34,7 @@ export const WEATHER_FAMILIES = Object.freeze({
  * @param {import('three/tsl').Node} options.up world normal's y
  * @param {?import('three/tsl').Node} [options.height] metres above the building's ground,
  *   or null where it is not known (no damp band then)
- * @param {{ moss: number|Node, streaks: number|Node, damp: number|Node }} options.family amounts, 0..1
+ * @param {{ moss: number|Node, streaks: number|Node, damp: number|Node, dust?: number|Node }} options.family amounts, 0..1
  * @returns {import('three/tsl').Node} weathered albedo (vec3)
  */
 export function weatherTownSurface(colour, { place, up, height = null, family }) {
@@ -42,18 +44,23 @@ export function weatherTownSurface(colour, { place, up, height = null, family })
   // Runs: noise stretched along the fall line, on faces that are near vertical.
   const run = mx_noise_float(vec3(place.x.mul(2.4), place.y.mul(0.16), place.z.mul(2.4)));
   const vertical = float(1).sub(up.abs()).clamp(0, 1);
-  const streak = smoothstep(0.05, 0.55, run).mul(vertical).mul(family.streaks).mul(0.24);
+  const streak = smoothstep(0.05, 0.55, run).mul(vertical).mul(family.streaks).mul(0.14);
   let weathered = colour.mul(float(1).sub(streak));
   if (height) {
     const foot = float(1).sub(smoothstep(0, 1.15, height)).pow(1.6);
-    const damp = foot.mul(patch.mul(0.25).add(0.75)).mul(family.damp).mul(0.6);
-    weathered = mix(weathered, vec3(...WEATHER_DAMP).mul(colour.dot(vec3(0.3, 0.55, 0.15)).mul(1.4).add(0.35)), damp);
+    const damp = foot.mul(patch.mul(0.25).add(0.75)).mul(family.damp).mul(0.42);
+    weathered = mix(weathered, vec3(...WEATHER_DAMP).mul(colour.dot(vec3(0.3, 0.55, 0.15)).mul(1.35).add(0.42)), damp);
   }
-  return mix(weathered, vec3(...WEATHER_MOSS).mul(colour.dot(vec3(0.3, 0.55, 0.15)).mul(0.9).add(0.55)), moss.clamp(0, 0.85));
+  const dustAmount = family.dust ?? 0.28;
+  const dustMask = smoothstep(0.15, 0.88, up).mul(patch.mul(0.25).add(0.75)).mul(dustAmount);
+  const luma = colour.dot(vec3(0.3, 0.55, 0.15));
+  const bleached = mix(vec3(luma), colour, DUST_HUE_KEEP).mul(1 - DUST_LIFT).add(DUST_LIFT * 0.62);
+  weathered = mix(weathered, bleached, dustMask.clamp(0, 0.45));
+  return mix(weathered, vec3(...WEATHER_MOSS).mul(colour.dot(vec3(0.3, 0.55, 0.15)).mul(0.9).add(0.55)), moss.clamp(0, 0.72));
 }
 
 /** Trodden grime on paving: how dark a patch gets, and the earth it darkens toward. */
-export const TREAD_GRIME = Object.freeze({ depth: 0.42, earth: [0.62, 0.55, 0.45], tone: 0.86 });
+export const TREAD_GRIME = Object.freeze({ depth: 0.34, earth: [0.66, 0.59, 0.49], tone: 0.90 });
 
 /**
  * A lived-in street's paving: never as pale as its photograph, and darkened

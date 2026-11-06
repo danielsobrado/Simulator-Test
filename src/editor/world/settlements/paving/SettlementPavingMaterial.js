@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute, color, dot, float, fract, mix, mx_noise_float, positionWorld, sin, smoothstep, step, texture, uv, vec2, vec3 } from 'three/tsl';
 import { treadPaving } from '../../../../render/materials/townWeathering.js';
+import { buildingShadeEmission } from '../../../stylized/forest/foliageLight.js';
 import { TOWN_GROUND } from '../view/SettlementGrade.js';
 
 /** Paving wears a hint of the town's own stone over the photographed surface. */
@@ -51,8 +52,8 @@ export function createPavingMaterial(layer, set, stoneStyle) {
       : (STONE_TINT[stoneStyle] ?? '#ffffff'),
     map: set.color,
     normalMap: set.normal,
-    // Relief enough to read each stone under a raking sun.
-    normalScale: new THREE.Vector2(1.35, 1.35),
+    // Restrained relief to sit with the stylized terrain and boulders.
+    normalScale: new THREE.Vector2(1.0, 1.0),
     // Packed AO / roughness / metalness: three reads AO from red, roughness from green.
     roughnessMap: set.arm,
     aoMap: set.arm,
@@ -75,6 +76,7 @@ export function createPavingMaterial(layer, set, stoneStyle) {
   material.opacityNode = step(cut, texture(set.arm, uv()).r.mul(0.38).add(grain.mul(0.58)).add(0.04));
   material.alphaTest = 0.5;
   material.colorNode = untiledColour(set.color, set.arm, material.color);
+  material.emissiveNode = buildingShadeEmission(material.colorNode, { fill: 1.35, bounce: 0.8 });
   material.name = `settlement-paving-${layer}-${set.name}`;
   return material;
 }

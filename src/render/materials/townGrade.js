@@ -4,32 +4,27 @@ import { dot, float, materialColor, materialNormal, materialRoughness, mix, norm
 import { WEATHER_FAMILIES, weatherTownSurface } from './townWeathering.js';
 import { TOWN_WET_FAMILIES, wetTownSurface } from './townWetness.js';
 import { filterSpecularRoughness } from './specularAntialiasing.js';
+import { buildingShadeEmission } from '../../editor/stylized/forest/foliageLight.js';
 
 /**
  * One palette for a whole town — and for every workshop building, so a house
  * looks the same in the workshop, as a baked object and in a settlement.
  *
- * Every surface of a settlement used to be coloured on its own: cool grey
- * masonry from the workshop's stone palette, warm photographed setts, orange
- * earth, saturated render. Side by side they read as four kits. Two things tie
- * them together here, after the glade wall work (construction/): quiet faces
- * that let bevels and crevice shadow do the drawing, and one family of colour.
- *
- * - `TOWN_GROUND` is the trodden earth of the place; the paving's earth layer
- *   is tinted to it.
- * - `FAMILY_GRADE` pulls each material family a little toward one daylight.
- * - Every family is then weathered as the medieval kit's towns are
- *   (render/materials/townWeathering): moss on ledges and slates, rain runs
- *   down faces, and a damp foot where a wall meets its ground.
+ * The style of the terrain's painted rocks, not their colours: quiet painterly
+ * planes (median-softened surface sets, restrained relief), and the rocks' sky
+ * fill, ground bounce and distance air (`buildingShadeEmission`). Each town keeps
+ * its own palette — its culture's stone, its slate or terracotta roofs, its
+ * limewash, ochre or rose render, its timber tone (SettlementProfile,
+ * SettlementDressing) — so no two peoples' towns read alike.
  */
 export const TOWN_GROUND = Object.freeze([0.47, 0.41, 0.33]);
 
 /** A multiplier per material family, in linear colour. */
 const FAMILY_GRADE = Object.freeze({
-  stone: [1, 1, 1],
-  mortar: [1.0, 0.98, 0.94],
-  wood: [1, 1, 1],
-  roof: [0.96, 0.95, 0.94],
+  stone: [0.98, 0.96, 0.92],
+  mortar: [1.0, 0.97, 0.92],
+  wood: [0.98, 0.95, 0.90],
+  roof: [0.95, 0.92, 0.88],
 });
 /**
  * Joint mortar of bare masonry, as a share of the stone it binds. Recessed joints
@@ -39,33 +34,27 @@ const FAMILY_GRADE = Object.freeze({
 const JOINT_DARKENING = 0.92;
 const WEATHER_OF_SLOT = Object.freeze({ stone: 'stone', wood: 'timber', roof: 'roof' });
 /**
- * One palette with the medieval kit's towns: each family keeps only part of its
- * own hue (`keep`) and takes the rest from the kit's — warm grey stone, cream
- * lime render, dark brown timber — at its own brightness, lifted by `gain`.
- * The workshop's finishes are paint-box bright (ochre reads as mud once
- * weathered), its stone palettes lean teal and its timber silver-green.
- * Hues are scaled so their luma is 1, so a family keeps its brightness.
+ * A little of the medieval kit's daylight in each family — warm grey stone,
+ * cream render, brown timber — at its own brightness, lifted by `gain`. `keep`
+ * is how much of the town's own hue stays: high, so granite stays cool grey and
+ * sandstone warm, rose render rose and ochre ochre. Pulled harder (keep 0.2-0.4)
+ * every town came out the same warm limestone. Roofs take no pull at all:
+ * slate against terracotta is the first thing that tells two towns apart.
  */
 const KIT_HUE = Object.freeze({
-  // Half the style's own hue stays, so sandstone stays warm and granite cool-grey;
-  // the teal it used to pick up was the meadow-green bounce (SettlementGroundBounce).
-  stone: Object.freeze({ hue: [1.28, 1.0, 0.7], keep: 0.5, gain: 1.05 }),
-  // The rubble photograph is darker than dressed block faces: lifted to sit with them.
-  rubble: Object.freeze({ hue: [1.28, 1.0, 0.7], keep: 0.15, gain: 1.35 }),
-  // Lime render is a warm cream even out of the sun: cool sky fill turned a
-  // greyer target grey-blue on every shaded wall.
-  render: Object.freeze({ hue: [1.14, 1.0, 0.76], keep: 0.25, gain: 1.22 }),
-  wood: Object.freeze({ hue: [1.32, 0.94, 0.66], keep: 0.3, gain: 0.82 }),
+  stone: Object.freeze({ hue: [1.24, 1.0, 0.74], keep: 0.78, gain: 1.04 }),
+  // The rubble photograph is darker and greyer than dressed faces: lifted, and pulled a little more.
+  rubble: Object.freeze({ hue: [1.24, 1.0, 0.74], keep: 0.55, gain: 1.28 }),
+  render: Object.freeze({ hue: [1.14, 1.0, 0.78], keep: 0.72, gain: 1.14 }),
+  wood: Object.freeze({ hue: [1.28, 0.96, 0.70], keep: 0.65, gain: 0.94 }),
 });
 const LUMA = [0.3, 0.55, 0.15];
-const FORGED_IRON = new THREE.Color('#38332e');
+const FORGED_IRON = new THREE.Color('#464039');
 /**
- * Photographed relief per family, as a multiple of the workshop's own normal
- * scale (tuned for its synthesised maps). A town is seen from a stride away
- * under a raking sun, where a scan's pits, grain and laps are what make a
- * surface read as made of something.
+ * Restrained surface relief so masonry, timber and roof planes read with the same
+ * clean bevelled faceting as the stylized rock pack rather than noisy photo-grit.
  */
-const RELIEF = Object.freeze({ stone: 1.7, wood: 1.5, mortar: 1.4, roof: 1.3 });
+const RELIEF = Object.freeze({ stone: 1.05, wood: 1.0, mortar: 0.95, roof: 1.0 });
 
 function kitHued(albedo, { hue, keep, gain }) {
   const scale = 1 / (hue[0] * LUMA[0] + hue[1] * LUMA[1] + hue[2] * LUMA[2]);
@@ -88,16 +77,20 @@ const SEED_SPREAD = 173;
 export function gradeTownMaterial(material, slot, { plastered = true, seed = float(0) } = {}) {
   if (slot === 'metal') {
     // The workshop's fittings are brass; a town's hinges, studs, brackets and
-    // shutter stays are black forged iron, as the kit towns' are.
+    // shutter stays are warm forged iron, lifted by the shared sky/ground bounce.
     material.color.copy(FORGED_IRON);
-    material.metalness = 0.6;
-    material.roughness = 0.55;
+    material.metalness = 0.5;
+    material.roughness = 0.62;
   }
   const grade = FAMILY_GRADE[slot];
   if (!grade) {
     // Emissive and metal families are left as authored; the dithered instance
     // material still wants an explicit colour node to vary.
     material.colorNode ??= materialColor;
+    if (slot === 'metal') {
+      const shade = buildingShadeEmission(material.colorNode, { fill: 1.4, bounce: 1.6 });
+      material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(shade) : shade;
+    }
     return;
   }
   // A masonry finish dressed in the town's rubble set is a stone wall, graded as stone;
@@ -127,6 +120,8 @@ export function gradeTownMaterial(material, slot, { plastered = true, seed = flo
     normalWorld.y, TOWN_WET_FAMILIES[familyKey]);
   material.colorNode = wet.color;
   material.roughnessNode = wet.roughness;
+  const shadeEmission = buildingShadeEmission(material.colorNode);
+  material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(shadeEmission) : shadeEmission;
   if (material.normalMap && !material.normalNode) {
     // Share the lit normal's sample and UV transform. A separate texture() here
     // made the shader fetch the same normal map twice for every visible wall.
