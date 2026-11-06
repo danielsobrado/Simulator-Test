@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TerrainMaterialBakeRuntime } from '../src/editor/materials/TerrainMaterialBakeRuntime.js';
+import { StylizedChunkRevisionTracker } from '../src/editor/stylized/StylizedChunkRevisionTracker.js';
 
 function config(overrides = {}) {
   return {
@@ -61,11 +62,13 @@ function terrainSlot(slotIndex, chunkX, chunkZ = 0) {
 function createRevisionTracker() {
   const revisions = { world: 0, tile: 0, height: 0, water: 0, canopy: 0 };
   return {
+    materialClock: 0,
     materialRevisionsFor() {
       return { ...revisions };
     },
     touchMaterialField(_chunkX, _chunkZ, field) {
       revisions[field] += 1;
+      this.materialClock += 1;
     },
   };
 }
@@ -129,6 +132,45 @@ test('runtime bakes resident terrain slots and releases leases on reassignment',
   runtime.dispose();
   assert.equal(slot.materialBake, null);
   assert.equal(terrainView.materialBakeRuntime, null);
+});
+
+test('unchanged material descriptors are reused and every source dependency invalidates them', () => {
+  const slot = terrainSlot(0, 0);
+  const tracker = new StylizedChunkRevisionTracker({
+    worldStore: { chunkSize: 4, subscribe: () => () => {} },
+  });
+  const terrainView = { slots: [slot], chunkSize: 4, surfaceMaskChunkRadius: 1,
+    worldStore: { tileSize: 2 } };
+  const settings = config();
+  settings.classification.shorelineRadiusCells = 1;
+  const runtime = new TerrainMaterialBakeRuntime({ terrainView, revisionTracker: tracker, config: settings });
+  let reads = 0;
+  const revisionsFor = tracker.materialRevisionsFor.bind(tracker);
+  tracker.materialRevisionsFor = (...args) => { reads++; return revisionsFor(...args); };
+  try {
+    const descriptor = runtime.prepareSlot(slot, runtime.stateFor(slot));
+    for (let frame = 0; frame < 100; frame++) runtime.update(() => true);
+    assert.equal(reads, 1, 'idle frames must not scan revision maps');
+    assert.equal(runtime.descriptorFor(slot), descriptor);
+    let previous = descriptor;
+    for (const [field, x] of [['tile', 1], ['height', 0], ['height', 1], ['water', 1], ['canopy', 0]]) {
+      tracker.touchMaterialField(x, 0, field);
+      const next = runtime.descriptorFor(slot);
+      assert.notEqual(next.key, previous.key, `${field} edits must refresh the descriptor`);
+      previous = next;
+    }
+    slot.forestFloorKey = '0:0:changed';
+    const canopy = runtime.prepareSlot(slot, runtime.stateFor(slot));
+    assert.notEqual(canopy.key, previous.key);
+    tracker.onWorldChange({ kind: 'reset' });
+    assert.notEqual(runtime.descriptorFor(slot).key, canopy.key);
+    const reset = runtime.descriptorFor(slot);
+    slot.descriptor = terrainDescriptor(2, 0);
+    assert.notEqual(runtime.descriptorFor(slot).key, reset.key);
+    const moved = runtime.descriptorFor(slot);
+    settings.quality = 'high';
+    assert.notEqual(runtime.descriptorFor(slot).key, moved.key);
+  } finally { runtime.dispose(); tracker.dispose(); }
 });
 
 test('valid forest-floor changes invalidate canopy material revision and refresh the bake', async () => {

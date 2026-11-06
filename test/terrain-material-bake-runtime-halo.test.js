@@ -47,6 +47,7 @@ function slot(slotIndex, chunkX, chunkZ) {
 
 function tracker() {
   return {
+    materialClock: 0,
     materialRevisionsFor() {
       return { world: 0, tile: 0, height: 0, water: 0, canopy: 0 };
     },
@@ -105,4 +106,38 @@ test('runtime defers a bake until the complete resident water halo is available'
   assert.equal(center.materialBake.source.waterHaloRadius, 1);
   assert.equal(center.materialBake.source.waterHaloSize, CHUNK_SIZE + 2);
   runtime.dispose();
+});
+
+test('an exact cached bake publishes without source copies or resident halo pages', async () => {
+  const center = slot(0, 0, 0);
+  const slots = [center];
+  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
+    if (x || z) slots.push(slot(slots.length, x, z));
+  }
+  const terrainView = { slots, chunkSize: CHUNK_SIZE, surfaceMaskChunkRadius: 1,
+    focusChunk: { chunkX: 0, chunkZ: 0 }, worldStore: { tileSize: 2 } };
+  let builds = 0;
+  const runtime = new TerrainMaterialBakeRuntime({ terrainView, revisionTracker: tracker(), config: config(),
+    bakePage: async ({ descriptor }) => {
+      builds++;
+      return { value: { descriptor }, byteLength: 32 };
+    } });
+  try {
+    runtime.update();
+    await settle(runtime);
+    const baked = center.materialBake;
+    assert.ok(baked);
+    assert.equal(builds, 1);
+    center.mesh.visible = false;
+    runtime.update();
+    for (const neighbor of slots) neighbor.mesh.visible = false;
+    center.mesh.visible = true;
+    runtime.captureSource = () => { assert.fail('an exact hit must not capture source arrays'); };
+    runtime.update();
+    await settle(runtime);
+    assert.equal(center.materialBake, baked);
+    assert.equal(builds, 1);
+    assert.equal(runtime.getStats().hits, 1);
+    assert.equal(runtime.getStats().activeLeases, 1);
+  } finally { runtime.dispose(); }
 });

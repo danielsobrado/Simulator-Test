@@ -336,6 +336,10 @@ export class TerrainMaterialBakeCache {
     }
   }
 
+  isResident(descriptor) {
+    return this.entries.has(descriptor.key);
+  }
+
   async whenResident(descriptor) {
     this.assertOpen();
     if (this.entries.has(descriptor.key)) return true;

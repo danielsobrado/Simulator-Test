@@ -20,6 +20,10 @@ function createSlotState() {
     generation: 0,
     retryAt: 0,
     lease: null,
+    descriptor: null,
+    descriptorClock: null,
+    tileHalo: null,
+    waterHalo: null,
   };
 }
 
@@ -137,6 +141,7 @@ export class TerrainMaterialBakeRuntime {
     state.forestFloorKey = validForestFloorKey(slot);
     state.pendingKey = null;
     state.retryAt = 0;
+    state.descriptor = null;
   }
 
   syncCanopyRevision(slot, state) {
@@ -152,16 +157,29 @@ export class TerrainMaterialBakeRuntime {
 
   descriptorFor(slot) {
     const { chunkX, chunkZ } = slot.descriptor;
-    return createTerrainMaterialBakeDescriptor({
+    const state = this.stateFor(slot);
+    const clock = this.revisionTracker.materialClock;
+    const tileHalo = this.terrainView.surfaceMaskChunkRadius ?? 0;
+    const waterHalo = this.waterHaloChunkRadius();
+    const cached = state.descriptor;
+    if (cached && cached.chunkX === chunkX && cached.chunkZ === chunkZ
+        && state.descriptorClock === clock && cached.quality === this.config.quality
+        && cached.recipe === this.recipeFingerprint
+        && state.tileHalo === tileHalo && state.waterHalo === waterHalo) return cached;
+    state.descriptor = createTerrainMaterialBakeDescriptor({
       chunkX,
       chunkZ,
       quality: this.config.quality,
       recipe: this.recipeFingerprint,
       revisions: this.revisionTracker.materialRevisionsFor(chunkX, chunkZ, {
-        tileHalo: this.terrainView.surfaceMaskChunkRadius ?? 0,
-        waterHalo: this.waterHaloChunkRadius(),
+        tileHalo,
+        waterHalo,
       }),
     });
+    state.descriptorClock = clock;
+    state.tileHalo = tileHalo;
+    state.waterHalo = waterHalo;
+    return state.descriptor;
   }
 
   rebuildResidentPageIndex() {
@@ -275,12 +293,10 @@ export class TerrainMaterialBakeRuntime {
       });
   }
 
-  requestSlot(slot, state, descriptor, now) {
-    if (state.lease?.descriptor.key === descriptor.key && !state.lease.stale) return false;
-    if (state.pendingKey === descriptor.key || now < state.retryAt) return false;
-
-    const source = this.captureSource(slot);
-    if (!source) return false;
+  requestSlot(slot, state, descriptor) {
+    const resident = this.cache.isResident(descriptor);
+    const source = resident ? null : this.captureSource(slot);
+    if (!resident && !source) return false;
     const generation = state.generation + 1;
     state.generation = generation;
     state.pendingKey = descriptor.key;
@@ -347,7 +363,10 @@ export class TerrainMaterialBakeRuntime {
         if (state.chunkKey !== null || state.lease) this.resetStateForChunk(slot, state);
         continue;
       }
-      candidates.push({ slot, state, descriptor: this.prepareSlot(slot, state) });
+      const descriptor = this.prepareSlot(slot, state);
+      if (state.lease?.descriptor.key === descriptor.key && !state.lease.stale) continue;
+      if (state.pendingKey === descriptor.key || now < state.retryAt) continue;
+      candidates.push({ slot, state, descriptor });
     }
     for (const [slotIndex, state] of this.states) {
       if (activeSlotIndexes.has(slotIndex)) continue;
@@ -363,7 +382,7 @@ export class TerrainMaterialBakeRuntime {
     let available = Math.max(0, this.config.build.maxConcurrent - this.cache.getStats().inFlight);
     for (const candidate of candidates) {
       if (available <= 0 || shouldYield?.()) break;
-      if (this.requestSlot(candidate.slot, candidate.state, candidate.descriptor, now)) {
+      if (this.requestSlot(candidate.slot, candidate.state, candidate.descriptor)) {
         available -= 1;
       }
     }

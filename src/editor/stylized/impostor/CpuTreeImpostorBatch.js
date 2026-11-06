@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { markAttributeRangeUpdated } from '../attributeUpload.js';
+import { markAttributeSubrangeUpdated } from '../attributeUpload.js';
+import { writeImpostorAttribute } from './ImpostorAttributeUpdates.js';
 import { createCpuTreeImpostorMaterial, updateImpostorCameraUniforms } from './TreeImpostorMaterial.js';
 
 const DEFAULT_APPEARANCE = Object.freeze([1, 1, 1, 1]);
@@ -58,21 +59,41 @@ export class CpuTreeImpostorBatch {
     this.scene = scene;
     this.frustum = new THREE.Frustum();
     this.projectionView = new THREE.Matrix4();
+    this.lastProjectionView = new THREE.Matrix4();
+    this.lastOriginX = Number.NaN;
+    this.lastOriginZ = Number.NaN;
+    this.lastCoordinateSystem = null;
+    this.recordsDirty = true;
     this.sphere = new THREE.Sphere();
   }
 
   setRecords(records) {
     this.records = records.slice(0, this.capacity);
+    this.recordsDirty = true;
     return this.records.length;
   }
 
   update(camera, origin, timestamp = 0) {
     updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    if (!this.recordsDirty && this.projectionView.equals(this.lastProjectionView)
+        && origin.x === this.lastOriginX && origin.z === this.lastOriginZ
+        && camera.coordinateSystem === this.lastCoordinateSystem) {
+      this.mesh.visible = this.geometry.instanceCount > 0;
+      return this.geometry.instanceCount;
+    }
+    this.lastProjectionView.copy(this.projectionView);
+    this.lastOriginX = origin.x;
+    this.lastOriginZ = origin.z;
+    this.lastCoordinateSystem = camera.coordinateSystem;
+    this.recordsDirty = false;
     this.frustum.setFromProjectionMatrix(this.projectionView, camera.coordinateSystem);
     const transforms = this.geometry.getAttribute('instanceTransform');
     const parameters = this.geometry.getAttribute('instanceImpostorParams');
     const appearances = this.geometry.getAttribute('instanceImpostorAppearance');
+    const transformRange = { min: Infinity, max: -1 };
+    const parameterRange = { min: Infinity, max: -1 };
+    const appearanceRange = { min: Infinity, max: -1 };
     let count = 0;
 
     for (const record of this.records) {
@@ -83,29 +104,25 @@ export class CpuTreeImpostorBatch {
       );
       this.sphere.radius = record.radius;
       if (!this.frustum.intersectsSphere(this.sphere)) continue;
-      const offset = count * 4;
-      transforms.array[offset] = record.x - origin.x;
-      transforms.array[offset + 1] = record.y;
-      transforms.array[offset + 2] = record.z - origin.z;
-      transforms.array[offset + 3] = record.scale;
-      parameters.array[offset] = record.yaw;
-      parameters.array[offset + 1] = record.fade;
-      parameters.array[offset + 2] = record.seed;
-      parameters.array[offset + 3] = record.radius;
+      writeImpostorAttribute(transforms, count,
+        record.x - origin.x, record.y, record.z - origin.z, record.scale, transformRange);
+      writeImpostorAttribute(parameters, count,
+        record.yaw, record.fade, record.seed, record.radius, parameterRange);
       const appearance = record.appearance ?? DEFAULT_APPEARANCE;
-      appearances.array[offset] = appearance[0];
-      appearances.array[offset + 1] = appearance[1];
-      appearances.array[offset + 2] = appearance[2];
-      appearances.array[offset + 3] = appearance[3];
+      writeImpostorAttribute(appearances, count,
+        appearance[0], appearance[1], appearance[2], appearance[3], appearanceRange);
       count += 1;
     }
 
     this.geometry.instanceCount = count;
     this.mesh.visible = count > 0;
     if (count > 0) {
-      markAttributeRangeUpdated(transforms, count, { counter: 'treeImpostorAttributeBytesUploaded' });
-      markAttributeRangeUpdated(parameters, count, { counter: 'treeImpostorAttributeBytesUploaded' });
-      markAttributeRangeUpdated(appearances, count, { counter: 'treeImpostorAttributeBytesUploaded' });
+      markAttributeSubrangeUpdated(transforms, transformRange.min, transformRange.max,
+        { counter: 'treeImpostorAttributeBytesUploaded' });
+      markAttributeSubrangeUpdated(parameters, parameterRange.min, parameterRange.max,
+        { counter: 'treeImpostorAttributeBytesUploaded' });
+      markAttributeSubrangeUpdated(appearances, appearanceRange.min, appearanceRange.max,
+        { counter: 'treeImpostorAttributeBytesUploaded' });
     }
     return count;
   }
