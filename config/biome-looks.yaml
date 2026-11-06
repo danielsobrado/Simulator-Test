@@ -84,7 +84,16 @@ biomeLooks:
       snow: { ground: 0.2, air: 0.3, fall: 0.3 }
       ripples: { speed: 1.6, fade: 1.8 }
       prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
-    3: { name: savanna, canopy: '#aeae5a', rock: { tint: '#e8d6b8', tone: 1.1, moss: 0.3 } }
+    # Dry-season savanna: tawny laterite under straw grass, muddy waterholes.
+    # With the map colour underneath it read as a green English meadow, the
+    # lagoon cyan as a tropical oasis and tone 1.1 stones near-white (2026-11-06 review).
+    3:
+      name: savanna
+      canopy: '#aeae5a'
+      soil: '#a8865a'
+      rock: { tint: '#e0c9a6', tone: 0.9, moss: 0 }
+      water: { tint: '#c8bf98', desaturate: 0.45 }
+      prints: { ground: 0.4, lifetime: 90, tint: '#8a6a48' }
     4: { name: grassland, canopy: '#86b04a' }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
     6: { name: temperate deciduous forest, canopy: '#6da03c' }

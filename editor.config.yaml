@@ -1526,7 +1526,8 @@ stylizedSurface:
           0: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           1: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           2: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
-          3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.72, patchMeters: 14, shape: slender}
+          # Savanna: tussocks over bare laterite, not an even sward.
+          3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.62, patchMeters: 8, shape: slender}
           4: {shortHeight: 0.24, tallHeight: 0.82, width: 0.045, density: 0.92, patchMeters: 17, shape: slender}
           5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
           6: {shortHeight: 0.16, tallHeight: 0.44, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
@@ -1554,7 +1555,7 @@ stylizedSurface:
         # style. Unlisted biomes (grassland, deciduous, tropical seasonal — the
         # spawn) wear the donor's own. One uniform-array entry per distinct pair.
         byTileId:
-          3: { base: '#6f6a2f', tip: '#c9bd6a' }   # savanna: dry, golden tips
+          3: { base: '#77692f', tip: '#d6c47a' }   # savanna: straw, pale golden tips
           5: { base: '#4d6839', tip: '#9ab477' }   # open woodland: shared forest pigment
           6: { base: '#4d6839', tip: '#9ab477' }
           7: { base: '#3d6635', tip: '#86aa60' }   # humid broadleaf floor
