@@ -3,6 +3,19 @@ import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { StylizedBuildQueue } from './StylizedBuildQueue.js';
 import { createStableChunkManifestBuilder, placementSignature } from './StableScatterManifest.js';
 import { createIteratorBuilder } from './ResumableIterator.js';
+
+/**
+ * The stone sources a chunk's manifest gathers after the scatter (stage 0), each
+ * a view method returning a resumable iterator, then one ground-fit pass.
+ */
+const STONE_SOURCES = Object.freeze([
+  { name: 'Riverbank', factory: 'riverbankRocksForChunk' },
+  { name: 'Coast', factory: 'coastStonesForChunk' },
+  { name: 'Seabed', factory: 'seabedRocksForChunk' },
+  { name: 'Formations', factory: 'formationRocksForChunk' },
+]);
+const STAGE_NAMES = Object.freeze(['Scatter', ...STONE_SOURCES.map(({ name }) => name), 'GroundFit']);
+const GROUND_FIT_STAGE = STAGE_NAMES.length - 1;
 import { withinPreparationWindow } from '../world/PlacementPreparationWindow.js';
 
 /** Placement ownership is independent of render slots and lookup order. */
@@ -95,25 +108,23 @@ export class RockManifestStore {
       this.pending.set(cacheKey, state);
     }
     const before = state.stage * 10000000 + state.builder.progress;
-    const stageNames = ['Scatter', 'Riverbank', 'Coast', 'Seabed', 'GroundFit'];
-    while (state.stage < 5 && !shouldYield()) {
+    while (state.stage <= GROUND_FIT_STAGE && !shouldYield()) {
       const started = performance.now();
       const placements = state.builder.step({ shouldYield });
-      PerfCounters.inc(`rock${stageNames[state.stage]}Ms`, performance.now() - started);
+      PerfCounters.inc(`rock${STAGE_NAMES[state.stage]}Ms`, performance.now() - started);
       if (placements === null) break;
-      if (state.stage === 4) state.placements = placements;
+      if (state.stage === GROUND_FIT_STAGE) state.placements = placements;
       else state.placements.push(...placements);
       state.stage++;
-      if (state.stage < 4) {
-        const factories = [null, 'riverbankRocksForChunk', 'coastStonesForChunk', 'seabedRocksForChunk'];
-        const factory = factories[state.stage];
+      if (state.stage < GROUND_FIT_STAGE) {
+        const factory = STONE_SOURCES[state.stage - 1].factory;
         state.builder = createIteratorBuilder(() => this.view[factory](x, z));
-      } else if (state.stage === 4) {
+      } else if (state.stage === GROUND_FIT_STAGE) {
         state.builder = createIteratorBuilder(() => this.view.resolveGroundPlacements(state.placements));
       }
     }
     PerfCounters.inc('rockManifestBuildSlices');
-    if (state.stage < 5 || shouldYield()) {
+    if (state.stage <= GROUND_FIT_STAGE || shouldYield()) {
       const after = state.stage * 10000000 + state.builder.progress;
       return { completed: false, advanced: after > before, blocked: after <= before, reason: 'budget' };
     }

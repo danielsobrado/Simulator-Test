@@ -154,6 +154,7 @@ function rockStore() {
     *riverbankRocksForChunk() { yield; return []; },
     *coastStonesForChunk() { yield; return []; },
     *seabedRocksForChunk() { yield; return []; },
+    *formationRocksForChunk() { yield; return []; },
     *resolveGroundPlacements(placements) { yield; return placements; },
   };
   return { view, store: new RockManifestStore(view) };

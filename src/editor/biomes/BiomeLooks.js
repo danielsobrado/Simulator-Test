@@ -85,6 +85,7 @@ function tileId(key, path) {
  *   snow: Readonly<Record<string, Float32Array>>,
  *   arid: Readonly<Record<string, readonly number[]>>,
  *   crags: Uint8Array,
+ *   formations: Float32Array,
  *   rock: Float32Array,
  *   understory: Float32Array,
  *   surface: ReturnType<typeof resolveBiomeSurfaceLooks>,
@@ -99,6 +100,8 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
   const soil = {};
   const arid = Object.fromEntries(BIOME_ARID_KINDS.map((kind) => [kind, []]));
   const crags = new Uint8Array(256);
+  // Chance a rock-formation cell grows a tor (stylized/rockFormations.js).
+  const formations = new Float32Array(256);
   // Four floats per tile id and look column (NEUTRAL_BIOME_LOOK).
   const looks = Object.fromEntries(Object.keys(LOOK_COLUMNS).map((column) => {
     const table = new Float32Array(256 * 4);
@@ -119,6 +122,7 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
       if (!BIOME_ARID_KINDS.includes(row.arid)) fail(`${path}.arid`, `is not one of ${BIOME_ARID_KINDS.join(', ')}`);
       arid[row.arid].push(id);
     }
+    if (row.formations !== undefined) formations[id] = unit(row.formations, `${path}.formations`);
     if (row.crags !== undefined) {
       if (typeof row.crags !== 'boolean') fail(`${path}.crags`, 'must be true or false');
       crags[id] = row.crags ? 1 : 0;
@@ -142,6 +146,7 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
     snow: Object.freeze(snow),
     arid: Object.freeze(Object.fromEntries(Object.entries(arid).map(([kind, ids]) => [kind, Object.freeze(ids)]))),
     crags,
+    formations,
     ...looks,
     surface: resolveBiomeSurfaceLooks(source.surface, surfaceRows),
   });

@@ -31,6 +31,10 @@
 #   ripples       how water near the player answers wading, swimming and spells
 #                 (water/RippleField.js): wave `speed` m/s, `fade` seconds for a
 #                 ring to die, `splash` gain, ambient `drops` per second.
+#   formations    chance (0..1) that a 96 m formation cell grows a tor: one to three
+#                 keystones of the scatter's own stones scaled 4.5-8.5x, 10-22
+#                 stones in all over 10-26 m (stylized/rockFormations.js), so big
+#                 rock areas share the boulders' look, biome tint and collision.
 #   understory    shrubs, bushes and ground plants (stylized/AuthoredFoliageMaterial.js),
 #                 per instance by the biome they stand in: greyed by `saturation`
 #                 (0 grey .. 1 as graded .. 1.5), then `tint` x `tone` multiplies them.
@@ -69,6 +73,7 @@ biomeLooks:
       arid: sand
       # Sun-bleached, sand-scoured stone: no moss survives the erg.
       rock: { tint: '#e6cfa8', tone: 1.1, moss: 0 }
+      formations: 0.3
       # Sun-baked scrub: olive-straw, never lawn green.
       understory: { tint: '#e2d3a6', tone: 1.1, saturation: 0.55 }
       ripples: { speed: 1.1, fade: 6, splash: 1.2 }
@@ -86,6 +91,8 @@ biomeLooks:
       # Frost-shattered stone; moss read as a green wash on a dry steppe. At tone
       # 1.1 the stones read near-white against the ground.
       rock: { tint: '#d6cbb8', tone: 0.95, moss: 0 }
+      # Frost-shattered tors break the open steppe.
+      formations: 0.4
       # Steel-grey meltwater: the lagoon cyan read as a tropical oasis.
       water: { tint: '#c6d2d8', desaturate: 0.5 }
       # Dusty sage steppe scrub, pale enough to sit on the grey-buff gravel.
@@ -101,13 +108,15 @@ biomeLooks:
       canopy: '#aeae5a'
       soil: '#a8865a'
       rock: { tint: '#e0c9a6', tone: 0.9, moss: 0 }
+      # Granite kopjes standing out of the grass.
+      formations: 0.25
       water: { tint: '#c8bf98', desaturate: 0.45 }
       # Dry-season thorn scrub, olive going to straw.
       understory: { tint: '#e6d6a0', tone: 1.05, saturation: 0.7 }
       prints: { ground: 0.4, lifetime: 90, tint: '#8a6a48' }
-    4: { name: grassland, canopy: '#86b04a' }
+    4: { name: grassland, canopy: '#86b04a', formations: 0.12 }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
-    6: { name: temperate deciduous forest, canopy: '#6da03c' }
+    6: { name: temperate deciduous forest, canopy: '#6da03c', formations: 0.08 }
     # Canopy drip keeps rainforest pools stippled with rings.
     7: { name: tropical rainforest, canopy: '#3f8f34', rock: { moss: 1.4 }, ripples: { drops: 6, fade: 2.2 } }
     8: { name: temperate rainforest, canopy: '#4c9142', rock: { moss: 1.4 }, ripples: { drops: 4, fade: 2.4 } }
@@ -123,6 +132,7 @@ biomeLooks:
       name: taiga
       canopy: '#4a7a55'
       soil: '#3d3a2b'
+      formations: 0.2
       water: { tint: '#bccaca', desaturate: 0.35 }
       snow: { ground: 0.1, canopy: 0.7, grass: 0.35, air: 0.4, fall: 0.15 }
       ripples: { speed: 1.5, fade: 2 }
@@ -133,6 +143,7 @@ biomeLooks:
       name: tundra
       canopy: '#8a9a62'
       rock: { tint: '#d6d8d4', tone: 1, moss: 0.35 }
+      formations: 0.3
       water: { tint: '#c8d6de', desaturate: 0.45 }
       # Dwarf willow and heath, frost-dulled.
       understory: { tint: '#d0d6c8', tone: 1.05, saturation: 0.6 }
@@ -174,6 +185,7 @@ biomeLooks:
       crags: true
       # Grey canyon stone, dusted pale; nothing grows on it.
       rock: { tint: '#cfc8bc', tone: 1.05, moss: 0 }
+      formations: 0.5
       water: { tint: '#c8c4b8', desaturate: 0.4 }
       understory: { tint: '#d8ccb0', tone: 1.1, saturation: 0.5 }
       snow: { ground: 0.05, air: 0.2 }

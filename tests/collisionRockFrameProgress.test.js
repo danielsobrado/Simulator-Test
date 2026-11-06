@@ -24,7 +24,8 @@ function rockHarness() {
     perChunk: 1, tileIds: new Set([1]), tileAt: () => 1, heightAt: () => 0,
     prototypeCount: 1, minScale: 1, maxScale: 1, radiusForScale: () => 0,
   });
-  rocks.riverbankRocksForChunk = rocks.coastStonesForChunk = rocks.seabedRocksForChunk = function* () { return []; };
+  rocks.riverbankRocksForChunk = rocks.coastStonesForChunk = rocks.seabedRocksForChunk
+    = rocks.formationRocksForChunk = function* () { return []; };
   // This harness isolates queue ownership; surface fitting has separate tests.
   rocks.resolveGroundPlacements = function* (placements) { yield; return placements; };
   rocks.manifestStore = new RockManifestStore(rocks);

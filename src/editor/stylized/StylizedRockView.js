@@ -39,6 +39,7 @@ import { iterateRiverbankRocks, DEFAULT_RIVERBANK_ROCKS } from './riverbankRocks
 import { RiverRockSource } from './RiverRockSource.js';
 import { iterateCoastStones, DEFAULT_COAST_STONES } from './coastStones.js';
 import { iterateSeabedRocks, DEFAULT_SEABED_ROCKS } from './seabedRocks.js';
+import { iterateRockFormations, DEFAULT_ROCK_FORMATIONS } from './rockFormations.js';
 import { applyRockWeathering, resolveRockWeathering } from './rockWeathering.js';
 import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
 import { fitRockToGround } from './rockGroundFit.js';
@@ -121,6 +122,7 @@ export class StylizedRockView {
     this.riverbankConfig = { ...DEFAULT_RIVERBANK_ROCKS, ...(config.rocks?.riverbank ?? {}) };
     this.coastStoneConfig = { ...DEFAULT_COAST_STONES, ...(config.rocks?.coast ?? {}) };
     this.seabedRockConfig = { ...DEFAULT_SEABED_ROCKS, ...(config.rocks?.seabed ?? {}) };
+    this.formationConfig = { ...DEFAULT_ROCK_FORMATIONS, ...(config.rocks?.formations ?? {}) };
     this.rockWeatheringSettings = resolveRockWeathering(config.rocks?.weathering);
     this.oceanDistance = this.coastStoneConfig.enabled
       ? createOceanDistanceField(terrainView, config.shoreLife?.coastalReachMeters ?? 48) : null;
@@ -560,6 +562,28 @@ export class StylizedRockView {
       ),
       radiusForScale: options.radiusForScale,
       config: this.riverbankConfig,
+    });
+  }
+
+  /** Tors and outcrops of scaled-up stones, where the biome grows them (biome-looks `formations`). */
+  formationRocksForChunk(chunkX, chunkZ) {
+    const share = this.config.biomeLooks?.formations;
+    if (!this.formationConfig.enabled || !share?.some((value) => value > 0)) return (function* () { return []; })();
+    const tileSize = this.terrainView.worldStore.tileSize;
+    const options = this.manifestOptions(chunkX, chunkZ);
+    const tileAt = (x, z) => options.tileAt(Math.floor(x / tileSize), Math.floor(-z / tileSize));
+    return iterateRockFormations({
+      chunkX,
+      chunkZ,
+      chunkSize: this.terrainView.worldStore.chunkSize,
+      tileSize,
+      heightAt: options.heightAt,
+      seaLevel: this.terrainView.worldStore?.generator?.seaLevel,
+      shareAt: (x, z) => share[tileAt(x, z)] ?? 0,
+      blocked: this.pathClearance?.enabled ? (x, z) => this.pathClearance.blocks(x, z) : null,
+      prototypeIndexForRoll: (roll, x, z) => options.prototypeIndexForRoll(roll, tileAt(x, z), x, z),
+      radiusForScale: options.radiusForScale,
+      config: this.formationConfig,
     });
   }
 
