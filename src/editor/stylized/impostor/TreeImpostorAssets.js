@@ -184,6 +184,8 @@ export async function createTreeImpostorBundle(atlases, sourceSignature) {
       radius: atlas.radius,
       foliageLighting: atlas.foliageLighting === true,
       barkLighting: atlas.barkLighting === true,
+      foliageSurface: atlas.foliageSurface ?? null,
+      barkSurface: atlas.barkSurface ?? null,
       normalEncoding: atlas.normalEncoding,
       albedoDataUrl: await canvasToDataUrl(atlas.albedoCanvas),
       normalDataUrl: await canvasToDataUrl(atlas.normalCanvas),

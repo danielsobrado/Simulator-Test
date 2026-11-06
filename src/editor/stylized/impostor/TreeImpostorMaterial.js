@@ -1,6 +1,6 @@
 import { applyJungleMist } from '../ambient/jungleMistOutput.js';
 import { treeBarkEmission, treeFoliageEmission } from '../forest/foliageLight.js';
-import { decodeTreeFoliageMaskNode } from './TreeImpostorNormalEncoding.js';
+import { decodeTreeCanopyVisibilityNode, decodeTreeFoliageMaskNode } from './TreeImpostorNormalEncoding.js';
 import * as THREE from 'three/webgpu';
 import {
   atan,
@@ -38,6 +38,10 @@ import { foliageMaterialClass } from '../forest/FoliageNodeMaterial.js';
 import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
 import { assignTreeFoliageMaterialData } from '../../../render/postprocessing/PostProcessingMaterialData.js';
 import { canonicalFromRender, sampleWorldWind, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
+import { applyTreeFoliageSnowSurface, configureTreeFoliageSurface } from '../forest/TreeFoliageSurface.js';
+import { resolveTreeFoliageSettings, resolveTreeBarkSettings } from '../forest/treeSurfaceSettings.js';
+import { wetSurfaceRoughness } from '../forest/TreeWetSurface.js';
+import { surfaceWetnessUniform } from '../../weather/surfaceWetness.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -139,21 +143,35 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance, 
     signedFade.abs(),
   );
 
-  const material = new (foliageMaterialClass(THREE.MeshLambertNodeMaterial))({ side: THREE.DoubleSide });
+  const barkSurface = resolveTreeBarkSettings({ barkSurface: atlas.barkSurface ?? {} });
+  const material = new (foliageMaterialClass(barkSurface.enabled ? THREE.MeshStandardNodeMaterial : THREE.MeshLambertNodeMaterial))({ side: THREE.DoubleSide });
   material.positionNode = worldPosition;
-  const crown = albedo.rgb.mul(colorMultiplier);
+  const barkWet = surfaceWetnessUniform.mul(barkSurface.enabled ? 0.7 : 0).mul(foliageMask.oneMinus());
+  const crown = albedo.rgb.mul(colorMultiplier).mul(barkWet.mul(barkSurface.wetStrength * 0.45).oneMinus());
+  const surface = configureTreeFoliageSurface(material, {
+    settings: resolveTreeFoliageSettings({ foliageLighting: atlas.foliageSurface ?? {} }),
+    visibility: decodeTreeCanopyVisibilityNode(normalSample.a), color: crown,
+  });
   // The crown's snow cap, on the atlas's own normals and only on foliage texels.
   const cap = canopySnowCap(canopySnow.mul(foliageMask), worldNormal.y);
   const snowed = applyCanopySnow({
     color: crown,
-    emissive: atlas.foliageLighting ? treeFoliageEmission(crown).mul(foliageMask) : null,
+    emissive: atlas.foliageLighting ? treeFoliageEmission(crown, null, surface.visibility).mul(foliageMask) : null,
     cap,
   });
   if (atlas.barkLighting) {
     const barkFill = treeImpostorBarkEmission(crown, foliageMask, worldNormal, atlas);
     snowed.emissive = snowed.emissive ? snowed.emissive.add(barkFill) : barkFill;
   }
-  if (atlas.foliageLighting) material.foliageTransmissionNode = foliageMask.mul(canopySnowTransmission(float(0.8), cap));
+  if (atlas.foliageLighting) material.foliageTransmissionNode = foliageMask.mul(canopySnowTransmission(material.foliageTransmissionNode ?? float(0.8), cap));
+  if (material.foliageWetnessNode) material.foliageWetnessNode = material.foliageWetnessNode.mul(foliageMask);
+  if (material.foliageNeedleSpecularNode) material.foliageNeedleSpecularNode = material.foliageNeedleSpecularNode.mul(foliageMask);
+  applyTreeFoliageSnowSurface(material, cap);
+  // Canopy AO belongs only to foliage; bark uses its own baked material grade.
+  if (material.aoNode) material.aoNode = mix(float(1), surface.visibility, foliageMask);
+  if (barkSurface.enabled) material.roughnessNode = mix(
+    wetSurfaceRoughness(float(barkSurface.roughness), barkWet, barkSurface), material.roughnessNode ?? float(0.98), foliageMask,
+  );
   material.colorNode = snowed.color;
   material.emissiveNode = snowed.emissive;
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(worldNormal, 0)).xyz);

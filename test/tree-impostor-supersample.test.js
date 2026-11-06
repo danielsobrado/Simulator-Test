@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { downsampleTreeImpostorCapture } from '../src/editor/stylized/impostor/TreeImpostorSupersample.js';
+import { encodeTreeFoliageMask, decodeTreeFoliageMaskNode, decodeTreeCanopyVisibilityNode } from '../src/editor/stylized/impostor/TreeImpostorNormalEncoding.js';
+import { createTreeImpostorBakeMaterial } from '../src/editor/stylized/impostor/TreeImpostorBaker.js';
+import { float } from 'three/tsl';
+import { evaluateShaderNode as evaluate } from './helpers/evaluateShaderNode.js';
+
+test('canopy visibility survives the normal-alpha bake, downsample and runtime decode', () => {
+ for(const visibility of [0,.25,.5,.75,1]) {
+  const material={userData:{canopyVisibilityNode:float(visibility)}};
+  const bake=createTreeImpostorBakeMaterial({kind:'leaf',material},true);
+  const alpha=Math.round(evaluate(bake.opacityNode)*255);
+  const albedo=new Uint8Array(4*4*4),normal=new Uint8Array(albedo.length);
+  for(let i=0;i<albedo.length;i+=4){albedo.set([118,80,48,255],i);normal.set([128,128,255,alpha],i);}
+  const result=downsampleTreeImpostorCapture(albedo,normal,1);
+  const encoded=float(result.normal[3]/255);
+  assert.equal(evaluate(decodeTreeFoliageMaskNode(encoded)),1);
+  assert.ok(Math.abs(evaluate(decodeTreeCanopyVisibilityNode(encoded))-visibility)<.02);
+  assert.equal(result.normal[3],encodeTreeFoliageMask(1,evaluate(decodeTreeCanopyVisibilityNode(encoded))));
+ }
+});
 test('trunk normals survive premultiplied canvas transport without becoming foliage',()=>{
  const albedo=new Uint8Array(4*4*4),normal=new Uint8Array(albedo.length);
  for(let i=0;i<albedo.length;i+=4){albedo.set([118,80,48,255],i);normal.set([90,180,230,0],i);}

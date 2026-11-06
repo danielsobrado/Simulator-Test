@@ -21,6 +21,8 @@ import { registerTreeWindTime } from './forest/TreeWindTime.js';
 import { gradeCanopy, resolveCanopyGrade } from './forest/canopyGrade.js';
 import { crownEdgeNodes } from './forest/crownEdge.js';
 import { treeFoliageEmission } from './forest/foliageLight.js';
+import { configureTreeFoliageSurface, treeGeometryVisibility } from './forest/TreeFoliageSurface.js';
+import { resolveTreeFoliageSettings } from './forest/treeSurfaceSettings.js';
 import { addTreeEmission, createTreeSurfaceMaterial } from './forest/TreeSurfaceMaterial.js';
 import { foliageWindPosition } from './forest/foliageWind.js';
 import { assignTreeFoliageMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
@@ -70,6 +72,9 @@ export function createStylizedLeafMaterial({
   // geometry carries it) instead of re-grading it onto the shared green ramp:
   // the swamp giants' grey moss and olive leaves are not canopy greens.
   canopyGrade = true,
+  species = 'broadleaf',
+  hasCanopyVisibility = false,
+  canopyBounds = null,
 }) {
   registerTreeWindTime(config, time);
   // Height within the crown from the prototype's own geometry: `positionLocal`
@@ -122,6 +127,11 @@ export function createStylizedLeafMaterial({
   const material = createTreeSurfaceMaterial(preserveSourceColor ? source : null, { foliage: true });
   material.map = map;
   if (authoredColor) material.foliageTransmissionNode = float(0.8);
+  const surface = configureTreeFoliageSurface(material, {
+    settings: resolveTreeFoliageSettings(config.trees, species),
+    visibility: treeGeometryVisibility(hasCanopyVisibility),
+    alpha: map ? authoredTexture(map).a : float(1), color: baseColor, bounds: canopyBounds,
+  });
   material.positionNode = finalPosition;
   if (authoredColor && map) {
     // A textured crown is lit the way its donor lit it: the graded leaf colour,
@@ -138,7 +148,7 @@ export function createStylizedLeafMaterial({
       : null;
     // Lit less as it takes the sky on, or a sunlit rim would out-shine the sky.
     material.colorNode = edge ? crown.mul(edge.sky.oneMinus()) : crown;
-    addTreeEmission(material, treeFoliageEmission(crown, edge?.sky));
+    addTreeEmission(material, treeFoliageEmission(crown, edge?.sky, surface.visibility));
     material.userData.crownOpacity = edge?.opacity ?? null;
     // Its biome and autumn tints are ratios against the grade, not the palette.
     material.userData.gradedCanopy = canopyGrade;
@@ -146,7 +156,7 @@ export function createStylizedLeafMaterial({
     material.colorNode = applyCanopyRim(leafColor, config, palette);
     // A vertex-painted crown has no leaf map but the same dark interior: without
     // sky fill the alpine conifers render near black beside every other tree.
-    if (authoredColor) addTreeEmission(material, treeFoliageEmission(leafColor));
+    if (authoredColor || material.foliageThicknessNode) addTreeEmission(material, treeFoliageEmission(leafColor, null, surface.visibility));
   }
   if (map) {
     material.opacityNode = material.userData.crownOpacity ?? authoredTexture(map).a;

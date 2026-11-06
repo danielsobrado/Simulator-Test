@@ -129,9 +129,13 @@ const TRUNK_SNOW = 0.85;
  * Snow along the tops of a trunk's limbs and root flares: the same tree's
  * canopy snow on its upward bark faces, broken by the bark's own geometry.
  */
-export function trunkSnow(color, snow) {
+export function trunkSnowCap(snow) {
   const local = positionGeometry;
   const broken = local.y.mul(2.3).add(local.x.mul(4.1)).sin().mul(0.12);
   const faces = smoothstep(0.35, 0.75, normalWorld.y.add(broken));
-  return mix(color, canopySnowColor, faces.mul(snow).mul(TRUNK_SNOW));
+  return faces.mul(snow).mul(TRUNK_SNOW);
+}
+
+export function trunkSnow(color, snow) {
+  return mix(color, canopySnowColor, trunkSnowCap(snow));
 }

@@ -1,5 +1,9 @@
 # Tree shader quality fixes and next effects
 
+The subsequent [tree surface effect implementation](tree-surface-effects-2026-11-06.md)
+implements the next effects below and supersedes this pass's atlas signature v9
+with signature v10 / manifest v5.
+
 This pass fixes the five findings from the tree shader review. Work is limited
 to source code and automated checks at the user's request; visual approval,
 atlas generation, and hardware performance measurements are deferred.
@@ -89,8 +93,9 @@ are project-specific judgments, not measured comparisons.
 Sources supporting the inspiration:
 
 - [Community Shaders Grass Lighting](https://github.com/community-shaders/skyrim-community-shaders/blob/dev/features/Grass%20Lighting/Shaders/GrassLighting/GrassLighting.hlsli)
-  separates reflected/front-transmitted/back-transmitted albedo and implements
-  canopy visibility and clump shading.
+  supplies specular and tangent-frame helpers in the currently inspected file.
+  Thickness-aware transmission and prototype canopy visibility are project
+  adaptations; they are not copied implementations from that helper file.
 - [Community Shaders Skylighting](https://github.com/community-shaders/skyrim-community-shaders/blob/dev/features/Skylighting/Shaders/Skylighting/Skylighting.hlsli)
   evaluates directional diffuse/specular visibility from a spatial probe volume.
 - [Community Shaders Wetness Effects](https://github.com/community-shaders/skyrim-community-shaders/blob/dev/features/Wetness%20Effects/Shaders/WetnessEffects/WetnessEffects.hlsli)

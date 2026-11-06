@@ -41,6 +41,7 @@ export const foliageLight = Object.freeze({
   skyColor: uniform(new THREE.Color('#ffffff')),
   /** The hemisphere's ground colour: light coming back up off the forest floor. */
   groundColor: uniform(new THREE.Color('#000000')),
+  sunDirection: uniform(new THREE.Vector3(0, 1, 0)),
 });
 
 /**
@@ -57,6 +58,8 @@ export function syncFoliageLight(sky) {
   foliageLight.fill.value = Math.min(Math.max(hemisphere?.intensity ?? 0, 0) * 0.35, 0.7);
   // Light intensity and colour are already included in the lighting model.
   foliageLight.strength.value = sky?.directional ? 0.12 : 0;
+  if (sky?.directional) foliageLight.sunDirection.value.copy(sky.directional.position)
+    .sub(sky.directional.target.position).normalize();
 }
 
 export function foliageSkyFill(color, amount) {
@@ -80,12 +83,12 @@ export function applySkywardNormal(material) {
  * The added air lifts shaded leaves toward the sky behind them: exp² fog is still
  * near zero at the treeline, where crowns otherwise cut out of the sky.
  */
-export function treeFoliageEmission(crown, skyEdge = null) {
+export function treeFoliageEmission(crown, skyEdge = null, visibility = float(1)) {
   const air = treeAir();
   const edge = skyEdge ?? float(0);
   const underside = normalWorld.y.negate().max(0);
-  return foliageSkyFill(crown, CROWN_FILL)
-    .add(crown.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(underside).mul(CROWN_BOUNCE))
+  return foliageSkyFill(crown, CROWN_FILL).mul(visibility)
+    .add(crown.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(underside).mul(CROWN_BOUNCE).mul(visibility))
     .add(foliageLight.skyColor.mul(foliageLight.fill).mul(air.add(edge)));
 }
 

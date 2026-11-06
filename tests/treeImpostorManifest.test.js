@@ -134,6 +134,15 @@ test('bark lighting metadata survives validation and rejects invalid types', () 
   assert.throws(() => validateTreeImpostorManifest(manifest([{ ...prototype(), barkLighting: 'true' }])), /bark lighting/);
 });
 
+test('surface traits survive manifest validation and invalid material values are rejected', () => {
+  const source = { ...prototype(), foliageSurface: { enabled: true, thickness: 0.7 }, barkSurface: { enabled: true, wetRoughness: 0.4 } };
+  const value = validateTreeImpostorManifest(manifest([source])).prototypes[0];
+  assert.deepEqual(value.foliageSurface, source.foliageSurface);
+  assert.deepEqual(value.barkSurface, source.barkSurface);
+  assert.throws(() => validateTreeImpostorManifest(manifest([{ ...source, foliageSurface: { thickness: 2 } }])), /thickness/);
+  assert.throws(() => validateTreeImpostorManifest(manifest([{ ...source, barkSurface: { wetRoughness: -1 } }])), /wetRoughness/);
+});
+
 test('source signature changes with geometry or bake configuration', () => {
   const config = { trees: { leafTop: '#ffffff' }, lod: { impostor: { columns: 8 } } };
   const first = createTreeImpostorSourceSignature([
@@ -145,7 +154,7 @@ test('source signature changes with geometry or bake configuration', () => {
   const configChanged = createTreeImpostorSourceSignature([
     [{ kind: 'leaf', geometry: geometry(1), sourceMap: null }],
   ], { ...config, lod: { impostor: { columns: 16 } } });
-  assert.match(first, /^tree-impostor-v9-/);
+  assert.match(first, /^tree-impostor-v10-/);
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });

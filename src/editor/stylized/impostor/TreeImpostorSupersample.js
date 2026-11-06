@@ -11,16 +11,18 @@ export function downsampleTreeImpostorCapture(albedo,normal,size,scale=TREE_IMPO
  const coverage=foliageMipmaps(albedo,sourceSize,sourceSize,.5)[Math.log2(scale)].data;
  const colour=new Uint8Array(size*size*4),normals=new Uint8Array(colour.length);
  for(let y=0;y<size;y++)for(let x=0;x<size;x++) {
-  const rgb=[0,0,0],n=[0,0,0];let weight=0,leaf=0;
+  const rgb=[0,0,0],n=[0,0,0];let weight=0,leaf=0,sky=0;
   for(let dy=0;dy<scale;dy++)for(let dx=0;dx<scale;dx++) {
    const i=((y*scale+dy)*sourceSize+x*scale+dx)*4,a=albedo[i+3]/255;
-   weight+=a;leaf+=normal[i+3]*a;
+   weight+=a;
+   const foliage=normal[i+3]>=128?1:0;
+   leaf+=foliage*a;sky+=Math.max(0,normal[i+3]/255*2-1)*foliage*a;
    for(let c=0;c<3;c++){rgb[c]+=decode(albedo[i+c])*a;n[c]+=(normal[i+c]/255*2-1)*a;}
   }
   const i=(y*size+x)*4,length=Math.hypot(...n)||1;
   for(let c=0;c<3;c++){colour[i+c]=weight?encode(rgb[c]/weight):0;normals[i+c]=Math.round((n[c]/length*.5+.5)*255);}
   colour[i+3]=coverage[i+3];
-  normals[i+3]=colour[i+3]>=128&&weight?encodeTreeFoliageMask(leaf/weight/255):0;
+  normals[i+3]=colour[i+3]>=128&&weight?encodeTreeFoliageMask(leaf/weight,leaf?sky/leaf:1):0;
  }
  return {albedo:colour,normal:normals};
 }

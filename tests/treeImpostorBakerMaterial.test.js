@@ -5,10 +5,14 @@ import {
   createTreeImpostorBakeMaterial,
   createTreeImpostorBakeTargets,
   createBakeGeometry,
+  TreeImpostorBaker,
 } from '../src/editor/stylized/impostor/TreeImpostorBaker.js';
 import {createCaptureDirections,impostorCanvasRow} from '../src/editor/stylized/impostor/impostorFrame.js';
 import { createTreeImpostorBundle } from '../src/editor/stylized/impostor/TreeImpostorAssets.js';
 import { TREE_IMPOSTOR_NORMAL_ENCODING } from '../src/editor/stylized/impostor/TreeImpostorManifest.js';
+import { evaluateShaderNode } from '../test/helpers/evaluateShaderNode.js';
+import { barkParallaxWeight } from '../src/editor/stylized/forest/BarkParallax.js';
+import { surfaceWetnessUniform } from '../src/editor/weather/surfaceWetness.js';
 
 test('bake targets encode PNG albedo once while normals remain linear',()=>{
  const targets=createTreeImpostorBakeTargets(120);
@@ -47,8 +51,8 @@ test('normal bake writes foliage classification through material opacity', () =>
   const trunk = createTreeImpostorBakeMaterial({ kind: 'trunk' }, true);
 
   try {
-    assert.equal(leaf.opacityNode?.value, 1);
-    assert.equal(trunk.opacityNode?.value, 0);
+    assert.equal(evaluateShaderNode(leaf.opacityNode), 1);
+    assert.equal(evaluateShaderNode(trunk.opacityNode), 0);
     assert.equal(leaf.blending, NoBlending);
     assert.equal(trunk.blending, NoBlending);
     const maskTextureNode = leaf.maskNode.aNode.node;
@@ -63,8 +67,31 @@ test('normal bake writes foliage classification through material opacity', () =>
 
 test('atlas export retains independent bark and foliage lighting flags', async () => {
   const canvas = { toDataURL: () => 'data:image/png;base64,AA==' };
-  const bundle = await createTreeImpostorBundle([{ prototypeIndex: 0, barkLighting: true, foliageLighting: false,
+  const foliageSurface = { enabled: true, thickness: .7 }, barkSurface = { enabled: true, wetStrength: .6 };
+  const bundle = await createTreeImpostorBundle([{ prototypeIndex: 0, barkLighting: true, foliageLighting: false, foliageSurface, barkSurface,
     normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING, albedoCanvas: canvas, normalCanvas: canvas }], 'tree-impostor-v9-test');
   assert.equal(bundle.prototypes[0].barkLighting, true);
   assert.equal(bundle.prototypes[0].foliageLighting, false);
+  assert.deepEqual(bundle.prototypes[0].foliageSurface, foliageSurface);
+  assert.deepEqual(bundle.prototypes[0].barkSurface, barkSurface);
+});
+
+test('offline baking freezes dry reflectance and restores live weather/detail even on failure', async () => {
+  const previousWet = surfaceWetnessUniform.value, previousDetail = barkParallaxWeight.value;
+  let disposed = false;
+  const baker = new TreeImpostorBaker({ config: { lod: { impostor: {} } }, rendererFactory: () => ({ dispose() { disposed = true; } }) });
+  baker.bakePrototype = async () => {
+    assert.equal(surfaceWetnessUniform.value, 0);
+    assert.equal(barkParallaxWeight.value, 0);
+    throw new Error('test readback failure');
+  };
+  try {
+    surfaceWetnessUniform.value = 0.7; barkParallaxWeight.value = 1;
+    await assert.rejects(baker.bake([[]]), /test readback failure/);
+    assert.equal(surfaceWetnessUniform.value, 0.7);
+    assert.equal(barkParallaxWeight.value, 1);
+    assert.equal(disposed, true);
+  } finally {
+    surfaceWetnessUniform.value = previousWet; barkParallaxWeight.value = previousDetail;
+  }
 });

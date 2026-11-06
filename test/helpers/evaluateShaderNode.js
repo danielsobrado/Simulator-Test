@@ -27,6 +27,7 @@ export function evaluateShaderNode(node, { values = new Map(), derivatives = {} 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const functions = {
       oneMinus: a => 1 - a, negate: a => -a, sin: Math.sin, pow: Math.pow,
+      abs: Math.abs, exp: Math.exp, sqrt: Math.sqrt, reciprocal: a => 1 / a,
       min: (a, b) => Math.min(a, b), max: (a, b) => Math.max(a, b), clamp,
       mix: (a, b, t) => a * (1 - t) + b * t,
       smoothstep: (lo, hi, x) => { const t = clamp((x - lo) / (hi - lo), 0, 1); return t * t * (3 - 2 * t); },

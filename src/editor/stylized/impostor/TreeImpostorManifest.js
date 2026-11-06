@@ -1,9 +1,11 @@
-export const TREE_IMPOSTOR_MANIFEST_VERSION = 4;
+import { resolveTreeFoliageSettings, resolveTreeBarkSettings } from '../forest/treeSurfaceSettings.js';
+
+export const TREE_IMPOSTOR_MANIFEST_VERSION = 5;
 export const TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION = 2;
-export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-half-a';
+export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-visibility-a';
 export const TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING = 'view-normal-rgb-coverage-a';
 
-const SOURCE_SIGNATURE_VERSION = 9;
+const SOURCE_SIGNATURE_VERSION = 10;
 const RUNTIME_TREE_FIELDS = new Set([
   'enabled',
   'residentRadius',
@@ -54,7 +56,7 @@ function indexCount(geometry) {
 }
 
 function arrayHash(attribute) {
-  const array = attribute?.array;
+  const array = attribute?.array ?? attribute?.data?.array;
   if (!array || !Number.isInteger(array.length)) return '00000000';
   const buffer = new ArrayBuffer(4);
   const view = new DataView(buffer);
@@ -189,6 +191,14 @@ function validatePrototype(prototype, expectedIndex, normalEncoding) {
   }
   if (prototype.barkLighting !== undefined && typeof prototype.barkLighting !== 'boolean') {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid bark lighting metadata.`);
+  }
+  if (prototype.foliageSurface != null) {
+    if (typeof prototype.foliageSurface !== 'object' || Array.isArray(prototype.foliageSurface)) throw new Error('Invalid tree foliage surface metadata.');
+    resolveTreeFoliageSettings({ foliageLighting: prototype.foliageSurface });
+  }
+  if (prototype.barkSurface != null) {
+    if (typeof prototype.barkSurface !== 'object' || Array.isArray(prototype.barkSurface)) throw new Error('Invalid tree bark surface metadata.');
+    resolveTreeBarkSettings({ barkSurface: prototype.barkSurface });
   }
   if (!Number.isInteger(gutter) || gutter < 0 || gutter * 2 >= prototype.tileSize) {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid gutter.`);

@@ -57,6 +57,7 @@ import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { applyCloudShadow } from './CloudShadow.js';
 import { applyJungleMist } from './ambient/jungleMistOutput.js';
 import { TreeRootFitter } from './forest/TreeRootFitter.js';
+import { bakeCanopyVisibility } from './forest/CanopyVisibility.js';
 
 function firstMaterial(mesh, name) {
   return materialList(mesh).find((material) => material?.name === name) ?? materialList(mesh)[0];
@@ -473,6 +474,7 @@ export class StylizedTreeView {
         }
         if (pivot === 'trunk') pivotOnTrunkBase(baked);
         attachTreeRoots(baked, `${sourceLabel}:${this.prototypes.length}`, rootProfile);
+        if (this.config.trees.foliageLighting?.enabled) bakeCanopyVisibility(baked, this.config.trees);
         const sway = this.treeSway(baked);
         const parts = baked.map((part) => {
           const source = firstMaterial(
@@ -506,6 +508,9 @@ export class StylizedTreeView {
               vertexColor: Boolean(part.geometry.getAttribute('color')),
               leafGain,
               canopyGrade,
+              species: rootProfile,
+              hasCanopyVisibility: Boolean(part.geometry.getAttribute('canopyVisibility')),
+              canopyBounds: { min: part.geometry.boundingBox.min.toArray(), max: part.geometry.boundingBox.max.toArray() },
             })
             : (preserveSourceAppearance
               ? createAuthoredTrunkMaterial({
@@ -517,6 +522,7 @@ export class StylizedTreeView {
                 barkGrade: this.config.trees.barkGrade,
                 vertexColor: Boolean(part.geometry.getAttribute('color')),
                 sway,
+                config: this.config,
               })
               : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config, sway,
                 barkWeathering: this.barkWeatheringSettings }));
@@ -559,6 +565,7 @@ export class StylizedTreeView {
       cardScale: this.config.trees.cardScale,
     });
     for (const prototype of generated) {
+      if (this.config.trees.foliageLighting?.enabled) bakeCanopyVisibility(prototype.parts, this.config.trees);
       const palette = FOREST_SPECIES_PALETTES[prototype.speciesId] ?? null;
       const sway = this.treeSway(prototype.parts);
       const parts = prototype.parts.map((part) => ({
@@ -580,6 +587,9 @@ export class StylizedTreeView {
             time: this.time,
             config: this.config,
             palette,
+            species: prototype.speciesId,
+            hasCanopyVisibility: Boolean(part.geometry.getAttribute('canopyVisibility')),
+            canopyBounds: { min: part.geometry.boundingBox.min.toArray(), max: part.geometry.boundingBox.max.toArray() },
           })
           : createStylizedTrunkMaterial({
             textures: barkTextures,

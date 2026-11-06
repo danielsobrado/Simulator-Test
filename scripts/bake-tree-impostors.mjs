@@ -325,6 +325,8 @@ async function writeAssets(bundle) {
       radius: source.radius,
       foliageLighting: source.foliageLighting === true,
       barkLighting: source.barkLighting === true,
+      foliageSurface: source.foliageSurface ?? null,
+      barkSurface: source.barkSurface ?? null,
       albedo: `/assets/impostors/trees/${albedoFilename}`,
       normal: `/assets/impostors/trees/${normalFilename}`,
     });

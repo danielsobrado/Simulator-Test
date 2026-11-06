@@ -7,6 +7,7 @@ import {
   materialColor,
   mix,
   normalWorld,
+  normalWorldGeometry,
   positionGeometry,
   positionWorld,
   smoothstep,
@@ -170,13 +171,17 @@ export function applyBarkWeathering(material, { settings }) {
   const soaked = grounded.mul(wet.mul(WET_DARKENING).oneMinus());
 
   if (!settings.snowBand) {
+    material.treeWetnessNode = wet;
     material.colorNode = soaked;
     return material;
   }
   // Snow collects on whatever faces up, broken by the same patches so it is not a
   // uniform white cap.
-  const snowFaces = normalWorld.y.smoothstep(0.3, 0.7).mul(patches.mul(0.5).add(0.5));
+  // Geometric exposure avoids a feedback loop when wet-film normal filtering
+  // itself depends on snow coverage, and keeps macro snow off the bump noise.
+  const snowFaces = normalWorldGeometry.y.smoothstep(0.3, 0.7).mul(patches.mul(0.5).add(0.5));
   const snow = snowFaces.mul(snowLine).mul(settings.snow);
+  material.treeWetnessNode = wet.mul(snow.clamp(0, 1).oneMinus());
   material.colorNode = mix(soaked, color(settings.snowBand.color), snow.clamp(0, 1));
   return material;
 }

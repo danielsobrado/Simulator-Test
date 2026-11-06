@@ -9,6 +9,9 @@ import { createSourceOpacityNode } from '../lod/StylizedDitheredMaterial.js';
 import { createDilatedAtlasTile, tightlyPackRgbaReadback } from './TreeImpostorAtlasPixels.js';
 import { createCaptureDirections, impostorCanvasRow } from './impostorFrame.js';
 import { TREE_IMPOSTOR_NORMAL_ENCODING } from './TreeImpostorManifest.js';
+import { foliageMaterialClass } from '../forest/FoliageNodeMaterial.js';
+import { barkParallaxWeight } from '../forest/BarkParallax.js';
+import { surfaceWetnessUniform } from '../../weather/surfaceWetness.js';
 
 export { createDilatedAtlasTile as createDilatedTile } from './TreeImpostorAtlasPixels.js';
 
@@ -47,7 +50,7 @@ const IMPOSTOR_FRAME_PADDING = 1.04;
 
 // MeshBasicNodeMaterial deliberately ignores normalNode/normalMap. Baking still
 // needs the lit surface's normal while writing unlit reflectance/normal RGB.
-class TreeBakeMaterial extends THREE.MeshBasicNodeMaterial {
+class TreeBakeMaterial extends (foliageMaterialClass(THREE.MeshBasicNodeMaterial)) {
   setupNormal() {
     return THREE.NodeMaterial.prototype.setupNormal.call(this);
   }
@@ -56,7 +59,7 @@ class TreeBakeMaterial extends THREE.MeshBasicNodeMaterial {
 function createBakeSurface(part) {
   const material = new TreeBakeMaterial({ side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide });
   const source = part.material ?? {};
-  for (const key of ['normalNode', 'normalMap', 'normalMapType', 'normalScale', 'bumpMap', 'bumpScale', 'flatShading']) {
+  for (const key of ['normalNode', 'normalMap', 'normalMapType', 'normalScale', 'bumpMap', 'bumpScale', 'flatShading', 'foliageShapeNormalNode', 'foliageNormalBlendNode', 'contextNode']) {
     if (source[key] !== undefined) material[key] = source[key];
   }
   return material;
@@ -115,7 +118,8 @@ export function createTreeImpostorBakeMaterial(part, normalPass) {
     const foliageMask = float(part.kind === 'leaf' ? 1 : 0);
     const source = part.material ?? {};
     material.colorNode = normalView.mul(0.5).add(0.5);
-    material.opacityNode = foliageMask;
+    const visibility = source.userData?.canopyVisibilityNode ?? float(1);
+    material.opacityNode = foliageMask.mul(visibility.mul(0.5).add(0.5));
     // NodeMaterial forces alpha to 1 for opaque NormalBlending materials.
     // NoBlending keeps depth writes and RGB normals intact while preserving
     // opacityNode as the foliage classification in render-target alpha.
@@ -221,6 +225,9 @@ export class TreeImpostorBaker {
     const settings = this.config.lod.impostor;
     const renderer = await this.createBakeRenderer();
     const atlases = [];
+    const previousWetness = surfaceWetnessUniform.value, previousParallax = barkParallaxWeight.value;
+    surfaceWetnessUniform.value = 0;
+    barkParallaxWeight.value = 0;
     try {
       for (let prototypeIndex = 0; prototypeIndex < prototypes.length; prototypeIndex += 1) {
         console.info(`[tree-impostor-bake] Baking prototype ${prototypeIndex + 1}/${prototypes.length}.`);
@@ -233,6 +240,8 @@ export class TreeImpostorBaker {
       }
       return Object.freeze(atlases);
     } finally {
+      surfaceWetnessUniform.value = previousWetness;
+      barkParallaxWeight.value = previousParallax;
       renderer.dispose();
     }
   }
@@ -338,6 +347,8 @@ export class TreeImpostorBaker {
       radius,
       foliageLighting: parts.some(part => part.kind === 'leaf' && Boolean(part.material.emissiveNode)),
       barkLighting: parts.some(part => part.kind === 'trunk' && part.material.userData.barkLighting === true),
+      foliageSurface: parts.find(part => part.kind === 'leaf')?.material.userData.treeFoliageSurface ?? null,
+      barkSurface: parts.find(part => part.kind === 'trunk')?.material.userData.treeBarkSurface ?? null,
       normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
       albedoCanvas,
       normalCanvas,

@@ -1,8 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { vec3 } from 'three/tsl';
+import { attribute, vec3 } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { treeWindTimeFor } from '../forest/TreeWindTime.js';
 import { foliageWindPosition } from '../forest/foliageWind.js';
+import { foliageMaterialClass } from '../forest/FoliageNodeMaterial.js';
+import { configureTreeFoliageSurface } from '../forest/TreeFoliageSurface.js';
+import { resolveTreeFoliageSettings, resolveTreeBarkSettings } from '../forest/treeSurfaceSettings.js';
+import { bakeCanopyVisibility } from '../forest/CanopyVisibility.js';
+import { treeFoliageEmission, treeBarkEmission } from '../forest/foliageLight.js';
+import { applyTreeBarkWetSurface } from '../forest/TreeWetSurface.js';
+import { surfaceWetnessUniform } from '../../weather/surfaceWetness.js';
 
 function unionBounds(parts, kind = null) {
   const box = new THREE.Box3();
@@ -39,8 +46,19 @@ function proxyCanopyColor(parts, fallback) {
   return count > 0 ? new THREE.Color().setRGB(sum.x / count, sum.y / count, sum.z / count) : fallback;
 }
 
-function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
-  const material = makeMaterial(color, side);
+function makeTreeLeafMaterial(color, config, bounds, geometry, settings = resolveTreeFoliageSettings(config.trees)) {
+  const material = settings.enabled
+    ? new (foliageMaterialClass(THREE.MeshLambertNodeMaterial))({ side: THREE.DoubleSide }) : makeMaterial(color);
+  if (settings.enabled) {
+    const value = new THREE.Color(color);
+    material.colorNode = vec3(...value.toArray());
+    bakeCanopyVisibility([{ kind: 'leaf', geometry }], config.trees);
+    const surface = configureTreeFoliageSurface(material, { settings,
+      visibility: attribute('canopyVisibility', 'float'), color: material.colorNode,
+      bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() },
+    });
+    material.emissiveNode = treeFoliageEmission(material.colorNode, null, surface.visibility);
+  }
   const wind = config.wind;
   const time = treeWindTimeFor(config);
   // `treeWindTimeFor` always yields a node, so a config without a wind block has
@@ -50,6 +68,18 @@ function makeTreeLeafMaterial(color, config, bounds, side = THREE.FrontSide) {
     config, time, minimumY: bounds.min.y, maximumY: bounds.max.y, flutter: false,
   });
   return material;
+}
+
+function makeTreeTrunkMaterial(config) {
+  const settings = resolveTreeBarkSettings(config.trees);
+  if (!settings.enabled) return makeMaterial(config.trees.barkTint);
+  const material = new (foliageMaterialClass(THREE.MeshStandardNodeMaterial))({ roughness: settings.roughness });
+  const value = new THREE.Color(config.trees.barkTint);
+  material.colorNode = vec3(...value.toArray());
+  material.treeWetnessNode = surfaceWetnessUniform.mul(0.7);
+  material.colorNode = material.colorNode.mul(material.treeWetnessNode.mul(settings.wetStrength * 0.45).oneMinus());
+  material.emissiveNode = treeBarkEmission(material.colorNode);
+  return applyTreeBarkWetSurface(material, settings);
 }
 
 export function createTreeProxyPrototype(parts, config) {
@@ -120,12 +150,14 @@ export function createTreeProxyPrototype(parts, config) {
           proxyCanopyColor(parts, config.trees.leafTop),
           config,
           canopyGeometry.boundingBox,
+          canopyGeometry,
+          parts.find(part => part.kind === 'leaf')?.material?.userData?.treeFoliageSurface,
         ),
         kind: 'leaf',
       },
       {
         geometry: trunkGeometry,
-        material: makeMaterial(config.trees.barkTint),
+        material: makeTreeTrunkMaterial(config),
         kind: 'trunk',
       },
     ],
@@ -144,6 +176,7 @@ export function createCanopyClusterPart(config) {
       config.trees.leafBottom,
       config,
       geometry.boundingBox,
+      geometry,
     ),
     kind: 'leaf',
   };
