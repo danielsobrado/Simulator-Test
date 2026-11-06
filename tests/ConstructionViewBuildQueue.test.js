@@ -157,6 +157,49 @@ test('pure LOD changes retain ivy while terrain and authored changes rebuild it'
   view.dispose();
 });
 
+test('LOD revisits reuse exact masonry while terrain, edits and retirement release stale products', () => {
+  const store = new ConstructionStore(), terrainView = createTerrainView();
+  terrainView.worldStore = { revision: 1 };
+  const view = new ConstructionView({ terrainView, store, compilerClient: null });
+  try {
+    const record = wallRecord(); store.add(record);
+    const plan = planConstruction(record); view.applyPlan(record, plan);
+    advanceConstructionFrames(view);
+    const entry = view.entries.get(record.id), module = plan.modules[0];
+    const resident = entry.modules.get(module.id);
+    const masonry = () => resident.meshes.filter(mesh => mesh.userData.constructionMaterialSlot !== CONSTRUCTION_MATERIAL_SLOT.GROWTH);
+    const near = masonry();
+    const before = view.stats.nearBuilds;
+    let disposals = 0;
+    for (const mesh of near) mesh.geometry.addEventListener('dispose', () => disposals++);
+    // A shell visit hides the retained tier before it gets cached.
+    for (const mesh of near) mesh.visible = false;
+    view.enqueueModuleBuild(record.id, module, 'coarse'); advanceConstructionFrames(view);
+    assert.equal(disposals, 0);
+    assert.ok(near.every(mesh => mesh.parent === null));
+    view.enqueueModuleBuild(record.id, module, 'near'); advanceConstructionFrames(view);
+    assert.deepEqual(masonry(), near);
+    assert.ok(near.every(mesh => mesh.parent === entry.group && mesh.visible));
+    assert.equal(view.stats.nearBuilds, before);
+    assert.equal(view.stats.lodCacheHits, 1);
+    assert.ok(view.lodCache.bytes <= view.lodCache.maxBytes);
+    view.enqueueModuleBuild(record.id, module, 'coarse'); advanceConstructionFrames(view);
+    assert.equal(view.stats.lodCacheHits, 2);
+    terrainView.worldStore.revision++;
+    view.enqueueModuleBuild(record.id, module, 'near'); advanceConstructionFrames(view);
+    assert.notEqual(masonry()[0].geometry, near[0].geometry, 'terrain revision cannot resurrect stale geometry');
+    assert.equal(view.stats.lodCacheHits, 2);
+    view.enqueueModuleBuild(record.id, module, 'coarse'); advanceConstructionFrames(view);
+    const edited = normalizeConstructionRecord({ ...record, revision: 2, seed: 77 });
+    view.upsertRecord(edited, { decorationOnly: true });
+    assert.equal(view.lodCache.entries.size, 0, 'authored edits invalidate detached products');
+    view.removeRecord(record.id);
+    assert.equal(view.lodCache.entries.size, 0);
+    assert.equal(view.lodCache.bytes, 0);
+    assert.equal(disposals, near.length, 'old cached geometry is released once');
+  } finally { view.dispose(); }
+});
+
 test('module publication leaves unrelated statistics alone and retirement removes its contribution', () => {
   const store = new ConstructionStore();
   const view = new ConstructionView({ terrainView: createTerrainView(), store, compilerClient: null });

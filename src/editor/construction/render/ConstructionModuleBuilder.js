@@ -43,6 +43,7 @@ export class ConstructionModuleBuilder {
     retainedGrowth = null,
     bounds = null,
     growthOnly = false,
+    cachedMasonry = null,
   }) {
     return {
       key,
@@ -56,23 +57,32 @@ export class ConstructionModuleBuilder {
       terrainRevision,
       retainedGrowth,
       bounds,
-      growthOnly,
+      growthOnly: growthOnly || Boolean(cachedMasonry),
+      cachedMasonry,
+      cacheHit: Boolean(cachedMasonry),
       cancelled: false,
       workerStarted: false,
       workerProduct: null,
       workerError: null,
       groundPatch: null,
       groundHeightAt: (x, z) => this.terrainView.getCanonicalHeight(x, z) ?? 0,
-      offset: 0,
+      offset: growthOnly || cachedMasonry ? placements.length : 0,
       batches: [],
       growth: retainedGrowth,
       ownsGrowth: false,
-      growthPrepared: Boolean(retainedGrowth) || placements.length === 0,
+      growthPrepared: Boolean(retainedGrowth) || placements.length === 0 || !materials.growth,
       merged: false,
     };
   }
 
   advance(state) {
+    if (state.cachedMasonry && state.growthPrepared) {
+      const built = attachConstructionGrowth(state.cachedMasonry, state.growth);
+      if (state.growth) state.growth.castShadow = state.lodBand !== 'coarse';
+      state.cachedMasonry = null;
+      state.ownsGrowth = false;
+      return { done: true, built };
+    }
     if (this.geometryWorker) return this.advanceWorker(state);
     if (state.offset < state.placements.length) {
       const end = Math.min(
@@ -104,7 +114,7 @@ export class ConstructionModuleBuilder {
         state.ownsGrowth = false;
       }
       state.merged = true;
-      return { done: true, built };
+      return { done: true, built: this.complete(state, built) };
     }
 
     return { done: true, built: null };
@@ -120,9 +130,12 @@ export class ConstructionModuleBuilder {
     }
     if (state.workerProduct) {
       const built = decodeConstructionGeometry(state.workerProduct, state.materials);
-      if (state.retainedGrowth) attachConstructionGrowth(built, state.retainedGrowth);
+      if (state.retainedGrowth) {
+        state.retainedGrowth.castShadow = state.lodBand !== 'coarse';
+        attachConstructionGrowth(built, state.retainedGrowth);
+      }
       state.workerProduct = null;
-      return { done: true, built };
+      return { done: true, built: this.complete(state, built) };
     }
     if (state.workerStarted) return { done: false, built: null };
     if (!this.geometryWorker.available) return { done: false, built: null };
@@ -142,10 +155,20 @@ export class ConstructionModuleBuilder {
 
   shutdown() { this.geometryWorker?.dispose(); }
 
+  complete(state, built) {
+    if (!state.cachedMasonry) return built;
+    const masonry = state.cachedMasonry;
+    state.cachedMasonry = null;
+    for (const mesh of built.meshes) attachConstructionGrowth(masonry, mesh);
+    return masonry;
+  }
+
   dispose(state) {
     if (!state) return;
     state.cancelled = true;
     state.workerProduct = null;
+    for (const mesh of state.cachedMasonry?.meshes ?? []) mesh.geometry.dispose();
+    state.cachedMasonry = null;
     for (const batch of state.batches ?? []) {
       for (const mesh of batch.meshes ?? []) mesh.geometry.dispose();
     }

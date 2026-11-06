@@ -5,6 +5,7 @@ import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { createConstructionMaterials, releaseConstructionMaterials } from './ConstructionMaterials.js';
 import { ConstructionBuildQueue } from './ConstructionBuildQueue.js';
 import { ConstructionModuleBuilder } from './ConstructionModuleBuilder.js';
+import { ConstructionLodCache, masonryStats } from './ConstructionLodCache.js';
 import { MODULE_STAT_KEYS, ROUNDED_STAT_KEYS, updateModuleStats } from './ConstructionModuleStats.js';
 import { ConstructionResidency } from './ConstructionResidency.js';
 import { ConstructionModuleResidency } from './ConstructionModuleResidency.js';
@@ -144,7 +145,7 @@ function draftDirtySegments(record, anchorId) {
 }
 
 export class ConstructionView {
-  constructor({ terrainView, store, compilerClient = null, materialStore = null, residencyRadius = 512 }) {
+  constructor({ terrainView, store, compilerClient = null, materialStore = null, residencyRadius = 512, lodCacheOptions = {} }) {
     this.terrainView = terrainView;
     this.floatingOrigin = terrainView.floatingOrigin;
     this.scene = terrainView.scene;
@@ -166,6 +167,7 @@ export class ConstructionView {
       radius: residencyRadius, chunkWorldSize: terrainView.chunkWorldSize ?? 128 });
     this.buildQueue = new ConstructionBuildQueue();
     this.moduleBuilder = new ConstructionModuleBuilder({ terrainView });
+    this.lodCache = new ConstructionLodCache(lodCacheOptions);
     this.lodCameraState = new Int32Array(10);
     this.lodCameraState.fill(0x7fffffff);
     this.lodDirty = true;
@@ -232,6 +234,7 @@ export class ConstructionView {
       staleBuildsDiscarded: 0,
       nearBuilds: 0,
       coarseBuilds: 0,
+      lodCacheHits: 0,
       buildMs: 0,
       stoneBuildMs: 0,
       mortarBuildMs: 0,
@@ -310,6 +313,7 @@ export class ConstructionView {
   }
 
   removeRecord(constructionId) {
+    this.lodCache.invalidate(constructionId);
     const entry = this.entries.get(constructionId);
     if (!entry) return;
     // Nothing left to restore: the products the draft hid are being disposed.
@@ -375,6 +379,7 @@ export class ConstructionView {
       };
       this.entries.set(record.id, entry);
     }
+    if (entry.record && entry.record.revision !== record.revision) this.lodCache.invalidate(record.id);
     entry.record = record;
     this.positionGroup(entry);
 
@@ -582,7 +587,10 @@ export class ConstructionView {
         this.stats.modulesSkippedByHash += 1;
         continue;
       }
-      if (existing) this.disposeResidentBuild(existing);
+      if (existing) {
+        this.disposeResidentBuild(existing);
+        this.lodCache.invalidate(record.id, module.id);
+      }
       const resident = {
         ...existing,
         hash: module.contentHash,
@@ -602,6 +610,7 @@ export class ConstructionView {
     for (const moduleId of [...entry.modules.keys()]) {
       if (planned.has(moduleId)) continue;
       const stale = entry.modules.get(moduleId);
+      this.lodCache.invalidate(record.id, moduleId);
       updateModuleStats(this.stats, stale.stats, null);
       this.buildQueue.removeModule(entry.record.id, moduleId);
       this.disposeResidentBuild(stale);
@@ -773,8 +782,8 @@ export class ConstructionView {
    * `shell` shows the module's own slice of the extruded ribbon, so the far
    * band costs nothing to build and never overlaps a neighbouring module that
    * is drawing masonry. `near` and `coarse` both draw the module's masonry; the
-   * coarse tier is a build-time detail reduction rather than a separate mesh
-   * set, so switching between them never waits on geometry.
+   * coarse tier is generated on demand. Previously visited masonry tiers are
+   * held in a bounded cache; uncached destinations keep the old geometry visible.
    */
   updateLod(camera, viewportHeight) {
     updateConstructionLod(this, camera, viewportHeight);
@@ -841,20 +850,25 @@ export class ConstructionView {
     }
 
     const terrainRevision = this.terrainView.worldStore?.revision ?? 0;
+    // Record revision covers appearance/decorative inputs beyond the structural
+    // plan. Origin-local geometry survives floating-origin rebases unchanged.
+    const geometryKey = `${expectedKey}|${entry.record.revision}|${terrainRevision}`;
     let state = resident.buildState;
     if (
       !state
       || state.key !== expectedKey
       || state.terrainRevision !== terrainRevision
+      || state.record.revision !== entry.record.revision
     ) {
       this.disposeResidentBuild(resident);
-      const placements = lodBand === 'coarse'
+      const cachedMasonry = resident.growthOnlyPending ? null : this.lodCache.take(geometryKey);
+      const placements = cachedMasonry?.placements ?? (lodBand === 'coarse'
         ? coarsePlacementsForModule({
           record: entry.record,
           module,
           totalLength: entry.plan?.totalLength,
         })
-        : module.placements ?? [];
+        : module.placements ?? []);
       const source = resident.growthSource;
       const retainedGrowth = source?.recordRevision === entry.record.revision
         && source.contentHash === module.contentHash
@@ -877,6 +891,7 @@ export class ConstructionView {
         retainedGrowth,
         bounds: module.bounds,
         growthOnly: resident.growthOnlyPending && resident.builtBand === lodBand,
+        cachedMasonry,
       });
       resident.buildState = state;
     }
@@ -894,8 +909,8 @@ export class ConstructionView {
 
     resident.buildState = null;
     const built = result.built;
-    if (!built) return false;
-    if (state.growthOnly) {
+    if (!built) { this.moduleBuilder.dispose(state); return false; }
+    if (state.growthOnly && !state.cacheHit) {
       const previous = resident.stats ?? {};
       const growthTriangles = built.stats.growthTriangles ?? 0;
       const totalTriangles = (previous.totalTriangles ?? 0) - (previous.growthTriangles ?? 0) + growthTriangles;
@@ -906,7 +921,16 @@ export class ConstructionView {
     }
     resident.growthOnlyPending = false;
 
+    const outgoing = resident.meshes.filter(mesh => !built.meshes.includes(mesh)
+      && mesh.userData.constructionMaterialSlot !== CONSTRUCTION_MATERIAL_SLOT.GROWTH);
+    const cacheOutgoing = outgoing.length > 0 && resident.builtBand !== lodBand && resident.builtGeometryKey
+      && resident.growthSource?.recordRevision === entry.record.revision
+      && resident.growthSource.contentHash === module.contentHash
+      && resident.growthSource.terrainRevision === terrainRevision;
+    if (cacheOutgoing) this.lodCache.put(resident.builtGeometryKey, entry.record.id, module.id,
+      { meshes: outgoing, stats: masonryStats(resident.stats), placements: resident.growthSource?.placements });
     resident.builtBand = lodBand;
+    resident.builtGeometryKey = geometryKey;
     resident.visibleBand = lodBand;
     resident.band = lodBand;
     resident.visibleSince = performance.now();
@@ -914,15 +938,17 @@ export class ConstructionView {
     resident.buildPriority = 0;
     resident.transitionTarget = null;
     this.stats.lodTransitionsCompleted += 1;
-    if (lodBand === 'near') this.stats.nearBuilds += 1;
+    if (state.cacheHit) this.stats.lodCacheHits += 1;
+    else if (lodBand === 'near') this.stats.nearBuilds += 1;
     else this.stats.coarseBuilds += 1;
 
     for (const stale of resident.meshes) {
       if (built.meshes.includes(stale)) continue;
       entry.group.remove(stale);
-      stale.geometry.dispose();
+      if (!cacheOutgoing || !outgoing.includes(stale)) stale.geometry.dispose();
     }
     for (const mesh of built.meshes) {
+      mesh.visible = true;
       const slot = mesh.userData.constructionMaterialSlot
         ?? CONSTRUCTION_MATERIAL_SLOT.STONE;
       mesh.name = [
@@ -1650,6 +1676,7 @@ export class ConstructionView {
     this.moduleBuilder.shutdown();
     this.finishPreviewDraft();
     for (const id of [...this.entries.keys()]) this.removeRecord(id);
+    this.lodCache.clear();
     this.scene.remove(this.root);
     if (this.previewMesh) this.root.remove(this.previewMesh);
     this.previewGeometry?.dispose();

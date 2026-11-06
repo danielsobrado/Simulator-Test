@@ -69,24 +69,28 @@ export function treeMorphologyPivotY(geometry, kind) {
 }
 
 function crownBounds(geometry) {
-  geometry.computeBoundingBox();
   const box = geometry.boundingBox;
   return box && !box.isEmpty() ? { min: box.min.toArray(), max: box.max.toArray() } : null;
 }
 
 export function treeMorphologyPivot(parts, part) {
   const pivotY = treeMorphologyPivotY(part.geometry, part.kind);
+  const center = treeMorphologyCenter(parts);
+  return { x: center.x, y: pivotY, z: center.z };
+}
+
+function treeMorphologyCenter(parts, boundsReady = false) {
   const horizontalBounds = new THREE.Box3();
   horizontalBounds.makeEmpty();
   const trunkParts = parts.filter((candidate) => candidate.kind === 'trunk');
   for (const candidate of trunkParts.length > 0 ? trunkParts : parts) {
-    candidate.geometry.computeBoundingBox();
+    if (!boundsReady) candidate.geometry.computeBoundingBox();
     horizontalBounds.union(candidate.geometry.boundingBox);
   }
   const center = horizontalBounds.isEmpty()
     ? new THREE.Vector3()
     : horizontalBounds.getCenter(new THREE.Vector3());
-  return { x: center.x, y: pivotY, z: center.z };
+  return center;
 }
 
 export function createInstancedRenderers({
@@ -99,45 +103,56 @@ export function createInstancedRenderers({
   renderer = null,
   reuseVertexArrays = false,
 }) {
-  return partsByPrototype.map((parts, prototypeIndex) => parts.map((part, partIndex) => {
-    const tinted = tintLeaves && part.kind === 'leaf';
-    const morphed = tintLeaves;
-    const geometry = createGeometry(part.geometry, capacity, tinted, morphed, part.instanceSurface,
-      part.material.userData.plantMotionAnchor, reuseVertexArrays, part.instanceBiomeLook);
-    if (morphed && part.kind === 'trunk') {
-      geometry.setAttribute('instanceRootPlane', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
+  return partsByPrototype.map((parts, prototypeIndex) => {
+    let morphologyCenter = null;
+    if (tintLeaves) {
+      // Bounds belong to the prototype. A building needs none of this work,
+      // and a tree scans each geometry once regardless of its material count.
+      for (const geometry of new Set(parts.map(part => part.geometry))) geometry.computeBoundingBox();
+      morphologyCenter = treeMorphologyCenter(parts, true);
     }
-    const material = createDitheredMaterial(part.material, {
-      tinted,
-      kind: morphed ? part.kind : null,
-      morphologyPivot: treeMorphologyPivot(parts, part),
-      crownBounds: tinted ? crownBounds(part.geometry) : null,
+    return parts.map((part, partIndex) => {
+      const tinted = tintLeaves && part.kind === 'leaf';
+      const morphed = tintLeaves;
+      const geometry = createGeometry(part.geometry, capacity, tinted, morphed, part.instanceSurface,
+        part.material.userData.plantMotionAnchor, reuseVertexArrays, part.instanceBiomeLook);
+      if (morphed && part.kind === 'trunk') {
+        geometry.setAttribute('instanceRootPlane', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
+      }
+      const material = createDitheredMaterial(part.material, {
+        tinted,
+        kind: morphed ? part.kind : null,
+        morphologyPivot: morphologyCenter ? { x: morphologyCenter.x,
+          y: part.kind === 'leaf' && Number.isFinite(part.geometry.boundingBox?.min.y) ? part.geometry.boundingBox.min.y : 0,
+          z: morphologyCenter.z } : null,
+        crownBounds: tinted ? crownBounds(part.geometry) : null,
+      });
+      const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+      // The matrices as a storage buffer, not an instanced vertex attribute. Past the
+      // uniform-buffer limit (~1000 matrices) three wraps a vertex attribute in an
+      // interleaved buffer and gives every material build its own views onto it; a
+      // view created after a partial write believes the buffer current and never
+      // uploads it. When a rebuild lands between our write and the old view's next
+      // draw (the environment arriving, a material swap), those instances keep the
+      // matrices the buffer was created with — the donor rock pack drew nothing at
+      // all until forced to re-upload. A storage buffer is its own binding with one
+      // version, so every tracked range reaches the GPU.
+      // WebGL cannot bind a mat4 storage attribute. Its standard instancing path
+      // uses a uniform buffer or four interleaved columns instead.
+      if (!renderer?.backend?.isWebGLBackend) {
+        mesh.instanceMatrix = new THREE.StorageInstancedBufferAttribute(mesh.instanceMatrix.array, 16);
+      }
+      mesh.count = 0;
+      mesh.visible = false;
+      mesh.matrixAutoUpdate = false;
+      mesh.castShadow = Boolean(castShadow && part.kind !== 'leaf');
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = true;
+      mesh.name = `${name}-${prototypeIndex}-${partIndex}`;
+      root.add(mesh);
+      return mesh;
     });
-    const mesh = new THREE.InstancedMesh(geometry, material, capacity);
-    // The matrices as a storage buffer, not an instanced vertex attribute. Past the
-    // uniform-buffer limit (~1000 matrices) three wraps a vertex attribute in an
-    // interleaved buffer and gives every material build its own views onto it; a
-    // view created after a partial write believes the buffer current and never
-    // uploads it. When a rebuild lands between our write and the old view's next
-    // draw (the environment arriving, a material swap), those instances keep the
-    // matrices the buffer was created with — the donor rock pack drew nothing at
-    // all until forced to re-upload. A storage buffer is its own binding with one
-    // version, so every tracked range reaches the GPU.
-    // WebGL cannot bind a mat4 storage attribute. Its standard instancing path
-    // uses a uniform buffer or four interleaved columns instead.
-    if (!renderer?.backend?.isWebGLBackend) {
-      mesh.instanceMatrix = new THREE.StorageInstancedBufferAttribute(mesh.instanceMatrix.array, 16);
-    }
-    mesh.count = 0;
-    mesh.visible = false;
-    mesh.matrixAutoUpdate = false;
-    mesh.castShadow = Boolean(castShadow && part.kind !== 'leaf');
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = true;
-    mesh.name = `${name}-${prototypeIndex}-${partIndex}`;
-    root.add(mesh);
-    return mesh;
-  }));
+  });
 }
 
 function resetDirtyRange(range) {

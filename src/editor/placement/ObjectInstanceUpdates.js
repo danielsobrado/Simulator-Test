@@ -1,23 +1,7 @@
-import { Matrix4, Vector3 } from 'three/webgpu';
-import { markAttributeSubrangeUpdated } from '../stylized/attributeUpload.js';
+import { Vector3 } from 'three/webgpu';
 import { prepareObjectCapacity, cancelObjectCapacity } from './ObjectCapacityPublication.js';
-const scratch = new Matrix4();
-function writeMatrices(mesh, matrices) {
-  const previousCount = mesh.count;
-  mesh.count = matrices.length; mesh.visible = matrices.length > 0;
-  const attribute = mesh.instanceMatrix;
-  let first = Infinity, last = -1;
-  for (let row = 0; row < matrices.length; row++) {
-    const elements = matrices[row].elements;
-    for (let i = 0; i < 16; i++) {
-      if (attribute.array[row * 16 + i] === Math.fround(elements[i])) continue;
-      attribute.array.set(elements, row * 16);
-      first = Math.min(first, row); last = row; break;
-    }
-  }
-  markAttributeSubrangeUpdated(attribute, first, last);
-  if (last >= 0 || previousCount !== mesh.count) mesh.computeBoundingSphere();
-}
+import { ObjectMatrixRows, writeObjectMatrixRows } from './ObjectMatrixRows.js';
+import { PerfCounters } from '../performance/qa/PerfCounters.js';
 
 /** Reuse exact placement products and LOD history for unchanged resident objects. */
 export function* prepareObjectInstances(view, renderer, objects, invalidation = null) {
@@ -25,7 +9,7 @@ export function* prepareObjectInstances(view, renderer, objects, invalidation = 
   const previous = renderer.placementRecords ?? new Map();
   const next = new Map();
   let changed = previous.size !== objects.length;
-  let prepared = 0;
+  let visited = 0;
   for (const object of objects) {
     const signature = JSON.stringify(object);
     let record = previous.get(object.id);
@@ -40,9 +24,10 @@ export function* prepareObjectInstances(view, renderer, objects, invalidation = 
         foundationMatrix: placement.surface.foundationDepth > 0.03
           ? view.createFoundationMatrix(placement.bounds, placement.surface) : null };
       changed = true;
-      if (++prepared % 16 === 0) yield;
     }
     next.set(object.id, record);
+    PerfCounters.inc('objectPlacementRecordsVisited');
+    if (++visited % 16 === 0) yield;
   }
   if (!changed && renderer.placementRecords) return null;
   return next;
@@ -65,17 +50,18 @@ export function publishObjectInstances(view, renderer, next) {
       }
     }
   } else {
+    const rows = renderer.matrixRows ??= new ObjectMatrixRows('matrix');
+    rows.patch(next);
     for (let part = 0; part < renderer.parts.length; part++) {
       const mesh = renderer.meshes[part];
-      const instances = records.map(record => scratch.clone().multiplyMatrices(record.matrix, renderer.parts[part].matrix));
-      writeMatrices(mesh, instances);
-      mesh.userData.objectIds = records.map(record => record.object.id);
+      writeObjectMatrixRows(mesh, rows, renderer.parts[part].matrix);
     }
   }
   view.ensureFoundationCapacity(renderer, foundations.length);
   if (renderer.foundationMesh) {
-    writeMatrices(renderer.foundationMesh, foundations.map(record => record.foundationMatrix));
-    renderer.foundationMesh.userData.objectIds = foundations.map(record => record.object.id);
+    const rows = renderer.foundationRows ??= new ObjectMatrixRows('foundationMatrix');
+    rows.patch(next);
+    writeObjectMatrixRows(renderer.foundationMesh, rows);
   }
   return true;
 }
