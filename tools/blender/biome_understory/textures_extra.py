@@ -629,29 +629,29 @@ def _shrub_card_atlas(tex_dir, name, filename, seed, wood_rgb, leaf_rgb, accent_
 
 def _tex_bush_ocotillo(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_ocotillo_alb', 'bush-ocotillo-alb.png', 321,
-                             (0.48, 0.42, 0.34), (0.28, 0.42, 0.20), (0.82, 0.42, 0.22), accent_v=0.64, accent_thresh=0.72)
+                             (0.54, 0.48, 0.38), (0.36, 0.44, 0.24), (0.74, 0.48, 0.30), accent_v=0.66, accent_thresh=0.74)
 
 
 def _tex_bush_savanna(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_savanna_alb', 'bush-savanna-alb.png', 322,
-                             (0.46, 0.38, 0.28), (0.28, 0.42, 0.18), (0.78, 0.72, 0.32), accent_v=0.62, accent_thresh=0.72)
+                             (0.52, 0.44, 0.34), (0.34, 0.44, 0.22), (0.74, 0.68, 0.38), accent_v=0.64, accent_thresh=0.74)
 
 
 def _tex_bush_gorse(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_gorse_alb', 'bush-gorse-alb.png', 323,
-                             (0.36, 0.28, 0.20), (0.22, 0.42, 0.15), (0.88, 0.74, 0.20), accent_v=0.52, accent_thresh=0.68)
+                             (0.42, 0.34, 0.24), (0.28, 0.44, 0.20), (0.80, 0.68, 0.28), accent_v=0.56, accent_thresh=0.70)
 
 
 def _tex_bush_juniper(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_juniper_alb', 'bush-juniper-alb.png', 324,
-                             (0.36, 0.28, 0.22), (0.20, 0.36, 0.18), (0.30, 0.42, 0.48), accent_v=0.54, accent_thresh=0.72)
+                             (0.42, 0.34, 0.26), (0.26, 0.38, 0.22), (0.38, 0.46, 0.50), accent_v=0.56, accent_thresh=0.74)
 
 
 def _tex_bush_hibiscus(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_hibiscus_alb', 'bush-hibiscus-alb.png', 325,
-                             (0.36, 0.28, 0.20), (0.20, 0.44, 0.14), (0.84, 0.26, 0.30), accent_v=0.56, accent_thresh=0.72)
+                             (0.40, 0.32, 0.24), (0.24, 0.44, 0.18), (0.74, 0.36, 0.34), accent_v=0.58, accent_thresh=0.74)
 
 
 def _tex_bush_buttonbush(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_buttonbush_alb', 'bush-buttonbush-alb.png', 326,
-                             (0.30, 0.25, 0.18), (0.22, 0.38, 0.14), (0.68, 0.74, 0.46), accent_v=0.58, accent_thresh=0.72)
+                             (0.38, 0.32, 0.24), (0.26, 0.40, 0.18), (0.68, 0.72, 0.48), accent_v=0.60, accent_thresh=0.74)

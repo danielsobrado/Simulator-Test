@@ -115,6 +115,7 @@ export class StylizedSurfaceView {
         seaLevel: terrainView.worldStore.generator?.seaLevel ?? 0,
         sunDirection: this.skyView.sunDirectionValue,
         snowGroundByTile: config.biomeLooks?.snow.ground ?? [],
+        getDrawPreparation: () => terrainView.drawPreparation,
       })
       : null;
     this.alpineRockView = this.enabled && !this.impostorBakeMode && this.skyView
@@ -605,6 +606,9 @@ export class StylizedSurfaceView {
    * in a movement frame.
    */
   prewarmStreamingResources(renderer = this.terrainView.renderer) {
+    // Seven fixed shapes belong to loading-screen geometry and shader warmup.
+    this.alpineRockView?.ensureMeshes();
+    this.icebergView?.ensureMeshes();
     const textures = new Set();
     for (const terrainSlot of this.terrainView.slots) {
       for (const texture of [
@@ -784,8 +788,12 @@ export class StylizedSurfaceView {
     if (camera) {
       const origin = this.terrainView.floatingOrigin.getState();
       const cameraWorld = { x: camera.position.x + origin.x, z: camera.position.z + origin.z };
-      this.icebergView?.update(cameraWorld);
-      this.alpineRockView?.update(cameraWorld);
+      const updateGeology = () => {
+        this.icebergView?.update(cameraWorld, this.shouldYieldWork);
+        this.alpineRockView?.update(cameraWorld, this.shouldYieldWork);
+      };
+      if (this.runDeferredWork) this.runDeferredWork(updateGeology);
+      else updateGeology();
     }
     syncViewRebuildQueue(this.rockBuildQueue, [this.rockView]);
     const rockPlacements = this.rockView?.getPlacements() ?? [];

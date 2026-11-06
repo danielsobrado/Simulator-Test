@@ -27,7 +27,8 @@ const INSTANCE_ATTRIBUTES = Object.freeze([
  * wind data and publication fades are copied together without resampling.
  */
 export class MeadowBandBatch {
-  constructor({ scene, template, material, name, renderOrder = 0, boundsPadding = null }) {
+  constructor({ scene, template, material, name, renderOrder = 0, boundsPadding = null, getDrawPreparation = () => null }) {
+    this.getDrawPreparation = getDrawPreparation;
     this.stride = Math.max(1, template.instanceCount);
     this.slotCapacity = meadowPageTileCapacity(this.stride);
     this.slots = new Map();
@@ -40,6 +41,7 @@ export class MeadowBandBatch {
     this.geometry.index = template.index;
     this.geometry.instanceCount = 0;
     const capacity = this.slotCapacity * this.stride;
+    this.initialUploadBytes = capacity * 14 * 4;
     for (const [name, , width] of [...INSTANCE_ATTRIBUTES, ['instanceTile', null, 4]]) {
       this.geometry.setAttribute(name,
         new THREE.InstancedBufferAttribute(new Float32Array(capacity * width), width));
@@ -109,7 +111,9 @@ export class MeadowBandBatch {
 
   update(tiles, budget = null) {
     const plan = meadowPageUpdatePlan(this, tiles);
-    if (budget && !budget.take(plan.bytes)) {
+    // Three creates new buffers from their full arrays, ignoring partial update ranges.
+    const bytes = plan.count > 0 ? Math.max(plan.bytes, this.initialUploadBytes) : plan.bytes;
+    if (budget && !budget.take(bytes)) {
       this.pending = true;
       PerfCounters.inc('meadowPageCommitsDeferred');
       return this.geometry.instanceCount;
@@ -130,7 +134,14 @@ export class MeadowBandBatch {
     }
     PerfCounters.inc('meadowRepackBytes', plan.repackBytes);
     this.geometry.instanceCount = plan.count;
-    this.mesh.visible = plan.count > 0;
+    if (plan.count > 0 && this.initialUploadBytes > 0) {
+      this.getDrawPreparation()?.register(this.mesh, { uploadBytes: this.initialUploadBytes });
+      this.initialUploadBytes = 0;
+    }
+    const preparation = this.getDrawPreparation();
+    const ready = !preparation || preparation.isMaterialReady(this.mesh, this.mesh.material);
+    this.mesh.visible = plan.count > 0 && ready;
+    this.pending = plan.count > 0 && !ready;
     if (changed) this.bounds?.update(this.order);
     this.mesh.frustumCulled = this.bounds !== null && !this.bounds.ground.isEmpty();
     return plan.count;

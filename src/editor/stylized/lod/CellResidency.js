@@ -3,6 +3,8 @@
  * world, so cells are worked off a few a frame and kept until they leave reach.
  * A cell's value is whatever the view's resolver returns; null means empty.
  */
+export const CELL_PENDING = Symbol('cell-pending');
+
 export class CellResidency {
   constructor({ cellMeters, reachCells, cellsPerFrame }) {
     Object.assign(this, { cellMeters, reachCells, cellsPerFrame });
@@ -38,13 +40,17 @@ export class CellResidency {
    * @param {(cellX: number, cellZ: number) => object|null} resolve
    * @returns {boolean} true once settled with a change the view should write
    */
-  step(resolve) {
+  step(resolve, shouldYield = () => false) {
+    const deferred = [];
     for (let i = 0; i < this.cellsPerFrame && this.pending.length; i += 1) {
+      if (shouldYield()) break;
       const [x, z, cell] = this.pending.pop();
       const value = resolve(x, z);
+      if (value === CELL_PENDING) { deferred.push([x, z, cell]); continue; }
       this.cells.set(cell, value);
       if (value) this.dirty = true;
     }
+    this.pending.push(...deferred);
     if (!this.dirty || this.pending.length) return false;
     this.dirty = false;
     return true;

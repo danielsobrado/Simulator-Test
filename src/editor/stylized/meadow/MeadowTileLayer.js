@@ -45,7 +45,7 @@ export class MeadowTileLayer {
    * @param {object} options.ground MeadowGroundSampler
    * @param {number} [options.renderOrder]
    */
-  constructor({ scene, name, tileSize, templates, material, selectBand, selectPreparationBand = null, reach, ground, renderOrder = 0, boundsPadding = null, maxPublicationBytes = Infinity, maxPublicationsPerFrame = Infinity, preparer = null }) {
+  constructor({ scene, name, tileSize, templates, material, selectBand, selectPreparationBand = null, reach, ground, renderOrder = 0, boundsPadding = null, maxPublicationBytes = Infinity, maxPublicationsPerFrame = Infinity, preparer = null, getDrawPreparation = () => null }) {
     this.tileSize = tileSize;
     this.templates = templates;
     this.selectBand = selectBand;
@@ -63,7 +63,7 @@ export class MeadowTileLayer {
     this.stablePrefixes = definitions.every(definition => definition?.tileSize === tileSize
       && definition.cards === definitions[0].cards);
     this.selectPreparationBand = this.stablePrefixes ? selectPreparationBand : null;
-    this.batches = new MeadowGrassBatches({ scene, templates, material, name, renderOrder, boundsPadding });
+    this.batches = new MeadowGrassBatches({ scene, templates, material, name, renderOrder, boundsPadding, getDrawPreparation });
     this.tiles = new Map();
     this.pools = new Map(Object.keys(templates).map((band) => [band, []]));
     this.buildSerial = 0;

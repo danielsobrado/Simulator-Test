@@ -461,79 +461,84 @@ def build_structure_rainforest_idol(mat):
 # 5. AUTHORED BIOME SHRUBS (`bushVariants`, height 1.15 - 1.65 m)
 # ---------------------------------------------------------------------------
 
-def _build_shrub_archetype(name, mat, seed, height=1.25, spread=1.15, n_branches=4, n_cards=16, flat_top=False):
-    """Grounded multi-tiered foliage card mound (natural `/\\` shrub silhouette with plush hemisphere normals)."""
+def _build_shrub_archetype(name, mat, seed, height=1.10, spread=1.24, n_branches=3, n_cards=12, flat_top=False):
+    """Grounded multi-tiered shrub mound with 3D faceted foliage cushion core (matching SM_Rocks facets) + wide-skirted dome cards."""
     rng = random.Random(seed)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
 
-    # 1. Subtle woody basal stems tucked inside the lower skirt
+    # 1. Two grounded 3D faceted low-poly foliage dome cushions at the core (mapped to opaque center of leaf atlas)
+    rock_chunk(
+        bm, uv,
+        Vector((-spread * 0.08, spread * 0.04, height * 0.34)),
+        (spread * 0.44, spread * 0.40, height * 0.38),
+        u_range=(0.48, 0.82), v_range=(0.24, 0.68),
+        subdivisions=1, rng=rng, dome=True,
+    )
+    rock_chunk(
+        bm, uv,
+        Vector((spread * 0.16, -spread * 0.10, height * 0.24)),
+        (spread * 0.34, spread * 0.30, height * 0.28),
+        u_range=(0.48, 0.82), v_range=(0.24, 0.68),
+        subdivisions=1, rng=rng, dome=True,
+    )
+
+    # 2. Subtle woody basal stems tucked inside the lower skirt
     for k in range(n_branches):
         yaw = k / n_branches * 2 * math.pi + rng.uniform(-0.22, 0.22)
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
-        p0 = out * (spread * 0.08) + Vector((0, 0, -0.03))
-        p1 = out * (spread * 0.22) + Vector((0, 0, height * 0.22))
-        p2 = out * (spread * 0.32) + Vector((0, 0, height * 0.44))
-        tube(bm, uv, [p0, p1, p2], [0.06, 0.04, 0.022], sides=4, u_range=(0.02, 0.28), v_range=(0.05, 0.92), rough=0.04, rng=rng)
-
-    # 2. 4 internal crossed core cards so the center of the shrub is never hollow from any view angle
-    for k in range(4):
-        yaw = k * math.pi / 4 + 0.18
-        out = Vector((math.cos(yaw), math.sin(yaw), 0))
-        side = Vector((-math.sin(yaw), math.cos(yaw), 0))
-        p0 = -out * (spread * 0.14) + Vector((0, 0, -0.02))
-        p1 = Vector((0, 0, height * 0.44))
-        p2 = out * (spread * 0.14) + Vector((0, 0, height * 0.84))
-        w = spread * 0.78
-        arched_card(bm, uv, p0, p1, p2, w * 0.85, w, w * 0.72, side, u_range=(0.30, 1.0), v_range=(0.02, 0.98))
+        p0 = out * (spread * 0.10) + Vector((0, 0, -0.03))
+        p1 = out * (spread * 0.24) + Vector((0, 0, height * 0.20))
+        p2 = out * (spread * 0.34) + Vector((0, 0, height * 0.40))
+        tube(bm, uv, [p0, p1, p2], [0.058, 0.038, 0.020], sides=4, u_range=(0.02, 0.28), v_range=(0.05, 0.92), rough=0.04, rng=rng)
 
     # 3. Grounded outer skirt + inward-arching dome cards (wide at base -> full belly -> rounded top)
-    n_skirt = n_cards // 2
+    n_skirt = (n_cards * 2) // 3
     for k in range(n_cards):
         yaw = (k * 2.39996) + rng.uniform(-0.16, 0.16)
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
         side = Vector((-math.sin(yaw), math.cos(yaw), 0))
         if k < n_skirt:
             r0 = spread * rng.uniform(0.46, 0.58)
-            r1 = spread * rng.uniform(0.60, 0.72)
-            r2 = spread * rng.uniform(0.26, 0.38)
+            r1 = spread * rng.uniform(0.58, 0.70)
+            r2 = spread * rng.uniform(0.24, 0.36)
             z0 = -0.03
-            z1 = height * rng.uniform(0.32, 0.44)
-            z2 = height * rng.uniform(0.64, 0.76)
+            z1 = height * rng.uniform(0.30, 0.42)
+            z2 = height * rng.uniform(0.60, 0.72)
         else:
             r0 = spread * rng.uniform(0.32, 0.44)
-            r1 = spread * rng.uniform(0.42, 0.54)
-            r2 = spread * (rng.uniform(0.18, 0.30) if flat_top else rng.uniform(0.06, 0.18))
+            r1 = spread * rng.uniform(0.42, 0.52)
+            r2 = spread * (rng.uniform(0.18, 0.28) if flat_top else rng.uniform(0.08, 0.18))
             z0 = height * rng.uniform(0.10, 0.18)
-            z1 = height * rng.uniform(0.52, 0.64)
-            z2 = height * (rng.uniform(0.80, 0.88) if flat_top else rng.uniform(0.86, 0.96))
+            z1 = height * rng.uniform(0.48, 0.60)
+            z2 = height * (rng.uniform(0.76, 0.84) if flat_top else rng.uniform(0.82, 0.92))
         p0 = out * r0 + Vector((0, 0, z0))
         p1 = out * r1 + Vector((0, 0, z1))
         p2 = out * r2 + Vector((0, 0, z2))
-        w = spread * rng.uniform(0.56, 0.70)
+        w = spread * rng.uniform(0.56, 0.68)
         arched_card(bm, uv, p0, p1, p2, w * 0.86, w, w * 0.68, side, u_range=(0.30, 1.0), v_range=(0.02, 0.98))
     return finish_mesh(name, bm, mat)
 
 
 def build_bush_arid_ocotillo(mat):
-    return _build_shrub_archetype('bush-arid-ocotillo-01', mat, 321, height=1.25, spread=1.12, n_branches=4, n_cards=14)
+    return _build_shrub_archetype('bush-arid-ocotillo-01', mat, 321, height=1.02, spread=1.18, n_branches=3, n_cards=12)
 
 
 def build_bush_savanna_thorn(mat):
-    return _build_shrub_archetype('bush-savanna-thorn-01', mat, 322, height=1.22, spread=1.28, n_branches=4, n_cards=14, flat_top=True)
+    return _build_shrub_archetype('bush-savanna-thorn-01', mat, 322, height=1.00, spread=1.32, n_branches=3, n_cards=12, flat_top=True)
 
 
 def build_bush_meadow_gorse(mat):
-    return _build_shrub_archetype('bush-meadow-gorse-01', mat, 323, height=1.20, spread=1.18, n_branches=4, n_cards=14)
+    return _build_shrub_archetype('bush-meadow-gorse-01', mat, 323, height=1.04, spread=1.22, n_branches=3, n_cards=12)
 
 
 def build_bush_boreal_juniper(mat):
-    return _build_shrub_archetype('bush-boreal-juniper-01', mat, 324, height=1.05, spread=1.22, n_branches=4, n_cards=14)
+    return _build_shrub_archetype('bush-boreal-juniper-01', mat, 324, height=0.92, spread=1.26, n_branches=3, n_cards=12)
 
 
 def build_bush_tropical_hibiscus(mat):
-    return _build_shrub_archetype('bush-tropical-hibiscus-01', mat, 325, height=1.35, spread=1.24, n_branches=4, n_cards=14)
+    return _build_shrub_archetype('bush-tropical-hibiscus-01', mat, 325, height=1.14, spread=1.26, n_branches=3, n_cards=12)
 
 
 def build_bush_swamp_buttonbush(mat):
-    return _build_shrub_archetype('bush-swamp-buttonbush-01', mat, 326, height=1.22, spread=1.20, n_branches=4, n_cards=14)
+    return _build_shrub_archetype('bush-swamp-buttonbush-01', mat, 326, height=1.04, spread=1.22, n_branches=3, n_cards=12)

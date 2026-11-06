@@ -20,13 +20,14 @@ const scratch = new THREE.Object3D();
 
 /** Icebergs off cold coasts: one instanced draw per shape, and nothing built until one is near. */
 export class IcebergView {
-  constructor({ scene, worldStore, floatingOrigin, seaLevel, sunDirection, snowGroundByTile, seed = 0 }) {
+  constructor({ scene, worldStore, floatingOrigin, seaLevel, sunDirection, snowGroundByTile, seed = 0, getDrawPreparation = () => null }) {
     this.worldStore = worldStore;
     this.floatingOrigin = floatingOrigin;
     this.seaLevel = seaLevel;
     this.sunDirection = sunDirection;
     this.snowGroundByTile = snowGroundByTile;
     this.seed = seed;
+    this.getDrawPreparation = getDrawPreparation;
     this.root = new THREE.Group();
     this.root.name = 'icebergs';
     scene.add(this.root);
@@ -77,6 +78,7 @@ export class IcebergView {
       mesh.frustumCulled = false;
       this.root.add(mesh);
       this.meshes.push(mesh);
+      this.getDrawPreparation()?.register(mesh);
     }
   }
 
@@ -99,9 +101,9 @@ export class IcebergView {
   }
 
   /** @param {{ x: number, z: number }} cameraWorld canonical metres */
-  update(cameraWorld) {
+  update(cameraWorld, shouldYield = () => false) {
     this.residency.refocus(cameraWorld.x, cameraWorld.z);
-    if (this.residency.step(this.resolve)) this.write();
+    if (this.residency.step(this.resolve, shouldYield)) this.write();
     this.anchor.place(this.root, this.floatingOrigin.getState());
   }
 

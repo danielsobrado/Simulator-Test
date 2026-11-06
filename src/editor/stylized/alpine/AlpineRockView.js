@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { CellResidency } from '../lod/CellResidency.js';
+import { CELL_PENDING, CellResidency } from '../lod/CellResidency.js';
 import { InstanceAnchor } from '../lod/InstanceAnchor.js';
 import { ALPINE_CELL_METERS, ALPINE_ROCK_KINDS, alpineRocksInCell } from './alpineRockField.js';
 import { createAlpineRockGeometry } from './alpineRockGeometry.js';
@@ -52,6 +52,14 @@ export class AlpineRockView {
   }
 
   resolveCell(cellX, cellZ) {
+    // The jitter, cluster spread and slope taps fit inside this cell plus one page.
+    // Never let decorative rocks trigger the generator's synchronous water fields.
+    const view = this.terrainView;
+    const chunkMeters = view.worldStore.chunkSize * view.worldStore.tileSize;
+    if (view.preparedPlacement && !view.preparedPlacement.ensureChunk(
+      Math.floor((cellX + 0.5) * ALPINE_CELL_METERS / chunkMeters),
+      Math.floor(-(cellZ + 0.5) * ALPINE_CELL_METERS / chunkMeters), 1, 0,
+    )) return CELL_PENDING;
     const rocks = alpineRocksInCell(cellX, cellZ, this.ground);
     if (!rocks) return null;
     for (const rock of rocks) {
@@ -74,6 +82,7 @@ export class AlpineRockView {
       mesh.receiveShadow = true;
       this.root.add(mesh);
       this.meshes.push(mesh);
+      this.terrainView.drawPreparation?.register(mesh);
     }
   }
 
@@ -98,9 +107,9 @@ export class AlpineRockView {
   }
 
   /** @param {{ x: number, z: number }} cameraWorld canonical metres */
-  update(cameraWorld) {
+  update(cameraWorld, shouldYield = () => false) {
     this.residency.refocus(cameraWorld.x, cameraWorld.z);
-    if (this.residency.step(this.resolve)) this.write();
+    if (this.residency.step(this.resolve, shouldYield)) this.write();
     this.anchor.place(this.root, this.floatingOrigin.getState());
   }
 

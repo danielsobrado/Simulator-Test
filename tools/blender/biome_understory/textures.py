@@ -207,22 +207,25 @@ def _tex_sagebrush(tex_dir):
     rgba[bark_mask, :3] = np.clip(np.array([0.34, 0.28, 0.21]) * (0.7 + 0.6 * noise[bark_mask, None]), 0, 1)
     rgba[bark_mask, 3] = 1.0
 
-    # Foliage card u in [0.35, 1.0]
+    # Foliage card u in [0.35, 1.0] with solid central cushion core + feathered sprigs
     fu = (u - 0.35) / 0.65
-    cx = 0.5 + 0.08 * np.sin(v * 8.0)
+    cx = 0.5 + 0.06 * np.sin(v * 8.0)
     dist = np.abs(fu - cx)
-    max_reach = 0.45 * np.sin(np.clip(v * 1.1, 0, 1) * math.pi) + 0.06
+    max_reach = 0.45 * np.sin(np.clip(v * 1.08, 0, 1) * math.pi) + 0.06
+    r_core = np.sqrt(((fu - 0.5) / 0.34) ** 2 + ((v - 0.48) / 0.36) ** 2)
     clump = fbm(w, h, (14, 14), rng, 3)
     in_branch = (u >= 0.35) & (dist < 0.045 * (1 - 0.6 * v))
-    in_leaves = (u >= 0.35) & (dist < max_reach) & (clump > 0.36 + 0.28 * (dist / np.maximum(max_reach, 0.05)))
-    rgba[in_branch, :3] = np.array([0.32, 0.26, 0.19])
+    in_leaves = (u >= 0.35) & (dist < max_reach) & (
+        (r_core <= 0.85) | (clump > 0.34 + 0.28 * (dist / np.maximum(max_reach, 0.05)))
+    )
+    rgba[in_branch, :3] = np.array([0.46, 0.40, 0.31])
     rgba[in_branch, 3] = 1.0
-    # Olive-sage green (g > r, b so biome grading works smoothly) with warm yellow desert blossoms near tips
-    is_bloom = in_leaves & (v > 0.62) & (clump > 0.66)
-    leaf_col = np.array([0.26, 0.35, 0.22]) * (0.78 + 0.42 * clump[..., None])
+    # Warm dusty olive-sage green (g > r, b so biome grading works smoothly) with muted ochre desert blooms
+    is_bloom = in_leaves & (v > 0.64) & (clump > 0.68)
+    leaf_col = np.array([0.36, 0.42, 0.28]) * (0.82 + 0.34 * clump[..., None])
     rgba[in_leaves, :3] = np.clip(leaf_col[in_leaves], 0, 1)
     rgba[in_leaves, 3] = 1.0
-    rgba[is_bloom, :3] = np.array([0.88, 0.74, 0.22])
+    rgba[is_bloom, :3] = np.array([0.78, 0.68, 0.36])
     return save_image('arid_sagebrush_alb', rgba, os.path.join(tex_dir, 'arid-sagebrush-alb.png'))
 
 
@@ -287,18 +290,18 @@ def _tex_savanna_aloe(tex_dir):
     spike_w = 0.36 * np.maximum(0.0, np.sin(sv * math.pi)) ** 0.75
     florets = 0.5 + 0.5 * np.cos(v * 52 * math.pi) * np.cos(ru * 10 * math.pi)
     in_spike = (u >= 0.56) & (v >= 0.38) & (np.abs(ru - 0.5) <= spike_w * (0.85 + 0.2 * florets))
-    # Gradient from golden yellow at bottom of raceme to fiery crimson-orange at top
+    # Warm sun-baked terracotta to ochre gradient (harmonized with savanna ground & rocks)
     fire_col = (
-        np.array([0.95, 0.78, 0.14]) * np.clip(1.0 - sv * 1.45, 0, 1)[..., None]
-        + np.array([0.92, 0.22, 0.08]) * np.clip(sv * 1.45, 0, 1)[..., None]
-    ) * (0.78 + 0.3 * florets[..., None])
+        np.array([0.82, 0.68, 0.32]) * np.clip(1.0 - sv * 1.45, 0, 1)[..., None]
+        + np.array([0.74, 0.38, 0.22]) * np.clip(sv * 1.45, 0, 1)[..., None]
+    ) * (0.82 + 0.24 * florets[..., None])
     rgba[in_spike, :3] = np.clip(fire_col[in_spike], 0, 1)
     rgba[in_spike, 3] = 1.0
     return save_image('savanna_aloe_alb', rgba, os.path.join(tex_dir, 'savanna-aloe-alb.png'))
 
 
 def _tex_meadow_lupine(tex_dir):
-    """u < 0.5: palmate lupine basal foliage; u >= 0.5: tall purple/violet/magenta & white lupine flower raceme."""
+    """u < 0.5: palmate lupine basal foliage; u >= 0.5: muted dusty lavender & cream lupine flower raceme."""
     rng = np.random.default_rng(106)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -306,40 +309,40 @@ def _tex_meadow_lupine(tex_dir):
     rgba = np.zeros((h, w, 4), dtype=np.float32)
     noise = fbm(w, h, (10, 10), rng, 3)
 
-    # Palmate leaf fan in u < 0.48
+    # Palmate leaf fan in u < 0.48 with solid core for 3D cushion
     lu = (u - 0.24) / 0.24
     lv = (v - 0.42) / 0.48
     r = np.sqrt(lu * lu + lv * lv)
     ang = np.arctan2(lv, lu)
     lobe = np.abs(np.cos(ang * 4.5)) ** 0.65 * 0.88
-    in_leaf = (u < 0.48) & ((r < lobe) & (v > 0.15) | ((np.abs(lu) < 0.07) & (v <= 0.45)))
-    leaf_col = np.array([0.16, 0.33, 0.13]) * (0.75 + 0.35 * (1.0 - r[..., None]))
+    in_leaf = (u < 0.48) & ((r <= 0.62) | ((r < lobe) & (v > 0.15)) | ((np.abs(lu) < 0.07) & (v <= 0.45)))
+    leaf_col = np.array([0.24, 0.36, 0.18]) * (0.78 + 0.32 * (1.0 - r[..., None]))
     rgba[in_leaf, :3] = np.clip(leaf_col[in_leaf], 0, 1)
     rgba[in_leaf, 3] = 1.0
 
     # Lupine floral spike in u >= 0.50
     ru = (u - 0.50) / 0.50
     in_stem = (u >= 0.50) & (v < 0.92) & (np.abs(ru - 0.5) < 0.065)
-    rgba[in_stem, :3] = np.array([0.18, 0.30, 0.14])
+    rgba[in_stem, :3] = np.array([0.24, 0.34, 0.18])
     rgba[in_stem, 3] = 1.0
 
     sv = np.clip((v - 0.25) / 0.72, 0, 1)
     cone_w = 0.38 * (1.0 - 0.65 * sv) * np.clip(sv * 4.0, 0, 1)
     whorl = 0.5 + 0.5 * np.sin(v * 38 * math.pi)
     in_raceme = (u >= 0.50) & (v >= 0.25) & (np.abs(ru - 0.5) <= cone_w * (0.75 + 0.35 * whorl))
-    # Rich violet-blue-magenta with creamy white banner tips (b > g and r > g so untouched by green foliage ramp)
+    # Muted dusty lavender-slate with warm cream banner tips
     banner = (whorl > 0.68).astype(np.float32)
     petal_col = (
-        np.array([0.46, 0.20, 0.74]) * (1 - 0.4 * sv[..., None])
-        + np.array([0.74, 0.26, 0.68]) * (0.4 * sv[..., None])
-    ) * (1 - 0.55 * banner[..., None]) + np.array([0.92, 0.86, 0.96]) * (0.55 * banner[..., None])
+        np.array([0.48, 0.38, 0.58]) * (1 - 0.4 * sv[..., None])
+        + np.array([0.60, 0.42, 0.56]) * (0.4 * sv[..., None])
+    ) * (1 - 0.55 * banner[..., None]) + np.array([0.86, 0.82, 0.76]) * (0.55 * banner[..., None])
     rgba[in_raceme, :3] = np.clip(petal_col[in_raceme] * (0.85 + 0.25 * noise[in_raceme, None]), 0, 1)
     rgba[in_raceme, 3] = 1.0
     return save_image('meadow_lupine_alb', rgba, os.path.join(tex_dir, 'meadow-lupine-alb.png'))
 
 
 def _tex_meadow_heather(tex_dir):
-    """u < 0.5: purple bell heather sprigs; u >= 0.5: goldenrod & moorland foliage sprigs."""
+    """u < 0.5: muted heather sprigs; u >= 0.5: warm ochre goldenrod & moorland foliage sprigs."""
     rng = np.random.default_rng(107)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -347,21 +350,24 @@ def _tex_meadow_heather(tex_dir):
     rgba = np.zeros((h, w, 4), dtype=np.float32)
     clump = fbm(w, h, (16, 16), rng, 3)
 
-    for side, u0, bloom_rgb in ((0, 0.0, np.array([0.72, 0.22, 0.64])), (1, 0.5, np.array([0.92, 0.74, 0.16]))):
+    for side, u0, bloom_rgb in ((0, 0.0, np.array([0.58, 0.38, 0.52])), (1, 0.5, np.array([0.78, 0.66, 0.32]))):
         su = (u - u0) / 0.5
         mask_half = (u >= u0) & (u < u0 + 0.5)
-        cx = 0.5 + 0.07 * np.sin(v * 9.0 + side * 2.0)
+        cx = 0.5 + 0.06 * np.sin(v * 9.0 + side * 2.0)
         dist = np.abs(su - cx)
         env = 0.42 * np.sin(np.clip(v * 1.08, 0, 1) * math.pi) + 0.05
+        r_core = np.sqrt(((su - 0.5) / 0.34) ** 2 + ((v - 0.48) / 0.36) ** 2)
         in_stem = mask_half & (dist < 0.045 * (1 - 0.5 * v))
-        in_sprig = mask_half & (dist < env) & (clump > 0.34 + 0.26 * (dist / np.maximum(env, 0.05)))
-        rgba[in_stem, :3] = np.array([0.28, 0.20, 0.14])
+        in_sprig = mask_half & (dist < env) & (
+            (r_core <= 0.85) | (clump > 0.34 + 0.26 * (dist / np.maximum(env, 0.05)))
+        )
+        rgba[in_stem, :3] = np.array([0.36, 0.30, 0.22])
         rgba[in_stem, 3] = 1.0
-        is_flower = in_sprig & (v > 0.38) & (clump > 0.52)
-        fol_col = np.array([0.18, 0.31, 0.13]) * (0.75 + 0.4 * clump[..., None])
+        is_flower = in_sprig & (v > 0.42) & (clump > 0.56)
+        fol_col = np.array([0.26, 0.36, 0.18]) * (0.80 + 0.34 * clump[..., None])
         rgba[in_sprig, :3] = np.clip(fol_col[in_sprig], 0, 1)
         rgba[in_sprig, 3] = 1.0
-        rgba[is_flower, :3] = np.clip(bloom_rgb * (0.8 + 0.35 * clump[is_flower, None]), 0, 1)
+        rgba[is_flower, :3] = np.clip(bloom_rgb * (0.82 + 0.28 * clump[is_flower, None]), 0, 1)
     return save_image('meadow_heather_alb', rgba, os.path.join(tex_dir, 'meadow-heather-alb.png'))
 
 

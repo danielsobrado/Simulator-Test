@@ -1564,13 +1564,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "29ba8f1792d78dea7b961efc66dae0374d4059a9075944d3cb3e38515032db85",
-      "sourceSha256": "a655d527ad383ef0709d4027f391913b31c9f8529404b1f9b77b8d2c7b9e39b1",
-      "outputSha256": "ae8bcd2662664c196a4466adb4a959975438e497619979dc0598ecb9c996a2d4",
-      "sourceBytes": 46656,
-      "outputBytes": 32112,
-      "gzipBytes": 29858,
-      "brotliBytes": 29412,
+      "cacheKey": "3e441698e23d583527f870f75cfd7b7f7d74476ae94e3fdf9cce0e16fd335a81",
+      "sourceSha256": "54bad9a50f7a8f63c5c89e5f29d4cbc1d52628c3bf05b6c055ac0ee2371ea663",
+      "outputSha256": "6351d1d8b96ce215a7fd8bd4cee2997309d47585a533b855961b9cdb4f6fb6e1",
+      "sourceBytes": 46240,
+      "outputBytes": 31844,
+      "gzipBytes": 29812,
+      "brotliBytes": 29363,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1580,30 +1580,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushAridOcotillo": 152
+          "BushAridOcotillo": 148
         },
         "sceneBounds": {
           "min": [
-            -0.8250382542610168,
-            -0.05255436897277832,
-            -0.8661518096923828
+            -0.770562469959259,
+            -0.06310921162366867,
+            -0.8512437343597412
           ],
           "max": [
-            0.8284322619438171,
-            1.1955841779708862,
-            0.739462673664093
+            0.8777267932891846,
+            0.9189753532409668,
+            0.820259690284729
           ]
         },
-        "bufferBytes": 45112,
-        "logicalAccessorBytes": 7472,
-        "logicalVertexBytes": 6560,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7472,
-        "imageBufferBytes": 37639,
+        "bufferBytes": 44696,
+        "logicalAccessorBytes": 6264,
+        "logicalVertexBytes": 5376,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6264,
+        "imageBufferBytes": 38431,
         "nodeNames": [
           "bush-arid-ocotillo-01",
           "bush-arid-ocotillo-01-mesh"
@@ -1624,30 +1624,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushAridOcotillo": 152
+          "BushAridOcotillo": 148
         },
         "sceneBounds": {
           "min": [
-            -0.825042725,
-            -0.0525550842,
-            -0.866149902
+            -0.770568848,
+            -0.0631103516,
+            -0.851257324
           ],
           "max": [
-            0.828430176,
-            1.19555664,
-            0.739471436
+            0.877716064,
+            0.91897583,
+            0.820251465
           ]
         },
-        "bufferBytes": 34500,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 26759,
+        "bufferBytes": 33488,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 26909,
         "nodeNames": [
           "bush-arid-ocotillo-01",
           "bush-arid-ocotillo-01-mesh"
@@ -1678,8 +1678,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -1693,17 +1693,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
           "json": 2462,
-          "binary": 29508,
+          "binary": 29240,
           "buffers": {
-            "vertex": 2565,
-            "index": 178,
+            "vertex": 2150,
+            "index": 171,
             "animation": 0,
             "transform": 0,
-            "image": 26759
+            "image": 26909
           }
         }
       }
@@ -1734,13 +1734,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "fde5f2295c6ad0ec876848a834de132e836e4691a16aa6215a9663c2d3e5c5c8",
-      "sourceSha256": "9ecf4ff176503f33a436bcd17e744f64ea1009b4c263fba87ed1d569d687cb92",
-      "outputSha256": "603040cd8c9c7779662b504f91677cc608b14975856ce522209b813bf83e80d2",
-      "sourceBytes": 47412,
-      "outputBytes": 32716,
-      "gzipBytes": 30556,
-      "brotliBytes": 30158,
+      "cacheKey": "c13e3e217506ef5d8b3d4e80a66e95e53d41476dd6af0a27c6b00dc4094b2a83",
+      "sourceSha256": "6b7376d0524be896c90439a30091c69eddad7919453c7bb3d0a65ae18909f21e",
+      "outputSha256": "06a17d34377a10d14b03bcc8131b1851399cf383bb4f8ab76e590d08457431c7",
+      "sourceBytes": 47404,
+      "outputBytes": 32556,
+      "gzipBytes": 30583,
+      "brotliBytes": 30206,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1750,30 +1750,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSavannaThorn": 152
+          "BushSavannaThorn": 148
         },
         "sceneBounds": {
           "min": [
-            -0.9163579940795898,
-            -0.05633129924535751,
-            -0.9842861890792847
+            -0.9960929751396179,
+            -0.06547125428915024,
+            -0.9565191268920898
           ],
           "max": [
-            0.9302798509597778,
-            1.0679032802581787,
-            0.9109693765640259
+            0.9795846939086914,
+            0.8390789031982422,
+            0.9414286017417908
           ]
         },
-        "bufferBytes": 45868,
-        "logicalAccessorBytes": 7440,
-        "logicalVertexBytes": 6528,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7440,
-        "imageBufferBytes": 38426,
+        "bufferBytes": 45860,
+        "logicalAccessorBytes": 6328,
+        "logicalVertexBytes": 5440,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6328,
+        "imageBufferBytes": 39530,
         "nodeNames": [
           "bush-savanna-thorn-01",
           "bush-savanna-thorn-01-mesh"
@@ -1794,30 +1794,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSavannaThorn": 152
+          "BushSavannaThorn": 148
         },
         "sceneBounds": {
           "min": [
-            -0.916351318,
-            -0.0563316345,
-            -0.984283447
+            -0.99609375,
+            -0.0654716492,
+            -0.956512451
           ],
           "max": [
-            0.930267334,
-            1.06793213,
-            0.910980225
+            0.97958374,
+            0.839080811,
+            0.941436768
           ]
         },
-        "bufferBytes": 35104,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 27353,
+        "bufferBytes": 34200,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 27642,
         "nodeNames": [
           "bush-savanna-thorn-01",
           "bush-savanna-thorn-01-mesh"
@@ -1848,8 +1848,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -1863,17 +1863,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
-          "json": 2461,
-          "binary": 30112,
+          "json": 2460,
+          "binary": 29952,
           "buffers": {
-            "vertex": 2572,
-            "index": 177,
+            "vertex": 2127,
+            "index": 172,
             "animation": 0,
             "transform": 0,
-            "image": 27353
+            "image": 27642
           }
         }
       }
@@ -1904,13 +1904,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "b4817663800798100174ea5ddff11a6da0315db18bc203a75b6b19d2ee5cce5b",
-      "sourceSha256": "3dec8b72f8bfa2998478dcbf45c9721991f71a6fba738fa20189d19ff506e8b6",
-      "outputSha256": "1a615468a1e791eef8b671954896d2d0a2ed65c052f1f16a97ef548ef7d386f3",
-      "sourceBytes": 45356,
-      "outputBytes": 31536,
-      "gzipBytes": 29353,
-      "brotliBytes": 28951,
+      "cacheKey": "a310faafca486155518b97d3fdecbece260eebfb11e533872cf71e32ffda8832",
+      "sourceSha256": "0c844b594adf372f3d7b345fa4ee4d8212508143b22eedbca82b8afddbafba83",
+      "outputSha256": "e787a5e747c819d1ce672941e67b145e1f7e50f1b408ddd7c256f4f260b112b4",
+      "sourceBytes": 45392,
+      "outputBytes": 31828,
+      "gzipBytes": 29856,
+      "brotliBytes": 29485,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1920,30 +1920,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushMeadowGorse": 152
+          "BushMeadowGorse": 148
         },
         "sceneBounds": {
           "min": [
-            -0.8031021356582642,
-            -0.05397568643093109,
-            -0.8732843399047852
+            -0.8661243915557861,
+            -0.06386757642030716,
+            -0.9207897186279297
           ],
           "max": [
-            0.8624970316886902,
-            1.1144347190856934,
-            0.8499311208724976
+            0.8438671827316284,
+            0.9543255567550659,
+            0.868215799331665
           ]
         },
-        "bufferBytes": 43816,
-        "logicalAccessorBytes": 7472,
-        "logicalVertexBytes": 6560,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7472,
-        "imageBufferBytes": 36343,
+        "bufferBytes": 43856,
+        "logicalAccessorBytes": 6296,
+        "logicalVertexBytes": 5408,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6296,
+        "imageBufferBytes": 37558,
         "nodeNames": [
           "bush-meadow-gorse-01",
           "bush-meadow-gorse-01-mesh"
@@ -1964,30 +1964,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushMeadowGorse": 152
+          "BushMeadowGorse": 148
         },
         "sceneBounds": {
           "min": [
-            -0.803100586,
-            -0.053976059,
-            -0.873291016
+            -0.866119385,
+            -0.0638694763,
+            -0.920776367
           ],
           "max": [
-            0.862487793,
-            1.11444092,
-            0.849945068
+            0.84387207,
+            0.954315186,
+            0.868225098
           ]
         },
-        "bufferBytes": 33932,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 26186,
+        "bufferBytes": 33480,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 26915,
         "nodeNames": [
           "bush-meadow-gorse-01",
           "bush-meadow-gorse-01-mesh"
@@ -2018,8 +2018,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2033,17 +2033,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
-          "json": 2454,
-          "binary": 28940,
+          "json": 2455,
+          "binary": 29232,
           "buffers": {
-            "vertex": 2568,
-            "index": 178,
+            "vertex": 2142,
+            "index": 172,
             "animation": 0,
             "transform": 0,
-            "image": 26186
+            "image": 26915
           }
         }
       }
@@ -2074,13 +2074,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "eb5b574b555b1933310ce0a89a33308658985f70c4b3ed375d14aba8b51b1c1e",
-      "sourceSha256": "7d1163b1caf452a7b7fd8e148599a79f28607e2b871df844c06d3af15f63348d",
-      "outputSha256": "8229f0cffe106b555fd974394966a8ea7b1613a2d24d8ff231befd862603fae6",
-      "sourceBytes": 44132,
-      "outputBytes": 30800,
-      "gzipBytes": 28598,
-      "brotliBytes": 28175,
+      "cacheKey": "91c21180b2639cd9af3ac7f21f72708d3b067cf2cfbcb7d546c99cfa22048a70",
+      "sourceSha256": "143b486ac1b75e889725385418b7fcc06cd448da329d9ff2271b444833a3999e",
+      "outputSha256": "2adccf6317b489c5a2276a207bae5ac29a28350f13cef9e390797c9be215c71d",
+      "sourceBytes": 44312,
+      "outputBytes": 30944,
+      "gzipBytes": 28943,
+      "brotliBytes": 28561,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2090,30 +2090,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushBorealJuniper": 152
+          "BushBorealJuniper": 148
         },
         "sceneBounds": {
           "min": [
-            -0.8408864140510559,
-            -0.057382769882678986,
-            -0.9463557004928589
+            -0.9358494281768799,
+            -0.06562185287475586,
+            -0.91353440284729
           ],
           "max": [
-            0.8989200592041016,
-            0.9700706005096436,
-            0.7667842507362366
+            0.9288777112960815,
+            0.8139892220497131,
+            0.9718757271766663
           ]
         },
-        "bufferBytes": 42584,
-        "logicalAccessorBytes": 7472,
-        "logicalVertexBytes": 6560,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7472,
-        "imageBufferBytes": 35110,
+        "bufferBytes": 42764,
+        "logicalAccessorBytes": 6264,
+        "logicalVertexBytes": 5376,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6264,
+        "imageBufferBytes": 36497,
         "nodeNames": [
           "bush-boreal-juniper-01",
           "bush-boreal-juniper-01-mesh"
@@ -2134,30 +2134,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushBorealJuniper": 152
+          "BushBorealJuniper": 148
         },
         "sceneBounds": {
           "min": [
-            -0.840881348,
-            -0.0573825836,
-            -0.946350098
+            -0.935852051,
+            -0.0656204224,
+            -0.913543701
           ],
           "max": [
-            0.898925781,
-            0.970062256,
-            0.766784668
+            0.928863525,
+            0.813995361,
+            0.971862793
           ]
         },
-        "bufferBytes": 33184,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 25437,
+        "bufferBytes": 32584,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 26010,
         "nodeNames": [
           "bush-boreal-juniper-01",
           "bush-boreal-juniper-01-mesh"
@@ -2188,8 +2188,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2203,17 +2203,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
           "json": 2464,
-          "binary": 28192,
+          "binary": 28336,
           "buffers": {
-            "vertex": 2568,
-            "index": 178,
+            "vertex": 2146,
+            "index": 171,
             "animation": 0,
             "transform": 0,
-            "image": 25437
+            "image": 26010
           }
         }
       }
@@ -2244,13 +2244,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "d8e9528cd0343d3d1c9abda5aefbdae62e835fece68224cf72fee3b92a82f864",
-      "sourceSha256": "5a6206fa2e08eb88d333aa58755386d5f07104ddfa4c8a4b594ae22201b9e168",
-      "outputSha256": "5f7d5dbcd29d683bb5f988b77111b931ae6df2afdc7eb4c555ffd86353c7b304",
-      "sourceBytes": 45860,
-      "outputBytes": 32132,
-      "gzipBytes": 29929,
-      "brotliBytes": 29536,
+      "cacheKey": "be10ab5d9897277df30d4c9b328683109009788a43ecc28cc3ab48017573b205",
+      "sourceSha256": "f32d25376cef4abffad29f5b6eb86fd8c5600032e002f06e1d975f6dbad174f5",
+      "outputSha256": "27d9eab54f3d2789a695f2c18a4f8d54e4325f55ed820a29bbf42ab08fa77af9",
+      "sourceBytes": 45348,
+      "outputBytes": 31996,
+      "gzipBytes": 29969,
+      "brotliBytes": 29548,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2260,30 +2260,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushTropicalHibiscus": 152
+          "BushTropicalHibiscus": 148
         },
         "sceneBounds": {
           "min": [
-            -0.8560616970062256,
-            -0.053822122514247894,
-            -0.9593499898910522
+            -0.8955471515655518,
+            -0.061963118612766266,
+            -0.8581256866455078
           ],
           "max": [
-            0.8641406297683716,
-            1.2861322164535522,
-            0.8194189071655273
+            0.8542641997337341,
+            1.0278809070587158,
+            0.8415709733963013
           ]
         },
-        "bufferBytes": 44296,
-        "logicalAccessorBytes": 7440,
-        "logicalVertexBytes": 6528,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7440,
-        "imageBufferBytes": 36855,
+        "bufferBytes": 43784,
+        "logicalAccessorBytes": 6264,
+        "logicalVertexBytes": 5376,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6264,
+        "imageBufferBytes": 37518,
         "nodeNames": [
           "bush-tropical-hibiscus-01",
           "bush-tropical-hibiscus-01-mesh"
@@ -2304,30 +2304,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushTropicalHibiscus": 152
+          "BushTropicalHibiscus": 148
         },
         "sceneBounds": {
           "min": [
-            -0.856048584,
-            -0.0538215637,
-            -0.959350586
+            -0.89553833,
+            -0.061964035,
+            -0.858123779
           ],
           "max": [
-            0.864135742,
-            1.28613281,
-            0.81942749
+            0.854278564,
+            1.02789307,
+            0.841583252
           ]
         },
-        "bufferBytes": 34508,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 26758,
+        "bufferBytes": 33628,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 27072,
         "nodeNames": [
           "bush-tropical-hibiscus-01",
           "bush-tropical-hibiscus-01-mesh"
@@ -2358,8 +2358,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2373,17 +2373,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
-          "json": 2473,
-          "binary": 29516,
+          "json": 2472,
+          "binary": 29380,
           "buffers": {
-            "vertex": 2573,
-            "index": 177,
+            "vertex": 2130,
+            "index": 171,
             "animation": 0,
             "transform": 0,
-            "image": 26758
+            "image": 27072
           }
         }
       }
@@ -2414,13 +2414,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "5d07183685c495ae93b051584df497852facd4401d235a6fa037e10ad412ae8d",
-      "sourceSha256": "7fe562b7ef7f5b096d5bfc2644bb06c6a0886ef23fd33e305f9d76de42ceaf43",
-      "outputSha256": "209b999fee0edb248bb37c8951ee315a31850208c2d2d22d40ca19ebcb21bdb8",
-      "sourceBytes": 43076,
-      "outputBytes": 30252,
-      "gzipBytes": 28055,
-      "brotliBytes": 27651,
+      "cacheKey": "aaa5ee14e501c3da948a2468cec6af160fabd6276e4d5cd906844fabc8c3dc36",
+      "sourceSha256": "9b173fcabb19148531d434282cac432c63989832978736966fb227cea9f221bd",
+      "outputSha256": "8005054209499c7ff71bfb9fe53b24d26d02e20833b8c24b1cad3d1409930724",
+      "sourceBytes": 43156,
+      "outputBytes": 30016,
+      "gzipBytes": 28009,
+      "brotliBytes": 27641,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2430,30 +2430,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSwampButtonbush": 152
+          "BushSwampButtonbush": 148
         },
         "sceneBounds": {
           "min": [
-            -0.8795944452285767,
-            -0.0544067919254303,
-            -0.915074348449707
+            -0.860505223274231,
+            -0.06319212913513184,
+            -0.9024782180786133
           ],
           "max": [
-            0.9135290384292603,
-            1.1509957313537598,
-            0.8537071943283081
+            0.8677805662155151,
+            0.9476868510246277,
+            0.8921421766281128
           ]
         },
-        "bufferBytes": 41520,
-        "logicalAccessorBytes": 7440,
-        "logicalVertexBytes": 6528,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 7440,
-        "imageBufferBytes": 34079,
+        "bufferBytes": 41596,
+        "logicalAccessorBytes": 6264,
+        "logicalVertexBytes": 5376,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 6264,
+        "imageBufferBytes": 35330,
         "nodeNames": [
           "bush-swamp-buttonbush-01",
           "bush-swamp-buttonbush-01-mesh"
@@ -2474,30 +2474,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 152,
-        "renderedTriangles": 152,
+        "triangles": 148,
+        "renderedTriangles": 148,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSwampButtonbush": 152
+          "BushSwampButtonbush": 148
         },
         "sceneBounds": {
           "min": [
-            -0.879608154,
-            -0.0544071198,
-            -0.91506958
+            -0.86050415,
+            -0.0631904602,
+            -0.90246582
           ],
           "max": [
-            0.913543701,
-            1.15100098,
-            0.85369873
+            0.867767334,
+            0.947692871,
+            0.892150879
           ]
         },
-        "bufferBytes": 32632,
-        "logicalAccessorBytes": 4788,
-        "logicalVertexBytes": 3876,
-        "logicalIndexBytes": 912,
-        "geometryBufferBytes": 4992,
-        "imageBufferBytes": 24889,
+        "bufferBytes": 31648,
+        "logicalAccessorBytes": 4080,
+        "logicalVertexBytes": 3192,
+        "logicalIndexBytes": 888,
+        "geometryBufferBytes": 4248,
+        "imageBufferBytes": 25078,
         "nodeNames": [
           "bush-swamp-buttonbush-01",
           "bush-swamp-buttonbush-01-mesh"
@@ -2528,8 +2528,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 204,
-        "triangles": 152
+        "vertices": 168,
+        "triangles": 148
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2543,17 +2543,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 152
+          "triangleCount": 148
         },
         "data": {
-          "json": 2471,
-          "binary": 27640,
+          "json": 2472,
+          "binary": 27400,
           "buffers": {
-            "vertex": 2562,
-            "index": 177,
+            "vertex": 2143,
+            "index": 171,
             "animation": 0,
             "transform": 0,
-            "image": 24889
+            "image": 25078
           }
         }
       }
@@ -11430,13 +11430,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "41dfda5858999ac4550bd0a2acbc5e5b4e2062d6ad96224d248872ff28477290",
-      "sourceSha256": "ec78524d316f0bd7e1fa1dac249497b82d2534c9ad2b2409712f92f1d9cfa2eb",
-      "outputSha256": "cab2c15b0624e28231f5f57b4402d772b721098cc36d20df8b85a972a13bae1b",
-      "sourceBytes": 45936,
-      "outputBytes": 34476,
-      "gzipBytes": 32557,
-      "brotliBytes": 32118,
+      "cacheKey": "5cd673e8e81ee18d7753e2cdc828f5d240eeafda6d6272c37d17e7a6b8cd9250",
+      "sourceSha256": "0e31b1322e0936d8ad49118cf0cd9a542b506f39ddbd1656f8f7491777503df5",
+      "outputSha256": "004a0e525f33012c0c7ff57954c7d82226bed9c51ee1a4cd9dd7ec5445261876",
+      "sourceBytes": 49780,
+      "outputBytes": 36444,
+      "gzipBytes": 34475,
+      "brotliBytes": 34073,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11446,30 +11446,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 128,
-        "renderedTriangles": 128,
+        "triangles": 140,
+        "renderedTriangles": 140,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "AridSagebrush": 128
+          "AridSagebrush": 140
         },
         "sceneBounds": {
           "min": [
-            -0.5362688899040222,
-            -0.07425384223461151,
-            -0.5689013600349426
+            -0.661931037902832,
+            -0.0688784196972847,
+            -0.6919166445732117
           ],
           "max": [
-            0.5313176512718201,
-            0.817704439163208,
-            0.5575366020202637
+            0.6874592900276184,
+            0.49013620615005493,
+            0.7084148526191711
           ]
         },
-        "bufferBytes": 44400,
-        "logicalAccessorBytes": 6144,
-        "logicalVertexBytes": 5376,
-        "logicalIndexBytes": 768,
-        "geometryBufferBytes": 6144,
-        "imageBufferBytes": 38256,
+        "bufferBytes": 48244,
+        "logicalAccessorBytes": 6024,
+        "logicalVertexBytes": 5184,
+        "logicalIndexBytes": 840,
+        "geometryBufferBytes": 6024,
+        "imageBufferBytes": 42219,
         "nodeNames": [
           "desert-sagebrush-01",
           "desert-sagebrush-01-mesh"
@@ -11490,30 +11490,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 128,
-        "renderedTriangles": 128,
+        "triangles": 140,
+        "renderedTriangles": 140,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "AridSagebrush": 128
+          "AridSagebrush": 140
         },
         "sceneBounds": {
           "min": [
-            -0.536254883,
-            -0.0742530823,
-            -0.568908691
+            -0.66192627,
+            -0.0688781738,
+            -0.691925049
           ],
           "max": [
-            0.531311035,
-            0.817718506,
-            0.557525635
+            0.687469482,
+            0.490142822,
+            0.708404541
           ]
         },
-        "bufferBytes": 35964,
-        "logicalAccessorBytes": 3922,
-        "logicalVertexBytes": 3154,
-        "logicalIndexBytes": 768,
-        "geometryBufferBytes": 4088,
-        "imageBufferBytes": 29628,
+        "bufferBytes": 37804,
+        "logicalAccessorBytes": 3804,
+        "logicalVertexBytes": 2964,
+        "logicalIndexBytes": 840,
+        "geometryBufferBytes": 3960,
+        "imageBufferBytes": 31651,
         "nodeNames": [
           "desert-sagebrush-01",
           "desert-sagebrush-01-mesh"
@@ -11544,8 +11544,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 166,
-        "triangles": 128
+        "vertices": 156,
+        "triangles": 140
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -11559,17 +11559,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 128
+          "triangleCount": 140
         },
         "data": {
-          "json": 2457,
-          "binary": 31876,
+          "json": 2456,
+          "binary": 33844,
           "buffers": {
-            "vertex": 2088,
-            "index": 155,
+            "vertex": 2022,
+            "index": 166,
             "animation": 0,
             "transform": 0,
-            "image": 29628
+            "image": 31651
           }
         }
       }
@@ -11772,13 +11772,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "40ff7c4235fee1b29ff24901bb0f71f6155a1456680b73a8087708f6dc17122d",
-      "sourceSha256": "0d8eea22630502fe096eac6e2de6a8aaed998ba423fcc385a7d454e83b7ee395",
-      "outputSha256": "c9224c75913b7acc3a98617a913cd3444f9407bfa52a8dcda2ec72b0847eafb6",
-      "sourceBytes": 24276,
-      "outputBytes": 25336,
-      "gzipBytes": 23398,
-      "brotliBytes": 23002,
+      "cacheKey": "3acd4b8c244852da976896320393dc966e21c993b23a4b9314e3c9c8316a80dd",
+      "sourceSha256": "c3ac7657e47c76b901d246ba0117519d6e960b0c4eaf0b063440f753c2448a83",
+      "outputSha256": "10ff2d00e3b973b43e76c7f6baa0beb886842284c03203d2e8b01c63c382e010",
+      "sourceBytes": 23744,
+      "outputBytes": 24964,
+      "gzipBytes": 23050,
+      "brotliBytes": 22658,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11788,30 +11788,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 80,
-        "renderedTriangles": 80,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SavannaAloe": 80
+          "SavannaAloe": 92
         },
         "sceneBounds": {
           "min": [
-            -0.7711045145988464,
-            0.029999999329447746,
-            -0.6011603474617004
+            -0.6004123091697693,
+            0.019999999552965164,
+            -0.6298433542251587
           ],
           "max": [
-            0.7164680361747742,
-            1.2799999713897705,
-            0.6205623149871826
+            0.601355791091919,
+            0.7599999904632568,
+            0.7319279909133911
           ]
         },
-        "bufferBytes": 22756,
-        "logicalAccessorBytes": 4320,
+        "bufferBytes": 22224,
+        "logicalAccessorBytes": 4392,
         "logicalVertexBytes": 3840,
-        "logicalIndexBytes": 480,
-        "geometryBufferBytes": 4320,
-        "imageBufferBytes": 18434,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 4392,
+        "imageBufferBytes": 17831,
         "nodeNames": [
           "savanna-aloe-01",
           "savanna-aloe-01-mesh"
@@ -11832,30 +11832,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 80,
-        "renderedTriangles": 80,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SavannaAloe": 80
+          "SavannaAloe": 92
         },
         "sceneBounds": {
           "min": [
-            -0.771118164,
-            0.029999733,
-            -0.601165771
+            -0.600402832,
+            0.0200004578,
+            -0.629852295
           ],
           "max": [
-            0.716461182,
-            1.2800293,
-            0.620574951
+            0.601348877,
+            0.760009766,
+            0.731933594
           ]
         },
-        "bufferBytes": 25648,
-        "logicalAccessorBytes": 2760,
+        "bufferBytes": 25344,
+        "logicalAccessorBytes": 2832,
         "logicalVertexBytes": 2280,
-        "logicalIndexBytes": 480,
-        "geometryBufferBytes": 2880,
-        "imageBufferBytes": 21119,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 2952,
+        "imageBufferBytes": 20711,
         "nodeNames": [
           "savanna-aloe-01",
           "savanna-aloe-01-mesh"
@@ -11887,7 +11887,7 @@
         "hints": 0,
         "drawCalls": 1,
         "vertices": 120,
-        "triangles": 80
+        "triangles": 92
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -11901,17 +11901,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 80
+          "triangleCount": 92
         },
         "data": {
-          "json": 2427,
-          "binary": 22768,
+          "json": 2431,
+          "binary": 22392,
           "buffers": {
-            "vertex": 1544,
-            "index": 97,
+            "vertex": 1563,
+            "index": 109,
             "animation": 0,
             "transform": 0,
-            "image": 21119
+            "image": 20711
           }
         }
       }
@@ -11942,13 +11942,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "c312c3c79e016d11011a3fbf8a0e9d60a4703d0dddc47ac917a8261add8081e7",
-      "sourceSha256": "dcc0e9667365f8c03e19bd0b45d5863b479031214b9d8fba985fb2fae64f5474",
-      "outputSha256": "a17aef8d60cc90be7a5f5071172b270ea16313c5be28a173cbbd039c831ff965",
-      "sourceBytes": 27548,
-      "outputBytes": 26356,
-      "gzipBytes": 24436,
-      "brotliBytes": 24051,
+      "cacheKey": "9e2beef7a03f0bea70afcc0fd17391bcb5360432949fa312ee817579fe433279",
+      "sourceSha256": "64776820600cd209b375917c29093c466717bc1c57c45bc262807b003c08a377",
+      "outputSha256": "3b08e163c6437fb8f22be051e246c42e829dfbac896d05bc7bff302ff6180c8a",
+      "sourceBytes": 27384,
+      "outputBytes": 25832,
+      "gzipBytes": 23858,
+      "brotliBytes": 23444,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11958,30 +11958,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 80,
-        "renderedTriangles": 80,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "MeadowLupine": 80
+          "MeadowLupine": 92
         },
         "sceneBounds": {
           "min": [
-            -0.6343179941177368,
-            0.029999999329447746,
-            -0.6304373145103455
+            -0.6428259015083313,
+            0.019999999552965164,
+            -0.6439318656921387
           ],
           "max": [
-            0.6354026198387146,
-            1.2400000095367432,
-            0.6326805949211121
+            0.6470075845718384,
+            0.7599999904632568,
+            0.6546083688735962
           ]
         },
-        "bufferBytes": 26020,
-        "logicalAccessorBytes": 4928,
-        "logicalVertexBytes": 4448,
-        "logicalIndexBytes": 480,
-        "geometryBufferBytes": 4928,
-        "imageBufferBytes": 21092,
+        "bufferBytes": 25856,
+        "logicalAccessorBytes": 4840,
+        "logicalVertexBytes": 4288,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 4840,
+        "imageBufferBytes": 21014,
         "nodeNames": [
           "meadow-lupine-01",
           "meadow-lupine-01-mesh"
@@ -12002,30 +12002,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 80,
-        "renderedTriangles": 80,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "MeadowLupine": 80
+          "MeadowLupine": 92
         },
         "sceneBounds": {
           "min": [
-            -0.634307861,
-            0.029999733,
-            -0.630432129
+            -0.642822266,
+            0.0200004578,
+            -0.643920898
           ],
           "max": [
-            0.635406494,
-            1.23999023,
-            0.63269043
+            0.647003174,
+            0.760009766,
+            0.654602051
           ]
         },
-        "bufferBytes": 26664,
-        "logicalAccessorBytes": 2760,
+        "bufferBytes": 26208,
+        "logicalAccessorBytes": 2832,
         "logicalVertexBytes": 2280,
-        "logicalIndexBytes": 480,
-        "geometryBufferBytes": 2880,
-        "imageBufferBytes": 22159,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 2952,
+        "imageBufferBytes": 21603,
         "nodeNames": [
           "meadow-lupine-01",
           "meadow-lupine-01-mesh"
@@ -12057,7 +12057,7 @@
         "hints": 0,
         "drawCalls": 1,
         "vertices": 120,
-        "triangles": 80
+        "triangles": 92
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -12071,17 +12071,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 80
+          "triangleCount": 92
         },
         "data": {
-          "json": 2431,
-          "binary": 23784,
+          "json": 2434,
+          "binary": 23256,
           "buffers": {
-            "vertex": 1510,
-            "index": 109,
+            "vertex": 1529,
+            "index": 118,
             "animation": 0,
             "transform": 0,
-            "image": 22159
+            "image": 21603
           }
         }
       }
@@ -12112,13 +12112,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "26a8b345cdd035cb29f87b0e4b15bc0f38b978475521fa556e582e20a22a50a8",
-      "sourceSha256": "d6914b7fb0c6267f0b45b0da446a22ad38a8af909f9486abc8eeb2c136693f1c",
-      "outputSha256": "296e084c0d4da709954cb0df369821331cb711cd399592a8551e4b85479bf112",
-      "sourceBytes": 38148,
-      "outputBytes": 32940,
-      "gzipBytes": 31079,
-      "brotliBytes": 30684,
+      "cacheKey": "18f67825de989d94b3150500012922aa80038884dcf06426cf52af9fd0be0249",
+      "sourceSha256": "bfb72c9597147940035a621de9494c4d3ebbdd11b51933aea9deb054f61f9348",
+      "outputSha256": "3f4616a10d7eb82149a8b36d7401f0a2d1a5f9e8766cbfbc5f00364535753e68",
+      "sourceBytes": 40192,
+      "outputBytes": 34000,
+      "gzipBytes": 32228,
+      "brotliBytes": 31826,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12128,30 +12128,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 72,
-        "renderedTriangles": 72,
+        "triangles": 88,
+        "renderedTriangles": 88,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "MeadowHeather": 72
+          "MeadowHeather": 88
         },
         "sceneBounds": {
           "min": [
-            -0.725725531578064,
-            0.029999999329447746,
-            -0.5759794116020203
+            -0.5725148320198059,
+            -0.019999999552965164,
+            -0.6576676964759827
           ],
           "max": [
-            0.6441892981529236,
-            0.7649677991867065,
-            0.7460335493087769
+            0.5739800930023193,
+            0.46664515137672424,
+            0.5719385743141174
           ]
         },
-        "bufferBytes": 36620,
-        "logicalAccessorBytes": 3888,
-        "logicalVertexBytes": 3456,
-        "logicalIndexBytes": 432,
-        "geometryBufferBytes": 3888,
-        "imageBufferBytes": 32732,
+        "bufferBytes": 38664,
+        "logicalAccessorBytes": 3600,
+        "logicalVertexBytes": 3072,
+        "logicalIndexBytes": 528,
+        "geometryBufferBytes": 3600,
+        "imageBufferBytes": 35061,
         "nodeNames": [
           "meadow-heather-01",
           "meadow-heather-01-mesh"
@@ -12172,30 +12172,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 72,
-        "renderedTriangles": 72,
+        "triangles": 88,
+        "renderedTriangles": 88,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "MeadowHeather": 72
+          "MeadowHeather": 88
         },
         "sceneBounds": {
           "min": [
-            -0.725738525,
-            0.029999733,
-            -0.57598877
+            -0.572509766,
+            -0.0200004578,
+            -0.657653809
           ],
           "max": [
-            0.644195557,
-            0.764953613,
-            0.746032715
+            0.573974609,
+            0.466644287,
+            0.571929932
           ]
         },
-        "bufferBytes": 32952,
-        "logicalAccessorBytes": 2484,
-        "logicalVertexBytes": 2052,
-        "logicalIndexBytes": 432,
-        "geometryBufferBytes": 2592,
-        "imageBufferBytes": 28911,
+        "bufferBytes": 33872,
+        "logicalAccessorBytes": 2352,
+        "logicalVertexBytes": 1824,
+        "logicalIndexBytes": 528,
+        "geometryBufferBytes": 2448,
+        "imageBufferBytes": 30057,
         "nodeNames": [
           "meadow-heather-01",
           "meadow-heather-01-mesh"
@@ -12226,8 +12226,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 108,
-        "triangles": 72
+        "vertices": 96,
+        "triangles": 88
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -12241,17 +12241,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 72
+          "triangleCount": 88
         },
         "data": {
-          "json": 2436,
-          "binary": 30360,
+          "json": 2434,
+          "binary": 31424,
           "buffers": {
-            "vertex": 1350,
-            "index": 89,
+            "vertex": 1253,
+            "index": 106,
             "animation": 0,
             "transform": 0,
-            "image": 28911
+            "image": 30057
           }
         }
       }
@@ -14164,13 +14164,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "660a6a96e4fb15a1123001065076024bc5dceb3b1af77231e19a38ed3b70f43f",
-      "sourceSha256": "2bdda19ab335af73404cb9d85810af6fb939c927757ed0614a29b13b4975add9",
-      "outputSha256": "a7f93bc2f13cb1f46643777ffb21bb23801d8d620f1e7953ca4ffe35cd0417c1",
-      "sourceBytes": 36852,
-      "outputBytes": 31480,
-      "gzipBytes": 29538,
-      "brotliBytes": 29124,
+      "cacheKey": "9d9730bd895eeabd612bc16879ab58bff3c6b105b664c11b27fbf9b72df71bc7",
+      "sourceSha256": "7da25bf19b34c25742194facb3fb17dc5f9af75959ef07d607ea3fcb97175503",
+      "outputSha256": "6bcecd65d6a596af81afaef57b8de1ae07b761062b6f0af915d2b3f9da768dca",
+      "sourceBytes": 36708,
+      "outputBytes": 31428,
+      "gzipBytes": 29541,
+      "brotliBytes": 29131,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14180,29 +14180,29 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 116,
-        "renderedTriangles": 116,
+        "triangles": 124,
+        "renderedTriangles": 124,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "TundraWillow": 116
+          "TundraWillow": 124
         },
         "sceneBounds": {
           "min": [
-            -0.8192545771598816,
+            -0.7004590034484863,
             -0.01675885170698166,
-            -0.823485255241394
+            -0.8080987334251404
           ],
           "max": [
-            0.7755446434020996,
-            0.3511938452720642,
-            0.7762805223464966
+            0.8366647958755493,
+            0.28956711292266846,
+            0.8568892478942871
           ]
         },
-        "bufferBytes": 35308,
-        "logicalAccessorBytes": 5688,
-        "logicalVertexBytes": 4992,
-        "logicalIndexBytes": 696,
-        "geometryBufferBytes": 5688,
+        "bufferBytes": 35164,
+        "logicalAccessorBytes": 5544,
+        "logicalVertexBytes": 4800,
+        "logicalIndexBytes": 744,
+        "geometryBufferBytes": 5544,
         "imageBufferBytes": 29617,
         "nodeNames": [
           "tundra-dwarf-willow-01",
@@ -14224,29 +14224,29 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 116,
-        "renderedTriangles": 116,
+        "triangles": 124,
+        "renderedTriangles": 124,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "TundraWillow": 116
+          "TundraWillow": 124
         },
         "sceneBounds": {
           "min": [
-            -0.819244385,
+            -0.700469971,
             -0.0167589188,
-            -0.823486328
+            -0.808105469
           ],
           "max": [
-            0.775543213,
-            0.351196289,
-            0.776275635
+            0.836669922,
+            0.28956604,
+            0.856903076
           ]
         },
-        "bufferBytes": 32716,
-        "logicalAccessorBytes": 3660,
-        "logicalVertexBytes": 2964,
-        "logicalIndexBytes": 696,
-        "geometryBufferBytes": 3816,
+        "bufferBytes": 32596,
+        "logicalAccessorBytes": 3594,
+        "logicalVertexBytes": 2850,
+        "logicalIndexBytes": 744,
+        "geometryBufferBytes": 3744,
         "imageBufferBytes": 26819,
         "nodeNames": [
           "tundra-dwarf-willow-01",
@@ -14278,8 +14278,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 156,
-        "triangles": 116
+        "vertices": 150,
+        "triangles": 124
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -14293,14 +14293,14 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 116
+          "triangleCount": 124
         },
         "data": {
-          "json": 2436,
-          "binary": 28900,
+          "json": 2435,
+          "binary": 28852,
           "buffers": {
-            "vertex": 1936,
-            "index": 139,
+            "vertex": 1878,
+            "index": 147,
             "animation": 0,
             "transform": 0,
             "image": 26819
@@ -22041,15 +22041,15 @@
     }
   ],
   "totals": {
-    "sourceBytes": 68603780,
-    "outputBytes": 40307168,
-    "gzipBytes": 38484181,
-    "brotliBytes": 38439247,
-    "logicalSourceVertexBytes": 31428888,
-    "logicalOutputVertexBytes": 15573163,
-    "logicalSourceIndexBytes": 4312764,
-    "logicalOutputIndexBytes": 4035492,
-    "savedBytes": 28296612,
-    "reductionRatio": 0.412464
+    "sourceBytes": 68608188,
+    "outputBytes": 40308884,
+    "gzipBytes": 38487148,
+    "brotliBytes": 38442321,
+    "logicalSourceVertexBytes": 31421048,
+    "logicalOutputVertexBytes": 15568527,
+    "logicalSourceIndexBytes": 4312980,
+    "logicalOutputIndexBytes": 4035708,
+    "savedBytes": 28299304,
+    "reductionRatio": 0.412477
   }
 }

@@ -134,6 +134,7 @@ export class MeadowGrassField {
     this.blades = new MeadowTileLayer({
       scene,
       name: 'meadow-grass',
+      getDrawPreparation: () => this.terrainView.drawPreparation,
       tileSize: settings.tileSize,
       templates: bladeTemplates,
       material: this.bladeMaterial,
@@ -159,6 +160,7 @@ export class MeadowGrassField {
       this.cards = new MeadowTileLayer({
         scene,
         name: 'meadow-grass-cards',
+        getDrawPreparation: () => this.terrainView.drawPreparation,
         tileSize: far.tileSize,
         templates: { cards: cardTemplate },
         material: this.cardMaterial,
