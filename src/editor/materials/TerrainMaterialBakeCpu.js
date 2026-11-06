@@ -278,9 +278,13 @@ export async function bakeTerrainMaterialPage({
         biomeCover: source.snowBiomeCover ? source.snowBiomeCover[sourceIndex] / 255 : undefined,
         worldX,
         worldZ,
-      }, classification, macroSeed) * land;
+        // The mask's continuous dry share, not the binary water class: cut by
+        // that, snow ended at every shore along the cell staircase.
+      }, classification, macroSeed) * smoothstep(0.25, 0.85, source.surfaceMaskPixels[sourceOffset + 3] / 255);
       const grass = grassCoverage * (1 - path) * (1 - rock) * (1 - snow) * land;
-      const dirt = Math.max(path, (1 - grassCoverage) * land) * (1 - rock) * (1 - snow);
+      // Bare bed under water as well as bare land: with snow no longer cut by the
+      // water class, a wet cell must still weigh dirt against it.
+      const dirt = Math.max(path, 1 - grassCoverage) * (1 - rock) * (1 - snow);
       const weightTotal = grass + dirt + rock + snow;
       const inverseWeightTotal = weightTotal > 1e-9 ? 1 / weightTotal : 0;
       const grassWeight = weightTotal > 1e-9 ? grass * inverseWeightTotal : 0;

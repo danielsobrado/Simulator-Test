@@ -142,16 +142,9 @@ export function createStylizedWaterMaterial({
   // wedges over the beach. Depth is the honest thickness of the body and
   // reaches zero on the waterline itself, so fading what the surface
   // contributes as it thins puts the edge back on the contour.
-  //
-  // The fade ends `shorelineFadeMargin` of depth short of the waterline. The
-  // flat sheet meets the terrain's 2 m triangles along a zigzag that this
-  // bilinearly filtered depth cannot follow; on a gently shelving bank the two
-  // disagree by a few centimetres, and a fade ending at zero showed that zigzag
-  // as soft square teeth along every shore. The contour just inside is smooth.
-  const fadeMargin = float(water.optics.shorelineFadeMargin ?? 0);
   const waterlineFade = smoothstep(
-    fadeMargin,
-    fadeMargin.add(max(float(water.optics.shorelineFadeDepth), 1e-4)),
+    0,
+    max(float(water.optics.shorelineFadeDepth), 1e-4),
     waterDepth,
   );
   // Metres from the chunk centre, canonical axes.

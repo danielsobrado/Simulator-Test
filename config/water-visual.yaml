@@ -26,11 +26,6 @@ water:
     # Thickness over which the sheet fades out at the bank. Keep it under the
     # ~0.12 m the surface sits above terrain, or the waterline reads as a step.
     shorelineFadeDepth: 0.2
-    # Depth short of the waterline where that fade ends. The sheet meets the
-    # terrain's 2 m triangles along a zigzag the filtered depth cannot follow;
-    # ending the fade inside it draws a smooth bank instead of square teeth.
-    # 0.06 and 0.12 left the teeth on flat cold-desert banks; 0.25 clears them.
-    shorelineFadeMargin: 0.25
     # The cell pattern the donor never had.
     surfaceDetailStrength: 0
     underwaterTintStrength: 0.35

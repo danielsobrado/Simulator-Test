@@ -11,7 +11,7 @@ import { blurTileField } from './BiomeFieldBlur.js';
 import { SNOW_BIOME_BLUR_CELLS, snowBiomeCoverField } from '../materials/SnowAccumulation.js';
 import { resolveMeadowGrowth } from '../stylized/meadow/meadowGrowthProfiles.js';
 import { TILE_BY_ID, hexToRgbBytes } from '../tileCatalog.js';
-import { halfToFloat } from '../water/WaterField.js';
+import { floatToHalf, halfToFloat } from '../water/WaterField.js';
 
 
 const DIST_INF = 1e9;
@@ -49,6 +49,40 @@ function sampleCellWaterOccupancy(field, localX, localZ, waterlineDepth) {
     }
   }
   return occupancy;
+}
+
+/**
+ * Each vertex's wetness, `coverage × smoothstep(depth)` as occupancy reads it,
+ * from the water field or, without one, the same samples the habitat halo takes
+ * (half-float rounded, so both production paths write identical bytes).
+ *
+ * The mask's alpha is a cell's dry share as the MEAN of its corners. Occupancy
+ * (B) is the wettest corner: nearly binary and dilated by up to a cell, so the
+ * bake's snow, cut by it, ended at every shore along the 2 m cell staircase in
+ * long straight runs. A mean is continuous, and the bake's bilinear filtering
+ * turns it into a smooth contour at the waterline.
+ */
+function vertexWetness(chunkSize, originX, originZ, field, sampleWater, waterlineDepth) {
+  if (!field && typeof sampleWater !== 'function') return null;
+  const width = chunkSize + 1;
+  const wet = new Float32Array(width * width);
+  for (let z = 0; z < width; z += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let coverage, depth;
+      if (field) {
+        const index = (z * field.width + x) * WATER_FIELD_CHANNELS;
+        coverage = halfToFloat(field.pixels[index]);
+        depth = halfToFloat(field.pixels[index + 2]);
+      } else {
+        const sample = sampleWater(originX + x, originZ + z);
+        if (!sample) continue;
+        coverage = halfToFloat(floatToHalf(sample.coverage));
+        depth = halfToFloat(floatToHalf(sample.depth));
+      }
+      if (coverage > 0) wet[z * width + x] = clamp(coverage, 0, 1) * smoothstep(0, waterlineDepth, Math.max(0, depth));
+    }
+  }
+  return wet;
 }
 
 /**
@@ -249,6 +283,7 @@ export function buildSurfaceMaskPixels({
   const snowCover = maskConfig.snow
     ? snowBiomeCoverField(halo, haloSize, maskConfig.snow.classification.snowBiomeCover)
     : null;
+  const wetness = vertexWetness(chunkSize, originX, originZ, usableWaterField, sampleWater, waterlineDepth);
   const habitat = prepareGrassHabitatHalo({halo,haloSize,searchRadius,chunkSize,heights,
     originX,originZ,maskConfig,sampleHeight,sampleWater,snowCover,
     coreWater:usableWaterField ? (x,z)=>sampleCellWaterOccupancy(usableWaterField,x,z,waterlineDepth) : null});
@@ -322,7 +357,11 @@ export function buildSurfaceMaskPixels({
       const dry = 1 - habitat.water[haloIndex];
       mask[offset + 1] = Math.round(grass * dry * dry);
       mask[offset + 2] = Math.round(habitat.water[haloIndex] * 255);
-      mask[offset + 3] = 255;
+      // Continuous dry share for the bake's snow (255 dry); B stays the gate.
+      mask[offset + 3] = wetness
+        ? Math.round((1 - (wetness[localZ * (chunkSize + 1) + localX] + wetness[localZ * (chunkSize + 1) + localX + 1]
+          + wetness[(localZ + 1) * (chunkSize + 1) + localX] + wetness[(localZ + 1) * (chunkSize + 1) + localX + 1]) / 4) * 255)
+        : Math.round((1 - habitat.water[haloIndex]) * 255);
       if (snowCoverOut) snowCoverOut[cellIndex] = Math.round((snowCover?.[haloIndex] ?? 0) * 255);
     }
   }
