@@ -1031,6 +1031,29 @@ runs lost native foreground focus (`capture.focus.native.passed` false; only one
 pond baseline passed), so the FPS and hitch rows are void as frame-pacing
 evidence; the GPU timestamp rows are the result.
 
+### Cold desert pass: rock looks, water tint, snow drifts, mineral stone (2026-11-06)
+
+A/B of the shader side of `170e3f8f`, `8b2922ef`, `007d6ef4`, `cd03d3a6` and
+`cbda611e` (`rockWeathering.js`, `StylizedLodRuntime.js`, `SnowAccumulation.js`,
+`StylizedWaterMaterial.js`, `AridSubstrateNodes.js`), reverse-applied in the
+shared checkout for the baseline arm and restored after. The change adds one
+per-instance vec4 on rocks, three noise taps on mineral ground within 560 m, a
+warped two-octave drift lookup in the CPU bake, and a uniform tint and depth
+margin on water. `chunk-cross --x 11453 --z 9877` (a cold-desert pond), `--warmup 8
+--settle`, headed WebGPU on Windows; other sessions' browsers were open on the GPU.
+
+| Metric | Baseline | Change |
+|--------|----------|--------|
+| GPU avg ms (`--gpuTimings 1`, 12 s) | 2.706, 2.386 | 2.052, 1.880 |
+| GPU p95 ms | 5.906, 4.110 | 2.913, 2.686 |
+| Avg FPS, focus-valid runs only (20 s) | 140.8, 148.5 | 152.4 |
+| Hitches, focus-valid runs | 11, 11 | 7 |
+
+No regression: GPU time is level or lower in the change arm, which the shared GPU
+makes noise rather than a gain. Six of the ten runs lost native focus and are
+void for FPS (they ranged 75–146 FPS in both arms); two more aborted on a Vite
+reload from another session's edit.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`
