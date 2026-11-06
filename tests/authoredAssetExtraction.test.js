@@ -49,7 +49,7 @@ test('extraction manifest covers the complete offline library and runtime subset
   // (donor-rock-pebbles).
   assert.equal(manifest.sources.length, 10);
   assert.equal(outputs.length, 87);
-  assert.equal(published.length, 39);
+  assert.equal(published.length, 38);
   assert.equal(wholeScene.outputs.filter((output) => output.name.startsWith('tree-')).length, 23);
   assert.ok(outputs.every((output) => Math.abs(output.bounds.min[1]) < 0.0001));
 });

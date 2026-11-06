@@ -100,7 +100,7 @@ drives. Which character the player walks as is `character.hero` in
 |---|---|---|---|
 | [Low Poly Tree Scene Free](https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd) | `assets/trees/low_poly_tree_scene_free.glb` | CC BY 4.0 | 23 trees and two grass shapes; two trees and both grass shapes publish under `public/assets/{trees,ground}/tree-scene/` |
 | [Low Poly Forest Tree Pack](https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b) | `assets/trees/low_poly_forest_tree_pack.glb` | CC BY 4.0 | Four trees and nine rocks; curated files publish under `public/assets/{trees,rocks}/forest-pack/` |
-| [Stylized Tree](https://sketchfab.com/3d-models/stylized-tree-6d1aeea748f147789004bc03e1930d32) | `assets/trees/stylized_tree.glb` | CC BY 4.0 | `public/assets/trees/stylized-oak.glb`, decimated to 5% |
+| [Stylized Tree](https://sketchfab.com/3d-models/stylized-tree-6d1aeea748f147789004bc03e1930d32) | `assets/trees/stylized_tree.glb` | CC BY 4.0 | Offline only: `stylized-oak`, decimated to 30%; savanna uses the Blender-built acacias instead |
 
 The 40.8 MiB tree scene is an offline source only. Never copy it wholesale to
 `public/`. Its 23 tree exports are only three distinct geometries — `tree-02`

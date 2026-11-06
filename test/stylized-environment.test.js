@@ -13,7 +13,6 @@ const ASSET_PATHS = Object.freeze([
   'public/assets/rocks/a_simple_rock.glb',
   'public/assets/rocks/ruined-fence/stone-01.glb',
   'public/assets/rocks/forest-pack/rock-02.glb',
-  'public/assets/trees/stylized-oak.glb',
   'public/assets/trees/forest-pack/tree-wide-01.glb',
   'public/assets/trees/tree-scene/tree-02.glb',
   'public/assets/ground/stylized-grass/clump-01.glb',

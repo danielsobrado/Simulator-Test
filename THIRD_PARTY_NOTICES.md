@@ -103,17 +103,6 @@ Runtime asset validation uses the official
 version 2.0.0-dev.3.10. The validator is licensed under the
 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
-## Stylized Tree
-
-`public/assets/trees/stylized-oak.glb`, including its embedded foliage texture,
-is the “Stylized Tree” model by Sketchfab user
-[yonimantz](https://sketchfab.com/yonimantz09).
-
-- Source: https://sketchfab.com/3d-models/stylized-tree-6d1aeea748f147789004bc03e1930d32
-- License: Creative Commons Attribution 4.0 International (CC BY 4.0)
-- Changes: runtime scale, grounding, instancing, stylized lighting, and LOD/proxy
-  generation are applied by this project.
-
 ## Authored Rocks
 
 The following models and their embedded textures are distributed under their

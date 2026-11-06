@@ -162,11 +162,13 @@ export const AUTHORED_ASSET_EXTRACTIONS = Object.freeze([
       // 0.30 is the knee: 6x the foliage for 31% more triangles than the broken
       // setting. Check `npm run validate:extracted-assets`, which now fails if the
       // two parts diverge like this again.
+      //
+      // Offline only: savanna, the last biome that drew it, wears the Blender-built
+      // acacias (tools/blender/savanna_trees) at 1 400-2 200 triangles.
       grouped({
         name: 'stylized-oak',
         roots: ['oak 01', 'oak 01.001'],
         scale: 14,
-        publishDir: 'public/assets/trees',
         simplifyRatio: 0.3,
         simplifyError: 0.02,
       }),

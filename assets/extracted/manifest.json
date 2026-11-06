@@ -1118,7 +1118,7 @@
           ],
           "scale": 14,
           "output": "assets/extracted/trees/stylized-oak/stylized-oak.glb",
-          "published": "public/assets/trees/stylized-oak.glb",
+          "published": null,
           "simplifyRatio": 0.3,
           "sha256": "4b2ec2e6768fc0cd8eb06335f45366634b2eaf49211b5d9e531ff1c2007f8715",
           "bytes": 6936448,

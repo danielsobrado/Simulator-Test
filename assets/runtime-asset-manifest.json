@@ -2559,196 +2559,6 @@
       }
     },
     {
-      "scene": "/assets/trees/stylized-oak.glb",
-      "source": "assets/extracted/trees/stylized-oak/stylized-oak.glb",
-      "output": "public/assets/trees/stylized-oak.glb",
-      "profile": "alphaCritical",
-      "optimizerArgs": [
-        "-cc",
-        "-kn",
-        "-km",
-        "-ke",
-        "-vpf",
-        "-tq",
-        "8",
-        "-tl",
-        "color,normal",
-        "1024",
-        "-tl",
-        "attrib",
-        "512",
-        "-tj",
-        "1",
-        "-tc",
-        "attrib",
-        "-tu",
-        "color,normal"
-      ],
-      "cacheKey": "f993b62133986e8fa4773f07a845bafdbd06ae40f44727299c460f78b4b3c7ac",
-      "sourceSha256": "4b2ec2e6768fc0cd8eb06335f45366634b2eaf49211b5d9e531ff1c2007f8715",
-      "outputSha256": "c6f7cb9b382b322fbb3988f3efed46749fde64b1bce28910c43e8ad92004b4f3",
-      "sourceBytes": 6936448,
-      "outputBytes": 1319160,
-      "gzipBytes": 1046129,
-      "brotliBytes": 1027452,
-      "sourceStats": {
-        "scenes": 1,
-        "nodes": 8,
-        "meshes": 5,
-        "materials": 2,
-        "textures": 1,
-        "images": 1,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 82330,
-        "renderedTriangles": 82330,
-        "drawParts": 5,
-        "materialTriangleCounts": {
-          "leafes_Mat.001": 17894,
-          "trunk_Mat.001": 64436
-        },
-        "sceneBounds": {
-          "min": [
-            -2.522637520671541,
-            -1.5371833215597768e-8,
-            -2.7089496872211707
-          ],
-          "max": [
-            2.522637520671541,
-            7.859021354488547,
-            2.708949361601221
-          ]
-        },
-        "bufferBytes": 6930416,
-        "logicalAccessorBytes": 6736820,
-        "logicalVertexBytes": 6242840,
-        "logicalIndexBytes": 493980,
-        "geometryBufferBytes": 6736828,
-        "imageBufferBytes": 193586,
-        "nodeNames": [
-          "oak 01",
-          "oak 01.001",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01_leafes_Mat.001_0",
-          "oak 01_leafes_Mat.001_0",
-          "stylized-oak"
-        ],
-        "materialNames": [
-          "leafes_Mat.001",
-          "trunk_Mat.001"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
-      },
-      "outputStats": {
-        "scenes": 1,
-        "nodes": 8,
-        "meshes": 5,
-        "materials": 2,
-        "textures": 1,
-        "images": 1,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 82330,
-        "renderedTriangles": 82330,
-        "drawParts": 5,
-        "materialTriangleCounts": {
-          "leafes_Mat.001": 17894,
-          "trunk_Mat.001": 64436
-        },
-        "sceneBounds": {
-          "min": [
-            -2.5226580743079685,
-            -1.5371696886154063e-8,
-            -2.708881865746015
-          ],
-          "max": [
-            2.522673840694726,
-            7.859140459098905,
-            2.70900864706039
-          ]
-        },
-        "bufferBytes": 4447120,
-        "logicalAccessorBytes": 2977466,
-        "logicalVertexBytes": 2483486,
-        "logicalIndexBytes": 493980,
-        "geometryBufferBytes": 3133484,
-        "imageBufferBytes": 235580,
-        "nodeNames": [
-          "oak 01",
-          "oak 01.001",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01.001_trunk_Mat.001_0",
-          "oak 01_leafes_Mat.001_0",
-          "oak 01_leafes_Mat.001_0",
-          "stylized-oak"
-        ],
-        "materialNames": [
-          "leafes_Mat.001",
-          "trunk_Mat.001"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu",
-          "KHR_texture_transform"
-        ],
-        "extensionsRequired": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu"
-        ]
-      },
-      "officialValidation": {
-        "validatorVersion": "2.0.0-dev.3.10",
-        "errors": 0,
-        "warnings": 0,
-        "knownKtx2Limitations": 2,
-        "inheritedWarnings": 0,
-        "inheritedWarningCodes": [],
-        "infos": 3,
-        "hints": 0,
-        "drawCalls": 5,
-        "vertices": 156018,
-        "triangles": 82330
-      },
-      "report": {
-        "generator": "gltfpack 1.2",
-        "scene": {
-          "nodeCount": 8,
-          "meshCount": 5,
-          "materialCount": 2,
-          "textureCount": 1,
-          "animationCount": 0
-        },
-        "render": {
-          "drawCount": 5,
-          "instanceCount": 5,
-          "triangleCount": 82330
-        },
-        "data": {
-          "json": 5378,
-          "binary": 1313636,
-          "buffers": {
-            "vertex": 995695,
-            "index": 82355,
-            "animation": 0,
-            "transform": 0,
-            "image": 235580
-          }
-        }
-      }
-    },
-    {
       "scene": "/assets/trees/forest-pack/tree-wide-01.glb",
       "source": "assets/extracted/trees/low-poly-forest-pack/tree-wide-01.glb",
       "output": "public/assets/trees/forest-pack/tree-wide-01.glb",
@@ -22231,15 +22041,15 @@
     }
   ],
   "totals": {
-    "sourceBytes": 75540228,
-    "outputBytes": 41626328,
-    "gzipBytes": 39530310,
-    "brotliBytes": 39466699,
-    "logicalSourceVertexBytes": 37671728,
-    "logicalOutputVertexBytes": 18056649,
-    "logicalSourceIndexBytes": 4806744,
-    "logicalOutputIndexBytes": 4529472,
-    "savedBytes": 33913900,
-    "reductionRatio": 0.448952
+    "sourceBytes": 68603780,
+    "outputBytes": 40307168,
+    "gzipBytes": 38484181,
+    "brotliBytes": 38439247,
+    "logicalSourceVertexBytes": 31428888,
+    "logicalOutputVertexBytes": 15573163,
+    "logicalSourceIndexBytes": 4312764,
+    "logicalOutputIndexBytes": 4035492,
+    "savedBytes": 28296612,
+    "reductionRatio": 0.412464
   }
 }

@@ -10,7 +10,7 @@ view distances.
 |---|---:|---|
 | Rocks | 12 | Four standalone rocks plus four ruined-fence stones and four forest-pack stones, each loaded from an individual GLB |
 | Bushes | 5 | One grounded prototype per authored bush GLB; authored cutout textures in near and proxy bands |
-| Trees | 14 total | Source-GLB conifers plus a decimated oak, four forest-pack conifers and the two distinct whole-scene crowns; near geometry, proxy geometry, then baked impostors |
+| Trees | 14 total | Source-GLB conifers, four forest-pack conifers and the two distinct whole-scene crowns; near geometry, proxy geometry, then baked impostors |
 | Ground detail | 17 | Tufts, blades, blossoms and sprouts under 350 triangles each, gated per biome over the procedural blade carpet |
 | Aquatic plants | 6 | Two rooted wetland plants, two broadly scattered weed silhouettes and two low-poly lotus leaves restricted to deterministic shoreline colonies |
 | Distant birds | Up to 10 | Generated three-triangle silhouettes in intermittent flocks; one instanced draw only while visible |
@@ -36,7 +36,8 @@ differing only by node transform, which the scatter already randomises.
 `tree-01` is a third geometry but carries no leaf material.
 
 `stylized-oak` is decimated at extraction time from 182 154 to 62 883 triangles
-and restricted to savanna and grassland. Decimation belongs in the extractor
+and kept as an offline library asset: savanna now uses the Blender-built acacias
+in its place (`tools/blender/savanna_trees`). Decimation belongs in the extractor
 because the runtime optimizer asserts triangle parity between its input and
 output, so gltfpack can never silently change a configured asset. Its crown is
 thousands of disconnected leaf shells, which is why simplification plateaus near

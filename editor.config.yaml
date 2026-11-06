@@ -454,26 +454,6 @@ stylizedSurface:
     # Additional authored tree prototypes. Their embedded textures are retained
     # and each entry joins the configured species' deterministic prototype pool.
     treeVariants:
-      - scene: /assets/trees/stylized-oak.glb
-        trunkMaterial: trunk_Mat.001
-        leafMaterial: leafes_Mat.001
-        species: broadleaf_round
-        # Deterministic CLOD bark synthesis, projected in object space so the
-        # trunk and branches share one consistent fissured surface.
-        barkProfile: spruce
-        barkScale: 0.8
-        barkSeed: 83
-        # Unit conversion, grounding and centring are baked by the offline extractor.
-        scale: 1
-        # Still the heaviest tree in the pool by an order of magnitude after
-        # offline decimation (182 154 -> 62 883 triangles; its crown is thousands
-        # of disconnected leaf shells that no simplifier will collapse further).
-        # Confined to the two biomes that place trees as isolated specimens and
-        # copses — savanna at density 0.24 and grassland at 0.16 — where a hero
-        # oak is what the composition wants and where few of them are drawn.
-        # Closed forest uses the 4 599- and 1 806-triangle crowns below.
-        # Grassland now wears grass-test's meadow trees; the oak keeps the savanna.
-        tileIds: [3]
       - scene: /assets/trees/forest-pack/tree-wide-01.glb
         trunkMaterial: Tree_Trunk_01
         leafMaterial: Tree_Branches_01
