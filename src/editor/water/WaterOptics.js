@@ -57,6 +57,9 @@ export function validateWaterOpticsConfig(config) {
     0.01,
     5,
   );
+  if (config.shorelineFadeMargin !== undefined) {
+    assertFiniteRange(config.shorelineFadeMargin, 'stylizedSurface.water.optics.shorelineFadeMargin', 0, 0.5);
+  }
   assertFiniteRange(
     config.surfaceDetailStrength,
     'stylizedSurface.water.optics.surfaceDetailStrength',

@@ -973,9 +973,6 @@ stylizedSurface:
           - [desert-sagebrush-01]
       - scene: /assets/ground/arid/badlands-deadwood-01.glb
         motion: rigid
-        # Lies along the slope; one end floated where the ground fell away.
-        conform: true
-        heightOffset: -0.04
         scale: 1.15
         weight: 0.85
         tileIds: [1, 2, 32]
