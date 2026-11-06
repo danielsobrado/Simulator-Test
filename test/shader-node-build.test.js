@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three/webgpu';
-import { float, lights, positionWorld, vec3, vec4, texture } from 'three/tsl';
+import { float, positionWorld, vec3, vec4, texture } from 'three/tsl';
 import { foliageMaterialClass } from '../src/editor/stylized/forest/FoliageNodeMaterial.js';
 import { applyCloudShadow } from '../src/editor/stylized/CloudShadow.js';
 import { gradeTownMaterial } from '../src/render/materials/townGrade.js';
@@ -13,29 +13,7 @@ import { parseQaParams } from '../src/editor/performance/qa/parseQaParams.js';
 import { setPipelineOutput } from '../src/editor/stylized/pipelineOutput.js';
 import { DEFAULT_CINEMATIC_FINISH, createFinishUniforms } from '../src/editor/stylized/cinematicFinish.js';
 
-// Exercise Three's real WGSL node generator without a browser/device. This
-// catches TSL integration errors; it does not replace driver validation or QA.
-function renderer() {
-  const value = new THREE.WebGPURenderer({ canvas: {
-    width: 64, height: 64, style: {}, addEventListener() {}, removeEventListener() {},
-  } });
-  value.hasFeature = () => false;
-  value.hasCompatibility = () => true;
-  value.backend.capabilities.getUniformBufferLimit = () => 65536;
-  value._bindings = { getSharedBindGroup: group => group }; // set by init(), which needs a device
-  return value;
-}
-
-function build(mesh, device = renderer(), sun = new THREE.DirectionalLight()) {
-  const builder = device.backend.createNodeBuilder(mesh, device);
-  builder.camera = new THREE.PerspectiveCamera();
-  builder.scene = new THREE.Scene();
-  builder.lightsNode = lights([sun]);
-  builder.build();
-  assert.ok(builder.fragmentShader.includes('@fragment'));
-  assert.doesNotMatch(builder.fragmentShader, /\b(?:NaN|undefined)\b/);
-  return builder;
-}
+import { buildShader as build, shaderTestRenderer as renderer } from './helpers/buildShader.js';
 
 test('foliage lighting generates with material shadows and cloud attenuation', () => {
   const device = renderer();

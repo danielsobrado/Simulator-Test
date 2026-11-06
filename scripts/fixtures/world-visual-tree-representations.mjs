@@ -14,7 +14,7 @@ import { syncFoliageLight } from '/src/editor/stylized/forest/foliageLight.js';
 import { jungleMistUniforms } from '/src/editor/stylized/ambient/JungleMist.js';
 import { applyFixtureLighting } from './world-visual-fixture-lighting.mjs';
 
-const assets=['/assets/trees/tree-scene/tree-02.glb','/assets/trees/forest-pack/tree-narrow-01.glb','/assets/trees/alpine/tree10.glb'];
+const assets=['/assets/grass-scene.glb','/assets/trees/meadow/tree7.glb','/assets/trees/tree-scene/tree-02.glb','/assets/trees/forest-pack/tree-narrow-01.glb','/assets/trees/alpine/tree10.glb'];
 class FixtureTreeView extends StylizedTreeView {
  createRenderResources() {
   this.proxyPrototypes=this.prototypes.map(parts=>this.withCloudShadow(createTreeProxyPrototype(parts,this.config).proxyParts));
@@ -58,6 +58,9 @@ export async function runTreeRepresentations({renderer,scene,camera,draw,state,s
    const foliageLighting=parts.some(part=>part.kind==='leaf'&&Boolean(part.material.emissiveNode));
    state.report.checks.push({id:`tree-foliage-lighting-metadata-${index}`,expected:foliageLighting,actual:atlas.foliageLighting,
     passed:foliageLighting===atlas.foliageLighting});
+   const barkLighting=parts.some(part=>part.kind==='trunk'&&part.material.userData.barkLighting===true);
+   state.report.checks.push({id:`tree-bark-lighting-metadata-${index}`,expected:barkLighting,actual:atlas.barkLighting,
+    passed:barkLighting===atlas.barkLighting});
    bounds.makeEmpty();for(const part of parts){part.geometry.computeBoundingBox();bounds.union(part.geometry.boundingBox);}
    const height=bounds.max.y-bounds.min.y,center=bounds.getCenter(new THREE.Vector3());
    const elevation=THREE.MathUtils.degToRad(atlas.lowElevationDegrees);

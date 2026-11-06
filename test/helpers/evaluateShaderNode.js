@@ -32,6 +32,7 @@ export function evaluateShaderNode(node, { values = new Map(), derivatives = {} 
       smoothstep: (lo, hi, x) => { const t = clamp((x - lo) / (hi - lo), 0, 1); return t * t * (3 - 2 * t); },
     };
     if (node.method === 'dot') return a.reduce((sum, v, i) => sum + v * b[i], 0);
+    if (node.method === 'length') return Math.hypot(...a);
     if (node.method === 'normalize') return a.map(value => value / Math.hypot(...a));
     if (functions[node.method]) return map(functions[node.method], a, b, c);
   }

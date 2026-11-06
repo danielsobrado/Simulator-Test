@@ -97,9 +97,9 @@ function treeAir() {
  * The same air and fill on bark, and the floor's own light on its lower faces: lit
  * only by the sun and a thin ambient, a shaded trunk is a black bar in a green wood.
  */
-export function treeBarkEmission(bark) {
-  const low = smoothstep(0, BOUNCE_REACH, positionGeometry.y).oneMinus();
-  const facing = normalWorld.y.negate().mul(0.5).add(0.5);
+export function treeBarkEmission(bark, { height = positionGeometry.y, up = normalWorld.y } = {}) {
+  const low = smoothstep(0, BOUNCE_REACH, height).oneMinus();
+  const facing = up.negate().mul(0.5).add(0.5);
   return foliageSkyFill(bark, BARK_FILL)
     .add(bark.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(low).mul(BARK_BOUNCE))
     .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));

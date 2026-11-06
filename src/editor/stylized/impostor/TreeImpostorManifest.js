@@ -3,7 +3,7 @@ export const TREE_IMPOSTOR_LEGACY_MANIFEST_VERSION = 2;
 export const TREE_IMPOSTOR_NORMAL_ENCODING = 'view-normal-rgb-foliage-mask-half-a';
 export const TREE_IMPOSTOR_LEGACY_NORMAL_ENCODING = 'view-normal-rgb-coverage-a';
 
-const SOURCE_SIGNATURE_VERSION = 8;
+const SOURCE_SIGNATURE_VERSION = 9;
 const RUNTIME_TREE_FIELDS = new Set([
   'enabled',
   'residentRadius',
@@ -186,6 +186,9 @@ function validatePrototype(prototype, expectedIndex, normalEncoding) {
   const gutter = prototype.gutter ?? 0;
   if (prototype.foliageLighting !== undefined && typeof prototype.foliageLighting !== 'boolean') {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid foliage lighting metadata.`);
+  }
+  if (prototype.barkLighting !== undefined && typeof prototype.barkLighting !== 'boolean') {
+    throw new Error(`Tree impostor prototype ${expectedIndex} has invalid bark lighting metadata.`);
   }
   if (!Number.isInteger(gutter) || gutter < 0 || gutter * 2 >= prototype.tileSize) {
     throw new Error(`Tree impostor prototype ${expectedIndex} has invalid gutter.`);

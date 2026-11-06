@@ -5,6 +5,7 @@ import {
   normalView,
 } from 'three/tsl';
 import { authoredTexture } from '../AuthoredTextureNode.js';
+import { createSourceOpacityNode } from '../lod/StylizedDitheredMaterial.js';
 import { createDilatedAtlasTile, tightlyPackRgbaReadback } from './TreeImpostorAtlasPixels.js';
 import { createCaptureDirections, impostorCanvasRow } from './impostorFrame.js';
 import { TREE_IMPOSTOR_NORMAL_ENCODING } from './TreeImpostorManifest.js';
@@ -43,6 +44,23 @@ function unionBounds(parts) {
 }
 
 const IMPOSTOR_FRAME_PADDING = 1.04;
+
+// MeshBasicNodeMaterial deliberately ignores normalNode/normalMap. Baking still
+// needs the lit surface's normal while writing unlit reflectance/normal RGB.
+class TreeBakeMaterial extends THREE.MeshBasicNodeMaterial {
+  setupNormal() {
+    return THREE.NodeMaterial.prototype.setupNormal.call(this);
+  }
+}
+
+function createBakeSurface(part) {
+  const material = new TreeBakeMaterial({ side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide });
+  const source = part.material ?? {};
+  for (const key of ['normalNode', 'normalMap', 'normalMapType', 'normalScale', 'bumpMap', 'bumpScale', 'flatShading']) {
+    if (source[key] !== undefined) material[key] = source[key];
+  }
+  return material;
+}
 
 export function measureTreeImpostorProjection(
   parts,
@@ -93,33 +111,29 @@ export function measureTreeImpostorProjection(
 export function createTreeImpostorBakeMaterial(part, normalPass) {
   const sourceMap = part.sourceMap ?? null;
   if (normalPass) {
-    const material = new THREE.MeshBasicNodeMaterial({
-      side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide,
-    });
+    const material = createBakeSurface(part);
     const foliageMask = float(part.kind === 'leaf' ? 1 : 0);
+    const source = part.material ?? {};
     material.colorNode = normalView.mul(0.5).add(0.5);
     material.opacityNode = foliageMask;
     // NodeMaterial forces alpha to 1 for opaque NormalBlending materials.
     // NoBlending keeps depth writes and RGB normals intact while preserving
     // opacityNode as the foliage classification in render-target alpha.
     material.blending = THREE.NoBlending;
-    if (sourceMap) {
+    const opacity = createSourceOpacityNode(source) ?? (sourceMap ? authoredTexture(sourceMap).a : null);
+    if (opacity) {
       // Leave the UV node implicit so TextureNode applies KHR_texture_transform.
       // gltfpack rescales foliage UVs and stores the inverse transform on the
       // texture; sampling raw `uv()` makes the entire leaf card transparent.
-      const alphaCutoff = part.material.alphaTest > 0
-        ? part.material.alphaTest
-        : 0.5;
-      material.maskNode = authoredTexture(sourceMap).a.greaterThan(alphaCutoff);
+      const alphaCutoff = source.alphaTest ?? 0.5;
+      if (alphaCutoff > 0) material.maskNode = opacity.greaterThan(alphaCutoff);
     }
     material.transparent = false;
     material.depthWrite = true;
     return material;
   }
 
-  const material = new THREE.MeshBasicNodeMaterial({
-    side: part.kind === 'leaf' ? THREE.DoubleSide : THREE.FrontSide,
-  });
+  const material = createBakeSurface(part);
   material.colorNode = part.material.colorNode;
   material.opacityNode = part.material.opacityNode ?? null;
   material.alphaTest = part.material.alphaTest ?? (sourceMap ? 0.5 : 0);
@@ -323,6 +337,7 @@ export class TreeImpostorBaker {
       centerY: center.y,
       radius,
       foliageLighting: parts.some(part => part.kind === 'leaf' && Boolean(part.material.emissiveNode)),
+      barkLighting: parts.some(part => part.kind === 'trunk' && part.material.userData.barkLighting === true),
       normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING,
       albedoCanvas,
       normalCanvas,

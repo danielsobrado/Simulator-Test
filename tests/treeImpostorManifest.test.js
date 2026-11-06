@@ -128,6 +128,12 @@ test('rejects missing or non-contiguous prototypes', () => {
   }), /expected 2/);
 });
 
+test('bark lighting metadata survives validation and rejects invalid types', () => {
+  const value = validateTreeImpostorManifest(manifest([{ ...prototype(), barkLighting: true }]));
+  assert.equal(value.prototypes[0].barkLighting, true);
+  assert.throws(() => validateTreeImpostorManifest(manifest([{ ...prototype(), barkLighting: 'true' }])), /bark lighting/);
+});
+
 test('source signature changes with geometry or bake configuration', () => {
   const config = { trees: { leafTop: '#ffffff' }, lod: { impostor: { columns: 8 } } };
   const first = createTreeImpostorSourceSignature([
@@ -139,7 +145,7 @@ test('source signature changes with geometry or bake configuration', () => {
   const configChanged = createTreeImpostorSourceSignature([
     [{ kind: 'leaf', geometry: geometry(1), sourceMap: null }],
   ], { ...config, lod: { impostor: { columns: 16 } } });
-  assert.match(first, /^tree-impostor-v8-/);
+  assert.match(first, /^tree-impostor-v9-/);
   assert.notEqual(first, geometryChanged);
   assert.notEqual(first, configChanged);
 });

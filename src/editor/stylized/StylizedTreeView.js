@@ -515,9 +515,11 @@ export class StylizedTreeView {
                 barkScale: authoredBarkScale,
                 barkWeathering: this.barkWeatheringSettings,
                 barkGrade: this.config.trees.barkGrade,
+                vertexColor: Boolean(part.geometry.getAttribute('color')),
                 sway,
               })
-              : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config, sway }));
+              : createStylizedTrunkMaterial({ textures: barkTextures, config: this.config, sway,
+                barkWeathering: this.barkWeatheringSettings }));
           return {
             geometry: part.geometry,
             material,
@@ -584,6 +586,7 @@ export class StylizedTreeView {
             config: this.config,
             palette,
             sway,
+            barkWeathering: this.barkWeatheringSettings,
           }),
       }));
       // No attachTreeRoots here: these prototypes already carry a root flare.

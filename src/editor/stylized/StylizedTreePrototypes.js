@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { materialList } from '../assets/assetUrl.js';
 import {
   bakeWorldGeometry,
+  ensureVertexNormals,
   isUprightSize,
 } from './StylizedPrototypeBake.js';
 
@@ -97,7 +98,9 @@ export function extractPrototypePartsFromRoots(roots, config) {
     part.geometry.translate(-centerX, -trunkMinY, -centerZ);
     part.geometry.computeBoundingBox();
     part.geometry.computeBoundingSphere();
-    part.geometry.computeVertexNormals();
+    // The world bake already transforms authored normals. Translation cannot
+    // invalidate them; rebuilding here flattens the donor's canopy lighting.
+    ensureVertexNormals(part.geometry);
   }
   return baked.map(({ geometry, kind, source }) => ({ geometry, kind, source }));
 }
@@ -304,16 +307,26 @@ function mergeIntoTrunk(parts, root) {
   const trunk = trunkPart.geometry;
   if (trunk.index && !root.index) root.setIndex([...Array(root.getAttribute('position').count).keys()]);
   if (!trunk.index && root.index) root = root.toNonIndexed();
+  if (trunk.getAttribute('tangent') && root.getAttribute('normal') && root.getAttribute('uv')) {
+    // Normal-mapped donors use their authored tangent frame. Generated roots
+    // need a valid frame too; a zero-filled tangent erases their normal detail.
+    const indexed = Boolean(root.index);
+    if (!indexed) root.setIndex([...Array(root.getAttribute('position').count).keys()]);
+    root.computeTangents();
+    if (!indexed) root.setIndex(null);
+  }
   for (const name of Object.keys(root.attributes)) {
     if (!trunk.getAttribute(name)) root.deleteAttribute(name);
   }
   for (const [name, attribute] of Object.entries(trunk.attributes)) {
     if (root.getAttribute(name)) continue;
-    root.setAttribute(name, new THREE.BufferAttribute(
-      new attribute.array.constructor(root.getAttribute('position').count * attribute.itemSize),
-      attribute.itemSize,
-      attribute.normalized,
-    ));
+    const added = new THREE.Float32BufferAttribute(
+      new Float32Array(root.getAttribute('position').count * attribute.itemSize), attribute.itemSize,
+    );
+    // Generated roots have no painted tint/AO. Zero would turn them black when
+    // the authored trunk's vertex colour is retained.
+    if (name === 'color') added.array.fill(1);
+    root.setAttribute(name, added);
   }
   for (const [name, attribute] of Object.entries(trunk.attributes)) {
     root.setAttribute(name, matchAttributeStorage(root.getAttribute(name), attribute));

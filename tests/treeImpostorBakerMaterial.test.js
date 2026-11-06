@@ -7,6 +7,8 @@ import {
   createBakeGeometry,
 } from '../src/editor/stylized/impostor/TreeImpostorBaker.js';
 import {createCaptureDirections,impostorCanvasRow} from '../src/editor/stylized/impostor/impostorFrame.js';
+import { createTreeImpostorBundle } from '../src/editor/stylized/impostor/TreeImpostorAssets.js';
+import { TREE_IMPOSTOR_NORMAL_ENCODING } from '../src/editor/stylized/impostor/TreeImpostorManifest.js';
 
 test('bake targets encode PNG albedo once while normals remain linear',()=>{
  const targets=createTreeImpostorBakeTargets(120);
@@ -57,4 +59,12 @@ test('normal bake writes foliage classification through material opacity', () =>
     leaf.dispose();
     trunk.dispose();
   }
+});
+
+test('atlas export retains independent bark and foliage lighting flags', async () => {
+  const canvas = { toDataURL: () => 'data:image/png;base64,AA==' };
+  const bundle = await createTreeImpostorBundle([{ prototypeIndex: 0, barkLighting: true, foliageLighting: false,
+    normalEncoding: TREE_IMPOSTOR_NORMAL_ENCODING, albedoCanvas: canvas, normalCanvas: canvas }], 'tree-impostor-v9-test');
+  assert.equal(bundle.prototypes[0].barkLighting, true);
+  assert.equal(bundle.prototypes[0].foliageLighting, false);
 });

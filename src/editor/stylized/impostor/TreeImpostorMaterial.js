@@ -1,5 +1,5 @@
 import { applyJungleMist } from '../ambient/jungleMistOutput.js';
-import { treeFoliageEmission } from '../forest/foliageLight.js';
+import { treeBarkEmission, treeFoliageEmission } from '../forest/foliageLight.js';
 import { decodeTreeFoliageMaskNode } from './TreeImpostorNormalEncoding.js';
 import * as THREE from 'three/webgpu';
 import {
@@ -17,6 +17,7 @@ import {
   mix,
   mod,
   normalize,
+  positionGeometry,
   positionLocal,
   sin,
   step,
@@ -39,6 +40,15 @@ import { assignTreeFoliageMaterialData } from '../../../render/postprocessing/Po
 import { canonicalFromRender, sampleWorldWind, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
 
 const TWO_PI = Math.PI * 2;
+
+export function treeImpostorBarkEmission(color, foliageMask, worldNormal, atlas) {
+  // Billboard vertices are in [-.5,.5], not prototype metres. Restore height
+  // above the foot so ground bounce fades over the same band as live bark.
+  return treeBarkEmission(color, {
+    height: positionGeometry.y.mul(atlas.height).add(atlas.centerY),
+    up: worldNormal.y,
+  }).mul(foliageMask.oneMinus());
+}
 
 function createMaterial({ atlas, readTransform, readParameters, readAppearance, ambientEffects }) {
   const cameraRight = uniform(new THREE.Vector3(1, 0, 0));
@@ -139,6 +149,10 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance, 
     emissive: atlas.foliageLighting ? treeFoliageEmission(crown).mul(foliageMask) : null,
     cap,
   });
+  if (atlas.barkLighting) {
+    const barkFill = treeImpostorBarkEmission(crown, foliageMask, worldNormal, atlas);
+    snowed.emissive = snowed.emissive ? snowed.emissive.add(barkFill) : barkFill;
+  }
   if (atlas.foliageLighting) material.foliageTransmissionNode = foliageMask.mul(canopySnowTransmission(float(0.8), cap));
   material.colorNode = snowed.color;
   material.emissiveNode = snowed.emissive;
