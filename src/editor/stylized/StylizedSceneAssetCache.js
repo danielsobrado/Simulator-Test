@@ -76,7 +76,7 @@ export function createStylizedSceneLoader({ renderer, baseUrl = '/', telemetry =
   // the transcoder never starts, and GLTFLoader drops every KTX2 texture: the
   // forest-pack crowns lost their leaf atlas and fell back to palette or vertex
   // colours (lilac AO data on two of them, which read as pale cream). The
-  // vendored copy is byte-identical to three r186's.
+  // vendored copy is byte-identical to three r187's.
   const ktx2Loader = new KTX2Loader()
     .setTranscoderPath(resolveAssetUrl(normalizeBaseUrl(baseUrl), BASIS_TRANSCODER_PATH))
     .detectSupport(renderer);

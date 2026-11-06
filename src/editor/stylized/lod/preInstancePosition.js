@@ -12,12 +12,10 @@ import { positionLocal } from 'three/tsl';
  * assigning `positionLocal` ahead of the material's own position setup.
  * `positionNode`, if any, still runs after instancing, in mesh space.
  *
- * Written against r185. `NodeMaterial.setupPosition` still exists in the pinned
- * 0.186.1 (and this patch still installs), but the ordering above is UNVERIFIED
- * since the 2026-09-28 bump: no GPU was available to check it, and if r186
- * reordered the two, per-tree morphology would shift. Re-check alongside
- * `qa:vegetation:lod` / `qa:perf` — see docs/plans/grass-test-handover.md, the
- * browser-QA item.
+ * Written against r185. The ordering above was re-read in r187's
+ * `NodeMaterial.setupPosition` (instancing, then `positionNode`) on 2026-11-06;
+ * if a later bump reorders the two, per-tree morphology would shift. Re-check
+ * alongside `qa:vegetation:lod` / `qa:perf` — see docs/plans/grass-test-handover.md.
  *
  * @param {THREE.NodeMaterial} material
  * @param {(position: object) => object} transform maps the prototype-space position node

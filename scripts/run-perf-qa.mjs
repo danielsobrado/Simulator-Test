@@ -184,7 +184,7 @@ const fs = require('fs');
       return;
     }
 
-    // Match Three r186 WebGPUBackend adapter selection. The canvas check above
+    // Match Three's (r187) WebGPUBackend adapter selection. The canvas check above
     // proves the measured renderer is WebGPU; this second request records the
     // identity selected by the same compatibility-level options.
     const adapter = await page.evaluate(async () => {

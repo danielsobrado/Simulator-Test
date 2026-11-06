@@ -1,6 +1,6 @@
 const DECLARATION = /^.*@binding\(\s*\d+\s*\).*@group\(\s*\d+\s*\).*var\s+\w+\s*:\s*sampler(?:_comparison)?\s*;.*$/gm;
 
-/** Three 0.186.1 binds samplers for filterable textureLoad-only inputs. */
+/** Three (0.186.1, still in 0.187.0) binds samplers for filterable textureLoad-only inputs. */
 export function pruneUnusedSamplerBindings(builder) {
   const stages = ['vertexShader', 'fragmentShader', 'computeShader'];
   const executable = stages.map(stage => (builder[stage] ?? '').replace(DECLARATION, '')).join('\n');

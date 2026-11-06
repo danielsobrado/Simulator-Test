@@ -29,7 +29,7 @@ function isInScene(object, scene) {
   return false;
 }
 
-// Pinned Three r186 adapter: render preparation must neither reuse the current
+// Pinned Three adapter (r186, unchanged in r187): render preparation must neither reuse the current
 // frame's cached scene pass nor leave its empty pass cached for gameplay. Advance
 // only the cache identity, not animation time/delta. Temporal history is not a
 // preparation resource and must not ingest an empty beauty pass.

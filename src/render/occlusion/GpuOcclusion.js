@@ -48,12 +48,13 @@ export class GpuOcclusion {
     this.world = world;
     this.renderer = world.renderer;
     // The indirect-draw bridge is pinned to the renderer revision whose backend
-    // contract is covered by the GPU contract suite.
-    this.enabled = settings.enabled !== false && REVISION === '186';
+    // contract (backend.draw -> renderObject.getIndirect() -> geometry.indirect,
+    // backend.get(attribute).buffer) was last checked: r187.
+    this.enabled = settings.enabled !== false && REVISION === '187';
     // Silent disablement here reads as "GPU culled nothing", which is
     // indistinguishable from a view that simply hides little geometry.
     if (settings.enabled !== false && !this.enabled) {
-      logger.warn(`GPU occlusion needs three r186; installed revision is r${REVISION}. Ordinary rendering remains active.`);
+      logger.warn(`GPU occlusion needs three r187; installed revision is r${REVISION}. Ordinary rendering remains active.`);
     }
     this.settings = {
       minTriangles: 256, minOccluderArea: 0.002, boundsPadding: 0.15,
