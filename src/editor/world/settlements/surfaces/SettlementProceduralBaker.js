@@ -180,9 +180,9 @@ export class SettlementProceduralBaker {
         const nodes = channelNodes(procedural, Math.max(procedural.displacementExtent, 1e-3));
         if (nodes.positionNode) paint.positionNode = nodes.positionNode;
         paint.colorNode = nodes.color;
-        const outputs = mrt({ color: output, normal: nodes.normal, arm: nodes.arm });
-        await this.draw(raw, outputs, () => this.renderer.compileAsync(scene, camera));
-        this.draw(raw, outputs, () => this.renderer.render(scene, camera));
+        paint.mrtNode = mrt({ color: output, normal: nodes.normal, arm: nodes.arm });
+        await this.draw(raw, null, () => this.renderer.compileAsync(scene, camera));
+        this.draw(raw, null, () => this.renderer.render(scene, camera));
       }
       CHANNELS.forEach((channel, index) => {
         const blend = new THREE.MeshBasicNodeMaterial();
@@ -243,10 +243,15 @@ export class SettlementProceduralBaker {
       const paint = new THREE.MeshBasicNodeMaterial();
       mesh.material = paint;
       const into = last ? raw : stages[layer % 2];
-      const outputs = last ? finishedOutputs(procedural, surface) : stageOutputs(surface);
+      // The outputs ride on the material, never on the renderer: three r187's
+      // compileAsync puts the MRT it was called under back on the renderer each
+      // time it yields to the main thread, so a renderer MRT bound for the
+      // compile stayed on through ordinary frames, every post pass drew into the
+      // stage targets, failed validation, and towns rendered nothing but terrain.
+      paint.mrtNode = last ? finishedOutputs(procedural, surface) : stageOutputs(surface);
       try {
-        await this.draw(into, outputs, () => this.renderer.compileAsync(scene, camera));
-        this.draw(into, outputs, () => this.renderer.render(scene, camera));
+        await this.draw(into, null, () => this.renderer.compileAsync(scene, camera));
+        this.draw(into, null, () => this.renderer.render(scene, camera));
       } finally {
         paint.dispose();
       }

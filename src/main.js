@@ -1606,6 +1606,13 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     if (!active) return;
 
     const frameTimestamp = Number.isFinite(timestamp) ? timestamp : performance.now();
+    // Every frame starts on the canvas. three r187's compileAsync puts back the
+    // target and MRT it was called under each time it yields to the main thread,
+    // so a compile into an offscreen target (the settlement surface baker) left
+    // that target bound through ordinary frames: every post pass drew into it,
+    // failed validation, and towns rendered nothing but terrain.
+    terrainView.renderer.setRenderTarget(null);
+    terrainView.renderer.setMRT?.(null);
     deferredWork.beginFrame();
     const profiling = perfQa?.beginFrame(frameTimestamp) ?? false;
     drawPreparation.beginFrame(deferredWork);
