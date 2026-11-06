@@ -41,7 +41,8 @@ const SPLASH_DEPTH = 0.04;
  */
 const SWIM_PIVOT_SHARE = 0.65;
 
-function skinnedBounds(model) {
+/** World bounds of a rigged model as its skinned meshes deform it, matrices updated first. */
+export function skinnedBounds(model) {
   model.updateMatrixWorld(true);
   model.traverse((object) => {
     if (object.isSkinnedMesh) object.computeBoundingBox();

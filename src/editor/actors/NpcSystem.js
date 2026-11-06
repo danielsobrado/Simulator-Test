@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { calibrateLocomotionClip } from '../character/glb/locomotionCalibration.js';
 import { createStandingClip } from '../character/glb/standingPose.js';
+import { skinnedBounds } from '../character/glb/GlbCharacterView.js';
 import { createSeededRandom } from '../wildlife/math.js';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 
@@ -41,10 +42,12 @@ export class NpcSystem {
       object.computeBoundingSphere?.();
       if (object.boundingSphere) { object.boundingSphere = object.boundingSphere.clone(); object.boundingSphere.radius *= 1.4; }
     });
-    const bounds = new THREE.Box3().setFromObject(model);
+    // Measured as the hero is (skinnedBounds): a fresh clone's matrices are stale, and a
+    // centimetre rig under a 0.01 armature (the radiant paladin) measured 100x off and
+    // walked a capital's square as a giant.
+    const bounds = skinnedBounds(model);
     model.scale.setScalar(definition.targetHeight / Math.max(0.001, bounds.max.y - bounds.min.y));
-    model.updateMatrixWorld(true);
-    model.position.y -= new THREE.Box3().setFromObject(model).min.y;
+    model.position.y -= skinnedBounds(model).min.y;
     const root = new THREE.Group(); root.name = record.id; root.add(model); this.root.add(root);
     const mixer = new THREE.AnimationMixer(model);
     const clips = gltf.animations.map(clip => clip.name === definition.clips.walk || clip.name === definition.clips.run
