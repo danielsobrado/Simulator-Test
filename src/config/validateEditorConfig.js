@@ -831,6 +831,7 @@ function validateStylizedSurface(config) {
           && (!Number.isFinite(variant.weight) || variant.weight <= 0)) {
         throw new Error(`Invalid editor configuration: ${path}.weight must be positive.`);
       }
+      if (variant.paletteTileId !== undefined) assertTileIds([variant.paletteTileId], `${path}.paletteTileId`);
       if (variant.conform !== undefined && typeof variant.conform !== 'boolean') {
         throw new Error(`Invalid editor configuration: ${path}.conform must be true or false.`);
       }

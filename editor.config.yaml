@@ -963,6 +963,9 @@ stylizedSurface:
           - [desert-agave-01]
       - scene: /assets/ground/arid/desert-sagebrush-01.glb
         motion: woody-shrub
+        # Silvery sage, graded with the tundra's dusty palette: the deserts have no
+        # meadow palette of their own, and the default lime read as a green shrub.
+        paletteTileId: 10
         scale: 1.15
         weight: 1.35
         tileIds: [1, 2, 32]

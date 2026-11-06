@@ -213,7 +213,9 @@ export class StylizedGroundDetailView {
               role: definition.materialRoles?.[sourceMaterial.name],
               foliageConfig: ['groundDetail', 'tropicalPlant'].includes(this.layerName) && definition.sway !== false
                 ? this.config : null,
-              tileId: definition.tileIds?.[0],
+              // `paletteTileId` grades a shrub with another biome's foliage palette
+              // without growing it there: desert sagebrush wore the lime meadow green.
+              tileId: definition.paletteTileId ?? definition.tileIds?.[0],
               ambientEffects: this.config.ambientEffects,
             }),
             kind: 'detail',
