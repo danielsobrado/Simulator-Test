@@ -75,11 +75,10 @@ test('mapped foliage keeps source alpha outside the stochastic LOD fade', () => 
   source.alphaTest = 0.15;
   const material = createDitheredMaterial(source, { kind: 'leaf' });
   try {
-    // TSL wraps assignments in VarNodes. The underlying top-level multiply is
-    // source alpha * fade mask; the old regression was step(threshold,
+    // The top-level multiply is source alpha * fade mask; the old regression was step(threshold,
     // source alpha * fade), which stippled leaves even at full coverage.
-    assert.equal(material.opacityNode.node?.op, '*');
-    assert.equal(material.opacityNode.node?.bNode?.node?.method, 'step');
+    assert.equal(material.opacityNode.op, '*');
+    assert.equal(material.opacityNode.bNode?.method, 'step');
     assert.equal(material.alphaTest, 0.15);
     assert.equal(material.alphaToCoverage, false);
   } finally {

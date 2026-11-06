@@ -109,3 +109,88 @@ test('the shipped configuration leaves the diagnostic readback off', async () =>
   );
   assert.match(source, /gpuOcclusion:[\s\S]*?diagnostics: false/);
 });
+
+test('occlusion retains buffers outside the view and releases retired geometries and groups', () => {
+  const allocated = [], released = [];
+  const renderer = { backend: {
+    createIndirectStorageAttribute: attribute => allocated.push(attribute),
+    destroyAttribute: attribute => released.push(attribute),
+  } };
+  const scene = new THREE.Scene();
+  const geometry = new THREE.BoxGeometry();
+  const materials = [new THREE.MeshBasicNodeMaterial(), new THREE.MeshBasicNodeMaterial()];
+  const mesh = new THREE.Mesh(geometry, materials);
+  scene.add(mesh);
+  const occlusion = new GpuOcclusion({ renderer, scene, camera: new THREE.PerspectiveCamera() });
+  try {
+    const firstGroup = geometry.groups[0], secondGroup = geometry.groups[1];
+    const first = occlusion.indirectRecord(mesh, firstGroup);
+    const second = occlusion.indirectRecord(mesh, secondGroup);
+    mesh.visible = false;
+    for (let turn = 0; turn < 10; turn++) {
+      occlusion.pruneRecords();
+      assert.equal(occlusion.indirectRecord(mesh, firstGroup), first);
+    }
+    assert.equal(allocated.length, 2);
+    assert.equal(released.length, 0, 'hidden resident meshes retain their buffers');
+    geometry.groups.splice(geometry.groups.indexOf(secondGroup), 1);
+    occlusion.pruneRecords();
+    assert.deepEqual(released, [second.indirect]);
+    mesh.geometry = new THREE.BoxGeometry();
+    occlusion.pruneRecords();
+    assert.deepEqual(released, [second.indirect, first.indirect]);
+    mesh.material = materials[0];
+    const replacement = occlusion.indirectRecord(mesh, null);
+    scene.remove(mesh);
+    occlusion.pruneRecords();
+    assert.equal(occlusion.records.size, 0);
+    assert.equal(released.at(-1), replacement.indirect);
+    assert.equal(released.length, allocated.length);
+  } finally {
+    occlusion.dispose();
+    geometry.dispose();
+    mesh.geometry.dispose();
+    for (const material of materials) material.dispose();
+  }
+});
+
+test('retained group buffers cannot supply stale visibility to current or other-camera draws', () => {
+  const drawn = [];
+  const renderer = { backend: {
+    createIndirectStorageAttribute() {}, destroyAttribute() {},
+    draw: object => drawn.push(object.geometry.indirect),
+  } };
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshBasicNodeMaterial();
+  const mesh = new THREE.Mesh(geometry, [material, material]);
+  scene.add(mesh);
+  const occlusion = new GpuOcclusion({ renderer, scene, camera });
+  try {
+    const currentGroup = geometry.groups[0], staleGroup = geometry.groups[1];
+    const current = occlusion.indirectRecord(mesh, currentGroup);
+    const stale = occlusion.indirectRecord(mesh, staleGroup);
+    occlusion.collectionSerial = 4;
+    current.collectionSerial = 4;
+    stale.collectionSerial = 3;
+    occlusion.active.set(mesh, occlusion.records.get(mesh));
+    const ownIndirect = new THREE.IndirectStorageBufferAttribute(new Uint32Array(5), 1);
+    geometry.indirect = ownIndirect;
+    const originalDraw = renderer.backend.draw;
+    const draw = { object: mesh, scene, camera, geometry, group: currentGroup };
+    occlusion.render(() => {
+      renderer.backend.draw(draw);
+      renderer.backend.draw({ ...draw, group: staleGroup });
+      renderer.backend.draw({ ...draw, camera: new THREE.PerspectiveCamera() });
+    });
+    assert.deepEqual(drawn, [current.indirect, ownIndirect, ownIndirect]);
+    assert.equal(geometry.indirect, ownIndirect);
+    assert.equal(renderer.backend.draw, originalDraw);
+    assert.throws(() => occlusion.render(() => { throw new Error('draw failed'); }), /draw failed/);
+    assert.equal(renderer.backend.draw, originalDraw, 'the bridge also restores after a failed render');
+  } finally {
+    occlusion.dispose();
+    geometry.dispose();
+    material.dispose();
+  }
+});

@@ -134,10 +134,8 @@ export class MeadowInteractionMap {
       this.lastCenter.set(body.x, body.z);
       this.center.set(body.x, body.z);
     }
-    const hadInk = this.hasMarksOrPress();
     this.recover(dtSeconds);
     if (body && stamp) this.paintSphere(body.x, body.y, body.z, this.bodyRadius, this.strength);
-    if (hadInk || (body && stamp)) this.textureDirty = true;
     this.uploadFrame += 1;
     if (
       this.textureDirty
@@ -173,7 +171,9 @@ export class MeadowInteractionMap {
           const cell=y*this.resolution+x;
           const value=this.press[cell]*factor;
           this.press[cell]=value;
-          this.pixels[index]=Math.round(value);
+          const byte = Math.round(value);
+          if (this.pixels[index] !== byte) this.textureDirty = true;
+          this.pixels[index]=byte;
           pressPeak=Math.max(pressPeak,this.pixels[index]);
         }
         if (marking) {
@@ -181,6 +181,7 @@ export class MeadowInteractionMap {
           if (mark > 0 && frame % MARK_FADE_FRAMES[this.pixels[index + 2] >> MARK_KIND_SHIFT] === 0) {
             mark -= 1;
             this.pixels[index + 1] = mark;
+            this.textureDirty = true;
           }
           if (mark > markPeak) markPeak = mark;
         }
@@ -198,6 +199,7 @@ export class MeadowInteractionMap {
     const shiftX = Math.trunc(deltaX * perMetre);
     const shiftY = Math.trunc(deltaZ * perMetre);
     if ((shiftX === 0 && shiftY === 0) || !this.hasInk()) return;
+    this.textureDirty = true;
     const { minX: oldMinX, minY: oldMinY, maxX: oldMaxX, maxY: oldMaxY } = this.ink;
     const width = oldMaxX - oldMinX + 1;
     for (let y = oldMinY; y <= oldMaxY; y += 1) {
@@ -261,7 +263,9 @@ export class MeadowInteractionMap {
         const offset = (py * this.resolution + px) * 4;
         const cell=py*this.resolution+px;
         const next=Math.max(this.press[cell],value);
-        this.press[cell]=next;this.pixels[offset]=Math.round(next);
+        const byte = Math.round(next);
+        if (this.pixels[offset] !== byte) this.textureDirty = true;
+        this.press[cell]=next;this.pixels[offset]=byte;
         this.peak=Math.max(this.peak,this.pixels[offset]);
       }
     }
@@ -296,12 +300,12 @@ export class MeadowInteractionMap {
         const offset = (py * this.resolution + px) * 4;
         const cell=py*this.resolution+px;
         const next=Math.max(this.press[cell],peak*falloff);
-        this.press[cell]=next;this.pixels[offset]=Math.round(next);
+        const byte = Math.round(next);
+        if (this.pixels[offset] !== byte) this.textureDirty = true;
+        this.press[cell]=next;this.pixels[offset]=byte;
         this.peak=Math.max(this.peak,this.pixels[offset]);
       }
     }
-    // Uploaded on the map's own cadence (uploadIntervalFrames), not once per stamp.
-    this.textureDirty = true;
   }
 
   /**
@@ -338,11 +342,10 @@ export class MeadowInteractionMap {
         if (value <= current) continue;
         if (current < 24 || value >= current * 1.5) this.pixels[offset + 2] = code;
         this.pixels[offset + 1] = value;
+        this.textureDirty = true;
         if (value > this.markPeak) this.markPeak = value;
       }
     }
-    // Uploaded on the map's own cadence (uploadIntervalFrames), not once per stamp.
-    this.textureDirty = true;
   }
 
   /** Texel rectangle of a render-space disc, or null when it misses the window. */
@@ -362,9 +365,14 @@ export class MeadowInteractionMap {
 
   clearPress() {
     this.press.fill(0);this.pressScratch.fill(0);this.peak=0;
-    for(let i=0;i<this.pixels.length;i+=4)this.pixels[i]=0;
+    let changed = this.textureDirty;
+    for(let i=0;i<this.pixels.length;i+=4) {
+      changed ||= this.pixels[i] !== 0;
+      this.pixels[i]=0;
+    }
     if(!this.markPeak)this.clearInk();
-    this.textureDirty=false;this.texture.needsUpdate=true;
+    this.textureDirty=false;
+    if (changed) this.texture.needsUpdate=true;
   }
 
   dispose() {

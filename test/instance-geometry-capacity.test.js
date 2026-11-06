@@ -14,9 +14,8 @@ for (const backend of ['webgpu', 'webgl']) test(`capacity growth shares CPU vert
   const second = create(old.geometry, 16, true), replacement = second[0][0];
   const deleted = new Set(), info = { memory: { geometries: 0 } };
   if (backend === 'webgpu') {
-    const manager = new Geometries({ delete: value => deleted.add(value) }, info);
-    for (const mesh of [old, replacement]) manager.initGeometry({ geometry: mesh.geometry,
-      getAttributes: () => Object.values(mesh.geometry.attributes) });
+    const manager = new Geometries({ getBufferAttribute: value => value }, { delete: value => deleted.add(value) }, info);
+    for (const mesh of [old, replacement]) manager.initGeometry(mesh.geometry);
   } else {
     const manager = WebGLGeometries({}, { remove: value => deleted.add(value) }, info, { releaseStatesOfGeometry() {} });
     for (const mesh of [old, replacement]) manager.get(mesh, mesh.geometry);

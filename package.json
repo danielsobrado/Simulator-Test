@@ -97,7 +97,7 @@
     "polygon-clipping": "0.15.7",
     "procedural-texture-lab": "github:danielsobrado/drusniel-procedural-textures#0611d31",
     "straight-skeleton": "1.1.0",
-    "three": "0.186.1",
+    "three": "^0.187.0",
     "three-mesh-bvh": "0.9.13"
   },
   "devDependencies": {

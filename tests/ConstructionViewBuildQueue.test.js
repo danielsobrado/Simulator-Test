@@ -8,6 +8,7 @@ import { createCubicBezierPathFromStroke } from '../src/editor/construction/curv
 import { planConstruction } from '../src/editor/construction/planning/ConstructionPlanner.js';
 import { disposeConstructionMaterials } from '../src/editor/construction/render/ConstructionMaterials.js';
 import { ConstructionView } from '../src/editor/construction/render/ConstructionView.js';
+import { MODULE_STAT_KEYS } from '../src/editor/construction/render/ConstructionModuleStats.js';
 import { CONSTRUCTION_MATERIAL_SLOT } from '../src/editor/construction/render/ConstructionMaterialSlots.js';
 import { advanceConstructionFrames } from './helpers/constructionFrames.js';
 
@@ -154,4 +155,54 @@ test('pure LOD changes retain ivy while terrain and authored changes rebuild it'
   rebuild('near');
   assert.notEqual(growth(), afterTerrain);
   view.dispose();
+});
+
+test('module publication leaves unrelated statistics alone and retirement removes its contribution', () => {
+  const store = new ConstructionStore();
+  const view = new ConstructionView({ terrainView: createTerrainView(), store, compilerClient: null });
+  try {
+    const record = wallRecord();
+    store.add(record);
+    const plan = planConstruction(record);
+    view.applyPlan(record, plan);
+    advanceConstructionFrames(view);
+    const entry = view.entries.get(record.id);
+    assert.ok(entry.modules.size >= 3);
+    view.setSelection(record.id);
+    const module = plan.modules[0];
+    const resident = entry.modules.get(module.id);
+    let unrelatedReads = 0;
+    for (const [id, other] of entry.modules) {
+      if (id === module.id) continue;
+      const stats = other.stats;
+      Object.defineProperty(other, 'stats', { configurable: true,
+        get() { unrelatedReads++; return stats; } });
+    }
+    view.enqueueModuleBuild(record.id, module, 'coarse');
+    advanceConstructionFrames(view);
+    assert.equal(unrelatedReads, 0, 'one publication must not recount every other module');
+    assert.equal(resident.builtBand, 'coarse');
+    assert.equal(entry.shellMesh.visible, false);
+    assert.equal(resident.shellMesh.visible, false);
+    for (const mesh of resident.meshes) {
+      const slot = mesh.userData.constructionMaterialSlot;
+      if (slot === CONSTRUCTION_MATERIAL_SLOT.STONE) assert.equal(mesh.material, entry.materials.stoneSelected);
+      if (slot === CONSTRUCTION_MATERIAL_SLOT.MORTAR) assert.equal(mesh.material, entry.materials.mortar);
+    }
+    const checkTotals = () => {
+      for (const key of MODULE_STAT_KEYS) {
+        let expected = 0;
+        for (const other of entry.modules.values()) expected += other.stats?.[key] ?? 0;
+        assert.ok(Math.abs(view.stats[key] - expected) < 1e-6, `${key} matches resident contributions`);
+      }
+    };
+    checkTotals();
+    view.applyPlan(record, { ...plan, modules: plan.modules.slice(1) });
+    assert.equal(entry.modules.has(module.id), false);
+    checkTotals();
+    view.removeRecord(record.id);
+    for (const key of MODULE_STAT_KEYS) assert.ok(Math.abs(view.stats[key]) < 1e-6, `${key} clears on removal`);
+  } finally {
+    view.dispose();
+  }
 });

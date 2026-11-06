@@ -124,7 +124,7 @@ export class CharacterAnimator {
     );
     this.body.rotation.x = swim.pitch;
     this.body.position.y = this.pivotHeight + swim.lift;
-    this.body.updateMatrixWorld(true);
+    this.body.updateWorldMatrix(true, false);
     const blend = this.locomotion.update(step, motion.speed, motion.grounded, swimming);
     this.footfall = this.footsteps.update(blend.phase, blend, motion.grounded && !swimming);
     this.footPlacement?.beginFrame();
@@ -138,9 +138,9 @@ export class CharacterAnimator {
     walk.setEffectiveWeight(blend.walk);
     run.setEffectiveWeight(blend.run);
     this.mixer.update(0);
-    this.model.updateMatrixWorld(true);
-
-    this.footPlacement?.update(motion.grounded && !swimming, motion.footY, step);
+    // Foot placement propagates the authored pose before sampling its feet.
+    if (this.footPlacement) this.footPlacement.update(motion.grounded && !swimming, motion.footY, step);
+    else this.model.updateMatrixWorld(true);
     this.swimStroke.apply(swim.weight, swim.stroke, swim.strokePhase, swim.treadPhase);
     this.castPose.apply(
       motion.cast,

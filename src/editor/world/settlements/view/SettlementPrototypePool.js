@@ -59,6 +59,7 @@ export class SettlementPrototypePool {
     this.worker = worker;
     this.entries = new Map();
     this.queue = [];
+    this.queueSortDirty = false;
     /** Generated, not yet installed: `{ entry, data }`. */
     this.built = [];
   }
@@ -74,8 +75,10 @@ export class SettlementPrototypePool {
       entry = { key, style, kind, variant, surfaces, priority, state: 'queued', near: null, far: null, failed: null };
       this.entries.set(key, entry);
       this.queue.push(entry);
+      this.queueSortDirty = true;
     } else if (priority < entry.priority) {
       entry.priority = priority;
+      if (entry.state === 'queued') this.queueSortDirty = true;
     }
     return entry;
   }
@@ -104,7 +107,10 @@ export class SettlementPrototypePool {
 
   /** The nearest queued entry `accept` takes, removed from the queue. */
   take(accept) {
-    this.queue.sort((left, right) => right.priority - left.priority);
+    if (this.queueSortDirty) {
+      this.queue.sort((left, right) => right.priority - left.priority);
+      this.queueSortDirty = false;
+    }
     for (let index = this.queue.length - 1; index >= 0; index -= 1) {
       if (accept(this.queue[index])) return this.queue.splice(index, 1)[0];
     }
@@ -126,6 +132,7 @@ export class SettlementPrototypePool {
           else {
             entry.state = 'queued';
             this.queue.push(entry);
+            this.queueSortDirty = true;
           }
         },
       );

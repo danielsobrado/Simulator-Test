@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-  Fn, If, Loop, exp, float, instanceIndex, int, ivec2, round, smoothstep, textureLoad, textureStore, uniform,
+  Fn, Loop, exp, float, instanceIndex, int, ivec2, round, smoothstep, textureLoad, textureStore, uniform,
   uniformArray, vec2, vec4,
 } from 'three/tsl';
 import { frameUniform } from '../../render/FrameUniforms.js';

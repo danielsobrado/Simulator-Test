@@ -220,3 +220,73 @@ test('a clock that runs backwards or ground that cannot be sampled never poisons
   assert.ok(Number.isFinite(model.position.y));
   assert.ok(Number.isFinite(worldY(bones.left.foot)));
 });
+
+for (const footPlacement of [true, false]) {
+  test(`consolidated rig transforms preserve poses and footfalls (foot placement ${footPlacement})`, () => {
+    const create = () => {
+      const { model, bones } = createRig();
+      const group = new THREE.Group(), body = new THREE.Group();
+      group.add(body); body.add(model);
+      const samples = [];
+      const terrain = { heightAt: (x, z) => { samples.push([x, z]); return x * 0.15 + z * 0.05; } };
+      const animator = new CharacterAnimator({ body, model, bones, terrain, solesY: 0,
+        clips: [createWalkClip('Walking', 0.2), createWalkClip('Running', 0.2)],
+        hero: { id: 'test', targetHeight: 1.8, footPlacement,
+          clips: { idle: null, walk: 'Walking', run: 'Running' },
+          clipSpeedInHeights: { walk: 0.85, run: 2.4 },
+          rootMotion: { inPlace: true, nodes: ['Hips'], axes: ['x', 'z'] },
+          locomotion: { maxTimeScale: 3.2, minTimeScale: 0.5, swimCadence: 0.55 } },
+      });
+      const fixture = { group, body, model, animator, samples, visits: 0 };
+      group.traverse(node => {
+        const update = node.updateMatrixWorld.bind(node);
+        node.updateMatrixWorld = force => { fixture.visits++; return update(force); };
+      });
+      return fixture;
+    };
+    const candidate = create(), reference = create();
+    // Reinsert the previous full-tree passes at their original consumption points.
+    const blend = reference.animator.locomotion.update.bind(reference.animator.locomotion);
+    reference.animator.locomotion.update = (...args) => {
+      reference.body.updateMatrixWorld(true);
+      return blend(...args);
+    };
+    if (footPlacement) {
+      const mix = reference.animator.mixer.update.bind(reference.animator.mixer);
+      reference.animator.mixer.update = dt => { mix(dt); reference.model.updateMatrixWorld(true); };
+    }
+    try {
+      for (let frame = 0; frame < 90; frame++) {
+        const motion = { speed: frame < 10 ? 0 : frame < 30 ? 4 : 9,
+          footY: frame * 0.01, grounded: frame < 40 || frame >= 70,
+          facing: frame * 0.03, cast: frame % 20 < 10 ? 0.8 : 0,
+          castAimX: 0.2, castAimY: 0.3, castAimZ: 1 };
+        for (const fixture of [candidate, reference]) {
+          fixture.samples.length = 0;
+          fixture.group.position.set(frame * 0.05, motion.footY, frame * 0.1);
+          fixture.group.rotation.y = motion.facing;
+          if (fixture === reference) fixture.group.updateMatrixWorld(true);
+          else fixture.group.updateWorldMatrix(true, false);
+          fixture.animator.update(1 / 60, motion, frame >= 40 && frame < 70, frame >= 50 && frame < 60, 1);
+          // The ordinary renderer propagates the final layered pose for drawing.
+          fixture.group.updateMatrixWorld(true);
+        }
+        assert.deepEqual(candidate.samples, reference.samples, 'ground samples and solve order match');
+        assert.equal(candidate.animator.footfall, reference.animator.footfall);
+        const matrices = fixture => {
+          const values = [];
+          fixture.model.traverse(node => values.push(...node.matrixWorld.elements));
+          return values;
+        };
+        const expected = matrices(reference);
+        matrices(candidate).forEach((value, index) => {
+          assert.ok(Math.abs(value - expected[index]) < 1e-10, `frame ${frame}, matrix value ${index}`);
+        });
+      }
+      assert.ok(candidate.visits < reference.visits, 'pose parity uses fewer full-tree matrix visits');
+    } finally {
+      candidate.animator.dispose();
+      reference.animator.dispose();
+    }
+  });
+}

@@ -273,7 +273,8 @@ export class GlbCharacterView {
     if (!this.animator) return;
     this.group.position.set(this.motion.x, this.motion.footY, this.motion.z);
     this.group.rotation.set(0, this.motion.facing, 0);
-    this.group.updateMatrixWorld(true);
+    // The animator propagates the new pose after the mixer, before its world-space solves.
+    this.group.updateWorldMatrix(true, false);
     const swimming = isSwimmingWaterState(status.waterState);
     this.animator.update(
       dt,

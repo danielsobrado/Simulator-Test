@@ -41,7 +41,7 @@ export const SETTLEMENT_VIEW = Object.freeze({
   /** How far the camera may turn or move, as a change of its matrix, before culling is redone. */
   cullTolerance: 0.02,
   /** Frames a queued build may be starved of frame budget before it runs anyway. */
-  starvationFrames: 8,
+  starvationFrames: 2,
 });
 
 /**
@@ -160,17 +160,20 @@ export class SettlementView {
 
   /** One slice of deferred work: site preparation first, then a mesh variant. */
   advanceWork(shouldYield) {
-    if (shouldYield()) {
-      return;
-    }
+    // Terrain and scenery streaming can spend the whole deferred budget every
+    // frame while a city loads; after `starvationFrames` of that, one unit runs anyway.
+    const starving = shouldYield();
+    if (starving && ++this.starved < SETTLEMENT_VIEW.starvationFrames) return;
     this.starved = 0;
-    this.plans.advance(shouldYield);
-    if (shouldYield()) return;
-    this.skyline.advance(shouldYield);
-    if (shouldYield()) return;
+    let forced = 0;
+    const yieldNow = starving ? () => forced++ > 0 : shouldYield;
+    this.plans.advance(yieldNow);
+    if (yieldNow()) return;
+    this.skyline.advance(yieldNow);
+    if (yieldNow()) return;
     // A starved slice still does one unit, then stops.
     let units = 0;
-    const gate = () => units++ > 0 && shouldYield();
+    const gate = () => units++ > 0 && yieldNow();
     for (const site of this.sites.values()) {
       if (site.job) {
         const started = performance.now();
@@ -288,7 +291,12 @@ export class SettlementView {
       this.selected.x = focus.x; this.selected.z = focus.z;
       this.dirty = false;
     }
-    while (this.selectionJob && !shouldYield()) {
+    // At least one slice (SettlementSelection SLICE placements) a frame: run only on
+    // spare budget, a capital's selection got none for a minute while the terrain
+    // streamed, and the player stood among stand-in boxes the whole time.
+    let steps = 0;
+    while (this.selectionJob && (steps === 0 || !shouldYield())) {
+      steps += 1;
       const step = this.selectionJob.next();
       if (step.done) { this.selectionJob = null; this.fading = step.value; }
     }

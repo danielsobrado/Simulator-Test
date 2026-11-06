@@ -5,6 +5,7 @@ import { CONSTRUCTION_MATERIAL_SLOT } from './ConstructionMaterialSlots.js';
 import { createConstructionMaterials, releaseConstructionMaterials } from './ConstructionMaterials.js';
 import { ConstructionBuildQueue } from './ConstructionBuildQueue.js';
 import { ConstructionModuleBuilder } from './ConstructionModuleBuilder.js';
+import { MODULE_STAT_KEYS, ROUNDED_STAT_KEYS, updateModuleStats } from './ConstructionModuleStats.js';
 import { ConstructionResidency } from './ConstructionResidency.js';
 import { ConstructionModuleResidency } from './ConstructionModuleResidency.js';
 import { updateConstructionLod } from './ConstructionLodController.js';
@@ -72,21 +73,6 @@ const WHOLE_SPAN = Object.freeze({ from: 0, to: 1, whole: true });
  * drag never reached.
  */
 const PREVIEW_SPAN_TOLERANCE = 0.25;
-
-/** Per-module counters only the rounded pillow-stone builder reports. */
-const ROUNDED_STAT_KEYS = Object.freeze([
-  'roundedStones',
-  'roundedTriangles',
-  'roundedFallbacks',
-  'roundedShrunk',
-  'roundedBuildMs',
-  'footingStones',
-]);
-const AGGREGATE_EXTRA_STAT_KEYS = Object.freeze([
-  ...ROUNDED_STAT_KEYS,
-  'growthLeaves',
-  'growthTriangles',
-]);
 
 function quantizeOrigin(value) {
   return Math.round(value / ORIGIN_QUANTUM) * ORIGIN_QUANTUM;
@@ -337,6 +323,7 @@ export class ConstructionView {
     }
     if (entry.shellMesh) entry.shellMesh.geometry.dispose();
     for (const module of entry.modules.values()) {
+      updateModuleStats(this.stats, module.stats, null);
       this.disposeResidentBuild(module);
       for (const mesh of module.meshes ?? []) mesh.geometry.dispose();
       module.shellMesh?.geometry.dispose();
@@ -457,10 +444,10 @@ export class ConstructionView {
     releaseConstructionMaterials(previous);
   }
 
-  applyResidentMaterials(entry, selected) {
+  applyResidentMaterials(entry, selected, residents = entry.modules.values()) {
     if (!entry.materials) return;
     const shell = selected ? this.selectedMaterial : this.shellMaterials.forRecord(entry.record);
-    for (const resident of entry.modules.values()) {
+    for (const resident of residents) {
       for (const mesh of resident.meshes) {
         mesh.material = residentMaterial(mesh, entry.materials, selected);
       }
@@ -615,6 +602,7 @@ export class ConstructionView {
     for (const moduleId of [...entry.modules.keys()]) {
       if (planned.has(moduleId)) continue;
       const stale = entry.modules.get(moduleId);
+      updateModuleStats(this.stats, stale.stats, null);
       this.buildQueue.removeModule(entry.record.id, moduleId);
       this.disposeResidentBuild(stale);
       for (const mesh of stale.meshes ?? []) {
@@ -947,6 +935,7 @@ export class ConstructionView {
       if (mesh.parent !== entry.group) entry.group.add(mesh);
     }
     resident.meshes = built.meshes;
+    updateModuleStats(this.stats, resident.stats, built.stats);
     resident.stats = built.stats;
     resident.growthSource = {
       recordRevision: entry.record.revision,
@@ -954,97 +943,20 @@ export class ConstructionView {
       placements: state.placements,
       terrainRevision,
     };
-    this.refreshModuleStats();
-    this.applySelectionMaterial(entry.record.id, entry);
-    this.updateShellVisibility(entry);
+    if (this.previewedMaterialId === entry.record.id) this.applySelectionMaterial(entry.record.id, entry);
+    else this.applyResidentMaterials(entry, entry.record.id === this.selectedId, [resident]);
+    this.updateShellVisibility(entry, resident);
     return true;
   }
 
-  /** Recompute stone/mortar counters from resident module stats (avoids drift). */
+  /** Reconcile totals after an explicit record-wide decoration edit. */
   refreshModuleStats() {
-    for (const key of AGGREGATE_EXTRA_STAT_KEYS) this.stats[key] = 0;
-    let stones = 0;
-    let mortarPrisms = 0;
-    let stoneTriangles = 0;
-    let mortarTriangles = 0;
-    let reliefStones = 0;
-    let reliefFallbacks = 0;
-    let reliefClamped = 0;
-    let reliefTriangles = 0;
-    let reliefBuildMs = 0;
-    let edgeWearEligible = 0;
-    let edgeWearStones = 0;
-    let edgeWearClamped = 0;
-    let edgeWearFallbacks = 0;
-    let flattenedCorners = 0;
-    let edgeWearTriangles = 0;
-    let edgeWearBuildMs = 0;
-    let nearSoftStones = 0;
-    let coarseSoftStones = 0;
-    let nearSoftTriangles = 0;
-    let coarseSoftTriangles = 0;
-    let appearanceDescriptors = 0;
-    let appearanceDescriptorMs = 0;
-    let lodReductionMs = 0;
-    let stoneBuildMs = 0;
-    let mortarBuildMs = 0;
+    for (const key of MODULE_STAT_KEYS) this.stats[key] = 0;
     for (const entry of this.entries.values()) {
       for (const other of entry.modules.values()) {
-        stones += other.stats?.stones ?? 0;
-        mortarPrisms += other.stats?.mortarPrisms ?? 0;
-        stoneTriangles += other.stats?.stoneTriangles ?? 0;
-        mortarTriangles += other.stats?.mortarTriangles ?? 0;
-        reliefStones += other.stats?.reliefStones ?? 0;
-        reliefFallbacks += other.stats?.reliefFallbacks ?? 0;
-        reliefClamped += other.stats?.reliefClamped ?? 0;
-        reliefTriangles += other.stats?.reliefTriangles ?? 0;
-        reliefBuildMs += other.stats?.reliefBuildMs ?? 0;
-        edgeWearEligible += other.stats?.edgeWearEligible ?? 0;
-        edgeWearStones += other.stats?.edgeWearStones ?? 0;
-        edgeWearClamped += other.stats?.edgeWearClamped ?? 0;
-        edgeWearFallbacks += other.stats?.edgeWearFallbacks ?? 0;
-        flattenedCorners += other.stats?.flattenedCorners ?? 0;
-        edgeWearTriangles += other.stats?.edgeWearTriangles ?? 0;
-        edgeWearBuildMs += other.stats?.edgeWearBuildMs ?? 0;
-        nearSoftStones += other.stats?.nearSoftStones ?? 0;
-        coarseSoftStones += other.stats?.coarseSoftStones ?? 0;
-        nearSoftTriangles += other.stats?.nearSoftTriangles ?? 0;
-        coarseSoftTriangles += other.stats?.coarseSoftTriangles ?? 0;
-        appearanceDescriptors += other.stats?.appearanceDescriptors ?? 0;
-        appearanceDescriptorMs += other.stats?.appearanceDescriptorMs ?? 0;
-        lodReductionMs += other.stats?.lodReductionMs ?? 0;
-        stoneBuildMs += other.stats?.stoneBuildMs ?? 0;
-        mortarBuildMs += other.stats?.mortarBuildMs ?? 0;
-        for (const key of ROUNDED_STAT_KEYS) this.stats[key] += other.stats?.[key] ?? 0;
-        this.stats.growthLeaves += other.stats?.growthLeaves ?? 0;
-        this.stats.growthTriangles += other.stats?.growthTriangles ?? 0;
+        updateModuleStats(this.stats, null, other.stats);
       }
     }
-    this.stats.stones = stones;
-    this.stats.mortarPrisms = mortarPrisms;
-    this.stats.stoneTriangles = stoneTriangles;
-    this.stats.mortarTriangles = mortarTriangles;
-    this.stats.reliefStones = reliefStones;
-    this.stats.reliefFallbacks = reliefFallbacks;
-    this.stats.reliefClamped = reliefClamped;
-    this.stats.reliefTriangles = reliefTriangles;
-    this.stats.reliefBuildMs = reliefBuildMs;
-    this.stats.edgeWearEligible = edgeWearEligible;
-    this.stats.edgeWearStones = edgeWearStones;
-    this.stats.edgeWearClamped = edgeWearClamped;
-    this.stats.edgeWearFallbacks = edgeWearFallbacks;
-    this.stats.flattenedCorners = flattenedCorners;
-    this.stats.edgeWearTriangles = edgeWearTriangles;
-    this.stats.edgeWearBuildMs = edgeWearBuildMs;
-    this.stats.nearSoftStones = nearSoftStones;
-    this.stats.coarseSoftStones = coarseSoftStones;
-    this.stats.nearSoftTriangles = nearSoftTriangles;
-    this.stats.coarseSoftTriangles = coarseSoftTriangles;
-    this.stats.appearanceDescriptors = appearanceDescriptors;
-    this.stats.appearanceDescriptorMs = appearanceDescriptorMs;
-    this.stats.lodReductionMs = lodReductionMs;
-    this.stats.stoneBuildMs = stoneBuildMs;
-    this.stats.mortarBuildMs = mortarBuildMs;
   }
 
   /** True once every resident module can show a ribbon for its own arc. */
@@ -1064,22 +976,31 @@ export class ConstructionView {
    * Per module wherever module shells exist — a record-wide ribbon shown for a
    * single pending module is drawn straight through its finished neighbours.
    */
-  updateShellVisibility(entry) {
+  updateShellVisibility(entry, changedResident = null) {
+    // Residency reconciliation establishes coverage; publication changes only this module.
+    if (changedResident && entry.modulesHaveShells) {
+      changedResident.shellMesh.visible = changedResident.meshes.length === 0 || changedResident.band === 'shell';
+      if (entry.shellMesh) entry.shellMesh.visible = false;
+      return;
+    }
     let pending = 0;
+    let modulesHaveShells = entry.modules.size > 0;
     for (const resident of entry.modules.values()) {
       // Same rule `updateLod` applies, so a build landing mid-frame cannot
       // un-hide the masonry of a module the camera already sent to the far band.
       const bare = resident.meshes.length === 0 || resident.band === 'shell';
       if (bare) pending += 1;
       if (resident.shellMesh) resident.shellMesh.visible = bare;
+      else modulesHaveShells = false;
     }
+    entry.modulesHaveShells = modulesHaveShells;
     if (!entry.shellMesh) return;
     if (entry.moduleResidency && entry.activePlanModules?.length === 0) {
       entry.shellMesh.visible = false;
       return;
     }
     const covered = entry.modules.size > 0
-      && (pending === 0 || this.modulesOwnTheirShells(entry));
+      && (pending === 0 || modulesHaveShells);
     entry.shellMesh.visible = !covered;
   }
 

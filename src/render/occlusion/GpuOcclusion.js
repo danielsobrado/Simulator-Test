@@ -68,6 +68,7 @@ export class GpuOcclusion {
     this.materials = new Map();
     this.records = new Map();
     this.active = new Map();
+    this.collectionSerial = 0;
     this.box = new Box3();
     this.frustum = new Frustum();
     this.projectionView = new Matrix4();
@@ -220,7 +221,8 @@ export class GpuOcclusion {
     this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projectionView, camera.coordinateSystem);
     const entries = [];
-    const used = new Set();
+    this.pruneRecords();
+    this.collectionSerial++;
     for (const proxy of this.proxies.values()) proxy.visible = false;
     this.active.clear();
     this.stats.occluders = 0;
@@ -242,30 +244,12 @@ export class GpuOcclusion {
         if (!material?.visible) continue;
         const draw = occlusionDrawRange(object, material, group);
         if (!draw || draw.count * draw.instances / 3 < this.settings.minTriangles) continue;
-        let records = this.records.get(object);
-        if (!records) this.records.set(object, records = new Map());
-        let record = records.get(group);
-        if (!record) {
-          const indirect = new IndirectStorageBufferAttribute(new Uint32Array(5), 1);
-          this.renderer.backend.createIndirectStorageAttribute(indirect);
-          record = { indirect };
-          records.set(group, record);
-        }
-        Object.assign(record, { rect, draw });
-        used.add(record);
+        const record = this.indirectRecord(object, group);
+        Object.assign(record, { rect, draw, collectionSerial: this.collectionSerial });
         entries.push(record);
-        this.active.set(object, records);
+        this.active.set(object, this.records.get(object));
       }
     });
-    // Tile pools/LODs can be rebuilt while the app is running.
-    for (const [object, records] of this.records) {
-      for (const [group, record] of records) {
-        if (used.has(record)) continue;
-        this.renderer.backend.destroyAttribute(record.indirect);
-        records.delete(group);
-      }
-      if (!records.size) this.records.delete(object);
-    }
     // Hidden proxies stay while their source is in the scene: a new proxy is a
     // new render object, and its first draw built a node graph and pipeline
     // mid-flight each time an occluder came back into view.
@@ -276,6 +260,33 @@ export class GpuOcclusion {
     }
     this.stats.candidates = entries.length;
     return entries;
+  }
+
+  indirectRecord(object, group) {
+    let records = this.records.get(object);
+    if (!records) this.records.set(object, records = new Map());
+    let record = records.get(group);
+    if (!record) {
+      const indirect = new IndirectStorageBufferAttribute(new Uint32Array(5), 1);
+      this.renderer.backend.createIndirectStorageAttribute(indirect);
+      record = { indirect, geometry: object.geometry, collectionSerial: -1 };
+      records.set(group, record);
+    }
+    return record;
+  }
+
+  /** Camera turns retain buffers; retired meshes, geometries and groups release them. */
+  pruneRecords() {
+    for (const [object, records] of this.records) {
+      const live = inScene(object, this.world.scene);
+      const groups = Array.isArray(object.material) ? object.geometry.groups : null;
+      for (const [group, record] of records) {
+        if (live && record.geometry === object.geometry && (groups ? groups.includes(group) : group === null)) continue;
+        this.renderer.backend.destroyAttribute(record.indirect);
+        records.delete(group);
+      }
+      if (!records.size) this.records.delete(object);
+    }
   }
 
   backoffIfEmpty() {
@@ -458,7 +469,8 @@ export class GpuOcclusion {
       const record = scene === this.world.scene && camera === this.world.camera
         ? this.active.get(object)?.get(group ?? null) : null;
       const indirect = geometry.indirect;
-      if (record) geometry.indirect = record.indirect;
+      const current = record?.collectionSerial === this.collectionSerial;
+      if (current) geometry.indirect = record.indirect;
       try { previous.call(backend, renderObject, info); }
       finally { geometry.indirect = indirect; }
     };

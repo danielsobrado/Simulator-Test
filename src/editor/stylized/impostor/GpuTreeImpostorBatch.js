@@ -84,11 +84,11 @@ export class GpuTreeImpostorBatch {
     const originUniform = uniform(new THREE.Vector3());
 
     const computeReset = Fn(() => {
-      drawStorage.get('vertexCount').assign(uint(6));
-      atomicStore(drawStorage.get('instanceCount'), uint(0));
-      drawStorage.get('firstVertex').assign(uint(0));
-      drawStorage.get('firstInstance').assign(uint(0));
-      drawStorage.get('offset').assign(uint(0));
+      drawStorage.element(0).get('vertexCount').assign(uint(6));
+      atomicStore(drawStorage.element(0).get('instanceCount'), uint(0));
+      drawStorage.element(0).get('firstVertex').assign(uint(0));
+      drawStorage.element(0).get('firstInstance').assign(uint(0));
+      drawStorage.element(0).get('offset').assign(uint(0));
     })().compute(1).setName(`${name} reset indirect draw`);
 
     const computeCull = Fn(() => {
@@ -105,7 +105,7 @@ export class GpuTreeImpostorBatch {
           });
         }
         If(visible.greaterThan(0.5), () => {
-          const outputIndex = atomicAdd(drawStorage.get('instanceCount'), uint(1));
+          const outputIndex = atomicAdd(drawStorage.element(0).get('instanceCount'), uint(1));
           visibleWrite.element(outputIndex).assign(sourceIndex);
         });
       });

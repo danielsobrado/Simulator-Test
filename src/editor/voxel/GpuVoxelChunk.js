@@ -374,11 +374,11 @@ export class GpuVoxelChunk {
     )));
 
     const computeInit = Fn(() => {
-      atomicStore(drawStorage.get('vertexCount'), uint(0));
-      drawStorage.get('instanceCount').assign(uint(1));
-      drawStorage.get('firstVertex').assign(uint(0));
-      drawStorage.get('firstInstance').assign(uint(0));
-      drawStorage.get('offset').assign(uint(0));
+      atomicStore(drawStorage.element(0).get('vertexCount'), uint(0));
+      drawStorage.element(0).get('instanceCount').assign(uint(1));
+      drawStorage.element(0).get('firstVertex').assign(uint(0));
+      drawStorage.element(0).get('firstInstance').assign(uint(0));
+      drawStorage.element(0).get('offset').assign(uint(0));
     })().compute(1).setName(`Initialize chunk ${this.descriptor.key} indirect draw`);
 
     const computeDensity = Fn(() => {
@@ -473,7 +473,7 @@ export class GpuVoxelChunk {
 
       If(triangleCount.greaterThan(0), () => {
         const vertexBase = atomicAdd(
-          drawStorage.get('vertexCount'),
+          drawStorage.element(0).get('vertexCount'),
           triangleCount.mul(uint(3)),
         );
 

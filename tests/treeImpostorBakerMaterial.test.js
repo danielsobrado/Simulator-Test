@@ -45,14 +45,14 @@ test('normal bake writes foliage classification through material opacity', () =>
   const trunk = createTreeImpostorBakeMaterial({ kind: 'trunk' }, true);
 
   try {
-    assert.equal(leaf.opacityNode?.node?.value, 1);
-    assert.equal(trunk.opacityNode?.node?.value, 0);
+    assert.equal(leaf.opacityNode?.value, 1);
+    assert.equal(trunk.opacityNode?.value, 0);
     assert.equal(leaf.blending, NoBlending);
     assert.equal(trunk.blending, NoBlending);
-    const maskTextureNode = leaf.maskNode.node.aNode.node;
+    const maskTextureNode = leaf.maskNode.aNode.node;
     assert.equal(maskTextureNode.uvNode, null);
     assert.equal(maskTextureNode.updateMatrix, true);
-    assert.equal(leaf.maskNode.node.bNode.value, 0.61);
+    assert.equal(leaf.maskNode.bNode.value, 0.61);
   } finally {
     leaf.dispose();
     trunk.dispose();

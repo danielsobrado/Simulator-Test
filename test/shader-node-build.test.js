@@ -22,6 +22,7 @@ function renderer() {
   value.hasFeature = () => false;
   value.hasCompatibility = () => true;
   value.backend.capabilities.getUniformBufferLimit = () => 65536;
+  value._bindings = { getSharedBindGroup: group => group }; // set by init(), which needs a device
   return value;
 }
 
