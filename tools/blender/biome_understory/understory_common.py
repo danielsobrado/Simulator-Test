@@ -11,8 +11,13 @@ MAX_TRIANGLES = 350
 
 def save_image(name, pixels, path, non_color=False):
     h, w, _ = pixels.shape
+    out = np.clip(pixels.astype(np.float32), 0.0, 1.0)
+    if not non_color:
+        # Lift procedural dark/mid tones for sRGB texture encoding so Three.js
+        # sRGB->linear sampling and understoryRamp receive balanced luminance.
+        out[..., :3] = np.power(out[..., :3], 0.74)
     image = bpy.data.images.new(name, w, h, alpha=True)
-    image.pixels.foreach_set(np.flipud(pixels).astype(np.float32).ravel())
+    image.pixels.foreach_set(np.flipud(out).ravel())
     image.filepath_raw = path
     image.file_format = 'PNG'
     if non_color:
@@ -151,8 +156,13 @@ def arched_card(bm, uv, p0, p1, p2, w0, w1, w2, side_dir, u_range=(0.0, 1.0), v_
         (((u0, vm), (u1, vm), (u1, v1), (u0, v1)), (verts[3], verts[2], verts[4], verts[5])),
     )
     faces = []
+    out_hint = Vector((p1.x, p1.y, max(0.6, abs(p2.z - p0.z) + 0.5)))
     for uvs, vs in quads:
         if len(set(vs)) == 4:
+            n_est = (vs[1].co - vs[0].co).cross(vs[2].co - vs[1].co)
+            if n_est.dot(out_hint) < 0:
+                vs = (vs[1], vs[0], vs[3], vs[2])
+                uvs = (uvs[1], uvs[0], uvs[3], uvs[2])
             f = bm.faces.new(vs)
             for loop, coord in zip(f.loops, uvs):
                 loop[uv].uv = coord
@@ -266,6 +276,16 @@ def finish_mesh(name, bm, materials):
         mesh.materials.append(mat)
     for p in mesh.polygons:
         p.use_smooth = True
+    up = Vector((0.0, 0.0, 1.0))
+    custom_normals = []
+    for v in mesh.vertices:
+        radial = Vector((v.co.x, v.co.y, max(0.40, v.co.z + 0.45)))
+        radial = radial.normalized() if radial.length > 1e-4 else up
+        n = v.normal * 0.30 + radial * 0.40 + up * 0.30
+        if n.z < 0.30:
+            n.z = 0.30
+        custom_normals.append(n.normalized())
+    mesh.normals_split_custom_set_from_vertices(custom_normals)
     tris = sum(len(p.vertices) - 2 for p in mesh.polygons)
     assert tris <= MAX_TRIANGLES, f'{name} has {tris} triangles (budget {MAX_TRIANGLES})'
     return mesh, tris

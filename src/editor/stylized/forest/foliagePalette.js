@@ -4,11 +4,12 @@ import { resolveCanopyGrade } from './canopyGrade.js';
 
 /** Brightest channel a petal keeps: hue survives, only its value is lifted. */
 const PETAL_MIN_PEAK = .62;
+const FALLBACK_PALETTE_TILE = Object.freeze({ 0: 3, 1: 10, 2: 10, 11: 10, 32: 10 });
 
 /** Understory bridges the meadow and canopy, using their configured pigments. */
 export function resolveFoliagePalette(config = {}, tileId = null) {
   const meadow = config.grass?.meadow?.palette;
-  const grass = meadow?.byTileId?.[tileId] ?? meadow;
+  const grass = meadow?.byTileId?.[tileId] ?? meadow?.byTileId?.[FALLBACK_PALETTE_TILE[tileId]] ?? meadow;
   const canopy = resolveCanopyGrade(config.trees?.canopyGrade);
   const base = new THREE.Color(grass?.base ?? config.color?.bottom ?? '#50852b');
   const tip = new THREE.Color(grass?.tip ?? config.color?.top ?? '#a6bf65');

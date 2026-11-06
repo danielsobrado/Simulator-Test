@@ -128,20 +128,18 @@ def build_desert_agave(mat):
             p2 = out * (length * 0.96 * math.cos(pitch * 0.85)) + Vector((0, 0, length * 0.92 * math.sin(pitch * 0.85)))
             arched_card(bm, uv, p0, p1, p2, 0.16, 0.24, 0.04, side, u_range=(0.0, 0.64), v_range=(0.02, 0.98))
 
-    # Central woody flower stalk & crossed yucca panicle cards
-    stalk_pts = [Vector((0, 0, 0.05)), Vector((0.02, -0.01, 0.72)), Vector((0.03, 0.01, 1.42))]
-    tube(bm, uv, stalk_pts, [0.055, 0.042, 0.022], sides=5, u_range=(0.68, 0.96), v_range=(0.02, 0.42))
-    for k in range(3):
-        ang = k * math.pi / 3
-        side = Vector((math.cos(ang), math.sin(ang), 0))
-        arched_card(
-            bm, uv,
-            Vector((0.02, 0.0, 0.78)),
-            Vector((0.03, 0.0, 1.15)),
-            Vector((0.03, 0.0, 1.52)),
-            0.22, 0.34, 0.16, side,
-            u_range=(0.66, 1.0), v_range=(0.45, 0.98),
-        )
+    # Companion offset agave pup rosette for a grounded, natural desert succulent cluster
+    pup_center = Vector((0.34, -0.16, 0.0))
+    for k in range(7):
+        yaw = k / 7 * 2 * math.pi + 0.35
+        pitch = rng.uniform(0.32, 0.62)
+        length = 0.48
+        out = Vector((math.cos(yaw), math.sin(yaw), 0))
+        side = Vector((-math.sin(yaw), math.cos(yaw), 0))
+        p0 = pup_center + out * 0.04 + Vector((0, 0, 0.02))
+        p1 = pup_center + out * (length * 0.52 * math.cos(pitch)) + Vector((0, 0, length * 0.55 * math.sin(pitch) + 0.05))
+        p2 = pup_center + out * (length * 0.96 * math.cos(pitch * 0.85)) + Vector((0, 0, length * 0.92 * math.sin(pitch * 0.85)))
+        arched_card(bm, uv, p0, p1, p2, 0.12, 0.18, 0.03, side, u_range=(0.0, 0.64), v_range=(0.02, 0.98))
     return finish_mesh('desert-agave-01', bm, mat)
 
 

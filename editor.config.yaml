@@ -409,43 +409,45 @@ stylizedSurface:
       # Authored biome-specific shrubs (tools/blender/biome_understory/builders_extra.py)
       - scene: /assets/bushes/bush-arid-ocotillo-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.25
+        paletteTileId: 10
+        scale: 0.9
+        weight: 0.85
         tileIds: [1, 32]
         character: scrub
         canopy: open
       - scene: /assets/bushes/bush-savanna-thorn-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.35
+        scale: 0.95
+        weight: 1.0
         tileIds: [3, 5]
         character: scrub
         canopy: open
       - scene: /assets/bushes/bush-meadow-gorse-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.3
+        scale: 0.9
+        weight: 0.95
         tileIds: [4, 6, 14]
         character: meadow
         canopy: edge
       - scene: /assets/bushes/bush-boreal-juniper-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.35
+        paletteTileId: 9
+        scale: 0.9
+        weight: 1.0
         tileIds: [9, 10, 2]
         character: scrub
         canopy: any
       - scene: /assets/bushes/bush-tropical-hibiscus-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.3
+        scale: 0.95
+        weight: 1.0
         tileIds: [7, 5, 8]
         character: forest
         canopy: edge
       - scene: /assets/bushes/bush-swamp-buttonbush-01.glb
         motion: woody-shrub
-        scale: 1
-        weight: 1.3
+        scale: 0.95
+        weight: 1.0
         tileIds: [12, 8]
         character: scrub
         canopy: edge
@@ -942,8 +944,10 @@ stylizedSurface:
       # and weathered sandstone deadwood separated by regional character district.
       - scene: /assets/ground/arid/desert-prickly-pear-01.glb
         motion: woody-shrub
-        scale: 1.05
-        weight: 0.95
+        paletteTileId: 10
+        scale: 1.0
+        heightOffset: -0.03
+        weight: 0.85
         tileIds: [1, 32]
         character: scrub
         characterStrength: 1.8
@@ -953,8 +957,10 @@ stylizedSurface:
           - [desert-prickly-pear-01]
       - scene: /assets/ground/arid/desert-agave-01.glb
         motion: woody-shrub
-        scale: 1.1
-        weight: 0.9
+        paletteTileId: 10
+        scale: 1.05
+        heightOffset: -0.03
+        weight: 0.85
         tileIds: [1, 2, 3, 32]
         character: rocky
         characterStrength: 1.8
@@ -976,8 +982,10 @@ stylizedSurface:
           - [desert-sagebrush-01]
       - scene: /assets/ground/arid/badlands-deadwood-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.85
+        conform: true
+        scale: 1.0
+        heightOffset: -0.04
+        weight: 0.45
         tileIds: [1, 2, 32]
         character: rocky
         characterStrength: 2.2
@@ -1041,8 +1049,10 @@ stylizedSurface:
           - [forest-bracken-01]
       - scene: /assets/ground/forest/forest-mushrooms-01.glb
         motion: rigid
-        scale: 1.1
-        weight: 0.7
+        conform: true
+        scale: 1.05
+        heightOffset: -0.03
+        weight: 0.6
         tileIds: [6, 8, 9]
         character: forest
         characterStrength: 2.0
@@ -1174,8 +1184,10 @@ stylizedSurface:
       # barnacle tidepool boulders with coral/kelp, and weathered shipwreck ribs.
       - scene: /assets/ground/coastal/coastal-dune-oats-01.glb
         motion: grass-tuft
-        scale: 1.15
-        weight: 1.3
+        paletteTileId: 3
+        scale: 1.1
+        heightOffset: -0.03
+        weight: 1.25
         tileIds: [0, 12]
         character: meadow
         characterStrength: 1.8
@@ -1184,8 +1196,10 @@ stylizedSurface:
           - [coastal-dune-oats-01]
       - scene: /assets/ground/coastal/coastal-tidepool-coral-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 1.1
+        conform: true
+        scale: 1.05
+        heightOffset: -0.04
+        weight: 0.65
         tileIds: [0, 12]
         character: rocky
         characterStrength: 2.0
@@ -1195,8 +1209,10 @@ stylizedSurface:
           - [coastal-tidepool-coral-01]
       - scene: /assets/ground/coastal/coastal-shipwreck-ribs-01.glb
         motion: rigid
-        scale: 1.2
-        weight: 0.65
+        conform: true
+        scale: 1.05
+        heightOffset: -0.05
+        weight: 0.22
         tileIds: [0, 12]
         character: rocky
         characterStrength: 2.1
@@ -1208,9 +1224,11 @@ stylizedSurface:
       # frost-cracked moraine cairns, steppe feathergrass, and alpine edelweiss.
       - scene: /assets/ground/alpine/glacier-ice-spires-01.glb
         motion: rigid
-        scale: 1.2
-        weight: 1.15
-        tileIds: [11, 10]
+        conform: true
+        scale: 0.75
+        heightOffset: -0.05
+        weight: 0.15
+        tileIds: [11]
         character: rocky
         characterStrength: 2.2
         canopy: open
@@ -1219,9 +1237,11 @@ stylizedSurface:
           - [glacier-ice-spires-01]
       - scene: /assets/ground/alpine/glacier-moraine-cairn-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 1.05
-        tileIds: [11, 10, 2]
+        conform: true
+        scale: 1.0
+        heightOffset: -0.04
+        weight: 0.35
+        tileIds: [11, 10]
         character: rocky
         characterStrength: 2.0
         canopy: open
@@ -1230,7 +1250,8 @@ stylizedSurface:
           - [glacier-moraine-cairn-01]
       - scene: /assets/ground/alpine/steppe-feathergrass-01.glb
         motion: grass-tuft
-        scale: 1.2
+        paletteTileId: 10
+        scale: 1.15
         weight: 1.35
         tileIds: [2, 10, 4]
         character: meadow
@@ -1240,9 +1261,11 @@ stylizedSurface:
           - [steppe-feathergrass-01]
       - scene: /assets/ground/alpine/alpine-edelweiss-stone-01.glb
         motion: flexible-stem
-        scale: 1.15
-        weight: 1.15
-        tileIds: [10, 9, 11]
+        conform: true
+        scale: 1.0
+        heightOffset: -0.03
+        weight: 0.55
+        tileIds: [10, 9]
         character: rocky
         characterStrength: 1.9
         canopy: open
@@ -1252,9 +1275,10 @@ stylizedSurface:
       # swollen Adenium desert rose, sun-bleached beast ribcages, and poppy-wheat sheaves.
       - scene: /assets/ground/savanna/savanna-termite-mound-01.glb
         motion: rigid
-        scale: 1.2
-        weight: 0.75
-        tileIds: [3, 5, 1]
+        scale: 0.95
+        heightOffset: -0.05
+        weight: 0.14
+        tileIds: [3]
         character: rocky
         characterStrength: 2.1
         canopy: open
@@ -1263,8 +1287,9 @@ stylizedSurface:
           - [savanna-termite-mound-01]
       - scene: /assets/ground/savanna/savanna-desert-rose-01.glb
         motion: woody-shrub
-        scale: 1.15
-        weight: 1.15
+        scale: 0.85
+        heightOffset: -0.03
+        weight: 0.65
         tileIds: [3, 1, 5]
         character: scrub
         characterStrength: 1.9
@@ -1273,8 +1298,10 @@ stylizedSurface:
           - [savanna-desert-rose-01]
       - scene: /assets/ground/savanna/savanna-sunbleached-ribcage-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.55
+        conform: true
+        scale: 1.0
+        heightOffset: -0.04
+        weight: 0.16
         tileIds: [1, 2, 3, 32]
         character: rocky
         characterStrength: 2.1
@@ -1284,8 +1311,8 @@ stylizedSurface:
           - [savanna-sunbleached-ribcage-01]
       - scene: /assets/ground/savanna/farmland-poppy-wheat-01.glb
         motion: flexible-stem
-        scale: 1.2
-        weight: 1.4
+        scale: 1.15
+        weight: 1.35
         tileIds: [14, 4]
         character: meadow
         characterStrength: 2.0
@@ -1296,9 +1323,10 @@ stylizedSurface:
       # toppled columns, roadside milestones, dwarven cairns, bog totems, and jungle idols.
       - scene: /assets/ground/structures/structure-waystone-shrine-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.42
-        tileIds: [4, 6, 8, 9, 10]
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.04
+        tileIds: [6, 8, 9]
         character: rocky
         characterStrength: 2.2
         canopy: any
@@ -1307,9 +1335,11 @@ stylizedSurface:
           - [structure-waystone-shrine-01]
       - scene: /assets/ground/structures/structure-ruined-column-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.45
-        tileIds: [3, 4, 5, 6, 14]
+        conform: true
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.05
+        tileIds: [4, 5, 14]
         character: rocky
         characterStrength: 2.1
         canopy: any
@@ -1318,9 +1348,10 @@ stylizedSurface:
           - [structure-ruined-column-01]
       - scene: /assets/ground/structures/structure-roadside-milestone-01.glb
         motion: rigid
-        scale: 1.1
-        weight: 0.55
-        tileIds: [13, 14, 4]
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.04
+        tileIds: [13, 14]
         character: rocky
         characterStrength: 1.9
         canopy: open
@@ -1329,9 +1360,10 @@ stylizedSurface:
           - [structure-roadside-milestone-01]
       - scene: /assets/ground/structures/structure-dwarven-cairn-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.55
-        tileIds: [32, 9, 10, 2]
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.06
+        tileIds: [32]
         character: rocky
         characterStrength: 2.2
         canopy: open
@@ -1340,9 +1372,10 @@ stylizedSurface:
           - [structure-dwarven-cairn-01]
       - scene: /assets/ground/structures/structure-bog-fetish-totem-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.55
-        tileIds: [12, 8]
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.06
+        tileIds: [12]
         character: scrub
         characterStrength: 2.1
         canopy: any
@@ -1351,9 +1384,10 @@ stylizedSurface:
           - [structure-bog-fetish-totem-01]
       - scene: /assets/ground/structures/structure-rainforest-idol-01.glb
         motion: rigid
-        scale: 1.15
-        weight: 0.48
-        tileIds: [5, 7, 8]
+        scale: 0.85
+        heightOffset: -0.04
+        weight: 0.05
+        tileIds: [7]
         character: forest
         characterStrength: 2.1
         canopy: any

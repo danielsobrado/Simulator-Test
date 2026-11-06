@@ -139,19 +139,19 @@ def build_steppe_feathergrass(mat):
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
 
-    # 15 graceful arching feathergrass plume cards fanning outward
-    for k in range(15):
-        tier = 0 if k < 9 else 1
-        yaw = (k / (9 if tier == 0 else 6)) * 2 * math.pi + rng.uniform(-0.2, 0.2)
+    # 14 graceful upright-arching feathergrass tussock cards
+    for k in range(14):
+        tier = 0 if k < 8 else 1
+        yaw = (k / (8 if tier == 0 else 6)) * 2 * math.pi + rng.uniform(-0.22, 0.22)
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
         side = Vector((-math.sin(yaw), math.cos(yaw), 0))
-        reach = rng.uniform(0.65, 0.96) if tier == 0 else rng.uniform(0.38, 0.58)
-        h_mid = rng.uniform(0.45, 0.64) if tier == 0 else rng.uniform(0.68, 0.88)
-        p0 = out * 0.05 + Vector((0, 0, 0.02))
-        p1 = out * (reach * 0.48) + Vector((0, 0, h_mid))
-        p2 = out * reach + Vector((0, 0, h_mid * 0.72))
-        w = rng.uniform(0.32, 0.46)
-        arched_card(bm, uv, p0, p1, p2, w * 0.35, w, w * 0.85, side, u_range=(0.0, 1.0), v_range=(0.02, 0.98))
+        reach = rng.uniform(0.32, 0.48) if tier == 0 else rng.uniform(0.18, 0.30)
+        h_top = rng.uniform(0.52, 0.72) if tier == 0 else rng.uniform(0.68, 0.86)
+        p0 = out * 0.06 + Vector((0, 0, -0.02))
+        p1 = out * (reach * 0.56) + Vector((0, 0, h_top * 0.62))
+        p2 = out * reach + Vector((0, 0, h_top))
+        w = rng.uniform(0.28, 0.38)
+        arched_card(bm, uv, p0, p1, p2, w * 0.55, w, w * 0.78, side, u_range=(0.0, 1.0), v_range=(0.02, 0.98))
     return finish_mesh('steppe-feathergrass-01', bm, mat)
 
 
@@ -213,30 +213,31 @@ def build_savanna_termite_mound(mat):
 
 
 def build_savanna_desert_rose(mat):
-    """Swollen bottle-shaped Adenium obesum (Desert Rose) caudex with crimson-pink blossoms."""
+    """Low grounded multi-stem Adenium obesum (Desert Rose) succulent cluster with coral-gold blossoms."""
     rng = random.Random(309)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
 
-    # Swollen bottle caudex + 3 thick succulent limbs
-    caudex = [Vector((0, 0, -0.04)), Vector((0.02, 0.01, 0.26)), Vector((0.0, -0.01, 0.54))]
-    tube(bm, uv, caudex, [0.24, 0.28, 0.14], sides=7, u_range=(0.02, 0.44), v_range=(0.04, 0.92), rough=0.08, rng=rng)
-    for yaw, h_end in ((0.4, 0.86), (2.5, 0.80), (4.6, 0.76)):
+    # Low gnarled caudex stems emerging from the earth
+    for yaw, h_end in ((0.4, 0.34), (2.5, 0.30), (4.6, 0.28)):
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
-        b0 = Vector((0, 0, 0.44)) + out * 0.08
-        b1 = b0 + out * 0.24 + Vector((0, 0, (h_end - 0.44) * 0.55))
-        b2 = b0 + out * 0.44 + Vector((0, 0, h_end - 0.44))
-        tube(bm, uv, [b0, b1, b2], [0.09, 0.065, 0.035], sides=5, u_range=(0.04, 0.44), v_range=(0.10, 0.90), rough=0.06, rng=rng)
+        b0 = out * 0.04 + Vector((0, 0, -0.02))
+        b1 = b0 + out * 0.14 + Vector((0, 0, h_end * 0.55))
+        b2 = b0 + out * 0.24 + Vector((0, 0, h_end))
+        tube(bm, uv, [b0, b1, b2], [0.085, 0.065, 0.040], sides=5, u_range=(0.04, 0.44), v_range=(0.10, 0.90), rough=0.05, rng=rng)
 
-    # 9 blossom-and-leaf crown cards atop the branches
-    for k in range(9):
-        yaw = k / 9 * 2 * math.pi + rng.uniform(-0.18, 0.18)
+    # 12 natural outward-splaying succulent & blossom sprig cards
+    for k in range(12):
+        yaw = k / 12 * 2 * math.pi + rng.uniform(-0.20, 0.20)
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
         side = Vector((-math.sin(yaw), math.cos(yaw), 0))
-        p0 = out * 0.18 + Vector((0, 0, 0.52))
-        p1 = out * 0.44 + Vector((0, 0, 0.84))
-        p2 = out * 0.68 + Vector((0, 0, 0.96))
-        arched_card(bm, uv, p0, p1, p2, 0.22, 0.38, 0.30, side, u_range=(0.48, 1.0), v_range=(0.02, 0.98))
+        ring = 0.08 if k < 5 else 0.18
+        reach = rng.uniform(0.34, 0.48) if k < 5 else rng.uniform(0.46, 0.62)
+        h_top = rng.uniform(0.46, 0.60) if k < 5 else rng.uniform(0.32, 0.46)
+        p0 = out * ring + Vector((0, 0, -0.02))
+        p1 = out * ((ring + reach) * 0.55) + Vector((0, 0, h_top * 0.65))
+        p2 = out * reach + Vector((0, 0, h_top))
+        arched_card(bm, uv, p0, p1, p2, 0.22, 0.34, 0.26, side, u_range=(0.48, 1.0), v_range=(0.02, 0.98))
     return finish_mesh('savanna-desert-rose-01', bm, mat)
 
 
@@ -325,12 +326,12 @@ def build_structure_ruined_column(mat):
     uv = bm.loops.layers.uv.new('UVMap')
 
     # Standing broken column base drum
-    base_drum = [Vector((-0.36, 0.12, -0.04)), Vector((-0.36, 0.12, 0.14)), Vector((-0.34, 0.12, 0.68))]
-    tube(bm, uv, base_drum, [0.38, 0.32, 0.30], sides=8, u_range=(0.0, 0.60), v_range=(0.04, 0.88), rough=0.03, rng=rng)
+    base_drum = [Vector((-0.32, 0.10, -0.04)), Vector((-0.32, 0.10, 0.12)), Vector((-0.30, 0.10, 0.46))]
+    tube(bm, uv, base_drum, [0.34, 0.28, 0.26], sides=8, u_range=(0.0, 0.60), v_range=(0.04, 0.88), rough=0.03, rng=rng)
 
     # Fallen fluted column drum lying diagonally on the ground
-    fallen = [Vector((0.02, -0.18, 0.22)), Vector((0.68, -0.04, 0.18))]
-    tube(bm, uv, fallen, [0.28, 0.27], sides=8, u_range=(0.0, 0.60), v_range=(0.08, 0.90), rough=0.03, rng=rng)
+    fallen = [Vector((0.02, -0.14, 0.16)), Vector((0.58, -0.04, 0.14))]
+    tube(bm, uv, fallen, [0.24, 0.23], sides=8, u_range=(0.0, 0.60), v_range=(0.08, 0.90), rough=0.03, rng=rng)
 
     # 6 trailing ivy cards draped over the standing and fallen drums
     for k in range(6):
@@ -460,70 +461,79 @@ def build_structure_rainforest_idol(mat):
 # 5. AUTHORED BIOME SHRUBS (`bushVariants`, height 1.15 - 1.65 m)
 # ---------------------------------------------------------------------------
 
-def _build_shrub_archetype(name, mat, seed, height=1.45, spread=1.15, n_branches=5, n_cards=16, flat_top=False):
-    """Sculpted woody 3D branch skeleton + multi-tiered organic dome/canopy cards."""
+def _build_shrub_archetype(name, mat, seed, height=1.25, spread=1.15, n_branches=4, n_cards=16, flat_top=False):
+    """Grounded multi-tiered foliage card mound (natural `/\\` shrub silhouette with plush hemisphere normals)."""
     rng = random.Random(seed)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
 
+    # 1. Subtle woody basal stems tucked inside the lower skirt
     for k in range(n_branches):
         yaw = k / n_branches * 2 * math.pi + rng.uniform(-0.22, 0.22)
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
-        p0 = Vector((0, 0, 0.0))
-        p1 = out * (spread * 0.28) + Vector((0, 0, height * 0.38))
-        p2 = out * (spread * 0.58) + Vector((0, 0, height * (0.74 if flat_top else 0.64)))
-        tube(bm, uv, [p0, p1, p2], [0.085, 0.055, 0.028], sides=4, u_range=(0.02, 0.28), v_range=(0.05, 0.92), rough=0.06, rng=rng)
+        p0 = out * (spread * 0.08) + Vector((0, 0, -0.03))
+        p1 = out * (spread * 0.22) + Vector((0, 0, height * 0.22))
+        p2 = out * (spread * 0.32) + Vector((0, 0, height * 0.44))
+        tube(bm, uv, [p0, p1, p2], [0.06, 0.04, 0.022], sides=4, u_range=(0.02, 0.28), v_range=(0.05, 0.92), rough=0.04, rng=rng)
 
-    n_outer = n_cards // 2
-    n_mid = n_cards - n_outer - 3
-    # Outer skirt tier + mid dome tier + 3 central crown dome cards
-    for k in range(n_cards):
-        yaw = (k * 2.39996) + rng.uniform(-0.18, 0.18)  # golden-angle distribution
+    # 2. 4 internal crossed core cards so the center of the shrub is never hollow from any view angle
+    for k in range(4):
+        yaw = k * math.pi / 4 + 0.18
         out = Vector((math.cos(yaw), math.sin(yaw), 0))
         side = Vector((-math.sin(yaw), math.cos(yaw), 0))
-        if k < n_outer:
-            r0, r1, r2 = spread * 0.14, spread * 0.56, spread * 0.92
-            z0 = height * (0.18 if flat_top else 0.08)
-            z1 = height * (0.62 if flat_top else 0.52)
-            z2 = height * (0.76 if flat_top else 0.42)
-        elif k < n_outer + n_mid:
-            r0, r1, r2 = spread * 0.08, spread * 0.42, spread * 0.68
-            z0 = height * 0.26
-            z1 = height * (0.86 if flat_top else 0.80)
-            z2 = height * (0.94 if flat_top else 0.72)
+        p0 = -out * (spread * 0.14) + Vector((0, 0, -0.02))
+        p1 = Vector((0, 0, height * 0.44))
+        p2 = out * (spread * 0.14) + Vector((0, 0, height * 0.84))
+        w = spread * 0.78
+        arched_card(bm, uv, p0, p1, p2, w * 0.85, w, w * 0.72, side, u_range=(0.30, 1.0), v_range=(0.02, 0.98))
+
+    # 3. Grounded outer skirt + inward-arching dome cards (wide at base -> full belly -> rounded top)
+    n_skirt = n_cards // 2
+    for k in range(n_cards):
+        yaw = (k * 2.39996) + rng.uniform(-0.16, 0.16)
+        out = Vector((math.cos(yaw), math.sin(yaw), 0))
+        side = Vector((-math.sin(yaw), math.cos(yaw), 0))
+        if k < n_skirt:
+            r0 = spread * rng.uniform(0.46, 0.58)
+            r1 = spread * rng.uniform(0.60, 0.72)
+            r2 = spread * rng.uniform(0.26, 0.38)
+            z0 = -0.03
+            z1 = height * rng.uniform(0.32, 0.44)
+            z2 = height * rng.uniform(0.64, 0.76)
         else:
-            # Central crown dome cards overarching the top
-            r0, r1, r2 = -spread * 0.18, spread * 0.06, spread * 0.36
-            z0 = height * 0.32
-            z1 = height * 0.98
-            z2 = height * (0.92 if flat_top else 0.82)
+            r0 = spread * rng.uniform(0.32, 0.44)
+            r1 = spread * rng.uniform(0.42, 0.54)
+            r2 = spread * (rng.uniform(0.18, 0.30) if flat_top else rng.uniform(0.06, 0.18))
+            z0 = height * rng.uniform(0.10, 0.18)
+            z1 = height * rng.uniform(0.52, 0.64)
+            z2 = height * (rng.uniform(0.80, 0.88) if flat_top else rng.uniform(0.86, 0.96))
         p0 = out * r0 + Vector((0, 0, z0))
         p1 = out * r1 + Vector((0, 0, z1))
         p2 = out * r2 + Vector((0, 0, z2))
-        w = spread * rng.uniform(0.56, 0.72)
-        arched_card(bm, uv, p0, p1, p2, w * 0.52, w, w * 0.76, side, u_range=(0.30, 1.0), v_range=(0.02, 0.98))
+        w = spread * rng.uniform(0.56, 0.70)
+        arched_card(bm, uv, p0, p1, p2, w * 0.86, w, w * 0.68, side, u_range=(0.30, 1.0), v_range=(0.02, 0.98))
     return finish_mesh(name, bm, mat)
 
 
 def build_bush_arid_ocotillo(mat):
-    return _build_shrub_archetype('bush-arid-ocotillo-01', mat, 321, height=1.55, spread=1.10, n_branches=6, n_cards=14)
+    return _build_shrub_archetype('bush-arid-ocotillo-01', mat, 321, height=1.25, spread=1.12, n_branches=4, n_cards=14)
 
 
 def build_bush_savanna_thorn(mat):
-    return _build_shrub_archetype('bush-savanna-thorn-01', mat, 322, height=1.45, spread=1.35, n_branches=5, n_cards=16, flat_top=True)
+    return _build_shrub_archetype('bush-savanna-thorn-01', mat, 322, height=1.22, spread=1.28, n_branches=4, n_cards=14, flat_top=True)
 
 
 def build_bush_meadow_gorse(mat):
-    return _build_shrub_archetype('bush-meadow-gorse-01', mat, 323, height=1.35, spread=1.18, n_branches=5, n_cards=16)
+    return _build_shrub_archetype('bush-meadow-gorse-01', mat, 323, height=1.20, spread=1.18, n_branches=4, n_cards=14)
 
 
 def build_bush_boreal_juniper(mat):
-    return _build_shrub_archetype('bush-boreal-juniper-01', mat, 324, height=1.15, spread=1.25, n_branches=5, n_cards=16)
+    return _build_shrub_archetype('bush-boreal-juniper-01', mat, 324, height=1.05, spread=1.22, n_branches=4, n_cards=14)
 
 
 def build_bush_tropical_hibiscus(mat):
-    return _build_shrub_archetype('bush-tropical-hibiscus-01', mat, 325, height=1.62, spread=1.28, n_branches=5, n_cards=16)
+    return _build_shrub_archetype('bush-tropical-hibiscus-01', mat, 325, height=1.35, spread=1.24, n_branches=4, n_cards=14)
 
 
 def build_bush_swamp_buttonbush(mat):
-    return _build_shrub_archetype('bush-swamp-buttonbush-01', mat, 326, height=1.38, spread=1.22, n_branches=6, n_cards=16)
+    return _build_shrub_archetype('bush-swamp-buttonbush-01', mat, 326, height=1.22, spread=1.20, n_branches=4, n_cards=14)

@@ -483,7 +483,7 @@
         "sceneBounds": {
           "min": [
             -2.7974111313206436,
-            -4.53674364371635e-9,
+            -4.53674364371635e-09,
             -1.6742247397998398
           ],
           "max": [
@@ -553,7 +553,7 @@
         "sceneBounds": {
           "min": [
             -2.7974135737069,
-            -4.5367808174363725e-9,
+            -4.5367808174363725e-09,
             -1.6741913607531782
           ],
           "max": [
@@ -1564,13 +1564,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "16554e30afa96c3340597e05a56a5e4a5d1957ba2ba1770babb1684047ceac88",
-      "sourceSha256": "e0934a5937fb0ad04518835bf669c693adfa491179b8165508dbabd1b5817574",
-      "outputSha256": "cb6a0566d837eedee7d81e3c933f6c853cb7e29f548ee3c8906e41d30390890e",
-      "sourceBytes": 51752,
-      "outputBytes": 36492,
-      "gzipBytes": 34299,
-      "brotliBytes": 33839,
+      "cacheKey": "29ba8f1792d78dea7b961efc66dae0374d4059a9075944d3cb3e38515032db85",
+      "sourceSha256": "a655d527ad383ef0709d4027f391913b31c9f8529404b1f9b77b8d2c7b9e39b1",
+      "outputSha256": "ae8bcd2662664c196a4466adb4a959975438e497619979dc0598ecb9c996a2d4",
+      "sourceBytes": 46656,
+      "outputBytes": 32112,
+      "gzipBytes": 29858,
+      "brotliBytes": 29412,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1580,30 +1580,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 176,
-        "renderedTriangles": 176,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushAridOcotillo": 176
+          "BushAridOcotillo": 152
         },
         "sceneBounds": {
           "min": [
-            -1.0330767631530762,
-            -0.03975959122180939,
-            -1.0402884483337402
+            -0.8250382542610168,
+            -0.05255436897277832,
+            -0.8661518096923828
           ],
           "max": [
-            1.04227614402771,
-            1.5190000534057617,
-            1.0292562246322632
+            0.8284322619438171,
+            1.1955841779708862,
+            0.739462673664093
           ]
         },
-        "bufferBytes": 50208,
-        "logicalAccessorBytes": 8352,
-        "logicalVertexBytes": 7296,
-        "logicalIndexBytes": 1056,
-        "geometryBufferBytes": 8352,
-        "imageBufferBytes": 41853,
+        "bufferBytes": 45112,
+        "logicalAccessorBytes": 7472,
+        "logicalVertexBytes": 6560,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7472,
+        "imageBufferBytes": 37639,
         "nodeNames": [
           "bush-arid-ocotillo-01",
           "bush-arid-ocotillo-01-mesh"
@@ -1624,30 +1624,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 176,
-        "renderedTriangles": 176,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushAridOcotillo": 176
+          "BushAridOcotillo": 152
         },
         "sceneBounds": {
           "min": [
-            -1.03308105,
-            -0.0397586823,
-            -1.0402832
+            -0.825042725,
+            -0.0525550842,
+            -0.866149902
           ],
           "max": [
-            1.04229736,
-            1.51898193,
-            1.02923584
+            0.828430176,
+            1.19555664,
+            0.739471436
           ]
         },
-        "bufferBytes": 39508,
-        "logicalAccessorBytes": 5388,
-        "logicalVertexBytes": 4332,
-        "logicalIndexBytes": 1056,
-        "geometryBufferBytes": 5616,
-        "imageBufferBytes": 30877,
+        "bufferBytes": 34500,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 26759,
         "nodeNames": [
           "bush-arid-ocotillo-01",
           "bush-arid-ocotillo-01-mesh"
@@ -1678,8 +1678,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 228,
-        "triangles": 176
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -1693,17 +1693,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 176
+          "triangleCount": 152
         },
         "data": {
-          "json": 2458,
-          "binary": 33892,
+          "json": 2462,
+          "binary": 29508,
           "buffers": {
-            "vertex": 2798,
-            "index": 205,
+            "vertex": 2565,
+            "index": 178,
             "animation": 0,
             "transform": 0,
-            "image": 30877
+            "image": 26759
           }
         }
       }
@@ -1734,13 +1734,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "69e5cf2c17c3d668ef568eeeb32d88a79196bc02d1c603e1562a0d48596b60d3",
-      "sourceSha256": "8d1f45e10bfdc7d57822e78c54c3f11e5d2465e3d743b0014f5266b9b56754dc",
-      "outputSha256": "7f0a8bef7b6dfd3962e07bceca998e8843ac0026ec3c5dfc80739cb1bb9087f7",
-      "sourceBytes": 56104,
-      "outputBytes": 39076,
-      "gzipBytes": 36824,
-      "brotliBytes": 36442,
+      "cacheKey": "fde5f2295c6ad0ec876848a834de132e836e4691a16aa6215a9663c2d3e5c5c8",
+      "sourceSha256": "9ecf4ff176503f33a436bcd17e744f64ea1009b4c263fba87ed1d569d687cb92",
+      "outputSha256": "603040cd8c9c7779662b504f91677cc608b14975856ce522209b813bf83e80d2",
+      "sourceBytes": 47412,
+      "outputBytes": 32716,
+      "gzipBytes": 30556,
+      "brotliBytes": 30158,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1750,30 +1750,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSavannaThorn": 164
+          "BushSavannaThorn": 152
         },
         "sceneBounds": {
           "min": [
-            -1.251818299293518,
-            -0.04917795583605766,
-            -1.276935338973999
+            -0.9163579940795898,
+            -0.05633129924535751,
+            -0.9842861890792847
           ],
           "max": [
-            1.2674058675765991,
-            1.4210000038146973,
-            1.2647682428359985
+            0.9302798509597778,
+            1.0679032802581787,
+            0.9109693765640259
           ]
         },
-        "bufferBytes": 54560,
-        "logicalAccessorBytes": 7896,
-        "logicalVertexBytes": 6912,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 7896,
-        "imageBufferBytes": 46664,
+        "bufferBytes": 45868,
+        "logicalAccessorBytes": 7440,
+        "logicalVertexBytes": 6528,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7440,
+        "imageBufferBytes": 38426,
         "nodeNames": [
           "bush-savanna-thorn-01",
           "bush-savanna-thorn-01-mesh"
@@ -1794,30 +1794,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSavannaThorn": 164
+          "BushSavannaThorn": 152
         },
         "sceneBounds": {
           "min": [
-            -1.25183105,
-            -0.0491771698,
-            -1.2769165
+            -0.916351318,
+            -0.0563316345,
+            -0.984283447
           ],
           "max": [
-            1.26739502,
-            1.42102051,
-            1.26477051
+            0.930267334,
+            1.06793213,
+            0.910980225
           ]
         },
-        "bufferBytes": 41780,
-        "logicalAccessorBytes": 5088,
-        "logicalVertexBytes": 4104,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 5304,
-        "imageBufferBytes": 33589,
+        "bufferBytes": 35104,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 27353,
         "nodeNames": [
           "bush-savanna-thorn-01",
           "bush-savanna-thorn-01-mesh"
@@ -1848,8 +1848,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 216,
-        "triangles": 164
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -1863,17 +1863,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 164
+          "triangleCount": 152
         },
         "data": {
-          "json": 2456,
-          "binary": 36476,
+          "json": 2461,
+          "binary": 30112,
           "buffers": {
-            "vertex": 2689,
-            "index": 191,
+            "vertex": 2572,
+            "index": 177,
             "animation": 0,
             "transform": 0,
-            "image": 33589
+            "image": 27353
           }
         }
       }
@@ -1904,13 +1904,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "86bdf67d129774bcfdff50919c2536606c0d4299d7965a1dd0e483afa7defecd",
-      "sourceSha256": "75da23cca4f063c60261a12698264ca57036add844494d4632f1351b5cd6e796",
-      "outputSha256": "bd2ffe75e24eb1bb41f6d5a8d9462a24fe0d203e21a2ae315ae883f3fc0923c5",
-      "sourceBytes": 51008,
-      "outputBytes": 38840,
-      "gzipBytes": 36614,
-      "brotliBytes": 36250,
+      "cacheKey": "b4817663800798100174ea5ddff11a6da0315db18bc203a75b6b19d2ee5cce5b",
+      "sourceSha256": "3dec8b72f8bfa2998478dcbf45c9721991f71a6fba738fa20189d19ff506e8b6",
+      "outputSha256": "1a615468a1e791eef8b671954896d2d0a2ed65c052f1f16a97ef548ef7d386f3",
+      "sourceBytes": 45356,
+      "outputBytes": 31536,
+      "gzipBytes": 29353,
+      "brotliBytes": 28951,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -1920,30 +1920,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushMeadowGorse": 164
+          "BushMeadowGorse": 152
         },
         "sceneBounds": {
           "min": [
-            -1.1043848991394043,
-            -0.04620833322405815,
-            -1.1313767433166504
+            -0.8031021356582642,
+            -0.05397568643093109,
+            -0.8732843399047852
           ],
           "max": [
-            1.0910860300064087,
-            1.3229999542236328,
-            1.1210079193115234
+            0.8624970316886902,
+            1.1144347190856934,
+            0.8499311208724976
           ]
         },
-        "bufferBytes": 49468,
-        "logicalAccessorBytes": 7896,
-        "logicalVertexBytes": 6912,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 7896,
-        "imageBufferBytes": 41571,
+        "bufferBytes": 43816,
+        "logicalAccessorBytes": 7472,
+        "logicalVertexBytes": 6560,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7472,
+        "imageBufferBytes": 36343,
         "nodeNames": [
           "bush-meadow-gorse-01",
           "bush-meadow-gorse-01-mesh"
@@ -1964,30 +1964,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushMeadowGorse": 164
+          "BushMeadowGorse": 152
         },
         "sceneBounds": {
           "min": [
-            -1.10437012,
-            -0.046207428,
-            -1.13134766
+            -0.803100586,
+            -0.053976059,
+            -0.873291016
           ],
           "max": [
-            1.09106445,
-            1.32299805,
-            1.12103271
+            0.862487793,
+            1.11444092,
+            0.849945068
           ]
         },
-        "bufferBytes": 41552,
-        "logicalAccessorBytes": 5088,
-        "logicalVertexBytes": 4104,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 5304,
-        "imageBufferBytes": 33361,
+        "bufferBytes": 33932,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 26186,
         "nodeNames": [
           "bush-meadow-gorse-01",
           "bush-meadow-gorse-01-mesh"
@@ -2018,8 +2018,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 216,
-        "triangles": 164
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2033,17 +2033,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 164
+          "triangleCount": 152
         },
         "data": {
-          "json": 2450,
-          "binary": 36248,
+          "json": 2454,
+          "binary": 28940,
           "buffers": {
-            "vertex": 2687,
-            "index": 191,
+            "vertex": 2568,
+            "index": 178,
             "animation": 0,
             "transform": 0,
-            "image": 33361
+            "image": 26186
           }
         }
       }
@@ -2074,13 +2074,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "5ac45b925c7f0eecb7111b66dc9b14d69483a457904b90cb8c610952ca110fb1",
-      "sourceSha256": "878777d94b4431a6d3277014f3d789886ee3610c5e3726caf146fd1fc4b81f73",
-      "outputSha256": "3c31046244571c7f5f019e5b9a012183ddc5230ef91bdab80e3613cd60fe2062",
-      "sourceBytes": 49144,
-      "outputBytes": 35836,
-      "gzipBytes": 33617,
-      "brotliBytes": 33227,
+      "cacheKey": "eb5b574b555b1933310ce0a89a33308658985f70c4b3ed375d14aba8b51b1c1e",
+      "sourceSha256": "7d1163b1caf452a7b7fd8e148599a79f28607e2b871df844c06d3af15f63348d",
+      "outputSha256": "8229f0cffe106b555fd974394966a8ea7b1613a2d24d8ff231befd862603fae6",
+      "sourceBytes": 44132,
+      "outputBytes": 30800,
+      "gzipBytes": 28598,
+      "brotliBytes": 28175,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2090,30 +2090,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushBorealJuniper": 164
+          "BushBorealJuniper": 152
         },
         "sceneBounds": {
           "min": [
-            -1.175123929977417,
-            -0.05439770594239235,
-            -1.1764593124389648
+            -0.8408864140510559,
+            -0.057382769882678986,
+            -0.9463557004928589
           ],
           "max": [
-            1.1705350875854492,
-            1.1269999742507935,
-            1.1758164167404175
+            0.8989200592041016,
+            0.9700706005096436,
+            0.7667842507362366
           ]
         },
-        "bufferBytes": 47596,
-        "logicalAccessorBytes": 7832,
-        "logicalVertexBytes": 6848,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 7832,
-        "imageBufferBytes": 39763,
+        "bufferBytes": 42584,
+        "logicalAccessorBytes": 7472,
+        "logicalVertexBytes": 6560,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7472,
+        "imageBufferBytes": 35110,
         "nodeNames": [
           "bush-boreal-juniper-01",
           "bush-boreal-juniper-01-mesh"
@@ -2134,30 +2134,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushBorealJuniper": 164
+          "BushBorealJuniper": 152
         },
         "sceneBounds": {
           "min": [
-            -1.17510986,
-            -0.054397583,
-            -1.17645264
+            -0.840881348,
+            -0.0573825836,
+            -0.946350098
           ],
           "max": [
-            1.17053223,
-            1.12701416,
-            1.17584229
+            0.898925781,
+            0.970062256,
+            0.766784668
           ]
         },
-        "bufferBytes": 38500,
-        "logicalAccessorBytes": 5050,
-        "logicalVertexBytes": 4066,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 5264,
-        "imageBufferBytes": 30358,
+        "bufferBytes": 33184,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 25437,
         "nodeNames": [
           "bush-boreal-juniper-01",
           "bush-boreal-juniper-01-mesh"
@@ -2188,8 +2188,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 214,
-        "triangles": 164
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2203,17 +2203,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 164
+          "triangleCount": 152
         },
         "data": {
-          "json": 2458,
-          "binary": 33236,
+          "json": 2464,
+          "binary": 28192,
           "buffers": {
-            "vertex": 2679,
-            "index": 192,
+            "vertex": 2568,
+            "index": 178,
             "animation": 0,
             "transform": 0,
-            "image": 30358
+            "image": 25437
           }
         }
       }
@@ -2244,13 +2244,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "a9ade3b183b6c35fc658f9c5e189519bb113f2d831d996399e01c2cf4d506d9d",
-      "sourceSha256": "2e731c5a2f959daef00d55b3f66e405013dee65ba29d385c0d6f7f686d1d1a7b",
-      "outputSha256": "3851a6ca11fff58a2cd186c3098310b838b8e39b2f271589af29f2e3af9d6053",
-      "sourceBytes": 51044,
-      "outputBytes": 37308,
-      "gzipBytes": 35061,
-      "brotliBytes": 34662,
+      "cacheKey": "d8e9528cd0343d3d1c9abda5aefbdae62e835fece68224cf72fee3b92a82f864",
+      "sourceSha256": "5a6206fa2e08eb88d333aa58755386d5f07104ddfa4c8a4b594ae22201b9e168",
+      "outputSha256": "5f7d5dbcd29d683bb5f988b77111b931ae6df2afdc7eb4c555ffd86353c7b304",
+      "sourceBytes": 45860,
+      "outputBytes": 32132,
+      "gzipBytes": 29929,
+      "brotliBytes": 29536,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2260,30 +2260,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushTropicalHibiscus": 164
+          "BushTropicalHibiscus": 152
         },
         "sceneBounds": {
           "min": [
-            -1.2136013507843018,
-            -0.04165012016892433,
-            -1.2125177383422852
+            -0.8560616970062256,
+            -0.053822122514247894,
+            -0.9593499898910522
           ],
           "max": [
-            1.1988463401794434,
-            1.5875999927520752,
-            1.2258212566375732
+            0.8641406297683716,
+            1.2861322164535522,
+            0.8194189071655273
           ]
         },
-        "bufferBytes": 49484,
-        "logicalAccessorBytes": 7896,
-        "logicalVertexBytes": 6912,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 7896,
-        "imageBufferBytes": 41586,
+        "bufferBytes": 44296,
+        "logicalAccessorBytes": 7440,
+        "logicalVertexBytes": 6528,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7440,
+        "imageBufferBytes": 36855,
         "nodeNames": [
           "bush-tropical-hibiscus-01",
           "bush-tropical-hibiscus-01-mesh"
@@ -2304,30 +2304,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 164,
-        "renderedTriangles": 164,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushTropicalHibiscus": 164
+          "BushTropicalHibiscus": 152
         },
         "sceneBounds": {
           "min": [
-            -1.21362305,
-            -0.0416507721,
-            -1.21252441
+            -0.856048584,
+            -0.0538215637,
+            -0.959350586
           ],
           "max": [
-            1.19885254,
-            1.58758545,
-            1.22583008
+            0.864135742,
+            1.28613281,
+            0.81942749
           ]
         },
-        "bufferBytes": 40000,
-        "logicalAccessorBytes": 5088,
-        "logicalVertexBytes": 4104,
-        "logicalIndexBytes": 984,
-        "geometryBufferBytes": 5304,
-        "imageBufferBytes": 31808,
+        "bufferBytes": 34508,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 26758,
         "nodeNames": [
           "bush-tropical-hibiscus-01",
           "bush-tropical-hibiscus-01-mesh"
@@ -2358,8 +2358,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 216,
-        "triangles": 164
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2373,17 +2373,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 164
+          "triangleCount": 152
         },
         "data": {
-          "json": 2470,
-          "binary": 34696,
+          "json": 2473,
+          "binary": 29516,
           "buffers": {
-            "vertex": 2695,
-            "index": 191,
+            "vertex": 2573,
+            "index": 177,
             "animation": 0,
             "transform": 0,
-            "image": 31808
+            "image": 26758
           }
         }
       }
@@ -2414,13 +2414,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "e3a93005b7b9fb3930ef244c5c99038d728b624e97854fe6eed524d195df5ef4",
-      "sourceSha256": "bd933c66ff8a21ce6f002c7633024557c9c0c54f5f87a0a565462dfa3dc3623b",
-      "outputSha256": "4281684fdc2c9582a30ca1ac03d7c6863d8348b27493c308a6234b403ecada41",
-      "sourceBytes": 49060,
-      "outputBytes": 35192,
-      "gzipBytes": 32925,
-      "brotliBytes": 32492,
+      "cacheKey": "5d07183685c495ae93b051584df497852facd4401d235a6fa037e10ad412ae8d",
+      "sourceSha256": "7fe562b7ef7f5b096d5bfc2644bb06c6a0886ef23fd33e305f9d76de42ceaf43",
+      "outputSha256": "209b999fee0edb248bb37c8951ee315a31850208c2d2d22d40ca19ebcb21bdb8",
+      "sourceBytes": 43076,
+      "outputBytes": 30252,
+      "gzipBytes": 28055,
+      "brotliBytes": 27651,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -2430,30 +2430,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 184,
-        "renderedTriangles": 184,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSwampButtonbush": 184
+          "BushSwampButtonbush": 152
         },
         "sceneBounds": {
           "min": [
-            -1.1266332864761353,
-            -0.04593212902545929,
-            -1.150286316871643
+            -0.8795944452285767,
+            -0.0544067919254303,
+            -0.915074348449707
           ],
           "max": [
-            1.1274126768112183,
-            1.3523999452590942,
-            1.1399039030075073
+            0.9135290384292603,
+            1.1509957313537598,
+            0.8537071943283081
           ]
         },
-        "bufferBytes": 47500,
-        "logicalAccessorBytes": 8784,
-        "logicalVertexBytes": 7680,
-        "logicalIndexBytes": 1104,
-        "geometryBufferBytes": 8784,
-        "imageBufferBytes": 38714,
+        "bufferBytes": 41520,
+        "logicalAccessorBytes": 7440,
+        "logicalVertexBytes": 6528,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 7440,
+        "imageBufferBytes": 34079,
         "nodeNames": [
           "bush-swamp-buttonbush-01",
           "bush-swamp-buttonbush-01-mesh"
@@ -2474,30 +2474,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 184,
-        "renderedTriangles": 184,
+        "triangles": 152,
+        "renderedTriangles": 152,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "BushSwampButtonbush": 184
+          "BushSwampButtonbush": 152
         },
         "sceneBounds": {
           "min": [
-            -1.12664795,
-            -0.0459327698,
-            -1.15026855
+            -0.879608154,
+            -0.0544071198,
+            -0.91506958
           ],
           "max": [
-            1.12744141,
-            1.35241699,
-            1.13989258
+            0.913543701,
+            1.15100098,
+            0.85369873
           ]
         },
-        "bufferBytes": 38484,
-        "logicalAccessorBytes": 5664,
-        "logicalVertexBytes": 4560,
-        "logicalIndexBytes": 1104,
-        "geometryBufferBytes": 5904,
-        "imageBufferBytes": 29457,
+        "bufferBytes": 32632,
+        "logicalAccessorBytes": 4788,
+        "logicalVertexBytes": 3876,
+        "logicalIndexBytes": 912,
+        "geometryBufferBytes": 4992,
+        "imageBufferBytes": 24889,
         "nodeNames": [
           "bush-swamp-buttonbush-01",
           "bush-swamp-buttonbush-01-mesh"
@@ -2528,8 +2528,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 240,
-        "triangles": 184
+        "vertices": 204,
+        "triangles": 152
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -2543,17 +2543,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 184
+          "triangleCount": 152
         },
         "data": {
-          "json": 2470,
-          "binary": 32580,
+          "json": 2471,
+          "binary": 27640,
           "buffers": {
-            "vertex": 2902,
-            "index": 213,
+            "vertex": 2562,
+            "index": 177,
             "animation": 0,
             "transform": 0,
-            "image": 29457
+            "image": 24889
           }
         }
       }
@@ -2610,7 +2610,7 @@
         "sceneBounds": {
           "min": [
             -2.522637520671541,
-            -1.5371833215597768e-8,
+            -1.5371833215597768e-08,
             -2.7089496872211707
           ],
           "max": [
@@ -2666,7 +2666,7 @@
         "sceneBounds": {
           "min": [
             -2.5226580743079685,
-            -1.5371696886154063e-8,
+            -1.5371696886154063e-08,
             -2.708881865746015
           ],
           "max": [
@@ -2800,7 +2800,7 @@
         "sceneBounds": {
           "min": [
             -2.9559936510333102,
-            -2.4768324768942307e-7,
+            -2.4768324768942307e-07,
             -2.7324228276485245
           ],
           "max": [
@@ -2854,7 +2854,7 @@
         "sceneBounds": {
           "min": [
             -2.95596697,
-            -0.00003622872858777271,
+            -3.622872858777271e-05,
             -2.73246436909068
           ],
           "max": [
@@ -2986,7 +2986,7 @@
         "sceneBounds": {
           "min": [
             -3.904052726214104,
-            -5.284238930869378e-7,
+            -5.284238930869378e-07,
             -3.743532127787834
           ],
           "max": [
@@ -3040,7 +3040,7 @@
         "sceneBounds": {
           "min": [
             -3.9040527299999996,
-            0.00007532979175639554,
+            7.532979175639554e-05,
             -3.743569984941075
           ],
           "max": [
@@ -3172,7 +3172,7 @@
         "sceneBounds": {
           "min": [
             -5.0314941377860976,
-            -2.496218325376276e-7,
+            -2.496218325376276e-07,
             -5.034486813011758
           ],
           "max": [
@@ -3226,7 +3226,7 @@
         "sceneBounds": {
           "min": [
             -5.031551320000002,
-            0.00006290924225815786,
+            6.290924225815786e-05,
             -5.0343676091760665
           ],
           "max": [
@@ -3358,7 +3358,7 @@
         "sceneBounds": {
           "min": [
             -3.307699202753348,
-            -3.0801358708032467e-7,
+            -3.0801358708032467e-07,
             -3.831017300805296
           ],
           "max": [
@@ -3412,7 +3412,7 @@
         "sceneBounds": {
           "min": [
             -3.3076695999999997,
-            -0.00003155223039819077,
+            -3.155223039819077e-05,
             -3.8310705317970495
           ],
           "max": [
@@ -3544,7 +3544,7 @@
         "sceneBounds": {
           "min": [
             -3.1444498352941155,
-            -3.4954963734329473e-7,
+            -3.4954963734329473e-07,
             -3.4719961719005625
           ],
           "max": [
@@ -3598,7 +3598,7 @@
         "sceneBounds": {
           "min": [
             -3.144482970662404,
-            -2.814753782357241e-7,
+            -2.814753782357241e-07,
             -3.472048627342404
           ],
           "max": [
@@ -3730,7 +3730,7 @@
         "sceneBounds": {
           "min": [
             -2.2629068850535763,
-            -2.800063016311638e-7,
+            -2.800063016311638e-07,
             -2.209544732818183
           ],
           "max": [
@@ -3784,7 +3784,7 @@
         "sceneBounds": {
           "min": [
             -2.2629437140513122,
-            -1.679713653515713e-7,
+            -1.679713653515713e-07,
             -2.209529025113486
           ],
           "max": [
@@ -6505,6 +6505,534 @@
       }
     },
     {
+      "scene": "/assets/trees/savanna/acacia-01.glb",
+      "source": "assets/runtime-sources/trees/savanna/acacia-01.glb",
+      "output": "public/assets/trees/savanna/acacia-01.glb",
+      "profile": "alphaCritical",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "1024",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "1d93173ff0f5e518090b73ab38dda9a90314947ab6340bad94ba984356cf6326",
+      "sourceSha256": "2fa76ab8b723fbce2ee62907fe8bd4a70c2c4294be2fd1c8ef02011bc1f5dc4b",
+      "outputSha256": "25efbd50b4bcff8a145523463b8d3145fb690099ff2bba4acbee53b303ea23c1",
+      "sourceBytes": 223360,
+      "outputBytes": 208752,
+      "gzipBytes": 202914,
+      "brotliBytes": 202209,
+      "sourceStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1623,
+        "renderedTriangles": 1623,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1377,
+          "Acacia leaves": 246
+        },
+        "sceneBounds": {
+          "min": [
+            -4.462234973907471,
+            -0.27910083532333374,
+            -2.7701456546783447
+          ],
+          "max": [
+            3.882546901702881,
+            8.73331069946289,
+            2.990886926651001
+          ]
+        },
+        "bufferBytes": 220716,
+        "logicalAccessorBytes": 66858,
+        "logicalVertexBytes": 57120,
+        "logicalIndexBytes": 9738,
+        "geometryBufferBytes": 66858,
+        "imageBufferBytes": 153853,
+        "nodeNames": [
+          "acacia-01",
+          "acacia-01-Bark",
+          "acacia-01-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1623,
+        "renderedTriangles": 1623,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1377,
+          "Acacia leaves": 246
+        },
+        "sceneBounds": {
+          "min": [
+            -4.4621582,
+            -0.279098511,
+            -2.7701416
+          ],
+          "max": [
+            3.88256836,
+            8.73339844,
+            2.99084473
+          ]
+        },
+        "bufferBytes": 243448,
+        "logicalAccessorBytes": 36669,
+        "logicalVertexBytes": 26931,
+        "logicalIndexBytes": 9738,
+        "geometryBufferBytes": 38202,
+        "imageBufferBytes": 190999,
+        "nodeNames": [
+          "acacia-01",
+          "acacia-01-Bark",
+          "acacia-01-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 2,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 3,
+        "hints": 0,
+        "drawCalls": 2,
+        "vertices": 1533,
+        "triangles": 1623
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 3,
+          "meshCount": 2,
+          "materialCount": 2,
+          "textureCount": 1,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 2,
+          "instanceCount": 2,
+          "triangleCount": 1623
+        },
+        "data": {
+          "json": 3363,
+          "binary": 205244,
+          "buffers": {
+            "vertex": 12527,
+            "index": 1705,
+            "animation": 0,
+            "transform": 0,
+            "image": 190999
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/trees/savanna/acacia-02.glb",
+      "source": "assets/runtime-sources/trees/savanna/acacia-02.glb",
+      "output": "public/assets/trees/savanna/acacia-02.glb",
+      "profile": "alphaCritical",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "1024",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "a83d229255a54b86c51f6e8b457634cf79d80ed3295a179fb77c06f45c41a551",
+      "sourceSha256": "7d5c45bf28bf6f9861384192baabe2fa1c16ca1ee701518c62e45b08b37512e6",
+      "outputSha256": "c2d117a0b385aef1345fe65460055d7b7f0916b5f7fdd28a2799b240796b0f30",
+      "sourceBytes": 247192,
+      "outputBytes": 213616,
+      "gzipBytes": 206313,
+      "brotliBytes": 205620,
+      "sourceStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2224,
+        "renderedTriangles": 2224,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1890,
+          "Acacia leaves": 334
+        },
+        "sceneBounds": {
+          "min": [
+            -4.182997703552246,
+            -0.28682276606559753,
+            -4.3630571365356445
+          ],
+          "max": [
+            4.283194541931152,
+            10.096990585327148,
+            4.578168869018555
+          ]
+        },
+        "bufferBytes": 244544,
+        "logicalAccessorBytes": 90688,
+        "logicalVertexBytes": 77344,
+        "logicalIndexBytes": 13344,
+        "geometryBufferBytes": 90688,
+        "imageBufferBytes": 153853,
+        "nodeNames": [
+          "acacia-02",
+          "acacia-02-Bark",
+          "acacia-02-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2224,
+        "renderedTriangles": 2224,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1890,
+          "Acacia leaves": 334
+        },
+        "sceneBounds": {
+          "min": [
+            -4.18310547,
+            -0.286819458,
+            -4.36303711
+          ],
+          "max": [
+            4.28320312,
+            10.097168,
+            4.578125
+          ]
+        },
+        "bufferBytes": 262136,
+        "logicalAccessorBytes": 49948,
+        "logicalVertexBytes": 36604,
+        "logicalIndexBytes": 13344,
+        "geometryBufferBytes": 52032,
+        "imageBufferBytes": 190999,
+        "nodeNames": [
+          "acacia-02",
+          "acacia-02-Bark",
+          "acacia-02-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 2,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 3,
+        "hints": 0,
+        "drawCalls": 2,
+        "vertices": 2084,
+        "triangles": 2224
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 3,
+          "meshCount": 2,
+          "materialCount": 2,
+          "textureCount": 1,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 2,
+          "instanceCount": 2,
+          "triangleCount": 2224
+        },
+        "data": {
+          "json": 3367,
+          "binary": 210104,
+          "buffers": {
+            "vertex": 16761,
+            "index": 2335,
+            "animation": 0,
+            "transform": 0,
+            "image": 190999
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/trees/savanna/acacia-03.glb",
+      "source": "assets/runtime-sources/trees/savanna/acacia-03.glb",
+      "output": "public/assets/trees/savanna/acacia-03.glb",
+      "profile": "alphaCritical",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "1024",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "e7e966e7c41a74a8a4628a5c98ab494026e7b34741a479f5087b397cdbbf94e8",
+      "sourceSha256": "703d94be168558311566dfaa9279d494956033d0d2c750007ae9d16512d9c718",
+      "outputSha256": "926fff551d2480de5e99d3e882a01d4ac8600534b809f5b311cf0b9c32d675b6",
+      "sourceBytes": 216588,
+      "outputBytes": 207524,
+      "gzipBytes": 202098,
+      "brotliBytes": 201416,
+      "sourceStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1444,
+        "renderedTriangles": 1444,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1212,
+          "Acacia leaves": 232
+        },
+        "sceneBounds": {
+          "min": [
+            -2.978694438934326,
+            -0.2681339681148529,
+            -4.686190128326416
+          ],
+          "max": [
+            3.0726213455200195,
+            7.888524055480957,
+            3.291081190109253
+          ]
+        },
+        "bufferBytes": 213944,
+        "logicalAccessorBytes": 60088,
+        "logicalVertexBytes": 51424,
+        "logicalIndexBytes": 8664,
+        "geometryBufferBytes": 60088,
+        "imageBufferBytes": 153853,
+        "nodeNames": [
+          "acacia-03",
+          "acacia-03-Bark",
+          "acacia-03-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 1,
+        "nodes": 3,
+        "meshes": 2,
+        "materials": 2,
+        "textures": 1,
+        "images": 1,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1444,
+        "renderedTriangles": 1444,
+        "drawParts": 2,
+        "materialTriangleCounts": {
+          "Acacia bark": 1212,
+          "Acacia leaves": 232
+        },
+        "sceneBounds": {
+          "min": [
+            -2.9786377,
+            -0.268127441,
+            -4.6862793
+          ],
+          "max": [
+            3.07263184,
+            7.88842773,
+            3.2911377
+          ]
+        },
+        "bufferBytes": 238540,
+        "logicalAccessorBytes": 33136,
+        "logicalVertexBytes": 24472,
+        "logicalIndexBytes": 8664,
+        "geometryBufferBytes": 34520,
+        "imageBufferBytes": 190999,
+        "nodeNames": [
+          "acacia-03",
+          "acacia-03-Bark",
+          "acacia-03-Leaves"
+        ],
+        "materialNames": [
+          "Acacia bark",
+          "Acacia leaves"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 2,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 3,
+        "hints": 0,
+        "drawCalls": 2,
+        "vertices": 1384,
+        "triangles": 1444
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 3,
+          "meshCount": 2,
+          "materialCount": 2,
+          "textureCount": 1,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 2,
+          "instanceCount": 2,
+          "triangleCount": 1444
+        },
+        "data": {
+          "json": 3360,
+          "binary": 204020,
+          "buffers": {
+            "vertex": 11496,
+            "index": 1517,
+            "animation": 0,
+            "transform": 0,
+            "image": 190999
+          }
+        }
+      }
+    },
+    {
       "scene": "/assets/ground/stylized-grass/clump-01.glb",
       "source": "assets/extracted/ground/stylized-grass/clump-01.glb",
       "output": "public/assets/ground/stylized-grass/clump-01.glb",
@@ -6619,7 +7147,7 @@
         "sceneBounds": {
           "min": [
             -0.24547768231512168,
-            7.069186405521399e-8,
+            7.069186405521399e-08,
             -0.24758408317074387
           ],
           "max": [
@@ -6831,7 +7359,7 @@
         "sceneBounds": {
           "min": [
             -0.2962994382625086,
-            1.9287299412792946e-7,
+            1.9287299412792946e-07,
             -0.3007366049331377
           ],
           "max": [
@@ -7049,7 +7577,7 @@
         "sceneBounds": {
           "min": [
             -0.27717025034556975,
-            1.6684466757135863e-7,
+            1.6684466757135863e-07,
             -0.26146576886708145
           ],
           "max": [
@@ -7246,7 +7774,7 @@
         "sceneBounds": {
           "min": [
             -0.028015623753304703,
-            8.058403671695052e-8,
+            8.058403671695052e-08,
             0
           ],
           "max": [
@@ -7427,7 +7955,7 @@
         "sceneBounds": {
           "min": [
             -0.11081486042996236,
-            6.707403671715739e-8,
+            6.707403671715739e-08,
             -0.07517947711033937
           ],
           "max": [
@@ -7609,7 +8137,7 @@
         "sceneBounds": {
           "min": [
             -1.4621377301266212,
-            3.580420662382955e-7,
+            3.580420662382955e-07,
             -1.4812792015108873
           ],
           "max": [
@@ -7786,7 +8314,7 @@
         "sceneBounds": {
           "min": [
             -0.6047877970366387,
-            -2.2516672953942773e-7,
+            -2.2516672953942773e-07,
             -0.5158274529709064
           ],
           "max": [
@@ -9911,7 +10439,7 @@
         "sceneBounds": {
           "min": [
             -0.033340621979272886,
-            -3.808693381567117e-9,
+            -3.808693381567117e-09,
             -0.0213597851462938
           ],
           "max": [
@@ -10094,7 +10622,7 @@
         "sceneBounds": {
           "min": [
             -0.13980640520154688,
-            0.0000026242183092661797,
+            2.6242183092661797e-06,
             -0.1700288205550291
           ],
           "max": [
@@ -10274,7 +10802,7 @@
         "sceneBounds": {
           "min": [
             -0.03181043020407032,
-            -6.87576252851943e-8,
+            -6.87576252851943e-08,
             -0.04689185947696253
           ],
           "max": [
@@ -10454,7 +10982,7 @@
         "sceneBounds": {
           "min": [
             -0.04143122721372912,
-            1.238326589637906e-7,
+            1.238326589637906e-07,
             -0.04800254877523719
           ],
           "max": [
@@ -10748,13 +11276,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "9130268a2d1d30de4f6f4ebf1564f2929c92867698495092845db26962a6d762",
-      "sourceSha256": "bffc515c5a45a27786d0b929c5954f7f0f08b2644358ff1eb943b3f95335ec80",
-      "outputSha256": "253b337ae08b6786344187b5ea731f201ecd4be427f221193c5a6764d9c7af0b",
-      "sourceBytes": 56328,
-      "outputBytes": 17104,
-      "gzipBytes": 13783,
-      "brotliBytes": 13439,
+      "cacheKey": "d09f5c191c9ae7f56d484a960e747f6ec6e817a87eb58ec36f5f59d2f4164392",
+      "sourceSha256": "76e9ce3dcd999820aa4239b41362fcc68b43506bee18c594fe16610abf4bf722",
+      "outputSha256": "e5013d0b9f078c5325dedee0a50319fbfda3e7c418f51d5f0b2bb99d90af9cec",
+      "sourceBytes": 57120,
+      "outputBytes": 16980,
+      "gzipBytes": 13651,
+      "brotliBytes": 13292,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -10782,12 +11310,12 @@
             0.37556374073028564
           ]
         },
-        "bufferBytes": 54644,
+        "bufferBytes": 55436,
         "logicalAccessorBytes": 12928,
         "logicalVertexBytes": 11008,
         "logicalIndexBytes": 1920,
         "geometryBufferBytes": 12928,
-        "imageBufferBytes": 41711,
+        "imageBufferBytes": 42506,
         "nodeNames": [
           "desert-prickly-pear-01",
           "desert-prickly-pear-01-mesh"
@@ -10826,12 +11354,12 @@
             0.375564575
           ]
         },
-        "bufferBytes": 23016,
+        "bufferBytes": 22892,
         "logicalAccessorBytes": 8456,
         "logicalVertexBytes": 6536,
         "logicalIndexBytes": 1920,
         "geometryBufferBytes": 8800,
-        "imageBufferBytes": 9944,
+        "imageBufferBytes": 9829,
         "nodeNames": [
           "desert-prickly-pear-01",
           "desert-prickly-pear-01-mesh"
@@ -10883,13 +11411,13 @@
         },
         "data": {
           "json": 2747,
-          "binary": 14216,
+          "binary": 14092,
           "buffers": {
-            "vertex": 3890,
+            "vertex": 3880,
             "index": 371,
             "animation": 0,
             "transform": 0,
-            "image": 9944
+            "image": 9829
           }
         }
       }
@@ -10920,13 +11448,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "99fd2c33f4e95d6ea299ce6094dca487e2488f42b35fa3d49d2c27c32dfdd1fe",
-      "sourceSha256": "374a073efe8d6f31bb47142fbe07bcc6cee74597c9589d754a72bfdcc783c2e1",
-      "outputSha256": "1a3bf65d209496154389f71ff6869cdcb26440e69cfd0e70d2874d3aef6785ec",
-      "sourceBytes": 52848,
-      "outputBytes": 40704,
-      "gzipBytes": 37947,
-      "brotliBytes": 37517,
+      "cacheKey": "b8354c92bc40853cdc4b588d36d5cf89a0d1bf099be1ace9c8ae11814873ee7a",
+      "sourceSha256": "71f7f63293cfc24d90dbc6708a9c3ce84538c806ae18b5e751eb289e3120e482",
+      "outputSha256": "910f2ec62e917e72eaa0b1069f386f4a460ce1c09965fb3a783ee3ad99825b71",
+      "sourceBytes": 53132,
+      "outputBytes": 41192,
+      "gzipBytes": 38448,
+      "brotliBytes": 37997,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -10936,30 +11464,30 @@
         "images": 2,
         "skins": 0,
         "animations": 0,
-        "triangles": 101,
-        "renderedTriangles": 101,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "AridAgave": 101
+          "AridAgave": 92
         },
         "sceneBounds": {
           "min": [
             -0.7288585901260376,
-            0.029999999329447746,
+            0.019999999552965164,
             -0.7212832570075989
           ],
           "max": [
-            0.741965651512146,
-            1.5199999809265137,
+            0.7534458041191101,
+            0.38700687885284424,
             0.7220276594161987
           ]
         },
-        "bufferBytes": 51140,
-        "logicalAccessorBytes": 5182,
-        "logicalVertexBytes": 4576,
-        "logicalIndexBytes": 606,
-        "geometryBufferBytes": 5182,
-        "imageBufferBytes": 45952,
+        "bufferBytes": 51420,
+        "logicalAccessorBytes": 4968,
+        "logicalVertexBytes": 4416,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 4968,
+        "imageBufferBytes": 46449,
         "nodeNames": [
           "desert-agave-01",
           "desert-agave-01-mesh"
@@ -10980,30 +11508,30 @@
         "images": 2,
         "skins": 0,
         "animations": 0,
-        "triangles": 101,
-        "renderedTriangles": 101,
+        "triangles": 92,
+        "renderedTriangles": 92,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "AridAgave": 101
+          "AridAgave": 92
         },
         "sceneBounds": {
           "min": [
             -0.728851318,
-            0.029999733,
+            0.0200004578,
             -0.721282959
           ],
           "max": [
-            0.741973877,
-            1.52001953,
+            0.753448486,
+            0.387008667,
             0.722015381
           ]
         },
-        "bufferBytes": 41284,
-        "logicalAccessorBytes": 3323,
-        "logicalVertexBytes": 2717,
-        "logicalIndexBytes": 606,
-        "geometryBufferBytes": 3466,
-        "imageBufferBytes": 35879,
+        "bufferBytes": 41612,
+        "logicalAccessorBytes": 3174,
+        "logicalVertexBytes": 2622,
+        "logicalIndexBytes": 552,
+        "geometryBufferBytes": 3312,
+        "imageBufferBytes": 36424,
         "nodeNames": [
           "desert-agave-01",
           "desert-agave-01-mesh"
@@ -11036,8 +11564,8 @@
         "infos": 4,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 143,
-        "triangles": 101
+        "vertices": 138,
+        "triangles": 92
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -11051,17 +11579,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 101
+          "triangleCount": 92
         },
         "data": {
-          "json": 2746,
-          "binary": 37816,
+          "json": 2750,
+          "binary": 38300,
           "buffers": {
-            "vertex": 1802,
-            "index": 121,
+            "vertex": 1752,
+            "index": 109,
             "animation": 0,
             "transform": 0,
-            "image": 35879
+            "image": 36424
           }
         }
       }
@@ -11092,13 +11620,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "00e8c51fe94621fa9ddbe60eae5c970e089e1e5dbdf0f03d182c6b32c85babf9",
-      "sourceSha256": "bad4000fe68fb318c5cfe64e8486239ce7f796049b71389e9634a4a40e912c2f",
-      "outputSha256": "e0977530e2d8929a2cc4d528b1a4b8b304dc4d1ac6a8af56c0e52c97cf094ddc",
-      "sourceBytes": 45656,
-      "outputBytes": 33856,
-      "gzipBytes": 31907,
-      "brotliBytes": 31503,
+      "cacheKey": "41dfda5858999ac4550bd0a2acbc5e5b4e2062d6ad96224d248872ff28477290",
+      "sourceSha256": "ec78524d316f0bd7e1fa1dac249497b82d2534c9ad2b2409712f92f1d9cfa2eb",
+      "outputSha256": "cab2c15b0624e28231f5f57b4402d772b721098cc36d20df8b85a972a13bae1b",
+      "sourceBytes": 45936,
+      "outputBytes": 34476,
+      "gzipBytes": 32557,
+      "brotliBytes": 32118,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11126,12 +11654,12 @@
             0.5575366020202637
           ]
         },
-        "bufferBytes": 44120,
-        "logicalAccessorBytes": 6080,
-        "logicalVertexBytes": 5312,
+        "bufferBytes": 44400,
+        "logicalAccessorBytes": 6144,
+        "logicalVertexBytes": 5376,
         "logicalIndexBytes": 768,
-        "geometryBufferBytes": 6080,
-        "imageBufferBytes": 38040,
+        "geometryBufferBytes": 6144,
+        "imageBufferBytes": 38256,
         "nodeNames": [
           "desert-sagebrush-01",
           "desert-sagebrush-01-mesh"
@@ -11170,12 +11698,12 @@
             0.557525635
           ]
         },
-        "bufferBytes": 35344,
+        "bufferBytes": 35964,
         "logicalAccessorBytes": 3922,
         "logicalVertexBytes": 3154,
         "logicalIndexBytes": 768,
         "geometryBufferBytes": 4088,
-        "imageBufferBytes": 29020,
+        "imageBufferBytes": 29628,
         "nodeNames": [
           "desert-sagebrush-01",
           "desert-sagebrush-01-mesh"
@@ -11225,13 +11753,13 @@
         },
         "data": {
           "json": 2457,
-          "binary": 31256,
+          "binary": 31876,
           "buffers": {
-            "vertex": 2078,
+            "vertex": 2088,
             "index": 155,
             "animation": 0,
             "transform": 0,
-            "image": 29020
+            "image": 29628
           }
         }
       }
@@ -11262,13 +11790,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "9fd8524e358c3fa03b25b1ada34ce707001c39a2d2b2cba144d0a9a3e4f8793e",
-      "sourceSha256": "5463b1c32b16805391f238185b0777650362f4ac14cd69fcb3a0ee041ff34b0a",
-      "outputSha256": "b99d1cd6e15177be15384d3d5324a022f38212a57443e600c4af1045e3c7b5fe",
-      "sourceBytes": 78492,
-      "outputBytes": 19280,
-      "gzipBytes": 16701,
-      "brotliBytes": 16299,
+      "cacheKey": "151c21eff8fb61a0776a324eb59cf42943b933e2c4518da034e928fbec84321c",
+      "sourceSha256": "ad4d97d7dc695cc52091c35821c17d18f3d0a0192f547e0f65cf949f2b3425e0",
+      "outputSha256": "b7c130a7937802d4186dbef567aa700c7bcf8ea4650ae33d0b8a7d5202a45e7d",
+      "sourceBytes": 75196,
+      "outputBytes": 18680,
+      "gzipBytes": 16077,
+      "brotliBytes": 15668,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11296,12 +11824,12 @@
             0.43293458223342896
           ]
         },
-        "bufferBytes": 76796,
+        "bufferBytes": 73500,
         "logicalAccessorBytes": 5858,
         "logicalVertexBytes": 4736,
         "logicalIndexBytes": 1122,
         "geometryBufferBytes": 5858,
-        "imageBufferBytes": 70934,
+        "imageBufferBytes": 67636,
         "nodeNames": [
           "badlands-deadwood-01",
           "badlands-deadwood-01-mesh"
@@ -11340,12 +11868,12 @@
             0.432937622
           ]
         },
-        "bufferBytes": 20464,
+        "bufferBytes": 19864,
         "logicalAccessorBytes": 3934,
         "logicalVertexBytes": 2812,
         "logicalIndexBytes": 1122,
         "geometryBufferBytes": 4082,
-        "imageBufferBytes": 14383,
+        "imageBufferBytes": 13785,
         "nodeNames": [
           "badlands-deadwood-01",
           "badlands-deadwood-01-mesh"
@@ -11397,13 +11925,13 @@
         },
         "data": {
           "json": 2757,
-          "binary": 16380,
+          "binary": 15780,
           "buffers": {
             "vertex": 1763,
             "index": 223,
             "animation": 0,
             "transform": 0,
-            "image": 14383
+            "image": 13785
           }
         }
       }
@@ -11434,13 +11962,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "f7aca23b29c71135bef71ec4bf3f96d0ce3b39868743785939201de50bdedf2b",
-      "sourceSha256": "5d9d746d0504bd1aeb7fca51050e839dd6cad55cb507eecc98b324b56bd71069",
-      "outputSha256": "766d9f13e94fdf7fe55286cbfb4409993f971aa44a9ff03a123d60b406d0d781",
-      "sourceBytes": 24536,
-      "outputBytes": 24888,
-      "gzipBytes": 22930,
-      "brotliBytes": 22553,
+      "cacheKey": "40ff7c4235fee1b29ff24901bb0f71f6155a1456680b73a8087708f6dc17122d",
+      "sourceSha256": "0d8eea22630502fe096eac6e2de6a8aaed998ba423fcc385a7d454e83b7ee395",
+      "outputSha256": "c9224c75913b7acc3a98617a913cd3444f9407bfa52a8dcda2ec72b0847eafb6",
+      "sourceBytes": 24276,
+      "outputBytes": 25336,
+      "gzipBytes": 23398,
+      "brotliBytes": 23002,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11468,12 +11996,12 @@
             0.6205623149871826
           ]
         },
-        "bufferBytes": 23016,
+        "bufferBytes": 22756,
         "logicalAccessorBytes": 4320,
         "logicalVertexBytes": 3840,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 4320,
-        "imageBufferBytes": 18695,
+        "imageBufferBytes": 18434,
         "nodeNames": [
           "savanna-aloe-01",
           "savanna-aloe-01-mesh"
@@ -11512,12 +12040,12 @@
             0.620574951
           ]
         },
-        "bufferBytes": 25200,
+        "bufferBytes": 25648,
         "logicalAccessorBytes": 2760,
         "logicalVertexBytes": 2280,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 2880,
-        "imageBufferBytes": 20709,
+        "imageBufferBytes": 21119,
         "nodeNames": [
           "savanna-aloe-01",
           "savanna-aloe-01-mesh"
@@ -11567,13 +12095,13 @@
         },
         "data": {
           "json": 2427,
-          "binary": 22320,
+          "binary": 22768,
           "buffers": {
-            "vertex": 1505,
+            "vertex": 1544,
             "index": 97,
             "animation": 0,
             "transform": 0,
-            "image": 20709
+            "image": 21119
           }
         }
       }
@@ -11604,13 +12132,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "9639906ccc493136ccd772adf6bc072237874b450c9b122e97880bb5e9a58586",
-      "sourceSha256": "a18fdfaa64256c77404af1ce7c588f116cb2a8c47b6e269054017bc830056baf",
-      "outputSha256": "72d914243df9aed84a0f9fd1a70f308e5d7271cad5047210a8afdd5fc50f2ed3",
-      "sourceBytes": 27440,
-      "outputBytes": 26280,
-      "gzipBytes": 24301,
-      "brotliBytes": 23924,
+      "cacheKey": "c312c3c79e016d11011a3fbf8a0e9d60a4703d0dddc47ac917a8261add8081e7",
+      "sourceSha256": "dcc0e9667365f8c03e19bd0b45d5863b479031214b9d8fba985fb2fae64f5474",
+      "outputSha256": "a17aef8d60cc90be7a5f5071172b270ea16313c5be28a173cbbd039c831ff965",
+      "sourceBytes": 27548,
+      "outputBytes": 26356,
+      "gzipBytes": 24436,
+      "brotliBytes": 24051,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11638,12 +12166,12 @@
             0.6326805949211121
           ]
         },
-        "bufferBytes": 25916,
-        "logicalAccessorBytes": 4320,
-        "logicalVertexBytes": 3840,
+        "bufferBytes": 26020,
+        "logicalAccessorBytes": 4928,
+        "logicalVertexBytes": 4448,
         "logicalIndexBytes": 480,
-        "geometryBufferBytes": 4320,
-        "imageBufferBytes": 21593,
+        "geometryBufferBytes": 4928,
+        "imageBufferBytes": 21092,
         "nodeNames": [
           "meadow-lupine-01",
           "meadow-lupine-01-mesh"
@@ -11682,12 +12210,12 @@
             0.63269043
           ]
         },
-        "bufferBytes": 26588,
+        "bufferBytes": 26664,
         "logicalAccessorBytes": 2760,
         "logicalVertexBytes": 2280,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 2880,
-        "imageBufferBytes": 22150,
+        "imageBufferBytes": 22159,
         "nodeNames": [
           "meadow-lupine-01",
           "meadow-lupine-01-mesh"
@@ -11736,14 +12264,14 @@
           "triangleCount": 80
         },
         "data": {
-          "json": 2430,
-          "binary": 23708,
+          "json": 2431,
+          "binary": 23784,
           "buffers": {
-            "vertex": 1455,
-            "index": 97,
+            "vertex": 1510,
+            "index": 109,
             "animation": 0,
             "transform": 0,
-            "image": 22150
+            "image": 22159
           }
         }
       }
@@ -11774,13 +12302,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "2e4132934c7edd465ce18ca8cd40a9fb47918db7611034a1a80f459ac6c25bc8",
-      "sourceSha256": "53371d290359790929f781e6ef0a0c2fa03a725cfd350d77111e7de0e304d8c2",
-      "outputSha256": "a82e09d44c07f31d9ec1c9826dac8b8eedaf7a35118d8dc2fa65483bd712ae90",
-      "sourceBytes": 38532,
-      "outputBytes": 33048,
-      "gzipBytes": 31160,
-      "brotliBytes": 30714,
+      "cacheKey": "26a8b345cdd035cb29f87b0e4b15bc0f38b978475521fa556e582e20a22a50a8",
+      "sourceSha256": "d6914b7fb0c6267f0b45b0da446a22ad38a8af909f9486abc8eeb2c136693f1c",
+      "outputSha256": "296e084c0d4da709954cb0df369821331cb711cd399592a8551e4b85479bf112",
+      "sourceBytes": 38148,
+      "outputBytes": 32940,
+      "gzipBytes": 31079,
+      "brotliBytes": 30684,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11808,12 +12336,12 @@
             0.7460335493087769
           ]
         },
-        "bufferBytes": 37004,
+        "bufferBytes": 36620,
         "logicalAccessorBytes": 3888,
         "logicalVertexBytes": 3456,
         "logicalIndexBytes": 432,
         "geometryBufferBytes": 3888,
-        "imageBufferBytes": 33113,
+        "imageBufferBytes": 32732,
         "nodeNames": [
           "meadow-heather-01",
           "meadow-heather-01-mesh"
@@ -11852,12 +12380,12 @@
             0.746032715
           ]
         },
-        "bufferBytes": 33060,
+        "bufferBytes": 32952,
         "logicalAccessorBytes": 2484,
         "logicalVertexBytes": 2052,
         "logicalIndexBytes": 432,
         "geometryBufferBytes": 2592,
-        "imageBufferBytes": 29104,
+        "imageBufferBytes": 28911,
         "nodeNames": [
           "meadow-heather-01",
           "meadow-heather-01-mesh"
@@ -11907,13 +12435,13 @@
         },
         "data": {
           "json": 2436,
-          "binary": 30468,
+          "binary": 30360,
           "buffers": {
-            "vertex": 1266,
+            "vertex": 1350,
             "index": 89,
             "animation": 0,
             "transform": 0,
-            "image": 29104
+            "image": 28911
           }
         }
       }
@@ -11944,13 +12472,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "6ec7d70d391d256966401142e799c4371856871afc0049173f75e04b305ddef3",
-      "sourceSha256": "e37b78a2c0919f20349ac7c8ae400dc6da1a4d4a98f8ce150f90158144bd0b8a",
-      "outputSha256": "f741913d25e3951317ed0081f5cabf5853233b7f2f3e9e84722cb62cc890b088",
-      "sourceBytes": 56996,
-      "outputBytes": 43200,
-      "gzipBytes": 40601,
-      "brotliBytes": 40200,
+      "cacheKey": "6b7ff5d03f483ea69a0eb63ea2225534795f97e10a125a449b0eb77414aeacea",
+      "sourceSha256": "92356d4e76439ae095895d8c59643b317871bb19785e571a788f89ff1f7d1e80",
+      "outputSha256": "238a6530e3376ec40b1791bd174dbd05d6cca331d9b1b4e327735d82b9733329",
+      "sourceBytes": 57336,
+      "outputBytes": 43532,
+      "gzipBytes": 40958,
+      "brotliBytes": 40507,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -11978,12 +12506,12 @@
             0.4428955018520355
           ]
         },
-        "bufferBytes": 55236,
+        "bufferBytes": 55576,
         "logicalAccessorBytes": 3168,
         "logicalVertexBytes": 2688,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 3168,
-        "imageBufferBytes": 52065,
+        "imageBufferBytes": 52406,
         "nodeNames": [
           "meadow-thistle-stone-01",
           "meadow-thistle-stone-01-mesh"
@@ -12022,12 +12550,12 @@
             0.442901611
           ]
         },
-        "bufferBytes": 42408,
+        "bufferBytes": 42740,
         "logicalAccessorBytes": 2076,
         "logicalVertexBytes": 1596,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 2160,
-        "imageBufferBytes": 39040,
+        "imageBufferBytes": 39312,
         "nodeNames": [
           "meadow-thistle-stone-01",
           "meadow-thistle-stone-01-mesh"
@@ -12079,13 +12607,13 @@
         },
         "data": {
           "json": 2809,
-          "binary": 40248,
+          "binary": 40580,
           "buffers": {
-            "vertex": 1096,
+            "vertex": 1159,
             "index": 97,
             "animation": 0,
             "transform": 0,
-            "image": 39040
+            "image": 39312
           }
         }
       }
@@ -12116,13 +12644,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "28af3b07976a914a3976ca52cdd461b83c34edfa470d315981d92703ac2e6558",
-      "sourceSha256": "7d79dec92a48adbed1fc55de9a5d0663176586bc9bf9d26fa640921178632f9d",
-      "outputSha256": "30c7655964e338fc89b986ee290771e2609e79becb74c9f2c99e7b17ac1997d5",
-      "sourceBytes": 28020,
-      "outputBytes": 38816,
-      "gzipBytes": 36897,
-      "brotliBytes": 36478,
+      "cacheKey": "b382e1a432d04c29cd72a1018779ee1a395c63f1516164be37fe526cdb3d5d64",
+      "sourceSha256": "8ed5b45c05a7fe4f768ff41add17d499ae8ba8bcb105d34322b694e15b2f13ed",
+      "outputSha256": "48ae4de452b7f795c91007f3aa8662005e1e7a8c5de35bac5dfb1b6d762825d3",
+      "sourceBytes": 28400,
+      "outputBytes": 40124,
+      "gzipBytes": 38176,
+      "brotliBytes": 37751,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12150,12 +12678,12 @@
             0.7934929132461548
           ]
         },
-        "bufferBytes": 26492,
+        "bufferBytes": 26872,
         "logicalAccessorBytes": 3240,
         "logicalVertexBytes": 2880,
         "logicalIndexBytes": 360,
         "geometryBufferBytes": 3240,
-        "imageBufferBytes": 23251,
+        "imageBufferBytes": 23629,
         "nodeNames": [
           "forest-bracken-01",
           "forest-bracken-01-mesh"
@@ -12194,12 +12722,12 @@
             0.793487549
           ]
         },
-        "bufferBytes": 38416,
+        "bufferBytes": 39724,
         "logicalAccessorBytes": 2070,
         "logicalVertexBytes": 1710,
         "logicalIndexBytes": 360,
         "geometryBufferBytes": 2160,
-        "imageBufferBytes": 34963,
+        "imageBufferBytes": 36270,
         "nodeNames": [
           "forest-bracken-01",
           "forest-bracken-01-mesh"
@@ -12249,13 +12777,13 @@
         },
         "data": {
           "json": 2419,
-          "binary": 36256,
+          "binary": 37564,
           "buffers": {
             "vertex": 1208,
             "index": 77,
             "animation": 0,
             "transform": 0,
-            "image": 34963
+            "image": 36270
           }
         }
       }
@@ -12286,13 +12814,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "74f9e3463afd3b109bb32fe4d0f71c8dcedf424149389b07a811ee351ae37f3b",
-      "sourceSha256": "abed1912ab3b6d7e1b6769de0cc9c18521638cf7277317e2d64a4ffd9c17c9f0",
-      "outputSha256": "feee8a162873512f3193463945f740304cbd2da0c6b1aa44be4cd15833a19a92",
-      "sourceBytes": 71200,
-      "outputBytes": 19444,
-      "gzipBytes": 16400,
-      "brotliBytes": 16034,
+      "cacheKey": "67e6b34aab28c62579682476f5e493d961cece7db5b57abf611b294bee494c0c",
+      "sourceSha256": "393b1be75d0c3913a149b7fe56cf1f5f2f703b9423d356f19f3bf2f56eceb57c",
+      "outputSha256": "ae0d60d597211907dc61b423c935f85f698536e37276b05c209d05fd940b607f",
+      "sourceBytes": 73032,
+      "outputBytes": 18944,
+      "gzipBytes": 15906,
+      "brotliBytes": 15511,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12320,12 +12848,12 @@
             0.41277509927749634
           ]
         },
-        "bufferBytes": 69508,
+        "bufferBytes": 71340,
         "logicalAccessorBytes": 10526,
         "logicalVertexBytes": 8960,
         "logicalIndexBytes": 1566,
         "geometryBufferBytes": 10526,
-        "imageBufferBytes": 58977,
+        "imageBufferBytes": 60808,
         "nodeNames": [
           "forest-mushrooms-01",
           "forest-mushrooms-01-mesh"
@@ -12364,12 +12892,12 @@
             0.412780762
           ]
         },
-        "bufferBytes": 23712,
+        "bufferBytes": 23212,
         "logicalAccessorBytes": 6886,
         "logicalVertexBytes": 5320,
         "logicalIndexBytes": 1566,
         "geometryBufferBytes": 7166,
-        "imageBufferBytes": 13137,
+        "imageBufferBytes": 12609,
         "nodeNames": [
           "forest-mushrooms-01",
           "forest-mushrooms-01-mesh"
@@ -12421,13 +12949,13 @@
         },
         "data": {
           "json": 2758,
-          "binary": 16544,
+          "binary": 16044,
           "buffers": {
-            "vertex": 3112,
+            "vertex": 3138,
             "index": 287,
             "animation": 0,
             "transform": 0,
-            "image": 13137
+            "image": 12609
           }
         }
       }
@@ -12458,13 +12986,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "67c661082bf4621cc5e484be324e3e98b7c724924bdce8fb004ba71a34fdbc71",
-      "sourceSha256": "625aa51610610c6ee15ceb21abecbc23a360e975a0c9e03adcf76acda59bbb71",
-      "outputSha256": "24fb1cca8d59a489738f497d4e6d8de05960858d8fcdce06ca18fc72f11ab38e",
-      "sourceBytes": 83652,
-      "outputBytes": 23300,
-      "gzipBytes": 20374,
-      "brotliBytes": 19976,
+      "cacheKey": "7faa2e28acabdc2ff440337d61fcf7d2441e9952534ec2bcdcdba95edaefc531",
+      "sourceSha256": "e8f02276a2876f954a20c45c3dcc253b6a8f3a7e0a36fee358daad81269cdbc8",
+      "outputSha256": "2996e48864067329cbf9abe5612a8ff6e0424f4eeb6f103d4511e214bc8049f5",
+      "sourceBytes": 83380,
+      "outputBytes": 22792,
+      "gzipBytes": 19933,
+      "brotliBytes": 19521,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12492,12 +13020,12 @@
             0.3742277920246124
           ]
         },
-        "bufferBytes": 81964,
+        "bufferBytes": 81692,
         "logicalAccessorBytes": 7620,
         "logicalVertexBytes": 6432,
         "logicalIndexBytes": 1188,
         "geometryBufferBytes": 7620,
-        "imageBufferBytes": 74339,
+        "imageBufferBytes": 74068,
         "nodeNames": [
           "forest-birch-log-01",
           "forest-birch-log-01-mesh"
@@ -12536,12 +13064,12 @@
             0.374221802
           ]
         },
-        "bufferBytes": 25636,
+        "bufferBytes": 25128,
         "logicalAccessorBytes": 5007,
         "logicalVertexBytes": 3819,
         "logicalIndexBytes": 1188,
         "geometryBufferBytes": 5208,
-        "imageBufferBytes": 17929,
+        "imageBufferBytes": 17411,
         "nodeNames": [
           "forest-birch-log-01",
           "forest-birch-log-01-mesh"
@@ -12593,13 +13121,13 @@
         },
         "data": {
           "json": 2728,
-          "binary": 20428,
+          "binary": 19920,
           "buffers": {
-            "vertex": 2254,
+            "vertex": 2263,
             "index": 237,
             "animation": 0,
             "transform": 0,
-            "image": 17929
+            "image": 17411
           }
         }
       }
@@ -12630,13 +13158,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "23c4030bedeedea62f29aa22ad49d95ea46c91182cfc2e666ea76f4553964417",
-      "sourceSha256": "83125a6793e9057166c198fb4fd3c33e83ea3f3ad3d8d62be8582c34bd2d2c04",
-      "outputSha256": "1ddf8ce07ea2312cc2160e31dadeabf956d2d398a620ac0bb27580f0402ca433",
-      "sourceBytes": 43324,
-      "outputBytes": 34136,
-      "gzipBytes": 32218,
-      "brotliBytes": 31792,
+      "cacheKey": "215bf9cfe195695c3a587be5bec82c8b66aed36e7a65f9e1ebbcfc6aea8554ef",
+      "sourceSha256": "0bff63cd2c96cd938fe5035e244934fc20a09af6c3c62b91d73cee1e583fc26c",
+      "outputSha256": "7d457d41821a4dfb813580ad5fdb03b92a14a90f88c5f58e3980d2f1c93d3768",
+      "sourceBytes": 45484,
+      "outputBytes": 34588,
+      "gzipBytes": 32700,
+      "brotliBytes": 32240,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12664,12 +13192,12 @@
             0.9006168246269226
           ]
         },
-        "bufferBytes": 41764,
+        "bufferBytes": 43924,
         "logicalAccessorBytes": 6144,
         "logicalVertexBytes": 5376,
         "logicalIndexBytes": 768,
         "geometryBufferBytes": 6144,
-        "imageBufferBytes": 35620,
+        "imageBufferBytes": 37778,
         "nodeNames": [
           "forest-berry-bramble-01",
           "forest-berry-bramble-01-mesh"
@@ -12708,12 +13236,12 @@
             0.900604248
           ]
         },
-        "bufferBytes": 35672,
+        "bufferBytes": 36124,
         "logicalAccessorBytes": 3960,
         "logicalVertexBytes": 3192,
         "logicalIndexBytes": 768,
         "geometryBufferBytes": 4128,
-        "imageBufferBytes": 29388,
+        "imageBufferBytes": 29829,
         "nodeNames": [
           "forest-berry-bramble-01",
           "forest-berry-bramble-01-mesh"
@@ -12763,13 +13291,13 @@
         },
         "data": {
           "json": 2451,
-          "binary": 31544,
+          "binary": 31996,
           "buffers": {
-            "vertex": 1996,
+            "vertex": 2001,
             "index": 153,
             "animation": 0,
             "transform": 0,
-            "image": 29388
+            "image": 29829
           }
         }
       }
@@ -12800,13 +13328,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "968c9ea637407eb77dce16a3dbd42bd206db2ab7c86962ee59574bf578af08aa",
-      "sourceSha256": "8870d9227fc603eacabb18f2a731ce6fa69cfccf8de9737dd2e807b6d70a354c",
-      "outputSha256": "2341c6f8fdfb60c93c299772893a3fcf1823f2a0b8eee230241f22680fe63711",
-      "sourceBytes": 28064,
-      "outputBytes": 25252,
-      "gzipBytes": 23163,
-      "brotliBytes": 22778,
+      "cacheKey": "2620754b1c7ea1332a0791a5c259618336eabfd83bc71ed78b47dc6ecf2d9120",
+      "sourceSha256": "10e1dd0095660944839ed6f593767a6b58faa338284b039acc4cf10c2748d3e3",
+      "outputSha256": "6949e34ff240c6c8974473fee75c3647710c473e3000df87ebefe6b5ecc4a936",
+      "sourceBytes": 29092,
+      "outputBytes": 26048,
+      "gzipBytes": 23958,
+      "brotliBytes": 23529,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -12834,12 +13362,12 @@
             0.7775568962097168
           ]
         },
-        "bufferBytes": 26516,
+        "bufferBytes": 27544,
         "logicalAccessorBytes": 4320,
         "logicalVertexBytes": 3840,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 4320,
-        "imageBufferBytes": 22193,
+        "imageBufferBytes": 23222,
         "nodeNames": [
           "tropical-bromeliad-01",
           "tropical-bromeliad-01-mesh"
@@ -12878,12 +13406,12 @@
             0.777557373
           ]
         },
-        "bufferBytes": 25536,
+        "bufferBytes": 26332,
         "logicalAccessorBytes": 2760,
         "logicalVertexBytes": 2280,
         "logicalIndexBytes": 480,
         "geometryBufferBytes": 2880,
-        "imageBufferBytes": 20951,
+        "imageBufferBytes": 21743,
         "nodeNames": [
           "tropical-bromeliad-01",
           "tropical-bromeliad-01-mesh"
@@ -12933,13 +13461,13 @@
         },
         "data": {
           "json": 2454,
-          "binary": 22656,
+          "binary": 23452,
           "buffers": {
-            "vertex": 1598,
+            "vertex": 1603,
             "index": 97,
             "animation": 0,
             "transform": 0,
-            "image": 20951
+            "image": 21743
           }
         }
       }
@@ -12970,13 +13498,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "f5d55ff9c4c8d090a950381b614bc13d45b8e7f202933fcaa294fd6ed9058d03",
-      "sourceSha256": "12fbad0b2ec9c9151475df8c38961f04ca1613d5a2f68b25d015cfcc5d3482fa",
-      "outputSha256": "12e11b2d1c4052ebbafc6f3e7d8e0e53aef6e7d5bf3a032b852c21211843f819",
-      "sourceBytes": 27484,
-      "outputBytes": 22280,
-      "gzipBytes": 20195,
-      "brotliBytes": 19840,
+      "cacheKey": "0c1a7a12019bfe259865480be02890d020e12dd7d56dd7018a20b2bc5219775b",
+      "sourceSha256": "47e1c30c64b6f6bf66fee0a562ec62d02970d67a4d7a09f57baad47f0d5aee11",
+      "outputSha256": "550d3533bb36367268ff695a579ddd68a53baa22bdfa0c417ad7a9268b7f77bb",
+      "sourceBytes": 27768,
+      "outputBytes": 23564,
+      "gzipBytes": 21564,
+      "brotliBytes": 21223,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13004,12 +13532,12 @@
             1.033773422241211
           ]
         },
-        "bufferBytes": 25936,
+        "bufferBytes": 26220,
         "logicalAccessorBytes": 3672,
         "logicalVertexBytes": 3264,
         "logicalIndexBytes": 408,
         "geometryBufferBytes": 3672,
-        "imageBufferBytes": 22264,
+        "imageBufferBytes": 22548,
         "nodeNames": [
           "tropical-heliconia-01",
           "tropical-heliconia-01-mesh"
@@ -13048,12 +13576,12 @@
             1.03375244
           ]
         },
-        "bufferBytes": 22136,
+        "bufferBytes": 23420,
         "logicalAccessorBytes": 2346,
         "logicalVertexBytes": 1938,
         "logicalIndexBytes": 408,
         "geometryBufferBytes": 2448,
-        "imageBufferBytes": 18248,
+        "imageBufferBytes": 19514,
         "nodeNames": [
           "tropical-heliconia-01",
           "tropical-heliconia-01-mesh"
@@ -13103,13 +13631,13 @@
         },
         "data": {
           "json": 2450,
-          "binary": 19688,
+          "binary": 20972,
           "buffers": {
-            "vertex": 1348,
+            "vertex": 1363,
             "index": 85,
             "animation": 0,
             "transform": 0,
-            "image": 18248
+            "image": 19514
           }
         }
       }
@@ -13140,13 +13668,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "f1e061c7cb7e9d3f2c9d42caabada234439e29412b2c902787c1ccf9ae2196c7",
-      "sourceSha256": "b33fd9265aeca96f16d975a0453c68b976016ece0aa738e64abf0e2cb8c257ef",
-      "outputSha256": "60ad53407e895d646c11d232d3511365dab972656b46e25b05b128a1b4878681",
-      "sourceBytes": 14792,
-      "outputBytes": 19756,
-      "gzipBytes": 17838,
-      "brotliBytes": 17476,
+      "cacheKey": "773d2a65f3898db3d41cf21013d2b3c99bceb899ff5f4423cf1c582d6869f33c",
+      "sourceSha256": "a8aac11705310ac5c7d14623e0d90fa831674e6e024d609284a82ceb1adb79f6",
+      "outputSha256": "dcb32cdc3483c225a347957f9da6c5bc4b5a9c4d5160ec6f2e0eb6ee97c3510f",
+      "sourceBytes": 14720,
+      "outputBytes": 20152,
+      "gzipBytes": 18244,
+      "brotliBytes": 17873,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13174,12 +13702,12 @@
             0.7774530649185181
           ]
         },
-        "bufferBytes": 13252,
+        "bufferBytes": 13180,
         "logicalAccessorBytes": 3024,
         "logicalVertexBytes": 2688,
         "logicalIndexBytes": 336,
         "geometryBufferBytes": 3024,
-        "imageBufferBytes": 10226,
+        "imageBufferBytes": 10156,
         "nodeNames": [
           "tropical-monstera-01",
           "tropical-monstera-01-mesh"
@@ -13218,12 +13746,12 @@
             0.77746582
           ]
         },
-        "bufferBytes": 19200,
+        "bufferBytes": 19596,
         "logicalAccessorBytes": 1932,
         "logicalVertexBytes": 1596,
         "logicalIndexBytes": 336,
         "geometryBufferBytes": 2016,
-        "imageBufferBytes": 15951,
+        "imageBufferBytes": 16350,
         "nodeNames": [
           "tropical-monstera-01",
           "tropical-monstera-01-mesh"
@@ -13273,13 +13801,13 @@
         },
         "data": {
           "json": 2430,
-          "binary": 17184,
+          "binary": 17580,
           "buffers": {
-            "vertex": 1150,
+            "vertex": 1151,
             "index": 73,
             "animation": 0,
             "transform": 0,
-            "image": 15951
+            "image": 16350
           }
         }
       }
@@ -13310,13 +13838,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "e180d5164971a55edb94707a64229c0d40a84fa32e0fae02a666f6229940c56d",
-      "sourceSha256": "b96a9e81e0bc8fa37d63c7c7da16895c079ad901d6ff0bce1fd9e15f4c71ea7b",
-      "outputSha256": "934757d95630f232d56d070b69435bb92cb230dc0beb0b319abab5355fde4f03",
-      "sourceBytes": 59308,
-      "outputBytes": 45124,
-      "gzipBytes": 42473,
-      "brotliBytes": 42076,
+      "cacheKey": "866638f58c8b39513e065404acff0cc787f4d91395fbf8bee2b4babcb886bce5",
+      "sourceSha256": "60149f98b8d2fb5ff19b8f9e1ad9d2d3cd420a9fa04e849a3e6dea2398c25909",
+      "outputSha256": "c480ea8c9f8684f6ec032003d4b09237b30fbae61f1703259644d13927310a8b",
+      "sourceBytes": 59732,
+      "outputBytes": 45540,
+      "gzipBytes": 42934,
+      "brotliBytes": 42497,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13344,12 +13872,12 @@
             0.6094289422035217
           ]
         },
-        "bufferBytes": 57584,
+        "bufferBytes": 58008,
         "logicalAccessorBytes": 4488,
         "logicalVertexBytes": 3648,
         "logicalIndexBytes": 840,
         "geometryBufferBytes": 4488,
-        "imageBufferBytes": 53094,
+        "imageBufferBytes": 53516,
         "nodeNames": [
           "taiga-berry-moss-01",
           "taiga-berry-moss-01-mesh"
@@ -13388,12 +13916,12 @@
             0.609436035
           ]
         },
-        "bufferBytes": 45316,
+        "bufferBytes": 45732,
         "logicalAccessorBytes": 3006,
         "logicalVertexBytes": 2166,
         "logicalIndexBytes": 840,
         "geometryBufferBytes": 3120,
-        "imageBufferBytes": 40564,
+        "imageBufferBytes": 40955,
         "nodeNames": [
           "taiga-berry-moss-01",
           "taiga-berry-moss-01-mesh"
@@ -13445,13 +13973,13 @@
         },
         "data": {
           "json": 2784,
-          "binary": 42196,
+          "binary": 42612,
           "buffers": {
-            "vertex": 1463,
+            "vertex": 1484,
             "index": 163,
             "animation": 0,
             "transform": 0,
-            "image": 40564
+            "image": 40955
           }
         }
       }
@@ -13482,13 +14010,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "0b8c513ec1213dbe04bb092235ba4e5bcad787332be30a719f2bc12fa9c546e8",
-      "sourceSha256": "604d0dbef2ddd99f46b8831dcbc3199891f2ccdef7f575ece6d48b9eb5fca7a4",
-      "outputSha256": "3de6244c29f87c03b353c7efae29af5de0469ecee9a7f1c45cc7a971268b7e95",
-      "sourceBytes": 72272,
-      "outputBytes": 18448,
-      "gzipBytes": 15866,
-      "brotliBytes": 15492,
+      "cacheKey": "dbb310dfb76576b917e5f00556ead13fdac6c8fd71ace2ae994151cad74580ec",
+      "sourceSha256": "9b858c7bd84da5d3f3e5b8e3769282b46a19016f19092c6526999fc3aef3a99c",
+      "outputSha256": "03c3936c5a2b8f1ae9573d219cf6ccb9e2ecca6b1a0b53df15fbbe7120d5358e",
+      "sourceBytes": 72780,
+      "outputBytes": 18412,
+      "gzipBytes": 15832,
+      "brotliBytes": 15432,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13516,12 +14044,12 @@
             0.4359876215457916
           ]
         },
-        "bufferBytes": 70596,
+        "bufferBytes": 71104,
         "logicalAccessorBytes": 5668,
         "logicalVertexBytes": 4576,
         "logicalIndexBytes": 1092,
         "geometryBufferBytes": 5668,
-        "imageBufferBytes": 64925,
+        "imageBufferBytes": 65434,
         "nodeNames": [
           "taiga-deadfall-01",
           "taiga-deadfall-01-mesh"
@@ -13560,12 +14088,12 @@
             0.43598938
           ]
         },
-        "bufferBytes": 19512,
+        "bufferBytes": 19476,
         "logicalAccessorBytes": 3809,
         "logicalVertexBytes": 2717,
         "logicalIndexBytes": 1092,
         "geometryBufferBytes": 3952,
-        "imageBufferBytes": 13632,
+        "imageBufferBytes": 13597,
         "nodeNames": [
           "taiga-deadfall-01",
           "taiga-deadfall-01-mesh"
@@ -13617,13 +14145,13 @@
         },
         "data": {
           "json": 2744,
-          "binary": 15560,
+          "binary": 15524,
           "buffers": {
             "vertex": 1699,
             "index": 217,
             "animation": 0,
             "transform": 0,
-            "image": 13632
+            "image": 13597
           }
         }
       }
@@ -13654,13 +14182,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "b6fb1df3b940943c1c775f0baf1dfe64eb85ac251e34cd31d2bcbda57d35a356",
-      "sourceSha256": "4165ca3b898335adcd5d69e5037c745089c93ec2a0b675e09fbce03e41f53e11",
-      "outputSha256": "c4ec570a83d8da16b46348879dedffdf3e66ef5cb20d14b2eeb59c878c0eceac",
-      "sourceBytes": 59220,
-      "outputBytes": 42344,
-      "gzipBytes": 39817,
-      "brotliBytes": 39391,
+      "cacheKey": "8ab7187753367e4e82ad9f238e27a43529ceade07fcf8e177c897e280ca20930",
+      "sourceSha256": "459585de73213572079a8febfe793fbf8caff9358c7be90256286fb7fbb9c9d7",
+      "outputSha256": "a87c07e8b1d39cecd9db5b6b15c95f536ac41404ce123ab49e774381272b1f89",
+      "sourceBytes": 59420,
+      "outputBytes": 42936,
+      "gzipBytes": 40402,
+      "brotliBytes": 39927,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13688,12 +14216,12 @@
             0.37721776962280273
           ]
         },
-        "bufferBytes": 57492,
+        "bufferBytes": 57692,
         "logicalAccessorBytes": 4056,
         "logicalVertexBytes": 3264,
         "logicalIndexBytes": 792,
         "geometryBufferBytes": 4056,
-        "imageBufferBytes": 53431,
+        "imageBufferBytes": 53634,
         "nodeNames": [
           "tundra-cushion-01",
           "tundra-cushion-01-mesh"
@@ -13732,12 +14260,12 @@
             0.377212524
           ]
         },
-        "bufferBytes": 42244,
+        "bufferBytes": 42836,
         "logicalAccessorBytes": 2730,
         "logicalVertexBytes": 1938,
         "logicalIndexBytes": 792,
         "geometryBufferBytes": 2832,
-        "imageBufferBytes": 37975,
+        "imageBufferBytes": 38525,
         "nodeNames": [
           "tundra-cushion-01",
           "tundra-cushion-01-mesh"
@@ -13789,13 +14317,13 @@
         },
         "data": {
           "json": 2788,
-          "binary": 39412,
+          "binary": 40004,
           "buffers": {
-            "vertex": 1274,
+            "vertex": 1312,
             "index": 155,
             "animation": 0,
             "transform": 0,
-            "image": 37975
+            "image": 38525
           }
         }
       }
@@ -13826,13 +14354,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "419a08ab00d94d63e03e9e605d08fde883752fbad2a2e34e4f7887d680ce0ecf",
-      "sourceSha256": "475cbacb81b125d0a334ac2666432394eed4391ebd657af31586f0260809edf2",
-      "outputSha256": "e82996dacc8dbebd63214545b8b57d72387f19ab113afc41cfdbe7831b892df2",
-      "sourceBytes": 36616,
-      "outputBytes": 30704,
-      "gzipBytes": 28762,
-      "brotliBytes": 28328,
+      "cacheKey": "660a6a96e4fb15a1123001065076024bc5dceb3b1af77231e19a38ed3b70f43f",
+      "sourceSha256": "2bdda19ab335af73404cb9d85810af6fb939c927757ed0614a29b13b4975add9",
+      "outputSha256": "a7f93bc2f13cb1f46643777ffb21bb23801d8d620f1e7953ca4ffe35cd0417c1",
+      "sourceBytes": 36852,
+      "outputBytes": 31480,
+      "gzipBytes": 29538,
+      "brotliBytes": 29124,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -13860,12 +14388,12 @@
             0.7762805223464966
           ]
         },
-        "bufferBytes": 35072,
+        "bufferBytes": 35308,
         "logicalAccessorBytes": 5688,
         "logicalVertexBytes": 4992,
         "logicalIndexBytes": 696,
         "geometryBufferBytes": 5688,
-        "imageBufferBytes": 29382,
+        "imageBufferBytes": 29617,
         "nodeNames": [
           "tundra-dwarf-willow-01",
           "tundra-dwarf-willow-01-mesh"
@@ -13904,12 +14432,12 @@
             0.776275635
           ]
         },
-        "bufferBytes": 31940,
+        "bufferBytes": 32716,
         "logicalAccessorBytes": 3660,
         "logicalVertexBytes": 2964,
         "logicalIndexBytes": 696,
         "geometryBufferBytes": 3816,
-        "imageBufferBytes": 26045,
+        "imageBufferBytes": 26819,
         "nodeNames": [
           "tundra-dwarf-willow-01",
           "tundra-dwarf-willow-01-mesh"
@@ -13959,13 +14487,13 @@
         },
         "data": {
           "json": 2436,
-          "binary": 28124,
+          "binary": 28900,
           "buffers": {
-            "vertex": 1931,
+            "vertex": 1936,
             "index": 139,
             "animation": 0,
             "transform": 0,
-            "image": 26045
+            "image": 26819
           }
         }
       }
@@ -13996,13 +14524,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "a89d1999875958799f9757dba183d6923e621c25b089546ff38110c1bc1fd230",
-      "sourceSha256": "7d9c41e28f58d0184babdbc51df749077b517244b181d999916c4e514125ffe6",
-      "outputSha256": "6d810de03f645d4cfbd51ec5373102ab29064e81edebf1bf7dd9e46b90289ae0",
-      "sourceBytes": 39700,
-      "outputBytes": 32416,
-      "gzipBytes": 30132,
-      "brotliBytes": 29667,
+      "cacheKey": "f10d9d56c130ef4fb2720beda8bbb6a8751eeb7f59ca8d9d894fcf93ff88dd64",
+      "sourceSha256": "f9106d450ed93c209c75dbe66a70b19b7f6711d9606659c2dfe3852b57024866",
+      "outputSha256": "1b36eac1c6ea78b276c33be99487a0902918c94fea3205b4b97f0b21f4ffb5b8",
+      "sourceBytes": 40092,
+      "outputBytes": 32544,
+      "gzipBytes": 30260,
+      "brotliBytes": 29792,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14030,12 +14558,12 @@
             0.4925544261932373
           ]
         },
-        "bufferBytes": 38172,
+        "bufferBytes": 38564,
         "logicalAccessorBytes": 12676,
         "logicalVertexBytes": 10720,
         "logicalIndexBytes": 1956,
         "geometryBufferBytes": 12676,
-        "imageBufferBytes": 25496,
+        "imageBufferBytes": 25885,
         "nodeNames": [
           "swamp-pitcher-01",
           "swamp-pitcher-01-mesh"
@@ -14074,12 +14602,12 @@
             0.492553711
           ]
         },
-        "bufferBytes": 38480,
+        "bufferBytes": 38608,
         "logicalAccessorBytes": 8321,
         "logicalVertexBytes": 6365,
         "logicalIndexBytes": 1956,
         "geometryBufferBytes": 8656,
-        "imageBufferBytes": 25736,
+        "imageBufferBytes": 25863,
         "nodeNames": [
           "swamp-pitcher-01",
           "swamp-pitcher-01-mesh"
@@ -14129,13 +14657,13 @@
         },
         "data": {
           "json": 2451,
-          "binary": 29824,
+          "binary": 29952,
           "buffers": {
-            "vertex": 3687,
+            "vertex": 3689,
             "index": 393,
             "animation": 0,
             "transform": 0,
-            "image": 25736
+            "image": 25863
           }
         }
       }
@@ -14166,13 +14694,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "2b78b17f37cf4ea14313ac5579751d988ce549f95c6f13982ee2f7e4bc6fa35f",
-      "sourceSha256": "ed8f7b9ac55ff21abc844ada3b3437d40528b5036dfc2b2d23799cce16f47860",
-      "outputSha256": "d0dccbf67970fd5df229db499c927ab271c5d80ae2450e6a98490b3e15c2e161",
-      "sourceBytes": 31832,
-      "outputBytes": 22624,
-      "gzipBytes": 20679,
-      "brotliBytes": 20323,
+      "cacheKey": "606dabaf0e8ac8d78160feefb0290a02d24aa6fbe6d57602f973e9b98349e280",
+      "sourceSha256": "cbc4bf2b07ef33b06a2ae8e79e971e7d93469389e85d6e828a9073f97dc28c17",
+      "outputSha256": "01d6797f93d7e15ad679ac9501d33f1f01ce7b640c66b9ae27405508feaafed7",
+      "sourceBytes": 32836,
+      "outputBytes": 23472,
+      "gzipBytes": 21516,
+      "brotliBytes": 21117,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14200,12 +14728,12 @@
             0.6619023084640503
           ]
         },
-        "bufferBytes": 30304,
-        "logicalAccessorBytes": 3672,
-        "logicalVertexBytes": 3264,
+        "bufferBytes": 31308,
+        "logicalAccessorBytes": 3928,
+        "logicalVertexBytes": 3520,
         "logicalIndexBytes": 408,
-        "geometryBufferBytes": 3672,
-        "imageBufferBytes": 26629,
+        "geometryBufferBytes": 3928,
+        "imageBufferBytes": 27379,
         "nodeNames": [
           "swamp-marigold-01",
           "swamp-marigold-01-mesh"
@@ -14244,12 +14772,12 @@
             0.661895752
           ]
         },
-        "bufferBytes": 22492,
+        "bufferBytes": 23340,
         "logicalAccessorBytes": 2346,
         "logicalVertexBytes": 1938,
         "logicalIndexBytes": 408,
         "geometryBufferBytes": 2448,
-        "imageBufferBytes": 18582,
+        "imageBufferBytes": 19386,
         "nodeNames": [
           "swamp-marigold-01",
           "swamp-marigold-01-mesh"
@@ -14299,13 +14827,13 @@
         },
         "data": {
           "json": 2437,
-          "binary": 20044,
+          "binary": 20892,
           "buffers": {
-            "vertex": 1366,
-            "index": 85,
+            "vertex": 1409,
+            "index": 90,
             "animation": 0,
             "transform": 0,
-            "image": 18582
+            "image": 19386
           }
         }
       }
@@ -14336,13 +14864,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "ebbd778130db3ae6453f1f76bdb2fcc79e60578a850edc9901b2594e1c517ec8",
-      "sourceSha256": "521a115e5d491567655af4bfad04b27d01d017248a5fc6813209aa48bc89ff6b",
-      "outputSha256": "9278569650f64d3227b7290643974041354a85e3674d1a37336346535d547965",
-      "sourceBytes": 43468,
-      "outputBytes": 36812,
-      "gzipBytes": 34914,
-      "brotliBytes": 34516,
+      "cacheKey": "a3dc540c6389e33864fa3fbeb76e7ef66db9e5288afaebe667db2c7013487a7f",
+      "sourceSha256": "657fcd447214a3f022bebf7dae53dacfc1c025455e250cc008e78bd280ea5b97",
+      "outputSha256": "a350d901608b6f59c22e1dcf658feb7a1ee5b3a64bc4b90d8d3c1fcfe93eadd9",
+      "sourceBytes": 41920,
+      "outputBytes": 35804,
+      "gzipBytes": 33849,
+      "brotliBytes": 33499,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14370,12 +14898,12 @@
             0.9431227445602417
           ]
         },
-        "bufferBytes": 41924,
-        "logicalAccessorBytes": 3670,
-        "logicalVertexBytes": 3232,
+        "bufferBytes": 40376,
+        "logicalAccessorBytes": 3734,
+        "logicalVertexBytes": 3296,
         "logicalIndexBytes": 438,
-        "geometryBufferBytes": 3670,
-        "imageBufferBytes": 38250,
+        "geometryBufferBytes": 3734,
+        "imageBufferBytes": 36638,
         "nodeNames": [
           "coastal-dune-oats-01",
           "coastal-dune-oats-01-mesh"
@@ -14414,12 +14942,12 @@
             0.943115234
           ]
         },
-        "bufferBytes": 36672,
+        "bufferBytes": 35664,
         "logicalAccessorBytes": 2357,
         "logicalVertexBytes": 1919,
         "logicalIndexBytes": 438,
         "geometryBufferBytes": 2458,
-        "imageBufferBytes": 32777,
+        "imageBufferBytes": 31753,
         "nodeNames": [
           "coastal-dune-oats-01",
           "coastal-dune-oats-01-mesh"
@@ -14469,13 +14997,13 @@
         },
         "data": {
           "json": 2458,
-          "binary": 34212,
+          "binary": 33204,
           "buffers": {
-            "vertex": 1331,
-            "index": 94,
+            "vertex": 1344,
+            "index": 96,
             "animation": 0,
             "transform": 0,
-            "image": 32777
+            "image": 31753
           }
         }
       }
@@ -14506,13 +15034,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "28c025764184ddcb75b0a6fb2b24159dddeabf3fe23d4a462ae3117707eff4f1",
-      "sourceSha256": "ac6a3f26fbec4a1780212183739c58dae59c5f285b64728022f378d859cbc404",
-      "outputSha256": "71e2a9b3492b25ecdf6e2d0c26dc5634c70e7c09560d30b71ba7e9b034fc8bca",
-      "sourceBytes": 73916,
-      "outputBytes": 19700,
-      "gzipBytes": 16900,
-      "brotliBytes": 16539,
+      "cacheKey": "1b3dfbff149ea5b6cd75412072737ed24b448ba34182aed80e9f68c0c17b91db",
+      "sourceSha256": "8c37660b4c4aad232d7e4aecb59e39e63c15b3cb10d208eeff3496c2a36a7f91",
+      "outputSha256": "1fd50934d6d9d4e37bdc4146252130cb1fb4f3f24981c760d04972d6ef8b00d5",
+      "sourceBytes": 74464,
+      "outputBytes": 20108,
+      "gzipBytes": 17340,
+      "brotliBytes": 16995,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14540,12 +15068,12 @@
             0.4284915626049042
           ]
         },
-        "bufferBytes": 72208,
+        "bufferBytes": 72756,
         "logicalAccessorBytes": 5740,
         "logicalVertexBytes": 4672,
         "logicalIndexBytes": 1068,
         "geometryBufferBytes": 5740,
-        "imageBufferBytes": 66464,
+        "imageBufferBytes": 67013,
         "nodeNames": [
           "coastal-tidepool-coral-01",
           "coastal-tidepool-coral-01-mesh"
@@ -14584,12 +15112,12 @@
             0.428497314
           ]
         },
-        "bufferBytes": 20780,
+        "bufferBytes": 21188,
         "logicalAccessorBytes": 3842,
         "logicalVertexBytes": 2774,
         "logicalIndexBytes": 1068,
         "geometryBufferBytes": 3988,
-        "imageBufferBytes": 14808,
+        "imageBufferBytes": 15211,
         "nodeNames": [
           "coastal-tidepool-coral-01",
           "coastal-tidepool-coral-01-mesh"
@@ -14641,13 +15169,13 @@
         },
         "data": {
           "json": 2766,
-          "binary": 16792,
+          "binary": 17200,
           "buffers": {
-            "vertex": 1772,
+            "vertex": 1773,
             "index": 201,
             "animation": 0,
             "transform": 0,
-            "image": 14808
+            "image": 15211
           }
         }
       }
@@ -14678,13 +15206,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "2c7464c87c331f3e5da2fc73a0ee136ab300863c1dfd0583f9d89f22008c3b4a",
-      "sourceSha256": "26c4e45af74b9363c23b7bbf342ff4e72842bd7fdb6b55eb52c3c281cfecc21a",
-      "outputSha256": "3600f1b7f6ceeef8835053ff520627f6a438788c7ce6dd19745d253c506a206e",
-      "sourceBytes": 71816,
-      "outputBytes": 17872,
-      "gzipBytes": 15092,
-      "brotliBytes": 14750,
+      "cacheKey": "0548804973721411af54b94d758923c4782d76511c63bb4ad528eb7b07ed55c1",
+      "sourceSha256": "dbd221b29002b929760d2ed8a07a3ac2c57c547134a1c22a0c94134a60a2dbef",
+      "outputSha256": "419aebfc27c5bfdfcc11a8cfe2ef7abc122558a533728c71c1ac31a80a65740e",
+      "sourceBytes": 70644,
+      "outputBytes": 17860,
+      "gzipBytes": 15071,
+      "brotliBytes": 14719,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14712,12 +15240,12 @@
             0.46869003772735596
           ]
         },
-        "bufferBytes": 70104,
+        "bufferBytes": 68932,
         "logicalAccessorBytes": 6022,
         "logicalVertexBytes": 5152,
         "logicalIndexBytes": 870,
         "geometryBufferBytes": 6022,
-        "imageBufferBytes": 64075,
+        "imageBufferBytes": 62904,
         "nodeNames": [
           "coastal-shipwreck-ribs-01",
           "coastal-shipwreck-ribs-01-mesh"
@@ -14756,12 +15284,12 @@
             0.468688965
           ]
         },
-        "bufferBytes": 19052,
+        "bufferBytes": 19040,
         "logicalAccessorBytes": 3929,
         "logicalVertexBytes": 3059,
         "logicalIndexBytes": 870,
         "geometryBufferBytes": 4090,
-        "imageBufferBytes": 12860,
+        "imageBufferBytes": 12846,
         "nodeNames": [
           "coastal-shipwreck-ribs-01",
           "coastal-shipwreck-ribs-01-mesh"
@@ -14813,13 +15341,13 @@
         },
         "data": {
           "json": 2769,
-          "binary": 14960,
+          "binary": 14948,
           "buffers": {
             "vertex": 1916,
             "index": 176,
             "animation": 0,
             "transform": 0,
-            "image": 12860
+            "image": 12846
           }
         }
       }
@@ -14850,13 +15378,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "0879c2b091445e37bd121df0b80cacedb302698269e00df508a6e68e3e73e106",
-      "sourceSha256": "1ba0fd07f199be7d0323cd3d9aa8d013a5bb3e923aa0550cf1321780ab3da390",
-      "outputSha256": "60ceff8633b3934ad6b4a114008197bee58abaf5bbf45a2d30e6e6972c796491",
-      "sourceBytes": 90336,
-      "outputBytes": 22780,
-      "gzipBytes": 19992,
-      "brotliBytes": 19590,
+      "cacheKey": "ca66e9d85dbbe24e6b91a1f95214bf13f4af5b5c474c41f202b790c2073abdeb",
+      "sourceSha256": "756656d8f5a2a5c16d23c590f5e4153583566576934a41b9a0f291ef9feb3b3d",
+      "outputSha256": "65b8af0ca93f2ebcf5e6d31b011061b042abba16f66fb28476a99abbd86d964a",
+      "sourceBytes": 67952,
+      "outputBytes": 16660,
+      "gzipBytes": 13830,
+      "brotliBytes": 13419,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -14884,12 +15412,12 @@
             0.42871251702308655
           ]
         },
-        "bufferBytes": 88648,
+        "bufferBytes": 66264,
         "logicalAccessorBytes": 6972,
         "logicalVertexBytes": 5952,
         "logicalIndexBytes": 1020,
         "geometryBufferBytes": 6972,
-        "imageBufferBytes": 81671,
+        "imageBufferBytes": 59287,
         "nodeNames": [
           "glacier-ice-spires-01",
           "glacier-ice-spires-01-mesh"
@@ -14928,12 +15456,12 @@
             0.428710938
           ]
         },
-        "bufferBytes": 24628,
+        "bufferBytes": 18508,
         "logicalAccessorBytes": 4554,
         "logicalVertexBytes": 3534,
         "logicalIndexBytes": 1020,
         "geometryBufferBytes": 4740,
-        "imageBufferBytes": 17480,
+        "imageBufferBytes": 11364,
         "nodeNames": [
           "glacier-ice-spires-01",
           "glacier-ice-spires-01-mesh"
@@ -14985,13 +15513,13 @@
         },
         "data": {
           "json": 2748,
-          "binary": 19888,
+          "binary": 13768,
           "buffers": {
-            "vertex": 2188,
+            "vertex": 2187,
             "index": 205,
             "animation": 0,
             "transform": 0,
-            "image": 17480
+            "image": 11364
           }
         }
       }
@@ -15022,13 +15550,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "1f1141170feaae98fe4c46b89b3537ff7f17e545d8c3b19eb78e866a814d892b",
-      "sourceSha256": "b667f83f8d1fb4db3fff9a53d58dd4833cd2cef1ed90ea2c9375e2e813c4a834",
-      "outputSha256": "d649b7e9f5888bceff1c829f023698f9f7fd00c51709737322a02c74682b20f9",
-      "sourceBytes": 79968,
-      "outputBytes": 19632,
-      "gzipBytes": 17111,
-      "brotliBytes": 16742,
+      "cacheKey": "2d7f7ddee716c0c7505626f0056e880e0dbfea1b670562698cc50a32b7728c91",
+      "sourceSha256": "345641bf1eab7222c9d63daab922f482b0fcc6643488d844e8128d96a8a70354",
+      "outputSha256": "3dd96ac85ffaea6bbe905123af85312d82f33f7b4fba62ff047e63fa1ca1203e",
+      "sourceBytes": 71040,
+      "outputBytes": 16308,
+      "gzipBytes": 13757,
+      "brotliBytes": 13396,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15056,12 +15584,12 @@
             0.41384434700012207
           ]
         },
-        "bufferBytes": 78276,
+        "bufferBytes": 69348,
         "logicalAccessorBytes": 3336,
         "logicalVertexBytes": 2496,
         "logicalIndexBytes": 840,
         "geometryBufferBytes": 3336,
-        "imageBufferBytes": 74937,
+        "imageBufferBytes": 66010,
         "nodeNames": [
           "glacier-moraine-cairn-01",
           "glacier-moraine-cairn-01-mesh"
@@ -15100,12 +15628,12 @@
             0.413848877
           ]
         },
-        "bufferBytes": 19136,
+        "bufferBytes": 15812,
         "logicalAccessorBytes": 2322,
         "logicalVertexBytes": 1482,
         "logicalIndexBytes": 840,
         "geometryBufferBytes": 2400,
-        "imageBufferBytes": 15545,
+        "imageBufferBytes": 12219,
         "nodeNames": [
           "glacier-moraine-cairn-01",
           "glacier-moraine-cairn-01-mesh"
@@ -15157,13 +15685,13 @@
         },
         "data": {
           "json": 2752,
-          "binary": 16736,
+          "binary": 13412,
           "buffers": {
             "vertex": 1020,
             "index": 163,
             "animation": 0,
             "transform": 0,
-            "image": 15545
+            "image": 12219
           }
         }
       }
@@ -15194,13 +15722,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "48298310ecc01e1a073c99aecb376ba9f7641d3b46252aed1bd3a5d5674875d0",
-      "sourceSha256": "bfcbfc6020a38ba9e6622d3ea7ff54f41137e78a09fed27ebbc5b41ff28d01b7",
-      "outputSha256": "b5ec2297eb614c398172dd2989d3db8f51812cf7fec5d5aa2b03ef9cc0dbf3d5",
-      "sourceBytes": 43016,
-      "outputBytes": 35860,
-      "gzipBytes": 33916,
-      "brotliBytes": 33538,
+      "cacheKey": "f40c1355ef478a075bb46e60bb5cc7add2808ee5ecaaae03ec33e82d909d01ab",
+      "sourceSha256": "207e91d792c275b889cb6635adc7b1cad6f3d964ab69daef05016bced807d390",
+      "outputSha256": "226498ab8da2c6b9f77924a12948863ec87ab12faa69eff3d554205654407f95",
+      "sourceBytes": 35068,
+      "outputBytes": 31244,
+      "gzipBytes": 29376,
+      "brotliBytes": 28956,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15210,30 +15738,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 60,
-        "renderedTriangles": 60,
+        "triangles": 56,
+        "renderedTriangles": 56,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SteppeFeathergrass": 60
+          "SteppeFeathergrass": 56
         },
         "sceneBounds": {
           "min": [
-            -0.8620494604110718,
-            0.019999999552965164,
-            -0.6685632467269897
+            -0.4301678538322449,
+            -0.019999999552965164,
+            -0.37350744009017944
           ],
           "max": [
-            0.8273511528968811,
-            0.8248105645179749,
-            0.8738318681716919
+            0.42779305577278137,
+            0.8103294968605042,
+            0.4571193754673004
           ]
         },
-        "bufferBytes": 41464,
-        "logicalAccessorBytes": 3240,
-        "logicalVertexBytes": 2880,
-        "logicalIndexBytes": 360,
-        "geometryBufferBytes": 3240,
-        "imageBufferBytes": 38222,
+        "bufferBytes": 33512,
+        "logicalAccessorBytes": 3024,
+        "logicalVertexBytes": 2688,
+        "logicalIndexBytes": 336,
+        "geometryBufferBytes": 3024,
+        "imageBufferBytes": 30488,
         "nodeNames": [
           "steppe-feathergrass-01",
           "steppe-feathergrass-01-mesh"
@@ -15254,30 +15782,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 60,
-        "renderedTriangles": 60,
+        "triangles": 56,
+        "renderedTriangles": 56,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SteppeFeathergrass": 60
+          "SteppeFeathergrass": 56
         },
         "sceneBounds": {
           "min": [
-            -0.862060547,
-            0.0200004578,
-            -0.668548584
+            -0.430160522,
+            -0.0200004578,
+            -0.373504639
           ],
           "max": [
-            0.827362061,
-            0.824798584,
-            0.873840332
+            0.42779541,
+            0.810333252,
+            0.457122803
           ]
         },
-        "bufferBytes": 35424,
-        "logicalAccessorBytes": 2070,
-        "logicalVertexBytes": 1710,
-        "logicalIndexBytes": 360,
-        "geometryBufferBytes": 2160,
-        "imageBufferBytes": 31972,
+        "bufferBytes": 30664,
+        "logicalAccessorBytes": 1932,
+        "logicalVertexBytes": 1596,
+        "logicalIndexBytes": 336,
+        "geometryBufferBytes": 2016,
+        "imageBufferBytes": 27399,
         "nodeNames": [
           "steppe-feathergrass-01",
           "steppe-feathergrass-01-mesh"
@@ -15308,8 +15836,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 90,
-        "triangles": 60
+        "vertices": 84,
+        "triangles": 56
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -15323,17 +15851,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 60
+          "triangleCount": 56
         },
         "data": {
           "json": 2452,
-          "binary": 33264,
+          "binary": 28648,
           "buffers": {
-            "vertex": 1208,
-            "index": 77,
+            "vertex": 1167,
+            "index": 73,
             "animation": 0,
             "transform": 0,
-            "image": 31972
+            "image": 27399
           }
         }
       }
@@ -15364,13 +15892,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "09bce6197a105ac6db4cf13de1cc3eda33a524019e0d8075e13b3aa2c997c343",
-      "sourceSha256": "93dcf11af6eeee162890bf38b11c82cf5896d26a2cb8d46fb24ba07954477ff2",
-      "outputSha256": "a929d347bfcd4cf9861d36959367297ece49031f42a599c3d0f5daa2f15b1600",
-      "sourceBytes": 43060,
-      "outputBytes": 32740,
-      "gzipBytes": 30178,
-      "brotliBytes": 29762,
+      "cacheKey": "6cf21592c57835742169d65148f1f50706589a69fe8e444ad0179b928c4f718e",
+      "sourceSha256": "cc660153102b34fb4cbfd15cba17359c75925bccbf9da5ba7a67c60e94c79f5b",
+      "outputSha256": "92af88f86f2988f4d68e56cee097f76764502fee23c6df70af69ef3c66fee5c1",
+      "sourceBytes": 37420,
+      "outputBytes": 29480,
+      "gzipBytes": 26940,
+      "brotliBytes": 26492,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15398,12 +15926,12 @@
             0.4897284507751465
           ]
         },
-        "bufferBytes": 41304,
-        "logicalAccessorBytes": 4272,
-        "logicalVertexBytes": 3456,
+        "bufferBytes": 35664,
+        "logicalAccessorBytes": 4400,
+        "logicalVertexBytes": 3584,
         "logicalIndexBytes": 816,
-        "geometryBufferBytes": 4272,
-        "imageBufferBytes": 37027,
+        "geometryBufferBytes": 4400,
+        "imageBufferBytes": 31262,
         "nodeNames": [
           "alpine-edelweiss-stone-01",
           "alpine-edelweiss-stone-01-mesh"
@@ -15442,12 +15970,12 @@
             0.489730835
           ]
         },
-        "bufferBytes": 32764,
+        "bufferBytes": 29504,
         "logicalAccessorBytes": 2868,
         "logicalVertexBytes": 2052,
         "logicalIndexBytes": 816,
         "geometryBufferBytes": 2976,
-        "imageBufferBytes": 28237,
+        "imageBufferBytes": 24954,
         "nodeNames": [
           "alpine-edelweiss-stone-01",
           "alpine-edelweiss-stone-01-mesh"
@@ -15499,13 +16027,13 @@
         },
         "data": {
           "json": 2809,
-          "binary": 29788,
+          "binary": 26528,
           "buffers": {
-            "vertex": 1383,
-            "index": 159,
+            "vertex": 1402,
+            "index": 162,
             "animation": 0,
             "transform": 0,
-            "image": 28237
+            "image": 24954
           }
         }
       }
@@ -15536,13 +16064,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "8dba5a82033783a590f781303f6f270bbf40d632b2953c848b6d2b1f21def722",
-      "sourceSha256": "cb6fec8ea91149a709e3d4c4ef3d383cacfd3ce716d3c493144856250afe67f8",
-      "outputSha256": "cdb1dd1a4d0507d15a89587e995e34696906d619270a704f395f24f57f67f5f3",
-      "sourceBytes": 58868,
-      "outputBytes": 43544,
-      "gzipBytes": 40567,
-      "brotliBytes": 40134,
+      "cacheKey": "cf8fc5ca83028dfc14171a195a733a071911074eac0ab074f97f300ffdc89247",
+      "sourceSha256": "5d6a4b81a2965cb97d2307e2a4dd042eb07425916af5e60eda4b5a05f6aae478",
+      "outputSha256": "9a109098f965f5bcc92f353e361401bb0c20fbac4f16f5e2ee04a3973771281f",
+      "sourceBytes": 59976,
+      "outputBytes": 43260,
+      "gzipBytes": 40304,
+      "brotliBytes": 39872,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15570,12 +16098,12 @@
             0.7882922291755676
           ]
         },
-        "bufferBytes": 57108,
+        "bufferBytes": 58216,
         "logicalAccessorBytes": 7498,
         "logicalVertexBytes": 6496,
         "logicalIndexBytes": 1002,
         "geometryBufferBytes": 7498,
-        "imageBufferBytes": 49603,
+        "imageBufferBytes": 50713,
         "nodeNames": [
           "savanna-termite-mound-01",
           "savanna-termite-mound-01-mesh"
@@ -15614,12 +16142,12 @@
             0.788299561
           ]
         },
-        "bufferBytes": 45652,
+        "bufferBytes": 45368,
         "logicalAccessorBytes": 4859,
         "logicalVertexBytes": 3857,
         "logicalIndexBytes": 1002,
         "geometryBufferBytes": 5062,
-        "imageBufferBytes": 37962,
+        "imageBufferBytes": 37680,
         "nodeNames": [
           "savanna-termite-mound-01",
           "savanna-termite-mound-01-mesh"
@@ -15671,13 +16199,13 @@
         },
         "data": {
           "json": 2812,
-          "binary": 40588,
+          "binary": 40304,
           "buffers": {
-            "vertex": 2416,
+            "vertex": 2410,
             "index": 201,
             "animation": 0,
             "transform": 0,
-            "image": 37962
+            "image": 37680
           }
         }
       }
@@ -15708,13 +16236,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "043b0c70f386a723c363cad465af8b1b491462e21a0363ba618affa7d7d32441",
-      "sourceSha256": "4b7ccc3cef4e85622fafc02b910726bb5e3fca229baf7a5b8d37d68892998fcc",
-      "outputSha256": "20c4d7ea9cf5c383411c2e0eea6de4b168c0d590e80bd374657aa8849b00972d",
-      "sourceBytes": 53252,
-      "outputBytes": 38696,
-      "gzipBytes": 36646,
-      "brotliBytes": 36210,
+      "cacheKey": "b54b0537e21303f013ad19f3d78ba181329ac8269b55c2ff6aba019eb00774ad",
+      "sourceSha256": "df46819d00b9c9f38b7b7d14c6280face8b92234d7cb852a7b9145f1eb2ecdef",
+      "outputSha256": "fdf8abfc041602163e953d6c532876856129f0261ef87c1f7df9b2308f774ef3",
+      "sourceBytes": 50908,
+      "outputBytes": 35176,
+      "gzipBytes": 33202,
+      "brotliBytes": 32746,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15724,30 +16252,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 146,
-        "renderedTriangles": 146,
+        "triangles": 123,
+        "renderedTriangles": 123,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SavannaDesertRose": 146
+          "SavannaDesertRose": 123
         },
         "sceneBounds": {
           "min": [
-            -0.6957924365997314,
-            -0.05692829564213753,
-            -0.6928690075874329
+            -0.5455289483070374,
+            -0.07497464120388031,
+            -0.49032413959503174
           ],
           "max": [
-            0.6910452246665955,
-            0.9599999785423279,
-            0.6963330507278442
+            0.5323989391326904,
+            0.5920114517211914,
+            0.6163369417190552
           ]
         },
-        "bufferBytes": 51696,
-        "logicalAccessorBytes": 6636,
-        "logicalVertexBytes": 5760,
-        "logicalIndexBytes": 876,
-        "geometryBufferBytes": 6636,
-        "imageBufferBytes": 45057,
+        "bufferBytes": 49352,
+        "logicalAccessorBytes": 5826,
+        "logicalVertexBytes": 5088,
+        "logicalIndexBytes": 738,
+        "geometryBufferBytes": 5826,
+        "imageBufferBytes": 43523,
         "nodeNames": [
           "savanna-desert-rose-01",
           "savanna-desert-rose-01-mesh"
@@ -15768,30 +16296,30 @@
         "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 146,
-        "renderedTriangles": 146,
+        "triangles": 123,
+        "renderedTriangles": 123,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "SavannaDesertRose": 146
+          "SavannaDesertRose": 123
         },
         "sceneBounds": {
           "min": [
-            -0.695800781,
-            -0.0569286346,
-            -0.692871094
+            -0.545532227,
+            -0.0749740601,
+            -0.490325928
           ],
           "max": [
-            0.691040039,
-            0.959991455,
-            0.69631958
+            0.532409668,
+            0.592010498,
+            0.616333008
           ]
         },
-        "bufferBytes": 40560,
-        "logicalAccessorBytes": 4296,
-        "logicalVertexBytes": 3420,
-        "logicalIndexBytes": 876,
-        "geometryBufferBytes": 4476,
-        "imageBufferBytes": 33679,
+        "bufferBytes": 36480,
+        "logicalAccessorBytes": 3759,
+        "logicalVertexBytes": 3021,
+        "logicalIndexBytes": 738,
+        "geometryBufferBytes": 3918,
+        "imageBufferBytes": 30423,
         "nodeNames": [
           "savanna-desert-rose-01",
           "savanna-desert-rose-01-mesh"
@@ -15822,8 +16350,8 @@
         "infos": 3,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 180,
-        "triangles": 146
+        "vertices": 159,
+        "triangles": 123
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -15837,17 +16365,17 @@
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 146
+          "triangleCount": 123
         },
         "data": {
-          "json": 2471,
-          "binary": 36084,
+          "json": 2472,
+          "binary": 32560,
           "buffers": {
-            "vertex": 2221,
-            "index": 179,
+            "vertex": 1980,
+            "index": 152,
             "animation": 0,
             "transform": 0,
-            "image": 33679
+            "image": 30423
           }
         }
       }
@@ -15878,13 +16406,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "16de3b99ed27973757e9281aab93f690c1903039fd37eac0d112ef34728bd8f2",
-      "sourceSha256": "3662619903e2c22dc4361383cbdf81778417fc98df7911a26b1bf3a8d3d4d7c7",
-      "outputSha256": "ff3ab25063d44eb36dc9729f49089de4210d2f02becd038fc0456ff17be32d4e",
-      "sourceBytes": 75204,
-      "outputBytes": 16792,
-      "gzipBytes": 13427,
-      "brotliBytes": 13082,
+      "cacheKey": "38ae922aad3d81ca2cdc2843a07e016df0659eaac2302549ef8ab07682a9ac65",
+      "sourceSha256": "12563013d674789b56e6866b26cb39fd0739b10b582db246cdd2831d587efe54",
+      "outputSha256": "eef47a1798d1aa1fffac6936ee6ba9941d2cf1619d50d5b9cafac1e11e63097e",
+      "sourceBytes": 74044,
+      "outputBytes": 16228,
+      "gzipBytes": 12882,
+      "brotliBytes": 12478,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -15912,12 +16440,12 @@
             0.5316091179847717
           ]
         },
-        "bufferBytes": 73484,
+        "bufferBytes": 72324,
         "logicalAccessorBytes": 11540,
         "logicalVertexBytes": 9920,
         "logicalIndexBytes": 1620,
         "geometryBufferBytes": 11540,
-        "imageBufferBytes": 61941,
+        "imageBufferBytes": 60781,
         "nodeNames": [
           "savanna-sunbleached-ribcage-01",
           "savanna-sunbleached-ribcage-01-mesh"
@@ -15956,12 +16484,12 @@
             0.531616211
           ]
         },
-        "bufferBytes": 21696,
+        "bufferBytes": 21132,
         "logicalAccessorBytes": 7510,
         "logicalVertexBytes": 5890,
         "logicalIndexBytes": 1620,
         "geometryBufferBytes": 7820,
-        "imageBufferBytes": 10118,
+        "imageBufferBytes": 9556,
         "nodeNames": [
           "savanna-sunbleached-ribcage-01",
           "savanna-sunbleached-ribcage-01-mesh"
@@ -16012,14 +16540,14 @@
           "triangleCount": 270
         },
         "data": {
-          "json": 2774,
-          "binary": 13876,
+          "json": 2773,
+          "binary": 13312,
           "buffers": {
             "vertex": 3431,
             "index": 313,
             "animation": 0,
             "transform": 0,
-            "image": 10118
+            "image": 9556
           }
         }
       }
@@ -16050,13 +16578,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "d16ce2bc4bc340df39cd51fc53aabb2e8654f8ea10cec7e212e9931b5d92806d",
-      "sourceSha256": "c45003397c5df4f8c48e2ec04ed2bb0da8a6e005ccdb9dbf48b5f06f051bfcb5",
-      "outputSha256": "4091230645707ceb5b4d301a48677f63de2768cf9048582073bf0b43890af77a",
-      "sourceBytes": 13704,
-      "outputBytes": 20516,
-      "gzipBytes": 18602,
-      "brotliBytes": 18223,
+      "cacheKey": "4481e5122e4385842f396603cfb737218bcd179194fa91db20ce0eaad851f3dc",
+      "sourceSha256": "38173e50c91a92cad3f9e9f9b27516e669cb5dc02f5a88390db474226c115705",
+      "outputSha256": "57f08ebfa3049c2832be1d7a23310c30610b100b8b4def5b7feb1e11a38df7ee",
+      "sourceBytes": 13644,
+      "outputBytes": 20740,
+      "gzipBytes": 18830,
+      "brotliBytes": 18451,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16084,12 +16612,12 @@
             0.7440174221992493
           ]
         },
-        "bufferBytes": 12148,
+        "bufferBytes": 12088,
         "logicalAccessorBytes": 3456,
         "logicalVertexBytes": 3072,
         "logicalIndexBytes": 384,
         "geometryBufferBytes": 3456,
-        "imageBufferBytes": 8689,
+        "imageBufferBytes": 8632,
         "nodeNames": [
           "farmland-poppy-wheat-01",
           "farmland-poppy-wheat-01-mesh"
@@ -16128,12 +16656,12 @@
             0.744018555
           ]
         },
-        "bufferBytes": 20224,
+        "bufferBytes": 20448,
         "logicalAccessorBytes": 2208,
         "logicalVertexBytes": 1824,
         "logicalIndexBytes": 384,
         "geometryBufferBytes": 2304,
-        "imageBufferBytes": 16621,
+        "imageBufferBytes": 16797,
         "nodeNames": [
           "farmland-poppy-wheat-01",
           "farmland-poppy-wheat-01-mesh"
@@ -16183,13 +16711,13 @@
         },
         "data": {
           "json": 2452,
-          "binary": 17920,
+          "binary": 18144,
           "buffers": {
-            "vertex": 1208,
+            "vertex": 1252,
             "index": 81,
             "animation": 0,
             "transform": 0,
-            "image": 16621
+            "image": 16797
           }
         }
       }
@@ -16220,13 +16748,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "200a9bbb43ab100cdc1d16391e9bcf7fdc22b5416afa7fbbe95f2aa0c2ffdea8",
-      "sourceSha256": "e3fdd2f8aff6efd887deb0ec3397a39e9bbcf438c685964d3568835134ebf0e8",
-      "outputSha256": "2641903bd328db0ff33ca51f863674d2a04373f877023f5fe2a70bcf1e408f70",
-      "sourceBytes": 67568,
-      "outputBytes": 14432,
-      "gzipBytes": 11856,
-      "brotliBytes": 11527,
+      "cacheKey": "0898a448adc9d231abe5985d6bdf341c8ca4a23a0662233b4df6543163e14bcc",
+      "sourceSha256": "d0f58b06b52c0f7c2548af27313ff1627a3359a999c9d7395740682c8fe2494f",
+      "outputSha256": "7d441dddb9adb32650673777c70ebf61c110849d9be7fe721e48d8ce0697c337",
+      "sourceBytes": 68724,
+      "outputBytes": 15628,
+      "gzipBytes": 13059,
+      "brotliBytes": 12739,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16254,12 +16782,12 @@
             0.43293389678001404
           ]
         },
-        "bufferBytes": 65852,
+        "bufferBytes": 67008,
         "logicalAccessorBytes": 2680,
         "logicalVertexBytes": 2176,
         "logicalIndexBytes": 504,
         "geometryBufferBytes": 2680,
-        "imageBufferBytes": 63168,
+        "imageBufferBytes": 64325,
         "nodeNames": [
           "structure-waystone-shrine-01",
           "structure-waystone-shrine-01-mesh"
@@ -16298,12 +16826,12 @@
             0.432937622
           ]
         },
-        "bufferBytes": 13408,
+        "bufferBytes": 14604,
         "logicalAccessorBytes": 1796,
         "logicalVertexBytes": 1292,
         "logicalIndexBytes": 504,
         "geometryBufferBytes": 1864,
-        "imageBufferBytes": 10521,
+        "imageBufferBytes": 11712,
         "nodeNames": [
           "structure-waystone-shrine-01",
           "structure-waystone-shrine-01-mesh"
@@ -16354,14 +16882,14 @@
           "triangleCount": 84
         },
         "data": {
-          "json": 2744,
-          "binary": 11544,
+          "json": 2745,
+          "binary": 12740,
           "buffers": {
-            "vertex": 907,
+            "vertex": 909,
             "index": 106,
             "animation": 0,
             "transform": 0,
-            "image": 10521
+            "image": 11712
           }
         }
       }
@@ -16392,13 +16920,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "94e4d77c341d90b3c9b481497a923e66985bfe4e84acb626c21744f0b3d00336",
-      "sourceSha256": "bef295a6901151999c06e58eee4abee9b3b852f7608d17206b2145fc3e5131ae",
-      "outputSha256": "b2a2db88df516b9cb3040066caf2265586d1abbd11cbfa240ba057596a5c2992",
-      "sourceBytes": 59864,
-      "outputBytes": 39488,
-      "gzipBytes": 36804,
-      "brotliBytes": 36289,
+      "cacheKey": "609ce8fd7804ac6aab05a5964eafcff70179730a2be0182323022ba2af3636b8",
+      "sourceSha256": "1a06f3c7d848a2d04c3c3382d624f5674ecdc32048bed003e60d97b57d9a5c88",
+      "outputSha256": "c954130299fe7b84dd984364cf71209c1dda04d5916b1d92538c1a22b60fbde3",
+      "sourceBytes": 53556,
+      "outputBytes": 38876,
+      "gzipBytes": 36214,
+      "brotliBytes": 35747,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16417,21 +16945,21 @@
         "sceneBounds": {
           "min": [
             -0.7600847482681274,
-            -0.09674155712127686,
+            -0.09601046144962311,
             -0.610224723815918
           ],
           "max": [
             0.7700847387313843,
-            0.6909019947052002,
+            0.6399999856948853,
             0.5902247428894043
           ]
         },
-        "bufferBytes": 58100,
+        "bufferBytes": 51792,
         "logicalAccessorBytes": 4208,
         "logicalVertexBytes": 3680,
         "logicalIndexBytes": 528,
         "geometryBufferBytes": 4208,
-        "imageBufferBytes": 53887,
+        "imageBufferBytes": 47580,
         "nodeNames": [
           "structure-ruined-column-01",
           "structure-ruined-column-01-mesh"
@@ -16461,21 +16989,21 @@
         "sceneBounds": {
           "min": [
             -0.760070801,
-            -0.0967407227,
+            -0.0960121155,
             -0.610229492
           ],
           "max": [
             0.770080566,
-            0.690887451,
+            0.640014648,
             0.590209961
           ]
         },
-        "bufferBytes": 39380,
+        "bufferBytes": 38768,
         "logicalAccessorBytes": 2713,
         "logicalVertexBytes": 2185,
         "logicalIndexBytes": 528,
         "geometryBufferBytes": 2828,
-        "imageBufferBytes": 34970,
+        "imageBufferBytes": 34363,
         "nodeNames": [
           "structure-ruined-column-01",
           "structure-ruined-column-01-mesh"
@@ -16527,13 +17055,13 @@
         },
         "data": {
           "json": 2794,
-          "binary": 36552,
+          "binary": 35940,
           "buffers": {
-            "vertex": 1448,
+            "vertex": 1441,
             "index": 121,
             "animation": 0,
             "transform": 0,
-            "image": 34970
+            "image": 34363
           }
         }
       }
@@ -16564,13 +17092,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "eab40e1dc16585ceec6ca1518a3f8f0b83f63f92d59e6c4a9aac34dcaa80ee45",
-      "sourceSha256": "daa5696685e51969ccd7527aeec0e6ddc0a37fd287f9398d60648359bae6ac9b",
-      "outputSha256": "d3bbb0351fb0a484083082f0e0de14f0048d8240dc5eb9fd86a3a64695ab4d20",
-      "sourceBytes": 58816,
-      "outputBytes": 41136,
-      "gzipBytes": 38364,
-      "brotliBytes": 37926,
+      "cacheKey": "3eb41cac2ad6d733e3fd2fc480dd52cdb70f27ea9393d935c173cd605acdfcda",
+      "sourceSha256": "bec5b14cde78614e6f0f7eeaac73ccef3747aeb15c9b242abfe5bebc47bbaf83",
+      "outputSha256": "51c3b547a628f3951860b225f05747aa602b17f8f5bc5ad9191300bddc831be8",
+      "sourceBytes": 58308,
+      "outputBytes": 40912,
+      "gzipBytes": 38204,
+      "brotliBytes": 37861,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16598,12 +17126,12 @@
             0.5692892074584961
           ]
         },
-        "bufferBytes": 57024,
+        "bufferBytes": 56516,
         "logicalAccessorBytes": 4750,
         "logicalVertexBytes": 4192,
         "logicalIndexBytes": 558,
         "geometryBufferBytes": 4750,
-        "imageBufferBytes": 52267,
+        "imageBufferBytes": 51760,
         "nodeNames": [
           "structure-roadside-milestone-01",
           "structure-roadside-milestone-01-mesh"
@@ -16642,12 +17170,12 @@
             0.569274902
           ]
         },
-        "bufferBytes": 41336,
+        "bufferBytes": 41112,
         "logicalAccessorBytes": 3047,
         "logicalVertexBytes": 2489,
         "logicalIndexBytes": 558,
         "geometryBufferBytes": 3178,
-        "imageBufferBytes": 36483,
+        "imageBufferBytes": 36260,
         "nodeNames": [
           "structure-roadside-milestone-01",
           "structure-roadside-milestone-01-mesh"
@@ -16699,13 +17227,13 @@
         },
         "data": {
           "json": 2839,
-          "binary": 38156,
+          "binary": 37932,
           "buffers": {
             "vertex": 1539,
             "index": 121,
             "animation": 0,
             "transform": 0,
-            "image": 36483
+            "image": 36260
           }
         }
       }
@@ -16736,13 +17264,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "c11d0c6f484d01697f457cc0e89145876fbd3e14ee51f6624905fa3d19abfbc6",
-      "sourceSha256": "e591684a423316cae649b1ff34246cc3b3999a677653de9667b4c602afee74a0",
-      "outputSha256": "75531ecea24376ea5bfafdd25985782f45396248e2e7cf10a69cdd8233c8dc7d",
-      "sourceBytes": 57172,
-      "outputBytes": 13220,
-      "gzipBytes": 10544,
-      "brotliBytes": 10223,
+      "cacheKey": "403713c6728eb312bbc641d3d7e8a5b9c1e76d60ec66956fb3eb276f8d039473",
+      "sourceSha256": "82385a0ee3e959e4298622a4191d521624e8ca64d2f975c1eee2d08be7128451",
+      "outputSha256": "ee9175eb2e2d0a142931e539123f6e39c2b2891cc59d1372094eff5f4efe1579",
+      "sourceBytes": 61716,
+      "outputBytes": 14080,
+      "gzipBytes": 11413,
+      "brotliBytes": 11091,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16770,12 +17298,12 @@
             0.42500734329223633
           ]
         },
-        "bufferBytes": 55452,
+        "bufferBytes": 59996,
         "logicalAccessorBytes": 3932,
         "logicalVertexBytes": 3296,
         "logicalIndexBytes": 636,
         "geometryBufferBytes": 3932,
-        "imageBufferBytes": 51518,
+        "imageBufferBytes": 56061,
         "nodeNames": [
           "structure-dwarven-cairn-01",
           "structure-dwarven-cairn-01-mesh"
@@ -16814,12 +17342,12 @@
             0.425003052
           ]
         },
-        "bufferBytes": 13004,
+        "bufferBytes": 13860,
         "logicalAccessorBytes": 2593,
         "logicalVertexBytes": 1957,
         "logicalIndexBytes": 636,
         "geometryBufferBytes": 2696,
-        "imageBufferBytes": 8866,
+        "imageBufferBytes": 9722,
         "nodeNames": [
           "structure-dwarven-cairn-01",
           "structure-dwarven-cairn-01-mesh"
@@ -16870,14 +17398,14 @@
           "triangleCount": 106
         },
         "data": {
-          "json": 2771,
-          "binary": 10308,
+          "json": 2773,
+          "binary": 11164,
           "buffers": {
             "vertex": 1290,
             "index": 141,
             "animation": 0,
             "transform": 0,
-            "image": 8866
+            "image": 9722
           }
         }
       }
@@ -16908,13 +17436,13 @@
         "-tu",
         "normal"
       ],
-      "cacheKey": "fd56a800343fc0127a6885abd9d723a8f5d965e4931840487dac78056b6e05de",
-      "sourceSha256": "c0acfb3dd4638e0e1ceab111fe35a1d34a65a5759428a49502f2b8ac4a7f4f6b",
-      "outputSha256": "49680be21373db8c2a24acc5ef37711051e6d03fea8f4e9d2e4ce55f962d047f",
-      "sourceBytes": 62300,
-      "outputBytes": 14696,
-      "gzipBytes": 11969,
-      "brotliBytes": 11651,
+      "cacheKey": "4aec80099db96d7dcc6e5e87831feedd62f840dc3c3cbe422601c1c8330f424c",
+      "sourceSha256": "7f3a8935d2c21d625c6a1e7fcf884b2f58d7cc57141e7073a989dc8d4660c7e4",
+      "outputSha256": "e2d9d70ef484d8676255c7bbc3b44f50ff10c51233739d370ac3a3a357593e84",
+      "sourceBytes": 61236,
+      "outputBytes": 14100,
+      "gzipBytes": 11378,
+      "brotliBytes": 11017,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -16942,12 +17470,12 @@
             0.42244505882263184
           ]
         },
-        "bufferBytes": 60572,
+        "bufferBytes": 59508,
         "logicalAccessorBytes": 6260,
         "logicalVertexBytes": 5408,
         "logicalIndexBytes": 852,
         "geometryBufferBytes": 6260,
-        "imageBufferBytes": 54309,
+        "imageBufferBytes": 53245,
         "nodeNames": [
           "structure-bog-fetish-totem-01",
           "structure-bog-fetish-totem-01-mesh"
@@ -16986,12 +17514,12 @@
             0.422439575
           ]
         },
-        "bufferBytes": 16008,
+        "bufferBytes": 15412,
         "logicalAccessorBytes": 4063,
         "logicalVertexBytes": 3211,
         "logicalIndexBytes": 852,
         "geometryBufferBytes": 4232,
-        "imageBufferBytes": 9600,
+        "imageBufferBytes": 9002,
         "nodeNames": [
           "structure-bog-fetish-totem-01",
           "structure-bog-fetish-totem-01-mesh"
@@ -17043,13 +17571,13 @@
         },
         "data": {
           "json": 2779,
-          "binary": 11776,
+          "binary": 11180,
           "buffers": {
-            "vertex": 1987,
+            "vertex": 1988,
             "index": 180,
             "animation": 0,
             "transform": 0,
-            "image": 9600
+            "image": 9002
           }
         }
       }
@@ -17080,13 +17608,13 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "b0352d04ea5bac3640a05acc1b6c2726be138bc30bdf9ec7c7d27e26c047412b",
-      "sourceSha256": "0688b7cffe4a3a5f101d43197b4112aebb3d0736fea1af3e1b4bb7917c0d474a",
-      "outputSha256": "f80287d2176a7a5b2a565e4e26298f4920e90a825df86ebc9a2edf04557e549b",
-      "sourceBytes": 48020,
-      "outputBytes": 40100,
-      "gzipBytes": 37398,
-      "brotliBytes": 36957,
+      "cacheKey": "bdf49b6f836740888da67329a6b8f8ac53364774256ffb8af8be84a7fa4e7e0b",
+      "sourceSha256": "9d07e98e96fe39d2dd6092da9dce8c99be82807634b5b640ca12de39bb747b53",
+      "outputSha256": "aaec3662cb162ca41e2812d69916885dc94356c945c53400602533538839d6cc",
+      "sourceBytes": 49676,
+      "outputBytes": 38712,
+      "gzipBytes": 35933,
+      "brotliBytes": 35542,
       "sourceStats": {
         "scenes": 1,
         "nodes": 2,
@@ -17114,12 +17642,12 @@
             0.746683657169342
           ]
         },
-        "bufferBytes": 46256,
+        "bufferBytes": 47912,
         "logicalAccessorBytes": 3588,
         "logicalVertexBytes": 3072,
         "logicalIndexBytes": 516,
         "geometryBufferBytes": 3588,
-        "imageBufferBytes": 42663,
+        "imageBufferBytes": 44321,
         "nodeNames": [
           "structure-rainforest-idol-01",
           "structure-rainforest-idol-01-mesh"
@@ -17158,12 +17686,12 @@
             0.746673584
           ]
         },
-        "bufferBytes": 39580,
+        "bufferBytes": 38192,
         "logicalAccessorBytes": 2340,
         "logicalVertexBytes": 1824,
         "logicalIndexBytes": 516,
         "geometryBufferBytes": 2436,
-        "imageBufferBytes": 35825,
+        "imageBufferBytes": 34430,
         "nodeNames": [
           "structure-rainforest-idol-01",
           "structure-rainforest-idol-01-mesh"
@@ -17215,13 +17743,13 @@
         },
         "data": {
           "json": 2814,
-          "binary": 37144,
+          "binary": 35756,
           "buffers": {
-            "vertex": 1199,
+            "vertex": 1202,
             "index": 110,
             "animation": 0,
             "transform": 0,
-            "image": 35825
+            "image": 34430
           }
         }
       }
@@ -17331,7 +17859,7 @@
         "sceneBounds": {
           "min": [
             -0.23622122874541665,
-            -1.1069854445860255e-8,
+            -1.1069854445860255e-08,
             -0.2379670171403836
           ],
           "max": [
@@ -17515,7 +18043,7 @@
         "sceneBounds": {
           "min": [
             -0.48641943009798516,
-            -1.887992659085902e-8,
+            -1.887992659085902e-08,
             -0.37610760381597474
           ],
           "max": [
@@ -17699,7 +18227,7 @@
         "sceneBounds": {
           "min": [
             -0.38895991282999764,
-            -1.309459726414608e-9,
+            -1.309459726414608e-09,
             -0.38766183802020704
           ],
           "max": [
@@ -17883,7 +18411,7 @@
         "sceneBounds": {
           "min": [
             -0.3882603861871007,
-            -1.4527959812590807e-8,
+            -1.4527959812590807e-08,
             -0.38640191095304893
           ],
           "max": [
@@ -18018,7 +18546,7 @@
           ],
           "max": [
             0.3868640065193176,
-            1.3090678502303277e-7,
+            1.3090678502303277e-07,
             0.3882460594177193
           ]
         },
@@ -18062,12 +18590,12 @@
         "sceneBounds": {
           "min": [
             -0.38685884909999996,
-            -0.000002088044095127639,
+            -2.088044095127639e-06,
             -0.3884199665253423
           ],
           "max": [
             0.38686856610000003,
-            -0.000001982984596693438,
+            -1.982984596693438e-06,
             0.38843544669740737
           ]
         },
@@ -18194,7 +18722,7 @@
           ],
           "max": [
             0.49568402767181396,
-            1.6134356800590055e-7,
+            1.6134356800590055e-07,
             0.4785161018371511
           ]
         },
@@ -18238,12 +18766,12 @@
         "sceneBounds": {
           "min": [
             -0.4957264640000001,
-            0.000003900842536874727,
+            3.900842536874727e-06,
             -0.47847257504286134
           ],
           "max": [
             0.495667576,
-            0.0000040302684465864935,
+            4.0302684465864935e-06,
             0.4785586319694506
           ]
         },
@@ -21703,15 +22231,15 @@
     }
   ],
   "totals": {
-    "sourceBytes": 74926936,
-    "outputBytes": 41022552,
-    "gzipBytes": 38944547,
-    "brotliBytes": 38883272,
-    "logicalSourceVertexBytes": 37489040,
-    "logicalOutputVertexBytes": 17971264,
-    "logicalSourceIndexBytes": 4775838,
-    "logicalOutputIndexBytes": 4498566,
-    "savedBytes": 33904384,
-    "reductionRatio": 0.452499
+    "sourceBytes": 75534372,
+    "outputBytes": 41603492,
+    "gzipBytes": 39507606,
+    "brotliBytes": 39443905,
+    "logicalSourceVertexBytes": 37671728,
+    "logicalOutputVertexBytes": 18056649,
+    "logicalSourceIndexBytes": 4806744,
+    "logicalOutputIndexBytes": 4529472,
+    "savedBytes": 33930880,
+    "reductionRatio": 0.449211
   }
 }

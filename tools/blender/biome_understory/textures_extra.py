@@ -189,9 +189,9 @@ def _tex_glacier_ice(tex_dir):
     facets = fbm(w, h, (8, 14), rng, 4)
     cracks = np.clip(1.0 - np.abs(facets - 0.5) * 8.0, 0, 1)
 
-    deep_ice = np.array([0.38, 0.68, 0.88]) * (0.80 + 0.30 * facets[..., None])
-    rime_snow = np.array([0.90, 0.94, 0.98])
-    snow_mix = np.clip((u < 0.45) * 0.75 + v * 0.45 + cracks * 0.45 - 0.25, 0, 1)
+    deep_ice = np.array([0.74, 0.88, 0.96]) * (0.86 + 0.20 * facets[..., None])
+    rime_snow = np.array([0.96, 0.98, 1.00])
+    snow_mix = np.clip((u < 0.45) * 0.75 + v * 0.50 + cracks * 0.45 - 0.15, 0, 1)
     col = deep_ice * (1 - snow_mix[..., None]) + rime_snow * snow_mix[..., None]
     rgba = np.concatenate([np.clip(col, 0, 1), np.ones((h, w, 1))], axis=2)
     alb = save_image('glacier_ice_alb', rgba, os.path.join(tex_dir, 'glacier-ice-alb.png'))
@@ -200,7 +200,7 @@ def _tex_glacier_ice(tex_dir):
 
 
 def _tex_glacier_moraine(tex_dir):
-    """Frost-shattered dark alpine slate moraine with windblown snow caps and rime frost."""
+    """Frost-weathered pale alpine granite/limestone moraine with windblown snow caps and rime frost."""
     rng = np.random.default_rng(305)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -208,9 +208,9 @@ def _tex_glacier_moraine(tex_dir):
     noise = fbm(w, h, (10, 10), rng, 4)
     strata = fbm(w, h, (4, 18), rng, 3)
 
-    slate = np.array([0.22, 0.25, 0.30]) * (0.68 + 0.55 * strata[..., None])
-    snow_cap = np.clip((v - 0.48) * 2.2 + (noise - 0.45) * 1.4, 0, 1)
-    snow_col = np.array([0.88, 0.92, 0.96]) * (0.9 + 0.12 * noise[..., None])
+    slate = np.array([0.72, 0.70, 0.65]) * (0.80 + 0.32 * strata[..., None])
+    snow_cap = np.clip((v - 0.36) * 2.2 + (noise - 0.42) * 1.4, 0, 1)
+    snow_col = np.array([0.93, 0.95, 0.98]) * (0.92 + 0.10 * noise[..., None])
     col = slate * (1 - snow_cap[..., None]) + snow_col * snow_cap[..., None]
     rgba = np.concatenate([np.clip(col, 0, 1), np.ones((h, w, 1))], axis=2)
     alb = save_image('glacier_moraine_alb', rgba, os.path.join(tex_dir, 'glacier-moraine-alb.png'))
@@ -219,7 +219,7 @@ def _tex_glacier_moraine(tex_dir):
 
 
 def _tex_steppe_feathergrass(tex_dir):
-    """Silvery-gold Eurasian steppe feathergrass (Stipa) plumes & frosty grey-green wormwood (Artemisia)."""
+    """Silvery-sage Eurasian steppe feathergrass (Stipa) plumes & frosty grey-green wormwood (Artemisia)."""
     rng = np.random.default_rng(306)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -227,16 +227,16 @@ def _tex_steppe_feathergrass(tex_dir):
     rgba = np.zeros((h, w, 4), dtype=np.float32)
     fine = fbm(w, h, (14, 14), rng, 3)
 
-    # Silvery-ivory silky feathergrass awns fanning across card
-    for k in range(9):
-        u0 = 0.14 + k * 0.09
-        bend = 0.12 * (v ** 1.6) * (1 if k % 2 == 0 else -0.7)
+    # Sage-olive grass blades grading to feathery golden-sage tips (g > max(r, b) so gradeUnderstory grades them!)
+    for k in range(11):
+        u0 = 0.12 + k * 0.076
+        bend = 0.08 * (v ** 1.5) * (1 if k % 2 == 0 else -0.8)
         du = np.abs(u - (u0 + bend))
-        w_awn = (0.018 + 0.045 * np.clip((v - 0.35) / 0.65, 0, 1)) * (1.0 - 0.3 * v)
-        in_awn = du <= w_awn
+        w_awn = 0.032 * (1.0 - 0.72 * (v ** 1.2))
+        in_awn = (v >= 0.02) & (v <= 0.92) & (du <= w_awn)
         col = (
-            np.array([0.26, 0.34, 0.22]) * np.clip(1.0 - v * 2.2, 0, 1)[..., None]
-            + np.array([0.86, 0.82, 0.70]) * np.clip(v * 2.2, 0, 1)[..., None]
+            np.array([0.24, 0.36, 0.18]) * np.clip(1.0 - v * 1.4, 0, 1)[..., None]
+            + np.array([0.46, 0.56, 0.32]) * np.clip(v * 1.4, 0, 1)[..., None]
         ) * (0.85 + 0.25 * fine[..., None])
         rgba[in_awn, :3] = np.clip(col[in_awn], 0, 1)
         rgba[in_awn, 3] = 1.0
@@ -254,9 +254,9 @@ def _tex_alpine_edelweiss(tex_dir):
 
     # Limestone slab in u < 0.48
     in_stone = u < 0.48
-    stone = np.array([0.52, 0.54, 0.56]) * (0.72 + 0.45 * noise[..., None])
-    snow = (v > 0.62) & (noise > 0.52)
-    stone[snow] = np.array([0.90, 0.93, 0.97])
+    stone = np.array([0.74, 0.72, 0.66]) * (0.80 + 0.32 * noise[..., None])
+    snow = (v > 0.56) & (noise > 0.48)
+    stone[snow] = np.array([0.92, 0.94, 0.97])
     rgba[in_stone, :3] = np.clip(stone[in_stone], 0, 1)
     rgba[in_stone, 3] = 1.0
 
@@ -276,10 +276,10 @@ def _tex_alpine_edelweiss(tex_dir):
     rgba[in_edel, :3] = ecol[in_edel]
     rgba[in_edel, 3] = 1.0
 
-    gu, gv = (ru - 0.72) / 0.22, (v - 0.58) / 0.18
+    gu, gv = (ru - 0.72) / 0.18, (v - 0.58) / 0.15
     gr = np.sqrt(gu * gu + gv * gv)
     in_gent = (u >= 0.50) & (gr <= 0.85)
-    rgba[in_gent, :3] = np.array([0.16, 0.28, 0.86]) * (0.8 + 0.3 * (1 - gr[in_gent, None]))
+    rgba[in_gent, :3] = np.array([0.42, 0.52, 0.72]) * (0.85 + 0.22 * (1 - gr[in_gent, None]))
     rgba[in_gent, 3] = 1.0
 
     alb = save_image('alpine_edelweiss_alb', rgba, os.path.join(tex_dir, 'alpine-edelweiss-alb.png'))
@@ -298,9 +298,9 @@ def _tex_savanna_termite(tex_dir):
     pores = fbm(w, h, (24, 24), rng, 3)
 
     in_clay = u < 0.58
-    clay = np.array([0.58, 0.26, 0.14]) * (0.68 + 0.52 * flutes[..., None]) * (0.85 + 0.25 * pores[..., None])
-    vent = (pores < 0.26) & (flutes < 0.42)
-    clay[vent] *= 0.35
+    clay = np.array([0.74, 0.58, 0.38]) * (0.78 + 0.36 * flutes[..., None]) * (0.88 + 0.20 * pores[..., None])
+    vent = (pores < 0.24) & (flutes < 0.40)
+    clay[vent] *= 0.55
     rgba[in_clay, :3] = np.clip(clay[in_clay], 0, 1)
     rgba[in_clay, 3] = 1.0
 
@@ -329,26 +329,26 @@ def _tex_savanna_desert_rose(tex_dir):
     noise = fbm(w, h, (8, 12), rng, 4)
 
     in_bark = u < 0.46
-    bark = np.array([0.52, 0.45, 0.36]) * (0.76 + 0.42 * noise[..., None])
+    bark = np.array([0.66, 0.60, 0.48]) * (0.82 + 0.28 * noise[..., None])
     rgba[in_bark, :3] = np.clip(bark[in_bark], 0, 1)
     rgba[in_bark, 3] = 1.0
 
-    # Right half: Adenium foliage & vivid rose-crimson 5-petal blossoms with pale throats
+    # Right half: Adenium foliage & subtle warm coral-gold desert blossoms
     ru = (u - 0.48) / 0.52
-    env = 0.42 * np.sin(np.clip(v, 0.04, 0.96) * math.pi)
-    in_fol = (u >= 0.48) & (np.abs(ru - 0.5) <= env) & (noise > 0.30)
-    rgba[in_fol, :3] = np.array([0.18, 0.34, 0.12]) * (0.8 + 0.35 * noise[in_fol, None])
+    env = 0.40 * np.sin(np.clip(v, 0.04, 0.94) * math.pi)
+    in_fol = (u >= 0.48) & (v <= 0.90) & (np.abs(ru - 0.5) <= env) & (noise > 0.32)
+    rgba[in_fol, :3] = np.array([0.24, 0.38, 0.16]) * (0.82 + 0.32 * noise[in_fol, None])
     rgba[in_fol, 3] = 1.0
 
-    for fu, fv in ((0.64, 0.58), (0.82, 0.66), (0.72, 0.82)):
-        fr = np.sqrt(((u - fu) / 0.11) ** 2 + ((v - fv) / 0.11) ** 2)
+    for fu, fv in ((0.66, 0.62), (0.80, 0.70)):
+        fr = np.sqrt(((u - fu) / 0.065) ** 2 + ((v - fv) / 0.065) ** 2)
         fang = np.arctan2(v - fv, u - fu)
         pet = 0.78 + 0.22 * np.cos(fang * 5)
         in_flw = fr <= pet
         fcol = np.where(
-            (fr < 0.35)[..., None],
-            np.array([0.96, 0.88, 0.86]),
-            np.array([0.88, 0.14, 0.36]),
+            (fr < 0.38)[..., None],
+            np.array([0.92, 0.84, 0.58]),
+            np.array([0.82, 0.44, 0.28]),
         )
         rgba[in_flw, :3] = fcol[in_flw]
         rgba[in_flw, 3] = 1.0
@@ -368,7 +368,7 @@ def _tex_savanna_ribcage(tex_dir):
     horn = v > 0.80
     bone[horn] = np.array([0.26, 0.22, 0.18]) * (0.8 + 0.3 * noise[horn, None])
 
-    earth = np.array([0.48, 0.30, 0.18]) * (0.72 + 0.45 * noise[..., None])
+    earth = np.array([0.74, 0.64, 0.46]) * (0.82 + 0.28 * noise[..., None])
     col = np.where((u < 0.55)[..., None], bone, earth)
     rgba = np.concatenate([np.clip(col, 0, 1), np.ones((h, w, 1))], axis=2)
     alb = save_image('savanna_ribcage_alb', rgba, os.path.join(tex_dir, 'savanna-ribcage-alb.png'))
@@ -412,24 +412,24 @@ def _tex_farmland_poppy_wheat(tex_dir):
 
 
 def _tex_structure_waystone(tex_dir):
-    """Weathered carved granite waystone obelisk with mossy base and glowing cyan/gold elder runes."""
+    """Weathered carved granite waystone obelisk with mossy base and subtle carved runes."""
     rng = np.random.default_rng(312)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
     u, v = xs / w, 1.0 - ys / h
     noise = fbm(w, h, (8, 8), rng, 4)
 
-    stone = np.array([0.38, 0.40, 0.43]) * (0.72 + 0.48 * noise[..., None])
-    # Moss creeping up from base (v < 0.35)
-    moss = np.clip((0.36 - v) * 3.0 + (noise - 0.48) * 1.5, 0, 1)
-    stone = stone * (1 - moss[..., None]) + np.array([0.16, 0.32, 0.10]) * moss[..., None]
+    stone = np.array([0.64, 0.62, 0.56]) * (0.80 + 0.32 * noise[..., None])
+    # Moss creeping up from base (v < 0.38)
+    moss = np.clip((0.38 - v) * 2.8 + (noise - 0.46) * 1.4, 0, 1)
+    stone = stone * (1 - moss[..., None]) + np.array([0.22, 0.38, 0.14]) * moss[..., None]
 
-    # Carved glowing cyan-blue geometric rune glyphs along centre of obelisk faces
+    # Carved weathered lichen-gold rune glyphs along centre of obelisk faces
     du = np.abs((u * 4.0) % 1.0 - 0.5)
-    glyph_band = (v > 0.32) & (v < 0.82) & (du < 0.14)
-    rune_pattern = (np.abs(np.sin(v * 26 * math.pi) - du * 4.5) < 0.22) | (du < 0.028)
+    glyph_band = (v > 0.32) & (v < 0.80) & (du < 0.12)
+    rune_pattern = (np.abs(np.sin(v * 24 * math.pi) - du * 4.5) < 0.18) | (du < 0.024)
     is_rune = glyph_band & rune_pattern
-    stone[is_rune] = np.array([0.22, 0.88, 0.96])
+    stone[is_rune] = np.array([0.78, 0.72, 0.44])
 
     rgba = np.concatenate([np.clip(stone, 0, 1), np.ones((h, w, 1))], axis=2)
     alb = save_image('structure_waystone_alb', rgba, os.path.join(tex_dir, 'structure-waystone-alb.png'))
@@ -447,9 +447,9 @@ def _tex_structure_ruined_column(tex_dir):
     noise = fbm(w, h, (8, 8), rng, 4)
 
     flutes = 0.5 + 0.5 * np.cos(u / 0.62 * 16 * math.pi)
-    marble = np.array([0.76, 0.73, 0.66]) * (0.78 + 0.22 * flutes[..., None]) * (0.82 + 0.28 * noise[..., None])
-    moss = (noise > 0.58) & (v < 0.55)
-    marble[moss] = np.array([0.18, 0.33, 0.11]) * (0.8 + 0.35 * noise[moss, None])
+    marble = np.array([0.48, 0.46, 0.38]) * (0.78 + 0.22 * flutes[..., None]) * (0.82 + 0.28 * noise[..., None])
+    moss = (noise > 0.46) | (v < 0.42)
+    marble[moss] = np.array([0.22, 0.38, 0.14]) * (0.8 + 0.35 * noise[moss, None])
     in_stone = u < 0.62
     rgba[in_stone, :3] = np.clip(marble[in_stone], 0, 1)
     rgba[in_stone, 3] = 1.0
@@ -506,23 +506,23 @@ def _tex_structure_milestone(tex_dir):
 
 
 def _tex_structure_dwarven_cairn(tex_dir):
-    """u < 0.55: dressed dark basalt with dwarven bronze trim; u >= 0.55: glowing ember brazier & geometric rune bands."""
+    """u < 0.55: dressed warm badlands sandstone/basalt with dwarven bronze trim; u >= 0.55: carved chevron bands."""
     rng = np.random.default_rng(315)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
     u, v = xs / w, 1.0 - ys / h
     noise = fbm(w, h, (8, 8), rng, 4)
 
-    basalt = np.array([0.20, 0.21, 0.24]) * (0.75 + 0.4 * noise[..., None])
+    basalt = np.array([0.56, 0.50, 0.42]) * (0.80 + 0.32 * noise[..., None])
     bronze_band = ((v > 0.44) & (v < 0.52)) | ((v > 0.78) & (v < 0.85))
-    basalt[bronze_band] = np.array([0.68, 0.48, 0.22]) * (0.85 + 0.25 * noise[bronze_band, None])
+    basalt[bronze_band] = np.array([0.74, 0.58, 0.32]) * (0.85 + 0.25 * noise[bronze_band, None])
 
-    # Right half: carved dwarven chevron runes & glowing forge-ember coals (v > 0.70)
+    # Right half: carved dwarven chevron runes & warm weathered bronze cap
     chev = np.abs(((u * 8 + v * 6) % 1.0) - 0.5) < 0.16
     right = basalt.copy()
-    right[chev & (v < 0.68)] = np.array([0.82, 0.58, 0.24])
+    right[chev & (v < 0.68)] = np.array([0.78, 0.62, 0.34])
     embers = v >= 0.70
-    right[embers] = np.array([0.96, 0.42, 0.10]) * (0.7 + 0.4 * noise[embers, None])
+    right[embers] = np.array([0.72, 0.54, 0.30]) * (0.80 + 0.28 * noise[embers, None])
 
     col = np.where((u < 0.55)[..., None], basalt, right)
     rgba = np.concatenate([np.clip(col, 0, 1), np.ones((h, w, 1))], axis=2)
@@ -566,11 +566,11 @@ def _tex_structure_rainforest_idol(tex_dir):
     noise = fbm(w, h, (8, 8), rng, 4)
 
     in_stone = u < 0.58
-    stone = np.array([0.32, 0.34, 0.28]) * (0.7 + 0.5 * noise[..., None])
+    stone = np.array([0.54, 0.56, 0.48]) * (0.78 + 0.34 * noise[..., None])
     carved = (np.cos(u * 24 * math.pi) * np.cos(v * 18 * math.pi)) > 0.35
-    stone[carved] *= 0.58
-    moss = (noise > 0.48) | (v > 0.68)
-    stone[moss] = np.array([0.14, 0.32, 0.09]) * (0.75 + 0.45 * noise[moss, None])
+    stone[carved] *= 0.68
+    moss = (noise > 0.46) | (v > 0.66)
+    stone[moss] = np.array([0.20, 0.38, 0.13]) * (0.80 + 0.35 * noise[moss, None])
     rgba[in_stone, :3] = np.clip(stone[in_stone], 0, 1)
     rgba[in_stone, 3] = 1.0
 
@@ -578,7 +578,7 @@ def _tex_structure_rainforest_idol(tex_dir):
     ru = (u - 0.60) / 0.40
     env = 0.42 * np.sin(np.clip(v, 0.04, 0.96) * math.pi)
     in_leaf = (u >= 0.60) & (np.abs(ru - 0.5) <= env)
-    rgba[in_leaf, :3] = np.array([0.13, 0.35, 0.10]) * (0.8 + 0.3 * noise[in_leaf, None])
+    rgba[in_leaf, :3] = np.array([0.20, 0.40, 0.14]) * (0.82 + 0.28 * noise[in_leaf, None])
     rgba[in_leaf, 3] = 1.0
 
     alb = save_image('structure_idol_alb', rgba, os.path.join(tex_dir, 'structure-idol-alb.png'))
@@ -591,7 +591,7 @@ def _tex_structure_rainforest_idol(tex_dir):
 # ---------------------------------------------------------------------------
 
 def _shrub_card_atlas(tex_dir, name, filename, seed, wood_rgb, leaf_rgb, accent_rgb, accent_v=0.62, accent_thresh=0.60):
-    """Shared generator for biome shrub textures: u < 0.30 is woody bark; u >= 0.30 is branching shrub card with foliage & blooms/berries."""
+    """Shared generator for biome shrub textures: u < 0.30 is woody bark; u >= 0.30 is radially-feathered foliage cluster with blooms/berries."""
     rng = np.random.default_rng(seed)
     w = h = 256
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -601,50 +601,57 @@ def _shrub_card_atlas(tex_dir, name, filename, seed, wood_rgb, leaf_rgb, accent_
     clump = fbm(w, h, (16, 16), rng, 3)
 
     in_wood = u < 0.30
-    rgba[in_wood, :3] = np.clip(np.array(wood_rgb) * (0.72 + 0.48 * noise[in_wood, None]), 0, 1)
+    rgba[in_wood, :3] = np.clip(np.array(wood_rgb) * (0.78 + 0.38 * noise[in_wood, None]), 0, 1)
     rgba[in_wood, 3] = 1.0
 
     fu = (u - 0.30) / 0.70
-    cx = 0.5 + 0.07 * np.sin(v * 8.0)
-    dist = np.abs(fu - cx)
-    env = 0.45 * np.sin(np.clip(v * 1.05, 0.02, 0.98) * math.pi) + 0.05
-    in_branch = (u >= 0.30) & (dist < 0.042 * (1 - 0.5 * v))
-    in_leaves = (u >= 0.30) & (dist <= env) & (clump > 0.33 + 0.25 * (dist / np.maximum(env, 0.05)))
+    # Elliptical distance from card center (fu=0.5, v=0.45) so top, bottom, and side edges are strictly alpha=0
+    dx = (fu - 0.50) / 0.43
+    dy = (v - 0.45) / 0.42
+    r_ell = np.sqrt(dx * dx + dy * dy)
+    ang = np.arctan2(dy, dx)
+    lobes = 0.08 * np.cos(ang * 7.0 + noise * 2.5)
+    # Dense core (r_ell < 0.62) for 3D cushion UVs + feathered outer leaf sprigs (0.62..0.92)
+    in_leaves = (u >= 0.32) & (r_ell <= 0.90 + lobes) & (
+        (r_ell <= 0.64) | (clump > 0.28 + 0.42 * np.clip((r_ell - 0.58) / 0.34, 0, 1))
+    )
+    in_branch = (u >= 0.32) & (v >= 0.05) & (v <= 0.58) & (np.abs(fu - 0.5 - 0.04 * np.sin(v * 7.0)) < 0.036 * (1 - 0.5 * v))
     rgba[in_branch, :3] = np.array(wood_rgb)
     rgba[in_branch, 3] = 1.0
-    rgba[in_leaves, :3] = np.clip(np.array(leaf_rgb) * (0.76 + 0.42 * clump[in_leaves, None]), 0, 1)
+    shade = (0.78 + 0.36 * clump[..., None]) * (0.86 + 0.22 * np.clip(v, 0, 1)[..., None])
+    rgba[in_leaves, :3] = np.clip(np.array(leaf_rgb) * shade[in_leaves], 0, 1)
     rgba[in_leaves, 3] = 1.0
     if accent_rgb is not None:
-        is_acc = in_leaves & (v >= accent_v) & (clump >= accent_thresh)
-        rgba[is_acc, :3] = np.clip(np.array(accent_rgb) * (0.85 + 0.25 * clump[is_acc, None]), 0, 1)
+        is_acc = in_leaves & (v >= accent_v) & (v <= 0.84) & (r_ell <= 0.78) & (clump >= accent_thresh)
+        rgba[is_acc, :3] = np.clip(np.array(accent_rgb) * (0.86 + 0.22 * clump[is_acc, None]), 0, 1)
     return save_image(name, rgba, os.path.join(tex_dir, filename))
 
 
 def _tex_bush_ocotillo(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_ocotillo_alb', 'bush-ocotillo-alb.png', 321,
-                             (0.36, 0.30, 0.24), (0.24, 0.36, 0.18), (0.92, 0.20, 0.12), accent_v=0.72, accent_thresh=0.52)
+                             (0.48, 0.42, 0.34), (0.28, 0.42, 0.20), (0.82, 0.42, 0.22), accent_v=0.64, accent_thresh=0.72)
 
 
 def _tex_bush_savanna(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_savanna_alb', 'bush-savanna-alb.png', 322,
-                             (0.38, 0.28, 0.18), (0.26, 0.35, 0.14), (0.90, 0.78, 0.24), accent_v=0.65, accent_thresh=0.62)
+                             (0.46, 0.38, 0.28), (0.28, 0.42, 0.18), (0.78, 0.72, 0.32), accent_v=0.62, accent_thresh=0.72)
 
 
 def _tex_bush_gorse(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_gorse_alb', 'bush-gorse-alb.png', 323,
-                             (0.30, 0.22, 0.15), (0.16, 0.32, 0.11), (0.96, 0.76, 0.12), accent_v=0.38, accent_thresh=0.52)
+                             (0.36, 0.28, 0.20), (0.22, 0.42, 0.15), (0.88, 0.74, 0.20), accent_v=0.52, accent_thresh=0.68)
 
 
 def _tex_bush_juniper(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_juniper_alb', 'bush-juniper-alb.png', 324,
-                             (0.28, 0.20, 0.16), (0.15, 0.28, 0.16), (0.78, 0.84, 0.90), accent_v=0.55, accent_thresh=0.62)
+                             (0.36, 0.28, 0.22), (0.20, 0.36, 0.18), (0.30, 0.42, 0.48), accent_v=0.54, accent_thresh=0.72)
 
 
 def _tex_bush_hibiscus(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_hibiscus_alb', 'bush-hibiscus-alb.png', 325,
-                             (0.32, 0.24, 0.16), (0.13, 0.36, 0.10), (0.92, 0.14, 0.26), accent_v=0.48, accent_thresh=0.58)
+                             (0.36, 0.28, 0.20), (0.20, 0.44, 0.14), (0.84, 0.26, 0.30), accent_v=0.56, accent_thresh=0.72)
 
 
 def _tex_bush_buttonbush(tex_dir):
     return _shrub_card_atlas(tex_dir, 'bush_buttonbush_alb', 'bush-buttonbush-alb.png', 326,
-                             (0.22, 0.19, 0.14), (0.16, 0.29, 0.10), (0.86, 0.84, 0.68), accent_v=0.60, accent_thresh=0.62)
+                             (0.30, 0.25, 0.18), (0.22, 0.38, 0.14), (0.68, 0.74, 0.46), accent_v=0.58, accent_thresh=0.72)

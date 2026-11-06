@@ -237,16 +237,16 @@ def _tex_badlands_deadwood(tex_dir):
 
     strata = 0.5 + 0.5 * np.sin((v * 8 + u * 2 + noise * 2.5) * math.pi)
     rock_col = (
-        np.array([0.46, 0.27, 0.18]) * strata[..., None]
-        + np.array([0.29, 0.26, 0.23]) * (1 - strata[..., None])
-    ) * (0.72 + 0.48 * noise[..., None])
-    # Ochre lichen speckles on upper rock faces
+        np.array([0.78, 0.66, 0.48]) * strata[..., None]
+        + np.array([0.62, 0.54, 0.42]) * (1 - strata[..., None])
+    ) * (0.82 + 0.32 * noise[..., None])
+    # Warm golden-ochre desert lichen on upper rock faces
     lichen = (noise > 0.64) & (grain > 0.52) & (v > 0.45)
-    rock_col[lichen] = np.array([0.66, 0.46, 0.20])
+    rock_col[lichen] = np.array([0.82, 0.68, 0.36])
 
     wood_col = (
-        np.array([0.58, 0.51, 0.42]) * (0.72 + 0.45 * grain[..., None])
-        - np.array([0.18, 0.16, 0.14]) * np.clip(1.0 - np.abs(grain - 0.5) * 5.0, 0, 1)[..., None]
+        np.array([0.76, 0.70, 0.58]) * (0.80 + 0.32 * grain[..., None])
+        - np.array([0.14, 0.12, 0.10]) * np.clip(1.0 - np.abs(grain - 0.5) * 5.0, 0, 1)[..., None]
     )
     col = np.where((u < 0.52)[..., None], rock_col, wood_col)
     height = np.where(u < 0.52, strata * 0.5 + noise * 0.5, grain)

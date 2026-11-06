@@ -171,6 +171,7 @@ export class StylizedBushView {
       for (let index = 0; index < variants.length; index += 1) {
         this.prototypeBiomeRules.push({
           tileIds: definition.tileIds ?? null,
+          paletteTileId: definition.paletteTileId ?? definition.tileIds?.[0],
           weight: definition.weight ?? 1,
           character: definition.character ?? null,
           characterStrength: definition.characterStrength,
@@ -194,13 +195,14 @@ export class StylizedBushView {
         geometry.dispose();
         throw new Error(`Bush prototype ${source.name || index} has no material.`);
       }
+      const rule = this.prototypeBiomeRules[firstNewPrototype + index];
       return {
         geometry,
         material: cloneBushMaterial(sourceMaterial, {
           config: this.config,
           motion,
           height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
-          tileId: this.prototypeBiomeRules[firstNewPrototype + index]?.tileIds?.[0],
+          tileId: rule?.paletteTileId ?? rule?.tileIds?.[0],
         }),
         kind: 'bush',
         height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
@@ -208,10 +210,13 @@ export class StylizedBushView {
       };
     });
     const proxyColor = bushes.proxyColor ?? bushes.colorLarge;
-    const newProxyPrototypes = newPrototypes.map((prototype, index) => createBushProxyPrototype(
-      prototype,
-      { color: proxyColor, config: this.config, tileId: this.prototypeBiomeRules[firstNewPrototype + index]?.tileIds?.[0] },
-    ));
+    const newProxyPrototypes = newPrototypes.map((prototype, index) => {
+      const rule = this.prototypeBiomeRules[firstNewPrototype + index];
+      return createBushProxyPrototype(
+        prototype,
+        { color: proxyColor, config: this.config, tileId: rule?.paletteTileId ?? rule?.tileIds?.[0] },
+      );
+    });
     this.prototypes.push(...newPrototypes);
     this.proxyPrototypes.push(...newProxyPrototypes);
     this.prototypeHeight = Math.max(...this.prototypes.map((prototype) => prototype.height));
