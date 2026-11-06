@@ -2,20 +2,20 @@ import { applyJungleMist } from './ambient/jungleMistOutput.js';
 import { authoredFoliageColor, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { rockShadeEmission } from './forest/foliageLight.js';
 import { cachedLodPlan } from './lod/CachedLodPlan.js';
-import { ITERATOR_PENDING } from './ResumableIterator.js';
+import { completeIterator, ITERATOR_PENDING } from './ResumableIterator.js';
 import { stepViewRebuild } from './StagedViewRebuild.js';
 import { RockManifestStore } from './RockManifestStore.js';
 import * as THREE from 'three/webgpu';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
-import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
+import { iterateAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { instanceCapacity } from './scatterMath.js';
 import {
   placementSignature,
 } from './StableScatterManifest.js';
 import {
   buildChunkLodPlan,
-  createInstancedRenderers,
+  iterateInstancedRenderers,
   disposeInstancedRenderers,
   pruneStateMap,
 } from './lod/StylizedLodRuntime.js';
@@ -194,12 +194,16 @@ export class StylizedRockView {
    * instances, and only the new ones get renderers.
    */
   appendVariants(authoredVariants = []) {
+    return completeIterator(this.appendVariantsJob(authoredVariants));
+  }
+
+  *appendVariantsJob(authoredVariants = []) {
     if (!this.config.rocks.enabled || this.disposed || authoredVariants.length === 0) return;
     const firstNewPrototype = this.prototypes.length;
     const extracted = [];
     for (const { scene, definition } of authoredVariants) {
       const firstIndex = firstNewPrototype + extracted.length;
-      const variants = extractAuthoredMeshPrototypes(scene, {
+      const variants = yield* iterateAuthoredMeshPrototypes(scene, {
         scale: definition.scale,
         rootNames: definition.rootNames,
       });
@@ -228,13 +232,14 @@ export class StylizedRockView {
       regionalCharacterField: this.regionalCharacterField,
     });
     this.prototypeBiomeRulesSignature = JSON.stringify(this.prototypeBiomeRules);
-    const newPrototypes = extracted.map(({ geometry, source }) => ({
-      geometry,
-      material: createStylizedRockMaterial(source, this.config, this.rockWeathering()),
-      kind: 'rock',
-      instanceSurface: Boolean(this.rockWeatheringSettings),
-      instanceBiomeLook: Boolean(this.rockWeatheringSettings),
-    }));
+    const newPrototypes = [];
+    for (const { geometry, source } of extracted) {
+      const material = createStylizedRockMaterial(source, this.config, this.rockWeathering());
+      newPrototypes.push({ geometry, material, kind: 'rock',
+        instanceSurface: Boolean(this.rockWeatheringSettings),
+        instanceBiomeLook: Boolean(this.rockWeatheringSettings) });
+      yield material;
+    }
     this.prototypes.push(...newPrototypes);
     // Both fields describe the terrain, not the prop set, so they are built once
     // on the first variant and reused by every one that streams in later.
@@ -259,13 +264,15 @@ export class StylizedRockView {
     // These authored meshes are already compact enough for the complete rock
     // residency window. Keeping cloned authored parts in the proxy band avoids
     // reverting to the old textureless dodecahedron in the mid-ground.
-    const newProxyPrototypes = newPrototypes.map((prototype) => [{
-      geometry: prototype.geometry.clone(),
-      material: prototype.material.clone(),
-      kind: 'rock',
-      instanceSurface: prototype.instanceSurface,
-      instanceBiomeLook: prototype.instanceBiomeLook,
-    }]);
+    const newProxyPrototypes = [];
+    for (const prototype of newPrototypes) {
+      const geometry = prototype.geometry.clone();
+      yield geometry;
+      const material = prototype.material.clone();
+      yield material;
+      newProxyPrototypes.push([{ geometry, material, kind: 'rock',
+        instanceSurface: prototype.instanceSurface, instanceBiomeLook: prototype.instanceBiomeLook }]);
+    }
     this.proxyPrototypes.push(...newProxyPrototypes);
     this.prototypeHeights.push(...newPrototypes.map((prototype) => {
       prototype.geometry.computeBoundingBox();
@@ -279,7 +286,7 @@ export class StylizedRockView {
       geometry.boundingBox.max.x - geometry.boundingBox.min.x,
       geometry.boundingBox.max.z - geometry.boundingBox.min.z,
     )));
-    this.meshes.push(...createInstancedRenderers({
+    this.meshes.push(...yield* iterateInstancedRenderers({
       root: this.root,
       partsByPrototype: newPrototypes.map((prototype) => [prototype]),
       renderer: this.terrainView.renderer,
@@ -287,7 +294,7 @@ export class StylizedRockView {
       name: `stylized-rock-near-${firstNewPrototype}`,
       castShadow: true,
     }));
-    this.proxyMeshes.push(...createInstancedRenderers({
+    this.proxyMeshes.push(...yield* iterateInstancedRenderers({
       root: this.root,
       partsByPrototype: newProxyPrototypes,
       renderer: this.terrainView.renderer,

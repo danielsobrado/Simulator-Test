@@ -271,6 +271,9 @@ export function buildPerfReport({
       'meadowDeadlineDeferredResults', 'meadowPublicationDeferredResults', 'meadowAttributeBytesUploaded',
       'meadowCompactionReuses', 'meadowRepackBytes', 'meadowPublications', 'meadowPublicationBytes',
       'meadowBatchPublicationBytes', 'meadowOriginMaintenanceBytes', 'meadowOversizedPageBytes',
+      'meadowInitialGpuAllocationBytes', 'meadowInitialGpuAllocationMs', 'meadowInitialGpuUploadBytes',
+      'meadowInitialGpuUploadSlices', 'streamedInitialUploadCpuMs', 'streamedDrawPreparationMs',
+      'stylizedVariantApplyMs', 'stylizedVariantApplySlices',
       'meadowPageCommitsDeferred', 'settlementPlansRequested', 'settlementPlanInstallationCpuMs',
       'settlementPlacementsEvaluated', 'settlementRetirementRowsChecked',
       'objectLodPlacementsEvaluated', 'stylizedInstanceRowsCompared']

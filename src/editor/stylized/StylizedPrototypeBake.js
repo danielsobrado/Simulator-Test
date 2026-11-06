@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { completeIterator } from './ResumableIterator.js';
 
 const COLLIDER_NODE_PATTERN = /^COLLIDER(?:_WALKABLE)?(?:$|[_:.-])/i;
 const AUTHORED_COLLISION_PROXIES = new WeakMap();
@@ -96,7 +97,7 @@ function collectMeshes(roots) {
   return meshes;
 }
 
-function mergePartsByMaterial(parts) {
+function* mergePartsByMaterial(parts) {
   const buckets = new Map();
   for (const part of parts) {
     const material = part.source.material;
@@ -107,22 +108,32 @@ function mergePartsByMaterial(parts) {
     if (bucket) bucket.push(part);
     else buckets.set(key, [part]);
   }
-  return [...buckets.values()].flatMap((bucket) => {
-    if (bucket.length === 1) return bucket;
+  const result = [];
+  for (const bucket of buckets.values()) {
+    if (bucket.length === 1) { result.push(...bucket); continue; }
     const geometry = mergeGeometries(
       bucket.map((part) => ensureVertexNormals(part.geometry)),
       false,
     );
-    if (!geometry) return bucket;
+    if (!geometry) { result.push(...bucket); continue; }
+    yield geometry;
     for (const part of bucket) part.geometry.dispose();
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
     ensureVertexNormals(geometry);
-    return [{ geometry, source: bucket[0].source }];
-  });
+    result.push({ geometry, source: bucket[0].source });
+    yield;
+  }
+  return result;
 }
 
 export function extractAuthoredGroupedPrototypes(
+  scene, options = {},
+) {
+  return completeIterator(iterateAuthoredGroupedPrototypes(scene, options));
+}
+
+export function* iterateAuthoredGroupedPrototypes(
   scene,
   { scale = 1, groups, label = 'Authored prototype' } = {},
 ) {
@@ -130,15 +141,19 @@ export function extractAuthoredGroupedPrototypes(
     throw new Error('Authored scatter prototype scale must be positive.');
   }
   scene.updateMatrixWorld(true);
-  return resolveAuthoredPrototypeGroups(scene, groups, label).map((roots) => {
+  const result = [];
+  for (const roots of resolveAuthoredPrototypeGroups(scene, groups, label)) {
     const meshes = collectMeshes(roots);
     if (meshes.length === 0) throw new Error(`${label} group contains no mesh geometry.`);
-    const parts = meshes.map((source) => {
+    const parts = [];
+    for (const source of meshes) {
       const geometry = bakeWorldGeometry(source);
+      yield geometry;
       if (scale !== 1) geometry.scale(scale, scale, scale);
       geometry.computeBoundingBox();
-      return { geometry, source };
-    });
+      parts.push({ geometry, source });
+      yield;
+    }
     const bounds = new THREE.Box3();
     for (const part of parts) bounds.union(part.geometry.boundingBox);
     const centerX = (bounds.min.x + bounds.max.x) * 0.5;
@@ -148,9 +163,11 @@ export function extractAuthoredGroupedPrototypes(
       part.geometry.computeBoundingBox();
       part.geometry.computeBoundingSphere();
       ensureVertexNormals(part.geometry);
+      yield;
     }
-    return mergePartsByMaterial(parts);
-  });
+    result.push(yield* mergePartsByMaterial(parts));
+  }
+  return result;
 }
 
 function colliderSuffix(name) {
@@ -182,6 +199,10 @@ function alignedProxyGeometry(proxyNode, visualBounds, scale) {
 }
 
 export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = null } = {}) {
+  return completeIterator(iterateAuthoredRockPrototypes(scene, { scale, rootNames }));
+}
+
+function* iterateAuthoredRockPrototypes(scene, { scale = 1, rootNames = null } = {}) {
   if (!Number.isFinite(scale) || scale <= 0) {
     throw new Error('Authored rock prototype scale must be positive.');
   }
@@ -192,19 +213,25 @@ export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = nu
   const meshes = collectMeshes(roots);
   const colliderMeshes = meshes.filter((node) => COLLIDER_NODE_PATTERN.test(node.name ?? ''));
   const visualMeshes = meshes.filter((node) => !COLLIDER_NODE_PATTERN.test(node.name ?? ''));
-  return visualMeshes.map((source, index) => {
+  const result = [];
+  for (const [index, source] of visualMeshes.entries()) {
     const rawVisual = bakeWorldGeometry(source);
+    yield rawVisual;
     if (scale !== 1) rawVisual.scale(scale, scale, scale);
     rawVisual.computeBoundingBox();
     const visualBounds = rawVisual.boundingBox.clone();
     const proxyNode = authoredColliderFor(source, index, visualMeshes.length, colliderMeshes);
-    return {
+    const collisionProxyGeometry = alignedProxyGeometry(proxyNode, visualBounds, scale);
+    if (collisionProxyGeometry) yield collisionProxyGeometry;
+    result.push({
       geometry: groundGeometry(rawVisual),
       source,
-      collisionProxyGeometry: alignedProxyGeometry(proxyNode, visualBounds, scale),
+      collisionProxyGeometry,
       collisionProxyName: proxyNode?.name ?? null,
-    };
-  });
+    });
+    yield;
+  }
+  return result;
 }
 
 /**
@@ -212,7 +239,12 @@ export function extractAuthoredRockPrototypes(scene, { scale = 1, rootNames = nu
  * existing rock view API unchanged while collision-only geometry stays hidden.
  */
 export function extractAuthoredMeshPrototypes(scene, options = {}) {
-  return extractAuthoredRockPrototypes(scene, options).map((prototype) => {
+  return completeIterator(iterateAuthoredMeshPrototypes(scene, options));
+}
+
+export function* iterateAuthoredMeshPrototypes(scene, options = {}) {
+  const prototypes = yield* iterateAuthoredRockPrototypes(scene, options);
+  return prototypes.map((prototype) => {
     if (prototype.collisionProxyGeometry) {
       AUTHORED_COLLISION_PROXIES.set(prototype.geometry, Object.freeze({
         geometry: prototype.collisionProxyGeometry,

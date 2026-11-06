@@ -135,7 +135,9 @@ export class MeadowBandBatch {
     PerfCounters.inc('meadowRepackBytes', plan.repackBytes);
     this.geometry.instanceCount = plan.count;
     if (plan.count > 0 && this.initialUploadBytes > 0) {
-      this.getDrawPreparation()?.register(this.mesh, { uploadBytes: this.initialUploadBytes });
+      this.getDrawPreparation()?.register(this.mesh, { uploadBytes: this.initialUploadBytes,
+        uploadAttributes: [...INSTANCE_ATTRIBUTES.map(([name]) => this.geometry.getAttribute(name)),
+          this.geometry.getAttribute('instanceTile')] });
       this.initialUploadBytes = 0;
     }
     const preparation = this.getDrawPreparation();

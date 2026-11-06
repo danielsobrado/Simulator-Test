@@ -89,6 +89,7 @@ export class StylizedVariantResidency {
     this.failed = new Set();
     this.pendingLoads = [];
     this.pendingApplies = [];
+    this.activeApply = null;
     this.inFlight = 0;
     this.inFlightIds = new Set();
     this.lastScanAt = -Infinity;
@@ -210,27 +211,46 @@ export class StylizedVariantResidency {
     }
   }
 
-  pumpApplies() {
+  pumpApplies(shouldYield = null) {
     let applied = 0;
-    while (applied < this.appliesPerFrame && this.pendingApplies.length > 0) {
-      const job = this.pendingApplies.shift();
-      applied += 1;
+    while (applied < this.appliesPerFrame && (this.activeApply || this.pendingApplies.length > 0)) {
+      if (shouldYield?.()) break;
+      const job = this.activeApply ?? this.pendingApplies.shift();
       const startedAt = performance.now();
       try {
-        const installed = job.layer.apply([{ definition: job.definition, scene: job.scene }]);
+        if (!this.activeApply) {
+          const result = job.layer.apply([{ definition: job.definition, scene: job.scene }]);
+          job.iterator = typeof result?.next === 'function' ? result : null;
+          job.installed = job.iterator ? null : result;
+          this.activeApply = job;
+        }
+        if (job.iterator) {
+          let step;
+          do { step = job.iterator.next(); } while (!step.done && !shouldYield?.());
+          if (!step.done) break;
+          job.installed = step.value;
+        }
+        const installed = job.installed;
         if (Array.isArray(installed)) {
           for (const root of installed) this.terrainView.drawPreparation?.register(root);
         } else this.terrainView.drawPreparation?.discover();
+        this.activeApply = null;
+        applied += 1;
         PerfCounters.inc('stylizedVariantsApplied');
       } catch (error) {
+        job.iterator?.return();
+        this.activeApply = null;
+        applied += 1;
         this.requested.delete(job.id);
         this.failed.add(job.id);
         console.warn(`Stylized variant ${job.definition.scene} could not be installed.`, error);
+      } finally {
+        const elapsedMs = performance.now() - startedAt;
+        PerfCounters.inc('stylizedVariantApplySlices');
+        PerfCounters.inc('stylizedVariantApplyMs', elapsedMs);
+        PerfCounters.set('stylizedVariantApplyMaxMs',
+          Math.max(PerfCounters.get('stylizedVariantApplyMaxMs'), elapsedMs));
       }
-      const elapsedMs = performance.now() - startedAt;
-      PerfCounters.inc('stylizedVariantApplyMs', elapsedMs);
-      PerfCounters.set('stylizedVariantApplyMaxMs',
-        Math.max(PerfCounters.get('stylizedVariantApplyMaxMs'), elapsedMs));
     }
   }
 
@@ -238,6 +258,7 @@ export class StylizedVariantResidency {
     const prefix = `${layerId}|`;
     const pending = this.pendingLoads.filter(job => job.layer.id === layerId).length
       + this.pendingApplies.filter(job => job.layer.id === layerId).length
+      + Number(this.activeApply?.layer.id === layerId)
       + [...this.inFlightIds].filter(id => id.startsWith(prefix)).length;
     const errors = [...this.failed].filter(id => id.startsWith(prefix));
     const layer = this.layers.find(layer => layer.id === layerId);
@@ -246,15 +267,15 @@ export class StylizedVariantResidency {
   }
 
   getPreparationStatus() {
-    return { pending: this.pendingLoads.length + this.pendingApplies.length + this.inFlight,
+    return { pending: this.pendingLoads.length + this.pendingApplies.length + this.inFlight + Number(Boolean(this.activeApply)),
       errors: [...this.failed] };
   }
 
-  update(now = performance.now()) {
+  update(now = performance.now(), shouldYield = null) {
     if (this.disposed || !this.terrainView.focusChunkKey) return;
     // Applies come first so a variant that landed during the previous frame is
     // installed before this frame's scan can queue more work behind it.
-    this.pumpApplies();
+    this.pumpApplies(shouldYield);
     const focus = this.terrainView.focusChunk;
     const scanKey = `${focus.chunkX}:${focus.chunkZ}:${this.biomeAssetPalette?.revision ?? 0}`;
     if (scanKey !== this.lastScanKey || now - this.lastScanAt >= this.rescanIntervalMs) {
@@ -268,6 +289,8 @@ export class StylizedVariantResidency {
 
   dispose() {
     this.disposed = true;
+    this.activeApply?.iterator?.return();
+    this.activeApply = null;
     this.pendingLoads.length = 0;
     this.pendingApplies.length = 0;
     this.chunkTileCache.clear();

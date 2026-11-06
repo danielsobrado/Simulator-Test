@@ -1,5 +1,5 @@
 import { applyJungleMist } from './ambient/jungleMistOutput.js';
-import { ITERATOR_PENDING } from './ResumableIterator.js';
+import { completeIterator, ITERATOR_PENDING } from './ResumableIterator.js';
 import { BudgetedDetailVisibility } from './lod/BudgetedDetailVisibility.js';
 import { stepViewRebuild } from './StagedViewRebuild.js';
 import * as THREE from 'three/webgpu';
@@ -11,11 +11,12 @@ import { instanceCapacity } from './scatterMath.js';
 import { createStableChunkManifestBuilder } from './StableScatterManifest.js';
 import {
   createInstancedRenderers,
+  iterateInstancedRenderers,
   disposeInstancedRenderers,
 } from './lod/StylizedLodRuntime.js';
 import { InstanceAnchor } from './lod/InstanceAnchor.js';
 import { ScatterInstanceRows } from './lod/ScatterInstanceRows.js';
-import { extractAuthoredGroupedPrototypes } from './StylizedPrototypeBake.js';
+import { iterateAuthoredGroupedPrototypes } from './StylizedPrototypeBake.js';
 import { acceptsStrategicDetailPlacement } from './StrategicDetailPlacement.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
@@ -159,16 +160,20 @@ export class StylizedGroundDetailView {
   }
 
   appendVariants(authoredVariants = []) {
+    return completeIterator(this.appendVariantsJob(authoredVariants));
+  }
+
+  *appendVariantsJob(authoredVariants = []) {
     if (!this.layerConfig?.enabled || this.disposed || authoredVariants.length === 0) return;
     const firstNewPrototype = this.prototypes.length;
     for (const { scene, definition } of authoredVariants) {
       const firstIndex = this.prototypes.length;
-      const extracted = extractAuthoredGroupedPrototypes(scene, {
+      const extracted = yield* iterateAuthoredGroupedPrototypes(scene, {
         scale: definition.scale,
         groups: definition.prototypeGroups,
         label: `${this.layerName} variant ${definition.scene}`,
       });
-      extracted.forEach((parts, groupIndex) => {
+      for (const [groupIndex, parts] of extracted.entries()) {
         this.prototypeConform.push(definition.conform === true);
         this.prototypeHeightOffsets.push(
           definition.prototypeHeightOffsets?.[groupIndex]
@@ -197,14 +202,15 @@ export class StylizedGroundDetailView {
           canopy: definition.canopy,
         });
         const foliage = ['groundDetail', 'tropicalPlant'].includes(this.layerName);
-        this.prototypes.push(parts.map(({ geometry, source }) => {
+        const prototype = [];
+        for (const { geometry, source } of parts) {
           const sourceMaterial = materialList(source)[0];
           if (!sourceMaterial) {
             geometry.dispose();
             throw new Error(`${this.layerName} prototype contains a mesh without a material.`);
           }
           geometry.computeBoundingBox();
-          return {
+          const part = {
             geometry,
             material: cloneDetailMaterial(sourceMaterial, {
               // Water plants keep their own current-driven sway, not the air's;
@@ -224,8 +230,11 @@ export class StylizedGroundDetailView {
             kind: 'detail',
             instanceBiomeLook: foliage,
           };
-        }));
-      });
+          prototype.push(part);
+          yield part.material;
+        }
+        this.prototypes.push(prototype);
+      }
       if (extracted.length === 0) {
         throw new Error(`${this.layerName} variant ${definition.scene} produced no prototypes.`);
       }
@@ -244,7 +253,7 @@ export class StylizedGroundDetailView {
       residentRadius: this.layerConfig.residentRadius,
       perChunk: this.layerConfig.perChunk,
     });
-    this.meshes.push(...createInstancedRenderers({
+    this.meshes.push(...yield* iterateInstancedRenderers({
       root: this.root,
       partsByPrototype: this.prototypes.slice(firstNewPrototype),
       renderer: this.terrainView.renderer,

@@ -53,6 +53,7 @@ import { StylizedSkyView } from './StylizedSkyView.js';
 import { StylizedTreeView } from './StylizedTreeView.js';
 import { StylizedWaterSlot } from './StylizedWaterSlot.js';
 import { StylizedVariantResidency } from './StylizedVariantResidency.js';
+import { installVariants } from './VariantInstallation.js';
 import { StylizedWildlifeView } from './StylizedWildlifeView.js';
 import { RegionalCharacterField } from './RegionalCharacterField.js';
 import { GrassTuning } from './GrassTuning.js';
@@ -491,11 +492,7 @@ export class StylizedSurfaceView {
         paths.push(scene);
         return loaded;
       },
-      apply: (variants) => {
-        const previous = new Set(view.root.children);
-        view.appendVariants(variants);
-        return view.root.children.filter(child => !previous.has(child));
-      },
+      apply: variants => installVariants(view, variants),
     });
     const streaming = config.streaming ?? {};
     return new StylizedVariantResidency({
@@ -765,7 +762,9 @@ export class StylizedSurfaceView {
     resetWaterChunkGauges();
     // Ahead of the layer updates: a variant installed here is picked up by this
     // frame's rebuild scheduling rather than waiting for the next one.
-    this.variantResidency?.update(this.frameStartedAt);
+    const updateVariants = () => this.variantResidency?.update(this.frameStartedAt, this.shouldYieldWork);
+    if (this.runDeferredWork) this.runDeferredWork(updateVariants);
+    else updateVariants();
     this.skyView?.update(timestamp, camera);
     syncFoliageLight(this.skyView);
     this.wildlifeView?.update(timestamp, camera);

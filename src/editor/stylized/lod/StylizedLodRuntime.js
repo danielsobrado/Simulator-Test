@@ -12,6 +12,7 @@ import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import { extendInstanceBounds } from './InstanceBoundsUpdate.js';
 import { NEUTRAL_BIOME_LOOK } from '../../biomes/BiomeLooks.js';
 import { instanceGeometryArrays } from './instanceGeometryArrays.js';
+import { completeIterator } from '../ResumableIterator.js';
 
 const WAITING_FADE = Number.EPSILON;
 const UNTINTED = Object.freeze([1, 1, 1]);
@@ -93,7 +94,11 @@ function treeMorphologyCenter(parts, boundsReady = false) {
   return center;
 }
 
-export function createInstancedRenderers({
+export function createInstancedRenderers(options) {
+  return completeIterator(iterateInstancedRenderers(options));
+}
+
+export function* iterateInstancedRenderers({
   root,
   partsByPrototype,
   capacity,
@@ -103,7 +108,10 @@ export function createInstancedRenderers({
   renderer = null,
   reuseVertexArrays = false,
 }) {
-  return partsByPrototype.map((parts, prototypeIndex) => {
+  const result = [];
+  for (const [prototypeIndex, parts] of partsByPrototype.entries()) {
+    const meshes = [];
+    result.push(meshes);
     let morphologyCenter = null;
     if (tintLeaves) {
       // Bounds belong to the prototype. A building needs none of this work,
@@ -111,7 +119,8 @@ export function createInstancedRenderers({
       for (const geometry of new Set(parts.map(part => part.geometry))) geometry.computeBoundingBox();
       morphologyCenter = treeMorphologyCenter(parts, true);
     }
-    return parts.map((part, partIndex) => {
+    for (const [partIndex, part] of parts.entries()) {
+      yield;
       const tinted = tintLeaves && part.kind === 'leaf';
       const morphed = tintLeaves;
       const geometry = createGeometry(part.geometry, capacity, tinted, morphed, part.instanceSurface,
@@ -119,6 +128,7 @@ export function createInstancedRenderers({
       if (morphed && part.kind === 'trunk') {
         geometry.setAttribute('instanceRootPlane', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
       }
+      yield geometry;
       const material = createDitheredMaterial(part.material, {
         tinted,
         kind: morphed ? part.kind : null,
@@ -127,6 +137,7 @@ export function createInstancedRenderers({
           z: morphologyCenter.z } : null,
         crownBounds: tinted ? crownBounds(part.geometry) : null,
       });
+      yield material;
       const mesh = new THREE.InstancedMesh(geometry, material, capacity);
       // The matrices as a storage buffer, not an instanced vertex attribute. Past the
       // uniform-buffer limit (~1000 matrices) three wraps a vertex attribute in an
@@ -150,9 +161,10 @@ export function createInstancedRenderers({
       mesh.frustumCulled = true;
       mesh.name = `${name}-${prototypeIndex}-${partIndex}`;
       root.add(mesh);
-      return mesh;
-    });
-  });
+      meshes.push(mesh);
+    }
+  }
+  return result;
 }
 
 function resetDirtyRange(range) {

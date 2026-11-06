@@ -1,5 +1,6 @@
 import { withDrawPreparation, withPreparationFrame } from './DrawPreparation.js';
 import { PerfCounters } from '../../editor/performance/qa/PerfCounters.js';
+import { BudgetedAttributeInitialization } from './BudgetedAttributeInitialization.js';
 
 const MAX_WAIT_FRAMES = 4;
 export const INITIAL_UPLOAD_BYTES_PER_FRAME = 768 * 1024;
@@ -13,6 +14,8 @@ export class StreamedDrawPreparation {
     this.stagedMaterials = new Map();
     this.pending = new Set();
     this.initialUploadBytes = new Map();
+    this.initialUploadAttributes = new Map();
+    this.attributeInitialization = new BudgetedAttributeInitialization(renderer);
     this.hidden = new Map();
     this.disposed = false;
     this.waitFrames = 0;
@@ -37,9 +40,10 @@ export class StreamedDrawPreparation {
     if (reservation) reservation.run(() => this.flush(camera));
     else budget.tryRun(() => this.flush(camera, budget.shouldYield), 6);
   }
-  register(root, { uploadBytes = 0 } = {}) {
+  register(root, { uploadBytes = 0, uploadAttributes = null } = {}) {
     this.discover(root);
     if (uploadBytes > 0 && this.pending.has(root)) this.initialUploadBytes.set(root, uploadBytes);
+    if (uploadAttributes && this.pending.has(root)) this.initialUploadAttributes.set(root, uploadAttributes);
   }
   discover(root = this.scene) {
     if (!this.settings.enabled || this.disposed) return;
@@ -72,45 +76,66 @@ export class StreamedDrawPreparation {
     if (shouldYield?.()) return;
     if (this.disposed || !this.settings.enabled || this.pending.size === 0) return;
     const targets = [];
-    let uploadBytes = 0;
-    for (const mesh of this.pending) {
-      let root = mesh;
-      while (root.parent) root = root.parent;
-      if (root !== this.scene) {
-        this.pending.delete(mesh); this.stagedMaterials.delete(mesh); this.initialUploadBytes.delete(mesh); continue;
-      }
-      const bytes = this.initialUploadBytes.get(mesh) ?? 0;
-      // One oversized allocation may progress alone, never stacked with another draw.
-      if (targets.length && uploadBytes + bytes > INITIAL_UPLOAD_BYTES_PER_FRAME) break;
-      this.pending.delete(mesh);
-      uploadBytes += bytes;
-      targets.push(mesh);
-      if (targets.length >= this.settings.meshesPerFrame || uploadBytes >= INITIAL_UPLOAD_BYTES_PER_FRAME) break;
-    }
-    if (targets.length === 0) return;
-    this.waitFrames = 0;
+    const materials = new Map();
     const started = performance.now();
-    const materials = new Map(targets.map(mesh => [mesh, mesh.material]));
+    let uploadBytes = 0;
+    const uploadStarted = performance.now();
+    let budgetedBytes = 0;
     try {
+      for (const mesh of this.pending) {
+        let root = mesh;
+        while (root.parent) root = root.parent;
+        if (root !== this.scene) {
+          this.attributeInitialization.cancel(this.initialUploadAttributes.get(mesh) ?? []);
+          this.initialUploadAttributes.delete(mesh);
+          this.pending.delete(mesh); this.stagedMaterials.delete(mesh); this.initialUploadBytes.delete(mesh); continue;
+        }
+        const attributes = this.initialUploadAttributes.get(mesh);
+        const budgeted = attributes && this.attributeInitialization.supported;
+        if (budgeted) {
+          const result = this.attributeInitialization.advance(attributes,
+            INITIAL_UPLOAD_BYTES_PER_FRAME - uploadBytes, shouldYield);
+          uploadBytes += result.bytes;
+          budgetedBytes += result.bytes;
+          if (!result.ready) break;
+        }
+        const bytes = budgeted ? 0 : this.initialUploadBytes.get(mesh) ?? 0;
+        // One oversized allocation may progress alone, never stacked with another draw.
+        if (targets.length && uploadBytes + bytes > INITIAL_UPLOAD_BYTES_PER_FRAME) break;
+        this.pending.delete(mesh);
+        uploadBytes += bytes;
+        targets.push(mesh);
+        if (targets.length >= this.settings.meshesPerFrame || uploadBytes >= INITIAL_UPLOAD_BYTES_PER_FRAME) break;
+      }
+      PerfCounters.inc('streamedInitialUploadCpuMs', performance.now() - uploadStarted);
+      PerfCounters.set('meadowInitialGpuUploadMaxFrameBytes',
+        Math.max(PerfCounters.get('meadowInitialGpuUploadMaxFrameBytes'), budgetedBytes));
+      if (budgetedBytes) PerfCounters.inc('streamedDrawInitialUploadBytes', budgetedBytes);
+      if (targets.length === 0) return;
+      this.waitFrames = 0;
+      for (const mesh of targets) materials.set(mesh, mesh.material);
       for (const target of targets) target.material = this.stagedMaterials.get(target) ?? target.material;
       withPreparationFrame(this.renderer, null, () => withDrawPreparation(this.scene, targets, () => this.render(camera)));
       for (const target of targets) {
         this.markPrepared(target, target.material);
         this.stagedMaterials.delete(target);
         this.initialUploadBytes.delete(target);
+        this.attributeInitialization.release(this.initialUploadAttributes.get(target) ?? []);
+        this.initialUploadAttributes.delete(target);
       }
       this.invalidateHistory?.();
       PerfCounters.inc('streamedDrawsPrepared', targets.length);
-      PerfCounters.inc('streamedDrawInitialUploadBytes', uploadBytes);
+      PerfCounters.inc('streamedDrawInitialUploadBytes', uploadBytes - budgetedBytes);
     } catch (error) {
       this.settings = { ...this.settings, enabled: false };
       this.pending.clear(); this.stagedMaterials.clear(); this.initialUploadBytes.clear();
+      this.attributeInitialization.cancel(); this.initialUploadAttributes.clear();
       PerfCounters.inc('streamedDrawPreparationFailures');
       console.warn('Streamed draw preparation unavailable.', error);
     } finally {
       for (const [mesh, material] of materials) mesh.material = material;
+      PerfCounters.inc('streamedDrawPreparationMs', performance.now() - started);
     }
-    PerfCounters.inc('streamedDrawPreparationMs', performance.now() - started);
   }
   hidePending() {
     for (const mesh of this.pending) {
@@ -126,5 +151,6 @@ export class StreamedDrawPreparation {
   dispose() {
     this.reservation?.cancel(); this.reservation = null;
     this.revealPending(); this.disposed = true; this.pending.clear(); this.stagedMaterials.clear(); this.initialUploadBytes.clear();
+    this.attributeInitialization.cancel(); this.initialUploadAttributes.clear();
   }
 }

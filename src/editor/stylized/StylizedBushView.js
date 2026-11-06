@@ -1,4 +1,4 @@
-import { ITERATOR_PENDING } from './ResumableIterator.js';
+import { completeIterator, ITERATOR_PENDING } from './ResumableIterator.js';
 import { cachedLodPlan } from './lod/CachedLodPlan.js';
 import { stepViewRebuild } from './StagedViewRebuild.js';
 import * as THREE from 'three/webgpu';
@@ -8,7 +8,7 @@ import { instanceCapacity } from './scatterMath.js';
 import { createStableChunkManifestBuilder, placementSignature } from './StableScatterManifest.js';
 import {
   buildChunkLodPlan,
-  createInstancedRenderers,
+  iterateInstancedRenderers,
   disposeInstancedRenderers,
   pruneStateMap,
 } from './lod/StylizedLodRuntime.js';
@@ -18,7 +18,7 @@ import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { forestFloorDensity, understoryClusterDensity } from './forest/ForestFloor.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 import { createPathClearanceField } from './TreeManifestStore.js';
-import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
+import { iterateAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
 import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
@@ -150,6 +150,10 @@ export class StylizedBushView {
    * instances, and only the new ones get renderers.
    */
   appendVariants(authoredVariants = []) {
+    return completeIterator(this.appendVariantsJob(authoredVariants));
+  }
+
+  *appendVariantsJob(authoredVariants = []) {
     if (!this.enabled || this.disposed || authoredVariants.length === 0) return;
     const bushes = this.config.bushes;
     // Both fields describe the terrain, not the prop set, so they are built once
@@ -170,7 +174,7 @@ export class StylizedBushView {
     const extracted = [];
     for (const { scene, definition } of authoredVariants) {
       const firstIndex = firstNewPrototype + extracted.length;
-      const variants = extractAuthoredMeshPrototypes(scene, { scale: definition.scale });
+      const variants = yield* iterateAuthoredMeshPrototypes(scene, { scale: definition.scale });
       if (variants.length === 0) {
         throw new Error(`Bush variant ${definition.scene} produced no prototypes.`);
       }
@@ -196,14 +200,15 @@ export class StylizedBushView {
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
     });
-    const newPrototypes = extracted.map(({ geometry, source, motion }, index) => {
+    const newPrototypes = [];
+    for (const [index, { geometry, source, motion }] of extracted.entries()) {
       const sourceMaterial = materialList(source)[0];
       if (!sourceMaterial) {
         geometry.dispose();
         throw new Error(`Bush prototype ${source.name || index} has no material.`);
       }
       const rule = this.prototypeBiomeRules[firstNewPrototype + index];
-      return {
+      const prototype = {
         geometry,
         material: cloneBushMaterial(sourceMaterial, {
           config: this.config,
@@ -217,15 +222,21 @@ export class StylizedBushView {
         height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
         prototypeId: `authored-bush-${firstNewPrototype + index}`,
       };
-    });
+      newPrototypes.push(prototype);
+      yield prototype.material;
+    }
     const proxyColor = bushes.proxyColor ?? bushes.colorLarge;
-    const newProxyPrototypes = newPrototypes.map((prototype, index) => {
+    const newProxyPrototypes = [];
+    for (const [index, prototype] of newPrototypes.entries()) {
       const rule = this.prototypeBiomeRules[firstNewPrototype + index];
-      return createBushProxyPrototype(
+      const proxy = createBushProxyPrototype(
         prototype,
         { color: proxyColor, config: this.config, tileId: rule?.paletteTileId ?? rule?.tileIds?.[0], biomeLook: true },
       );
-    });
+      newProxyPrototypes.push(proxy);
+      yield proxy.geometry;
+      yield proxy.material;
+    }
     this.prototypes.push(...newPrototypes);
     this.proxyPrototypes.push(...newProxyPrototypes);
     this.prototypeHeight = Math.max(...this.prototypes.map((prototype) => prototype.height));
@@ -235,7 +246,7 @@ export class StylizedBushView {
       residentRadius: settings.proxyRadius + 1,
       perChunk: bushes.perChunk,
     });
-    this.meshes.push(...createInstancedRenderers({
+    this.meshes.push(...yield* iterateInstancedRenderers({
       root: this.root,
       renderer: this.terrainView.renderer,
       partsByPrototype: newPrototypes.map((prototype) => [prototype]),
@@ -243,7 +254,7 @@ export class StylizedBushView {
       name: `stylized-bush-near-${firstNewPrototype}`,
       castShadow: BUSH_CAST_SHADOW,
     }));
-    this.proxyMeshes.push(...createInstancedRenderers({
+    this.proxyMeshes.push(...yield* iterateInstancedRenderers({
       root: this.root,
       renderer: this.terrainView.renderer,
       partsByPrototype: newProxyPrototypes.map((prototype) => [prototype]),
