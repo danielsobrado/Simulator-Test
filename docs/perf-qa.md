@@ -1049,8 +1049,17 @@ margin on water. `chunk-cross --x 11453 --z 9877` (a cold-desert pond), `--warmu
 | Avg FPS, focus-valid runs only (20 s) | 140.8, 148.5 | 152.4 |
 | Hitches, focus-valid runs | 11, 11 | 7 |
 
-No regression: GPU time is level or lower in the change arm, which the shared GPU
-makes noise rather than a gain. Six of the ten runs lost native focus and are
+A second series alternated the arms A/B/A/B/A/B with no other session active
+(`--gpuTimings 1`, 12 s each; the baseline modules were fetched from Vite before
+each B run so it was really served, and the files restored after):
+
+| Metric | Baseline (B1–B3) | Change (A1–A3) |
+|--------|------------------|----------------|
+| GPU avg ms | 2.743, 2.733, 2.336 (median 2.733) | 2.309, 2.798, 2.243 (median 2.309) |
+| GPU p95 ms | 5.297, 4.917, 3.155 (median 4.917) | 4.550, 4.202, 3.157 (median 4.202) |
+
+No regression: GPU time is level or lower in the change arm in both series. The
+lower medians are within the spread between runs, not a measured gain. Six of the ten runs lost native focus and are
 void for FPS (they ranged 75–146 FPS in both arms); two more aborted on a Vite
 reload from another session's edit.
 
