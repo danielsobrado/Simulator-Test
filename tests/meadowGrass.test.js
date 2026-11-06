@@ -295,7 +295,7 @@ test('meadow palette is optional and validated', () => {
   assert.equal(resolveMeadowGrassConfig({}).palette, null);
   assert.deepEqual(
     resolveMeadowGrassConfig({ palette: { base: '#50852b', tip: '#a6bf65' } }).palette,
-    { palettes: [{ base: '#50852b', tip: '#a6bf65' }], brightness: 1 },
+    { palettes: [{ base: '#50852b', tip: '#a6bf65', lush: 1 }], brightness: 1 },
   );
   assert.throws(() => resolveMeadowGrassConfig({ palette: { base: 'green', tip: '#a6bf65' } }), /palette\.base/);
 });
