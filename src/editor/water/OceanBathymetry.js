@@ -47,6 +47,11 @@ export function sampleOceanBed({
     * smoothstep(distanceMeters / config.coastalShelfMeters);
   const targetDepth = clamp(profileDepth + detail, 0, config.maximumDepth);
   const baseDepth = Math.max(0, surfaceHeight - baseHeight);
-  const blendedDepth = lerp(baseDepth, targetDepth, smoothstep(distanceMeters / config.cellSizeMeters));
+  // The carve eases in over half the shelf. Taken at full depth one cell out, it
+  // dropped the bed 0.3-0.7 m between neighbouring vertices along the sea mask's
+  // cell staircase, and on flat coasts every waterline and shallow came out in
+  // right-angle steps. Near the shore the bed now follows the ground's own contour.
+  const blendMeters = Math.max(config.cellSizeMeters, config.coastalShelfMeters * 0.5);
+  const blendedDepth = lerp(baseDepth, targetDepth, smoothstep(distanceMeters / blendMeters));
   return surfaceHeight - clamp(blendedDepth, 0, config.maximumDepth);
 }

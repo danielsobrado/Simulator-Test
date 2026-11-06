@@ -98,3 +98,27 @@ test('low land by the sea rises into a beach, higher ground is untouched', () =>
   // Ground already above the berm keeps its own height.
   assert.equal(createModel().sampleHeight(-10, 0), 3);
 });
+
+test('the bed eases away from the shore instead of stepping one cell out', () => {
+  // A flat coastal plain just under the sea: the shelf must not drop a step
+  // along the cell boundary next to the shore.
+  const flat = new WaterTerrainModel({
+    seed: 17,
+    seaLevel: 0,
+    config,
+    sampleBaseHeight: (x) => (x < 0 ? 0.2 : -0.05),
+    sampleBaseTile: (x) => (x < 0 ? 4 : 0),
+  });
+  // One cell out the bed keeps the ground's own height, where it once took the
+  // full shelf depth and stepped along the cell boundary.
+  const shelf = oceanDepthProfile(1, { ...config.ocean, shoreDistanceMeters: config.shoreDistanceMeters });
+  const oneOut = -flat.sampleHeight(1, 0);
+  assert.ok(oneOut - 0.05 < (shelf - 0.05) * 0.5, `bed at 1 m is ${oneOut} m deep, shelf ${shelf} m`);
+  let previous = -flat.sampleHeight(1, 0);
+  for (let x = 2; x <= 40; x += 1) {
+    const depth = -flat.sampleHeight(x, 0);
+    assert.ok(depth >= previous - 1e-9, `bed rises at ${x} m`);
+    previous = depth;
+  }
+  assert.ok(-flat.sampleHeight(40, 0) > 10, 'still deep offshore');
+});
