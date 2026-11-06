@@ -23,15 +23,16 @@ function hex(value, path) {
 
 /**
  * @param {object | null | undefined} source `base`, `tip`, optional `brightness`
- *   and `byTileId: { [tileId]: { base, tip } }`
+ *   and `byTileId: { [tileId]: { base, tip, lush? } }`; `lush` (0..1, default 1)
+ *   scales the green-ward patch and hollow tints, which turn a dry palette olive
  * @param {string} path for error messages
- * @returns {null | { palettes: {base: string, tip: string}[], brightness: number, table: Uint8Array }}
+ * @returns {null | { palettes: {base: string, tip: string, lush: number}[], brightness: number, table: Uint8Array }}
  *   null paints the meadow with the shared grass tuning instead; `table` is the
  *   palette index per tile id (0, the base palette, where unlisted)
  */
 export function resolveMeadowPalettes(source, path) {
   if (source == null) return null;
-  const palettes = [{ base: hex(source.base, `${path}.base`), tip: hex(source.tip, `${path}.tip`) }];
+  const palettes = [{ base: hex(source.base, `${path}.base`), tip: hex(source.tip, `${path}.tip`), lush: 1 }];
   const brightness = source.brightness ?? 1;
   if (!Number.isFinite(brightness) || brightness < 0 || brightness > 4) {
     throw new Error(`Invalid editor configuration: ${path}.brightness must be a number in [0, 4].`);
@@ -45,7 +46,11 @@ export function resolveMeadowPalettes(source, path) {
     }
     const base = hex(entry?.base, `${path}.byTileId.${tile}.base`);
     const tip = hex(entry?.tip, `${path}.byTileId.${tile}.tip`);
-    const key = `${base}${tip}`.toLowerCase();
+    const lush = entry.lush ?? 1;
+    if (!Number.isFinite(lush) || lush < 0 || lush > 1) {
+      throw new Error(`Invalid editor configuration: ${path}.byTileId.${tile}.lush must be a number in [0, 1].`);
+    }
+    const key = `${base}${tip}${lush}`.toLowerCase();
     if (!byColour.has(key)) {
       if (palettes.length === MAX_MEADOW_PALETTES) {
         throw new Error(
@@ -53,7 +58,7 @@ export function resolveMeadowPalettes(source, path) {
         );
       }
       byColour.set(key, palettes.length);
-      palettes.push({ base, tip });
+      palettes.push({ base, tip, lush });
     }
     table[id] = byColour.get(key);
   }

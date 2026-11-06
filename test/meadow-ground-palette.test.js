@@ -3,6 +3,7 @@ import test from 'node:test';
 import { Color } from 'three/webgpu';
 import { createMeadowGroundPalette } from '../src/editor/stylized/meadow/meadowGroundPalette.js';
 import { resolveMeadowGrassConfig } from '../src/editor/stylized/meadow/meadowGrassConfig.js';
+import { resolveMeadowPalettes } from '../src/editor/stylized/meadow/meadowPalettes.js';
 import { createTerrainMaterialFarStyle, encodeTerrainMaterialFarColor } from '../src/editor/materials/TerrainMaterialBakeFarColor.js';
 
 const config = {
@@ -75,7 +76,7 @@ test('shipped woodland and tundra pigments remain distinct within the eight-pale
  assert.notEqual(index(5),index(4));
  assert.notEqual(index(7),index(5));
  assert.notEqual(index(8),index(7));
- assert.deepEqual(settings.palette.palettes[index(10)],{base:'#666746',tip:'#a3a07a'});
+ assert.deepEqual(settings.palette.palettes[index(10)],{base:'#666746',tip:'#a3a07a',lush:1});
  assert.equal(settings.palette.palettes.length,8);
  assert.notDeepEqual(colors.roots.subarray(10*3,11*3),colors.roots.subarray(9*3,10*3));
 });
@@ -108,4 +109,10 @@ test('zero canopy strength keeps the far bake on the substrate root', () => {
   off.grass.meadow.appearance = { groundTipMix: 0.08, canopyStrength: 0 };
   const palette = createMeadowGroundPalette(off);
   assert.deepEqual([...palette.far], [...palette.roots]);
+});
+
+test('a palette lush share is validated, defaults to 1 and keeps otherwise equal palettes apart',()=>{
+ const p=resolveMeadowPalettes({base:'#000000',tip:'#ffffff',byTileId:{3:{base:'#111111',tip:'#222222',lush:0},4:{base:'#111111',tip:'#222222'}}},'p');
+ assert.equal(p.palettes[p.table[3]].lush,0);assert.equal(p.palettes[p.table[4]].lush,1);assert.notEqual(p.table[3],p.table[4]);
+ assert.throws(()=>resolveMeadowPalettes({base:'#000000',tip:'#ffffff',byTileId:{3:{base:'#111111',tip:'#222222',lush:2}}},'p'),/lush/);
 });

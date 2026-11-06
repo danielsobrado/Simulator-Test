@@ -105,6 +105,7 @@ export function createMeadowUniforms(settings, interaction = null, spellGround =
       ? {
         base: uniformArray(settings.palette.palettes.map(({ base }) => new THREE.Color(base)), 'color'),
         tip: uniformArray(settings.palette.palettes.map(({ tip }) => new THREE.Color(tip)), 'color'),
+        lush: uniformArray(settings.palette.palettes.map(({ lush }) => lush), 'float'),
         brightness: uniform(settings.palette.brightness),
       }
       : null,

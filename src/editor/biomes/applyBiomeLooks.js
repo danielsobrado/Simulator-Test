@@ -24,6 +24,7 @@ export function frostMeadowPalette(palette, looks) {
   for (const [tile, frost] of Object.entries(frostByTile)) {
     const own = byTileId[tile] ?? { base: palette.base, tip: palette.tip };
     byTileId[tile] = {
+      ...own,
       base: frosted(own.base, looks.frostColor, frost * BASE_FROST),
       tip: frosted(own.tip, looks.frostColor, frost * TIP_FROST),
     };

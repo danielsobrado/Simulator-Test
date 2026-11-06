@@ -1552,7 +1552,8 @@ stylizedSurface:
         # style. Unlisted biomes (grassland, deciduous, tropical seasonal — the
         # spawn) wear the donor's own. One uniform-array entry per distinct pair.
         byTileId:
-          3: { base: '#77692f', tip: '#d6c47a' }   # savanna: straw, pale golden tips
+          # lush 0: the green patch and hollow tints turned the tawny root olive.
+          3: { base: '#7d6030', tip: '#d9bf7c', lush: 0 }   # savanna: tawny straw, pale golden tips
           5: { base: '#4d6839', tip: '#9ab477' }   # open woodland: shared forest pigment
           6: { base: '#4d6839', tip: '#9ab477' }
           7: { base: '#3d6635', tip: '#86aa60' }   # humid broadleaf floor
@@ -1634,7 +1635,8 @@ stylizedSurface:
           # Stonehold Badlands: grey canyon sand. Unlisted, it fell back to the grass scan.
           32: { floor: [grit, grit] }
           # Savanna earth is dry grit under straw: the cracked-mud scan read as oversized plates in the grass.
-          3: { litter: '#b39a5f', litterAmount: 0.6, moss: 0.0, soil: 0.45, streaks: 0.7, floor: [mossy, grit] }   # savanna: straw, warm earth
+          # The mossy scan under it read as green turf (2026-11-06 review).
+          3: { litter: '#b39a5f', litterAmount: 0.7, moss: 0.0, soil: 0.6, streaks: 0.7, floor: [grit, grit] }   # savanna: straw, warm earth
           5: { litter: '#78613f', litterAmount: 0.65, moss: 0.2, soil: 0.3, streaks: 0.25, floor: [litter, mossy] }
           6: { litter: '#806642', litterAmount: 0.7, moss: 0.35, soil: 0.3, streaks: 0.35, floor: [litter, mossy] }
           7: { litter: '#5e4c31', litterAmount: 0.5, moss: 0.45, soil: 0.2, streaks: 0.3, floor: [litter, mossy] }   # tropical rainforest: leaf litter

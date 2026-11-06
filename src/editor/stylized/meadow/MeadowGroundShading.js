@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { float, ivec2, mix, texture } from 'three/tsl';
+import { float, ivec2, mix, texture, vec3 } from 'three/tsl';
 import { createMeadowGroundPalette } from './meadowGroundPalette.js';
 import { resolveMeadowGroundDetail } from './meadowGroundDetailConfig.js';
 import { meadowPatchColors } from './meadowColorNodes.js';
@@ -8,7 +8,7 @@ import { applyMeadowGroundStyle, meadowGroundStyle } from './meadowGroundStyle.j
 
 /**
  * Read biome pigment from tile alpha; no new terrain sampler or instance attribute.
- * Rows: 0 root, 1 tip, 2 litter colour + amount, 3 moss / soil / streaks
+ * Rows: 0 root, 1 tip + lush share (meadowPalettes.js), 2 litter colour + amount, 3 moss / soil / streaks
  * (meadowGroundDetailConfig.js), 4 canopy colour + strength (meadowCanopy.js),
  * 5 floor scan layers (terrainGroundLayers.js) + area style share.
  * The map is float and nearest-filtered, so it binds no sampler.
@@ -26,6 +26,7 @@ export function createMeadowGroundShading(config, tileSample, worldXZ) {
       data[id * 4 + channel] = palette.roots[id * 3 + channel];
       data[(256 + id) * 4 + channel] = palette.tips[id * 3 + channel];
     }
+    data[(256 + id) * 4 + 3] = palette.lush[id];
   }
   if (detail) {
     data.set(detail.litter, 512 * 4);
@@ -43,13 +44,16 @@ export function createMeadowGroundShading(config, tileSample, worldXZ) {
   const { tint, dry, dryColor } = meadowPatchColors(worldXZ, palette.appearance);
   const dryPigment = dryColor.mul(palette.brightness);
   const row = index => texture(map, ivec2(id, index)).setSampler(false);
-  let soilRoot = mix(row(0).rgb.mul(tint), dryPigment, dry);
-  let tip = mix(row(1).rgb.mul(tint), dryPigment.mul(1.06), dry.mul(0.45));
+  const lush = row(1).a;
+  const patchTint = mix(vec3(1), tint, lush);
+  let soilRoot = mix(row(0).rgb.mul(patchTint), dryPigment, dry);
+  let tip = mix(row(1).rgb.mul(patchTint), dryPigment.mul(1.06), dry.mul(0.45));
   const canopy = row(4);
-  let canopyColor = mix(canopy.rgb.mul(tint), dryPigment, dry);
+  let canopyColor = mix(canopy.rgb.mul(patchTint), dryPigment, dry);
   let floorBlend = float(0);
   if (palette.appearance.groundStyle > 0) {
-    const style = meadowGroundStyle(worldXZ, row(5).z.mul(palette.appearance.groundStyle));
+    const area = meadowGroundStyle(worldXZ, row(5).z.mul(palette.appearance.groundStyle));
+    const style = { ...area, lush: area.lush.mul(lush) };
     floorBlend = style.dry.max(style.worn).smoothstep(0.15, 0.6);
     ({ root: soilRoot, tip } = applyMeadowGroundStyle(soilRoot, tip, style));
     ({ root: canopyColor } = applyMeadowGroundStyle(canopyColor, tip, style));

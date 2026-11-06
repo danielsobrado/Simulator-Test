@@ -42,13 +42,15 @@ export function meadowPigment({ uniforms, tuning, config, blade, marks = false, 
   });
   const palette = uniforms.palette;
   const index = blade.palette.toInt();
+  const lush = palette ? palette.lush.element(index) : float(1);
   const bottom = palette ? palette.base.element(index) : tuning.colorBottom;
   const top = palette ? palette.tip.element(index) : tuning.colorTop;
   const brightness = palette?.brightness ?? tuning.brightness;
   // These fields are constant along a stem. Evaluate their noise at vertices,
   // then interpolate pigment instead of repeating it in every covered fragment.
-  let root = mix(mix(bottom, top, appearance.groundTipMix).mul(tint), dryColor, dry);
-  let tip = mix(top.mul(tint), dryColor.mul(1.06), dry.mul(0.45));
+  const patchTint = mix(vec3(1), tint, lush);
+  let root = mix(mix(bottom, top, appearance.groundTipMix).mul(patchTint), dryColor, dry);
+  let tip = mix(top.mul(patchTint), dryColor.mul(1.06), dry.mul(0.45));
   const fringe = config.path?.fringe ?? {};
   if (fringe.enabled !== false) {
     const wear = stylizedPathWearMask(blade.path, blade.canonical, {
@@ -64,7 +66,10 @@ export function meadowPigment({ uniforms, tuning, config, blade, marks = false, 
   const stand = meadowStandNodes(blade.canonical, blade.rank);
   root = root.mul(stand.rootTone);
   tip = mix(tip.mul(stand.tipTone), color(STRAW_SEED).mul(dot(tip, vec3(0.3, 0.59, 0.11)).mul(1.1).add(0.45)), stand.seedStem.mul(0.75));
-  if (uniforms.groundStyle) ({ root, tip } = applyMeadowGroundStyle(root, tip, meadowGroundStyle(blade.canonical, uniforms.groundStyle.mul(uniforms.growth.areaStyle.element(blade.growth.toInt())))));
+  if (uniforms.groundStyle) {
+    const style = meadowGroundStyle(blade.canonical, uniforms.groundStyle.mul(uniforms.growth.areaStyle.element(blade.growth.toInt())));
+    ({ root, tip } = applyMeadowGroundStyle(root, tip, { ...style, lush: style.lush.mul(lush) }));
+  }
   const tufts = uniforms.tufts;
   const occupancy = meadowTuftNodes(blade.canonical).occupancy;
   const melt = melted ? float(1) : smoothstep(appearance.meltStart, appearance.meltEnd, cameraPosition.distance(blade.base));
