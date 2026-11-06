@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { vertexColor } from 'three/tsl';
+import { abs, float, fract, mix, mx_noise_float, normalWorld, normalize, positionWorld, smoothstep, vec2, vertexColor } from 'three/tsl';
 import { stagedDrawPublication, WAIT_FOR_DRAW_PREPARATION } from '../../../../render/preparation/StagedDrawPublication.js';
 import { PerfCounters } from '../../../performance/qa/PerfCounters.js';
 import { buildingShadeEmission } from '../../../stylized/forest/foliageLight.js';
@@ -12,6 +12,32 @@ export const SETTLEMENT_SKYLINE = Object.freeze({ radius: 3200, near: 560, maxTo
  * population-sized city is wider than `near`, so the site, not the distance, decides.
  */
 
+/**
+ * The massing's flat colour, painted like the rocks: broad tonal breakup, and on
+ * walls the rhythm of windows and floors, on roofs the courses of tiles, with a
+ * darker foot. From world position alone, so it costs no geometry. A box of one
+ * colour read as a white block standing in the street while a city loaded.
+ */
+function paintedMassing(base) {
+  const p = positionWorld;
+  const n = normalize(normalWorld);
+  const roof = smoothstep(0.25, 0.45, n.y);
+  // Along the wall: world xz projected on the face's horizontal tangent.
+  const tangent = normalize(vec2(n.z, n.x.negate()).add(vec2(1e-4, 0)));
+  const along = p.x.mul(tangent.x).add(p.z.mul(tangent.y));
+  const bay = fract(along.div(2.6)), floor = fract(p.y.div(3.1));
+  const window = smoothstep(0.32, 0.36, bay).mul(smoothstep(0.68, 0.64, bay))
+    .mul(smoothstep(0.38, 0.42, floor)).mul(smoothstep(0.78, 0.74, floor));
+  const band = smoothstep(0.02, 0.0, abs(floor.sub(0.06))).mul(0.12);
+  const wall = base.mul(float(1).sub(window.mul(0.55)).sub(band));
+  const course = smoothstep(0.55, 0.95, fract(p.y.mul(2.8))).mul(0.14);
+  const roofed = base.mul(float(1).sub(course));
+  const tone = mx_noise_float(p.mul(0.07)).mul(0.2).add(mx_noise_float(p.mul(0.6)).mul(0.08)).add(0.9);
+  // Weathered toward the foot, as the real walls' damp band.
+  const foot = smoothstep(0, 3, p.y.sub(p.y.div(40).floor().mul(40))).mul(0.1).add(0.9);
+  return mix(wall.mul(foot), roofed, roof).mul(tone);
+}
+
 /** Worker-prepared massing; installation and shader preparation are deferred. */
 export class SettlementSkyline {
   constructor({ scene, getDrawPreparation = () => null, isDrawn = null }) {
@@ -20,7 +46,10 @@ export class SettlementSkyline {
     this.getDrawPreparation = getDrawPreparation;
     this.material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.94, metalness: 0,
       side: THREE.DoubleSide, flatShading: true });
-    this.material.emissiveNode = buildingShadeEmission(vertexColor().rgb);
+    const painted = paintedMassing(vertexColor().rgb);
+    this.material.colorNode = painted;
+    // Half the buildings' fill: at full fill a limewashed box glowed white beside the street.
+    this.material.emissiveNode = buildingShadeEmission(painted, { fill: 1.1, bounce: 1.3 });
     this.material.name = 'settlement-skyline';
     this.towns = new Map(); this.expected = new Map(); this.jobs = new Map(); this.failed = new Map();
     this.staged = new Map();
