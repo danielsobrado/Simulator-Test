@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { lensDirt } from 'three/addons/tsl/display/lensDirt.js';
 import {
   dot,
   float,
@@ -10,11 +11,13 @@ import {
   smoothstep,
   time,
   uniform,
+  texture,
   uv,
   vec2,
   vec3,
   vec4,
 } from 'three/tsl';
+import { getLensDirtTexture } from './lensDirtTexture.js';
 
 /**
  * The walking view's finish, ported from grass-test's cinematic pipeline
@@ -25,7 +28,8 @@ import {
  *    holds and dark tones are compressed, never clipped;
  *  - a lift/gain split that cools the shadows and warms the highlights;
  *  - highlight desaturation, so sunlit grass bleaches toward white, not neon;
- *  - a soft vignette and a fine animated grain.
+ *  - a soft vignette and a fine animated grain;
+ *  - lens dirt, revealed by the bloom only where the frame is bright (sun).
  *
  * Defaults are the donor's shipped values (`cinematic.post`). Everything is a
  * uniform, so a look can be tuned live; `enabled: false` leaves the frame as the
@@ -41,6 +45,8 @@ export const DEFAULT_CINEMATIC_FINISH = Object.freeze({
   vignette: 0.14,
   grain: 0.012,
   bloom: Object.freeze({ enabled: true, strength: 0.09, radius: 0.3, threshold: 2.1 }),
+  // Reads the bloom's blurred light, so it needs bloom and costs one texture tap.
+  lensDirt: Object.freeze({ enabled: true, intensity: 1.5 }),
 });
 
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -67,6 +73,7 @@ export function resolveCinematicFinish(source) {
   if (source?.enabled === false) return { enabled: false };
   const path = 'stylizedSurface.cinematicFinish';
   const bloomSource = { ...d.bloom, ...(source?.bloom ?? {}) };
+  const dirtSource = { ...d.lensDirt, ...(source?.lensDirt ?? {}) };
   return {
     enabled: true,
     saturation: finite(source?.saturation, d.saturation, `${path}.saturation`, 0, 3),
@@ -82,6 +89,10 @@ export function resolveCinematicFinish(source) {
       radius: finite(bloomSource.radius, d.bloom.radius, `${path}.bloom.radius`, 0, 1),
       threshold: finite(bloomSource.threshold, d.bloom.threshold, `${path}.bloom.threshold`, 0, 20),
     },
+    lensDirt: dirtSource.enabled === false || bloomSource.enabled === false ? { enabled: false } : {
+      enabled: true,
+      intensity: finite(dirtSource.intensity, d.lensDirt.intensity, `${path}.lensDirt.intensity`, 0, 20),
+    },
   };
 }
 
@@ -95,6 +106,7 @@ export function createFinishUniforms(settings) {
     highlightDesaturation: uniform(settings.highlightDesaturation),
     vignette: uniform(settings.vignette),
     grain: uniform(settings.grain),
+    lensDirt: uniform(settings.lensDirt?.intensity ?? 0),
   };
 }
 
@@ -116,7 +128,7 @@ export function gradeNode(input, grade) {
 }
 
 /**
- * The finished linear frame: bloom from the scene's beauty added in, then graded.
+ * The finished linear frame: bloom (and lens dirt lit by it) added in, then graded.
  *
  * @param {object} composite vec4 node, scene-referred
  * @param {object} options
@@ -132,6 +144,9 @@ export function finishFrame(composite, { beauty, settings, uniforms }) {
   if (settings.bloom.enabled) {
     bloomNode = bloom(beauty, settings.bloom.strength, settings.bloom.radius, settings.bloom.threshold);
     rgb = rgb.add(bloomNode.rgb);
+    if (settings.lensDirt?.enabled) {
+      rgb = rgb.add(lensDirt(bloomNode.getTextureNode(), texture(getLensDirtTexture()), uniforms.lensDirt).rgb);
+    }
   }
   return { node: vec4(gradeNode(rgb, uniforms), composite.a), bloom: bloomNode };
 }
