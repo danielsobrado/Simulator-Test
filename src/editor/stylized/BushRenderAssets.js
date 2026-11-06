@@ -9,7 +9,7 @@ import {
 } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assignBushFoliageMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
-import { applyUnderstoryPalette, authoredFoliageColor, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
+import { applyUnderstoryPalette, authoredFoliageColor, biomeUnderstoryColor, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { applyPlantMotion } from './PlantMotionNodes.js';
 import { resolveFoliagePalette } from './forest/foliagePalette.js';
 import { applySkywardNormal } from './forest/foliageLight.js';
@@ -38,14 +38,14 @@ function usesCutout(material) {
   );
 }
 
-export function cloneBushMaterial(source, { config = null, height = 0, tileId = null, motion = 'woody-shrub' } = {}) {
+export function cloneBushMaterial(source, { config = null, height = 0, tileId = null, motion = 'woody-shrub', biomeLook = false } = {}) {
   if (!source?.isMaterial) throw new Error('Bush prototypes require an authored material.');
   const material = cloneAuthoredNodeMaterial(source, { lit: true });
   if (material.map?.colorSpace !== undefined) {
     material.map.colorSpace = THREE.SRGBColorSpace;
   }
   material.colorNode = authoredFoliageColor(material);
-  if (config) applyUnderstoryPalette(material, config, tileId);
+  if (config) applyUnderstoryPalette(material, config, tileId, 'auto', { biomeLook });
   applyPlantMotion(material, { wind: config?.wind, height, profile: motion });
   if (config) applySkywardNormal(material);
   material.side = THREE.DoubleSide;
@@ -127,6 +127,7 @@ export function createBushProxyMaterial(sourceMaterial, {
   config = null,
   tileId = null,
   motion = 'woody-shrub',
+  biomeLook = false,
 } = {}) {
   const value = proxyColor(sourceMaterial, color);
   const palette = config ? resolveFoliagePalette(config, tileId) : null;
@@ -135,11 +136,12 @@ export function createBushProxyMaterial(sourceMaterial, {
   const height = Math.max(MIN_PROXY_EXTENT, maximumHeight - minimumHeight);
   const heightMix = clamp(positionGeometry.y.sub(float(minimumHeight)).div(float(height)), 0, 1);
   const material = new THREE.MeshLambertNodeMaterial({ flatShading: true });
-  material.colorNode = mix(
+  const ramp = mix(
     vec3(bottom.r, bottom.g, bottom.b),
     vec3(top.r, top.g, top.b),
     heightMix,
   );
+  material.colorNode = biomeLook ? biomeUnderstoryColor(ramp) : ramp;
   material.transparent = false;
   material.depthWrite = true;
   applyPlantMotion(material, { wind: config?.wind, height, profile: motion });
@@ -163,6 +165,7 @@ export function createBushProxyPrototype(prototype, options = {}) {
       maximumHeight: bounds.max.y,
     }),
     kind: 'bush-proxy',
+    instanceBiomeLook: Boolean(options.biomeLook),
     height: prototype.height,
     prototypeId: `${prototype.prototypeId}-proxy`,
   };

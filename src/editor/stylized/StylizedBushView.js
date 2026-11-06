@@ -21,6 +21,7 @@ import { createPathClearanceField } from './TreeManifestStore.js';
 import { extractAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
+import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
 import {
   BUSH_CAST_SHADOW,
   cloneBushMaterial,
@@ -67,8 +68,13 @@ function bushMatrix(placement) {
   );
 }
 
-function bushAppearance(placement) {
-  return { seed: placement.priority, colorVariation: 0.84 + placement.priority * 0.32 };
+/** Seed, brightness variation and the understory look of the biome the bush stands in. */
+function bushAppearance(placement, terrainView, looks) {
+  return {
+    seed: placement.priority,
+    colorVariation: 0.84 + placement.priority * 0.32,
+    biomeLook: biomeLook(looks, 'understory', placementTileId(terrainView, placement)),
+  };
 }
 
 function disposePrototypes(prototypes) {
@@ -130,7 +136,8 @@ export class StylizedBushView {
     this.root = new THREE.Group();
     // Instances are written relative to this, not in canonical metres (InstanceAnchor).
     this.instanceAnchor = new InstanceAnchor();
-    this.instanceRows = new ScatterInstanceRows('bush', bushMatrix, bushAppearance);
+    this.instanceRows = new ScatterInstanceRows('bush', bushMatrix,
+      (placement) => bushAppearance(placement, this.terrainView, this.config.biomeLooks));
     this.root.name = 'stylized-bushes';
     terrainView.scene.add(this.root);
   }
@@ -203,8 +210,10 @@ export class StylizedBushView {
           motion,
           height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
           tileId: rule?.paletteTileId ?? rule?.tileIds?.[0],
+          biomeLook: true,
         }),
         kind: 'bush',
+        instanceBiomeLook: true,
         height: geometry.boundingBox.max.y - geometry.boundingBox.min.y,
         prototypeId: `authored-bush-${firstNewPrototype + index}`,
       };
@@ -214,7 +223,7 @@ export class StylizedBushView {
       const rule = this.prototypeBiomeRules[firstNewPrototype + index];
       return createBushProxyPrototype(
         prototype,
-        { color: proxyColor, config: this.config, tileId: rule?.paletteTileId ?? rule?.tileIds?.[0] },
+        { color: proxyColor, config: this.config, tileId: rule?.paletteTileId ?? rule?.tileIds?.[0], biomeLook: true },
       );
     });
     this.prototypes.push(...newPrototypes);

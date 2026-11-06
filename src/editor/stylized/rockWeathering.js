@@ -98,7 +98,7 @@ export function resolveRockWeathering(configured) {
  * @param {object} options
  * @param {object} options.settings resolved weathering settings
  * @param {number|null} [options.seaLevel] world sea level, for the splash line
- * @param {boolean} [options.biomeLook] read the per-instance `instanceRockLook`
+ * @param {boolean} [options.biomeLook] read the per-instance `instanceBiomeLook`
  *   (rgb albedo multiplier, moss scale) the rock view writes from each stone's biome
  */
 export function applyRockWeathering(material, { settings, seaLevel = null, localWater = false, biomeLook = false }) {
@@ -106,7 +106,7 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   const sourceMap = material.map ?? null;
   const world = positionWorld;
   const pattern = patternPosition();
-  const look = biomeLook ? attribute('instanceRockLook', 'vec4') : null;
+  const look = biomeLook ? attribute('instanceBiomeLook', 'vec4') : null;
   const donor = pattern.mul(DONOR_UNITS_PER_METRE);
   const donorXZ = donor.xz;
 

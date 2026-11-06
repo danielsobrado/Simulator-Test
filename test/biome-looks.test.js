@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import * as THREE from 'three';
-import { resolveBiomeLooks, biomeSnowCover, biomeRockLook, NEUTRAL_ROCK_LOOK } from '../src/editor/biomes/BiomeLooks.js';
+import { resolveBiomeLooks, biomeSnowCover, biomeLook, NEUTRAL_BIOME_LOOK } from '../src/editor/biomes/BiomeLooks.js';
 import { applyBiomeLooks, frostMeadowPalette, settleMeadowGrowth } from '../src/editor/biomes/applyBiomeLooks.js';
 import { createTerrainMaterialBakeConfig } from '../src/editor/materials/TerrainMaterialBakeConfig.js';
 import { resolveMeadowPalettes } from '../src/editor/stylized/meadow/meadowPalettes.js';
@@ -169,13 +169,23 @@ test('taiga stays below the regional snowfall threshold', () => {
 test('rock looks pack tint and tone into an albedo multiplier beside the moss scale', () => {
   const base = { snow: { color: '#ffffff', frost: '#eeeeee' } };
   const looks = resolveBiomeLooks({ ...base, byTileId: { 2: { rock: { tint: '#ff8000', tone: 2, moss: 0 } }, 32: { rock: { moss: 1.5 } } } });
-  assert.deepEqual([...biomeRockLook(looks, 2)].map((v) => Math.round(v * 100) / 100), [2, 1, 0, 0]);
-  assert.deepEqual([...biomeRockLook(looks, 32)], [1, 1, 1, 1.5]);
-  assert.deepEqual([...biomeRockLook(looks, 4)], [...NEUTRAL_ROCK_LOOK], 'unlisted biomes keep the authored stone');
-  assert.equal(biomeRockLook(null, 2), NEUTRAL_ROCK_LOOK);
-  assert.equal(biomeRockLook(looks, undefined), NEUTRAL_ROCK_LOOK);
+  assert.deepEqual([...biomeLook(looks, 'rock', 2)].map((v) => Math.round(v * 100) / 100), [2, 1, 0, 0]);
+  assert.deepEqual([...biomeLook(looks, 'rock', 32)], [1, 1, 1, 1.5]);
+  assert.deepEqual([...biomeLook(looks, 'rock', 4)], [...NEUTRAL_BIOME_LOOK], 'unlisted biomes keep the authored stone');
+  assert.equal(biomeLook(null, 'rock', 2), NEUTRAL_BIOME_LOOK);
+  assert.equal(biomeLook(looks, 'rock', undefined), NEUTRAL_BIOME_LOOK);
   for (const rock of [{ tone: 3 }, { moss: -1 }, { tint: 'red' }, { lichen: 1 }, 1]) {
     assert.throws(() => resolveBiomeLooks({ ...base, byTileId: { 2: { rock } } }), /rock/);
   }
-  assert.equal(biomeRockLook(LOOKS, COLD_DESERT)[3], 0, 'the shipped cold desert grows no moss on its stones');
+  assert.equal(biomeLook(LOOKS, 'rock', COLD_DESERT)[3], 0, 'the shipped cold desert grows no moss on its stones');
+});
+
+test('understory looks pack tint and tone beside a saturation, per biome', () => {
+  const base = { snow: { color: '#ffffff', frost: '#eeeeee' } };
+  const looks = resolveBiomeLooks({ ...base, byTileId: { 2: { understory: { tint: '#808080', tone: 2, saturation: 0.4 } } } });
+  assert.deepEqual([...biomeLook(looks, 'understory', 2)].map((v) => Math.round(v * 100) / 100), [1, 1, 1, 0.4]);
+  assert.deepEqual([...biomeLook(looks, 'understory', 6)], [...NEUTRAL_BIOME_LOOK], 'unlisted biomes keep the graded palette');
+  assert.throws(() => resolveBiomeLooks({ ...base, byTileId: { 2: { understory: { moss: 1 } } } }), /understory\.moss/);
+  assert.throws(() => resolveBiomeLooks({ ...base, byTileId: { 2: { understory: { saturation: 3 } } } }), /saturation/);
+  assert.ok(biomeLook(LOOKS, 'understory', COLD_DESERT)[3] < 1, 'the shipped cold desert greys its shrubs');
 });

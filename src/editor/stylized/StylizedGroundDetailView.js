@@ -22,6 +22,7 @@ import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
 import { applyPlantMotion } from './PlantMotionNodes.js';
 import { applyUnderstoryPalette, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { applySkywardNormal } from './forest/foliageLight.js';
+import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
 import { createOceanDistanceField } from '../water/OceanDistanceField.js';
 
 const DETAIL_UP = new THREE.Vector3(0, 1, 0);
@@ -36,7 +37,8 @@ const DETAIL_SCRATCH = {
 
 function cloneDetailMaterial(source, { wind = null, height = 0, motion = 'woody-shrub', foliageConfig = null, tileId = null, role = 'auto', ambientEffects = null } = {}) {
   const material = cloneAuthoredNodeMaterial(source, { lit: !!foliageConfig });
-  if (foliageConfig) applyUnderstoryPalette(material, foliageConfig, tileId, role);
+  // Foliage parts carry `instanceBiomeLook` (see appendVariants), so they wear each biome's understory look.
+  if (foliageConfig) applyUnderstoryPalette(material, foliageConfig, tileId, role, { biomeLook: true });
   // Swayed with the meadow's own wave, so a tuft is not a rigid patch in a moving
   // sward (groundDetailWind.js).
   applyPlantMotion(material, { wind, height, profile: motion });
@@ -152,6 +154,7 @@ export class StylizedGroundDetailView {
       seed: placement.priority,
       colorVariation: 1 - range * 0.5 + placement.priority * range,
       surfaceData: placement.surfaceData,
+      biomeLook: biomeLook(this.config.biomeLooks, 'understory', placementTileId(this.terrainView, placement)),
     };
   }
 
@@ -193,6 +196,7 @@ export class StylizedGroundDetailView {
           characterStrength: definition.characterStrength,
           canopy: definition.canopy,
         });
+        const foliage = ['groundDetail', 'tropicalPlant'].includes(this.layerName);
         this.prototypes.push(parts.map(({ geometry, source }) => {
           const sourceMaterial = materialList(source)[0];
           if (!sourceMaterial) {
@@ -211,14 +215,14 @@ export class StylizedGroundDetailView {
               height: geometry.boundingBox.max.y - Math.min(0, geometry.boundingBox.min.y),
               motion: definition.motion,
               role: definition.materialRoles?.[sourceMaterial.name],
-              foliageConfig: ['groundDetail', 'tropicalPlant'].includes(this.layerName)
-                ? this.config : null,
+              foliageConfig: foliage ? this.config : null,
               // `paletteTileId` grades a shrub with another biome's foliage palette
               // without growing it there: desert sagebrush wore the lime meadow green.
               tileId: definition.paletteTileId ?? definition.tileIds?.[0],
               ambientEffects: this.config.ambientEffects,
             }),
             kind: 'detail',
+            instanceBiomeLook: foliage,
           };
         }));
       });

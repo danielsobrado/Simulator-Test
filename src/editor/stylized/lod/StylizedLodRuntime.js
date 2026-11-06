@@ -10,7 +10,7 @@ import { createDitheredMaterial } from './StylizedDitheredMaterial.js';
 import { markAttributeSubrangeUpdated } from '../attributeUpload.js';
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 import { extendInstanceBounds } from './InstanceBoundsUpdate.js';
-import { NEUTRAL_ROCK_LOOK } from '../../biomes/BiomeLooks.js';
+import { NEUTRAL_BIOME_LOOK } from '../../biomes/BiomeLooks.js';
 import { instanceGeometryArrays } from './instanceGeometryArrays.js';
 
 const WAITING_FADE = Number.EPSILON;
@@ -29,7 +29,7 @@ const LOD_WORLD_POSITION = { x: 0, y: 0, z: 0 };
  *
  * x = signed LOD fade, y = stable dither seed, z = colour variation.
  */
-function createGeometry(source, capacity, tinted, morphed, surface, plantMotion, reuseVertexArrays, rockLook) {
+function createGeometry(source, capacity, tinted, morphed, surface, plantMotion, reuseVertexArrays, biomeLook) {
   const geometry = reuseVertexArrays ? instanceGeometryArrays(source) : source.clone();
   const dither = new Float32Array(capacity * 3);
   // Colour variation is a multiplier, so it must default to 1 rather than 0.
@@ -39,8 +39,8 @@ function createGeometry(source, capacity, tinted, morphed, surface, plantMotion,
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
   if (surface) geometry.setAttribute('instanceSurface',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
-  // rgb = biome albedo multiplier, w = moss scale (biomes/BiomeLooks.js `rock`).
-  if (rockLook) geometry.setAttribute('instanceRockLook',
+  // rgb = biome albedo multiplier, w = rock moss or understory saturation (biomes/BiomeLooks.js).
+  if (biomeLook) geometry.setAttribute('instanceBiomeLook',
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4).fill(1), 4));
   if (morphed) {
     geometry.setAttribute(
@@ -103,7 +103,7 @@ export function createInstancedRenderers({
     const tinted = tintLeaves && part.kind === 'leaf';
     const morphed = tintLeaves;
     const geometry = createGeometry(part.geometry, capacity, tinted, morphed, part.instanceSurface,
-      part.material.userData.plantMotionAnchor, reuseVertexArrays, part.instanceRockLook);
+      part.material.userData.plantMotionAnchor, reuseVertexArrays, part.instanceBiomeLook);
     if (morphed && part.kind === 'trunk') {
       geometry.setAttribute('instanceRootPlane', new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3));
     }
@@ -232,7 +232,7 @@ const SURFACE_RANGE = { min: Infinity, max: -1 };
 const PLANT_ROOT_RANGE = { min: Infinity, max: -1 };
 const PLANT_ROOT = [0, 0, 0];
 const DRY_SURFACE = Object.freeze([0, 0, 0]);
-const ROCK_LOOK_RANGE = { min: Infinity, max: -1 };
+const BIOME_LOOK_RANGE = { min: Infinity, max: -1 };
 
 /**
  * @param {Array<Array<THREE.InstancedMesh>>} renderers parts per prototype
@@ -264,8 +264,8 @@ export function writeInstances(renderers, instancesByPrototype, anchor = null, r
       const roots = mesh.geometry.getAttribute('instanceRootPlane');
       const surfaces = mesh.geometry.getAttribute('instanceSurface');
       const plantRoots = mesh.geometry.getAttribute('instancePlantRoot');
-      const rockLooks = mesh.geometry.getAttribute('instanceRockLook');
-      const rockLookRange = resetDirtyRange(ROCK_LOOK_RANGE);
+      const biomeLooks = mesh.geometry.getAttribute('instanceBiomeLook');
+      const biomeLookRange = resetDirtyRange(BIOME_LOOK_RANGE);
       const matrixRange = resetDirtyRange(MATRIX_RANGE);
       const ditherRange = resetDirtyRange(DITHER_RANGE);
       const tintRange = resetDirtyRange(TINT_RANGE);
@@ -291,7 +291,7 @@ export function writeInstances(renderers, instancesByPrototype, anchor = null, r
           writeVector3Instance(plantRoots, index, PLANT_ROOT, plantRange);
         }
         if (surfaces) writeVector3Instance(surfaces, index, instance.surfaceData ?? DRY_SURFACE, surfaceRange);
-        if (rockLooks) writeVector4Instance(rockLooks, index, instance.rockLook ?? NEUTRAL_ROCK_LOOK, rockLookRange);
+        if (biomeLooks) writeVector4Instance(biomeLooks, index, instance.biomeLook ?? NEUTRAL_BIOME_LOOK, biomeLookRange);
         if (roots) {
           const fit = instance.rootFit;
           const e = instance.matrix.elements;
@@ -337,7 +337,7 @@ export function writeInstances(renderers, instancesByPrototype, anchor = null, r
       if (tints) markAttributeSubrangeUpdated(tints, tintRange.min, tintRange.max);
       if (roots) markAttributeSubrangeUpdated(roots, morphologyRange.min, morphologyRange.max);
       if (surfaces) markAttributeSubrangeUpdated(surfaces, surfaceRange.min, surfaceRange.max);
-      if (rockLooks) markAttributeSubrangeUpdated(rockLooks, rockLookRange.min, rockLookRange.max);
+      if (biomeLooks) markAttributeSubrangeUpdated(biomeLooks, biomeLookRange.min, biomeLookRange.max);
       if (plantRoots) markAttributeSubrangeUpdated(plantRoots, plantRange.min, plantRange.max);
       if (morphologies) {
         markAttributeSubrangeUpdated(

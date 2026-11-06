@@ -13,8 +13,17 @@ export const BIOME_SNOW_COLUMNS = Object.freeze(['ground', 'canopy', 'grass', 'a
 /** Bare ground the terrain dresses as rippled sand or frost-broken mineral (AridSubstrateNodes.js). */
 export const BIOME_ARID_KINDS = Object.freeze(['sand', 'mineral']);
 
-/** Neutral rock look: authored albedo, the configured moss. */
-export const NEUTRAL_ROCK_LOOK = Object.freeze([1, 1, 1, 1]);
+/**
+ * A packed look `[r, g, b, w]` (per-instance `instanceBiomeLook`): rgb multiplies
+ * the albedo; w is the moss scale on rocks and the saturation on understory.
+ * Neutral is the authored colour with the configured moss and full saturation.
+ */
+export const NEUTRAL_BIOME_LOOK = Object.freeze([1, 1, 1, 1]);
+/** Look columns, the key each packs into w and that key's range. */
+const LOOK_COLUMNS = Object.freeze({
+  rock: Object.freeze({ w: 'moss', range: Object.freeze([0, 2]) }),
+  understory: Object.freeze({ w: 'saturation', range: Object.freeze([0, 1.5]) }),
+});
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const PATH = 'biomeLooks';
@@ -37,14 +46,15 @@ function inRange(value, path, min, max) {
   return value;
 }
 
-/** `rock: { tint, tone, moss }` as one packed rgb multiplier plus a moss scale. */
-function rockLook(row, path) {
+/** `{ tint, tone, <w> }` as one packed rgb multiplier plus the column's w. */
+function packLook(row, path, { w, range }) {
   if (!isRecord(row)) fail(path, 'must be an object');
-  for (const key of Object.keys(row)) if (!['tint', 'tone', 'moss'].includes(key)) fail(`${path}.${key}`, 'is not one of tint, tone, moss');
+  const keys = ['tint', 'tone', w];
+  for (const key of Object.keys(row)) if (!keys.includes(key)) fail(`${path}.${key}`, `is not one of ${keys.join(', ')}`);
   const tint = row.tint === undefined ? 0xffffff : parseInt(hex(row.tint, `${path}.tint`).slice(1), 16);
   const tone = row.tone === undefined ? 1 : inRange(row.tone, `${path}.tone`, 0.25, 2);
-  const moss = row.moss === undefined ? 1 : inRange(row.moss, `${path}.moss`, 0, 2);
-  return [(tint >> 16 & 255) / 255 * tone, (tint >> 8 & 255) / 255 * tone, (tint & 255) / 255 * tone, moss];
+  const last = row[w] === undefined ? 1 : inRange(row[w], `${path}.${w}`, range[0], range[1]);
+  return [(tint >> 16 & 255) / 255 * tone, (tint >> 8 & 255) / 255 * tone, (tint & 255) / 255 * tone, last];
 }
 
 function unit(value, path) {
@@ -76,6 +86,7 @@ function tileId(key, path) {
  *   arid: Readonly<Record<string, readonly number[]>>,
  *   crags: Uint8Array,
  *   rock: Float32Array,
+ *   understory: Float32Array,
  *   surface: ReturnType<typeof resolveBiomeSurfaceLooks>,
  * }>}
  */
@@ -88,9 +99,12 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
   const soil = {};
   const arid = Object.fromEntries(BIOME_ARID_KINDS.map((kind) => [kind, []]));
   const crags = new Uint8Array(256);
-  // Four floats per tile id: rgb albedo multiplier, moss scale (stylized/rockWeathering.js).
-  const rock = new Float32Array(256 * 4);
-  for (let id = 0; id < 256; id += 1) rock.set(NEUTRAL_ROCK_LOOK, id * 4);
+  // Four floats per tile id and look column (NEUTRAL_BIOME_LOOK).
+  const looks = Object.fromEntries(Object.keys(LOOK_COLUMNS).map((column) => {
+    const table = new Float32Array(256 * 4);
+    for (let id = 0; id < 256; id += 1) table.set(NEUTRAL_BIOME_LOOK, id * 4);
+    return [column, table];
+  }));
   const snow = Object.fromEntries(BIOME_SNOW_COLUMNS.map((column) => [column, new Float32Array(256)]));
   const surfaceRows = [];
   for (const [key, row] of Object.entries(source.byTileId ?? {})) {
@@ -109,7 +123,9 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
       if (typeof row.crags !== 'boolean') fail(`${path}.crags`, 'must be true or false');
       crags[id] = row.crags ? 1 : 0;
     }
-    if (row.rock !== undefined) rock.set(rockLook(row.rock, `${path}.rock`), id * 4);
+    for (const [column, spec] of Object.entries(LOOK_COLUMNS)) {
+      if (row[column] !== undefined) looks[column].set(packLook(row[column], `${path}.${column}`, spec), id * 4);
+    }
     if (row.snow !== undefined && !isRecord(row.snow)) fail(`${path}.snow`, 'must be an object');
     for (const column of Object.keys(row.snow ?? {})) {
       if (!BIOME_SNOW_COLUMNS.includes(column)) fail(`${path}.snow.${column}`, `is not one of ${BIOME_SNOW_COLUMNS.join(', ')}`);
@@ -126,16 +142,26 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
     snow: Object.freeze(snow),
     arid: Object.freeze(Object.fromEntries(Object.entries(arid).map(([kind, ids]) => [kind, Object.freeze(ids)]))),
     crags,
-    rock,
+    ...looks,
     surface: resolveBiomeSurfaceLooks(source.surface, surfaceRows),
   });
 }
 
-/** The rock look `[r, g, b, moss]` of a tile id; neutral for unlisted biomes or no table. */
-export function biomeRockLook(looks, tileId) {
-  const table = looks?.rock;
-  if (!table || !(tileId >= 0 && tileId < 256)) return NEUTRAL_ROCK_LOOK;
+/** A tile id's packed look in `column` (`rock`, `understory`); neutral when unlisted or absent. */
+export function biomeLook(looks, column, tileId) {
+  const table = looks?.[column];
+  if (!table || !(tileId >= 0 && tileId < 256)) return NEUTRAL_BIOME_LOOK;
   return table.subarray(tileId * 4, tileId * 4 + 4);
+}
+
+/**
+ * The tile under a placement. Manifest placements carry their tile id; coast,
+ * riverbank, seabed and strand placements are looked up where they stand.
+ */
+export function placementTileId(terrainView, placement) {
+  if (placement.tileId !== undefined) return placement.tileId;
+  const tileSize = terrainView.worldStore?.tileSize;
+  return tileSize ? terrainView.tileMap?.get(Math.floor(placement.x / tileSize), Math.floor(-placement.z / tileSize)) : undefined;
 }
 
 /** A snow column as `{ [tileId]: value }`, listing only biomes that carry it. */

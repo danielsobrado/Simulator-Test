@@ -40,7 +40,7 @@ import { RiverRockSource } from './RiverRockSource.js';
 import { iterateCoastStones, DEFAULT_COAST_STONES } from './coastStones.js';
 import { iterateSeabedRocks, DEFAULT_SEABED_ROCKS } from './seabedRocks.js';
 import { applyRockWeathering, resolveRockWeathering } from './rockWeathering.js';
-import { biomeRockLook } from '../biomes/BiomeLooks.js';
+import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
 import { fitRockToGround } from './rockGroundFit.js';
 import { rockWaterContact } from './localRockWater.js';
 import { staticWaterContactAt } from '../water/StaticWaterSample.js';
@@ -180,15 +180,8 @@ export class StylizedRockView {
       seed: placement.priority,
       colorVariation: 1 - colorRange * 0.5 + placement.priority * colorRange,
       surfaceData: placement.surfaceData,
-      rockLook: biomeRockLook(this.config.biomeLooks, this.placementTileId(placement)),
+      biomeLook: biomeLook(this.config.biomeLooks, 'rock', placementTileId(this.terrainView, placement)),
     };
-  }
-
-  /** The biome under a stone: coast, riverbank and seabed placements carry no tile id of their own. */
-  placementTileId(placement) {
-    if (placement.tileId !== undefined) return placement.tileId;
-    const tileSize = this.terrainView.worldStore?.tileSize;
-    return tileSize ? this.terrainView.tileMap?.get(Math.floor(placement.x / tileSize), Math.floor(-placement.z / tileSize)) : undefined;
   }
 
   /**
@@ -238,7 +231,7 @@ export class StylizedRockView {
       material: createStylizedRockMaterial(source, this.config, this.rockWeathering()),
       kind: 'rock',
       instanceSurface: Boolean(this.rockWeatheringSettings),
-      instanceRockLook: Boolean(this.rockWeatheringSettings),
+      instanceBiomeLook: Boolean(this.rockWeatheringSettings),
     }));
     this.prototypes.push(...newPrototypes);
     // Both fields describe the terrain, not the prop set, so they are built once
@@ -269,7 +262,7 @@ export class StylizedRockView {
       material: prototype.material.clone(),
       kind: 'rock',
       instanceSurface: prototype.instanceSurface,
-      instanceRockLook: prototype.instanceRockLook,
+      instanceBiomeLook: prototype.instanceBiomeLook,
     }]);
     this.proxyPrototypes.push(...newProxyPrototypes);
     this.prototypeHeights.push(...newPrototypes.map((prototype) => {

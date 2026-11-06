@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { float, vec3 } from 'three/tsl';
+import { attribute, dot, float, mix, vec3 } from 'three/tsl';
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { gradePlantPart, resolveFoliagePalette } from './forest/foliagePalette.js';
 import { foliageSkyFill } from './forest/foliageLight.js';
@@ -35,9 +35,24 @@ export function authoredFoliageColor(material) {
   return material.map ? authoredTexture(material.map).rgb.mul(base) : base;
 }
 
-/** Green leaves share the meadow/canopy ramp; flowers and bark retain their paint. */
-export function applyUnderstoryPalette(material, config, tileId = null, role = 'auto') {
-  const color = gradePlantPart(authoredFoliageColor(material), resolveFoliagePalette(config, tileId), role);
+/**
+ * The biome's understory look (biome-looks `understory`), per instance: greyed
+ * toward its own luminance by `w` (saturation), then tinted by rgb. A shrub
+ * shared by several biomes otherwise wore one biome's green in all of them.
+ */
+export function biomeUnderstoryColor(color) {
+  const look = attribute('instanceBiomeLook', 'vec4');
+  return mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, look.w).mul(look.xyz);
+}
+
+/**
+ * Green leaves share the meadow/canopy ramp; flowers and bark retain their paint.
+ * `biomeLook` reads the instance's understory look; its mesh must carry
+ * `instanceBiomeLook` (a part with `instanceBiomeLook: true`).
+ */
+export function applyUnderstoryPalette(material, config, tileId = null, role = 'auto', { biomeLook = false } = {}) {
+  const graded = gradePlantPart(authoredFoliageColor(material), resolveFoliagePalette(config, tileId), role);
+  const color = biomeLook ? biomeUnderstoryColor(graded) : graded;
   material.colorNode = color;
   const blossom = role === 'petal' || role === 'center';
   const fill = foliageSkyFill(color, blossom ? .1 : .14);

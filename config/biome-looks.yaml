@@ -31,6 +31,11 @@
 #   ripples       how water near the player answers wading, swimming and spells
 #                 (water/RippleField.js): wave `speed` m/s, `fade` seconds for a
 #                 ring to die, `splash` gain, ambient `drops` per second.
+#   understory    shrubs, bushes and ground plants (stylized/AuthoredFoliageMaterial.js),
+#                 per instance by the biome they stand in: greyed by `saturation`
+#                 (0 grey .. 1 as graded .. 1.5), then `tint` x `tone` multiplies them.
+#                 A shrub shared by several biomes otherwise wore one biome's
+#                 green in all of them: dark juniper blobs on a pale steppe.
 #   water         the region's water, sea and inland: `desaturate` (0..1) greys
 #                 its colour toward its own luminance, then `tint` multiplies it.
 #                 Cold country takes the tropical cyan out of its pools.
@@ -64,6 +69,8 @@ biomeLooks:
       arid: sand
       # Sun-bleached, sand-scoured stone: no moss survives the erg.
       rock: { tint: '#e6cfa8', tone: 1.1, moss: 0 }
+      # Sun-baked scrub: olive-straw, never lawn green.
+      understory: { tint: '#e2d3a6', tone: 1.1, saturation: 0.55 }
       ripples: { speed: 1.1, fade: 6, splash: 1.2 }
       prints: { ground: 0.9, lifetime: 30, tint: '#8c7458' }
       dunes: { wavelength: 0.22, wind: 18, height: 2, sharpness: 0.75 }
@@ -81,6 +88,8 @@ biomeLooks:
       rock: { tint: '#d6cbb8', tone: 0.95, moss: 0 }
       # Steel-grey meltwater: the lagoon cyan read as a tropical oasis.
       water: { tint: '#c6d2d8', desaturate: 0.5 }
+      # Dusty sage steppe scrub, pale enough to sit on the grey-buff gravel.
+      understory: { tint: '#d2d4bc', tone: 1.15, saturation: 0.45 }
       snow: { ground: 0.2, air: 0.3, fall: 0.3 }
       ripples: { speed: 1.6, fade: 1.8 }
       prints: { ground: 0.5, lifetime: 120, tint: '#a9a49c' }
@@ -93,6 +102,8 @@ biomeLooks:
       soil: '#a8865a'
       rock: { tint: '#e0c9a6', tone: 0.9, moss: 0 }
       water: { tint: '#c8bf98', desaturate: 0.45 }
+      # Dry-season thorn scrub, olive going to straw.
+      understory: { tint: '#e6d6a0', tone: 1.05, saturation: 0.7 }
       prints: { ground: 0.4, lifetime: 90, tint: '#8a6a48' }
     4: { name: grassland, canopy: '#86b04a' }
     5: { name: tropical seasonal forest, canopy: '#6fae3e' }
@@ -123,6 +134,8 @@ biomeLooks:
       canopy: '#8a9a62'
       rock: { tint: '#d6d8d4', tone: 1, moss: 0.35 }
       water: { tint: '#c8d6de', desaturate: 0.45 }
+      # Dwarf willow and heath, frost-dulled.
+      understory: { tint: '#d0d6c8', tone: 1.05, saturation: 0.6 }
       snow: { ground: 0.95, canopy: 0.95, grass: 0.8, air: 0.7, fall: 0.75 }
       # Near-freezing meltwater: thick, quick to still.
       ripples: { speed: 0.8, fade: 0.9, splash: 0.7 }
@@ -131,6 +144,7 @@ biomeLooks:
       name: glacier
       rock: { tint: '#d4dbe2', tone: 1.05, moss: 0 }
       water: { tint: '#d0dee8', desaturate: 0.4 }
+      understory: { tint: '#d6dde2', tone: 1.1, saturation: 0.4 }
       # No grass grows on the ice (grass.meadow.growth), so it takes no frost:
       # a frosted palette would spend one of the meadow's eight for nothing.
       snow: { ground: 1, canopy: 1, air: 1, fall: 1 }
@@ -161,6 +175,7 @@ biomeLooks:
       # Grey canyon stone, dusted pale; nothing grows on it.
       rock: { tint: '#cfc8bc', tone: 1.05, moss: 0 }
       water: { tint: '#c8c4b8', desaturate: 0.4 }
+      understory: { tint: '#d8ccb0', tone: 1.1, saturation: 0.5 }
       snow: { ground: 0.05, air: 0.2 }
       # Coarse grey canyon sand: short, choppy ripples across the wind.
       ripples: { speed: 1.3, fade: 4 }
