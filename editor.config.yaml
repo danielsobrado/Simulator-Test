@@ -692,6 +692,43 @@ stylizedSurface:
         scale: 1
         tileIds: [12]
         pivot: trunk
+      # Savanna acacias (tools/blender/savanna_trees/build_savanna_trees.py): a short
+      # bole forking low into zig-zag limbs under one flat plate of leaf pads,
+      # 1.6k-3.2k triangles. `preferredTileIds` makes them replace the oak and the
+      # meadow crowns in savanna, which read as an English park (2026-11-06 review).
+      - scene: /assets/trees/savanna/acacia-01.glb
+        trunkMaterial: Acacia bark
+        leafMaterial: Acacia leaves
+        species: broadleaf_round
+        barkProfile: karst_gnarl
+        barkScale: 0.6
+        barkSeed: 241
+        scale: 1
+        tileIds: [3]
+        preferredTileIds: [3]
+        pivot: trunk
+      - scene: /assets/trees/savanna/acacia-02.glb
+        trunkMaterial: Acacia bark
+        leafMaterial: Acacia leaves
+        species: broadleaf_round
+        barkProfile: karst_gnarl
+        barkScale: 0.6
+        barkSeed: 251
+        scale: 1
+        tileIds: [3]
+        preferredTileIds: [3]
+        pivot: trunk
+      - scene: /assets/trees/savanna/acacia-03.glb
+        trunkMaterial: Acacia bark
+        leafMaterial: Acacia leaves
+        species: broadleaf_round
+        barkProfile: karst_gnarl
+        barkScale: 0.6
+        barkSeed: 263
+        scale: 1
+        tileIds: [3]
+        preferredTileIds: [3]
+        pivot: trunk
     # Sparse recognisable plants layered over the shared procedural blade carpet.
     # Each prototype group becomes one instanced object with all of its authored
     # stem/leaf/flower materials intact.
@@ -1590,7 +1627,7 @@ stylizedSurface:
         # spawn) wear the donor's own. One uniform-array entry per distinct pair.
         byTileId:
           # lush 0: the green patch and hollow tints turned the tawny root olive.
-          3: { base: '#7d6030', tip: '#d9bf7c', lush: 0 }   # savanna: tawny straw, pale golden tips
+          3: { base: '#776336', tip: '#dcc890', lush: 0 }   # savanna: sun-bleached straw
           5: { base: '#4d6839', tip: '#9ab477' }   # open woodland: shared forest pigment
           6: { base: '#4d6839', tip: '#9ab477' }
           7: { base: '#3d6635', tip: '#86aa60' }   # humid broadleaf floor
