@@ -1,4 +1,4 @@
-import { drainJob, typedArrayJob } from '../../SettlementArrayJobs.js';
+import { drainJob } from '../../SettlementArrayJobs.js';
 /**
  * Gathers a town's rooms into a handful of meshes, one per material, with
  * their light baked in.
@@ -19,10 +19,41 @@ const CELL = 1.1;
 /** A face turned away from a light still catches this share of it, as bounce. */
 const WRAP = 0.3;
 
+const OUTWARD_ORDER = Object.freeze([0, 1, 2, 0, 2, 3]);
+const INWARD_ORDER = Object.freeze([0, 3, 2, 0, 2, 1]);
+
 export const INTERIOR_MATERIALS = Object.freeze(['wood', 'plaster', 'stone', 'plain', 'glow', 'sky', 'exterior']);
 
+/**
+ * A float32 list that grows by doubling. A city's rooms run to ~100 million
+ * values; held as JS number arrays (8 bytes each, plus growth) until the end,
+ * they alone took most of a gigabyte while the town loaded.
+ */
+class FloatList {
+  constructor() { this.array = new Float32Array(1024); this.length = 0; }
+  reserve(count) {
+    if (this.length + count <= this.array.length) return;
+    let size = this.array.length * 2;
+    while (size < this.length + count) size *= 2;
+    const grown = new Float32Array(size);
+    grown.set(this.array.subarray(0, this.length));
+    this.array = grown;
+  }
+  push(a, b, c) {
+    const count = c !== undefined ? 3 : b !== undefined ? 2 : 1;
+    this.reserve(count);
+    const array = this.array;
+    array[this.length++] = a;
+    if (count > 1) array[this.length++] = b;
+    if (count > 2) array[this.length++] = c;
+  }
+  /** The values, trimmed to their length (a copy, so the doubling slack is freed). */
+  toArray() { return this.array.slice(0, this.length); }
+}
+
 function emptyGroup() {
-  return { positions: [], normals: [], colors: [], uvs: [], fire: [], sky: [] };
+  return { positions: new FloatList(), normals: new FloatList(), colors: new FloatList(),
+    uvs: new FloatList(), fire: new FloatList(), sky: new FloatList() };
 }
 
 export class InteriorBuilder {
@@ -30,17 +61,15 @@ export class InteriorBuilder {
     this.groups = new Map(INTERIOR_MATERIALS.map((key) => [key, emptyGroup()]));
     this.group = this.groups.get('plain');
     this.lights = [];
-    this.at = null;
-    this.toward = null;
   }
 
   /** Aim the builder at one building, and light what follows with `lights`. */
   enter(building, lights = []) {
-    const sin = Math.sin(building.yaw);
-    const cos = Math.cos(building.yaw);
     // +x is (cos, −sin) and +z is (sin, cos) in plan space, and local z is minus plan z.
-    this.at = (x, y, z) => [building.x + cos * x + sin * z, y, -(building.z - sin * x + cos * z)];
-    this.toward = (x, y, z) => [cos * x + sin * z, y, -(-sin * x + cos * z)];
+    this.sin = Math.sin(building.yaw);
+    this.cos = Math.cos(building.yaw);
+    this.originX = building.x;
+    this.originZ = building.z;
     this.lights = lights;
   }
 
@@ -51,9 +80,14 @@ export class InteriorBuilder {
     return this;
   }
 
-  /** What the room's lights give a point with normal `n`: `[fireR, fireG, fireB, sky]`. */
+  /**
+   * What the room's lights give a point with normal `n`: `[fireR, fireG, fireB, sky]`,
+   * in one scratch array reused for every vertex. A city's rooms run to tens of
+   * millions of vertices, and fresh arrays for each pushed its tab past Chrome's memory limit.
+   */
   lightAt(point, n) {
-    const light = [0, 0, 0, 0];
+    const light = this.light ??= [0, 0, 0, 0];
+    light[0] = 0; light[1] = 0; light[2] = 0; light[3] = 0;
     for (const source of this.lights) {
       const dx = source.at[0] - point[0];
       const dy = source.at[1] - point[1];
@@ -68,11 +102,12 @@ export class InteriorBuilder {
   }
 
   vertex(point, n, color, u, v) {
-    const { group } = this;
+    const { group, sin, cos } = this;
     const light = this.lightAt(point, n);
-    group.positions.push(...this.at(...point));
-    group.normals.push(...this.toward(...n));
-    group.colors.push(...color);
+    const [x, y, z] = point;
+    group.positions.push(this.originX + cos * x + sin * z, y, -(this.originZ - sin * x + cos * z));
+    group.normals.push(cos * n[0] + sin * n[2], n[1], -(-sin * n[0] + cos * n[2]));
+    group.colors.push(color[0], color[1], color[2]);
     group.uvs.push(u, v);
     group.fire.push(light[0], light[1], light[2]);
     group.sky.push(light[3]);
@@ -94,19 +129,24 @@ export class InteriorBuilder {
     // The footprint frame is a mirror image of settlement-local space (its z is
     // negated), so a face wound to look along `n` here looks the other way there.
     const outward = cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] < 0;
-    const at = (s, t) => [0, 1, 2].map((axis) => {
-      const near = a[axis] + (b[axis] - a[axis]) * s;
-      const far = d[axis] + (c[axis] - d[axis]) * s;
-      return near + (far - near) * t;
-    });
+    const point = this.point ??= [0, 0, 0];
+    const at = (s, t) => {
+      for (let axis = 0; axis < 3; axis += 1) {
+        const near = a[axis] + (b[axis] - a[axis]) * s;
+        const far = d[axis] + (c[axis] - d[axis]) * s;
+        point[axis] = near + (far - near) * t;
+      }
+      return point;
+    };
     const width = length(a, b) * density;
     const height = length(a, d) * density;
+    const order = outward ? OUTWARD_ORDER : INWARD_ORDER;
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
-        const [s0, s1, t0, t1] = [column / columns, (column + 1) / columns, row / rows, (row + 1) / rows];
-        const corners = [[s0, t0], [s1, t0], [s1, t1], [s0, t1]];
-        for (const index of outward ? [0, 1, 2, 0, 2, 3] : [0, 3, 2, 0, 2, 1]) {
-          const [s, t] = corners[index];
+        for (const index of order) {
+          // Corners 0..3 run (s0,t0) (s1,t0) (s1,t1) (s0,t1).
+          const s = (column + (index === 1 || index === 2 ? 1 : 0)) / columns;
+          const t = (row + (index >= 2 ? 1 : 0)) / rows;
           this.vertex(at(s, t), n, color, s * width, t * height);
         }
       }
@@ -184,7 +224,7 @@ export class InteriorBuilder {
     for (const [key, group] of this.groups) {
       if (group.positions.length === 0) continue;
       result[key] = {};
-      for (const [name, values] of Object.entries(group)) result[key][name] = yield* typedArrayJob(values);
+      for (const [name, values] of Object.entries(group)) { result[key][name] = values.toArray(); yield; }
     }
     return result;
   }
