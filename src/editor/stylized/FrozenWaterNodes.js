@@ -1,8 +1,8 @@
 import { Color } from 'three/webgpu';
 import {
-  Fn, If, cameraPosition, clamp, float, fwidth, max, min, mix, normalize, oneMinus, positionWorld, pow, smoothstep, vec2, vec3,
+  Fn, If, cameraPosition, step, clamp, float, fwidth, max, min, mix, normalize, oneMinus, positionWorld, pow, smoothstep, vec2, vec3,
 } from 'three/tsl';
-import { periodicFbm2, periodicVoronoiDistances } from './PeriodicNoiseNodes.js';
+import { periodicFbm2, periodicVoronoiCellValue, periodicVoronoiDistances } from './PeriodicNoiseNodes.js';
 
 /** Pattern frames the ice reads; merged into the water's pattern origins. */
 export const FROZEN_WATER_PATTERN_FRAMES = Object.freeze({
@@ -10,6 +10,7 @@ export const FROZEN_WATER_PATTERN_FRAMES = Object.freeze({
   iceCrack: { scale: 1 / 6 },
   iceCrackFine: { scale: 1 / 2.2 },
   iceCrackWarp: { scale: 1 / 3 },
+  iceFloe: { scale: 1 / 9 },
 });
 
 const color = (hex) => { const c = new Color(hex); return vec3(c.r, c.g, c.b); };
@@ -38,7 +39,7 @@ const CLOUD_DEPTH = 0.6;
 /**
  * Water in the coldest country lies frozen where `cold` is glacier or tundra
  * (taiga, 0.55, stays open): lakes whole, and sea-kind water out to a ragged
- * edge some 30-60 m from shore. Every non-lake water tile is sea-kind, so that
+ * floe edge some 12-67 m from shore. Every non-lake water tile is sea-kind, so that
  * freezes the small inland pools through and gives the open sea a band of
  * shore-fast ice, with open water (and the icebergs) beyond. Clear dark ice over
  * deep water, whiter ice toward the banks, wandering pressure cracks and
@@ -56,7 +57,12 @@ const CLOUD_DEPTH = 0.6;
 export function createFrozenWaterNodes({ appearance, patterns, localXZ, waterDepth, currentStrength, shoreDistance }) {
   if (!appearance || !patterns) return null;
   const macro = periodicFbm2(patterns.latticePoint('iceMacro', localXZ));
-  const fastIce = oneMinus(smoothstep(30, 34, shoreDistance.add(macro.sub(0.5).mul(60))));
+  // The edge breaks into floes: each ~9 m Voronoi cell freezes out to its own
+  // distance, so the edge steps along cell borders and loose floes lie beyond it
+  // rather than one smooth line. A cell straddling its own distance is still cut.
+  const floe = periodicVoronoiCellValue(patterns.latticePoint('iceFloe', localXZ));
+  // Constant per cell: any smooth term here would slice cells along a curve again.
+  const fastIce = oneMinus(step(floe.mul(55).add(12), shoreDistance));
   // Ice is there or it is not: the cold share drifts over 16 m cells, and as a
   // straight weight it drew a wide foggy band between ice and open water.
   const frozen = smoothstep(0.4, 0.6, max(appearance.lake, appearance.ocean.mul(fastIce))

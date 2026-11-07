@@ -7,6 +7,7 @@ import {
   max,
   min,
   mix,
+  select,
   sin,
   uint,
   vec2,
@@ -128,6 +129,29 @@ export function periodicVoronoiDistances(position, time, cellSpeed) {
     });
   });
   return distances;
+}
+
+/**
+ * A 0..1 value constant over each Voronoi cell (the nearest point's own hash),
+ * so a threshold on it switches whole cells: floes, not contour lines.
+ */
+export function periodicVoronoiCellValue(position) {
+  const integer = floor(position);
+  const fraction = position.sub(integer);
+  const offsets = [-1, 0, 1];
+  const cellsX = offsets.map((offset) => wrapCell(integer.x.add(offset), PATTERN_PERIOD));
+  const cellsZ = offsets.map((offset) => wrapCell(integer.y.add(offset), PATTERN_PERIOD));
+  let nearest = float(8);
+  let value = float(0);
+  offsets.forEach((offsetZ, indexZ) => {
+    offsets.forEach((offsetX, indexX) => {
+      const distance = length(vec2(offsetX, offsetZ).add(cellPoint(cellsX[indexX], cellsZ[indexZ], float(0), 0)).sub(fraction));
+      // Swapped axes: a hash apart from the one that placed the point.
+      value = select(distance.lessThan(nearest), latticeHashNode(cellsZ[indexZ], cellsX[indexX]), value);
+      nearest = min(nearest, distance);
+    });
+  });
+  return value;
 }
 
 function smoothMin(a, b, k) {
