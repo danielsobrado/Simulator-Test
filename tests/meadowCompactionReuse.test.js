@@ -122,3 +122,31 @@ test('a ground revision discards partial results before a promoted build publish
   layer.buildTiles(layer.staleTiles, Infinity);
   for (let i = 0; i < tile.output.count; i++) assert.equal(tile.output.position[i * 4 + 1], 7);
 });
+
+test('a compaction done from its previous prefix alone publishes the prepared prefix, not a null output', t => {
+  const templates = {
+    high: createMeadowTemplate({ detail: 5, count: 100, tileSize: 8 }),
+    low: createMeadowTemplate({ detail: 2, count: 40, tileSize: 8 }),
+  };
+  const sample = (_x, _z, rank, out) => { Object.assign(out, { height: 1, strength: 1, shape: 0, path: 0 }); return rank % 2 === 0; };
+  const material = new MeshBasicMaterial();
+  const layer = new MeadowTileLayer({ scene: new Scene(), name: 'prefix-only', tileSize: 8,
+    templates, material, reach: 0, selectBand: () => 'low',
+    ground: { revisionAt: () => 2, forTile: () => ({ revision: 2, sample }) } });
+  t.after(() => { layer.dispose(); material.dispose(); Object.values(templates).forEach(g => g.dispose()); });
+  const prepared = createCompaction({ template: templates.high, centerX: 4, centerZ: 4, sample });
+  prepared.advance();
+  let cancelled = false;
+  // A worker compaction whose previous prefix already covers the band: done, no output of its own.
+  const compaction = { done: true, output: null, progress: 1, asynchronous: false, advance() {}, cancel() { cancelled = true; } };
+  const tile = { centerX: 4, centerZ: 4, renderX: 4, renderZ: 4, band: 'low', preparationBand: 'low',
+    preparationCapacity: 40, revision: 1, output: null,
+    prepared: { output: prepared.output, capacity: 100, band: 'high', revision: 2 },
+    job: { band: 'low', revision: 2, compaction } };
+  layer.tiles.set('0:0', tile);
+  layer.buildTiles([tile], Infinity);
+  assert.equal(cancelled, true);
+  assert.equal(tile.job, null);
+  assert.equal(tile.prepared.output, prepared.output, 'the prepared buffers stay where they were');
+  assertOutput(tile.output, compactionPrefix(prepared.output, 40));
+});

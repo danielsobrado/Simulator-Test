@@ -439,6 +439,17 @@ export class MeadowTileLayer {
         stale[write++] = tile;
         continue;
       }
+      if (!compaction.output) {
+        // Done from its `previous` prefix alone: the prepared ranks already
+        // cover this band, so nothing new was compacted and the compaction
+        // hands back no output (the prefix's buffers stay owned by
+        // tile.prepared). Publish that prefix; dereferencing the null output
+        // threw thousands of times a run and scenery never settled.
+        compaction.cancel?.();
+        tile.job = null;
+        if (!tile.prepared || !this.publishPrepared(tile)) stale[write++] = tile;
+        continue;
+      }
       const publication = this.stablePrefixes && tile.band !== null
         ? compactionPrefix(compaction.output, this.templates[tile.band].instanceCount)
         : compaction.output;
