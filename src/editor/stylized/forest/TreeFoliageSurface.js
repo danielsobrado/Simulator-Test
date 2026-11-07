@@ -2,6 +2,7 @@ import { Color } from 'three/webgpu';
 import { attribute, float, materialAO, materialRoughness, mix, normalWorld, positionGeometry, positionView, uv, vec3 } from 'three/tsl';
 import { surfaceWetnessUniform } from '../../weather/surfaceWetness.js';
 import { resolveTreeFoliageSettings } from './treeSurfaceSettings.js';
+import { setRuntimeUserData } from '../../../render/materials/runtimeUserData.js';
 
 /** Occlusion has a floor, retaining readable crown interiors and donor AO. */
 export function canopyVisibilityNode(visibility, settings) {
@@ -50,7 +51,7 @@ export function configureTreeFoliageSurface(material, {
     material.foliageNormalBlendNode = float(settings.normalBlend);
   }
   material.userData.treeFoliageSurface = settings;
-  material.userData.canopyVisibilityNode = visibility;
+  setRuntimeUserData(material, 'canopyVisibilityNode', visibility);
   return { visibility: sky };
 }
 

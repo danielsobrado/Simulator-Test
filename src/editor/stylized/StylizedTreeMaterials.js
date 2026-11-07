@@ -26,6 +26,7 @@ import { resolveTreeFoliageSettings } from './forest/treeSurfaceSettings.js';
 import { addTreeEmission, createTreeSurfaceMaterial } from './forest/TreeSurfaceMaterial.js';
 import { foliageWindPosition } from './forest/foliageWind.js';
 import { assignTreeFoliageMaterialData } from '../../render/postprocessing/PostProcessingMaterialData.js';
+import { setRuntimeUserData } from '../../render/materials/runtimeUserData.js';
 export { createAuthoredTrunkMaterial, createStylizedTrunkMaterial } from './forest/TreeBarkMaterial.js';
 
 function colorNode(value) {
@@ -149,7 +150,7 @@ export function createStylizedLeafMaterial({
     // Lit less as it takes the sky on, or a sunlit rim would out-shine the sky.
     material.colorNode = edge ? crown.mul(edge.sky.oneMinus()) : crown;
     addTreeEmission(material, treeFoliageEmission(crown, edge?.sky, surface.visibility));
-    material.userData.crownOpacity = edge?.opacity ?? null;
+    setRuntimeUserData(material, 'crownOpacity', edge?.opacity ?? null);
     // Its biome and autumn tints are ratios against the grade, not the palette.
     material.userData.gradedCanopy = canopyGrade;
   } else {
