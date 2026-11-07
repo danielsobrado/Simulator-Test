@@ -44,6 +44,8 @@ export const DEFAULT_COAST_SWASH = Object.freeze({
   enabled: true,
   period: 7.5,
   runupHeight: 1.1,
+  /** Farthest the wash runs up the ground from the still waterline, in metres. */
+  runupMeters: 7,
   breakDepth: 0.5,
   frontBand: 0.08,
   foamCore: 0.02,
@@ -131,8 +133,15 @@ export function createCoastSwashNodes({
 }) {
   if (!config.enabled) return null;
   const height = groundHeight.sub(seaStateUniforms.seaLevel);
+  // Run-up is a height, so on a nearly flat bank 1.1 m reached some 30 m inland
+  // and drew foam lines across dry sand round sea-level pools. Cap it in metres
+  // from the still waterline too; a steep beach never reaches the cap.
+  const runupMeters = config.runupMeters ?? DEFAULT_COAST_SWASH.runupMeters;
+  const inland = shoreContactDistance(max(height, 0), localXZ).distance;
+  const reach = oneMinus(smoothstep(runupMeters * 0.6, runupMeters, inland));
   const band = smoothstep(-config.breakDepth - 0.8, -config.breakDepth + 0.1, height)
     .mul(oneMinus(smoothstep(config.runupHeight + 0.2, config.runupHeight + config.dampHeight + 0.4, height)))
+    .mul(reach)
     .mul(oceanMask);
   // Slow drift of the wave timing along the shore.
   const drift = periodicFbm(patternOrigins.latticePoint('drift', localXZ)).mul(TAU * 1.6);
@@ -168,6 +177,7 @@ export function createCoastSwashNodes({
   // stopped half a metre under, and over a carved bed's near-planar ramp that
   // cut drew a pale patch bounded by long straight contours.
   const above = oneMinus(smoothstep(config.runupHeight + 0.2, config.runupHeight + config.dampHeight + 0.4, height))
+    .mul(oneMinus(smoothstep(runupMeters, runupMeters * 1.6, inland)))
     .mul(oceanMask);
   const wet = max(memory.mul(band), damp.mul(above));
   const filmTint = colorNode(config.filmTint);

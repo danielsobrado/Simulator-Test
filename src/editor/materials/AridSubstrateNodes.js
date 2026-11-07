@@ -107,9 +107,17 @@ export function createAridSubstrateNodes({ tileId, bare, patterns, localXZ, came
       // and soft macro blotches the cold desert read as one blur from above; soft,
       // faint patches (±13 %) did not change that.
       const midReach = smoothstep(12, 35, cameraDistance).mul(oneMinus(smoothstep(380, 560, cameraDistance)));
-      const stones = smoothstep(.44, .56, periodicNoise(p.div(2).add(51.7), PATTERN_PERIOD / 2)).mul(.3)
-        .add(smoothstep(.42, .58, periodicNoise(p.div(4).add(87.3), PATTERN_PERIOD / 4)).mul(.4))
-        .add(smoothstep(.36, .64, periodicNoise(p.div(16).add(23.9), PATTERN_PERIOD / 16)).mul(.3));
+      // Sampled through a domain warp: thresholded this narrowly, plain value noise
+      // drew its lattice as rows of rounded squares from the air. The warp is
+      // periodic over PATTERN_PERIOD too, so the pattern still closes over its wrap.
+      const panWarp = vec2(
+        periodicNoise(p.div(8).add(13.1), PATTERN_PERIOD / 8).add(periodicNoise(p.div(2).add(71.3), PATTERN_PERIOD / 2).mul(.35)),
+        periodicNoise(p.div(8).add(57.9), PATTERN_PERIOD / 8).add(periodicNoise(p.div(2).add(29.4), PATTERN_PERIOD / 2).mul(.35)),
+      ).sub(.675).mul(7);
+      const q = p.add(panWarp);
+      const stones = smoothstep(.44, .56, periodicNoise(q.div(2).add(51.7), PATTERN_PERIOD / 2)).mul(.3)
+        .add(smoothstep(.42, .58, periodicNoise(q.div(4).add(87.3), PATTERN_PERIOD / 4)).mul(.4))
+        .add(smoothstep(.36, .64, periodicNoise(q.div(16).add(23.9), PATTERN_PERIOD / 16)).mul(.3));
       const mineral = mix(pigment('#787b76'), pigment('#b6b7a5'), macro).div(mineralMean)
         .mul(grain.sub(.5).mul(.18).mul(reach).add(1))
         .mul(stones.sub(.5).mul(.5).mul(midReach).add(1));

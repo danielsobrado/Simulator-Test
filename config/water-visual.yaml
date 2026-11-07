@@ -164,6 +164,9 @@ water:
     # Seconds per wave, and how far above still water it runs up the sand.
     period: 7.5
     runupHeight: 0.5
+    # And how far it may run in metres from the still waterline. A height alone
+    # reached 10-15 m over the flat banks of sea-level pools: foam lines on dry sand.
+    runupMeters: 4
     # Depth in the shallows where the foam line forms.
     breakDepth: 0.5
     # Height over which the wash's edge fades. At 8 cm the film filled every
