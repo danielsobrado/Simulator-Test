@@ -14,6 +14,7 @@ import {
   select,
   smoothstep,
   texture,
+  uniformArray,
   vec3,
 } from 'three/tsl';
 import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochasticNodes.js';
@@ -341,7 +342,7 @@ export function createTerrainMaterialBakedSurface({
       nearDetailed,
       midColor,
       farColor,
-      proceduralColor,
+      proceduralColor: snowedFallback(proceduralColor, snowColor.mul(heightShade), tileId, stylizedConfig),
       cameraDistance,
       render,
       gpuState,
@@ -373,6 +374,19 @@ export function createTerrainMaterialBakedSurface({
  * times in the terrain's fragment shader. As variables they are emitted once and
  * each branch reads a name.
  */
+/**
+ * The colour a chunk shows before its bake is ready (or while it fades in or
+ * goes stale): the procedural ground, under its biome's ground snow. Without
+ * the snow, the unbaked outer ring of resident chunks drew as a flat band of
+ * Azgaar's tundra map colour across the snow mountains.
+ */
+function snowedFallback(proceduralColor, snowColor, tileId, stylizedConfig) {
+  const ground = stylizedConfig.biomeLooks?.snow?.ground;
+  if (!ground || !ground.some((value) => value > 0)) return proceduralColor;
+  const cover = uniformArray(Array.from(ground), 'float').element(clamp(tileId, 0, 255).toInt());
+  return mix(proceduralColor, snowColor, cover);
+}
+
 function assembleBakedColor(inputs) {
   const {
     cameraDistance, render, gpuState, nearBlend, farBlend, nearBlendEnd, farBlendEnd,
