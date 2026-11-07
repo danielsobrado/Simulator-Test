@@ -1,4 +1,4 @@
-import { beveledBox } from '../ProceduralWorkshopGeometry.js';
+import { beveledBox, quarterTurnUv } from '../ProceduralWorkshopGeometry.js';
 import { facadeBeam, facadePoint } from './HouseFacade.js';
 import { openingExtent } from './HouseTimberFrame.js';
 
@@ -11,11 +11,17 @@ import { openingExtent } from './HouseTimberFrame.js';
  * girth, a little sway in height and its own end length, so no course reads as
  * a ruled line.
  */
-export const LOG_DIAMETER = 0.25;
+// Checked on screen: at 0.25 m a storey read as fine stripes, not logs.
+export const LOG_DIAMETER = 0.32;
 /** Course pitch as a share of the diameter: logs bed into the one below. */
 const COURSE = 0.86;
-/** Beyond-the-corner length of a log end, past the crossing wall's face. */
-const END_REACH = 0.28;
+/**
+ * How far a log end stands past the crossing wall's logs. At 0.28 m past its
+ * face, with a rounded bevel, every corner read as a row of saw teeth.
+ */
+const END_REACH = 0.12;
+/** Round enough to read as a log, not so round its sawn end comes to a point. */
+const LOG_BEVEL = 0.3;
 
 function logSegments(u0, u1, y, extents) {
   const blockers = extents.filter((extent) => y > extent.y0 && y < extent.y1).sort((a, b) => a.u0 - b.u0);
@@ -56,18 +62,21 @@ export function layLogWall(kit, facade, { thickness, openings = [], phase = 0 })
   for (let course = 0; course < courses; course += 1) {
     const crossing = (course + phase) % 2 === 0;
     const y = facade.y0 + step * (course + 0.5);
-    const start = crossing ? -thickness - END_REACH * (0.8 + kit.random() * 0.4) : inset;
-    const end = facade.length + (crossing ? thickness + END_REACH * (0.8 + kit.random() * 0.4) : -inset);
+    // Past the corner: through the crossing wall, over its proud logs, then the end itself.
+    const reach = () => LOG_DIAMETER * 0.85 + END_REACH * (0.7 + kit.random() * 0.6);
+    const start = crossing ? -reach() : inset;
+    const end = facade.length + (crossing ? reach() : -inset);
     for (const [a, b] of logSegments(start, end, y, extents)) {
       const girth = step / COURSE * (0.9 + kit.random() * 0.2);
       const sway = (kit.random() - 0.5) * 0.03;
-      kit.add('wood', facadeBeam(
+      // Grain runs along the log; the shared projection lays it across a horizontal beam.
+      kit.add('wood', quarterTurnUv(facadeBeam(
         facade,
         [a, y + sway, girth / 2 - thickness * 0.15],
         [b, y - sway, girth / 2 - thickness * 0.15],
         girth,
-        { proud: girth, bevelRatio: 0.42 },
-      ));
+        { proud: girth, bevelRatio: LOG_BEVEL },
+      )));
     }
   }
 }

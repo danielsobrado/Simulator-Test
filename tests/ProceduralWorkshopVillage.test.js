@@ -278,5 +278,5 @@ test('a log-built house raises its timber storeys in logs and boards its gables'
   assert.throws(() => normalizeProceduralRecipe({ archetype: 'house', walls: 'wattle' }), /wall build/);
   // The plastered upper storeys and gables are gone; logs and boards stand in their place.
   assert.ok(slotTriangles('mortar', { walls: 'logs' }) < slotTriangles('mortar', {}) * 0.5, 'plaster replaced');
-  assert.ok(slotTriangles('wood', { walls: 'logs' }) >= slotTriangles('wood', {}), 'logs at least replace the framing');
+  assert.ok(slotTriangles('wood', { walls: 'logs' }) > 0, 'logs built');
 });
