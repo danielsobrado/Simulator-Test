@@ -6,6 +6,7 @@ import { WorldGuidanceField } from './WorldGuidanceField.js';
 import { ridgeFineHeight, ridgeHeight, validateMountainRidges } from './MountainRidges.js';
 import { landformRelief } from './TerrainLandforms.js';
 import { canyonRelief } from './CanyonRelief.js';
+import { alpineHeight, alpineLakeLift, createAlpineMask } from './AlpineRelief.js';
 import { valueNoise } from './valueNoise2d.js';
 import { createBiomeBoundaryWarp } from './BiomeBoundaryWarp.js';
 import { TrailGrading, validateTrailGrading } from './TrailGrading.js';
@@ -303,6 +304,17 @@ export class AzgaarMacroWorldGenerator {
     this.canyonMask = canyonBiomes.size && this.biomeAtlas.some((id) => canyonBiomes.has(id))
       ? Uint8Array.from(this.biomeAtlas, (id) => (canyonBiomes.has(id) ? 1 : 0))
       : null;
+    // Tundra and glacier rise into snow mountains (AlpineRelief.js); null when the world has none.
+    this.alpineMask = createAlpineMask({
+      biomes: this.biomeAtlas,
+      heights: this.heights,
+      features: this.features,
+      lakeIds: new Set((source.lakes ?? []).map((lake) => lake.id)),
+      width: source.atlas.width,
+      height: source.atlas.height,
+      metersPerTexel: (source.physical?.widthMeters ?? source.bounds.widthCells * 2) / source.atlas.width,
+      landHeight: LAND_HEIGHT,
+    });
     this.riverIndex = createRiverIndex(
       source.rivers,
       source.atlas.width,
@@ -385,6 +397,18 @@ export class AzgaarMacroWorldGenerator {
   /** 0..1, how far a vertex lies inside canyon country, eased across one atlas texel. */
   canyonWeight(cellX, cellZ) {
     return this.canyonMask ? this.sampleAtlasBilinear(this.canyonMask, cellX, cellZ) : 0;
+  }
+
+  /** 0..1, how far a vertex lies inside cold mountain country. */
+  alpineWeight(cellX, cellZ) {
+    return this.alpineMask ? this.sampleAtlasBilinear(this.alpineMask.weight, cellX, cellZ) : 0;
+  }
+
+  /** Alpine relief at a vertex in metres; zero outside cold country. */
+  alpineRelief(cellX, cellZ, weight, fine = false) {
+    if (weight <= 0) return 0;
+    const calm = this.sampleAtlasBilinear(this.alpineMask.calm, cellX, cellZ);
+    return alpineHeight(cellX, cellZ, this.seed, weight, calm, fine);
   }
 
   sampleAtlasBilinear(values, cellX, cellZ) {
@@ -554,11 +578,14 @@ export class AzgaarMacroWorldGenerator {
     );
     // Mesas replace the crests: ridged noise over a flat top reads as hills again.
     const canyon = this.canyonWeight(vertexX, vertexZ);
+    // The alpine range carries its own, larger crests in place of the high-ground ridges.
+    const alpine = this.alpineWeight(vertexX, vertexZ);
     // The far backdrop skips landforms: it sits heightBias under them, past their reach.
     return base
       + detail * coastFade * ruggedness * this.morphologyScale(vertexX, vertexZ)
       + landformRelief(vertexX, vertexZ, this.seed) * clamp((rawHeight - LAND_HEIGHT) / LANDFORM_COAST_RAW, 0, 1)
-      + this.ridgeRelief(vertexX, vertexZ, elevationFraction, ridgeHeightWithFine) * coastFade * (1 - canyon)
+      + this.ridgeRelief(vertexX, vertexZ, elevationFraction, ridgeHeightWithFine) * coastFade * (1 - canyon) * (1 - alpine)
+      + this.alpineRelief(vertexX, vertexZ, alpine * coastFade, true)
       + (canyon > 0 ? canyonRelief(vertexX, vertexZ, this.seed) * canyon * coastFade : 0);
   }
 
@@ -591,7 +618,9 @@ export class AzgaarMacroWorldGenerator {
       // The far backdrop carries the same crests, so ranges keep their shape
       // where near terrain hands over to it.
       const canyon = this.canyonWeight(cellX, cellZ);
-      height += this.ridgeRelief(cellX, cellZ, landReliefFraction(rawHeight, this.source.terrain)) * (1 - canyon)
+      const alpine = this.alpineWeight(cellX, cellZ);
+      height += this.ridgeRelief(cellX, cellZ, landReliefFraction(rawHeight, this.source.terrain)) * (1 - canyon) * (1 - alpine)
+        + this.alpineRelief(cellX, cellZ, alpine)
         + (canyon > 0 ? canyonRelief(cellX, cellZ, this.seed, false) * canyon : 0);
     }
     return { height, tileId: this.sampleTile(cellX, cellZ) };
@@ -599,7 +628,19 @@ export class AzgaarMacroWorldGenerator {
 
   /** A lake's surface in metres, by the same mapping as the land around it. */
   lakeSurfaceHeight(lake) {
-    return convertHeight(lake.height, this.source.terrain);
+    return convertHeight(lake.height, this.source.terrain) + this.alpineLakeLift(lake);
+  }
+
+  /** A lake in cold mountain country rises with the calmed ground around it. */
+  alpineLakeLift(lake) {
+    if (!this.alpineMask) return 0;
+    const { width, height } = this.source.atlas;
+    let x = 0;
+    let y = 0;
+    for (const [px, py] of lake.outline) { x += px; y += py; }
+    const tx = clamp(Math.floor(x / lake.outline.length), 0, width - 1);
+    const ty = clamp(Math.floor(y / lake.outline.length), 0, height - 1);
+    return alpineLakeLift(this.alpineMask.weight[this.atlasIndex(tx, ty)]);
   }
 
   isRiver(cellX, cellZ) {

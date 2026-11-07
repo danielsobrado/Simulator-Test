@@ -198,7 +198,7 @@ function createSource(ridges) {
       height: 2,
       fields: {
         elevation: encodeMacroField(Uint8Array.of(95, 95, 95, 95), 'u8'),
-        biomeId: encodeMacroField(Uint8Array.of(10, 10, 10, 10), 'u8'),
+        biomeId: encodeMacroField(Uint8Array.of(9, 9, 9, 9), 'u8'), // taiga: tundra and glacier carry alpine relief instead
         moisture: encodeMacroField(Uint8Array.of(128, 128, 128, 128), 'u8', { scale: 1 / 255 }),
       },
     },

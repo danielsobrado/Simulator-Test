@@ -1,5 +1,7 @@
 import { Color } from 'three/webgpu';
-import { Fn, If, clamp, float, fwidth, max, min, mix, oneMinus, smoothstep, vec2, vec3 } from 'three/tsl';
+import {
+  Fn, If, cameraPosition, clamp, float, fwidth, max, min, mix, normalize, oneMinus, positionWorld, pow, smoothstep, vec2, vec3,
+} from 'three/tsl';
 import { periodicFbm2, periodicVoronoiDistances } from './PeriodicNoiseNodes.js';
 
 /** Pattern frames the ice reads; merged into the water's pattern origins. */
@@ -11,11 +13,27 @@ export const FROZEN_WATER_PATTERN_FRAMES = Object.freeze({
 });
 
 const color = (hex) => { const c = new Color(hex); return vec3(c.r, c.g, c.b); };
-const BLACK_ICE = color('#2a4b5c');
-const CLEAR_ICE = color('#6f9fb2');
+const BLACK_ICE = color('#1b4a66');
+const CLEAR_ICE = color('#3f8fb5');
 const WHITE_ICE = color('#c9dde4');
 const SNOW = color('#eef3f5');
 const CRACK = color('#e9f6fb');
+/** Deep cracks glow blue-white through the ice rather than sitting on it as dirt. */
+const DEEP_CRACK = color('#a9d6e6');
+/** Milky cloud frozen into the body, after the article's offset cloud noise. */
+const CLOUD = color('#86bfd6');
+/** Sky caught at a grazing angle: the sheet pales toward the horizon. */
+const GRAZE = color('#d4e8f0');
+/*
+ * Cracked ice after 80.lv's "How to Build Cracked Ice in Material Editor":
+ * the crack mask is re-read through a stack of bump offsets, each one deeper
+ * along the view ray and fainter, so a crack reads as a sheet running down into
+ * the ice instead of a line painted on it. The source runs 24 layers; four
+ * coarse layers carry the depth here, and only the surface reads the fine cracks.
+ */
+// Spaced under a crack's width, so the layers merge into one sheet sinking into the ice.
+const CRACK_LAYER_DEPTHS = Object.freeze([0.04, 0.08, 0.12, 0.16]);
+const CLOUD_DEPTH = 0.6;
 
 /**
  * Water in the coldest country lies frozen where `cold` is glacier or tundra
@@ -24,7 +42,7 @@ const CRACK = color('#e9f6fb');
  * freezes the small inland pools through and gives the open sea a band of
  * shore-fast ice, with open water (and the icebergs) beyond. Clear dark ice over
  * deep water, whiter ice toward the banks, wandering pressure cracks and
- * drifted snow patches. The sheet goes near-opaque there and loses its waves,
+ * drifted snow patches. Cracks run down into the ice by parallax (see above). The sheet goes near-opaque there and loses its waves,
  * glint and foam; the caller gates those with `frozen`.
  *
  * @param {object} options
@@ -61,26 +79,46 @@ export function createFrozenWaterNodes({ appearance, patterns, localXZ, waterDep
     return oneMinus(smoothstep(width, footprint.mul(1.5).add(width), gap))
       .mul(oneMinus(smoothstep(0.08, 0.3, footprint)));
   };
+  // Toward the camera; clamped so a grazing view does not shoot the layers off to infinity.
+  const view = normalize(cameraPosition.sub(positionWorld));
+  const parallax = view.xz.div(max(view.y, 0.2));
+  const below = (depth) => localXZ.sub(parallax.mul(depth));
   const cracks = Fn(() => {
-    const result = float(0).toVar();
+    const result = vec2(0).toVar();
     If(frozen.greaterThan(0.001), () => {
-      const warp = vec2(
-        periodicFbm2(patterns.latticePoint('iceCrackWarp', localXZ)),
-        periodicFbm2(patterns.latticePoint('iceCrackWarp', localXZ).add(vec2(37.1, 11.9))),
+      const warpAt = (point) => vec2(
+        periodicFbm2(patterns.latticePoint('iceCrackWarp', point)),
+        periodicFbm2(patterns.latticePoint('iceCrackWarp', point).add(vec2(37.1, 11.9))),
       ).sub(0.5).mul(0.6);
-      result.assign(max(
+      const warp = warpAt(localXZ);
+      const surface = max(
         crackEdges(patterns.latticePoint('iceCrack', localXZ).add(warp), 0.025),
         crackEdges(patterns.latticePoint('iceCrackFine', localXZ).add(warp.mul(1.6)), 0.02).mul(0.5),
-      ));
+      );
+      // The warp is shared: the fracture plane runs straight down, so each layer
+      // is the same crack seen through more ice.
+      let deep = float(0);
+      CRACK_LAYER_DEPTHS.forEach((depth, index) => {
+        const fade = 1 - (index + 1) / (CRACK_LAYER_DEPTHS.length + 1);
+        deep = max(deep, crackEdges(patterns.latticePoint('iceCrack', below(depth)).add(warp), 0.03).mul(fade));
+      });
+      result.assign(vec2(surface, deep));
     });
     return result;
   })();
   const depthShade = smoothstep(0.4, 4, waterDepth);
-  const body = mix(mix(WHITE_ICE, CLEAR_ICE, smoothstep(0.1, 0.9, depthShade)), BLACK_ICE,
-    smoothstep(0.55, 1, depthShade).mul(smoothstep(0.35, 0.7, macro)));
-  // Snow drifts onto the ice in patches, thicker near the banks.
+  // Cloudy depth: the macro noise read again below the surface, so clear and milky
+  // ice slide past each other as the view moves.
+  const cloud = smoothstep(0.35, 0.75, periodicFbm2(patterns.latticePoint('iceMacro', below(CLOUD_DEPTH))));
+  const clear = mix(CLEAR_ICE, CLOUD, cloud.mul(0.55));
+  const body = mix(mix(WHITE_ICE, clear, smoothstep(0.1, 0.9, depthShade)), BLACK_ICE,
+    smoothstep(0.55, 1, depthShade).mul(smoothstep(0.35, 0.7, macro)).mul(oneMinus(cloud.mul(0.6))));
+  const facing = pow(oneMinus(clamp(view.y, 0, 1)), 3);
+  const lit = mix(body, GRAZE, facing.mul(0.55));
+  // Snow drifts onto the ice in patches, thicker near the banks, and is caught in the cracks.
   const snow = smoothstep(0.5, 0.7, macro.add(oneMinus(depthShade).mul(0.25)));
-  const ice = mix(mix(body, CRACK, cracks.mul(0.7)), SNOW, snow);
+  const cracked = mix(mix(lit, DEEP_CRACK, cracks.y.mul(0.6)), CRACK, cracks.x.mul(0.85));
+  const ice = mix(cracked, SNOW, snow);
   return {
     frozen,
     color(base) { return mix(base, ice, frozen); },
