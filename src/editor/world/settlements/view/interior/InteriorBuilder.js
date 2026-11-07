@@ -1,7 +1,7 @@
 import { drainJob } from '../../SettlementArrayJobs.js';
+import { InteriorBatchStore } from './InteriorBatchStore.js';
 /**
- * Gathers a town's rooms into a handful of meshes, one per material, with
- * their light baked in.
+ * Gathers a town's rooms into bounded spatial/material batches with baked light.
  *
  * A room has a fire, a few candles and a window or two. Real lights for every
  * room of a town would not scale, and the sun must not reach indoors at all, so
@@ -24,42 +24,10 @@ const INWARD_ORDER = Object.freeze([0, 3, 2, 0, 2, 1]);
 
 export const INTERIOR_MATERIALS = Object.freeze(['wood', 'plaster', 'stone', 'plain', 'glow', 'sky', 'exterior']);
 
-/**
- * A float32 list that grows by doubling. A city's rooms run to ~100 million
- * values; held as JS number arrays (8 bytes each, plus growth) until the end,
- * they alone took most of a gigabyte while the town loaded.
- */
-class FloatList {
-  constructor() { this.array = new Float32Array(1024); this.length = 0; }
-  reserve(count) {
-    if (this.length + count <= this.array.length) return;
-    let size = this.array.length * 2;
-    while (size < this.length + count) size *= 2;
-    const grown = new Float32Array(size);
-    grown.set(this.array.subarray(0, this.length));
-    this.array = grown;
-  }
-  push(a, b, c) {
-    const count = c !== undefined ? 3 : b !== undefined ? 2 : 1;
-    this.reserve(count);
-    const array = this.array;
-    array[this.length++] = a;
-    if (count > 1) array[this.length++] = b;
-    if (count > 2) array[this.length++] = c;
-  }
-  /** The values, trimmed to their length (a copy, so the doubling slack is freed). */
-  toArray() { return this.array.slice(0, this.length); }
-}
-
-function emptyGroup() {
-  return { positions: new FloatList(), normals: new FloatList(), colors: new FloatList(),
-    uvs: new FloatList(), fire: new FloatList(), sky: new FloatList() };
-}
-
 export class InteriorBuilder {
-  constructor() {
-    this.groups = new Map(INTERIOR_MATERIALS.map((key) => [key, emptyGroup()]));
-    this.group = this.groups.get('plain');
+  constructor(options = {}) {
+    this.batches = new InteriorBatchStore(options);
+    this.materialKey = 'plain';
     this.lights = [];
   }
 
@@ -71,13 +39,19 @@ export class InteriorBuilder {
     this.originX = building.x;
     this.originZ = building.z;
     this.lights = lights;
+    this.batches.enter(building.x, -building.z);
   }
 
   /** Which material what follows is made of. */
   use(key) {
-    this.group = this.groups.get(key);
-    if (!this.group) throw new Error(`Unknown interior material: ${key}.`);
+    if (!INTERIOR_MATERIALS.includes(key)) throw new Error(`Unknown interior material: ${key}.`);
+    this.materialKey = key;
     return this;
+  }
+
+  reserveVertices(count) {
+    this.group = this.batches.acquire(this.materialKey, count);
+    return this.group.positions.length / 3;
   }
 
   /**
@@ -143,12 +117,15 @@ export class InteriorBuilder {
     const order = outward ? OUTWARD_ORDER : INWARD_ORDER;
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
-        for (const index of order) {
+        const base = this.reserveVertices(4);
+        for (let index = 0; index < 4; index++) {
           // Corners 0..3 run (s0,t0) (s1,t0) (s1,t1) (s0,t1).
           const s = (column + (index === 1 || index === 2 ? 1 : 0)) / columns;
           const t = (row + (index >= 2 ? 1 : 0)) / rows;
           this.vertex(at(s, t), n, color, s * width, t * height);
         }
+        this.group.indices.push(base + order[0], base + order[1], base + order[2]);
+        this.group.indices.push(base + order[3], base + order[4], base + order[5]);
       }
     }
   }
@@ -161,7 +138,9 @@ export class InteriorBuilder {
       (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
     ];
     const outward = cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] < 0;
+    const base = this.reserveVertices(3);
     for (const point of outward ? [a, b, c] : [a, c, b]) this.vertex(point, n, color, point[0] * 0.6, point[2] * 0.6);
+    this.group.indices.push(base, base + 1, base + 2);
   }
 
   /** An upright rectangle from (ax, az) to (bx, bz) between two heights, facing `[fx, fz]`. */
@@ -218,15 +197,9 @@ export class InteriorBuilder {
     }
   }
 
-  /** The gathered meshes, by material, as typed arrays; materials with nothing in them are left out. */
+  /** Indexed spatial/material batches, copied one fixed page per scheduling step. */
   *arraysJob() {
-    const result = {};
-    for (const [key, group] of this.groups) {
-      if (group.positions.length === 0) continue;
-      result[key] = {};
-      for (const [name, values] of Object.entries(group)) { result[key][name] = values.toArray(); yield; }
-    }
-    return result;
+    return yield* this.batches.arraysJob();
   }
   arrays() { return drainJob(this.arraysJob()); }
 }

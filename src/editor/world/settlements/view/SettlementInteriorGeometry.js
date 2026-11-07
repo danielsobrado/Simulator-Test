@@ -14,7 +14,7 @@ import { drainJob } from '../SettlementArrayJobs.js';
  * is nothing inside them. A room is the clear floor measured behind each
  * house's door (SettlementDoors.generated), so it fits inside the shell rather
  * than through it. Rooms differ with every house, so they are not pooled; a
- * whole town's worth is one small static mesh, like its paving.
+ * rooms are batched by material and spatial cell for conservative frustum culling.
  *
  * Pure geometry in settlement-local space: x is plan x, z is minus plan z, y is
  * absolute. No three.
@@ -195,8 +195,8 @@ export function roomSolids(building, shell) {
 
 /**
  * @param {object} plan a settlement plan whose buildings carry `door` and `pad`
- * @returns {?Record<string, Record<string, Float32Array>>} the rooms as one set of arrays
- *   per material (InteriorBuilder), or null when no house can be entered
+ * @returns {?object[]} indexed spatial/material batches (InteriorBuilder),
+ *   or null when no house can be entered
  */
 export function* settlementInteriorJob(plan) {
   const builder = new InteriorBuilder();

@@ -22,6 +22,7 @@ import { residentManifest } from '../src/editor/actors/ResidentManifest.js';
 import { isTrimKind, SETTLEMENT_TRIM, WALL_STAIR } from '../src/editor/world/settlements/SettlementTrim.js';
 import { murmurLevel, settlementPresence } from '../src/editor/audio/settlement_ambience.js';
 import { houseShell, roomSolids, settlementInteriorArrays } from '../src/editor/world/settlements/view/SettlementInteriorGeometry.js';
+import { INTERIOR_BATCH_MAX_VERTICES, INTERIOR_VERTEX_ATTRIBUTES } from '../src/editor/world/settlements/view/interior/InteriorBatchStore.js';
 import { planRoom } from '../src/editor/world/settlements/view/interior/RoomPlan.js';
 import { ROOM_PIECE_TYPES } from '../src/editor/world/settlements/view/interior/RoomFurnitureMesh.js';
 import { buildingDoor, buildingRecipe, SETTLEMENT_BUILDINGS } from '../src/editor/world/settlements/SettlementBuildingCatalog.js';
@@ -324,36 +325,42 @@ test('a town has rooms behind its doors', () => {
   }
   assert.equal(houseShell(cityPlan.buildings.find(({ kind }) => kind === 'wall')), null);
   const groups = settlementInteriorArrays(cityPlan);
-  for (const key of ['wood', 'plaster', 'stone', 'plain', 'glow', 'sky', 'exterior']) assert.ok(groups[key], `no ${key} in the rooms`);
-  for (const [key, group] of Object.entries(groups)) {
+  const roles = new Set(groups.map(group => group.materialKey));
+  for (const key of ['wood', 'plaster', 'stone', 'plain', 'glow', 'sky', 'exterior']) assert.ok(roles.has(key), `no ${key} in the rooms`);
+  for (const group of groups) {
+    const key = group.materialKey;
     const vertices = group.positions.length / 3;
-    assert.ok(vertices > 0 && vertices % 3 === 0, key);
+    assert.ok(vertices > 0 && vertices <= INTERIOR_BATCH_MAX_VERTICES, key);
+    assert.ok(group.indices instanceof Uint16Array && group.indices.length % 3 === 0);
+    assert.ok(group.indices.every(index => index < vertices && index < 0xffff));
     assert.equal(group.normals.length, vertices * 3);
     assert.equal(group.colors.length, vertices * 3);
     assert.equal(group.fire.length, vertices * 3);
     assert.equal(group.uvs.length, vertices * 2);
     assert.equal(group.sky.length, vertices);
-    for (const values of Object.values(group)) assert.ok(values.every(Number.isFinite), `${key} has a hole in it`);
+    for (const name of Object.keys(INTERIOR_VERTEX_ATTRIBUTES)) assert.ok(group[name].every(Number.isFinite), `${key} ${name} has a hole in it`);
     for (let index = 0; index < group.normals.length; index += 3) {
       assert.ok(Math.abs(Math.hypot(group.normals[index], group.normals[index + 1], group.normals[index + 2]) - 1) < 1e-6);
     }
   }
   // Every face is wound to look along its normal, as the renderer will cull it.
-  for (const group of Object.values(groups)) {
-    const { positions: p, normals: n } = group;
-    for (let index = 0; index < p.length; index += 9) {
-      const [ux, uy, uz] = [p[index + 3] - p[index], p[index + 4] - p[index + 1], p[index + 5] - p[index + 2]];
-      const [vx, vy, vz] = [p[index + 6] - p[index], p[index + 7] - p[index + 1], p[index + 8] - p[index + 2]];
-      const facing = (uy * vz - uz * vy) * n[index] + (uz * vx - ux * vz) * n[index + 1] + (ux * vy - uy * vx) * n[index + 2];
+  for (const group of groups) {
+    const { positions: p, normals: n, indices } = group;
+    for (let index = 0; index < indices.length; index += 3) {
+      const a = indices[index] * 3, b = indices[index + 1] * 3, c = indices[index + 2] * 3;
+      const [ux, uy, uz] = [p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]];
+      const [vx, vy, vz] = [p[c] - p[a], p[c + 1] - p[a + 1], p[c + 2] - p[a + 2]];
+      const facing = (uy * vz - uz * vy) * n[a] + (uz * vx - ux * vz) * n[a + 1] + (ux * vy - uy * vx) * n[a + 2];
       assert.ok(facing > -1e-9, 'a face is wound against its normal');
     }
   }
   // Baked light: a room is brighter by its fire than in its far corners, and never unlit by it.
-  const fire = groups.wood.fire;
   let [dimmest, brightest] = [Infinity, 0];
-  for (let index = 0; index < fire.length; index += 3) {
-    dimmest = Math.min(dimmest, fire[index]);
-    brightest = Math.max(brightest, fire[index]);
+  for (const group of groups.filter(group => group.materialKey === 'wood')) {
+    for (let index = 0; index < group.fire.length; index += 3) {
+      dimmest = Math.min(dimmest, group.fire[index]);
+      brightest = Math.max(brightest, group.fire[index]);
+    }
   }
   assert.ok(brightest > 0.8 && dimmest < brightest * 0.2, `fire ${dimmest}..${brightest}`);
   assert.equal(settlementInteriorArrays({ buildings: [] }), null);

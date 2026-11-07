@@ -21,7 +21,7 @@ import {
 /**
  * Sun (or moon) light falling through a room's windows onto its floor and
  * walls, shaped by the leaded glazing — a light cookie, computed rather than
- * lit. Every room is in its town's one interior mesh with no lights of its own;
+ * lit. Rooms share the town's interior materials with no lights of their own;
  * a real light per window would not scale to a town's hundreds of windows and
  * would add a shadow pass apiece. Instead each fragment traces toward the sun
  * and asks whether that ray leaves through one of its room's window openings,

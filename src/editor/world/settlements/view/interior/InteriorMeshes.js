@@ -54,13 +54,16 @@ function materialFor(key, surfaces) {
 }
 
 /**
- * The rooms of one town as meshes, one per material.
+ * Spatial batches share one material per role across the town. Their positions
+ * stay in the original settlement frame, including the world-position flicker.
  *
- * @param {Record<string, Record<string, Float32Array>>} arrays from `settlementInteriorArrays`
+ * @param {object[]} batches from `settlementInteriorArrays`
  * @param {?object} surfaces the town's surface sets, by role
+ * @param {Map<string, THREE.Material>} materials shared across installation slices
  */
-export function createInteriorMeshes(arrays, surfaces) {
-  return Object.entries(arrays).map(([key, group]) => {
+export function createInteriorMeshes(batches, surfaces, materials = new Map()) {
+  return batches.map(group => {
+    const key = group.materialKey;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(group.positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(group.normals, 3));
@@ -68,15 +71,23 @@ export function createInteriorMeshes(arrays, surfaces) {
     geometry.setAttribute('uv', new THREE.BufferAttribute(group.uvs, 2));
     geometry.setAttribute('fire', new THREE.BufferAttribute(group.fire, 3));
     geometry.setAttribute('sky', new THREE.BufferAttribute(group.sky, 1));
+    geometry.setIndex(new THREE.BufferAttribute(group.indices, 1));
     if (group.boundingSphere) geometry.boundingSphere = group.boundingSphere;
     else geometry.computeBoundingSphere();
-    const material = materialFor(key, surfaces);
-    material.name = `settlement-interior-${key}`;
+    let material = materials.get(key);
+    if (!material) {
+      material = materialFor(key, surfaces);
+      material.name = `settlement-interior-${key}`;
+      materials.set(key, material);
+    }
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = material.name;
+    mesh.name = `${material.name}-${group.cellX}:${group.cellZ}-${group.part}`;
+    // Static local identity; the site's paving root follows the floating origin.
+    mesh.matrixAutoUpdate = false;
     mesh.receiveShadow = key === 'exterior';
     mesh.castShadow = false;
-    // Not for the streamed draw-preparation queue: it hides what it has not reached.
+    // Whole-scene warmup excludes these; the site's explicit publication prepares
+    // each bounded batch before revealing the complete town.
     mesh.userData.skipWarmup = true;
     return mesh;
   });

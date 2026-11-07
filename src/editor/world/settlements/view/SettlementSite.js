@@ -135,7 +135,7 @@ export class SettlementSite {
       .map(([layer, role]) => [layer, SETTLEMENT_SURFACE_SETS[this.dressing[role]].tileMetres]));
     this.pavingArrays = yield* settlementPavingJob(this.plan, heightAt, tileMetres);
     for (const arrays of this.pavingArrays) yield* prepareSurfaceJob(arrays, true);
-    for (const arrays of Object.values(this.interiorArrays ?? {})) yield* prepareSurfaceJob(arrays);
+    for (const arrays of this.interiorArrays ?? []) yield* prepareSurfaceJob(arrays);
   }
 
   /** Runs preparation until `shouldYield`. Returns true once paving geometry exists. */
@@ -154,6 +154,7 @@ export class SettlementSite {
   /** Turns finished paving geometry into meshes, once the dressing's textures are in. */
   *installation() {
     this.stagedMeshes = [];
+    const interiorMaterials = new Map();
     for (const arrays of this.pavingArrays) {
       const material = arrays.kind === SHADE_LAYER
         ? createShadeMaterial()
@@ -164,8 +165,8 @@ export class SettlementSite {
       this.stagedMeshes.push(mesh);
       yield;
     }
-    for (const [key, arrays] of Object.entries(this.interiorArrays ?? {})) {
-      this.stagedMeshes.push(...createInteriorMeshes({ [key]: arrays }, this.surfaces));
+    for (const arrays of this.interiorArrays ?? []) {
+      this.stagedMeshes.push(...createInteriorMeshes([arrays], this.surfaces, interiorMaterials));
       yield;
     }
     yield* stagedDrawPublication(this.paving, this.stagedMeshes, this.getDrawPreparation());
@@ -189,17 +190,22 @@ export class SettlementSite {
   }
 
   dispose() {
+    if (this.disposed) return;
     this.disposed = true;
     this.installJob?.return();
+    this.job?.return();
     this.job = null;
     this.installJob = null;
-    for (const mesh of this.stagedMeshes ?? []) { mesh.geometry.dispose(); mesh.material.dispose(); }
-    this.stagedMeshes = null;
-    for (const child of this.paving.children) {
+    const materials = new Set();
+    for (const child of new Set([...(this.stagedMeshes ?? []), ...this.paving.children])) {
       // A sprite's quad is three's own, shared by every sprite there is.
       if (!child.isSprite) child.geometry.dispose();
-      child.material.dispose();
+      for (const material of Array.isArray(child.material) ? child.material : [child.material]) materials.add(material);
     }
+    for (const material of materials) material.dispose();
+    this.stagedMeshes = null;
+    this.interiorArrays = null;
+    this.pavingArrays = null;
     this.paving.clear();
     this.paving.removeFromParent();
     this.releaseSurfaces();
