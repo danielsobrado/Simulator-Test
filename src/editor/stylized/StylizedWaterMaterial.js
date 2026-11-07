@@ -57,6 +57,7 @@ import { skyLightUniforms } from './sky/skyLight.js';
 import { LAKE_WAVES, lakeWaveRise } from '../water/LakeSurfaceWaves.js';
 import { bilinearLoad } from '../materials/TerrainSlotBindings.js';
 import { createWaterAppearanceNodes } from './WaterAppearanceNodes.js';
+import { createFrozenWaterNodes } from './FrozenWaterNodes.js';
 import { rippleFieldSlope } from '../water/rippleFieldNode.js';
 
 const CAUSTIC_RING_RADIUS = 0.4;
@@ -627,18 +628,26 @@ export function createStylizedWaterMaterial({
   // what made the bank polygonal. Tapering the lift out as the body thins sets
   // the sheet down onto the bed exactly at the waterline, so the terrain
   // occludes the rest per pixel and the bank follows the contour, not the grid.
+  // Lakes in glacier and tundra country lie frozen: ice over the body, no waves.
+  const ice = createFrozenWaterNodes({ appearance, patterns: surfacePatterns, localXZ, waterDepth, currentStrength, shoreDistance });
+  if (ice) {
+    color = ice.color(color);
+    alpha = ice.alpha(alpha, waterlineFade.mul(waterCoverage), fade);
+    foamAmount = foamAmount.mul(ice.open);
+  }
+  const open = ice ? ice.open : float(1);
   let surfaceHeight = waterField.g.add(waterSurfaceOrigin)
     .add(float(water.heightOffset).mul(waterlineFade));
   // Waves die out over the last metre of depth. A vertex just off the bank
   // otherwise bobbed while its dry neighbour sat at water level, and the flat
   // triangle between them rose over the sand as a pale, straight-edged wedge.
   const swing = smoothstep(0.25, 1.2, waterDepth);
-  if (sea) surfaceHeight = surfaceHeight.add(sea.displacement.mul(swing));
+  if (sea) surfaceHeight = surfaceHeight.add(sea.displacement.mul(swing).mul(open));
   if (water.riverSurface?.enabled && quality.flow) {
     const phases = LAKE_WAVES.map((_, i) => surfacePatterns.wavePhase(`lakeWave${i}`, localXZ));
     surfaceHeight = surfaceHeight.add(lakeWaveRise(phases, time)
       .mul(oneMinus(clamp(currentStrength.mul(4), 0, 1)))
-      .mul(sea ? oneMinus(sea.mask) : float(1)).mul(swing));
+      .mul(sea ? oneMinus(sea.mask) : float(1)).mul(swing).mul(open));
   }
   const material = new THREE.MeshBasicNodeMaterial({
     transparent: true,
@@ -662,12 +671,12 @@ export function createStylizedWaterMaterial({
   // The sun's glint is its own light, not the sky's: added after the dimming.
   if (river) {
     lit = lit.add(river.glint.mul(skyLightUniforms.sunColor)
-      .mul(inland).mul(waterCoverage).mul(reflectionVisibility)
+      .mul(inland).mul(waterCoverage).mul(reflectionVisibility).mul(open)
       .mul(oneMinus(clamp(foamAmount, 0, 1))));
   }
   if (sea) {
     lit = lit.add(sea.glint(normalize(cameraPosition.sub(positionWorld))).mul(skyLightUniforms.sunColor)
-      .mul(sea.mask).mul(waterCoverage).mul(reflectionVisibility)
+      .mul(sea.mask).mul(waterCoverage).mul(reflectionVisibility).mul(open)
       .mul(oneMinus(clamp(foamAmount, 0, 1))));
   }
   material.colorNode = lit;
