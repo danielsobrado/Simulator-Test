@@ -7,12 +7,14 @@ import {
   dot,
   float,
   fract,
+  max,
   mix,
   normalize,
   sin,
   step,
   texture,
   uniform,
+  uniformArray,
   uv,
   vec2,
   vec3,
@@ -20,6 +22,8 @@ import {
 
 import { skyLightUniforms } from '../sky/skyLight.js';
 import { fallingLeafPalette } from '../forest/foliagePalette.js';
+import { MAX_LEAF_SHELTERS } from './fallingLeafPlaces.js';
+import { setRuntimeUserData } from '../../../render/materials/runtimeUserData.js';
 
 const TAU = Math.PI * 2;
 
@@ -33,6 +37,11 @@ export function createFallingLeavesUniforms({ boxSize, boxHeight, palette = fall
     boxSize: uniform(boxSize),
     boxHeight: uniform(boxHeight),
     palette: palette.map(rgb => uniform(new THREE.Color().fromArray(rgb))),
+    // Buildings near the camera (fallingLeafPlaces): centre x, z in render
+    // space, then yaw cos, sin; and half width, half depth, roof top y. A
+    // negative half width is an empty slot.
+    shelterPlacement: uniformArray(Array.from({ length: MAX_LEAF_SHELTERS }, () => new THREE.Vector4(0, 0, 1, 0))),
+    shelterSize: uniformArray(Array.from({ length: MAX_LEAF_SHELTERS }, () => new THREE.Vector4(-1, -1, 0, 0))),
   };
 }
 
@@ -41,6 +50,22 @@ function rotateAbout(v, axis, angle) {
   const c = cos(angle);
   const s = sin(angle);
   return v.mul(c).add(cross(axis, v).mul(s)).add(axis.mul(dot(axis, v)).mul(float(1).sub(c)));
+}
+
+/** 1 when a render-space point is inside any shelter; see insideShelter. */
+function shelteredNode(point, { shelterPlacement, shelterSize }) {
+  let sheltered = float(0);
+  for (let index = 0; index < MAX_LEAF_SHELTERS; index += 1) {
+    const placement = shelterPlacement.element(index);
+    const extent = shelterSize.element(index);
+    const planX = point.x.sub(placement.x);
+    const planZ = placement.y.sub(point.z);
+    const localX = placement.z.mul(planX).sub(placement.w.mul(planZ)).abs();
+    const localZ = placement.w.mul(planX).add(placement.z.mul(planZ)).abs();
+    const inside = step(localX, extent.x).mul(step(localZ, extent.y)).mul(step(point.y, extent.z));
+    sheltered = max(sheltered, inside);
+  }
+  return sheltered;
 }
 
 /**
@@ -72,7 +97,8 @@ export function createFallingLeavesMaterial(uniforms, { size, fallSpeed }) {
 
   const axis = normalize(vec3(seed.x.sub(0.5), seed.z.add(0.2), seed.y.sub(0.5)));
   const angle = time.mul(mix(1.5, 4, seed.z)).add(seed.w.mul(TAU));
-  const visible = step(seed.w, amount);
+  // Indoors, under a roof or inside a wall, a leaf is folded away.
+  const visible = step(seed.w, amount).mul(shelteredNode(origin, uniforms).oneMinus());
   const scaled = vec3(corner.x, corner.y, 0).mul(size).mul(mix(0.7, 1.3, seed.x)).mul(visible);
 
   const material = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
@@ -87,7 +113,7 @@ export function createFallingLeavesMaterial(uniforms, { size, fallSpeed }) {
   material.alphaTest = 0.5;
   material.opacityNode = leaf.a;
   material.colorNode = leaf.rgb.mul(pigment).mul(mix(0.8, 1.05, seed.y)).mul(skyLightUniforms.brightness);
-  material.userData.leafTexture = leafTexture;
+  setRuntimeUserData(material, 'leafTexture', leafTexture);
   const dispose = () => {
     leafTexture.dispose();
     material.removeEventListener('dispose', dispose);

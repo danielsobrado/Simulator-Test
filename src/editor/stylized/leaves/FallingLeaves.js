@@ -1,8 +1,9 @@
 import * as THREE from 'three/webgpu';
 
 import { createFallingLeavesMaterial, createFallingLeavesUniforms } from './fallingLeavesMaterial.js';
-import { sampleTilesAround, tileShare } from '../../world/sampleTilesAround.js';
+import { ringPoints, sampleTilesAround } from '../../world/sampleTilesAround.js';
 import { fallingLeafPalette } from '../forest/foliagePalette.js';
+import { collectLeafShelters, sheddingWoodlandShare } from './fallingLeafPlaces.js';
 
 export const DEFAULT_FALLING_LEAVES = Object.freeze({
   enabled: true,
@@ -51,19 +52,18 @@ export function createLeafGeometry(count, random = Math.random) {
   return geometry;
 }
 
-/** Share of samples on shedding biomes, 0..1. */
-export function sheddingCanopyShare(tiles, tileIds) {
-  return tileShare(tiles, tileIds);
-}
-
 /**
  * Leaves drifting down around the camera in deciduous woods (after
  * grass-test's LeafSystem, but animated wholly on the GPU). How many fall
- * follows the share of shedding canopy nearby, eased so walking out of a wood
- * thins them rather than cutting them off.
+ * follows the shedding woodland nearby (biome x forest cover, minus town
+ * ground), eased so walking out of a wood thins them rather than cutting them
+ * off. None are drawn inside a nearby building's footprint below its roof.
  */
 export class FallingLeaves {
-  constructor({ scene, config = {}, foliageConfig = {}, getTile, getTileSize, getOrigin }) {
+  constructor({
+    scene, config = {}, foliageConfig = {}, getTile, getTileSize, getOrigin,
+    getForestField = () => null, getSettlementField = () => null,
+  }) {
     this.config = { ...DEFAULT_FALLING_LEAVES, ...config };
     this.config.palette ??= fallingLeafPalette(foliageConfig).map(color => color.toArray());
     this.followsFoliagePalette = config.palette == null;
@@ -72,6 +72,9 @@ export class FallingLeaves {
     this.getTile = getTile;
     this.getTileSize = getTileSize;
     this.getOrigin = getOrigin;
+    this.getForestField = getForestField;
+    this.getSettlementField = getSettlementField;
+    this.shelters = [];
     this.target = 0;
     this.sinceSample = Infinity;
     this.uniforms = createFallingLeavesUniforms(this.config);
@@ -86,15 +89,17 @@ export class FallingLeaves {
 
   sampleCanopy(camera) {
     const origin = this.getOrigin();
-    const tiles = sampleTilesAround({
-      getTile: this.getTile,
-      tileSize: this.getTileSize(),
-      x: camera.position.x + origin.x,
-      z: camera.position.z + origin.z,
-      rings: SAMPLE_RINGS,
-      directions: SAMPLE_DIRECTIONS,
+    const tileSize = this.getTileSize();
+    const x = camera.position.x + origin.x;
+    const z = camera.position.z + origin.z;
+    const ring = { x, z, rings: SAMPLE_RINGS, directions: SAMPLE_DIRECTIONS };
+    const tiles = sampleTilesAround({ getTile: this.getTile, tileSize, ...ring });
+    const settlementField = this.getSettlementField();
+    this.shelters = collectLeafShelters({ settlementField, x, z, radius: this.config.boxSize * 0.75, tileSize });
+    const share = sheddingWoodlandShare({
+      points: ringPoints(ring), tileIds: this.config.tileIds, getTile: this.getTile, tileSize,
+      forestField: this.getForestField(), settlementField,
     });
-    const share = sheddingCanopyShare(tiles, this.config.tileIds);
     if (this.followsFoliagePalette && share > 0) {
       this.paletteTargets.forEach(color => color.setRGB(0, 0, 0));
       let count = 0;
@@ -134,6 +139,20 @@ export class FallingLeaves {
     this.uniforms.time.value = seconds;
     this.uniforms.center.value.copy(camera.position);
     this.uniforms.wind.value.set(wind?.x ?? 0, wind?.z ?? 0);
+    this.placeShelters();
+  }
+
+  /** Shelters live in canonical space; the shader tests render space. */
+  placeShelters() {
+    const origin = this.getOrigin();
+    const placements = this.uniforms.shelterPlacement.array;
+    const sizes = this.uniforms.shelterSize.array;
+    for (let index = 0; index < sizes.length; index += 1) {
+      const shelter = this.shelters[index];
+      if (!shelter) { sizes[index].set(-1, -1, 0, 0); continue; }
+      placements[index].set(shelter.x - origin.x, shelter.z - origin.z, shelter.cos, shelter.sin);
+      sizes[index].set(shelter.halfWidth, shelter.halfDepth, shelter.top, 0);
+    }
   }
 
   dispose() {

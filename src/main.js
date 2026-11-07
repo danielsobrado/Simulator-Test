@@ -1044,6 +1044,8 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     getTile: (cellX, cellZ) => worldStore.getTile(cellX, cellZ),
     getTileSize: () => config.map.tileSize,
     getOrigin: () => terrainView.floatingOrigin.readState(fallingLeavesOrigin),
+    getForestField: () => stylizedSurface.treeView?.manifestStore?.forestField ?? null,
+    getSettlementField: () => worldStore.generator?.ensureSettlementField?.() ?? null,
   });
   resources.own(fallingLeaves);
   const snowCountry = new SnowCountryWeight({
