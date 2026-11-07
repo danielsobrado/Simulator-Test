@@ -7,6 +7,7 @@ import {
 } from '../ProceduralWorkshopGeometry.js';
 import { beamBetween, facadeBeam, facadeAt } from './HouseFacade.js';
 import { createRoofSurface } from './HouseRoofSurface.js';
+import { addRoofTrim } from './HouseRoofTrim.js';
 
 const DECK_THICKNESS = 0.12;
 export const TILES_PER_ROOF = 900;
@@ -308,7 +309,10 @@ function gableTimbers(kit, surface, end) {
  * (open — for an end that runs into another roof). Hipped roofs have no gables.
  */
 export function buildRoof(kit, spec, { gableEnds = { start: 'plaster', end: 'plaster' }, gableFrame = false, tiles = null } = {}) {
-  const surface = createRoofSurface(spec);
+  // A hand-built ridge is never quite straight: a few centimetres of settle
+  // unless the design asks for its own sag.
+  const sag = spec.sag ?? (0.04 + kit.random() * 0.08) * Math.min(1.5, (spec.x1 - spec.x0 + spec.z1 - spec.z0) / 12);
+  const surface = createRoofSurface({ ...spec, sag });
   const { faces, gabled } = roofFaces(surface);
   const rows = surface.sweep > 0.01 ? 8 : 2;
   for (const face of faces) {
@@ -320,6 +324,7 @@ export function buildRoof(kit, spec, { gableEnds = { start: 'plaster', end: 'pla
   const useTiles = tiles ?? kit.recipe.detail >= 3;
   if (useTiles) addTiles(kit, faces, slantLength);
   else addBattens(kit, faces, slantLength);
+  addRoofTrim(kit, surface, faces, { gabled, gableEnds, deck: DECK_THICKNESS });
   if (gabled) {
     for (const [key, end] of [['start', -1], ['end', 1]]) {
       const material = gableEnds[key];

@@ -127,7 +127,7 @@ export function buildingRecipe(style, kind, variantIndex, { detail = 2, finishIn
     // would paint their core, which shows on every wall top, in house colours.
     finish: castleLike ? 'masonry' : style.finishes[finishIndex % style.finishes.length],
     roofScale: 1,
-    roofOverhang: style.roofOverhang ?? 0.35,
+    roofOverhang: style.roofOverhang ?? 0.5,
     roofPitch: style.roofPitch ?? 40,
     weathering: 0.3,
     // Coursed and tidy. At the workshop's default (0.45) every stone is turned,

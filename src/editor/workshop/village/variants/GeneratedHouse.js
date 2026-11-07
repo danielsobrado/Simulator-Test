@@ -44,7 +44,7 @@ function rollGrammar(recipe) {
     ridgeAlongX,
     hip: hipped ? 0.4 + random() * 0.5 : 0,
     sweep: chance(0.6) ? random() * 0.55 : 0,
-    sag: chance(0.3) ? random() * 0.3 : 0,
+    sag: chance(0.3) ? random() * 0.3 : undefined,
     pitchScale: 0.9 + random() * 0.35,
     wing,
     wingWidth: clamp(width * (0.3 + random() * 0.12), 2.6, 4.5),
