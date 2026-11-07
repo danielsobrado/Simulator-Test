@@ -7,6 +7,10 @@ import { createMeadowGroundSample } from './MeadowGroundSample.js';
 import { identityOf } from './MeadowSharedGroundInputs.js';
 export { MIN_GRASS_STRENGTH } from './MeadowGroundSample.js';
 
+/** A tree's root zone scales with its size, within these bounds. */
+const ROOT_SCALE_MIN = 0.5;
+const ROOT_SCALE_MAX = 2;
+
 /**
  * The ground under the meadow grass: height, whether grass grows, and which
  * silhouette it wears, read from the terrain pages already resident in the
@@ -25,11 +29,19 @@ export class MeadowGroundSampler {
    * @param {object} [options.forestFloorConfig] trees.forestFloor
    * @param {() => object[]} [options.rockPlacementsProvider] canonical rock placements
    * @param {{ radius: number, falloff: number, flatten: number }} [options.rocks] config.rocks
+   * @param {(chunkX: number, chunkZ: number) => object[] | null} [options.treePlacementsProvider]
+   *   a chunk's built tree placements, null while they stream
    */
   constructor({
     terrainView, tileIds, shapeTable, forestFieldProvider = () => null, forestFloorConfig = null,
     rockPlacementsProvider = () => [], rocks = null, growth = null, pathConfig = null,
+    treePlacementsProvider = null,
   }) {
+    this.treePlacementsProvider = treePlacementsProvider;
+    const rootZone = forestFloorConfig?.rootZone;
+    this.rootZone = treePlacementsProvider && rootZone?.enabled !== false && rootZone
+      ? { radius: rootZone.radius, falloff: rootZone.falloff, maxReach: (rootZone.radius + rootZone.falloff) * ROOT_SCALE_MAX }
+      : null;
     this.terrainView = terrainView;
     this.eligible = new Uint8Array(256);
     for (const id of tileIds) this.eligible[id] = 1;
@@ -108,10 +120,46 @@ export class MeadowGroundSampler {
    * the rocks standing in its chunk — or null while the chunk streams. A rock set
    * that changes elsewhere leaves this tile's revision, and so its stems, alone.
    */
-  revisionAt(centerX, centerZ) {
+  revisionAt(centerX, centerZ, tileHalf = 4) {
     const slot = this.slotFor(...this.chunkOf(centerX, centerZ));
     if (!slot) return null;
-    return `${slot.descriptor.key}:${slot.pageRevision}:${this.rockSignature(slot.descriptor)}${this.growthKey(slot)}${this.paths.signature}`;
+    return `${slot.descriptor.key}:${slot.pageRevision}:${this.rockSignature(slot.descriptor)}${this.growthKey(slot)}${this.paths.signature}${this.rootSignature(centerX, centerZ, tileHalf)}`;
+  }
+
+  /** Tree placement lists, one per chunk a trunk's root zone could reach this tile from. */
+  rootChunks(centerX, centerZ, tileHalf) {
+    const reach = tileHalf + this.rootZone.maxReach;
+    const [x0, z0] = this.chunkOf(centerX - reach, centerZ + reach);
+    const [x1, z1] = this.chunkOf(centerX + reach, centerZ - reach);
+    const chunks = [];
+    for (let chunkZ = z0; chunkZ <= z1; chunkZ += 1) {
+      for (let chunkX = x0; chunkX <= x1; chunkX += 1) chunks.push(this.treePlacementsProvider(chunkX, chunkZ));
+    }
+    return chunks;
+  }
+
+  /** Keyed on placement-list identity, so a tile rebuilds once its trees arrive or change. */
+  rootSignature(centerX, centerZ, tileHalf) {
+    if (!this.rootZone) return '';
+    return `:r${this.rootChunks(centerX, centerZ, tileHalf).map(list => (list ? identityOf(list) : '-')).join(',')}`;
+  }
+
+  /** Trunks whose root zone touches a tile: grass thins to bare litter round their foot. */
+  rootsNear(centerX, centerZ, tileHalf) {
+    if (!this.rootZone) return [];
+    const { radius, falloff } = this.rootZone;
+    const near = [];
+    for (const list of this.rootChunks(centerX, centerZ, tileHalf)) {
+      for (const tree of list ?? []) {
+        const scale = Math.min(ROOT_SCALE_MAX, Math.max(ROOT_SCALE_MIN, tree.heightScale ?? tree.scale ?? 1));
+        const reach = (radius + falloff) * scale;
+        if (Math.abs(tree.x - centerX) > tileHalf + reach || Math.abs(tree.z - centerZ) > tileHalf + reach) continue;
+        // Deterministic per trunk, so the lobes do not turn with every rebuild.
+        const phase = (Math.abs(Math.sin(tree.x * 12.9898 + tree.z * 78.233)) * 43758.5453 % 1) * Math.PI * 2;
+        near.push({ x: tree.x, z: tree.z, radius: radius * scale, reach, phase });
+      }
+    }
+    return near;
   }
 
   rockSignature(descriptor) {
@@ -194,9 +242,10 @@ export class MeadowGroundSampler {
     // Only the rocks that can reach this tile are tested per stem.
     const rocks = this.rocksNear(descriptor, centerX, centerZ, tileHalf);
     const flatten = this.rocks?.flatten ?? 0;
+    const roots = this.rootsNear(centerX, centerZ, tileHalf);
     const snapshot = {
       page: { tiles: page.tiles, heights: page.heights, surfaceMaskPixels: mask },
-      descriptor, chunkSize, tileSize, eligible, shapeTable, growth, worldSeed, rocks, flatten,
+      descriptor, chunkSize, tileSize, eligible, shapeTable, growth, worldSeed, rocks, flatten, roots,
       pathConfig: this.pathConfig, forest: forest?.snapshot ?? null,
     };
     // Every input a worker may cache, by identity: a replaced page, canopy grid
@@ -207,6 +256,6 @@ export class MeadowGroundSampler {
     // The same key `revisionAt` gives the tile, rocks included: a job whose
     // revision differs from its tile's is abandoned, so a mismatch here would
     // restart every build every frame.
-    return { sample, snapshot, revision: `${descriptor.key}:${slot.pageRevision}:${this.rockSignature(descriptor)}${this.growthKey(slot)}${this.paths.signature}` };
+    return { sample, snapshot, revision: `${descriptor.key}:${slot.pageRevision}:${this.rockSignature(descriptor)}${this.growthKey(slot)}${this.paths.signature}${this.rootSignature(centerX, centerZ, tileHalf)}` };
   }
 }

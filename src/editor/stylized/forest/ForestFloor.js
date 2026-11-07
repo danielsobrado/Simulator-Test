@@ -32,6 +32,11 @@ export function validateForestFloorDensities(config = {}) {
     }
   };
   validate(config, 'trees.forestFloor');
+  const root = config.rootZone;
+  if (root !== undefined && !(root && Number.isFinite(root.radius) && root.radius >= 0
+      && Number.isFinite(root.falloff) && root.falloff > 0)) {
+    throw new Error('Invalid editor configuration: trees.forestFloor.rootZone needs radius >= 0 and falloff > 0.');
+  }
   for (const [id, profile] of Object.entries(config.byTileId ?? {})) {
     if (!Number.isInteger(Number(id)) || Number(id) < 0 || Number(id) > 254 || !profile || typeof profile !== 'object') {
       throw new Error(`Invalid editor configuration: trees.forestFloor.byTileId.${id} needs a terrain ID and profile.`);

@@ -299,7 +299,7 @@ export class MeadowTileLayer {
         || previousRenderZ !== tile.renderZ) {
       this.batchDirty = true;
     }
-    tile.revision = this.ground.revisionAt(centerX, centerZ);
+    tile.revision = this.ground.revisionAt(centerX, centerZ, this.tileSize / 2);
     return tile;
   }
 

@@ -267,6 +267,15 @@ export class TreeManifestStore {
     return cached.placements;
   }
 
+  /**
+   * The last built placements for a chunk without the signature check `get`
+   * makes — cheap enough to ask every frame. A rebuild replaces the array, so
+   * callers can key on its identity.
+   */
+  peek(chunkX, chunkZ) {
+    return this.cache.get(`${chunkX}:${chunkZ}`)?.placements ?? null;
+  }
+
   lodAnchor(chunkX, chunkZ) {
     const entry = this.cache.get(`${chunkX}:${chunkZ}`);
     if (!entry) return null;

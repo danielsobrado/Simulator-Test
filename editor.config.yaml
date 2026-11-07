@@ -2665,6 +2665,10 @@ stylizedSurface:
       # Core densities are how much ground cover survives under closed canopy.
       # Forest overrides leave room for the shared litter/moss substrate and
       # shade-tolerant understory. Edges and open meadow keep their growth.
+      # Root zone (meadow/MeadowGroundSample.js): no grass within `radius` m of a
+      # trunk, thinning back to full over `falloff` m, both times the tree's size.
+      # Bare roots and litter at the foot, inside the contactShade patch.
+      rootZone: { radius: 0.9, falloff: 1.8 }
       grassCoreDensity: 0.28
       grassEdgeDensity: 0.78
       flowerCoreDensity: 0.10

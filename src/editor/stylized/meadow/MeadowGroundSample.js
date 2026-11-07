@@ -19,6 +19,8 @@ const ECOTONE_REACH_CELLS = 0.9;
 const DENSITY_TAP_SHIFT = 311.7;
 
 export const MIN_GRASS_STRENGTH = 0.02;
+/** How far a root zone's three lobes push in and out of its circle. */
+const ROOT_LOBE = 0.22;
 const sampleMask = (pixels, size, x, z, channel) => sampleSurfaceMaskChannel(pixels, size, size, x, z, channel);
 function smoothstep(edge0, edge1, value) {
   const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
@@ -27,7 +29,7 @@ function smoothstep(edge0, edge1, value) {
 
 /** The identical ground rule runs against immutable job inputs on either thread. */
 export function createMeadowGroundSample(snapshot, { forest = null, paths = null } = {}) {
-  const { page, descriptor, chunkSize, tileSize, eligible, shapeTable, growth, worldSeed, rocks, flatten } = snapshot;
+  const { page, descriptor, chunkSize, tileSize, eligible, shapeTable, growth, worldSeed, rocks, flatten, roots = [] } = snapshot;
   const mask = page.surfaceMaskPixels;
   paths ??= createMeadowPathSampler(snapshot.pathConfig);
   forest ??= snapshot.forest ? forestDensitySamplerFromGrid(snapshot.forest) : null;
@@ -91,6 +93,16 @@ export function createMeadowGroundSample(snapshot, { forest = null, paths = null
       if (distance < rock.reach) {
         strength *= 1 - flatten * (1 - smoothstep(rock.radius, rock.reach, distance));
       }
+    }
+    // Root zone: bare roots and litter at a trunk's foot, the stand thinning in
+    // over the falloff. Lobed, not round: litter spills unevenly between roots.
+    for (const root of roots) {
+      const dx = x - root.x, dz = z - root.z, distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= root.reach * root.reach) continue;
+      const lobe = 1 + ROOT_LOBE * Math.cos(3 * Math.atan2(dz, dx) + root.phase);
+      const keep = smoothstep(root.radius, root.reach, Math.sqrt(distanceSquared) / lobe);
+      if (hash2d(rank, 93) >= keep) return false;
+      strength *= 0.55 + 0.45 * keep;
     }
     if (strength < MIN_GRASS_STRENGTH) return false;
     out.height = sampleHeight(page, localX, localZ, chunkSize);

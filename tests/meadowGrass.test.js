@@ -11,6 +11,7 @@ import {
 import { MeadowGrassBatches } from '../src/editor/stylized/meadow/MeadowGrassBatches.js';
 import { MeadowTileLayer } from '../src/editor/stylized/meadow/MeadowTileLayer.js';
 import { MeadowGroundSampler } from '../src/editor/stylized/meadow/MeadowGroundSampler.js';
+import { validateForestFloorDensities } from '../src/editor/stylized/forest/ForestFloor.js';
 import { MeadowInteractionMap } from '../src/editor/stylized/meadow/MeadowInteractionMap.js';
 import { meadowShapeId, resolveShapeTable } from '../src/editor/stylized/meadow/meadowGrassShapes.js';
 
@@ -234,6 +235,33 @@ test('the ground sampler reads height, grass, water and shape from the resident 
   assert.equal(rockGround.sample(2.8, -2, 0, out), true);
   assert.ok(out.strength < 0.9, `pressed flatter beside it (${out.strength})`);
   assert.equal(rockGround.sample(1, -1, 0, out), true);
+
+  // A trunk at (2, -6): bare at its foot, thinned over the falloff, and the tile
+  // rebuilds once its chunk's trees arrive.
+  let trees = null;
+  const rooted = new MeadowGroundSampler({
+    terrainView, tileIds: [4, 12], shapeTable: resolveShapeTable({}),
+    forestFloorConfig: { rootZone: { radius: 0.9, falloff: 1.8 } },
+    treePlacementsProvider: () => trees,
+  });
+  rooted.beginFrame();
+  const before = rooted.revisionAt(4, -4);
+  trees = [{ x: 2, z: -6, heightScale: 1 }];
+  assert.notEqual(rooted.revisionAt(4, -4), before, 'trees arriving change the revision');
+  const rootGround = rooted.forTile(4, -4, 4);
+  assert.equal(rootGround.revision, rooted.revisionAt(4, -4), 'roots included on both sides');
+  let atFoot = 0, outside = 0;
+  for (let rank = 0; rank < 200; rank += 1) {
+    if (rootGround.sample(2.3, -6.2, rank, out)) atFoot += 1;
+    if (rootGround.sample(6.5, -1.5, rank, out)) outside += 1;
+  }
+  assert.equal(atFoot, 0, 'nothing grows at the trunk');
+  assert.ok(outside > 0, 'grass beyond the root zone');
+});
+
+test('a malformed root zone fails at load', () => {
+  assert.throws(() => validateForestFloorDensities({ rootZone: { radius: 1, falloff: 0 } }), /rootZone/);
+  assert.doesNotThrow(() => validateForestFloorDensities({ rootZone: { radius: 0.9, falloff: 1.8 } }));
 });
 
 test('the shipped defaults resolve, and bad names fail at load', () => {

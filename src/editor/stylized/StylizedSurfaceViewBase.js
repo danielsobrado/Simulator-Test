@@ -315,6 +315,7 @@ export class StylizedSurfaceView {
         skyView: this.skyView,
         baseUrl,
         rockPlacementsProvider: () => this.rockView?.getPlacements() ?? [],
+        treePlacementsProvider: (chunkX, chunkZ) => this.treeView?.manifestStore?.peek(chunkX, chunkZ) ?? null,
       })
       : null;
     this.slots = this.enabled && !this.impostorBakeMode && !this.meadowGrass
