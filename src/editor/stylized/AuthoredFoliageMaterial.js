@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { attribute, dot, float, mix, vec3 } from 'three/tsl';
+import { attribute, dot, float, mix, mx_noise_float, normalWorld, positionWorld, smoothstep, vec3 } from 'three/tsl';
+import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { gradePlantPart, resolveFoliagePalette } from './forest/foliagePalette.js';
 import { understoryShadeEmission } from './forest/foliageLight.js';
@@ -37,12 +38,22 @@ export function authoredFoliageColor(material) {
 
 /**
  * The biome's understory look (biome-looks `understory`), per instance: greyed
- * toward its own luminance by `w` (saturation), then tinted by rgb. A shrub
+ * toward its own luminance by its saturation, then tinted by rgb. A shrub
  * shared by several biomes otherwise wore one biome's green in all of them.
+ *
+ * In snow country the leaves and bark facing the sky carry snow, broken in
+ * clumps, as shrubs and logs do in Community Shaders' snow cover. `w` packs
+ * saturation + 4 * snow steps (BiomeLooks LOOK_SNOW_STEPS).
  */
 export function biomeUnderstoryColor(color) {
   const look = attribute('instanceBiomeLook', 'vec4');
-  return mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, look.w).mul(look.xyz);
+  const snowSteps = look.w.div(4).floor();
+  const saturation = look.w.sub(snowSteps.mul(4));
+  const tinted = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, saturation).mul(look.xyz);
+  const clumps = mx_noise_float(positionWorld.mul(2.7)).mul(0.5).add(0.5);
+  const cap = smoothstep(0.15, 0.55, normalWorld.y.add(clumps.sub(0.5).mul(0.5)))
+    .mul(snowSteps.div(LOOK_SNOW_STEPS).mul(1.2).clamp(0, 1));
+  return mix(tinted, vec3(0.9, 0.93, 0.97), cap.mul(0.9));
 }
 
 /**

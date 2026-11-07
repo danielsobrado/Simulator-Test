@@ -12,7 +12,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
-import { ROCK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
+import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 
 /**
@@ -111,10 +111,10 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   const world = positionWorld;
   const pattern = patternPosition();
   const look = biomeLook ? attribute('instanceBiomeLook', 'vec4') : null;
-  // w = moss + 4 * snow steps (BiomeLooks ROCK_SNOW_STEPS).
+  // w = moss + 4 * snow steps (BiomeLooks LOOK_SNOW_STEPS).
   const snowSteps = look ? look.w.div(4).floor() : null;
   const moss = look ? look.w.sub(snowSteps.mul(4)) : null;
-  const snowGround = look ? snowSteps.div(ROCK_SNOW_STEPS) : null;
+  const snowGround = look ? snowSteps.div(LOOK_SNOW_STEPS) : null;
   const donor = pattern.mul(DONOR_UNITS_PER_METRE);
   const donorXZ = donor.xz;
 
