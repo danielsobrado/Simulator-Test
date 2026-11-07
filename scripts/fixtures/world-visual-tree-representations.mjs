@@ -51,7 +51,7 @@ export async function runTreeRepresentations({renderer,scene,camera,draw,state,s
   state.report.prototypeSignature=signature;jungleMistUniforms.weight.value=0;
   camera.fov=35;camera.updateProjectionMatrix();sun.intensity=1;fill.intensity=.4;
   const lighting=applyFixtureLighting(original,sun,fill,fixtureLight);
-  for(const asset of treeDiagnostic ? assets.slice(-1) : assets) {
+  for(const asset of assets) {
    const index=view.prototypeIndicesByAsset.get(asset)?.[0];
    if(!Number.isInteger(index))throw new Error(`No production prototype for ${asset}.`);
    const parts=view.prototypes[index],atlas=atlases.find(a=>a.prototypeIndex===index),bounds=new THREE.Box3();

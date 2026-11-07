@@ -8,19 +8,27 @@ import {compileYamlModule} from './compiled-yaml-plugin.mjs';
 // QA-only immutable source/atlas snapshot. Never changes the shared checkout.
 const root=process.cwd(),revision=execFileSync('git',['rev-parse',process.argv[2]??'HEAD'],{encoding:'utf8'}).trim();
 const port=Number(process.argv[3]??5176);
-const archive=execFileSync('git',['archive','--format=tar',revision,'src','config','scripts','editor.config.yaml','index.html','package.json','package-lock.json','public/assets/impostors/trees'],{maxBuffer:192*1024*1024});
-const files=new Map(),fileHashes={},digest=createHash('sha256');let paxPath=null;
+// Optional 3rd argument: a harness revision whose scripts/fixtures replace the frozen ones, so an A/B shares one fixture while src stays frozen.
+const harnessRevision=process.argv[4]?execFileSync('git',['rev-parse',process.argv[4]],{encoding:'utf8'}).trim():null;
+const files=new Map(),fileHashes={},digest=createHash('sha256');
 const normalize=file=>path.resolve(file).replaceAll('\\','/');
+const isFixture=name=>name.startsWith('scripts/fixtures/');
+function readArchive(rev,paths,accept) {
+const archive=execFileSync('git',['archive','--format=tar',rev,...paths],{maxBuffer:192*1024*1024});let paxPath=null;
 for(let offset=0;offset+512<=archive.length;) {
  const header=archive.subarray(offset,offset+512),string=(start,end)=>header.subarray(start,end).toString().replace(/\0.*$/s,'');
  const size=parseInt(string(124,136).trim()||'0',8),type=string(156,157),prefix=string(345,500);
  const filename=paxPath??(prefix?`${prefix}/`:'')+string(0,100),bytes=archive.subarray(offset+512,offset+512+size);
  offset+=512+Math.ceil(size/512)*512;
  if(type==='x'||type==='g'){paxPath=bytes.toString().match(/\d+ path=([^\n]+)/)?.[1]??null;continue;}
- paxPath=null;if(type==='5'||!filename)continue;
- files.set(normalize(filename),bytes);fileHashes[filename]=createHash('sha256').update(bytes).digest('hex');digest.update(filename).update(bytes);
+ paxPath=null;if(type==='5'||!filename||!accept(filename))continue;
+ files.set(normalize(filename),bytes);fileHashes[filename]=createHash('sha256').update(bytes).digest('hex');
 }
-const manifest={schemaVersion:1,frozen:true,sourceSha:revision,sha256:digest.digest('hex'),files:fileHashes,capturedAt:new Date().toISOString()};
+}
+readArchive(revision,['src','config','scripts','editor.config.yaml','index.html','package.json','package-lock.json','public/assets/impostors/trees'],name=>!harnessRevision||!isFixture(name));
+if(harnessRevision)readArchive(harnessRevision,['scripts/fixtures'],isFixture);
+for(const name of Object.keys(fileHashes))digest.update(name).update(files.get(normalize(name)));
+const manifest={schemaVersion:1,frozen:true,sourceSha:revision,harnessSha:harnessRevision,sha256:digest.digest('hex'),files:fileHashes,capturedAt:new Date().toISOString()};
 const mime=file=>file.endsWith('.png')?'image/png':file.endsWith('.json')?'application/json':file.endsWith('.ktx2')?'image/ktx2':'application/octet-stream';
 const snapshot={name:'immutable-world-visual-snapshot',enforce:'pre',
  load(id) {
@@ -51,4 +59,4 @@ const snapshot={name:'immutable-world-visual-snapshot',enforce:'pre',
 };
 const server=await createServer({...base,configFile:false,root,cacheDir:`tmp/world-visual-quality/vite-${revision.slice(0,8)}-${port}`,
  plugins:[snapshot,...base.plugins],server:{host:'0.0.0.0',port,strictPort:true,hmr:false,watch:{ignored:['**/*']}}});
-await server.listen();console.log(JSON.stringify({sourceSha:revision,sha256:manifest.sha256,files:files.size,port}));server.printUrls();
+await server.listen();console.log(JSON.stringify({sourceSha:revision,harnessSha:harnessRevision,sha256:manifest.sha256,files:files.size,port}));server.printUrls();
