@@ -1,4 +1,4 @@
-import { Fn, If, float, length, max, normalize, smoothstep, vec2, vec3 } from 'three/tsl';
+import { Fn, If, cameraPosition, distance, float, length, max, normalize, positionWorld, smoothstep, vec2, vec3 } from 'three/tsl';
 import { noise2, noised, snowWarp } from './SnowNoiseNodes.js';
 import { skyLightUniforms } from './sky/skyLight.js';
 
@@ -17,6 +17,11 @@ const SHADOW_STEPS_METERS = [2.5, 6, 14];
 // From a little short of blocked: drift shoulders sink into shade before the sun is cut off.
 const SHADOW_START_METERS = -0.2;
 const SHADOW_FULL_METERS = 0.1;
+// Cast shade reads as drifts only up close. From 20 m and more it read as a grid
+// of grey rounded blobs over every drifted field (checked at 8, 20 and 45 m up);
+// the slopes still model the drifts at any distance.
+const SHADOW_NEAR_METERS = 14;
+const SHADOW_FAR_METERS = 34;
 
 const heightAt = (p) => noise2(p.div(BROAD_METERS)).mul(BROAD_HEIGHT)
   .add(noise2(p.div(FINE_METERS).add(FINE_OFFSET)).mul(FINE_HEIGHT));
@@ -50,6 +55,7 @@ export function createSnowDriftNodes({ point, snow, footprint, weight, sun = nul
     // Direct light casts these, so they go with it: at night and under cloud, none. Red, because a golden sun has little green.
     shadow: sun
       ? smoothstep(SHADOW_START_METERS, SHADOW_FULL_METERS, fields.z).mul(amount).mul(smoothstep(0, 0.05, sun.y))
+        .mul(smoothstep(SHADOW_NEAR_METERS, SHADOW_FAR_METERS, distance(cameraPosition, positionWorld)).oneMinus())
         .mul(skyLightUniforms.sunColor.r.clamp(0, 1))
       : float(0),
   };
