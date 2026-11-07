@@ -20,6 +20,13 @@ export const BIOME_ARID_KINDS = Object.freeze(['sand', 'mineral']);
  */
 export const NEUTRAL_BIOME_LOOK = Object.freeze([1, 1, 1, 1]);
 /** Look columns, the key each packs into w and that key's range. */
+/**
+ * Rock snow rides in the rock look's w beside the moss, in whole steps of 4
+ * (moss stays under 2): w = moss + 4 * round(snow.ground * ROCK_SNOW_STEPS).
+ * The per-instance attribute has no free channel, and a vertex buffer more
+ * would break the tree parts' eight-buffer limit (StylizedLodRuntime).
+ */
+export const ROCK_SNOW_STEPS = 16;
 const LOOK_COLUMNS = Object.freeze({
   rock: Object.freeze({ w: 'moss', range: Object.freeze([0, 2]) }),
   understory: Object.freeze({ w: 'saturation', range: Object.freeze([0, 1.5]) }),
@@ -137,6 +144,7 @@ export function resolveBiomeLooks(source, { snow: withSnow = true } = {}) {
       if (withSnow) snow[column][id] = value;
     }
   }
+  for (let id = 0; id < 256; id += 1) looks.rock[id * 4 + 3] += 4 * Math.round(snow.ground[id] * ROCK_SNOW_STEPS);
   return Object.freeze({
     snowColor,
     frostColor,

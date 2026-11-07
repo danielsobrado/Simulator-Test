@@ -12,6 +12,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
+import { ROCK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 
 /**
@@ -56,6 +57,9 @@ const MOSS_LIGHT = '#7d9a3a';
 const MOSS_DARK = '#4d6424';
 const DUST = '#a89a80';
 const ALGAE = '#4a5a2a';
+const ROCK_SNOW = '#eef2f6';
+/** Snow on a face tipping away from the sky: a cooler, deeper white. */
+const ROCK_SNOW_SHADE = '#c3cfdc';
 
 export const DEFAULT_ROCK_WEATHERING = Object.freeze({
   enabled: true,
@@ -107,6 +111,10 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   const world = positionWorld;
   const pattern = patternPosition();
   const look = biomeLook ? attribute('instanceBiomeLook', 'vec4') : null;
+  // w = moss + 4 * snow steps (BiomeLooks ROCK_SNOW_STEPS).
+  const snowSteps = look ? look.w.div(4).floor() : null;
+  const moss = look ? look.w.sub(snowSteps.mul(4)) : null;
+  const snowGround = look ? snowSteps.div(ROCK_SNOW_STEPS) : null;
   const donor = pattern.mul(DONOR_UNITS_PER_METRE);
   const donorXZ = donor.xz;
 
@@ -130,7 +138,7 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   const mossMask = up.smoothstep(0.35, 0.85)
     .mul(patches.smoothstep(0.25, 0.7))
     .mul(settings.moss)
-    .mul(look ? look.w : float(1))
+    .mul(look ? moss : float(1))
     .clamp(0, 1);
   const shade = dot(biomeAlbedo, vec3(0.3, 0.59, 0.11)).mul(0.9).add(0.55);
   const mossColor = mix(color(MOSS_DARK), color(MOSS_LIGHT), patches).mul(shade);
@@ -173,6 +181,15 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
         .mul(settings.algae);
       weathered = mix(weathered, color(settings.algaeColor ?? ALGAE), growth.mul(eligible).clamp(0, 1));
     }
+  }
+
+  // Snow country: a soft-edged cap on every face turned up, as Community
+  // Shaders' snow cover lays it over Skyrim's stones; broken where a face tips.
+  if (look) {
+    const cap = up.add(patches.sub(0.5).mul(0.3)).smoothstep(0.38, 0.66)
+      .mul(snowGround.mul(1.3).clamp(0, 1));
+    weathered = mix(weathered, mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), cap);
+    roughness = mix(roughness, float(0.6), cap);
   }
 
   material.colorNode = weathered;

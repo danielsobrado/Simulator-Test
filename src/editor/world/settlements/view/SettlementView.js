@@ -59,8 +59,9 @@ export class SettlementView {
    * @param {() => ?{ direction: object, color: object, intensity: number }} [options.sunlightProvider]
    *   the sky's key light (sun by day, moon by night), for the light through the rooms' windows
    */
-  constructor({ terrainView, baseUrl = '/', enabled = true, duskProvider = () => 0, sunlightProvider = () => null }) {
+  constructor({ terrainView, baseUrl = '/', enabled = true, duskProvider = () => 0, sunlightProvider = () => null, snowGroundByTile = [] }) {
     this.sunlightProvider = sunlightProvider;
+    this.snowGroundByTile = snowGroundByTile;
     this.terrainView = terrainView;
     this.duskProvider = duskProvider;
     this.enabled = enabled;
@@ -138,7 +139,8 @@ export class SettlementView {
       if (!ready) continue;
       if (this.sites.has(id)) continue;
       const site = new SettlementSite({ entry, plan, generator: this.generator, tileSize,
-        library: this.library, getDrawPreparation: () => this.terrainView.drawPreparation });
+        library: this.library, getDrawPreparation: () => this.terrainView.drawPreparation,
+        snowGroundByTile: this.snowGroundByTile });
       this.pavingRoot.add(site.paving);
       this.sites.set(id, site);
       this.selectionJob = null;

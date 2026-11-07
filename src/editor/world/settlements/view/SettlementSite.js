@@ -15,6 +15,23 @@ const UP = new THREE.Vector3(0, 1, 0);
 const STONE_SINK = 0.06;
 
 /**
+ * The ground snow of the biomes a town stands in, averaged over its centre and
+ * a ring round it, so a town on a biome border takes the share it is in.
+ */
+function townSnow(generator, settlement, snowGroundByTile) {
+  if (!snowGroundByTile.length || typeof generator?.sampleTile !== 'function') return 0;
+  let sum = 0;
+  let count = 0;
+  for (const [dx, dz] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
+    const tile = generator.sampleTile(settlement.cellX + dx, settlement.cellZ + dz);
+    if (!Number.isInteger(tile) || tile === 0) continue;
+    sum += snowGroundByTile[tile] ?? 0;
+    count += 1;
+  }
+  return count ? sum / count : 0;
+}
+
+/**
  * Ground height at a plan-space point, as the terrain mesh draws it: the
  * generator's height at the four surrounding vertices, bilinearly blended.
  * Sampling the height function itself between vertices would follow a surface
@@ -72,7 +89,7 @@ const LAYER_ROLE = Object.freeze({ earth: 'earth', cobble: 'cobble', flagstone: 
  * because each needs terrain height samples.
  */
 export class SettlementSite {
-  constructor({ entry, plan, generator, tileSize, library, getDrawPreparation = () => null }) {
+  constructor({ entry, plan, generator, tileSize, library, getDrawPreparation = () => null, snowGroundByTile = [] }) {
     this.getDrawPreparation = getDrawPreparation;
     this.id = entry.settlement.id;
     this.settlement = entry.settlement;
@@ -93,6 +110,8 @@ export class SettlementSite {
       console.warn(`Settlement ${this.id} could not load its surface textures.`, error);
     });
     this.centre = { x: entry.settlement.cellX * tileSize, z: -entry.settlement.cellZ * tileSize };
+    /** Per-instance look of this town's buildings: neutral tint, w = the snow lying on them (SettlementSnow). */
+    this.biomeLook = Object.freeze([1, 1, 1, townSnow(generator, entry.settlement, snowGroundByTile)]);
     this.placements = null;
     this.smithies = [];
     this.paving = new THREE.Group();

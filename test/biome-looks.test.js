@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import * as THREE from 'three';
-import { resolveBiomeLooks, biomeSnowCover, biomeLook, NEUTRAL_BIOME_LOOK } from '../src/editor/biomes/BiomeLooks.js';
+import { ROCK_SNOW_STEPS, resolveBiomeLooks, biomeSnowCover, biomeLook, NEUTRAL_BIOME_LOOK } from '../src/editor/biomes/BiomeLooks.js';
 import { applyBiomeLooks, frostMeadowPalette, settleMeadowGrowth } from '../src/editor/biomes/applyBiomeLooks.js';
 import { createTerrainMaterialBakeConfig } from '../src/editor/materials/TerrainMaterialBakeConfig.js';
 import { resolveMeadowPalettes } from '../src/editor/stylized/meadow/meadowPalettes.js';
@@ -177,7 +177,12 @@ test('rock looks pack tint and tone into an albedo multiplier beside the moss sc
   for (const rock of [{ tone: 3 }, { moss: -1 }, { tint: 'red' }, { lichen: 1 }, 1]) {
     assert.throws(() => resolveBiomeLooks({ ...base, byTileId: { 2: { rock } } }), /rock/);
   }
-  assert.equal(biomeLook(LOOKS, 'rock', COLD_DESERT)[3], 0, 'the shipped cold desert grows no moss on its stones');
+  // w = moss + 4 * snow steps: the cold desert's stones carry no moss and its 0.2 ground snow.
+  const coldW = biomeLook(LOOKS, 'rock', COLD_DESERT)[3];
+  assert.equal(coldW % 4, 0, 'the shipped cold desert grows no moss on its stones');
+  assert.equal(Math.floor(coldW / 4), Math.round(0.2 * ROCK_SNOW_STEPS), 'and its stones take its ground snow');
+  const snowy = resolveBiomeLooks({ ...base, byTileId: { 5: { rock: { moss: 1.5 }, snow: { ground: 1 } } } });
+  assert.equal(biomeLook(snowy, 'rock', 5)[3], 1.5 + 4 * ROCK_SNOW_STEPS, 'snow packs above the moss');
 });
 
 test('understory looks pack tint and tone beside a saturation, per biome', () => {

@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { materialColor } from 'three/tsl';
 import { createInstancedRenderers, disposeInstancedRenderers } from '../../../stylized/lod/StylizedLodRuntime.js';
 import { normalizeProceduralRecipe } from '../../../workshop/ProceduralAssetStore.js';
+import { snowSettlementMaterial } from './SettlementSnow.js';
 import { createWorkshopMaterials, hasPlasterWalls } from '../../../workshop/ProceduralWorkshopMaterials.js';
 import { withWorkshopSurfaceOverrides } from '../../../workshop/ProceduralWorkshopSurfaceOverrides.js';
 import { buildingRecipe } from '../SettlementBuildingCatalog.js';
@@ -176,7 +177,10 @@ export class SettlementPrototypePool {
     const materials = withWorkshopSurfaceOverrides(entry.surfaces, () => createWorkshopMaterials(recipe));
     lightSettlementMaterials(materials);
     const plastered = hasPlasterWalls(recipe);
-    for (const [slot, material] of Object.entries(materials)) gradeSettlementMaterial(material, slot, { plastered });
+    for (const [slot, material] of Object.entries(materials)) {
+      gradeSettlementMaterial(material, slot, { plastered });
+      snowSettlementMaterial(material, slot);
+    }
     const part = (packed) => ({ slot: packed.slot, geometry: geometryFrom(packed), material: materials[packed.slot] ?? materials.stone });
     const near = data.near.map(part);
     let far = data.far ? data.far.map(part) : null;
@@ -210,10 +214,11 @@ export class SettlementPrototypePool {
     // The dithered instance material scales an explicit colour node by each
     // instance's variation; this one is the material's own colour, unchanged.
     for (const { material } of parts) material.colorNode ??= materialColor;
+    // Every instance carries its town's snow (SettlementSnow) in `instanceBiomeLook.w`.
     const [meshes] = createInstancedRenderers({
       root: this.root,
       renderer: this.renderer,
-      partsByPrototype: [parts],
+      partsByPrototype: [parts.map((part) => ({ ...part, instanceBiomeLook: true }))],
       capacity: MIN_CAPACITY,
       name,
       castShadow,
@@ -233,7 +238,7 @@ export class SettlementPrototypePool {
     if (!tier || count <= tier.capacity) return tier;
     let capacity = tier.capacity;
     while (capacity < count) capacity *= 2;
-    const sources = tier.meshes.map((mesh, index) => ({ geometry: mesh.geometry, material: tier.materials[index] }));
+    const sources = tier.meshes.map((mesh, index) => ({ geometry: mesh.geometry, material: tier.materials[index], instanceBiomeLook: true }));
     const [meshes] = createInstancedRenderers({
       root: this.root,
       renderer: this.renderer,

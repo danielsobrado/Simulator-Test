@@ -718,6 +718,8 @@ const kitTowns = kitTownsEnabled();
   resources.own(roadsideDetails);
   const settlementView = new SettlementView({ terrainView, baseUrl: import.meta.env.BASE_URL,
     enabled: config.stylizedSurface.enhancements?.settlementBuildings !== false && !kitTowns,
+    // Towns in snow country wear snow on every face turned up (SettlementSnow).
+    snowGroundByTile: config.stylizedSurface.biomeLooks?.snow?.ground ?? [],
     // A night look keeps its "sun" high as moonlight, so the sky alone never reads as dusk:
     // the look's own night flag lights the windows, as it does for the kit towns.
     // (`skyLooks` is declared further down; the view first asks once the frame loop runs.)

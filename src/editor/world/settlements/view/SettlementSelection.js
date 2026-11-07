@@ -93,7 +93,7 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
         if (visible > 0 && inView) {
           for (const [band, fade, direction] of [['near', visible * blend, 1], ['far', visible * (1 - blend), -1]]) {
             if (fade <= 0 || band === 'far' && !entry.far) continue;
-            representations.push({ ...placement[band], band, fade, objectId: id,
+            representations.push({ ...placement[band], band, fade, objectId: id, biomeLook: site.biomeLook,
               quantizedFade: Math.fround(fade), ditherDirection: direction });
             if (needsCoverage) {
               if (!coverage.required.has(placement.key)) coverage.required.set(placement.key, new Set());
