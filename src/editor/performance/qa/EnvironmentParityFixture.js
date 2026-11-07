@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { texture, uv, vec3 } from 'three/tsl';
-import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { acquireKtx2Loader } from '../../assets/sharedKtx2Loader.js';
 import { loadFoliageMipTexture } from '../../stylized/impostor/FoliageMipTexture.js';
 import { createFrostShading, resolveFrost, frostUniforms } from '../../stylized/ambient/FrostShading.js';
 import { installUnusedSamplerPruning } from '../../../render/UnusedSamplerBindings.js';
@@ -27,7 +27,7 @@ window.__environmentFixture = state;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0);
 const camera = new THREE.OrthographicCamera(-4, 4, 3, -3, 0.1, 100);
 camera.position.z = 10; camera.updateMatrixWorld();
-const loader = new KTX2Loader().setTranscoderPath('/assets/gods-end/decoders/basis/').setWorkerLimit(2).detectSupport(renderer);
+const { loader, release: releaseKtx2 } = acquireKtx2Loader(renderer);
 const owned = [];
 async function capture(id, extra = {}) {
   renderer.render(scene, camera);
@@ -92,7 +92,7 @@ try {
   }
 } catch (error) { state.report.failure = error.stack; }
 finally {
-  owned.forEach(map => map.dispose()); loader.dispose(); frostUniforms.cold.value = 0;
+  owned.forEach(map => map.dispose()); releaseKtx2(); frostUniforms.cold.value = 0;
   state.report.done = true;
   // Keep the final canvas available to the browser runner until its context closes.
   pruning.dispose();

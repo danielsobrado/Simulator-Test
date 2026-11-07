@@ -7,8 +7,9 @@ import { loadScenePreprocessing, NPC_LOD_RATIOS, npcStageKey, resolveStages } fr
 export class ResidentAssets {
   constructor({ renderer, roster, baseUrl, loader = null }) {
     Object.assign(this, { roster, baseUrl });
-    const context = loader ? { loader, ktx2Loader: null } : createStylizedSceneLoader({ renderer });
-    Object.assign(this, context);
+    const context = loader ? { loader, release: null } : createStylizedSceneLoader({ renderer });
+    this.loader = context.loader;
+    this.releaseKtx2 = context.release;
     this.templates = new Map();
     this.disposed = false;
     this.preprocessing = null;
@@ -48,6 +49,6 @@ export class ResidentAssets {
     if (this.disposed) return;
     this.disposed = true;
     for (const task of this.templates.values()) task.then(template => template.dispose()).catch(() => {});
-    this.templates.clear(); this.ktx2Loader?.dispose();
+    this.templates.clear(); this.releaseKtx2?.();
   }
 }

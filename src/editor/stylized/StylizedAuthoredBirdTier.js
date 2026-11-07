@@ -43,10 +43,10 @@ export class StylizedAuthoredBirdTier {
     this.root = root;
     this.baseUrl = normalizeBaseUrl(baseUrl);
     const configuredLoader = loader
-      ? { loader, ktx2Loader: null }
+      ? { loader, release: null }
       : createStylizedSceneLoader({ renderer, baseUrl: this.baseUrl });
     this.loader = configuredLoader.loader;
-    this.ownedKtx2Loader = configuredLoader.ktx2Loader;
+    this.releaseKtx2 = configuredLoader.release;
     this.species = [];
     this.active = [];
     this.eventIndex = 0;
@@ -239,7 +239,7 @@ export class StylizedAuthoredBirdTier {
     }
     this.species.length = 0;
     this.active.length = 0;
-    this.ownedKtx2Loader?.dispose();
-    this.ownedKtx2Loader = null;
+    this.releaseKtx2?.();
+    this.releaseKtx2 = null;
   }
 }

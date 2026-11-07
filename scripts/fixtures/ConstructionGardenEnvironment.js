@@ -98,10 +98,10 @@ export async function addConstructionGardenEnvironment(scene, { walls, path, sun
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const { loader, ktx2Loader } = createStylizedSceneLoader({ renderer });
+  const { loader, release } = createStylizedSceneLoader({ renderer });
   let tree;
   try { tree = (await loader.loadAsync('/assets/trees/meadow/tree7.glb')).scene; }
-  finally { ktx2Loader.dispose(); }
+  finally { release(); }
   const bounds = new THREE.Box3().setFromObject(tree);
   const scale = (trees?.height ?? 9.5) / (bounds.max.y - bounds.min.y);
   const root = new THREE.Group();

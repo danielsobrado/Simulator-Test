@@ -1,8 +1,8 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { disposeScene, normalizeBaseUrl, resolveAssetUrl } from '../assets/assetUrl.js';
 import { assetStartupTelemetry } from '../performance/AssetStartupTelemetry.js';
+import { acquireKtx2Loader } from '../assets/sharedKtx2Loader.js';
 
 function instrumentMeshoptDecoder(telemetry) {
   const decoder = Object.create(MeshoptDecoder);
@@ -17,35 +17,6 @@ function instrumentMeshoptDecoder(telemetry) {
     return decoded;
   };
   return decoder;
-}
-
-function instrumentKtx2Loader(ktx2Loader, telemetry) {
-  const load = ktx2Loader.load.bind(ktx2Loader);
-  ktx2Loader.load = (url, onLoad, onProgress, onError) => {
-    const startedAt = telemetry.clock();
-    let finished = false;
-    const finish = (texture, error = null) => {
-      if (finished) return;
-      finished = true;
-      telemetry.recordKtx2({
-        durationMs: telemetry.clock() - startedAt,
-        texture,
-        error,
-      });
-    };
-    return load(
-      url,
-      (texture) => {
-        finish(texture);
-        onLoad?.(texture);
-      },
-      onProgress,
-      (error) => {
-        finish(null, error);
-        onError?.(error);
-      },
-    );
-  };
 }
 
 function instrumentAssetLoads(loader, telemetry) {
@@ -63,30 +34,17 @@ function instrumentAssetLoads(loader, telemetry) {
   };
 }
 
-/** The Basis transcoder every KTX2 loader in the app shares. */
-const BASIS_TRANSCODER_PATH = 'assets/gods-end/decoders/basis/';
-
+/**
+ * A GLTF loader on the renderer's shared KTX2 loader. Call `release` (never
+ * `ktx2Loader.dispose()`) when done: other owners share the transcoder workers.
+ */
 export function createStylizedSceneLoader({ renderer, baseUrl = '/', telemetry = assetStartupTelemetry }) {
-  if (!renderer) {
-    throw new Error('A renderer is required to initialize KTX2 texture support.');
-  }
-  // An empty transcoder path makes three load its bundled transcoder relative to
-  // KTX2Loader's own module. Vite pre-bundles that module into
-  // node_modules/.vite/deps, so in dev the URL lands on the SPA fallback,
-  // the transcoder never starts, and GLTFLoader drops every KTX2 texture: the
-  // forest-pack crowns lost their leaf atlas and fell back to palette or vertex
-  // colours (lilac AO data on two of them, which read as pale cream). The
-  // vendored copy is byte-identical to three r187's.
-  const ktx2Loader = new KTX2Loader()
-    .setTranscoderPath(resolveAssetUrl(normalizeBaseUrl(baseUrl), BASIS_TRANSCODER_PATH))
-    .detectSupport(renderer);
-  telemetry.setKtx2Support(ktx2Loader.workerConfig);
-  instrumentKtx2Loader(ktx2Loader, telemetry);
+  const { loader: ktx2Loader, release } = acquireKtx2Loader(renderer, baseUrl, telemetry);
   const loader = new GLTFLoader()
     .setMeshoptDecoder(instrumentMeshoptDecoder(telemetry))
     .setKTX2Loader(ktx2Loader);
   instrumentAssetLoads(loader, telemetry);
-  return { loader, ktx2Loader };
+  return { loader, ktx2Loader, release };
 }
 
 /**
@@ -98,11 +56,11 @@ export class StylizedSceneAssetCache {
     this.baseUrl = normalizeBaseUrl(baseUrl);
     if (loader) {
       this.loader = loader;
-      this.ktx2Loader = null;
+      this.releaseKtx2 = null;
     } else {
       const configured = createStylizedSceneLoader({ renderer, baseUrl: this.baseUrl });
       this.loader = configured.loader;
-      this.ktx2Loader = configured.ktx2Loader;
+      this.releaseKtx2 = configured.release;
     }
     this.entries = new Map();
     this.disposed = false;
@@ -179,7 +137,7 @@ export class StylizedSceneAssetCache {
       entry.scene = null;
     }
     this.entries.clear();
-    this.ktx2Loader?.dispose();
-    this.ktx2Loader = null;
+    this.releaseKtx2?.();
+    this.releaseKtx2 = null;
   }
 }

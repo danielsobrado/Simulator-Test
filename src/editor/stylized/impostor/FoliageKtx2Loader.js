@@ -1,17 +1,19 @@
-import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
-import { resolveAssetUrl } from '../../assets/assetUrl.js';
+import { acquireKtx2Loader } from '../../assets/sharedKtx2Loader.js';
 
-/** Bounded workers owned by one atlas load; downloads overlap initialization. */
-export function createFoliageKtx2Loader(renderer, baseUrl) {
+/**
+ * The renderer's shared KTX2 loader, held for one atlas load; downloads overlap
+ * transcoder initialization. Returns `{ loader, release }`, or null when
+ * compressed foliage is unavailable.
+ */
+export function acquireFoliageKtx2Loader(renderer, baseUrl) {
   if (!renderer) return null;
-  let loader;
+  let held = null;
   try {
-    loader = new KTX2Loader().setTranscoderPath(resolveAssetUrl(baseUrl, 'assets/gods-end/decoders/basis/'))
-      .setWorkerLimit(2).detectSupport(renderer);
-    loader.init().catch(() => {}); // loadAsync observes the same failure and uses the raw fallback.
-    return loader;
+    held = acquireKtx2Loader(renderer, baseUrl);
+    held.loader.init().catch(() => {}); // loadAsync observes the same failure and uses the raw fallback.
+    return held;
   } catch (error) {
-    loader?.dispose();
+    held?.release();
     console.warn('Compressed foliage support unavailable; using baked RGBA mip chains.', error);
     return null;
   }

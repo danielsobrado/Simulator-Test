@@ -46,6 +46,6 @@ export function createCharacterView({
     runSpeed: config.runSpeed,
     enabled: config.enabled !== false,
     contactShadow: config.contactShadow !== false,
-    onDispose: owned ? () => owned.ktx2Loader.dispose() : null,
+    onDispose: owned ? owned.release : null,
   });
 }

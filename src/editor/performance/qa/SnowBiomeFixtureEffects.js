@@ -16,7 +16,7 @@ export async function createSnowBiomeFixtureEffects({ renderer, scene, sun, fill
   const config = structuredClone(editorSource.stylizedSurface);
   const trees = new THREE.Group(); trees.name = 'qa-snowy-alpine-trees'; scene.add(trees);
   const definitions = config.assets.treeVariants.filter(variant => variant.scene.includes('/alpine/'));
-  const { loader, ktx2Loader } = createStylizedSceneLoader({ renderer });
+  const { loader, release } = createStylizedSceneLoader({ renderer });
   for (const [i, definition] of definitions.entries()) {
     const gltf = await loader.loadAsync(definition.scene);
     gltf.scene.traverse(mesh => {
@@ -37,7 +37,7 @@ export async function createSnowBiomeFixtureEffects({ renderer, scene, sun, fill
     const x = i === 0 ? -6 : 7, z = -5 - i * 3;
     gltf.scene.position.set(x, groundHeight(x, z), z); trees.add(gltf.scene);
   }
-  ktx2Loader.dispose();
+  release();
   const snow = new SnowWeatherSystem({ scene, isWebGpu: true, seed: 0x51eaf00d,
     snowfall: resolveWeatherEffects(weatherSource).snowfall });
   snow.applySettings({ enabled: false, intensity: 0, windX: -0.62, windZ: 0.21 });

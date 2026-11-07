@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { loadFoliageMipTexture } from './FoliageMipTexture.js';
-import { createFoliageKtx2Loader } from './FoliageKtx2Loader.js';
+import { acquireFoliageKtx2Loader } from './FoliageKtx2Loader.js';
 import { normalizeBaseUrl, resolveAssetUrl } from '../../assets/assetUrl.js';
 import {
   TREE_IMPOSTOR_MANIFEST_VERSION,
@@ -131,8 +131,9 @@ export class TreeImpostorAssetLoader {
       return null;
     }
     const assetVersion = manifest.generatedAt ?? manifest.sourceSignature;
-    const compressedLoader = this.compressed
-      ? this.compressedLoader ?? createFoliageKtx2Loader(this.renderer, this.baseUrl) : null;
+    const held = this.compressed && !this.compressedLoader
+      ? acquireFoliageKtx2Loader(this.renderer, this.baseUrl) : null;
+    const compressedLoader = this.compressed ? this.compressedLoader ?? held?.loader ?? null : null;
     let results;
     try {
       results = await Promise.allSettled(manifest.prototypes.map(async (prototype) => {
@@ -142,8 +143,8 @@ export class TreeImpostorAssetLoader {
         return Object.freeze({ ...prototype, ...textures, source: 'asset' });
       }));
     } finally {
-      // Textures own their GPU data; transcoder workers have no runtime role.
-      if (compressedLoader !== this.compressedLoader) compressedLoader?.dispose();
+      // Textures own their GPU data; the shared transcoder is only held while loading.
+      held?.release();
     }
     const atlases = results
       .filter((result) => result.status === 'fulfilled')

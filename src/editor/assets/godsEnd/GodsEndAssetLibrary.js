@@ -1,6 +1,6 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { acquireKtx2Loader } from '../sharedKtx2Loader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { StylizedSceneAssetCache } from '../../stylized/StylizedSceneAssetCache.js';
 import { resolveAssetUrl } from '../assetUrl.js';
@@ -46,9 +46,8 @@ export class GodsEndAssetLibrary {
   getCache() {
     if (this.cache) return this.cache;
     this.draco = new DRACOLoader().setDecoderPath(resolveAssetUrl(this.baseUrl, 'assets/gods-end/decoders/draco/'));
-    this.ktx2 = new KTX2Loader().setTranscoderPath(resolveAssetUrl(this.baseUrl, 'assets/gods-end/decoders/basis/'))
-      .detectSupport(this.renderer);
-    const loader = new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx2).setMeshoptDecoder(MeshoptDecoder);
+    this.ktx2 = acquireKtx2Loader(this.renderer, this.baseUrl);
+    const loader = new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx2.loader).setMeshoptDecoder(MeshoptDecoder);
     this.cache = new StylizedSceneAssetCache({ loader, baseUrl: this.baseUrl });
     return this.cache;
   }
@@ -128,6 +127,6 @@ export class GodsEndAssetLibrary {
     this.installed.clear();
     this.cache?.dispose();
     this.draco?.dispose();
-    this.ktx2?.dispose();
+    this.ktx2?.release();
   }
 }
