@@ -345,6 +345,7 @@ export class StylizedGroundDetailView {
       this.layerConfig.perChunk,
       this.layerConfig.tileIds.join(','),
       JSON.stringify(this.layerConfig.densityByTile ?? null),
+      this.layerConfig.regionalChannel ?? 'meadow',
       JSON.stringify(this.layerConfig.water ?? null),
       JSON.stringify(this.layerConfig.surfaceWater ?? null),
       JSON.stringify(this.prototypeBiomeRules),
@@ -411,10 +412,12 @@ export class StylizedGroundDetailView {
         const tileDensity = this.layerConfig.densityByTile?.[candidate.tileId] ?? 1;
         if (tileDensity < 1 && candidate.priority >= tileDensity) return null;
         if (!this.regionalCharacterField) return metadata ?? true;
+        // Meadow districts thin floor accents; an understory layer follows the
+        // woodland channel instead (`regionalChannel: forest`).
         const regionalMeadow = this.regionalCharacterField.sampleChannel(
           candidate.x,
           candidate.z,
-          'meadow',
+          this.layerConfig.regionalChannel ?? 'meadow',
         );
         return candidate.priority < regionalMeadow
           ? { ...(metadata ?? {}), regionalMeadow }

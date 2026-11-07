@@ -115,3 +115,14 @@ test('validates prepared placement cache bounds', () => {
   value.stylizedSurface.preparedPlacementCache.maxMiB = 0;
   assert.throws(() => validateStylizedLodConfig(value), /preparedPlacementCache\.maxMiB/);
 });
+
+test('ground detail layers gate on a known regional character channel', () => {
+  const value = config();
+  value.stylizedSurface.tropicalKit = {
+    enabled: true, residentRadius: 1, perChunk: 256, minScale: 0.8, maxScale: 1.25, radius: 0.6,
+    heightOffset: 0, colorVariation: 0.12, castShadow: false, tileIds: [7], regionalChannel: 'forest',
+  };
+  assert.equal(validateStylizedLodConfig(value), value);
+  value.stylizedSurface.tropicalKit.regionalChannel = 'jungle';
+  assert.throws(() => validateStylizedLodConfig(value), /tropicalKit\.regionalChannel/);
+});

@@ -6,7 +6,8 @@ const DEFAULT_CACHE_LIMIT = 8192;
 const HASH_X = 73856093;
 const HASH_Z = 19349663;
 const HASH_CHANNEL = 83492791;
-const CHANNELS = Object.freeze(['meadow', 'forest', 'scrub', 'rocky']);
+export const REGIONAL_CHARACTER_CHANNELS = Object.freeze(['meadow', 'forest', 'scrub', 'rocky']);
+const CHANNELS = REGIONAL_CHARACTER_CHANNELS;
 const UNIFORM = Object.freeze({ meadow: 1, forest: 1, scrub: 1, rocky: 1 });
 // Node coordinates pack into one integer key so the per-candidate cache lookup
 // costs no string allocation. ±2^24 nodes covers ±470 M world units at the

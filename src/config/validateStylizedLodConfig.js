@@ -1,3 +1,4 @@
+import { REGIONAL_CHARACTER_CHANNELS } from '../editor/stylized/RegionalCharacterField.js';
 import { resolveRockWeathering } from '../editor/stylized/rockWeathering.js';
 import { resolveContactShade } from '../editor/stylized/contactShade.js';
 import { resolveBlownStreaks } from '../editor/stylized/ambient/BlownStreaks.js';
@@ -321,6 +322,9 @@ function validateGroundDetailLayer(layer, path) {
   assertBoolean(layer.castShadow, `${path}.castShadow`);
   if (!Array.isArray(layer.tileIds) || layer.tileIds.length === 0) {
     throw new Error(`Invalid editor configuration: ${path}.tileIds must be a non-empty array.`);
+  }
+  if (layer.regionalChannel !== undefined && !REGIONAL_CHARACTER_CHANNELS.includes(layer.regionalChannel)) {
+    throw new Error(`Invalid editor configuration: ${path}.regionalChannel must be one of ${REGIONAL_CHARACTER_CHANNELS.join(', ')}.`);
   }
 }
 

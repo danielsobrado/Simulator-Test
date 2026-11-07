@@ -152,6 +152,25 @@ function dropDegenerateTriangles(document) {
   return removed;
 }
 
+/**
+ * `dedup` lets two primitives with identical topology share one index accessor.
+ * gltfpack always writes one index buffer per primitive, so a shared accessor
+ * makes the optimizer's "logical geometry never grows" check fail
+ * (banana-understory). Giving each primitive its own copy states the source the
+ * way gltfpack will emit it; the rendered geometry is unchanged.
+ */
+function unshareIndices(document) {
+  const seen = new Set();
+  for (const mesh of document.getRoot().listMeshes()) {
+    for (const primitive of mesh.listPrimitives()) {
+      const indices = primitive.getIndices();
+      if (!indices) continue;
+      if (seen.has(indices)) primitive.setIndices(indices.clone());
+      else seen.add(indices);
+    }
+  }
+}
+
 function replaceFileAtomically(bytes, targetPath) {
   const temporaryPath = `${targetPath}.prepare-${process.pid}.tmp`;
   const displacedPath = `${targetPath}.prepare-${process.pid}.previous`;
@@ -200,6 +219,7 @@ for (const name of TROPICAL_ASSETS) {
       dedup(),
       prune(),
     );
+    unshareIndices(document);
     const afterTriangles = triangleCount(document);
     const afterVertices = vertexCount(document);
     // The invariant that can actually be proved is that nothing grew. An exact
