@@ -327,7 +327,8 @@ export function buildRoof(kit, spec, { gableEnds = { start: 'plaster', end: 'pla
   addRoofTrim(kit, surface, faces, { gabled, gableEnds, deck: DECK_THICKNESS });
   if (gabled) {
     for (const [key, end] of [['start', -1], ['end', 1]]) {
-      const material = gableEnds[key];
+      // A log-built town boards its gables: plaster over logs is a different house.
+      const material = gableEnds[key] === 'plaster' && kit.recipe.walls === 'logs' ? 'boards' : gableEnds[key];
       if (!material) continue;
       gablePanel(kit, surface, end, material);
       if (gableFrame && material === 'plaster') gableTimbers(kit, surface, end);

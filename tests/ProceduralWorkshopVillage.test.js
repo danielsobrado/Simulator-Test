@@ -262,3 +262,21 @@ test('roof surface sags toward the middle and hips toward its ends', () => {
   assert.ok(hipped.heightAt(hipped.halfLength - 0.05, 0) < hipped.heightAt(0, 0) - 2);
   assert.equal(hipped.heightAt(0, 10), null);
 });
+
+test('a log-built house raises its timber storeys in logs and boards its gables', () => {
+  const variant = WORKSHOP_VARIANT_ARCHETYPES.house.variants.find((entry) => entry.id === 'cottage');
+  const slotTriangles = (name, overrides) => {
+    const parts = createProceduralMedievalParts(recipeFor('house', variant, overrides));
+    try {
+      return parts.filter((part) => slot(part) === name)
+        .reduce((sum, part) => sum + (part.geometry.index?.count ?? part.geometry.attributes.position.count) / 3, 0);
+    } finally {
+      disposeModelParts(parts);
+    }
+  };
+  assert.equal(normalizeProceduralRecipe({ archetype: 'house', walls: 'logs' }).walls, 'logs');
+  assert.throws(() => normalizeProceduralRecipe({ archetype: 'house', walls: 'wattle' }), /wall build/);
+  // The plastered upper storeys and gables are gone; logs and boards stand in their place.
+  assert.ok(slotTriangles('mortar', { walls: 'logs' }) < slotTriangles('mortar', {}) * 0.5, 'plaster replaced');
+  assert.ok(slotTriangles('wood', { walls: 'logs' }) >= slotTriangles('wood', {}), 'logs at least replace the framing');
+});

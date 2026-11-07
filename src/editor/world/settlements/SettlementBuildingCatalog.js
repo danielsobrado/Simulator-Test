@@ -128,6 +128,7 @@ export function buildingRecipe(style, kind, variantIndex, { detail = 2, finishIn
     finish: castleLike ? 'masonry' : style.finishes[finishIndex % style.finishes.length],
     roofScale: 1,
     roofOverhang: style.roofOverhang ?? 0.5,
+    walls: castleLike ? 'default' : (style.walls ?? 'default'),
     roofPitch: style.roofPitch ?? 40,
     weathering: 0.3,
     // Coursed and tidy. At the workshop's default (0.45) every stone is turned,

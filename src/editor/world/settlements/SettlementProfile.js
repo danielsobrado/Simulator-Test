@@ -49,7 +49,7 @@ export const SETTLEMENT_STYLES = Object.freeze([
   Object.freeze({ key: 'sandstone-terracotta', style: 'sandstone', topStyle: 'terracotta', finishes: ['ochre', 'rose', 'limewash'] }),
   Object.freeze({ key: 'limestone-slate', style: 'limestone', topStyle: 'slate', finishes: ['limewash', 'masonry', 'ochre'] }),
   // Realm roof lines (VisualIdentityCatalog roofPitch): a culture style with a steep or low roof.
-  Object.freeze({ key: 'granite-slate-steep', style: 'granite', topStyle: 'slate', finishes: ['limewash', 'masonry', 'ochre'], roofPitch: 50, roofOverhang: 0.5 }),
+  Object.freeze({ key: 'granite-slate-steep', style: 'granite', topStyle: 'slate', finishes: ['limewash', 'masonry', 'ochre'], roofPitch: 50, roofOverhang: 0.5, walls: 'logs' }),
   Object.freeze({ key: 'granite-slate-low', style: 'granite', topStyle: 'slate', finishes: ['masonry', 'ochre', 'limewash'], roofPitch: 30, roofOverhang: 0.55 }),
   Object.freeze({ key: 'limestone-terracotta-low', style: 'limestone', topStyle: 'terracotta', finishes: ['limewash', 'rose', 'ochre'], roofPitch: 28, roofOverhang: 0.6 }),
 ]);

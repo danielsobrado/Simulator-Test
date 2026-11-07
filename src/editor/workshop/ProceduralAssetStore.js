@@ -42,6 +42,8 @@ const VALID_ARCHETYPES = new Set([
 const VALID_STYLES = new Set(['granite', 'limestone', 'sandstone']);
 const VALID_TOP_STYLES = new Set(['battlements', 'slate', 'terracotta']);
 const VALID_FINISHES = new Set(['masonry', 'ochre', 'limewash', 'rose']);
+/** How a village house raises its non-stone storeys: as designed, or in logs. */
+const VALID_WALL_BUILDS = new Set(['default', 'logs']);
 const VALID_SHAPES = new Set(['classic', 'stepped', 'tapered']);
 const VALID_TOWER_SIDES = new Set(['left', 'right', 'none']);
 
@@ -141,6 +143,7 @@ export function normalizeProceduralRecipe(input = {}) {
   const finish = optionalString(source.finish, 'Workshop wall finish', 'masonry');
   const shape = optionalString(source.shape, 'Workshop silhouette', 'classic');
   const towerSide = optionalString(source.towerSide, 'Workshop tower position', 'left');
+  const walls = optionalString(source.walls, 'Workshop wall build', 'default');
   if (!VALID_ARCHETYPES.has(archetype)) {
     throw new Error(`Unknown workshop archetype: ${archetype}.`);
   }
@@ -156,6 +159,9 @@ export function normalizeProceduralRecipe(input = {}) {
   if (!VALID_SHAPES.has(shape)) {
     throw new Error(`Unknown workshop silhouette: ${shape}.`);
   }
+  if (!VALID_WALL_BUILDS.has(walls)) {
+    throw new Error(`Unknown workshop wall build: ${walls}.`);
+  }
   if (!VALID_TOWER_SIDES.has(towerSide)) {
     throw new Error(`Unknown workshop tower position: ${towerSide}.`);
   }
@@ -170,6 +176,7 @@ export function normalizeProceduralRecipe(input = {}) {
     finish,
     shape,
     towerSide,
+    walls,
     width: requireFinite(valueOrDefault(source.width, 8), 'Width', 2, 16),
     depth: requireFinite(valueOrDefault(source.depth, 2), 'Depth', 1, 12),
     height: requireFinite(valueOrDefault(source.height, 5), 'Height', 2, 14),

@@ -3,6 +3,7 @@ import { buildWallCourses } from '../ProceduralWorkshopMasonry.js';
 import { boxFacades, facadeBeam, facadePoint } from './HouseFacade.js';
 import { buildOpenings } from './HouseOpenings.js';
 import { timberFrame } from './HouseTimberFrame.js';
+import { layLogWall } from './HouseLogWall.js';
 
 /** Masonry is laid this far below the ground line so a gentle slope never shows a gap. */
 export const GROUND_SINK = 0.3;
@@ -17,7 +18,7 @@ export const ROOF_SEAT = 0.2;
 export const SIDES = Object.freeze(['front', 'back', 'right', 'left']);
 
 const SIDE_LABELS = Object.freeze({ front: 'front', back: 'back', right: 'right', left: 'left' });
-const DEFAULT_THICKNESS = Object.freeze({ stone: 0.42, plaster: 0.22, boards: 0.16 });
+const DEFAULT_THICKNESS = Object.freeze({ stone: 0.42, plaster: 0.22, boards: 0.16, logs: 0.2 });
 
 function sidesOf(storey) {
   return SIDES.filter((side) => !(storey.skip ?? []).includes(side));
@@ -204,6 +205,8 @@ function frameFor(storey, side) {
  * casements proud of it. Each wall is emitted as its own facade host.
  */
 export function buildStorey(kit, storey, resolved) {
+  // A log-built town (recipe `walls: 'logs'`) raises every timber or plaster storey in logs.
+  if (kit.recipe.walls === 'logs' && storey.wall !== 'stone') storey = { ...storey, wall: 'logs', thickness: thicknessOf(storey) };
   const thickness = thicknessOf(storey);
   const facades = boxFacades({ ...storey.box, thickness });
   const hosts = storeyHosts(storey);
@@ -222,6 +225,8 @@ export function buildStorey(kit, storey, resolved) {
         }
       } else if (storey.wall === 'boards') {
         layBoardWall(kit, facade, { thickness, openings });
+      } else if (storey.wall === 'logs') {
+        layLogWall(kit, facade, { thickness, openings, phase: side === 'front' || side === 'back' ? 0 : 1 });
       } else {
         layPlasterWall(kit, facade, { thickness });
         const { braces = 'none', spacing = 1.5, rails = [] } = frameFor(storey, side);
