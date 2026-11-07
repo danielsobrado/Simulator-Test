@@ -4,6 +4,7 @@ import * as THREE from 'three/webgpu';
 import { CpuTreeImpostorBatch } from '../src/editor/stylized/impostor/CpuTreeImpostorBatch.js';
 import { GpuTreeImpostorBatch } from '../src/editor/stylized/impostor/GpuTreeImpostorBatch.js';
 import { TreeImpostorBatch } from '../src/editor/stylized/impostor/TreeImpostorBatch.js';
+import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
 
 function createFixture(Batch, capacity = 4) {
   const scene = new THREE.Scene();
@@ -44,6 +45,27 @@ test('reflection cameras recover off-screen impostors and restore the main selec
     }), /capture/);
     assert.equal(owned.auxiliary.mesh.visible, false); assert.equal(owned.batch.mesh.visible, false);
     assert.equal(owned.batch.geometry.instanceCount, 0);
+  } finally { owned.dispose(); atlas.albedo.dispose(); atlas.normal.dispose(); }
+});
+
+test('auxiliary diagnostics count only reflection selection and distinguish reused visibility', () => {
+  const { batch, camera, atlas } = createFixture(TreeImpostorBatch); batch.dispose();
+  const owned = new TreeImpostorBatch({ renderer: {}, scene: new THREE.Scene(), atlas, capacity: 4, auxiliaryViews: true });
+  try {
+    owned.setRecords([record, { ...record, x: 1000 }]);
+    PerfCounters.reset(); owned.update(camera, { x: 0, z: 0 });
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryUpdates'), 0);
+    owned.withCamera(camera, { x: 0, z: 0 }, 0, () => {});
+    owned.withCamera(camera, { x: 0, z: 0 }, 1, () => {});
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryUpdates'), 2);
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryRecordsTested'), 2);
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryCacheHits'), 1);
+    camera.position.x = 1; camera.updateMatrixWorld();
+    assert.throws(() => owned.withCamera(camera, { x: 0, z: 0 }, 2, () => { throw new Error('render'); }), /render/);
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryRecordsTested'), 4);
+    assert.equal(PerfCounters.get('treeImpostorAuxiliaryUpdates'), 3);
+    assert.equal(owned.auxiliary.mesh.visible, false);
+    assert.ok(PerfCounters.get('treeImpostorAuxiliaryCpuMs') >= 0);
   } finally { owned.dispose(); atlas.albedo.dispose(); atlas.normal.dispose(); }
 });
 

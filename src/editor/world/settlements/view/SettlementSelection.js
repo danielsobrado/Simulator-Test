@@ -138,8 +138,15 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
 
 /** Rebase roots at mesh granularity; their retained instance rows stay untouched. */
 export function placeSettlementRows(view) {
+  const origin = view.origin, retirement = view.pool.retirementVersion ?? 0;
+  const state = view.rowPlacementState ??= { x: NaN, z: NaN, retirement: -1 };
+  const moved = state.x !== origin.x || state.z !== origin.z;
+  const retired = state.retirement !== retirement;
+  if (!moved && !retired) return;
   for (const rows of view.rows.values()) for (const [tier, anchor] of rows.tiers) {
-    if (tier.meshes.every(mesh => !mesh.parent)) { rows.tiers.delete(tier); continue; }
-    for (const mesh of tier.meshes) anchor.place(mesh, view.origin);
+    PerfCounters.inc('settlementPlacementTiersVisited');
+    if (retired && tier.meshes.every(mesh => !mesh.parent)) { rows.tiers.delete(tier); continue; }
+    if (moved) for (const mesh of tier.meshes) anchor.place(mesh, origin);
   }
+  state.x = origin.x; state.z = origin.z; state.retirement = retirement;
 }

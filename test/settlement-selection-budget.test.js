@@ -66,6 +66,28 @@ test('origin movement preserves complete old tiers until their own rows are rewr
   assert.equal(mesh.instanceMatrix.array[12] + mesh.position.x + 4096, x);
 });
 
+test('settled row placement skips unchanged tiers and cleans up only after retirement', t => {
+  const f = fixture(t); run(f.view, 0); run(f.view, 400); placeSettlementRows(f.view);
+  PerfCounters.reset();
+  for (let frame = 0; frame < 100; frame++) placeSettlementRows(f.view);
+  assert.equal(PerfCounters.get('settlementPlacementTiersVisited'), 0);
+  const rows = f.view.rows.get('house-0');
+  const tier = { meshes: [new Group()] };
+  f.view.root.add(...tier.meshes);
+  rows.tiers.set(tier, rows.tiers.values().next().value);
+  for (const mesh of tier.meshes) mesh.removeFromParent();
+  f.view.pool.retirementVersion = 1; placeSettlementRows(f.view);
+  assert.ok(!rows.tiers.has(tier));
+  assert.ok(PerfCounters.get('settlementPlacementTiersVisited') > 0);
+  PerfCounters.reset(); placeSettlementRows(f.view);
+  assert.equal(PerfCounters.get('settlementPlacementTiersVisited'), 0);
+  const live = f.entries.get('house-1').near.meshes[0], x = live.instanceMatrix.array[12];
+  f.view.origin.x = 128; placeSettlementRows(f.view);
+  assert.equal(live.instanceMatrix.array[12] + live.position.x + 128, x);
+  PerfCounters.reset(); run(f.view, 800); placeSettlementRows(f.view);
+  assert.equal(PerfCounters.get('settlementPlacementTiersVisited'), 0, 'publication positions tiers without another complete pass');
+});
+
 test('skyline handover waits for this site buildings, fades and published tiers', t => {
   const f = fixture(t), site = f.view.sites.get(1);
   site.pavingReady = true;

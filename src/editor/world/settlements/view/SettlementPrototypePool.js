@@ -50,8 +50,9 @@ export class SettlementPrototypePool {
   constructor({ root, renderer, worker = new SettlementMeshWorkerClient(), getDrawPreparation = () => null }) {
     this.root = root;
     this.renderer = renderer;
+    this.retirementVersion = 0;
     this.publications = new SettlementTierPublication(root, getDrawPreparation,
-      meshes => disposeInstancedRenderers(root, [meshes]));
+      meshes => { disposeInstancedRenderers(root, [meshes]); this.retirementVersion++; });
     /** New meshes, hidden: first waiting for their shaders, then for `reveal` to show them a few at a time. */
     this.uncompiled = [];
     this.compiling = 0;

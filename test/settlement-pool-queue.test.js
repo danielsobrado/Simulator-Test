@@ -1,9 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Group } from 'three/webgpu';
+import { BoxGeometry, Group, InstancedMesh, MeshBasicNodeMaterial } from 'three/webgpu';
 import { SettlementPrototypePool } from '../src/editor/world/settlements/view/SettlementPrototypePool.js';
 
 const source = { style: 'test', kind: 'house', variant: 0, surfaces: null };
+
+test('settlement tier release and pruning advance the retirement clock', () => {
+  const root = new Group(), pool = new SettlementPrototypePool({ root, worker: { available: false, inFlight: 0, dispose() {} } });
+  const tier = () => {
+    const mesh = new InstancedMesh(new BoxGeometry(), new MeshBasicNodeMaterial(), 1);
+    root.add(mesh); return { meshes: [mesh] };
+  };
+  try {
+    const first = pool.request('first', source, 1), second = pool.request('second', source, 2);
+    first.near = tier(); first.far = tier(); second.near = tier();
+    assert.equal(pool.retirementVersion, 0);
+    pool.release(first); assert.equal(pool.retirementVersion, 2);
+    pool.clear(); assert.equal(pool.retirementVersion, 3);
+    assert.equal(root.children.length, 0);
+  } finally { pool.dispose(); }
+});
 
 test('settlement queue keeps nearest and equal-priority order without repeated sorts', () => {
   const worker = { available: false, inFlight: 0, dispose() {} };

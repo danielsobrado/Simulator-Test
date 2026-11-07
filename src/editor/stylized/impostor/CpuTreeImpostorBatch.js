@@ -65,6 +65,8 @@ export class CpuTreeImpostorBatch {
     this.lastCoordinateSystem = null;
     this.recordsDirty = true;
     this.sphere = new THREE.Sphere();
+    this.lastCullRecordCount = 0;
+    this.lastCullReused = false;
   }
 
   setRecords(records) {
@@ -74,11 +76,14 @@ export class CpuTreeImpostorBatch {
   }
 
   update(camera, origin, timestamp = 0) {
+    this.lastCullRecordCount = 0;
+    this.lastCullReused = false;
     updateImpostorCameraUniforms(this.uniforms, camera, timestamp);
     this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     if (!this.recordsDirty && this.projectionView.equals(this.lastProjectionView)
         && origin.x === this.lastOriginX && origin.z === this.lastOriginZ
         && camera.coordinateSystem === this.lastCoordinateSystem) {
+      this.lastCullReused = true;
       this.mesh.visible = this.geometry.instanceCount > 0;
       return this.geometry.instanceCount;
     }
@@ -95,6 +100,7 @@ export class CpuTreeImpostorBatch {
     const parameterRange = { min: Infinity, max: -1 };
     const appearanceRange = { min: Infinity, max: -1 };
     let count = 0;
+    this.lastCullRecordCount = this.records.length;
 
     for (const record of this.records) {
       this.sphere.center.set(

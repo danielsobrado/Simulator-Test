@@ -332,7 +332,6 @@ export class StylizedSurfaceView {
     this.reflections = this.enabled && !this.impostorBakeMode && config.enhancements?.waterReflections.enabled
       ? new WaterReflectionController(terrainView, config.enhancements.waterReflections) : null;
     this.sharedWaterMaterials = new SharedWaterMaterials(this.reflections);
-    this.reflectionFrame = 0;
     this.reflectionPrepared = null;
     terrainView.beforeMainRender = camera => {
       this.skyView?.cascades?.prepare(camera);
@@ -341,14 +340,14 @@ export class StylizedSurfaceView {
       this.reflectionPrepared = prepared;
       this.reflectionReservation?.cancel();
       this.reflectionReservation = null;
-      const captureTurn = this.reflectionFrame++ % 4 === 0;
+      const captureTurn = this.reflections?.captureSchedule.nextFrame() ?? false;
       if (
         prepared
         && captureTurn
         && now >= this.reflections.nextCapture
         && this.reserveDeferredWork
       ) {
-        this.reflectionReservation = this.reserveDeferredWork(6);
+        this.reflectionReservation = this.reserveDeferredWork(this.reflections.captureBudgetMs);
       }
       // Standalone views have no shared scheduler; preserve their direct capture path.
       this.reflectionBudgetReserved = Boolean(
@@ -722,7 +721,7 @@ export class StylizedSurfaceView {
     this.reflectionReservation?.cancel();
     this.reflectionReservation = null;
     if (this.reflections?.prepare(camera, this) && now >= this.reflections.nextCapture) {
-      this.reflectionReservation = this.reserveDeferredWork?.(6) ?? null;
+      this.reflectionReservation = this.reserveDeferredWork?.(this.reflections.captureBudgetMs) ?? null;
     }
   }
 

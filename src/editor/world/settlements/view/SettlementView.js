@@ -104,6 +104,7 @@ export class SettlementView {
     this.skyline.clear();
     this.pool.clear();
     this.rows.clear();
+    this.rowPlacementState = null;
     this.selectionJob = null;
     this.nextRefresh = 0;
     this.dirty = true;

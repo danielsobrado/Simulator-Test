@@ -2,6 +2,8 @@ import { CubeCamera, CubeRenderTarget, HalfFloatType, LinearFilter, RenderTarget
 import { abs, cubeTexture, distance, float, mix, positionWorld, smoothstep, texture, uniform, vec2 } from 'three/tsl';
 import { PerfCounters } from '../../editor/performance/qa/PerfCounters.js';
 import { withReflectionCapture } from './ReflectionCapture.js';
+import { ReflectionShadowRegistry } from './ReflectionShadowRegistry.js';
+import { ReflectionCaptureSchedule } from './ReflectionCaptureSchedule.js';
 import { preparePlanarCamera } from './PlanarCamera.js';
 import { PlanarReprojection } from './PlanarReprojection.js';
 import { withAuxiliaryScene } from './ReflectionScene.js';
@@ -45,10 +47,14 @@ export class WaterReflectionController {
     this.overlayRefreshCountdown = 0;
     this.planarWetSlots = [];
     this.preparedState = { origin: null, canonical: { x: 0, z: 0 }, wet: this.wetSlots };
-    this.captureScratch = { states: [], shadows: [] };
+    this.shadowRegistry = terrainView.scene ? new ReflectionShadowRegistry(terrainView.scene) : null;
+    this.captureScratch = { states: [], shadows: [], shadowOwners: this.shadowRegistry?.owners };
     this.originScratch = { x: 0, z: 0 };
     this.lastCaptureCpuMs = 0;
+    this.captureSchedule = new ReflectionCaptureSchedule(config);
   }
+
+  get captureBudgetMs() { return this.captureSchedule.budgetMs(this.planarPending ? 'planar' : 'cube'); }
 
   sample(direction, fallback, allowPlanar = float(1), distortion = vec2(0), roughness = float(0)) {
     const local = this.valid.mul(smoothstep(this.config.reachMeters * 0.7, this.config.reachMeters,
@@ -74,6 +80,8 @@ export class WaterReflectionController {
       planarAgeMs: Number.isFinite(this.lastPlanar) ? now - this.lastPlanar : null,
       facePending: this.face, canonicalProbe: { ...this.canonicalProbe },
       poolTargets: this.targets.length + (this.planarTarget ? 1 : 0),
+      captureFrameStride: this.captureSchedule.stride, captureBudgetEstimateMs: this.captureBudgetMs,
+      lastCaptureCpuMs: this.lastCaptureCpuMs,
       roughnessFiltering: this.config.roughnessFiltering !== false };
   }
 
@@ -155,6 +163,7 @@ export class WaterReflectionController {
     this.refreshOverlayObjects();
     for (const object of this.overlayObjects) hidden.push(object);
     const started = performance.now();
+    const captureKind = this.planarPending ? 'planar' : 'cube';
     this.capturing = true;
     try {
       withReflectionCapture(this.view.renderer, this.view.scene, hidden, () => {
@@ -197,7 +206,9 @@ export class WaterReflectionController {
     } finally {
       this.capturing = false;
       this.lastCaptureCpuMs = performance.now() - started;
+      this.captureSchedule.record(captureKind, this.lastCaptureCpuMs);
       PerfCounters.inc('waterReflectionCpuMs', this.lastCaptureCpuMs);
+      PerfCounters.set('waterReflectionBudgetEstimateMs', this.captureBudgetMs);
     }
   }
 
@@ -251,7 +262,7 @@ export class WaterReflectionController {
     this.planarValid.value = 0;
   }
 
-  dispose() { this.disposed = true; this.invalidate(); for (const target of this.targets) target.dispose(); this.planarTarget?.dispose(); }
+  dispose() { this.disposed = true; this.invalidate(); this.shadowRegistry?.dispose(); for (const target of this.targets) target.dispose(); this.planarTarget?.dispose(); }
 
   prewarm(camera, surface) {
     const now = performance.now();

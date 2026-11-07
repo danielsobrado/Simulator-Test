@@ -1,5 +1,6 @@
 import { CpuTreeImpostorBatch } from './CpuTreeImpostorBatch.js';
 import { GpuTreeImpostorBatch } from './GpuTreeImpostorBatch.js';
+import { PerfCounters } from '../../performance/qa/PerfCounters.js';
 
 export class TreeImpostorBatch {
   constructor({ renderer, scene, atlas, capacity, name, gpuCulling, auxiliaryViews = false, ambientEffects = null }) {
@@ -49,7 +50,16 @@ export class TreeImpostorBatch {
     if (!this.auxiliary) return operation();
     const visible = this.batch.mesh.visible, auxiliaryVisible = this.auxiliary.mesh.visible;
     try {
-      this.auxiliary.update(camera, origin, timestamp);
+      const started = performance.now();
+      try { this.auxiliary.update(camera, origin, timestamp); }
+      finally {
+        const elapsed = performance.now() - started;
+        PerfCounters.inc('treeImpostorAuxiliaryCpuMs', elapsed);
+        PerfCounters.inc('treeImpostorAuxiliaryUpdates');
+        PerfCounters.inc('treeImpostorAuxiliaryRecordsTested', this.auxiliary.lastCullRecordCount);
+        if (this.auxiliary.lastCullReused) PerfCounters.inc('treeImpostorAuxiliaryCacheHits');
+        PerfCounters.set('treeImpostorAuxiliaryMaxCpuMs', Math.max(PerfCounters.get('treeImpostorAuxiliaryMaxCpuMs'), elapsed));
+      }
       this.batch.mesh.visible = false;
       return operation();
     } finally { this.batch.mesh.visible = visible; this.auxiliary.mesh.visible = auxiliaryVisible; }

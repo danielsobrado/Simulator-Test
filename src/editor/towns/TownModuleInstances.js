@@ -1,5 +1,6 @@
 import { drainJob } from '../world/settlements/SettlementArrayJobs.js';
 import { townBoundsJob } from './TownBoundsJob.js';
+import { writeTownInstanceRows } from './TownInstancePublication.js';
 import * as THREE from 'three/webgpu';
 import { markAttributeSubrangeUpdated } from '../stylized/attributeUpload.js';
 
@@ -164,28 +165,17 @@ export class TownModuleInstances {
 
   /**
    * Copy the placements `indices[0..count)` to the front of every mesh in `meshes`,
-   * uploading only the range that changed since this set was last written.
+   * copying only changed slots and uploading their separate contiguous runs.
    */
   writeSubset(meshes, indices, count) {
     const previous = this.shown.get(meshes) ?? { indices: new Uint32Array(this.count).fill(0xffffffff), count: -1 };
-    let first = count, last = -1;
+    const dirty = [];
     for (let k = 0; k < count; k++) {
       if (previous.indices[k] === indices[k] && k < previous.count) continue;
-      first = Math.min(first, k); last = k;
+      dirty.push(k);
     }
-    for (const mesh of meshes) {
-      const matrices = mesh.instanceMatrix.array;
-      const colours = mesh.instanceColor?.array;
-      for (let k = first; k <= last; k += 1) {
-        const i = indices[k];
-        matrices.set(this.matrices.subarray(i * 16, i * 16 + 16), k * 16);
-        colours?.set(this.colours.subarray(i * 3, i * 3 + 3), k * 3);
-      }
-      mesh.count = count;
-      markAttributeSubrangeUpdated(mesh.instanceMatrix, first, last);
-      markAttributeSubrangeUpdated(mesh.instanceColor, first, last);
-    }
-    previous.indices.set(indices.subarray(0, count));
+    writeTownInstanceRows(meshes, this.matrices, this.colours, indices, count, dirty);
+    for (const slot of dirty) previous.indices[slot] = indices[slot];
     previous.count = count;
     this.shown.set(meshes, previous);
   }
@@ -275,24 +265,8 @@ export class TownModuleInstances {
 
   /** Write the changed slots of a slot set into its meshes, uploading each run of them. */
   writeSlots(meshes, slots, dirty) {
-    const live = dirty.filter((slot) => slot < slots.count).sort((a, b) => a - b);
-    for (const mesh of meshes) {
-      const matrices = mesh.instanceMatrix.array;
-      const colours = mesh.instanceColor?.array;
-      for (const slot of live) {
-        const i = slots.placementAt[slot];
-        matrices.set(this.matrices.subarray(i * 16, i * 16 + 16), slot * 16);
-        colours?.set(this.colours.subarray(i * 3, i * 3 + 3), slot * 3);
-      }
-      mesh.count = slots.count;
-      for (let start = 0; start < live.length;) {
-        let end = start;
-        while (end + 1 < live.length && live[end + 1] === live[end] + 1) end += 1;
-        markAttributeSubrangeUpdated(mesh.instanceMatrix, live[start], live[end]);
-        markAttributeSubrangeUpdated(mesh.instanceColor, live[start], live[end]);
-        start = end + 1;
-      }
-    }
+    const live = [...new Set(dirty.filter(slot => slot < slots.count))].sort((a, b) => a - b);
+    writeTownInstanceRows(meshes, this.matrices, this.colours, slots.placementAt, slots.count, live);
   }
 
   /** Interior modules: draw only placements within `radius` of town-local (x, z). */
