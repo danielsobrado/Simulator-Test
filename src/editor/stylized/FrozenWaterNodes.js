@@ -90,7 +90,8 @@ export function createFrozenWaterNodes({ appearance, patterns, localXZ, waterDep
   const parallax = view.xz.div(max(view.y, 0.2));
   const below = (depth) => localXZ.sub(parallax.mul(depth));
   const cracks = Fn(() => {
-    const result = vec2(0).toVar();
+    // x surface crack, y deep crack, z the slab's own tone (constant per crack cell).
+    const result = vec3(0).toVar();
     If(frozen.greaterThan(0.001), () => {
       const warpAt = (point) => vec2(
         periodicFbm2(patterns.latticePoint('iceCrackWarp', point)),
@@ -108,7 +109,8 @@ export function createFrozenWaterNodes({ appearance, patterns, localXZ, waterDep
         const fade = 1 - (index + 1) / (CRACK_LAYER_DEPTHS.length + 1);
         deep = max(deep, crackEdges(patterns.latticePoint('iceCrack', below(depth)).add(warp), 0.03).mul(fade));
       });
-      result.assign(vec2(surface, deep));
+      const slab = periodicVoronoiCellValue(patterns.latticePoint('iceCrack', localXZ).add(warp));
+      result.assign(vec3(surface, deep, slab));
     });
     return result;
   })();
@@ -117,12 +119,18 @@ export function createFrozenWaterNodes({ appearance, patterns, localXZ, waterDep
   // ice slide past each other as the view moves.
   const cloud = smoothstep(0.35, 0.75, periodicFbm2(patterns.latticePoint('iceMacro', below(CLOUD_DEPTH))));
   const clear = mix(CLEAR_ICE, CLOUD, cloud.mul(0.55));
-  const body = mix(mix(WHITE_ICE, clear, smoothstep(0.1, 0.9, depthShade)), BLACK_ICE,
+  // White only where the ice sits on the bed: a wide white rim read as a snowfield, not ice.
+  const deepBody = mix(clear, BLACK_ICE,
     smoothstep(0.55, 1, depthShade).mul(smoothstep(0.35, 0.7, macro)).mul(oneMinus(cloud.mul(0.6))));
+  // Each slab between cracks froze on its own: a little lighter or darker, a
+  // little milkier, so the sheet reads as plates rather than one painted plane.
+  const slabTone = cracks.z.sub(0.5);
+  const slabbed = mix(deepBody, CLOUD, max(slabTone, 0).mul(0.35)).mul(slabTone.mul(0.22).add(1));
+  const body = mix(WHITE_ICE, slabbed, smoothstep(0.05, 0.5, waterDepth));
   const facing = pow(oneMinus(clamp(view.y, 0, 1)), 3);
   const lit = mix(body, GRAZE, facing.mul(0.55));
   // Snow drifts onto the ice in patches, thicker near the banks, and is caught in the cracks.
-  const snow = smoothstep(0.5, 0.7, macro.add(oneMinus(depthShade).mul(0.25)));
+  const snow = smoothstep(0.64, 0.74, macro.add(oneMinus(smoothstep(0.1, 1, waterDepth)).mul(0.12)));
   const cracked = mix(mix(lit, DEEP_CRACK, cracks.y.mul(0.6)), CRACK, cracks.x.mul(0.85));
   const ice = mix(cracked, SNOW, snow);
   return {
