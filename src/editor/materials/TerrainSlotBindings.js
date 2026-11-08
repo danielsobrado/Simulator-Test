@@ -71,6 +71,11 @@ export function bilinearLoad(template, uvNode, read = null, transform = null) {
   );
 }
 
+/** `bilinearLoad` of the drawn slot's own texture `name`, each texel decoded by `transform` before filtering. */
+export function slotBilinearLoad(name, template, uvNode, transform) {
+  return bilinearLoad(template, uvNode, (object) => slotData(object)?.[name], transform);
+}
+
 /** A texture node that samples the drawn slot's own texture `name`. */
 export function slotTexture(name, template, uvNode) {
   return perObjectTexture(template, uvNode, (object) => slotData(object)?.[name]);

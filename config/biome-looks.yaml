@@ -153,6 +153,9 @@ biomeLooks:
       prints: { lifetime: 240 }
     11:
       name: glacier
+      # Bare glacier ice through the snow, as on a scanned Icelandic glacier:
+      # weathered grey-white hummocks, blue in the hollows, grit streaks.
+      glacier: 0.85
       rock: { tint: '#d4dbe2', tone: 1.05, moss: 0 }
       water: { tint: '#d0dee8', desaturate: 0.4 }
       understory: { tint: '#d6dde2', tone: 1.1, saturation: 0.4 }

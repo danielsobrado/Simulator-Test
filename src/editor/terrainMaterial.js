@@ -23,6 +23,7 @@ import {
   uv,
   vec2,
   vec3,
+  uniformArray,
 } from 'three/tsl';
 import { assignTerrainMaterialData } from '../render/postprocessing/PostProcessingMaterialData.js';
 import { createTerrainMaterialBakedSurface } from './materials/TerrainMaterialBakedNodes.js';
@@ -56,6 +57,7 @@ import { applyJungleMist } from './stylized/ambient/jungleMistOutput.js';
 import { createValleyFogNodes } from './stylized/mist/ValleyFogShading.js';
 import { applyValleyFogOutput } from './stylized/mist/ValleyFogOutput.js';
 import { createFootprintShading } from './stylized/deformation/FootprintShading.js';
+import { createGlacierIceShading } from './stylized/GlacierIceShading.js';
 import { acquireGroundLayers } from './stylized/path/terrainGroundLayers.js';
 import { GROUND_LAYERS } from './stylized/path/groundLayerIds.js';
 import { createTerrainPathPaint, resolvePathPaint } from './stylized/path/terrainPathPaint.js';
@@ -74,6 +76,7 @@ import {
   slotPatternOrigins,
   slotTexel,
   slotTexture,
+  slotBilinearLoad,
   slotVector2,
 } from './materials/TerrainSlotBindings.js';
 
@@ -515,16 +518,35 @@ export function createTerrainMaterial({
     const driftColor = drift ? drift.apply(surface.color) : surface.color;
     const detailedSnowColor = snowDetail ? snowDetail.color(driftColor) : driftColor;
     const printed = footprints.apply(snowSurface ? snowSurface.apply(detailedSnowColor) : detailedSnowColor);
-    material.colorNode = wake ? wake.apply(printed) : printed;
+    // Glacier biomes show bare ice through the snow (biome-looks `glacier`).
+    const glacierTable = stylizedConfig.biomeLooks?.glacier;
+    const glacierShareByTile = glacierTable?.some((value) => value > 0) ? uniformArray(Array.from(glacierTable), 'float') : null;
+    const glacierIce = bakedSurface.snow && glacierShareByTile ? createGlacierIceShading({
+      terrainUv, chunkWorldSize, chunkCenter,
+      // Decoded per cell and then filtered: the ecotone swaps border cells to the
+      // neighbouring biome one by one, and a per-cell share drew 2 m blue squares.
+      tileShare: slotBilinearLoad('tileTexture', tileTexture, terrainUv, (value) =>
+        glacierShareByTile.element(value.a.mul(255).round().toInt())),
+    }) : null;
+    const iced = glacierIce ? glacierIce.apply(printed) : printed;
+    material.colorNode = wake ? wake.apply(iced) : iced;
     const filteredRoughness = bakedSurface.normal
       ? antialiasSpecularRoughness(surface.roughness, bakedSurface.normal)
       : surface.roughness;
     material.roughnessNode = filteredRoughness;
-    if (snowSurface) material.emissiveNode = snowDetail ? snowSurface.emissive.add(snowDetail.shade) : snowSurface.emissive;
+    if (snowSurface) {
+      const snowGlow = snowDetail ? snowSurface.emissive.add(snowDetail.shade) : snowSurface.emissive;
+      // Glints and backscatter belong to the powder, not to the bare ice beside it.
+      material.emissiveNode = glacierIce ? snowGlow.mul(glacierIce.share.oneMinus()) : snowGlow;
+    }
     if (bakedSurface.normal) material.normalNode = footprints.relief(bakedSurface.normal);
     if (snowDetail) {
       material.roughnessNode = snowDetail.roughness(filteredRoughness);
       if (snowNormal) material.normalNode = snowNormal;
+    }
+    if (glacierIce) {
+      material.roughnessNode = glacierIce.roughness(material.roughnessNode);
+      if (material.normalNode) material.normalNode = glacierIce.normal(material.normalNode);
     }
     // Rime on the up-facing faces, keyed on the same baked snow: the deposition the
     // terrain would otherwise wash out. Needs a surface normal, so it too compiles
@@ -533,7 +555,8 @@ export function createTerrainMaterial({
       ? createFrostShading({
         normal: bakedSurface.normal,
         worldXZ,
-        cold: bakedSurface.snow,
+        // Rime is powder's: on bare glacier ice the per-texel snow weight drew it in 2 m squares.
+        cold: glacierIce ? bakedSurface.snow.mul(glacierIce.share.oneMinus()) : bakedSurface.snow,
         settings: surfaceEffects.frost,
       })
       : null;
