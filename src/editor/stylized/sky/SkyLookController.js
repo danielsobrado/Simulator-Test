@@ -3,6 +3,7 @@ import { mixSkyLooks, overcastSkyLook, resolveSkyLook } from './SkyLook.js';
 import { bogMurkLook, regionalSkyLook } from './regionalSkyLook.js';
 import { NEUTRAL_AIR, NEUTRAL_SKY_REGION, SKY_CLIMATES } from './skyRegionClimate.js';
 import { snowCountryLook } from './snowCountryLook.js';
+import { stormAirLook } from './stormAirLook.js';
 
 /** Seconds a change of time of day takes to settle. */
 const PRESET_TRANSITION_SECONDS = 2.5;
@@ -59,6 +60,8 @@ export class SkyLookController {
     this.progress = 1;
     this.overcast = 0;
     this.overcastTarget = 0;
+    /** StormState's eased storm and snow share; already eased, so taken as given. */
+    this.weather = { storm: 0, snowShare: 0 };
     this.snowCountry = 0;
     this.snowCountryTarget = 0;
     this.region = cloneRegion(NEUTRAL_SKY_REGION);
@@ -117,6 +120,20 @@ export class SkyLookController {
   /** @param {number} amount 0 clear … 1 full overcast */
   setOvercast(amount) {
     this.overcastTarget = Math.max(0, Math.min(1, amount));
+  }
+
+  /**
+   * The storm frame (StormState): its cloud is the overcast; the storm value
+   * darkens past full cover and closes the fog.
+   * @param {{ cloud: number, storm: number, snowShare: number }} frame
+   */
+  setStorm(frame) {
+    this.setOvercast(frame?.cloud ?? 0);
+    const storm = Math.max(0, Math.min(1, frame?.storm ?? 0));
+    const snowShare = Math.max(0, Math.min(1, frame?.snowShare ?? 0));
+    if (storm === this.weather.storm && snowShare === this.weather.snowShare) return;
+    this.weather = { storm, snowShare };
+    this.dirty = true;
   }
 
   /** @param {number} weight 0 lowland … 1 deep in snow country (SnowCountryWeight) */
@@ -187,10 +204,10 @@ export class SkyLookController {
     const timeOfDay = mixSkyLooks(this.from, this.to, easeTransition(this.progress));
     // A bog wears its own low lid whatever the weather does; rain only adds to it.
     const bogOvercast = BOG_OVERCAST * (this.region.weights.wetland ?? 0) ** 2;
-    this.current = bogMurkLook(snowCountryLook(
-      overcastSkyLook(regionalSkyLook(timeOfDay, this.region), Math.max(this.overcast, bogOvercast)),
+    this.current = stormAirLook(bogMurkLook(snowCountryLook(
+      overcastSkyLook(regionalSkyLook(timeOfDay, this.region), Math.max(this.overcast, bogOvercast), this.weather.storm),
       this.snowCountry,
-    ), this.region.weights.wetland ?? 0);
+    ), this.region.weights.wetland ?? 0), this.weather, this.skyView.baseFogDensity ?? this.skyView.config.sky.fogDensity);
     this.skyView.applyLook(this.current);
     this.onLook?.(this.current);
     return true;

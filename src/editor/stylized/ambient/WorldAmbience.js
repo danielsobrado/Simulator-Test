@@ -120,14 +120,21 @@ export class WorldAmbience {
     });
   }
 
-  /** The weather's wind when it blows, else a light breeze at the reference strength. */
+  /**
+   * The weather's wind when it blows, else a light breeze at the reference
+   * strength. A storm's wind (StormState, 0..1) lifts it up to twice the
+   * reference, so spindrift and diamond dust thicken with the storm.
+   */
   windFor(weather) {
+    const reference = this.system.settings.windReference ?? 1;
+    const wind = Math.max(0, Math.min(1, weather.storm ?? 0));
+    const storm = wind > 0 ? reference * (1 + wind) : 0;
     const active = weather.enabled && weather.mode !== 'off';
     if (active) {
       const strength = Math.hypot(weather.windX, weather.windZ) * Math.max(0, weather.intensity ?? 0);
-      if (strength > 1e-4) return { x: weather.windX, z: weather.windZ, strength };
+      if (strength > 1e-4) return { x: weather.windX, z: weather.windZ, strength: Math.max(strength, storm) };
     }
-    return { ...this.defaultWind, strength: this.system.settings.windReference ?? 1 };
+    return { ...this.defaultWind, strength: Math.max(reference, storm) };
   }
 
   shiftWorld(shiftX, shiftZ) {

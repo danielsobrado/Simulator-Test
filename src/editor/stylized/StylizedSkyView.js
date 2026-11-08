@@ -209,8 +209,9 @@ function createSkyMaterial({
   }
 
   // Fogged dome: wholly at the horizon, half at the zenith, so the far trees and
-  // the sky behind them are one murk.
-  color = mix(color, look.fogColor, look.skyFog.mul(oneMinus(smoothstep(0, 0.9, direction.y).mul(0.5))));
+  // the sky behind them are one murk; a whiteout carries it to the zenith too.
+  color = mix(color, look.fogColor, look.skyFog.mul(oneMinus(
+    smoothstep(0, 0.9, direction.y).mul(oneMinus(look.whiteout).mul(0.5)))));
 
   const material = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide });
   // Snow country stops the exposure down for the ground; the sky keeps most of

@@ -19,7 +19,7 @@ export const SKY_LOOK_NUMBERS = Object.freeze([
   'ambientIntensity', 'ambientSaturation', 'directionalIntensity', 'fogDensityScale',
   'cloudShadowStrength', 'shadowRadius',
   'cloudSharpness', 'cloudDetail', 'mist', 'snowBrightness', 'snowShade', 'snowBlue', 'nightness',
-  'exposure', 'skyFog',
+  'exposure', 'skyFog', 'whiteout',
 ]);
 /**
  * Look values with a fixed neutral default when neither the preset nor the
@@ -27,17 +27,18 @@ export const SKY_LOOK_NUMBERS = Object.freeze([
  * air is (valley fog), and how snow takes the light — `snowBrightness` scales its
  * albedo, `snowShade` how far faces turned from the sun fall into shade, and
  * `snowBlue` how blue that shade is (0 grey, 1 cold blue). `skyFog` is how far
- * the dome itself sinks into the fog colour (a bog's murk swallows its sky).
+ * the dome itself sinks into the fog colour (a bog's murk swallows its sky), and
+ * `whiteout` carries that fog band up to the zenith (a blizzard hides sun and stars).
  */
 const LOOK_NUMBER_DEFAULTS = Object.freeze({
   cloudSharpness: 0.24, cloudDetail: 1, mist: 0, exposure: 1, snowBrightness: 0.82, snowShade: 0.35, snowBlue: 0.6,
-  skyFog: 0,
+  skyFog: 0, whiteout: 0,
 });
 /** The look values the sky material reads, which become its uniforms. */
 const MATERIAL_COLORS = Object.freeze(['lowColor', 'highColor', 'sunColor', 'sunGlowColor', 'cloudCore', 'cloudEdge', 'cloudRim',
   'fogColor']);
 const MATERIAL_NUMBERS = Object.freeze(['sunEmission', 'sunGlowIntensity', 'cloudOpacity', 'cloudDensity',
-  'cloudSharpness', 'cloudDetail', 'skyFog']);
+  'cloudSharpness', 'cloudDetail', 'skyFog', 'whiteout']);
 
 export function skyPresetNames() {
   return Object.keys(SKY_PRESETS);
@@ -94,29 +95,52 @@ const OVERCAST_DIMMING = Object.freeze({ highColor: 0.35, cloudCore: 0.5, cloudE
 /** Far enough under the cloud noise's whole range, with the stratus sharpness, that nothing shows through. */
 const OVERCAST_CLOUD_DENSITY = -0.25;
 
+/** Storm levels (StormState: clear 0, light 0.25, moderate 0.5, heavy 0.75, storm 1)
+ * and the light left under each, as a share of the clear look (plan §4.1). */
+const STORM_LEVELS = Object.freeze([0, 0.25, 0.5, 0.75, 1]);
+const STORM_LIGHT = Object.freeze({
+  directionalIntensity: [1, 0.6, 0.25, 0.15, 0.1],
+  ambientIntensity: [1, 0.95, 0.88, 0.8, 0.7],
+  cloudShadowStrength: [1, 0.5, 0.1, 0, 0],
+});
+
+/** A per-level ladder read at storm value `storm`, linear between the levels. */
+export function stormLadder(values, storm) {
+  const s = Math.max(0, Math.min(1, storm));
+  const i = Math.min(STORM_LEVELS.length - 2, Math.floor(s * 4));
+  const t = (s - STORM_LEVELS[i]) / (STORM_LEVELS[i + 1] - STORM_LEVELS[i]);
+  return values[i] + (values[i + 1] - values[i]) * t;
+}
+
 /**
  * The look under cloud cover: colours drain toward a cool grey, the sun
  * weakens, clouds close up and stop casting distinct shadows, fog thickens.
- * Works for any time of day, so rain at night stays dark.
+ * Works for any time of day, so rain at night stays dark. A storm darkens past
+ * full overcast: its light ladder is a floor the cover cannot lift.
  *
  * @param {number} amount 0 clear … 1 full overcast
+ * @param {number} [storm] 0 clear … 1 full storm (StormState)
  */
-export function overcastSkyLook(look, amount) {
+export function overcastSkyLook(look, amount, storm = 0) {
   const t = Math.max(0, Math.min(1, amount));
-  if (t === 0) return look;
+  if (t === 0 && !(storm > 0)) return look;
   const result = { ...look };
   // Preserve the weather mix through the regional fog/snow layers for diffuse sky light.
   result.overcastAmount = t;
   for (const key of SKY_LOOK_COLORS) result[key] = greyed(look[key], t * 0.75, OVERCAST_DIMMING[key] ?? 0.15);
-  result.directionalIntensity = look.directionalIntensity * (1 - 0.85 * t);
-  result.ambientIntensity = look.ambientIntensity * (1 - 0.15 * t);
+  result.directionalIntensity = look.directionalIntensity
+    * Math.min(1 - 0.85 * t, stormLadder(STORM_LIGHT.directionalIntensity, storm));
+  result.ambientIntensity = look.ambientIntensity
+    * Math.min(1 - 0.15 * t, stormLadder(STORM_LIGHT.ambientIntensity, storm));
   result.shadowRadius = look.shadowRadius * (1 + 1.5 * t);
   result.sunEmission = look.sunEmission * (1 - 0.8 * t);
   result.sunGlowIntensity = look.sunGlowIntensity * (1 - 0.8 * t);
   // Toward an absolute lid, not by an offset: a clear-skied region would otherwise keep blue holes at full cover.
-  result.cloudDensity = look.cloudDensity + (OVERCAST_CLOUD_DENSITY - look.cloudDensity) * t * t;
+  // Linear in the cover: squared, a sky at cloud 0.55 still read mostly clear.
+  result.cloudDensity = look.cloudDensity + (OVERCAST_CLOUD_DENSITY - look.cloudDensity) * t;
   result.cloudOpacity = Math.min(1, look.cloudOpacity + 0.3 * t);
-  result.cloudShadowStrength = look.cloudShadowStrength * (1 - t);
+  result.cloudShadowStrength = look.cloudShadowStrength
+    * Math.min(1 - t, stormLadder(STORM_LIGHT.cloudShadowStrength, storm));
   result.fogDensityScale = look.fogDensityScale * (1 + 0.6 * t);
   // A grey lid: soft-edged, smooth stratus rather than broken cumulus, and the
   // flat light takes the modelling out of the snow.

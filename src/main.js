@@ -1861,7 +1861,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     const frameDelta = lastWetnessSeconds === null ? 0 : Math.min(1, frameSeconds - lastWetnessSeconds);
     lastWetnessSeconds = frameSeconds;
     surfaceWetness.update(frameDelta, frameWeatherAudio.rain);
-    skyLooks?.setOvercast(stormFrame().cloud);
+    skyLooks?.setStorm(stormFrame());
     const snowCountryWeight = snowCountry.update(frameDelta, viewModeController.camera);
     skyLooks?.setSnowCountry(snowCountryWeight);
     skyLooks?.setRegion(skyRegion.update(frameDelta, viewModeController.camera));
@@ -1905,6 +1905,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
         intensity: weatherSettings.weatherIntensity,
         windX: weatherSettings.weatherWindX,
         windZ: weatherSettings.weatherWindZ,
+        storm: stormFrame().wind,
       },
       skyPreset: skyLooks?.preset ?? 'configured',
       night: Boolean(skyLooks?.night),
