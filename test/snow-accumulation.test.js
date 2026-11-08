@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { snowAccumulation } from '../src/editor/materials/SnowAccumulation.js';
+import { snowAccumulation, snowBiomeCoverAt, snowBiomeCoverField } from '../src/editor/materials/SnowAccumulation.js';
 
 const classification = Object.freeze({
   snowLine: 700,
@@ -88,4 +88,17 @@ test('the drift field stays near-uniform, so partial cover matches its area', as
   }
   const share = above / samples;
   assert.ok(share > 0.25 && share < 0.42, `cover 0.35 lies over ${share}`);
+});
+
+test('a road lies under the snow of the country it crosses', () => {
+  const size = 21;
+  const road = 13;
+  // Glacier with a road down the middle column.
+  const halo = Array.from({ length: size * size }, (_, i) => (i % size === 10 ? road : 11));
+  const field = snowBiomeCoverField(halo, size, { 11: 1 }, road);
+  assert.ok(Math.abs(field[10 * size + 10] - 1) < 1e-6);
+  const tileAt = (x, z) => (x === 10 && z >= 0 && z < size ? road : 11);
+  assert.ok(Math.abs(snowBiomeCoverAt(tileAt, 10, 10, { 11: 1 }, road) - 1) < 1e-6);
+  // Without the road id it still counts as snowless ground.
+  assert.ok(snowBiomeCoverField(halo, size, { 11: 1 })[10 * size + 10] < 0.9);
 });

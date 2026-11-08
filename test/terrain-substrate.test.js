@@ -42,3 +42,12 @@ test('pure sand, litter, mud and fallback mineral are selected explicitly',()=>{
  assert.equal(terrainSubstrateResponse({tileId:32},profiles).roughness,.90);
  assert.throws(()=>resolveTerrainSubstrates({sand:{tintMix:2}}),/tintMix/);
 });
+test('snow country bares dark thawed earth, not the lowland dirt',()=>{
+ for(const tileId of [10,11]){
+  const r=terrainSubstrateResponse({tileId},profiles);
+  assert.equal(r.weights.thaw,1);
+  const bare=r.applyColor([.5,.4,.3],1,0);
+  assert.ok(bare.every((c,i)=>c<[.5,.4,.3][i]*.4));
+ }
+ assert.equal(terrainSubstrateResponse({tileId:10,wetness:1},profiles).weights.mud,1);
+});

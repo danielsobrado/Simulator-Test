@@ -1,4 +1,4 @@
-import { Fn, If, abs, cameraWorldMatrix, dFdx, dFdy, int, mix, normalize, sin, smoothstep, texture, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, If, abs, cameraWorldMatrix, dFdx, dFdy, float, int, mix, normalize, sin, smoothstep, texture, vec2, vec3, vec4 } from 'three/tsl';
 import { GROUND_LAYERS } from '../stylized/path/groundLayerIds.js';
 
 /** Texture repeat: a power of two, so it closes across the 1024 m canonical wrap. */
@@ -16,9 +16,11 @@ const wave = (cycles) => (cycles * Math.PI * 2) / CANONICAL_PERIOD;
  * along the cliff, so a face reads as stone rather than a stretched ground texture.
  * The array is already bound; this adds no sampler, which the terrain has none of.
  *
+ * @param {object} [options.strata] 0..1 bedding strength: snow country passes
+ *   less, its snow-plastered faces showing the 1 m seams as contour stripes
  * @returns {object} the colour with stone over `rock`
  */
-export function applyTerrainRockDetail({ color, rock, normal, local, chunkCenter, height, textures }) {
+export function applyTerrainRockDetail({ color, rock, normal, local, chunkCenter, height, textures, strata: bedding = float(1) }) {
   const point = chunkCenter.mod(CANONICAL_PERIOD).add(local);
   // Before the branch: screen derivatives need uniform control flow.
   const projections = [vec2(point.y, height), point, vec2(point.x, height)].map((plane) => {
@@ -43,7 +45,7 @@ export function applyTerrainRockDetail({ color, rock, normal, local, chunkCenter
       const beds = sin(bedHeight.div(STRATA_METERS).mul(Math.PI * 2))
         .mul(sin(bedHeight.div(STRATA_METERS * 3.7).mul(Math.PI * 2)).mul(0.5).add(0.75));
       const seams = sin(bedHeight.div(STRATA_METERS * 0.23).mul(Math.PI * 2)).mul(0.35);
-      const strata = beds.add(seams).mul(STRATA_DEPTH).add(1);
+      const strata = beds.add(seams).mul(STRATA_DEPTH).mul(bedding).add(1);
       result.assign(mix(result, result.mul(stone).mul(strata), smoothstep(0.15, 0.55, rock)));
     });
     return result;

@@ -144,6 +144,8 @@ families:
     mineral: {roughness: 0.90, wetRoughness: 0.64, color: '#7e8585', tintMix: 0.34}
     litter: {roughness: 0.97, wetRoughness: 0.72, color: '#63513d', tintMix: 0.40}
     mud: {roughness: 0.87, wetRoughness: 0.43, color: '#555747', tintMix: 0.40}
+    # Tundra and glacier ground bared between the drifts: dark damp earth.
+    thaw: {roughness: 0.84, wetRoughness: 0.50, color: '#3a332c', tintMix: 0.82}
   profiles:
     grass:
       contrast: 0.26

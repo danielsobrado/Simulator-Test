@@ -388,8 +388,20 @@ export function createTerrainMaterial({
       Object.assign(bakedSurface, arid.apply(bakedSurface.color, bakedSurface.roughness, bakedSurface.normal));
     }
     if (bakedSurface.rock && bakedSurface.normal) {
+      // Snow country's faces are snow-plastered (biome-looks rock tint): their
+      // bedding seams read as fine contour stripes across the snow mountains.
+      const groundSnow = stylizedConfig.biomeLooks?.snow?.ground;
+      const groundSnowByTile = groundSnow?.some((value) => value > 0) ? uniformArray(Array.from(groundSnow), 'float') : null;
+      const snowCountry = groundSnowByTile
+        ? slotBilinearLoad('tileTexture', tileTexture, terrainUv, (value) =>
+          groundSnowByTile.element(value.a.mul(255).round().toInt()))
+        : float(0);
       bakedSurface.color = applyTerrainRockDetail({
-        color: bakedSurface.color, rock: bakedSurface.rock, normal: bakedSurface.normal,
+        strata: oneMinus(snowCountry),
+        // Stone and strata on the rock snow leaves bare: over the whole colour of a
+        // snowed slope the strata ruled the snow in contour stripes.
+        color: bakedSurface.color, rock: bakedSurface.rock.mul(oneMinus(bakedSurface.snow ?? float(0))),
+        normal: bakedSurface.normal,
         local: vec2(terrainUv.x.sub(0.5), float(0.5).sub(terrainUv.y)).mul(chunkWorldSize),
         chunkCenter, height: positionWorld.y, textures: acquireGroundLayers(),
       });

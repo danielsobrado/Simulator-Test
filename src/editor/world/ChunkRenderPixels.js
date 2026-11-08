@@ -281,7 +281,7 @@ export function buildSurfaceMaskPixels({
   const distances = computeRoadDistanceField(halo, haloSize, haloSize, roadTileId);
   const mask = new Uint8Array(chunkSize * chunkSize * 4);
   const snowCover = maskConfig.snow
-    ? snowBiomeCoverField(halo, haloSize, maskConfig.snow.classification.snowBiomeCover)
+    ? snowBiomeCoverField(halo, haloSize, maskConfig.snow.classification.snowBiomeCover, roadTileId)
     : null;
   const wetness = vertexWetness(chunkSize, originX, originZ, usableWaterField, sampleWater, waterlineDepth);
   const habitat = prepareGrassHabitatHalo({halo,haloSize,searchRadius,chunkSize,heights,

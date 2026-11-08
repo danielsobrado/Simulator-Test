@@ -46,16 +46,26 @@ export const SNOW_BIOME_BLUR_CELLS = BIOME_BLUR_CELLS;
 /**
  * Blurred biome snow cover over a halo of tile ids (BiomeFieldBlur.js), or null
  * when no biome carries snow.
+ *
+ * A road (`roadTileId`) neither gives nor takes cover: it lies under the snow of
+ * the country it crosses. Counted as a snowless biome, it cut the cover along
+ * every road through tundra, the drifts bared it in 60 m dashes, and its tread
+ * drew there as tan earth across the snow mountains.
  */
-export function snowBiomeCoverField(halo, size, coverByTile) {
+export function snowBiomeCoverField(halo, size, coverByTile, roadTileId) {
   if (!coverByTile || Object.keys(coverByTile).length === 0) return null;
-  return blurTileField(halo, size, (tileId) => coverByTile[tileId] ?? 0);
+  const cover = blurTileField(halo, size, (tileId) => (tileId === roadTileId ? 0 : coverByTile[tileId] ?? 0));
+  if (!halo.includes(roadTileId)) return cover;
+  const share = blurTileField(halo, size, (tileId) => (tileId === roadTileId ? 0 : 1));
+  return cover.map((value, index) => (share[index] > 1e-6 ? value / share[index] : 0));
 }
 
 /** The same blurred cover at one cell, for point queries (a footstep, a town). */
-export function snowBiomeCoverAt(tileAt, cellX, cellZ, coverByTile) {
+export function snowBiomeCoverAt(tileAt, cellX, cellZ, coverByTile, roadTileId) {
   if (!coverByTile) return 0;
-  return blurTileValueAt(tileAt, cellX, cellZ, (tileId) => coverByTile[tileId] ?? 0);
+  const cover = blurTileValueAt(tileAt, cellX, cellZ, (tileId) => (tileId === roadTileId ? 0 : coverByTile[tileId] ?? 0));
+  const share = blurTileValueAt(tileAt, cellX, cellZ, (tileId) => (tileId === roadTileId ? 0 : 1));
+  return share > 1e-6 ? cover / share : 0;
 }
 
 /**

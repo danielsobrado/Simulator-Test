@@ -1197,7 +1197,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       dz: 0,
       curvature: 0,
       tileId,
-      biomeCover: snowBiomeCoverAt((x, z) => worldStore.getTile(x, z), cellX, cellZ, bake.classification.snowBiomeCover),
+      biomeCover: snowBiomeCoverAt((x, z) => worldStore.getTile(x, z), cellX, cellZ, bake.classification.snowBiomeCover, config.stylizedSurface.path?.tileId ?? 13),
       worldX: canonicalX,
       worldZ: canonicalZ,
     }, bake.classification, terrainBakeMacroSeed(bake.macro.seedOffset, generator?.toMetadata?.().seed));
@@ -1381,7 +1381,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
         curvature: 0,
         tileId,
         biomeCover: snowBiomeCoverAt((x, z) => worldStore.getTile(x, z), Math.floor(canonicalX / tileSize),
-          Math.floor(-canonicalZ / tileSize), bake.classification.snowBiomeCover),
+          Math.floor(-canonicalZ / tileSize), bake.classification.snowBiomeCover, config.stylizedSurface.path?.tileId ?? 13),
         worldX: canonicalX,
         worldZ: canonicalZ,
       }, bake.classification, terrainBakeMacroSeed(bake.macro.seedOffset, worldStore.generator?.toMetadata?.().seed));
