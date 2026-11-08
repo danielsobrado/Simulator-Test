@@ -5,7 +5,6 @@ import {
   positionGeometry, uniform, uv, vec2, vec3,
 } from 'three/tsl';
 import { DEFAULT_WEATHER_EFFECTS } from './WeatherEffectsConfig.js';
-import { sampleWorldWind } from './wind/worldWindState.js';
 import { skyLightUniforms } from '../stylized/sky/skyLight.js';
 
 /** One GPU-animated instanced field; existing terrain/water impacts stay separate. */
@@ -18,6 +17,10 @@ export function createCinematicRainField(settings = DEFAULT_WEATHER_EFFECTS.rain
   const clock = uniform(0);
   const intensity = uniform(0);
   const wind = uniform(new THREE.Vector2());
+  // Wind × the shared camera gust (worldWindCamera), and its integral: travel
+  // must integrate the gust, or every drop jumps when the gust changes.
+  const vector = uniform(new THREE.Vector2());
+  const drift = uniform(new THREE.Vector2());
   const index = instanceIndex.toFloat().add((seed >>> 0) % 65536);
   const random = offset => hash(index.add(offset));
   const length = mix(settings.dropLength * 0.45, settings.dropLength * 1.35, random(331.71));
@@ -25,12 +28,8 @@ export function createCinematicRainField(settings = DEFAULT_WEATHER_EFFECTS.rain
   const speed = mix(settings.speed * 0.7, settings.speed * 1.35, random(71.91));
   const range = settings.top - settings.bottom;
   const y = fract(random(41.27).add(clock.mul(speed).div(range))).mul(range).add(settings.bottom);
-  // Use the existing shared gust field, sampled once per vertex, instead of
-  // evaluating Gods' End's cinematic noise again for each of 10,000 drops.
-  const field = sampleWorldWind(center.xz);
-  const vector = wind.mul(field.envelope.clamp(0.4, 4));
   const variation = mix(1 - settings.windVariation, 1 + settings.windVariation, random(121.43));
-  const travel = clock.mul(vector).mul(variation);
+  const travel = drift.mul(variation);
   const offset = fract(vec2(random(17.13), random(93.71)).add(travel.div(settings.area)))
     .sub(0.5).mul(settings.area);
   const phase = clock.mul(0.7).add(random(211.17).mul(Math.PI * 2));
@@ -53,9 +52,18 @@ export function createCinematicRainField(settings = DEFAULT_WEATHER_EFFECTS.rain
     .mul(settings.opacity).clamp(0.05, 1).mul(intensity);
   material.colorNode = vec3(...settings.colorLinear).mul(skyLightUniforms.brightness);
   let disposed = false;
+  let gust = 1;
+  let lastTime = null;
   return {
-    material, geometry, uniforms: { center, time: clock, intensity, wind },
-    setTime: value => { clock.value = value; },
+    material, geometry, uniforms: { center, time: clock, intensity, wind, vector, drift },
+    setTime: value => {
+      vector.value.copy(wind.value).multiplyScalar(Math.min(4, Math.max(0.4, gust)));
+      if (lastTime !== null && value > lastTime) drift.value.addScaledVector(vector.value, Math.min(0.25, value - lastTime));
+      lastTime = value;
+      clock.value = value;
+    },
+    /** The world wind envelope at the camera (worldWindCamera.envelope). */
+    setGust: value => { gust = value; },
     setIntensity: value => { intensity.value = value; },
     setCenter: value => { center.value.copy(value); },
     setWind: (x, z) => { wind.value.set(x, z); },

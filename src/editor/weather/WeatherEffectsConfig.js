@@ -9,7 +9,7 @@ export const DEFAULT_WEATHER_EFFECTS = Object.freeze({
     regionalIntensity: 1, regionalMinCoverage: 0.2, regionalFullCoverage: 0.7, regionalFadeRate: 1.2,
     count: 12000, top: 16.2, bottom: -3.6, speed: 1.224,
     swayRadius: 0.504, swayFrequency: 0.6, turbulence: 0.396,
-    opacity: 0.95, color: '#dae6f6', gustStrength: 0.45, gustPeriod: 11,
+    opacity: 0.95, color: '#dae6f6',
     layers: Object.freeze([
       Object.freeze({ share: 0.56, area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9 }),
       Object.freeze({ share: 0.43, area: 16.56, sizeMin: 0.0324, sizeMax: 0.0792, opacity: 0.9, speedScale: 1, nearFade: 1.44, softness: 0, brightness: 1 }),
@@ -59,8 +59,6 @@ export function resolveWeatherEffects(source = {}) {
   if (snowfall.regionalFullCoverage <= snowfall.regionalMinCoverage) {
     throw new Error('weatherEffects.snowfall.regionalFullCoverage must exceed regionalMinCoverage.');
   }
-  number(snowfall.gustStrength, 'weatherEffects.snowfall.gustStrength', 0, 0.95);
-  number(snowfall.gustPeriod, 'weatherEffects.snowfall.gustPeriod', 0.1, 120);
   if (!/^#[0-9a-f]{6}$/i.test(snowfall.color)) throw new Error('weatherEffects.snowfall.color must be a hex colour.');
   if (!Array.isArray(snowfall.layers) || !snowfall.layers.length || snowfall.layers.length > 8) throw new Error('weatherEffects.snowfall.layers must contain 1–8 populations.');
   snowfall.layers = snowfall.layers.map((layer, index) => {

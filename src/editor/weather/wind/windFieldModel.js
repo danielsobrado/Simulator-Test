@@ -93,8 +93,13 @@ function layerCpu(x, z, time, prevailingX, prevailingZ, layer, warpX, warpZ) {
  * @param {number} options.directionDegrees prevailing direction (0 = +x, 90 = +z)
  * @param {number} [options.intensity]
  * @param {ReturnType<typeof resolveWindFieldConfig>} options.params
+ * @param {number} [options.gustThreshold] live gust shape (storms); defaults to params.gust
+ * @param {number} [options.gustPeak]
  */
-export function sampleWindFieldCpu({ x, z, time, directionDegrees, intensity = 1, params }) {
+export function sampleWindFieldCpu({
+  x, z, time, directionDegrees, intensity = 1, params,
+  gustThreshold = params.gust.threshold, gustPeak = params.gust.peak,
+}) {
   const radians = directionDegrees * DEG_TO_RAD;
   const px = Math.cos(radians);
   const pz = Math.sin(radians);
@@ -126,8 +131,8 @@ export function sampleWindFieldCpu({ x, z, time, directionDegrees, intensity = 1
   const flutter = layerCpu(x, z, time, px, pz, params.flutter, warpX, warpZ) * 2 - 1;
 
   const { gust: gustParams } = params;
-  const gust = smoothstepCpu(gustParams.threshold, gustParams.peak, large) ** gustParams.exponent;
-  const previousGust = smoothstepCpu(gustParams.threshold, gustParams.peak, previousLarge) ** gustParams.exponent;
+  const gust = smoothstepCpu(gustThreshold, gustPeak, large) ** gustParams.exponent;
+  const previousGust = smoothstepCpu(gustThreshold, gustPeak, previousLarge) ** gustParams.exponent;
   const envelope = Math.max(params.minStrength, Math.min(
     params.maxStrength,
     params.baseStrength
@@ -158,10 +163,14 @@ function layerNode(positionXZ, timeNode, prevailing, layer, warpOffset) {
 
 /**
  * The same field as a TSL expression over a canonical-space position.
+ * `gustThreshold` / `gustPeak` are optional nodes (uniforms) for a live gust shape.
  *
  * @returns {{ direction: object, strength: object, gust: object, turbulence: object }} TSL nodes
  */
-export function createWindFieldNode({ positionXZ, timeNode, directionDegrees, intensity, params }) {
+export function createWindFieldNode({
+  positionXZ, timeNode, directionDegrees, intensity, params,
+  gustThreshold = float(params.gust.threshold), gustPeak = float(params.gust.peak),
+}) {
   const radians = directionDegrees.mul(DEG_TO_RAD);
   const prevailing = vec2(cos(radians), sin(radians));
   const directionClock = timeNode.mul(params.direction.speed);
@@ -188,8 +197,8 @@ export function createWindFieldNode({ positionXZ, timeNode, directionDegrees, in
   const medium = layerNode(positionXZ, timeNode, prevailing, params.medium, warpOffset).sub(0.5).mul(2);
 
   const { gust: gustParams } = params;
-  const gust = smoothstep(gustParams.threshold, gustParams.peak, large).pow(gustParams.exponent);
-  const previousGust = smoothstep(gustParams.threshold, gustParams.peak, previousLarge).pow(gustParams.exponent);
+  const gust = smoothstep(gustThreshold, gustPeak, large).pow(gustParams.exponent);
+  const previousGust = smoothstep(gustThreshold, gustPeak, previousLarge).pow(gustParams.exponent);
   const envelope = float(params.baseStrength)
     .add(gust.mul(params.large.strength))
     .add(medium.abs().mul(params.medium.strength))

@@ -18,9 +18,11 @@ import { createWindFieldNode, resolveWindFieldConfig, sampleWindFieldCpu } from 
 import {
   WIND_TEXTURE_SIZE,
   WIND_WINDOW_METRES,
+  worldWindCamera,
   worldWindTarget,
   worldWindUniforms,
 } from './worldWindState.js';
+import { evaluateLevels, STORM_WIND } from '../storm/stormCurves.js';
 
 const RAD_TO_DEG = 180 / Math.PI;
 /** Weather wind magnitude → field intensity: calm air still moves a little. */
@@ -49,6 +51,21 @@ export function prevailingWindFromWeather(weather, fallbackDirection) {
   return { directionDegrees: Math.atan2(z, x) * RAD_TO_DEG, intensity };
 }
 
+/**
+ * The storm's wind channel (0..1) on top of the settings' wind: the intensity
+ * rises from the settings' value to the ceiling along the §5.3 table, and the
+ * gusts come more often and harder. At 0 the settings' wind is untouched.
+ */
+export function stormWindShape(baseIntensity, wind, params) {
+  const lift = (evaluateLevels(STORM_WIND.intensity, wind) - 1) / (INTENSITY_CEILING - 1);
+  const s = Math.max(0, Math.min(1, Number(wind) || 0));
+  return {
+    intensity: baseIntensity + (INTENSITY_CEILING - baseIntensity) * lift,
+    gustThreshold: s > 0 ? evaluateLevels(STORM_WIND.gustThreshold, s) : params.gust.threshold,
+    gustPeak: s > 0 ? evaluateLevels(STORM_WIND.gustPeak, s) : params.gust.peak,
+  };
+}
+
 export class WorldWindPass {
   /**
    * @param {object} options
@@ -61,6 +78,8 @@ export class WorldWindPass {
     this.time = 0;
     this.directionDegrees = 0;
     this.intensity = 1;
+    this.gustThreshold = this.params.gust.threshold;
+    this.gustPeak = this.params.gust.peak;
     this.centerCanonical = { x: 0, z: 0 };
     this.origin = { x: 0, z: 0 };
     worldWindUniforms.referenceStrength.value = this.params.baseStrength;
@@ -71,6 +90,8 @@ export class WorldWindPass {
       intensity: uniform(1),
       centerCanonical: uniform(new THREE.Vector2()),
       size: uniform(WIND_WINDOW_METRES),
+      gustThreshold: uniform(this.gustThreshold),
+      gustPeak: uniform(this.gustPeak),
     };
     const canonical = this.uniforms.centerCanonical.add(uv().sub(0.5).mul(this.uniforms.size));
     const field = createWindFieldNode({
@@ -79,6 +100,8 @@ export class WorldWindPass {
       directionDegrees: this.uniforms.directionDegrees,
       intensity: this.uniforms.intensity,
       params: this.params,
+      gustThreshold: this.uniforms.gustThreshold,
+      gustPeak: this.uniforms.gustPeak,
     });
     this.material = new THREE.NodeMaterial();
     this.material.name = 'world-wind-field';
@@ -93,13 +116,17 @@ export class WorldWindPass {
    * @param {number} dt seconds
    * @param {{ x: number, z: number }} cameraRender camera position, render space
    * @param {{ x: number, z: number }} origin floating-origin offset (canonical = render + origin)
-   * @param {object} [weather] `{ enabled, windX, windZ, intensity }`
+   * @param {object} [weather] `{ enabled, windX, windZ, intensity, storm }`; `storm` is
+   *   the storm's wind channel (StormState frame `wind`)
    */
   update(dt, cameraRender, origin, weather = null) {
     this.time += Math.min(Math.max(Number.isFinite(dt) ? dt : 0, 0), 0.25);
     const prevailing = prevailingWindFromWeather(weather, this.defaultDirection);
+    const shape = stormWindShape(prevailing.intensity, weather?.storm ?? 0, this.params);
     this.directionDegrees = prevailing.directionDegrees;
-    this.intensity = prevailing.intensity;
+    this.intensity = shape.intensity;
+    this.gustThreshold = shape.gustThreshold;
+    this.gustPeak = shape.gustPeak;
     this.origin.x = origin.x;
     this.origin.z = origin.z;
 
@@ -112,12 +139,20 @@ export class WorldWindPass {
     this.uniforms.time.value = this.time;
     this.uniforms.directionDegrees.value = this.directionDegrees;
     this.uniforms.intensity.value = this.intensity;
+    this.uniforms.gustThreshold.value = this.gustThreshold;
+    this.uniforms.gustPeak.value = this.gustPeak;
     this.uniforms.centerCanonical.value.set(centerX, centerZ);
     worldWindUniforms.windowCenter.value.set(centerX - origin.x, centerZ - origin.z);
     worldWindUniforms.windowCenterCanonical.value.set(centerX, centerZ);
     const radians = this.directionDegrees / RAD_TO_DEG;
     worldWindUniforms.prevailing.value.set(Math.cos(radians), Math.sin(radians));
     worldWindUniforms.prevailingStrength.value = this.params.baseStrength * this.intensity;
+    // One gust sample per frame that rain and snow share.
+    const here = this.sample(cameraRender.x, cameraRender.z);
+    worldWindCamera.directionX = here.directionX;
+    worldWindCamera.directionZ = here.directionZ;
+    worldWindCamera.envelope = here.strength / this.params.baseStrength;
+    worldWindCamera.storm = Math.max(0, Math.min(1, Number(weather?.storm) || 0));
   }
 
   /** Draw this frame's field. Call before the scene renders. */
@@ -146,6 +181,8 @@ export class WorldWindPass {
       directionDegrees: this.directionDegrees,
       intensity: this.intensity,
       params: this.params,
+      gustThreshold: this.gustThreshold,
+      gustPeak: this.gustPeak,
     });
   }
 

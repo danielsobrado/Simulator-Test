@@ -54,6 +54,19 @@ export const worldWindUniforms = Object.freeze({
 });
 
 /**
+ * The field at the camera, sampled once per frame on the CPU by `WorldWindPass`,
+ * so every CPU consumer (rain, snow) reads the same gust. `envelope` is the
+ * strength relative to the calm reference, as `sampleWorldWind` reports it;
+ * `storm` is the storm's wind channel (0 calm … 1 gale). Mutated in place.
+ */
+export const worldWindCamera = {
+  directionX: 1,
+  directionZ: 0,
+  envelope: 1,
+  storm: 0,
+};
+
+/**
  * @param {object} worldXZ TSL vec2, render-space position
  * @returns {{ direction: object, strength: object, gust: object, envelope: object }}
  *   TSL nodes: unit direction, absolute strength, gust 0..1, and strength

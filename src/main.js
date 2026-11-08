@@ -1820,6 +1820,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
         windX: weatherSettings.weatherWindX,
         windZ: weatherSettings.weatherWindZ,
         intensity: weatherSettings.weatherIntensity,
+        storm: stormFrame().wind,
       },
     );
     lastWindTimestamp = frameTimestamp;

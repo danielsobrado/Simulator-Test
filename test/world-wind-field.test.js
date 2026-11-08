@@ -11,7 +11,8 @@ import {
   resolveWindFieldConfig,
   sampleWindFieldCpu,
 } from '../src/editor/weather/wind/windFieldModel.js';
-import { prevailingWindFromWeather } from '../src/editor/weather/wind/WorldWindPass.js';
+import { prevailingWindFromWeather, stormWindShape } from '../src/editor/weather/wind/WorldWindPass.js';
+import { evaluateLevels } from '../src/editor/weather/storm/stormCurves.js';
 
 const params = resolveWindFieldConfig();
 
@@ -128,4 +129,32 @@ test('weather wind sets the prevailing direction and intensity; calm falls back 
   assert.ok(storm.intensity > 1.5);
   const breeze = prevailingWindFromWeather({ enabled: true, windX: -0.42, windZ: 0.18, intensity: 0.7 }, [1, 0]);
   assert.ok(breeze.intensity >= 0.45 && breeze.intensity < 1);
+});
+
+test('level tables hit every key and stay monotone between them', () => {
+  const values = [1, 1.3, 1.7, 2.1, 2.4];
+  [0, 0.25, 0.5, 0.75, 1].forEach((s, i) => assert.ok(Math.abs(evaluateLevels(values, s) - values[i]) < 1e-12));
+  let previous = -Infinity;
+  for (let s = -0.1; s <= 1.1; s += 0.01) {
+    const value = evaluateLevels(values, s);
+    assert.ok(value >= previous - 1e-12);
+    previous = value;
+  }
+});
+
+test('the storm wind lifts the field to the ceiling and sharpens gusts, and leaves calm air alone', () => {
+  const calm = stormWindShape(0.61, 0, params);
+  assert.deepEqual(calm, { intensity: 0.61, gustThreshold: 0.48, gustPeak: 0.86 });
+  const storm = stormWindShape(0.61, 1, params);
+  assert.ok(Math.abs(storm.intensity - 2.4) < 1e-12);
+  assert.deepEqual([storm.gustThreshold, storm.gustPeak], [0.3, 1]);
+  // A lower threshold means a gust blows over more of the field.
+  let calmGusts = 0;
+  let stormGusts = 0;
+  for (let i = 0; i < 400; i += 1) {
+    const at = { x: i * 13.1, z: i * -7.7, time: i * 0.37, directionDegrees: 0, params };
+    if (sampleWindFieldCpu(at).gust > 0.05) calmGusts += 1;
+    if (sampleWindFieldCpu({ ...at, gustThreshold: 0.3, gustPeak: 1 }).gust > 0.05) stormGusts += 1;
+  }
+  assert.ok(stormGusts > calmGusts * 1.3, `gusty share ${calmGusts} → ${stormGusts}`);
 });

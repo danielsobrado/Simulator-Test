@@ -27,8 +27,6 @@ snowfall:
   turbulence: 0.396
   opacity: 0.95
   color: '#dae6f6'
-  gustStrength: 0.45
-  gustPeriod: 11
   layers:
     - { share: 0.56, area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9 }
     - { share: 0.43, area: 16.56, sizeMin: 0.0324, sizeMax: 0.0792, opacity: 0.9, speedScale: 1, nearFade: 1.44, softness: 0, brightness: 1 }

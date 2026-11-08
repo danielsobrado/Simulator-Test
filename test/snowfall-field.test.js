@@ -6,10 +6,9 @@ import {
   SNOWFALL_POPULATIONS,
   createSnowfallField,
   createSnowfallGeometry,
-  gustFactor,
   snowfallFlakeCount,
 } from '../src/editor/weather/snowfall/SnowfallField.js';
-import { REGIONAL_SNOW_INTENSITY, SnowWeatherSystem } from '../src/editor/weather/snow_system.js';
+import { REGIONAL_SNOW_INTENSITY, SnowWeatherSystem, snowDriftVelocity } from '../src/editor/weather/snow_system.js';
 
 test('the seeded flake populations share one quad and retain their size and appearance profiles', () => {
   const geometry = createSnowfallGeometry(SNOWFALL_POPULATIONS, () => 0.5);
@@ -41,9 +40,8 @@ test('the drift integrates the wind, so a gust never jumps the field', () => {
     assert.ok(drift - previous >= 0 && drift - previous < 0.05, `frame ${frame} moved ${drift - previous}`);
     previous = drift;
   }
-  assert.ok(Math.abs(previous - 10) < 3, `about ten seconds of a 1 m/s wind (${previous})`);
+  assert.ok(Math.abs(previous - 10) < 1e-6, `ten seconds of a 1 m/s wind (${previous})`);
   assert.equal(field.uniforms.drift.value.y, 0);
-  assert.ok(gustFactor(3) > 0);
   field.dispose();
 });
 
@@ -84,15 +82,24 @@ test('regional coverage thresholds and intensity are configurable without changi
 });
 
 test('flakes drift with the world wind, not a separate snow wind', async () => {
-  const { worldWindUniforms } = await import('../src/editor/weather/wind/worldWindState.js');
-  const before = worldWindUniforms.prevailing.value.clone();
-  worldWindUniforms.prevailing.value.set(0, 1);
+  const { worldWindCamera } = await import('../src/editor/weather/wind/worldWindState.js');
+  const before = { ...worldWindCamera };
+  Object.assign(worldWindCamera, { directionX: 0, directionZ: 1, envelope: 1, storm: 0 });
   const snow = new SnowWeatherSystem({ scene: new THREE.Scene(), isWebGpu: true });
   snow.applySettings({ enabled: true, intensity: 1, windX: -3, windZ: 0 });
   snow.update(0.1, 0, new THREE.Vector3());
   snow.update(0.1, 1, new THREE.Vector3());
   const drift = snow.snowMaterial.uniforms.drift.value;
   assert.ok(drift.y > 0.1 && Math.abs(drift.x) < 1e-6, `drift follows the world wind (${drift.x}, ${drift.y})`);
-  worldWindUniforms.prevailing.value.copy(before);
+  Object.assign(worldWindCamera, before);
   snow.dispose();
+});
+
+test('a storm wind drives a blizzard drift, capped at 15 m/s', () => {
+  const calm = snowDriftVelocity({ directionX: 1, directionZ: 0, envelope: 1, storm: 0 });
+  const gale = snowDriftVelocity({ directionX: 1, directionZ: 0, envelope: 2.4 * 2.5, storm: 1 });
+  const gust = snowDriftVelocity({ directionX: 0, directionZ: -1, envelope: 2.4 * 7, storm: 1 });
+  assert.ok(calm.x > 0.4 && calm.x < 0.8, `calm drift ${calm.x}`);
+  assert.ok(gale.x > 8 && gale.x < 15, `gale drift ${gale.x}`);
+  assert.equal(gust.z, -15);
 });

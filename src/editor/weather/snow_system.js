@@ -6,7 +6,7 @@ import { createSnowGeometry } from "./rain_geometry.js";
 import { createSnowfallField } from "./snowfall/SnowfallField.js";
 import { clampWindWeatherSettings, isWeatherVisible } from "./weather_settings.js";
 import { DEFAULT_WEATHER_EFFECTS } from './WeatherEffectsConfig.js';
-import { worldWindUniforms } from './wind/worldWindState.js';
+import { worldWindCamera } from './wind/worldWindState.js';
 /**
  * Maximum coverage-driven snowfall over snow country with the weather off.
  * Resolved weather-effects settings can override this reference intensity.
@@ -14,6 +14,17 @@ import { worldWindUniforms } from './wind/worldWindState.js';
 const REGIONAL_SNOW_INTENSITY = DEFAULT_WEATHER_EFFECTS.snowfall.regionalIntensity;
 /** Flake drift (m/s) in the calm reference wind; scales with the world wind's strength. */
 const SNOW_DRIFT_SPEED = Math.hypot(DEFAULT_SNOW_WEATHER_SETTINGS.windX, DEFAULT_SNOW_WEATHER_SETTINGS.windZ);
+/** A blizzard drives flakes ~15 m/s sideways against a 1.2 m/s fall (storm plan §3.3). */
+const SNOW_DRIFT_CAP = 15;
+/** Extra drift at full storm wind: the field's 2.4× intensity alone leaves a gale at ~3 m/s. */
+const SNOW_STORM_DRIFT_GAIN = 2;
+
+/** Drift velocity (m/s) from the shared camera wind sample. */
+export function snowDriftVelocity(sample = worldWindCamera) {
+  const speed = Math.min(SNOW_DRIFT_CAP,
+    SNOW_DRIFT_SPEED * sample.envelope * (1 + SNOW_STORM_DRIFT_GAIN * sample.storm));
+  return { x: sample.directionX * speed, z: sample.directionZ * speed };
+}
 class SnowWeatherSystem {
   group = new THREE.Group();
   snowMaterial;
@@ -76,11 +87,9 @@ class SnowWeatherSystem {
     this.center.copy(cameraPosition);
     this.snowMaterial.setCenter(this.center);
     this.snowMaterial.setOrigin?.(origin);
-    // Drift with the world wind the grass and trees bend to; the weather's own
-    // wind already steers it while the weather is on.
-    const { prevailing, prevailingStrength, referenceStrength } = worldWindUniforms;
-    const speed = Math.min(5, SNOW_DRIFT_SPEED * prevailingStrength.value / referenceStrength.value);
-    this.snowMaterial.setWind(prevailing.value.x * speed, prevailing.value.y * speed);
+    // Drift with the gust the grass and trees bend to at the camera.
+    const drift = snowDriftVelocity();
+    this.snowMaterial.setWind(drift.x, drift.z);
     this.snowMaterial.setTime(elapsedSeconds);
   }
   getStats() {

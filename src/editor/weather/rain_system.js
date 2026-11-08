@@ -6,6 +6,7 @@ import { DEFAULT_RAIN_WEATHER_SETTINGS } from "./rain_defaults.js";
 import { createRainGeometry, createSplashGeometry } from "./rain_geometry.js";
 import { RainSplashPlacement } from "./rain_splash_placement.js";
 import { createCinematicRainField } from './CinematicRainField.js';
+import { worldWindCamera } from './wind/worldWindState.js';
 import { applyWindWeatherToMaterials, clampWindWeatherSettings, isWeatherVisible } from "./weather_settings.js";
 class RainWeatherSystem {
   group = new THREE.Group();
@@ -62,6 +63,7 @@ class RainWeatherSystem {
     if (!this.group.visible) return;
     this.rainCenter.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
     this.rainMaterial.setCenter(this.rainCenter);
+    this.rainMaterial.setGust?.(worldWindCamera.envelope);
     this.rainMaterial.setTime(elapsedSeconds);
     this.hardSplashMaterial.setTime(elapsedSeconds);
     this.waterSplashMaterial.setTime(elapsedSeconds);

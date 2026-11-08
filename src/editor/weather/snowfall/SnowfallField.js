@@ -53,19 +53,6 @@ export function createSnowfallGeometry(populations = SNOWFALL_POPULATIONS, rando
   return geometry;
 }
 
-export function gustFactor(seconds, settings = DEFAULT_WEATHER_EFFECTS.snowfall) {
-  const rate = Math.PI * 2 / settings.gustPeriod;
-  return 1 + settings.gustStrength * Math.cos(seconds * rate)
-    + settings.gustStrength * 0.4 * Math.cos(seconds * rate * 2.7 + 1.3);
-}
-
-/** Analytic integral from Gods' End: no discontinuous time-times-gust drift. */
-export function snowWindIntegral(seconds, settings = DEFAULT_WEATHER_EFFECTS.snowfall) {
-  const rate = Math.PI * 2 / settings.gustPeriod;
-  return seconds + Math.sin(seconds * rate) * settings.gustStrength / rate
-    + Math.sin(seconds * rate * 2.7 + 1.3) * settings.gustStrength * 0.4 / (rate * 2.7);
-}
-
 export function createSnowfallField(settings = DEFAULT_WEATHER_EFFECTS.snowfall, seed = 0x51eaf00d) {
   const uniforms = createSnowfallUniforms(settings);
   const material = createSnowfallMaterial(uniforms, settings);
@@ -88,10 +75,10 @@ export function createSnowfallField(settings = DEFAULT_WEATHER_EFFECTS.snowfall,
   return {
     material, geometry, uniforms,
     setTime(seconds) {
-      if (lastTime !== null) {
-        const start = Math.max(lastTime, seconds - 0.25);
-        const travel = seconds > start ? snowWindIntegral(seconds, settings) - snowWindIntegral(start, settings) : 0;
-        uniforms.drift.value.addScaledVector(wind, travel);
+      // Integrate the wind (which carries the world gust) rather than
+      // multiplying it by time, so a gust changes the speed, never the place.
+      if (lastTime !== null && seconds > lastTime) {
+        uniforms.drift.value.addScaledVector(wind, Math.min(0.25, seconds - lastTime));
       }
       lastTime = seconds;
       uniforms.time.value = seconds;

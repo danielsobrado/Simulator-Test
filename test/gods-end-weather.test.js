@@ -5,7 +5,7 @@ import yaml from 'js-yaml';
 import * as THREE from 'three/webgpu';
 import { createCinematicRainField } from '../src/editor/weather/CinematicRainField.js';
 import { DEFAULT_WEATHER_EFFECTS, resolveWeatherEffects } from '../src/editor/weather/WeatherEffectsConfig.js';
-import { createSnowfallField, snowWindIntegral } from '../src/editor/weather/snowfall/SnowfallField.js';
+import { createSnowfallField } from '../src/editor/weather/snowfall/SnowfallField.js';
 import { GodsEndLightShafts, shaftNormalization, shaftSourceReference } from '../src/editor/stylized/GodsEndLightShafts.js';
 import { StylizedGodRaysPostProcess } from '../src/editor/stylized/StylizedGodRaysPostProcess.js';
 
@@ -14,7 +14,7 @@ test('weather configuration matches donor-scaled defaults and rejects unsafe fie
   assert.deepEqual(resolveWeatherEffects(source), DEFAULT_WEATHER_EFFECTS);
   for (const patch of [
     { rain: { count: 20001 } }, { rain: { count: 0.5 } }, { rain: { top: -100 } },
-    { snowfall: { gustPeriod: 0 } }, { snowfall: { speed: -1 } },
+    { snowfall: { opacity: 2 } }, { snowfall: { speed: -1 } },
     { snowfall: { layers: [] } }, { rain: { colorLinear: [1, NaN, 1] } },
   ]) assert.throws(() => resolveWeatherEffects(patch), /weatherEffects/);
 });
@@ -32,6 +32,13 @@ test('rain uses one four-vertex quad and keeps its field centred at camera heigh
   assert.deepEqual(field.uniforms.wind.value.toArray(), [1, -2]);
   assert.equal(field.uniforms.time.value, 12.5);
   assert.equal(field.uniforms.intensity.value, 0.7);
+  // Travel integrates wind × gust, so a gust changes speed without moving drops.
+  field.setGust(2);
+  field.setTime(13.5);
+  assert.deepEqual(field.uniforms.drift.value.toArray(), [0.5, -1], 'wind × gust × a dt clamped to 0.25 s');
+  field.setGust(10);
+  field.setTime(13.75);
+  assert.deepEqual(field.uniforms.vector.value.toArray(), [4, -8], 'gust clamps at 4×');
   let disposed = 0;
   field.geometry.addEventListener('dispose', () => { disposed += 1; });
   field.dispose();
@@ -51,7 +58,7 @@ test('snow seeds repeat across recovery and its wind integral is frame-rate inde
     for (let frame = 1; frame <= fps * 10; frame += 1) field.setTime(frame / fps);
   }
   assert.ok(Math.abs(a.uniforms.drift.value.x - b.uniforms.drift.value.x) < 1e-8);
-  assert.ok(Math.abs(a.uniforms.drift.value.x - (snowWindIntegral(10) - snowWindIntegral(0))) < 1e-8);
+  assert.ok(Math.abs(a.uniforms.drift.value.x - 10) < 1e-8);
   a.dispose(); b.dispose(); c.dispose();
 });
 
