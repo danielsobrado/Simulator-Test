@@ -143,6 +143,7 @@ test('the weather sub-bus ramps the storm beds and schedules thunder', async () 
   near(weather.beds.get('rainStorm').gain.gain.value, 0.55, 0.01, 'storm rain');
   near(weather.beds.get('windStrong').gain.gain.value, 0.45, 0.01, 'strong wind');
   assert.ok(loaded.some((url) => url.includes('storm/thunder-far-01.mp3')), 'thunder streams in with the storm');
+  assert.ok(loaded.some((url) => url.includes('storm/gust-01.mp3')), 'gust swells are fetched before the first one fires');
 
   weather.update(0.1, { weights: stormWeights, storm, listener, roofed: 1 });
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -170,4 +171,21 @@ test('every storm sample the soundscape names is in the bank and the catalog', (
     assert.ok(existsSync(`public/audio/cc0/storm/${file}`), `${file} on disk`);
     assert.match(catalog, new RegExp(`\`storm/${file}\`.*\\| (CC0|Public domain) \\|`), `${file} catalogued`);
   }
+});
+
+test('LightningScheduler strikes schedule thunder at distance / 343 s', async () => {
+  const { LightningScheduler } = await import('../src/editor/weather/storm/LightningScheduler.js');
+  const { context, started } = fakeAudio();
+  const bank = new SampleBank({ getContext: () => context, getDestination: () => ({}), fetchBytes: async () => new ArrayBuffer(8) });
+  const weather = new WeatherSoundscape({ bank, getContext: () => context, getDestination: () => ({ connect() {} }), random: () => 0.5 });
+  // A storm with lightning streams the thunder in; let it decode.
+  weather.update(0.1, { weights: {}, storm: { rain: 1, snow: 0, wind: 0.3, lightning: 1 }, listener: { x: 0, z: 0, yaw: 0 } });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const scheduler = new LightningScheduler({ seed: 7 });
+  const strikes = [];
+  scheduler.subscribe((event) => { strikes.push(event); weather.strike(event); });
+  for (let step = 0; step < 60 * 30; step += 1) scheduler.step(1 / 30, 1);
+  assert.ok(strikes.length >= 1, 'a full storm strikes within a minute');
+  const first = strikes[0];
+  near(started[0].when, context.currentTime + first.distance / 343, 1e-9, 'first thunder delay');
 });

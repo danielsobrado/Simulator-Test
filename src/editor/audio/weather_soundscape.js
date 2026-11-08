@@ -65,6 +65,7 @@ export class WeatherSoundscape {
     this.bags = { near: new ShuffleBag(THUNDER_NEAR, random), far: new ShuffleBag(THUNDER_FAR, random), gust: new ShuffleBag(GUSTS, random) };
     this.thunderVoices = 0;
     this.thunderLoading = false;
+    this.gustsLoading = false;
     this.listener = { x: 0, z: 0, yaw: 0 };
     this.enabled = true;
     this.mixWeights = {};
@@ -116,6 +117,11 @@ export class WeatherSoundscape {
       // Streamed on the first storm, never at startup.
       this.thunderLoading = true;
       for (const path of [...THUNDER_NEAR, ...THUNDER_FAR]) this.bank.load(path);
+    }
+    if (storm.wind > 0.35 && !this.gustsLoading) {
+      // One-shots play only once decoded: fetch them before the first swell.
+      this.gustsLoading = true;
+      for (const path of GUSTS) this.bank.load(path);
     }
     if (enabled && !underwater && storm.wind > 0.35 && this.gusts.update(gust, dt)) this.playGust(gust, storm.wind);
   }
