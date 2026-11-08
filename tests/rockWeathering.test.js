@@ -117,3 +117,19 @@ test('switching it off leaves the clone untouched', () => {
   assert.equal(material.roughnessNode, before.roughness);
   material.dispose();
 });
+
+test('bakeSnowNormal welds a faceted stone into one normal per corner', async () => {
+  const THREE = await import('three/webgpu');
+  const { bakeSnowNormal } = await import('../src/editor/stylized/snowDeposition.js');
+  // A box splits its corners per face, as a flat-shaded rock does.
+  const box = bakeSnowNormal(new THREE.BoxGeometry(1, 1, 1));
+  const normal = box.getAttribute('snowNormal');
+  assert.equal(normal.count, box.getAttribute('position').count);
+  const position = box.getAttribute('position');
+  for (let i = 0; i < normal.count; i += 1) {
+    // Every corner leans out along all three axes, not along its own face's one.
+    for (const axis of ['getX', 'getY', 'getZ']) {
+      assert.ok(normal[axis](i) * position[axis](i) > 0.1, `corner ${i} ${axis}: ${normal[axis](i)}`);
+    }
+  }
+});

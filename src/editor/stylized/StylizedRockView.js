@@ -25,6 +25,7 @@ import { ScatterClusterField } from './forest/ScatterClusterField.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
+import { bakeSnowNormal } from './snowDeposition.js';
 
 // Reused across a rebuild: `compose` reads out of these, so only the matrix
 // itself has to be a fresh object per instance.
@@ -51,11 +52,12 @@ const ROCK_CLUSTER_SEED_OFFSET = 0xa7;
 
 /** Where a prototype meets the ground once placementMatrix sinks it, in its own space. */
 function rockGroundLine(geometry, burial) {
+  bakeSnowNormal(geometry);
   geometry.computeBoundingBox();
   const { min, max } = geometry.boundingBox;
   const height = Math.max(0.1, max.y - min.y);
   const groundY = min.y + Math.max(0, Number(burial) || 0) * height;
-  return { groundY, height: max.y - groundY, centre: [(min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2] };
+  return { smoothNormal: true, groundY, height: max.y - groundY, centre: [(min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2] };
 }
 
 /**
