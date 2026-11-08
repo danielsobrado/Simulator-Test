@@ -1,4 +1,4 @@
-import { dot, float, max, normalize, normalLocal, normalWorld, positionGeometry, vec2, vec3 } from 'three/tsl';
+import { dot, float, max, normalize, normalLocal, normalWorld, positionGeometry, varying, vec2, vec3 } from 'three/tsl';
 import { PREVAILING_WIND } from '../materials/SnowAccumulation.js';
 
 /**
@@ -43,13 +43,14 @@ export function snowDeposition({ snow, breakup = float(0), centre = null, ground
   const amount = snow.mul(1.3).clamp(0, 1);
   const cavity = centre
     // A convex stone's faces sit well out along their radius; only faces turned in from it are recesses.
-    ? float(0.35).sub(dot(normalLocal, normalize(positionGeometry.sub(vec3(...centre))))).mul(1.5).clamp(0, 1)
+    // Per vertex: it varies smoothly over a stone, and the fragment pass is the expensive one.
+    ? varying(float(0.35).sub(dot(normalLocal, normalize(positionGeometry.sub(vec3(...centre))))).mul(1.5).clamp(0, 1))
     : float(0);
   const start = float(CAP_START).sub(snow.mul(0.15)).sub(cavity.mul(0.25)).sub(lee.mul(0.1));
   const cover = up.add(breakup.mul(0.3)).smoothstep(start, start.add(CAP_WIDTH));
   if (groundY === null) return { cover: cover.mul(amount), skirt: float(0) };
 
-  const level = positionGeometry.y.sub(groundY).div(Math.max(1e-3, height));
+  const level = varying(positionGeometry.y.sub(groundY).div(Math.max(1e-3, height)));
   // Banked against the lee face: deep at the foot, thinning up it; not under an overhang.
   // WGSL leaves smoothstep undefined for reversed edges, so falling ramps are oneMinus.
   const drift = level.smoothstep(0, lee.mul(LEE_DRIFT).max(0.02)).oneMinus()
