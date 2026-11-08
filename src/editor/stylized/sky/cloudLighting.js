@@ -9,7 +9,13 @@ import {
   oneMinus,
   pow,
   smoothstep,
+  vec3,
 } from 'three/tsl';
+import { frameUniform } from '../../../render/FrameUniforms.js';
+
+/** Lightning lighting the cloud deck from inside, 0..1 (LightningScheduler.flash, written by the CPU). */
+export const lightningFlash = frameUniform(0);
+const FLASH_GLOW = vec3(0.8, 0.86, 1).mul(1.8);
 
 /**
  * Light on the dome's clouds, so they read as masses rather than a flat stencil.
@@ -99,7 +105,7 @@ export function litCloudColorNode({
   const shade = facing
     ? clamp(cloud.shadow.sub(facing.mul(settings.sunShading).mul(presence)), 0, 1)
     : cloud.shadow;
-  let color = mix(look.cloudEdge, look.cloudCore, shade).add(rim);
+  let color = mix(look.cloudEdge, look.cloudCore, shade).add(rim).add(FLASH_GLOW.mul(lightningFlash));
   if (!settings.enabled) return color;
   const thin = cloud.shape.mul(oneMinus(cloud.body));
   const silver = pow(sunAlignment, settings.silverFalloff)

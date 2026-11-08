@@ -25,7 +25,7 @@ import { updateSkyLight, updateSnowLight } from './sky/skyLight.js';
 import { applySceneEnvironment, environmentLightScale } from './sky/sceneEnvironment.js';
 import { sceneExposure } from '../../render/sceneExposure.js';
 import { resolveSunHazeConfig, sunHazeColor, SunHazeFog } from './sky/sunHaze.js';
-import { litCloudColorNode, resolveCloudLightingConfig } from './sky/cloudLighting.js';
+import { lightningFlash, litCloudColorNode, resolveCloudLightingConfig } from './sky/cloudLighting.js';
 
 /** How far past the cloud threshold the noise must climb for a cloud's body to be fully in its own shade. */
 const CLOUD_BODY_DEPTH = 0.32;
@@ -365,6 +365,16 @@ export class StylizedSkyView {
     }) : null;
     // The soft outdoor HDR standard materials take their fill and reflections from.
     this.environment = applySceneEnvironment(terrainView.scene, config.sky.environment);
+  }
+
+  /**
+   * A lightning flash, 0..1, from LightningScheduler: lights the cloud deck and
+   * lifts the hemisphere ambient for the frame — uniform writes, no new light.
+   * Call after the look is applied each frame; 0 restores the look's ambient.
+   */
+  setLightningFlash(flash) {
+    lightningFlash.value = flash;
+    this.hemisphere.intensity = this.look.ambientIntensity * (1 + 2.5 * flash);
   }
 
   setCloudShadowStrength(strength) {

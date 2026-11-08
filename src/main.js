@@ -1868,6 +1868,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       stylizedSurface.skyView?.setCelestial(dayNightCycle.evaluate());
     }
     skyLooks?.update(frameDelta);
+    stylizedSurface.skyView?.setLightningFlash(weatherController?.lightning.flash ?? 0);
     // The gorge mist's local height patch and colours, from the sky the look just
     // wrote. Weighted by how misty the place's air is (regionalSkyLook): snow
     // country keeps a little of it in its gorges even in dry air, and damp

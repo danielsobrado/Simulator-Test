@@ -18,6 +18,7 @@ import {
 import { StormLightningSystem } from './storm_ground.js';
 import { WindWeatherSystem } from './wind.js';
 import { StormState, stormTargetForSettings } from './storm/StormState.js';
+import { LightningScheduler } from './storm/LightningScheduler.js';
 
 const DEFAULT_SETTINGS = Object.freeze({
   weatherMode: 'off',
@@ -224,13 +225,8 @@ export function createWeatherController(deps) {
     isWebGpu,
     seed: 0x5a4d570d,
   });
-  const stormWeather = new StormLightningSystem({
-    scene: deps.scene,
-    isWebGpu,
-    worldCells: deps.worldCells,
-    seed: 0x57a4d0c7,
-    samplers: deps.samplers,
-  });
+  const stormWeather = new StormLightningSystem({ scene: deps.scene, isWebGpu });
+  const lightning = new LightningScheduler({ seed: 0x57a4d0c7 });
   const systems = Object.freeze([
     meadowWeather,
     windWeather,
@@ -254,7 +250,7 @@ export function createWeatherController(deps) {
   // changing the weather builds or breaks over a minute or two (StormState).
   const storm = new StormState();
   const stormOverride = deps.stormOverride ?? null;
-  const applied = { rain: -1, snow: -1, lightning: -1 };
+  const applied = { rain: -1, snow: -1 };
   const changed = (key, value) => {
     if (Math.abs(applied[key] - value) < 1e-3 && (value > 0) === (applied[key] > 0)) return false;
     applied[key] = value;
@@ -264,8 +260,6 @@ export function createWeatherController(deps) {
     const wind = { windX: settings.weatherWindX, windZ: settings.weatherWindZ };
     if (changed('rain', frame.rain)) rainWeather.applySettings({ enabled: frame.rain > 0, intensity: frame.rain, ...wind });
     if (changed('snow', frame.snow)) snowWeather.applySettings({ enabled: frame.snow > 0, intensity: frame.snow, ...wind });
-    const lightning = frame.lightning * frame.gain;
-    if (changed('lightning', lightning)) stormWeather.applySettings({ enabled: lightning > 1e-3, intensity: lightning });
   };
   const currentSandstormSettings = () => ({
     enabled: settings.weatherMode === 'sandstorm',
@@ -354,6 +348,8 @@ export function createWeatherController(deps) {
       const wet = storm.frame.rain > 0.02 || settings.weatherMode === 'sandstorm';
       snowWeather.setRegionalSnow(wet ? 0 : amount);
     },
+    /** Weather lightning: `subscribe(event => …)` for strikes, `flash` for the sky (LightningScheduler). */
+    lightning,
     /** This frame's storm channels (StormState.frame); read-only. */
     get storm() {
       return storm.frame;
@@ -374,7 +370,8 @@ export function createWeatherController(deps) {
       rainWeather.update(deltaSeconds, elapsedSeconds, cameraPosition, effectCenter);
       snowWeather.update(deltaSeconds, elapsedSeconds, cameraPosition, deps.getOrigin?.());
       sandstormWeather.update(deltaSeconds, elapsedSeconds, cameraPosition);
-      stormWeather.update(deltaSeconds, elapsedSeconds, effectCenter);
+      lightning.step(deltaSeconds, storm.frame.lightning);
+      stormWeather.update(deltaSeconds, elapsedSeconds, cameraPosition, lightning.bolt, lightning.boltFlash);
     },
     getStats() {
       return Object.freeze({
