@@ -98,6 +98,17 @@ test('it assembles with a source map and roughness map, and without a sea', () =
   material.dispose();
 });
 
+test('snow country assembles the deposition mask with a ground line', () => {
+  const material = rockMaterial();
+  applyRockWeathering(material, {
+    settings: resolveRockWeathering(shippedRocks().weathering),
+    biomeLook: true,
+    ground: { groundY: 0.1, height: 1.2, centre: [0, 0.5, 0] },
+  });
+  assert.ok(material.colorNode);
+  material.dispose();
+});
+
 test('switching it off leaves the clone untouched', () => {
   const material = rockMaterial();
   const before = { color: material.colorNode, roughness: material.roughnessNode };

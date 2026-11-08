@@ -49,12 +49,21 @@ import { createOceanDistanceField } from '../water/OceanDistanceField.js';
 
 const ROCK_CLUSTER_SEED_OFFSET = 0xa7;
 
+/** Where a prototype meets the ground once placementMatrix sinks it, in its own space. */
+function rockGroundLine(geometry, burial) {
+  geometry.computeBoundingBox();
+  const { min, max } = geometry.boundingBox;
+  const height = Math.max(0.1, max.y - min.y);
+  const groundY = min.y + Math.max(0, Number(burial) || 0) * height;
+  return { groundY, height: max.y - groundY, centre: [(min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2] };
+}
+
 /**
  * Keep the source GLB's authored stylized texture. Upstream only overrides the
  * PBR response (roughness, metalness and flat shading); deleting the map turns
  * its warm, painted rocks into featureless silhouettes.
  */
-export function createStylizedRockMaterial(mesh, config, weathering) {
+export function createStylizedRockMaterial(mesh, config, weathering, geometry = null) {
   const source = materialList(mesh)[0];
   const material = cloneAuthoredNodeMaterial(source);
   if ('roughness' in material) material.roughness = 1;
@@ -70,6 +79,7 @@ export function createStylizedRockMaterial(mesh, config, weathering) {
       seaLevel: weathering.seaLevel,
       localWater: true,
       biomeLook: true,
+      ground: geometry ? rockGroundLine(geometry, config?.rocks?.burial) : null,
     });
   }
   material.emissiveNode = rockShadeEmission(material.colorNode ?? authoredFoliageColor(material));
@@ -234,7 +244,7 @@ export class StylizedRockView {
     this.prototypeBiomeRulesSignature = JSON.stringify(this.prototypeBiomeRules);
     const newPrototypes = [];
     for (const { geometry, source } of extracted) {
-      const material = createStylizedRockMaterial(source, this.config, this.rockWeathering());
+      const material = createStylizedRockMaterial(source, this.config, this.rockWeathering(), geometry);
       newPrototypes.push({ geometry, material, kind: 'rock',
         instanceSurface: Boolean(this.rockWeatheringSettings),
         instanceBiomeLook: Boolean(this.rockWeatheringSettings) });

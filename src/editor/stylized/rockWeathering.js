@@ -14,6 +14,7 @@ import {
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
 import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
+import { SNOW_GROUND_COLOR, snowDeposition } from './snowDeposition.js';
 
 /**
  * Weathering for the authored rock pack — after grass-test's `rockWeathering`.
@@ -104,8 +105,11 @@ export function resolveRockWeathering(configured) {
  * @param {number|null} [options.seaLevel] world sea level, for the splash line
  * @param {boolean} [options.biomeLook] read the per-instance `instanceBiomeLook`
  *   (rgb albedo multiplier, moss scale) the rock view writes from each stone's biome
+ * @param {{ groundY: number, height: number, centre: number[] }} [options.ground]
+ *   the stone's object-space ground line, height above it and centre, for the
+ *   snow skirt, lee drift and cavities (snowDeposition)
  */
-export function applyRockWeathering(material, { settings, seaLevel = null, localWater = false, biomeLook = false }) {
+export function applyRockWeathering(material, { settings, seaLevel = null, localWater = false, biomeLook = false, ground = null }) {
   if (!settings?.enabled) return material;
   const sourceMap = material.map ?? null;
   const world = positionWorld;
@@ -183,13 +187,13 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
     }
   }
 
-  // Snow country: a soft-edged cap on every face turned up, as Community
-  // Shaders' snow cover lays it over Skyrim's stones; broken where a face tips.
+  // Snow country: capped on top, drifted into the lee and the recesses, and
+  // buried at the foot in the terrain's own snow (snowDeposition).
   if (look) {
-    const cap = up.add(patches.sub(0.5).mul(0.3)).smoothstep(0.38, 0.66)
-      .mul(snowGround.mul(1.3).clamp(0, 1));
-    weathered = mix(weathered, mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), cap);
-    roughness = mix(roughness, float(0.6), cap);
+    const { cover, skirt } = snowDeposition({ snow: snowGround, breakup: patches.sub(0.5), ...(ground ?? {}) });
+    const snowColor = mix(mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), color(SNOW_GROUND_COLOR), skirt);
+    weathered = mix(weathered, snowColor, cover);
+    roughness = mix(roughness, float(0.6), cover);
   }
 
   material.colorNode = weathered;
