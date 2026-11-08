@@ -10,23 +10,33 @@ import { PREVAILING_WIND } from '../materials/SnowAccumulation.js';
  *   cavity  recesses (a face turned in from the object's centre) hold more;
  *   lee     faces turned downwind of the bake's PREVAILING_WIND carry a drift
  *           banked up their lower half, as the terrain's own lee slopes do;
+ *   scour   the windward foot is scooped out, the skirt sitting lower there;
  *   skirt   a band above the ground line, deepest in the lee, in the terrain's
  *           snow colour so the object's foot runs into the baked snow.
+ *
+ * The snow amount moves the edges, not the opacity: a light fall leaves only
+ * the flattest tops and a low skirt white, rather than a grey film over the
+ * whole stone. Edges are narrow and torn by the breakup noise, as settled snow
+ * meets rock in a line, not a gradient.
  *
  * Pure normal and object-space arithmetic: no texture, no light.
  */
 /** The terrain bake's snow (terrain-material-bake.yaml render.snowColor), for the skirt. */
 export const SNOW_GROUND_COLOR = '#e8eef2';
 const WIND = vec2(...PREVAILING_WIND).normalize();
-/** Up-facing band over which a face goes bare to capped, before snow, cavity and lee lower it. */
-const CAP_START = 0.62;
-const CAP_WIDTH = 0.26;
-/** Skirt height as a share of the object's height above the ground line. */
-const SKIRT = 0.12;
-/** How much higher the skirt climbs a lee face. */
-const SKIRT_LEE = 0.14;
+/** Up-facing value where a full fall starts to cap a face, and how much higher a trace of snow starts. */
+const CAP_START = 0.58;
+const CAP_LIGHT = 0.4;
+const CAP_WIDTH = 0.1;
+/** Skirt height as a share of the object's height above the ground line, under a full fall. */
+const SKIRT = 0.13;
+/** How much higher the skirt climbs a lee face, and how much lower it sits on the windward one. */
+const SKIRT_LEE = 0.08;
+const SKIRT_SCOUR = 0.04;
 /** Drift up a lee face, as a share of the object's height. */
-const LEE_DRIFT = 0.35;
+const LEE_DRIFT = 0.22;
+/** Softness of the skirt's top edge, in the same share. */
+const SKIRT_EDGE = 0.025;
 
 /**
  * @param {object} options
@@ -39,23 +49,33 @@ const LEE_DRIFT = 0.35;
  */
 export function snowDeposition({ snow, breakup = float(0), centre = null, groundY = null, height = 1 }) {
   const up = normalWorld.y;
-  const lee = dot(normalWorld.xz, WIND).clamp(0, 1);
-  const amount = snow.mul(1.3).clamp(0, 1);
+  const facing = dot(normalWorld.xz, WIND);
+  const lee = facing.clamp(0, 1);
+  const depth = snow.clamp(0, 1);
+  // Only a trace switches it off; any real fall is drawn at full white where it lies.
+  const present = depth.smoothstep(0.02, 0.12);
   const cavity = centre
     // A convex stone's faces sit well out along their radius; only faces turned in from it are recesses.
     // Per vertex: it varies smoothly over a stone, and the fragment pass is the expensive one.
     ? varying(float(0.35).sub(dot(normalLocal, normalize(positionGeometry.sub(vec3(...centre))))).mul(1.5).clamp(0, 1))
     : float(0);
-  const start = float(CAP_START).sub(snow.mul(0.15)).sub(cavity.mul(0.25)).sub(lee.mul(0.1));
-  const cover = up.add(breakup.mul(0.3)).smoothstep(start, start.add(CAP_WIDTH));
-  if (groundY === null) return { cover: cover.mul(amount), skirt: float(0) };
+  const start = float(CAP_START).add(depth.oneMinus().mul(CAP_LIGHT)).sub(cavity.mul(0.25)).sub(lee.mul(0.1));
+  const cap = up.add(breakup.mul(0.45)).smoothstep(start, start.add(CAP_WIDTH));
+  if (groundY === null) return { cover: cap.mul(present), skirt: float(0) };
 
   const level = varying(positionGeometry.y.sub(groundY).div(Math.max(1e-3, height)));
-  // Banked against the lee face: deep at the foot, thinning up it; not under an overhang.
+  // Deeper snow buries more of the foot; the root keeps a light fall from sitting as high as a heavy one.
+  const fill = depth.sqrt();
+  // Banked against the lee face, tallest straight downwind and tapering round the
+  // sides like a drift tail; not under an overhang. Crisp-topped, like the skirt.
   // WGSL leaves smoothstep undefined for reversed edges, so falling ramps are oneMinus.
-  const drift = level.smoothstep(0, lee.mul(LEE_DRIFT).max(0.02)).oneMinus()
-    .mul(lee.smoothstep(0.15, 0.6)).mul(up.smoothstep(-0.45, 0.1));
-  const skirtTop = float(SKIRT).add(lee.mul(SKIRT_LEE)).add(breakup.mul(0.12)).max(0.04);
-  const skirt = level.smoothstep(skirtTop.mul(0.35), skirtTop).oneMinus();
-  return { cover: max(max(cover, drift), skirt).mul(amount), skirt: skirt.mul(amount) };
+  // Gentle in lee: these stones are faceted, and a steep lee term stepped the snow
+  // line at every facet edge, drawing it as straight vertical cuts.
+  const driftTop = facing.smoothstep(-0.3, 1).mul(fill).mul(LEE_DRIFT).mul(breakup.mul(0.6).add(1)).max(0.01);
+  const drift = level.smoothstep(driftTop.sub(SKIRT_EDGE), driftTop).oneMinus().mul(up.smoothstep(-0.45, 0.1));
+  const scour = facing.negate().clamp(0, 1);
+  const skirtTop = float(SKIRT).add(lee.mul(SKIRT_LEE)).sub(scour.mul(SKIRT_SCOUR))
+    .add(breakup.mul(0.22)).mul(fill).max(0.02);
+  const skirt = level.smoothstep(skirtTop.sub(SKIRT_EDGE), skirtTop).oneMinus();
+  return { cover: max(max(cap, drift), skirt).mul(present), skirt: skirt.mul(present) };
 }

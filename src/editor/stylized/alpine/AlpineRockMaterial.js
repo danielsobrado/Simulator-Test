@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-  color, float, mix, mx_noise_float, normalWorld, normalize, positionWorld, texture, vec3,
+  attribute, color, float, mix, mx_noise_float, normalWorld, normalize, positionWorld, texture, vec3,
 } from 'three/tsl';
 import { acquireRockTextures } from '../../world/FarAlpineSurface.js';
 import { SNOW_GROUND_COLOR, snowDeposition } from '../snowDeposition.js';
@@ -24,8 +24,8 @@ export function createAlpineRockMaterial() {
     .add(texture(maps.color, p.xz.mul(scale)).rgb.mul(weights.y))
     .add(texture(maps.color, p.xy.mul(scale)).rgb.mul(weights.z)).toVar();
   const breakup = mx_noise_float(p.mul(0.35)).toVar();
-  // Crags grow only on snowy or craggy ground, so they carry full snow.
-  const { cover: snow, skirt } = snowDeposition({ snow: float(0.8), breakup: breakup.mul(0.9), centre: [0, 0, 0], groundY: GROUND_Y, height: 1.15 });
+  // Per crag (AlpineRockView): its biome's ground snow or its altitude's, so badlands crags stay bare.
+  const { cover: snow, skirt } = snowDeposition({ snow: attribute('instanceSnow', 'float'), breakup: breakup.mul(0.9), centre: [0, 0, 0], groundY: GROUND_Y, height: 1.15 });
   material.colorNode = mix(stone.mul(color(ROCK_TINT)).mul(2), mix(color(SNOW), color(SNOW_GROUND_COLOR), skirt), snow);
   material.roughnessNode = mix(float(0.86), float(0.78), snow);
   return material;

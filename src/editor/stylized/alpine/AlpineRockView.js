@@ -16,18 +16,21 @@ const SLOPE_STEP_METERS = 3;
 /** Share of a rock's height left in the ground, so it breaks out rather than sits on it. */
 const BURIAL = 0.35;
 const UP = new THREE.Vector3(0, 1, 0);
+/** Snow on a crag where neither its biome nor its height carries any: none. */
+const NO_SNOW_BAND = Object.freeze({ snowLine: Infinity, snowFade: 1 });
 const scratch = new THREE.Object3D();
 const normal = new THREE.Vector3();
 const spin = new THREE.Quaternion();
 
 /** Crags and boulder clusters round the player: one instanced draw per shape, nothing until one is near. */
 export class AlpineRockView {
-  constructor({ scene, terrainView, snowGroundByTile, cragsByTile = [], seaLevel }) {
+  constructor({ scene, terrainView, snowGroundByTile, cragsByTile = [], seaLevel, snowBand = NO_SNOW_BAND }) {
     this.terrainView = terrainView;
     this.floatingOrigin = terrainView.floatingOrigin;
     this.snowGroundByTile = snowGroundByTile;
     this.cragsByTile = cragsByTile;
     this.seaLevel = seaLevel;
+    this.snowBand = snowBand;
     this.root = new THREE.Group();
     this.root.name = 'alpine-rocks';
     scene.add(this.root);
@@ -43,12 +46,16 @@ export class AlpineRockView {
     const height = view.getCanonicalHeight(x, z);
     const size = view.worldStore.tileSize;
     const tile = view.worldStore.getTile(Math.floor(x / size), Math.floor(-z / size));
-    const rocky = (this.snowGroundByTile[tile] ?? 0) >= COLD_GROUND_SNOW || this.cragsByTile[tile] === 1;
+    const biomeSnow = this.snowGroundByTile[tile] ?? 0;
+    const rocky = biomeSnow >= COLD_GROUND_SNOW || this.cragsByTile[tile] === 1;
     const allowed = height > this.seaLevel + 1 && (height >= ALPINE_HEIGHT || rocky);
     if (!allowed) return { allowed, slope: 0, height };
+    // The terrain's own two sources (SnowAccumulation): the biome's ground snow and the altitude band.
+    const { snowLine, snowFade } = this.snowBand;
+    const snow = Math.max(biomeSnow, THREE.MathUtils.smoothstep(height, snowLine, snowLine + snowFade));
     const dx = (view.getCanonicalHeight(x + SLOPE_STEP_METERS, z) - height) / SLOPE_STEP_METERS;
     const dz = (view.getCanonicalHeight(x, z + SLOPE_STEP_METERS) - height) / SLOPE_STEP_METERS;
-    return { allowed, slope: Math.hypot(dx, dz), height, dx, dz };
+    return { allowed, slope: Math.hypot(dx, dz), height, dx, dz, snow };
   }
 
   resolveCell(cellX, cellZ) {
@@ -67,6 +74,7 @@ export class AlpineRockView {
       rock.y = ground.height;
       rock.dx = ground.dx ?? 0;
       rock.dz = ground.dz ?? 0;
+      rock.snow = ground.snow ?? 0;
     }
     return rocks;
   }
@@ -75,7 +83,9 @@ export class AlpineRockView {
     if (this.meshes.length) return;
     const material = createAlpineRockMaterial();
     for (let kind = 0; kind < ALPINE_ROCK_KINDS; kind += 1) {
-      const mesh = new THREE.InstancedMesh(createAlpineRockGeometry(kind), material, CAPACITY);
+      const geometry = createAlpineRockGeometry(kind);
+      geometry.setAttribute('instanceSnow', new THREE.InstancedBufferAttribute(new Float32Array(CAPACITY), 1));
+      const mesh = new THREE.InstancedMesh(geometry, material, CAPACITY);
       mesh.count = 0;
       mesh.frustumCulled = false;
       mesh.castShadow = true;
@@ -101,9 +111,13 @@ export class AlpineRockView {
       scratch.scale.set(rock.scale, rock.scale * rock.stretch, rock.scale);
       scratch.updateMatrix();
       mesh.setMatrixAt(mesh.count, scratch.matrix);
+      mesh.geometry.attributes.instanceSnow.setX(mesh.count, rock.snow);
       mesh.count += 1;
     }
-    for (const mesh of this.meshes) mesh.instanceMatrix.needsUpdate = true;
+    for (const mesh of this.meshes) {
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.geometry.attributes.instanceSnow.needsUpdate = true;
+    }
   }
 
   /** @param {{ x: number, z: number }} cameraWorld canonical metres */

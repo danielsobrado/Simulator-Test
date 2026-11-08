@@ -3,6 +3,7 @@ import {
   color,
   dot,
   float,
+  mx_noise_float,
   mix,
   normalWorld,
   positionGeometry,
@@ -59,6 +60,11 @@ const MOSS_DARK = '#4d6424';
 const DUST = '#a89a80';
 const ALGAE = '#4a5a2a';
 const ROCK_SNOW = '#eef2f6';
+/** Snow-edge noise frequency: a few tears across a metre-scale boulder. */
+const SNOW_TEAR_PER_METRE = 1.4;
+/** How far snow country greys a boulder, and the cold grey it greys toward. */
+const FROST_GREY = 0.75;
+const FROST_TINT = '#c6d0dc';
 /** Snow on a face tipping away from the sky: a cooler, deeper white. */
 const ROCK_SNOW_SHADE = '#c3cfdc';
 
@@ -190,7 +196,14 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   // Snow country: capped on top, drifted into the lee and the recesses, and
   // buried at the foot in the terrain's own snow (snowDeposition).
   if (look) {
-    const { cover, skirt } = snowDeposition({ snow: snowGround, breakup: patches.sub(0.5), ...(ground ?? {}) });
+    // Frost-dulled stone: snow country greys a warm authored texture toward the cold
+    // crags beside it (AlpineRockMaterial's tint), as a biome tint alone could not.
+    const frost = snowGround.smoothstep(0.3, 0.9).mul(FROST_GREY);
+    weathered = mix(weathered, dot(weathered, vec3(0.3, 0.59, 0.11)).mul(color(FROST_TINT)), frost);
+    // The sine patches are too smooth to tear an edge: alone, whole facets went white
+    // at once and the skirt ran in straight lines across a face.
+    const tear = mx_noise_float(pattern.mul(SNOW_TEAR_PER_METRE)).mul(0.6).add(patches.sub(0.5).mul(0.3));
+    const { cover, skirt } = snowDeposition({ snow: snowGround, breakup: tear, ...(ground ?? {}) });
     const snowColor = mix(mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), color(SNOW_GROUND_COLOR), skirt);
     weathered = mix(weathered, snowColor, cover);
     roughness = mix(roughness, float(0.6), cover);

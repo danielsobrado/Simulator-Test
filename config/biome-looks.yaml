@@ -142,7 +142,9 @@ biomeLooks:
     10:
       name: tundra
       canopy: '#8a9a62'
-      rock: { tint: '#d6d8d4', tone: 1, moss: 0.35 }
+      # Cold grey stone with a little lichen, so the boulders sit with the blue-grey
+      # crags beside them; a neutral tint and 0.35 moss read as olive-brown rocks.
+      rock: { tint: '#c2ccd6', tone: 1, moss: 0.12 }
       formations: 0.3
       water: { tint: '#c8d6de', desaturate: 0.45 }
       # Dwarf willow and heath, frost-dulled.
