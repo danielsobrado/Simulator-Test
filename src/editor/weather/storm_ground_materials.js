@@ -185,7 +185,7 @@ function createStormGroundNodeMaterial() {
     }
     const dist = abs(q.x.add(fbm)).max(0.012);
     // Seeded from the strike, so a replayed storm flickers the same way.
-    const flicker = mix(0.02, 0.05, hash21(vec2(aParams.z.mul(97), uTime.mul(30).floor())));
+    const flicker = mix(0.04, 0.09, hash21(vec2(aParams.z.mul(97), uTime.mul(30).floor())));
     // Clamped so the core cannot blow out the bloom.
     const glow = min(flicker.div(dist), 2.5);
     const fadeTop = float(1).sub(smoothstep(0.85, 1, p.y));
