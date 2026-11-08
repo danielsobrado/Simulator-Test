@@ -13,8 +13,8 @@
   --border-strong: rgb(233 224 203 / 28%);
   --text: var(--glade-ink);
   --text-dim: var(--glade-ink-soft);
-  --accent: #ead29c;
-  --accent-soft: rgb(234 210 156 / 16%);
+  --accent: var(--hud-gold);
+  --accent-soft: rgb(220 220 216 / 16%);
   --danger: #ff9a8a;
 
   top: var(--glade-under-top);

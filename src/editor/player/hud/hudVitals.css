@@ -67,7 +67,7 @@
 }
 
 .hud-vital i::before {
-  background: #f3dfa2b0;
+  background: #e9e9e6a0;
   transition: width 500ms ease 250ms;
 }
 
@@ -100,7 +100,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  color: #fff3d8;
+  color: #f2f2ef;
   content: attr(data-value);
   font: 700 10px/1 var(--hud-font);
   text-shadow: 0 1px 2px #000;
@@ -117,22 +117,22 @@
 }
 
 .hud-vital--life {
-  --vital-fill: linear-gradient(90deg, #6e0f18, #c9303a 70%, #e8505a);
+  --vital-fill: linear-gradient(90deg, #6a3036, #a65a61 70%, #c4878c);
   --vital-from: left;
 }
 
 .hud-vital--mana {
-  --vital-fill: linear-gradient(270deg, #16306f, #2f62c4 70%, #6ea4f2);
+  --vital-fill: linear-gradient(270deg, #323f5e, #5b7398 70%, #8ea3c2);
   --vital-from: right;
 }
 
 .hud-vital--stamina {
-  --vital-fill: linear-gradient(90deg, #1f6b43, #63c48a);
+  --vital-fill: linear-gradient(90deg, #3c5f4b, #7fa18b);
   --vital-from: left;
 }
 
 .hud-vital--energy {
-  --vital-fill: linear-gradient(270deg, #a06a12, #f0c04f);
+  --vital-fill: linear-gradient(270deg, #7d6c4e, #bfae86);
   --vital-from: right;
 }
 

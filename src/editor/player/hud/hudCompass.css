@@ -28,8 +28,7 @@
   background:
     var(--hud-brass) top / 100% 2px no-repeat,
     var(--hud-brass) bottom / 100% 2px no-repeat,
-    repeating-linear-gradient(115deg, #ffffff06 0 2px, transparent 2px 5px),
-    var(--hud-leather);
+    var(--hud-marble);
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 10% 90%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 10% 90%, transparent);
 }
@@ -49,7 +48,7 @@
 }
 
 .hud-compass__point.is-cardinal {
-  color: #f3dfa2;
+  color: var(--hud-trim-light);
   font-size: 18px;
   font-weight: 700;
   text-shadow: 0 1px 0 #000, 0 0 8px #d8a94a66;
@@ -66,7 +65,7 @@
 .hud-compass__place::before {
   position: absolute;
   inset: 0;
-  background: #b68a3e;
+  background: var(--hud-plate-line);
   content: '';
   rotate: 45deg;
 }
@@ -79,7 +78,7 @@
 
 .hud-compass__place::before {
   background: var(--place-color);
-  box-shadow: 0 0 0 1.5px #f3dfa2, 0 0 0 3px var(--hud-leather);
+  box-shadow: 0 0 0 1.5px var(--hud-trim-light), 0 0 0 3px var(--hud-leather);
 }
 
 /* Burgs a kingdom answers to wear a second band. */
@@ -89,7 +88,7 @@
 }
 
 .hud-compass__place.is-capital::before {
-  box-shadow: 0 0 0 1.5px #f3dfa2, 0 0 0 3px #7c1d1d, 0 0 0 4px #f3dfa2;
+  box-shadow: 0 0 0 1.5px var(--hud-trim-light), 0 0 0 3px #7c1d1d, 0 0 0 4px var(--hud-trim-light);
 }
 
 .hud-compass__pointer {
