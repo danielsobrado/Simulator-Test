@@ -21,7 +21,7 @@
 import { terrainBakeValueNoise } from './TerrainBakeNoise.js';
 import { BIOME_BLUR_CELLS, blurTileField, blurTileValueAt } from '../world/BiomeFieldBlur.js';
 
-const PREVAILING_WIND = Object.freeze([0.8, 0.6]);
+export const PREVAILING_WIND = Object.freeze([0.8, 0.6]);
 /** Offset of the snow drift noise from the bake's macro seed. */
 const SNOW_PATCH_SEED = 53;
 const SLOPE_BREAKUP = 0.8;

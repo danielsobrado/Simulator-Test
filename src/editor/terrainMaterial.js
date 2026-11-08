@@ -534,7 +534,7 @@ export function createTerrainMaterial({
     const glacierTable = stylizedConfig.biomeLooks?.glacier;
     const glacierShareByTile = glacierTable?.some((value) => value > 0) ? uniformArray(Array.from(glacierTable), 'float') : null;
     const glacierIce = bakedSurface.snow && glacierShareByTile ? createGlacierIceShading({
-      terrainUv, chunkWorldSize, chunkCenter,
+      terrainUv, chunkWorldSize, chunkCenter, normal: bakedSurface.normal,
       // Decoded per cell and then filtered: the ecotone swaps border cells to the
       // neighbouring biome one by one, and a per-cell share drew 2 m blue squares.
       tileShare: slotBilinearLoad('tileTexture', tileTexture, terrainUv, (value) =>
