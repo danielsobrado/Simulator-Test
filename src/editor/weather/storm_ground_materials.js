@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import { assignWeatherNodeOutput } from './weather_node_output.js';
+import { hash21, noise2 } from '../stylized/SnowNoiseNodes.js';
 import {
   abs,
   attribute,
@@ -16,6 +17,7 @@ import {
   smoothstep,
   uniform,
   uv,
+  vec2,
   vec3,
   vec4
 } from "three/tsl";
@@ -43,7 +45,7 @@ float noise(vec2 p) {
 float fbm(vec2 p) {
   float value = 0.0;
   float amplitude = 0.5;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < BOLT_OCTAVES; i++) {
     value += amplitude * noise(p);
     p *= 2.0;
     amplitude *= 0.5;
@@ -62,6 +64,8 @@ float godotLightningField(vec2 p, float seed, float time, float xSize, float ySi
 }
 `
 );
+// Distant bolts are a few pixels wide; finer octaves are invisible.
+const BOLT_OCTAVES = 5;
 const STORM_VERTEX = (
   /* glsl */
   `
@@ -99,6 +103,7 @@ uniform vec3 uEffectColor;
 varying vec2 vUv;
 varying float vSeed;
 
+#define BOLT_OCTAVES ${BOLT_OCTAVES}
 ${NOISE_GLSL}
 
 void main() {
@@ -108,7 +113,7 @@ void main() {
   float field = godotLightningField(p, vSeed, uTime, 1.15, 4.0, 0.055);
   float body = smoothstep(0.72, 2.8, field);
   float glow = smoothstep(0.12, 1.25, field);
-  float alpha = min((body + glow * 0.42) * uFlash, 1.0);
+  float alpha = min((body + glow * 0.42) * uFlash, 1.0) * (1.0 - smoothstep(0.85, 1.0, vUv.y));
   if (alpha < 0.003) discard;
 
   vec3 color = uEffectColor * (body * 2.5 + glow * 0.95) * uEmissionPower;
@@ -154,7 +159,7 @@ function createStormGroundShaderMaterial() {
 function createStormGroundNodeMaterial() {
   const uTime = uniform(0);
   const uFlash = uniform(0);
-  const uEmissionPower = uniform(3.2);
+  const uEmissionPower = uniform(2);
   const uEffectColor = uniform(EFFECT_COLOR.clone());
   const aCenter = attribute("aLightningCenter", "vec3");
   const aNormal = attribute("aLightningNormal", "vec3");
@@ -167,19 +172,26 @@ function createStormGroundNodeMaterial() {
   const widthAxis = pos.z.lessThan(0.5).select(tangent, bitangent);
   const up = normalize(mix(vec3(0, 1, 0), n, 0.24).add(widthAxis.mul(sin(aParams.z.mul(17)).mul(0.22))));
   const worldPosition = aCenter.add(widthAxis.mul(pos.x).mul(aParams.y)).add(up.mul(pos.y).mul(aParams.x));
+  // Godot-style bolt: a vertical line displaced by gradient-noise FBM that
+  // scrolls with time, lit as 1/distance with a per-frame flicker.
   const fragment = Fn(() => {
-    const p = uv();
     uFlash.lessThan(2e-3).discard();
-    const x = p.x.mul(2).sub(1);
-    const y = p.y;
-    const centerLine = sin(y.mul(13).add(aParams.z.mul(41)).add(uTime.mul(3))).mul(0.2).add(sin(y.mul(31).add(aParams.z.mul(17)).add(uTime.mul(1.7))).mul(0.11)).mul(mix(0.35, 1, y));
-    const dist = abs(x.sub(centerLine));
-    const body = float(1).sub(smoothstep(0, 0.12, dist));
-    const glow = float(1).sub(smoothstep(0.08, 0.64, dist));
-    const alpha = min(body.add(glow.mul(0.42)).mul(clamp(uFlash, 0, 1)), 1);
+    const p = uv();
+    const q = vec2(p.x.mul(2).sub(1).sub(0.5), p.y.mul(2).sub(1).mul(4));
+    const drift = q.add(uTime.mul(3)).add(aParams.z.mul(17));
+    let fbm = float(0);
+    for (let octave = 0, amplitude = 0.5, frequency = 1; octave < BOLT_OCTAVES; octave++, amplitude *= 0.5, frequency *= 2) {
+      fbm = fbm.add(noise2(drift.mul(frequency)).add(0.5).mul(amplitude));
+    }
+    const dist = abs(q.x.add(fbm)).max(0.012);
+    // Seeded from the strike, so a replayed storm flickers the same way.
+    const flicker = mix(0.02, 0.05, hash21(vec2(aParams.z.mul(97), uTime.mul(30).floor())));
+    // Clamped so the core cannot blow out the bloom.
+    const glow = min(flicker.div(dist), 2.5);
+    const fadeTop = float(1).sub(smoothstep(0.85, 1, p.y));
+    const alpha = min(glow, 1).mul(clamp(uFlash, 0, 1)).mul(fadeTop);
     alpha.lessThan(3e-3).discard();
-    const brightness = body.mul(2.5).add(glow.mul(0.95));
-    return vec4(uEffectColor.mul(brightness).mul(uEmissionPower), alpha);
+    return vec4(uEffectColor.mul(glow).mul(uEmissionPower), alpha);
   });
   const material = new MeshBasicNodeMaterial();
   material.name = "weather-storm-bolt-node";
