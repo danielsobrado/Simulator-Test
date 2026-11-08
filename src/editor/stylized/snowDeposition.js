@@ -22,11 +22,11 @@ const WIND = vec2(...PREVAILING_WIND).normalize();
 const CAP_START = 0.62;
 const CAP_WIDTH = 0.26;
 /** Skirt height as a share of the object's height above the ground line. */
-const SKIRT = 0.16;
+const SKIRT = 0.12;
 /** How much higher the skirt climbs a lee face. */
-const SKIRT_LEE = 0.22;
+const SKIRT_LEE = 0.14;
 /** Drift up a lee face, as a share of the object's height. */
-const LEE_DRIFT = 0.55;
+const LEE_DRIFT = 0.35;
 
 /**
  * @param {object} options
@@ -42,9 +42,10 @@ export function snowDeposition({ snow, breakup = float(0), centre = null, ground
   const lee = dot(normalWorld.xz, WIND).clamp(0, 1);
   const amount = snow.mul(1.3).clamp(0, 1);
   const cavity = centre
-    ? float(1).sub(dot(normalLocal, normalize(positionGeometry.sub(vec3(...centre))))).mul(0.5).clamp(0, 1)
+    // A convex stone's faces sit well out along their radius; only faces turned in from it are recesses.
+    ? float(0.35).sub(dot(normalLocal, normalize(positionGeometry.sub(vec3(...centre))))).mul(1.5).clamp(0, 1)
     : float(0);
-  const start = float(CAP_START).sub(snow.mul(0.28)).sub(cavity.mul(0.3)).sub(lee.mul(0.18));
+  const start = float(CAP_START).sub(snow.mul(0.15)).sub(cavity.mul(0.25)).sub(lee.mul(0.1));
   const cover = up.add(breakup.mul(0.3)).smoothstep(start, start.add(CAP_WIDTH));
   if (groundY === null) return { cover: cover.mul(amount), skirt: float(0) };
 
