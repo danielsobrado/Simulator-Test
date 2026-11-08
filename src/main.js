@@ -62,7 +62,8 @@ import { PLAYER_MODE_EDIT, PLAYER_MODE_WALK, PLAYER_MODE_FLY } from './editor/pl
 import { isTreeImpostorBakeMode } from './editor/stylized/impostorBakeMode.js';
 import { StylizedSurfaceView } from './editor/stylized/StylizedSurfaceView.js';
 import { BiomeAssetPalette } from './editor/stylized/BiomeAssetPalette.js';
-import { createWeatherController, weatherOvercastAmount } from './editor/weather/weather_controller.js';
+import { createWeatherController } from './editor/weather/weather_controller.js';
+import { StormState, readStormOverride } from './editor/weather/storm/StormState.js';
 import { createWeatherUi } from './editor/weather/weather_ui.js';
 import {
   createWeatherTerrainSamplers,
@@ -979,15 +980,13 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   configureSea(waterVisual.enabled !== false && resolveWaterQualityFeatures(waterVisual).flow
     ? waterVisual.sea
     : null);
-  // How stormy the sea is: rain roughens it, a storm fully.
+  // Every weather reader below takes this frame's eased storm channels.
+  const calmStorm = StormState.emptyFrame();
+  const stormFrame = () => weatherController?.storm ?? calmStorm;
+  // How stormy the sea is: wind roughens it, the top of the storm fully.
   const seaStormForWeather = () => {
-    if (!weatherEnabled) return 0;
-    const intensity = Math.max(0, Math.min(1, weatherSettings.weatherIntensity ?? 0));
-    if (weatherSettings.weatherMode === 'storm') return intensity;
-    if (weatherSettings.weatherMode === 'rain' || weatherSettings.weatherMode === 'wind') {
-      return intensity * 0.5;
-    }
-    return 0;
+    const storm = stormFrame();
+    return Math.min(1, storm.wind * (0.5 + 0.5 * Math.min(1, Math.max(0, (storm.storm - 0.5) * 2))));
   };
   const fallSites = createRiverFallSiteSource(() => worldStore.generator);
   const waterfallMist = new WaterfallMist({
@@ -1004,11 +1003,9 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   // reads the same rain.
   const weatherAudioLevelsScratch = { rain: 0, wind: 0.25 };
   const weatherAudioLevels = () => {
-    const active = weatherEnabled && weatherSettings.weatherMode !== 'off';
-    const intensity = active ? Math.max(0, Math.min(1, weatherSettings.weatherIntensity ?? 0)) : 0;
-    const mode = weatherSettings.weatherMode;
-    weatherAudioLevelsScratch.rain = mode === 'rain' || mode === 'storm' ? intensity : 0;
-    weatherAudioLevelsScratch.wind = mode === 'wind' || mode === 'storm' ? intensity : 0.25;
+    const storm = stormFrame();
+    weatherAudioLevelsScratch.rain = Math.min(1, storm.rain);
+    weatherAudioLevelsScratch.wind = Math.max(0.25, storm.wind);
     return weatherAudioLevelsScratch;
   };
   const surfaceWetness = new SurfaceWetness(config.stylizedSurface.wetness);
@@ -1089,7 +1086,6 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     sunDirection: terrainView.godRays.sunDirection,
   });
   resources.own(snowPowder);
-  const weatherOvercast = () => weatherOvercastAmount(weatherSettings, weatherEnabled);
   const worldSoundscape = new WorldSoundscape({
     audioBus,
     getTile: (cellX, cellZ) => worldStore.getTile(cellX, cellZ),
@@ -1133,6 +1129,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       getSettings: () => weatherSettings,
       getCamera: () => viewModeController.camera,
       getSunDirection: () => stylizedSurface.skyView?.sunDirectionValue ?? undefined,
+      stormOverride: readStormOverride(typeof window === 'undefined' ? '' : window.location.search),
     })
     : null;
   resources.own(weatherController);
@@ -1461,7 +1458,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
             weatherSettings.weatherIntensity,
             1.1,
           );
-          weatherController.applySettings();
+          weatherController.applySettings({ snap: true });
         }
         if (mode.night && stylizedSurface?.skyView?.directional) {
           stylizedSurface.skyView.directional.intensity = Math.min(
@@ -1854,7 +1851,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     const frameDelta = lastWetnessSeconds === null ? 0 : Math.min(1, frameSeconds - lastWetnessSeconds);
     lastWetnessSeconds = frameSeconds;
     surfaceWetness.update(frameDelta, frameWeatherAudio.rain);
-    skyLooks?.setOvercast(weatherOvercast());
+    skyLooks?.setOvercast(stormFrame().cloud);
     const snowCountryWeight = snowCountry.update(frameDelta, viewModeController.camera);
     skyLooks?.setSnowCountry(snowCountryWeight);
     skyLooks?.setRegion(skyRegion.update(frameDelta, viewModeController.camera));

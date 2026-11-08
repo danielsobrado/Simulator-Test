@@ -33,7 +33,7 @@ try {
     window.__renderFixture.current = mode;
     document.querySelector('#status').textContent = mode;
     settings.weatherMode = mode;
-    weather.applySettings();
+    weather.applySettings({ snap: true });
     weather.update(1 / 60, 1, camera.position, camera.position);
     // Include episodic impacts and shafts even between their scheduled events.
     const names = [];

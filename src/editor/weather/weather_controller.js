@@ -17,6 +17,7 @@ import {
 } from './rain.js';
 import { StormLightningSystem } from './storm_ground.js';
 import { WindWeatherSystem } from './wind.js';
+import { StormState, stormTargetForSettings } from './storm/StormState.js';
 
 const DEFAULT_SETTINGS = Object.freeze({
   weatherMode: 'off',
@@ -39,14 +40,6 @@ const VALID_WEATHER_MODES = new Set([
 function finiteNumber(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
-}
-
-/** Dry cloud cover uses the same eased sky response as precipitation. */
-export function weatherOvercastAmount(settings, enabled = true) {
-  if (!enabled) return 0;
-  const intensity = THREE.MathUtils.clamp(finiteNumber(settings.weatherIntensity, 0), 0, 1);
-  const share = { overcast: 1, rain: 0.8, storm: 1, snow: 0.6, sandstorm: 0.4 }[settings.weatherMode] ?? 0;
-  return share * intensity;
 }
 
 function sanitizeWeatherSettings(value = {}) {
@@ -257,30 +250,31 @@ export function createWeatherController(deps) {
     windX: settings.weatherWindX,
     windZ: settings.weatherWindZ,
   });
-  const currentRainSettings = () => ({
-    enabled: settings.weatherMode === 'rain',
-    intensity: settings.weatherIntensity,
-    windX: settings.weatherWindX,
-    windZ: settings.weatherWindZ,
-  });
-  const currentSnowSettings = () => ({
-    enabled: settings.weatherMode === 'snow',
-    intensity: settings.weatherIntensity,
-    windX: settings.weatherWindX,
-    windZ: settings.weatherWindZ,
-  });
+  // Rain, snow and lightning follow the eased storm channels, not the mode:
+  // changing the weather builds or breaks over a minute or two (StormState).
+  const storm = new StormState();
+  const stormOverride = deps.stormOverride ?? null;
+  const applied = { rain: -1, snow: -1, lightning: -1 };
+  const changed = (key, value) => {
+    if (Math.abs(applied[key] - value) < 1e-3 && (value > 0) === (applied[key] > 0)) return false;
+    applied[key] = value;
+    return true;
+  };
+  const applyStormChannels = (frame) => {
+    const wind = { windX: settings.weatherWindX, windZ: settings.weatherWindZ };
+    if (changed('rain', frame.rain)) rainWeather.applySettings({ enabled: frame.rain > 0, intensity: frame.rain, ...wind });
+    if (changed('snow', frame.snow)) snowWeather.applySettings({ enabled: frame.snow > 0, intensity: frame.snow, ...wind });
+    const lightning = frame.lightning * frame.gain;
+    if (changed('lightning', lightning)) stormWeather.applySettings({ enabled: lightning > 1e-3, intensity: lightning });
+  };
   const currentSandstormSettings = () => ({
     enabled: settings.weatherMode === 'sandstorm',
     intensity: settings.weatherIntensity,
     windX: settings.weatherWindX,
     windZ: settings.weatherWindZ,
   });
-  const currentStormSettings = () => ({
-    enabled: settings.weatherMode === 'storm',
-    intensity: settings.weatherIntensity,
-  });
-
-  const applySettings = () => {
+  /** @param {{ snap?: boolean }} [options] snap: jump straight to the new weather (QA, captures). */
+  const applySettings = ({ snap = false } = {}) => {
     if (disposed) return false;
     settings = sanitizeWeatherSettings({
       ...DEFAULT_SETTINGS,
@@ -288,13 +282,15 @@ export function createWeatherController(deps) {
     });
     meadowWeather.applySettings(currentMeadowSettings());
     windWeather.applySettings(currentWindSettings());
-    rainWeather.applySettings(currentRainSettings());
-    snowWeather.applySettings(currentSnowSettings());
     sandstormWeather.applySettings(currentSandstormSettings());
-    stormWeather.applySettings(currentStormSettings());
+    storm.setTarget(stormOverride
+      ? { ...stormTargetForSettings({ weatherMode: 'storm', weatherIntensity: stormOverride.storm }), kind: stormOverride.kind }
+      : stormTargetForSettings(settings));
+    if (snap || stormOverride?.snap) applyStormChannels(storm.snap());
     return true;
   };
-  applySettings();
+  // The page opens on the saved weather, not on a storm building from clear.
+  applySettings({ snap: true });
 
   const precompile = async (renderer, camera = deps.getCamera?.() ?? deps.camera) => {
     if (disposed || !renderer || !camera) return false;
@@ -352,12 +348,20 @@ export function createWeatherController(deps) {
      */
     setRegionalSnow(amount) {
       if (disposed) return;
-      const wet = ['rain', 'storm', 'sandstorm'].includes(settings.weatherMode);
+      // shortcut: snow country alone decides rain vs snow; add the snow-line
+      // height term of the storm plan §2.3 when storms reach high valleys.
+      storm.setSnowShare(THREE.MathUtils.smoothstep(amount, 0.15, 0.6));
+      const wet = storm.frame.rain > 0.02 || settings.weatherMode === 'sandstorm';
       snowWeather.setRegionalSnow(wet ? 0 : amount);
+    },
+    /** This frame's storm channels (StormState.frame); read-only. */
+    get storm() {
+      return storm.frame;
     },
     update(deltaSeconds, elapsedSeconds, cameraPosition, effectCenter) {
       if (disposed) return;
       if (deps.getCamera) sandstormWeather.camera = deps.getCamera();
+      applyStormChannels(storm.step(deltaSeconds));
       const visual = resolveSunbeamMoteVisualState(readActiveBiomeVisualState());
       normalizeSunDirection(deps.getSunDirection?.(), sunDirection);
       meadowWeather.update(

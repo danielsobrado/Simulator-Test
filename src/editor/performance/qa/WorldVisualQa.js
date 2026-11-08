@@ -96,7 +96,7 @@ export class WorldVisualQa {
     const e=this.editor;
     e.dayNightCycle?.setPaused(true);e.dayNightCycle?.setHour(hour);e.skyLooks?.setPreset(preset);
     e.weatherSettings.weatherMode=weather;e.weatherSettings.weatherIntensity=weather==='off'?0:1;
-    e.weatherController?.applySettings();
+    e.weatherController?.applySettings({ snap: true });
     await e.stylizedSurface.skyView.environment.ready;
   }
   setWaterTime(seconds = null) { setWaterTimeOverride(seconds); }

@@ -9,7 +9,7 @@ import { SkyLookController } from '../src/editor/stylized/sky/SkyLookController.
 import { applySceneEnvironment, environmentLightScale } from '../src/editor/stylized/sky/sceneEnvironment.js';
 import { StylizedSkyView } from '../src/editor/stylized/StylizedSkyView.js';
 import { sceneExposure } from '../src/render/sceneExposure.js';
-import { createWeatherController, sanitizeWeatherSettings, weatherOvercastAmount } from '../src/editor/weather/weather_controller.js';
+import { createWeatherController, sanitizeWeatherSettings } from '../src/editor/weather/weather_controller.js';
 import { ambientPresetName } from '../src/editor/stylized/ambient/ambientPresets.js';
 
 const { stylizedSurface } = yaml.load(await readFile(new URL('../editor.config.yaml', import.meta.url), 'utf8'));
@@ -129,11 +129,6 @@ test('disabled or disposed environment cannot publish a late HDR', async t => {
 test('dry overcast is selectable and activates no precipitation or storm systems', () => {
   const settings = sanitizeWeatherSettings({ weatherMode: 'overcast', weatherIntensity: 1 });
   assert.equal(settings.weatherMode, 'overcast');
-  assert.equal(weatherOvercastAmount(settings), 1);
-  assert.equal(weatherOvercastAmount(settings, false), 0);
-  assert.equal(weatherOvercastAmount({ ...settings, weatherIntensity: Number.NaN }), 0);
-  assert.equal(weatherOvercastAmount({ ...settings, weatherIntensity: 0.5 }), 0.5);
-  assert.equal(weatherOvercastAmount({ ...settings, weatherMode: 'rain' }), 0.8);
   assert.equal(ambientPresetName({ skyPreset: 'highfield', weatherMode: 'overcast' }), 'calm');
   assert.equal(ambientPresetName({ skyPreset: 'moonrise', weatherMode: 'overcast', night: true }), 'moonlight');
   const scene = new THREE.Scene();
@@ -143,6 +138,8 @@ test('dry overcast is selectable and activates no precipitation or storm systems
     getSettings: () => settings, getCamera: () => camera });
   try {
     assert.equal(controller.getStats().mode, 'overcast');
+    assert.equal(controller.storm.cloud, 1);
+    assert.equal(controller.storm.precip, 0);
     for (const name of ['rain', 'snow', 'sandstorm', 'storm', 'wind']) {
       assert.equal(scene.getObjectByName(`weather-${name}`).visible, false, name);
     }

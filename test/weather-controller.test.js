@@ -113,6 +113,8 @@ test('weather controller applies VFX material policy and restores visibility aft
 
   settings.weatherMode = 'rain';
   assert.equal(controller.applySettings(), true);
+  assert.equal(scene.getObjectByName('weather-rain').visible, false, 'a UI change builds, it does not cut');
+  assert.equal(controller.applySettings({ snap: true }), true);
   assert.equal(scene.getObjectByName('weather-rain').visible, true);
 
   let compileCalls = 0;
