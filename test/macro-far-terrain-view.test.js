@@ -187,3 +187,14 @@ test('large far-terrain rings yield every sixteen samples and preserve exact com
     assert.equal(sliced.mesh.visible, true);
   } finally { reference.dispose(); sliced.dispose(); }
 });
+
+test('snow-country tiles go bare as thawed earth, not their map colour', () => {
+  const view = Object.create(MacroFarTerrainView.prototype);
+  view.colorCache = new Map();
+  view.generator = { getTileDefinition: () => ({ color: '#96784b' }) };
+  view.snowBiomeCover = { 9: 0.1, 10: 0.95 };
+  view.snowBareColor = { r: 0.04, g: 0.03, b: 0.02 };
+  const tundra = view.colorForTile(10), taiga = view.colorForTile(9);
+  assert.ok(tundra.r < 0.06 && tundra.r > 0.04);
+  assert.ok(taiga.r > 0.2, 'partial-cover biomes keep their own ground');
+});

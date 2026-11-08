@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { biomeSnowCover } from './BiomeLooks.js';
+import { TERRAIN_SUBSTRATES } from '../materials/TerrainSubstrateConfig.js';
 
 /** How far a fully frosted tip leans to the frost colour; the root keeps more. */
 const TIP_FROST = 0.8;
@@ -80,6 +81,10 @@ export function applyBiomeLooks(config, bakeSource, looks) {
     config.world.farTerrain.snowBiomeCover = { ...ground };
     config.world.farTerrain.glacierCover = Object.fromEntries([...looks.glacier]
       .flatMap((share, id) => (share > 0 ? [[id, share]] : [])));
+    // Snow country's bare ground, as the near bake draws it (`thaw` substrate):
+    // the tundra map colour read as rust-brown smears on the distant ranges.
+    config.world.farTerrain.snowBareColor = bakeSource?.families?.substrates?.thaw?.color
+      ?? TERRAIN_SUBSTRATES.thaw.color;
   }
   const meadow = config.stylizedSurface?.grass?.meadow;
   if (meadow?.palette) meadow.palette = frostMeadowPalette(meadow.palette, looks);

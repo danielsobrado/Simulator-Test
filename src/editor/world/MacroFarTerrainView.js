@@ -91,6 +91,8 @@ export class MacroFarTerrainView {
     this.snowBiomeCover = { ...(farConfig.snowBiomeCover ?? {}) };
     // Glacier biomes' snow is mostly bare ice (biome-looks `glacier`, GlacierIceShading).
     this.glacierCover = { ...(farConfig.glacierCover ?? {}) };
+    // Snowy biomes' ground where the snow does not hold, by their cover (applyBiomeLooks).
+    this.snowBareColor = farConfig.snowBareColor ? new THREE.Color(farConfig.snowBareColor) : null;
     this.rockSlopeStart = Math.max(0, Number(farConfig.rockSlopeStart ?? 0.18));
     this.rockSlopeFull = Math.max(
       this.rockSlopeStart + 0.001,
@@ -257,6 +259,9 @@ export class MacroFarTerrainView {
     if (!color) {
       const definition = this.generator.getTileDefinition(tileId);
       color = new THREE.Color(definition?.color ?? FALLBACK_COLOR);
+      const cover = this.snowBiomeCover[tileId] ?? 0;
+      // Snow country only (tundra, glacier): taiga and cold desert keep their own ground.
+      if (this.snowBareColor && cover >= 0.5) color.lerp(this.snowBareColor, cover);
       this.colorCache.set(tileId, color);
     }
     return color;

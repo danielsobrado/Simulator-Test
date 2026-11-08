@@ -56,8 +56,11 @@ export function createGlacierIceShading({ terrainUv, chunkWorldSize, chunkCenter
   const veer = noise2(p.div(140)).mul(1.4);
   const along = vec2(veer.cos(), veer.sin());
   const across = vec2(along.y.negate(), along.x);
-  const streakField = noise2(vec2(p.dot(along).div(28), p.dot(across).div(1.3)));
-  const grit = smoothstep(0.24, 0.34, streakField).mul(0.55).mul(near(1.3).mul(0.6).add(0.4))
+  // Bands metres wide with soft edges, broken along their length: at 1.3 m across
+  // under a hard threshold they drew as crisp ruled lines, like tyre tracks.
+  const streakField = noise2(vec2(q.dot(along).div(28), q.dot(across).div(4.5)));
+  const broken = smoothstep(-0.2, 0.35, noise2(p.div(37).add(vec2(-8.3, 12.9))));
+  const grit = smoothstep(0.12, 0.5, streakField).mul(broken).mul(0.42).mul(near(4.5).mul(0.6).add(0.4))
     .add(smoothstep(0.3, 0.55, noise2(q.div(9))).mul(0.15));
 
   const shade = noise2(q.div(6.5)).mul(near(6.5)).mul(0.5).add(0.5);
