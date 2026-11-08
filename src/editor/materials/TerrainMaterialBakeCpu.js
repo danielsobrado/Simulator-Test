@@ -222,7 +222,8 @@ export async function bakeTerrainMaterialPage({
   const sourceIndices = new Uint32Array(texelCount);
   const waterSource = waterDistanceSource(source, chunkSize);
   const rowsPerYield = config.build.rowsPerYield;
-  const farStyle = createTerrainMaterialFarStyle(materialStyle, config.render, config.families?.substrates);
+  const farStyle = createTerrainMaterialFarStyle(materialStyle, config.render, config.families?.substrates,
+    config.classification?.glacierCover);
 
   for (let z = 0; z < resolution; z += 1) {
     const sourceZ = outputToSource(z, resolution, chunkSize);

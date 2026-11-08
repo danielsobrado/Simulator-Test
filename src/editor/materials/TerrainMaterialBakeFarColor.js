@@ -37,8 +37,16 @@ function hexToLinearRgb(value, field) {
   ]);
 }
 
-export function createTerrainMaterialFarStyle(materialStyle, render, substrates = null) {
+/** Glacier ice as the far bake sees it: the near shading's grey-blue averaged (GlacierIceShading). */
+export const FAR_GLACIER_ICE = '#a3b7c1';
+
+/**
+ * @param {Record<string, number>} [glacierCover] biome-looks `glacier` share by tile id
+ */
+export function createTerrainMaterialFarStyle(materialStyle, render, substrates = null, glacierCover = null) {
   if (!materialStyle) return null;
+  const glacier = new Float32Array(256);
+  for (const [tileId, share] of Object.entries(glacierCover ?? {})) glacier[Number(tileId)] = share;
   const grassBrightness = Number(materialStyle.grassBrightness);
   if (!Number.isFinite(grassBrightness) || grassBrightness < 0) {
     throw new Error('Terrain material bake grass brightness must be non-negative and finite.');
@@ -52,6 +60,8 @@ export function createTerrainMaterialFarStyle(materialStyle, render, substrates 
     forest: hexToLinearRgb(materialStyle.forestColor, 'forestColor'),
     rock: hexToLinearRgb(render.rockColor, 'render.rockColor'),
     snow: hexToLinearRgb(render.snowColor, 'render.snowColor'),
+    glacier,
+    glacierIce: hexToLinearRgb(FAR_GLACIER_ICE, 'FAR_GLACIER_ICE'),
     shoreline: hexToLinearRgb(render.shorelineColor, 'render.shorelineColor'),
     grassTintStrength: render.grassTintStrength,
     wetDarkening: render.wetDarkening,
@@ -99,18 +109,23 @@ export function encodeTerrainMaterialFarColor(
     meadow ? meadow[meadowOffset + 2] : style.grassBottom[2] * style.grassBrightness,
     meadow ? 1 : style.grassTintStrength,
   );
+  // A glacier biome's snow is mostly bare ice, so its distant slopes read grey-blue.
+  const ice = style.glacier?.[sourcePixels[sourceOffset + 3]] ?? 0;
+  const snowRed = lerp(style.snow[0], style.glacierIce[0], ice);
+  const snowGreen = lerp(style.snow[1], style.glacierIce[1], ice);
+  const snowBlue = lerp(style.snow[2], style.glacierIce[2], ice);
   let red = grassRed * grassWeight
     + style.dirt[0] * dirtWeight
     + style.rock[0] * rockWeight
-    + style.snow[0] * snowWeight;
+    + snowRed * snowWeight;
   let green = grassGreen * grassWeight
     + style.dirt[1] * dirtWeight
     + style.rock[1] * rockWeight
-    + style.snow[1] * snowWeight;
+    + snowGreen * snowWeight;
   let blue = grassBlue * grassWeight
     + style.dirt[2] * dirtWeight
     + style.rock[2] * rockWeight
-    + style.snow[2] * snowWeight;
+    + snowBlue * snowWeight;
   if (style.substrates) {
     const response=terrainSubstrateResponse({tileId:sourcePixels[sourceOffset+3],canopy,wetness,shoreline},style.substrates);
     [red,green,blue]=response.applyColor([red,green,blue],dirtWeight,path);

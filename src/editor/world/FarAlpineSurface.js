@@ -5,6 +5,7 @@ import {
 } from 'three/tsl';
 import { resolveAssetUrl } from '../assets/assetUrl.js';
 import { snowLightUniforms } from '../stylized/sky/skyLight.js';
+import { FAR_GLACIER_ICE } from '../materials/TerrainMaterialBakeFarColor.js';
 
 const COLOR_FILE = 'assets/textures/settlement/stone-rock-color.webp';
 const NORMAL_FILE = 'assets/textures/settlement/stone-rock-normal.webp';
@@ -46,7 +47,7 @@ export function acquireRockTextures() {
  * than a ridge: triplanar stone with strata on the faces, snow held on ledges
  * and in cracks. No viewport textures.
  */
-export function createFarAlpineSurface({ vertexColor, snowCover, snowColor }) {
+export function createFarAlpineSurface({ vertexColor, snowCover, snowColor, iceCover = float(0) }) {
   const maps = acquireRockTextures();
   const origin = uniform(new THREE.Vector3());
   const p = positionWorld.add(origin).toVar();
@@ -76,7 +77,8 @@ export function createFarAlpineSurface({ vertexColor, snowCover, snowColor }) {
   // The near snow's albedo and shade, or the two meet at a visible seam.
   const farShade = mix(vec3(1), snowLightUniforms.shadeTint, snowLightUniforms.shade);
   return {
-    color: mix(ground, color(snowColor).mul(snowLightUniforms.brightness).mul(farShade), snow),
+    // A glacier's snow reads as its bare grey-blue ice from afar (GlacierIceShading).
+    color: mix(ground, mix(color(snowColor), color(FAR_GLACIER_ICE), iceCover).mul(snowLightUniforms.brightness).mul(farShade), snow),
     normal: normalize(cameraViewMatrix.mul(vec4(lit, 0)).xyz),
     /** Keeps the rock fixed to the world across floating-origin snaps. */
     setOrigin(state) {

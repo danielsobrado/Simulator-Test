@@ -89,6 +89,8 @@ export class MacroFarTerrainView {
     this.snowSlopeMax = Math.max(0.001, Number(farConfig.snowSlopeMax ?? 0.55));
     // Snow at any height by terrain tile (Azgaar biome id), as in the near bake.
     this.snowBiomeCover = { ...(farConfig.snowBiomeCover ?? {}) };
+    // Glacier biomes' snow is mostly bare ice (biome-looks `glacier`, GlacierIceShading).
+    this.glacierCover = { ...(farConfig.glacierCover ?? {}) };
     this.rockSlopeStart = Math.max(0, Number(farConfig.rockSlopeStart ?? 0.18));
     this.rockSlopeFull = Math.max(
       this.rockSlopeStart + 0.001,
@@ -112,9 +114,11 @@ export class MacroFarTerrainView {
     this.pendingPositions = new Float32Array(vertexCount * 3);
     this.pendingColors = new Float32Array(vertexCount * 3);
     this.pendingSnow = new Float32Array(vertexCount);
+    this.pendingIce = new Float32Array(vertexCount);
     this.pendingNormals = new Float32Array(vertexCount * 3);
     this.normals = new Float32Array(vertexCount * 3);
     this.snow = new Float32Array(vertexCount);
+    this.ice = new Float32Array(vertexCount);
     this.pendingHeights = new Float32Array(vertexCount);
     this.pendingTileIds = new Int32Array(vertexCount);
     this.pendingForest = new Float32Array(vertexCount);
@@ -123,6 +127,7 @@ export class MacroFarTerrainView {
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     this.geometry.setAttribute('snowCover', new THREE.BufferAttribute(this.snow, 1));
+    this.geometry.setAttribute('iceCover', new THREE.BufferAttribute(this.ice, 1));
     this.geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
     this.geometry.setIndex(this.buildIndices());
 
@@ -151,6 +156,7 @@ export class MacroFarTerrainView {
     this.alpine = createFarAlpineSurface({
       vertexColor: attribute('color', 'vec3'),
       snowCover: attribute('snowCover', 'float'),
+      iceCover: attribute('iceCover', 'float'),
       snowColor: this.snowColor,
     });
     const ground = this.alpine.color;
@@ -403,6 +409,7 @@ export class MacroFarTerrainView {
         this.snowBiomeCover[job.tileIds[index]] ?? 0,
       );
       this.pendingSnow[index] = altitude;
+      this.pendingIce[index] = this.glacierCover?.[job.tileIds[index]] ?? 0;
       this.writeNormal(job, ring, spoke, index);
 
       // The forest reads the ring's own tile, height and slope: at this spacing
@@ -456,11 +463,13 @@ export class MacroFarTerrainView {
     this.positions.set(this.pendingPositions);
     this.colors.set(this.pendingColors);
     this.snow.set(this.pendingSnow);
+    this.ice.set(this.pendingIce);
     this.normals.set(this.pendingNormals);
     this.alpine?.setOrigin(this.floatingOrigin.getState());
     this.geometry.getAttribute('position').needsUpdate = true;
     this.geometry.getAttribute('color').needsUpdate = true;
     this.geometry.getAttribute('snowCover').needsUpdate = true;
+    this.geometry.getAttribute('iceCover').needsUpdate = true;
     this.geometry.getAttribute('normal').needsUpdate = true;
     // The backdrop is never frustum-culled, so recomputing bounds here only
     // adds a full-vertex pass to the origin-snap publication frame.

@@ -70,8 +70,17 @@ export function settleMeadowGrowth(growth, looks) {
  */
 export function applyBiomeLooks(config, bakeSource, looks) {
   const ground = biomeSnowCover(looks, 'ground');
-  if (bakeSource?.classification) bakeSource.classification.snowBiomeCover = { ...ground };
-  if (config.world?.farTerrain) config.world.farTerrain.snowBiomeCover = { ...ground };
+  if (bakeSource?.classification) {
+    bakeSource.classification.snowBiomeCover = { ...ground };
+    // The far bake tints a glacier biome's snow toward bare ice (TerrainMaterialBakeFarColor).
+    bakeSource.classification.glacierCover = Object.fromEntries([...looks.glacier]
+      .flatMap((share, id) => (share > 0 ? [[id, share]] : [])));
+  }
+  if (config.world?.farTerrain) {
+    config.world.farTerrain.snowBiomeCover = { ...ground };
+    config.world.farTerrain.glacierCover = Object.fromEntries([...looks.glacier]
+      .flatMap((share, id) => (share > 0 ? [[id, share]] : [])));
+  }
   const meadow = config.stylizedSurface?.grass?.meadow;
   if (meadow?.palette) meadow.palette = frostMeadowPalette(meadow.palette, looks);
   if (meadow?.growth) meadow.growth = settleMeadowGrowth(meadow.growth, looks);
