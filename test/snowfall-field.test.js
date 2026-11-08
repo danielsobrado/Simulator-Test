@@ -8,6 +8,7 @@ import {
   createSnowfallGeometry,
   snowfallFlakeCount,
 } from '../src/editor/weather/snowfall/SnowfallField.js';
+import { PRECIP_LEVEL_KEYS } from '../src/editor/weather/storm/stormCurves.js';
 import { REGIONAL_SNOW_INTENSITY, SnowWeatherSystem, snowDriftVelocity } from '../src/editor/weather/snow_system.js';
 
 test('the seeded flake populations share one quad and retain their size and appearance profiles', () => {
@@ -17,15 +18,19 @@ test('the seeded flake populations share one quad and retain their size and appe
   assert.equal(seeds.count, snowfallFlakeCount());
   assert.equal(geometry.attributes.position.count, 4, 'all flakes share one quad');
   assert.equal(geometry.instanceCount, snowfallFlakeCount());
-  let start = 0;
-  for (const population of SNOWFALL_POPULATIONS) {
-    const ranks = Array.from({ length: population.count }, (_, i) => seeds.getW(start + i));
-    assert.ok(ranks[0] < 1 / population.count + 1e-9 && ranks.at(-1) > 1 - 1 / population.count - 1e-9);
-    const appearance = geometry.attributes.snowAppearance;
-    assert.equal(appearance.getY(start), population.softness, 'soft lens flakes keep their population profile');
-    assert.ok(shapes.getZ(start) >= population.sizeMin && shapes.getZ(start) <= population.sizeMax);
-    start += population.count;
-  }
+  const layers = geometry.attributes.snowLayer;
+  const appearance = geometry.attributes.snowAppearance;
+  SNOWFALL_POPULATIONS.forEach((population, layer) => {
+    const slots = geometry.userData.slots[layer];
+    assert.equal(slots.length, population.count);
+    // Ranks rise along the buffer, so a density culls from its end.
+    slots.forEach((slot, rank) => {
+      assert.equal(layers.getX(slot), layer);
+      assert.ok(Math.abs(seeds.getW(slot) - (rank + 0.5) / population.count) < 1e-6);
+    });
+    assert.equal(appearance.getY(slots[0]), population.softness, 'soft lens flakes keep their population profile');
+    assert.ok(shapes.getZ(slots[0]) >= population.sizeMin && shapes.getZ(slots[0]) <= population.sizeMax);
+  });
   geometry.dispose();
 });
 
@@ -54,11 +59,15 @@ test('coverage-driven snow fades in with the weather off, and weather snow only 
   assert.equal(snow.group.visible, false, 'regional snow starts through the update fade');
   snow.update(0.1, 0.1, new THREE.Vector3());
   assert.equal(snow.group.visible, true);
-  assert.ok(snow.snowMaterial.uniforms.intensity.value > 0 && snow.snowMaterial.uniforms.intensity.value < 0.2);
+  const early = snow.getStats().flakes;
+  assert.ok(early > 0 && early < 6000, `regional snow starts below its full count (${early})`);
   for (let frame = 2; frame <= 60; frame++) snow.update(0.1, frame / 10, new THREE.Vector3());
+  // Full regional snowfall is the moderate level: about the former 12 000 flakes, fully opaque.
+  assert.ok(Math.abs(snow.getStats().flakes - 12044) < 2, `${snow.getStats().flakes}`);
   assert.equal(snow.snowMaterial.uniforms.intensity.value, REGIONAL_SNOW_INTENSITY);
   snow.applySettings({ enabled: true, intensity: 1.2, windX: 0, windZ: 0 });
-  assert.equal(snow.snowMaterial.uniforms.intensity.value, 1.2);
+  assert.equal(snow.getStats().flakes, 30000, 'a storm draws the whole allocation (near-soft culled)');
+  assert.equal(snow.snowMaterial.uniforms.intensity.value, 1.2, 'above 1 only the opacity grows');
   snow.applySettings({ enabled: false, intensity: 1.2, windX: 0, windZ: 0 });
   snow.setRegionalSnow(0);
   for (let frame = 61; frame <= 120; frame++) snow.update(0.1, frame / 10, new THREE.Vector3());
@@ -76,7 +85,7 @@ test('regional coverage thresholds and intensity are configurable without changi
   assert.equal(snow.group.visible, false);
   snow.setRegionalSnow(0.6);
   for (let frame = 1; frame <= 60; frame++) snow.update(0.1, frame / 10, new THREE.Vector3());
-  assert.ok(Math.abs(snow.effectiveIntensity() - 0.448) < 0.002);
+  assert.ok(Math.abs(snow.effectiveIntensity() - 0.448 * PRECIP_LEVEL_KEYS[2]) < 0.002);
   assert.equal(snow.flakeCount, count);
   snow.dispose();
 });
@@ -102,4 +111,5 @@ test('a storm wind drives a blizzard drift, capped at 15 m/s', () => {
   assert.ok(calm.x > 0.4 && calm.x < 0.8, `calm drift ${calm.x}`);
   assert.ok(gale.x > 8 && gale.x < 15, `gale drift ${gale.x}`);
   assert.equal(gust.z, -15);
+  assert.equal(snowDriftVelocity({ directionX: 1, directionZ: 0, envelope: 2.4 * 7, storm: 1 }, 5).x, 5, 'per-level cap');
 });

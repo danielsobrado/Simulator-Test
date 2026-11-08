@@ -7,6 +7,7 @@
  * Channels lag S in the order cloud → wind → precipitation, so the sky darkens
  * before the first drop and clears last.
  */
+import { PRECIP_START } from './stormCurves.js';
 
 /** Approach time constant (s) and rate limits (S per second) of §2.2. */
 const APPROACH_TAU = 8;
@@ -120,7 +121,7 @@ export class StormState {
 
   precipTarget() {
     // Nothing falls until the cloud is in.
-    return smoothstep(0.12, 1, this.storm);
+    return smoothstep(PRECIP_START, 1, this.storm);
   }
 
   publish() {

@@ -7,6 +7,7 @@ import { createSnowfallField } from "./snowfall/SnowfallField.js";
 import { clampWindWeatherSettings, isWeatherVisible } from "./weather_settings.js";
 import { DEFAULT_WEATHER_EFFECTS } from './WeatherEffectsConfig.js';
 import { worldWindCamera } from './wind/worldWindState.js';
+import { evaluateLevels, PRECIP_LEVEL_KEYS } from './storm/stormCurves.js';
 /**
  * Maximum coverage-driven snowfall over snow country with the weather off.
  * Resolved weather-effects settings can override this reference intensity.
@@ -14,14 +15,17 @@ import { worldWindCamera } from './wind/worldWindState.js';
 const REGIONAL_SNOW_INTENSITY = DEFAULT_WEATHER_EFFECTS.snowfall.regionalIntensity;
 /** Flake drift (m/s) in the calm reference wind; scales with the world wind's strength. */
 const SNOW_DRIFT_SPEED = Math.hypot(DEFAULT_SNOW_WEATHER_SETTINGS.windX, DEFAULT_SNOW_WEATHER_SETTINGS.windZ);
-/** A blizzard drives flakes ~15 m/s sideways against a 1.2 m/s fall (storm plan §3.3). */
-const SNOW_DRIFT_CAP = 15;
+/** Regional snowfall at full coverage reads as the moderate level (≈ the former full field). */
+const REGIONAL_LEVEL_KEY = PRECIP_LEVEL_KEYS[2];
 /** Extra drift at full storm wind: the field's 2.4× intensity alone leaves a gale at ~3 m/s. */
 const SNOW_STORM_DRIFT_GAIN = 2;
 
-/** Drift velocity (m/s) from the shared camera wind sample. */
-export function snowDriftVelocity(sample = worldWindCamera) {
-  const speed = Math.min(SNOW_DRIFT_CAP,
+/**
+ * Drift velocity (m/s) from the shared camera wind sample, capped per level
+ * (`snowfall.levels.driftCap`: a blizzard drives flakes ~15 m/s sideways against a 1.2 m/s fall).
+ */
+export function snowDriftVelocity(sample = worldWindCamera, cap = 15) {
+  const speed = Math.min(cap,
     SNOW_DRIFT_SPEED * sample.envelope * (1 + SNOW_STORM_DRIFT_GAIN * sample.storm));
   return { x: sample.directionX * speed, z: sample.directionZ * speed };
 }
@@ -68,9 +72,10 @@ class SnowWeatherSystem {
     const { regionalMinCoverage, regionalFullCoverage, regionalIntensity } = this.snowfallSettings;
     this.regionalTarget = THREE.MathUtils.smoothstep(coverage, regionalMinCoverage, regionalFullCoverage) * regionalIntensity;
   }
+  /** The snow channel the field draws: the weather's, or the regional floor, whichever is heavier. */
   effectiveIntensity() {
     const weather = isWeatherVisible(this.settings) ? this.settings.intensity : 0;
-    return Math.max(weather, this.regional);
+    return Math.max(weather, this.regional * REGIONAL_LEVEL_KEY);
   }
   refresh() {
     const intensity = this.effectiveIntensity();
@@ -88,12 +93,15 @@ class SnowWeatherSystem {
     this.snowMaterial.setCenter(this.center);
     this.snowMaterial.setOrigin?.(origin);
     // Drift with the gust the grass and trees bend to at the camera.
-    const drift = snowDriftVelocity();
+    const level = Math.min(1, this.effectiveIntensity());
+    const drift = snowDriftVelocity(worldWindCamera, evaluateLevels(this.snowfallSettings.levels.driftCap, level, PRECIP_LEVEL_KEYS));
     this.snowMaterial.setWind(drift.x, drift.z);
     this.snowMaterial.setTime(elapsedSeconds);
   }
   getStats() {
-    return { flakes: this.group.visible ? this.flakeCount : 0 };
+    if (!this.group.visible) return { flakes: 0 };
+    const density = this.snowMaterial.getDensity?.();
+    return { flakes: density ? density.live.reduce((sum, count) => sum + Math.round(count), 0) : this.flakeCount };
   }
   dispose() {
     this.group.removeFromParent();

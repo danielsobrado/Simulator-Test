@@ -12,33 +12,44 @@ import { StylizedGodRaysPostProcess } from '../src/editor/stylized/StylizedGodRa
 test('weather configuration matches donor-scaled defaults and rejects unsafe fields', () => {
   const source = yaml.load(readFileSync(new URL('../config/weather-effects.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(resolveWeatherEffects(source), DEFAULT_WEATHER_EFFECTS);
+  const mid = DEFAULT_WEATHER_EFFECTS.rain.layers[1];
   for (const patch of [
-    { rain: { count: 20001 } }, { rain: { count: 0.5 } }, { rain: { top: -100 } },
+    { rain: { layers: [] } }, { rain: { layers: [{ ...mid, counts: [0, 1, 2, 3, 32001] }] } },
+    { rain: { layers: [{ ...mid, counts: [0, 1, 2.5] }] } }, { rain: { layers: [{ ...mid, top: -100 }] } },
+    { rain: { levels: { opacity: [1, 1, 1, 1, 9] } } }, { rain: { levels: { fallSpeed: [12, 12] } } },
     { snowfall: { opacity: 2 } }, { snowfall: { speed: -1 } },
     { snowfall: { layers: [] } }, { rain: { colorLinear: [1, NaN, 1] } },
+    { snowfall: { levels: { driftCap: [3, 3, 5, 9, -1] } } },
   ]) assert.throws(() => resolveWeatherEffects(patch), /weatherEffects/);
 });
 
 test('rain uses one four-vertex quad and keeps its field centred at camera height', () => {
   const field = createCinematicRainField();
-  assert.equal(field.geometry.instanceCount, 10000);
   assert.equal(field.geometry.attributes.position.count, 4);
+  assert.equal(field.geometry.instanceCount, 0, 'clear weather draws nothing');
   const center = new THREE.Vector3(1234, 876, -5678);
   field.setCenter(center);
   field.setTime(12.5);
   field.setWind(1, -2);
   field.setIntensity(0.7);
+  assert.ok(field.geometry.instanceCount > 0 && field.geometry.instanceCount < 22500);
   assert.deepEqual(field.uniforms.center.value.toArray(), center.toArray());
   assert.deepEqual(field.uniforms.wind.value.toArray(), [1, -2]);
   assert.equal(field.uniforms.time.value, 12.5);
-  assert.equal(field.uniforms.intensity.value, 0.7);
+  assert.equal(field.uniforms.intensity.value, 1, 'moderate-to-heavy rain is fully opaque; density is count');
   // Travel integrates wind × gust, so a gust changes speed without moving drops.
   field.setGust(2);
   field.setTime(13.5);
   assert.deepEqual(field.uniforms.drift.value.toArray(), [0.5, -1], 'wind × gust × a dt clamped to 0.25 s');
+  assert.ok(Math.abs(field.uniforms.fall.value - field.uniforms.fallSpeed.value * 0.25) < 1e-9, 'the fall integrates too');
   field.setGust(10);
   field.setTime(13.75);
   assert.deepEqual(field.uniforms.vector.value.toArray(), [4, -8], 'gust clamps at 4×');
+  field.setIntensity(1);
+  assert.equal(field.geometry.instanceCount, 22500, 'a full storm draws its whole allocation');
+  assert.equal(field.uniforms.fallSpeed.value, 18);
+  field.setIntensity(0);
+  assert.equal(field.geometry.instanceCount, 0);
   let disposed = 0;
   field.geometry.addEventListener('dispose', () => { disposed += 1; });
   field.dispose();

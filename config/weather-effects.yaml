@@ -1,24 +1,35 @@
 # Ported from Gods' End RainSystem / SnowfallSystem. Lengths and speeds are
 # scaled by 1.8 / 5 to match the world builder's human-sized characters.
+#
+# Per-level tables (docs/plans/storm-weather-plan-2026-11-08.md §3.5) list five
+# values, one per storm level: [clear, light, moderate, heavy, storm]. `counts`
+# are live instances per layer at each level; each field is allocated at its
+# densest level (at most 32 000) and culls the rest, so density is count, not
+# opacity, and clear weather draws nothing.
 rain:
-  count: 10000
-  area: 48
-  top: 36
-  bottom: -12
-  speed: -16.2
   windVariation: 0.6
   turbulence: 0.29
-  dropLength: 0.648
-  dropWidth: 0.0126
   opacity: 2
   colorLinear: [0.78, 0.86, 1]
+  layers:
+    # near: drives the slant you read
+    - { area: 12, top: 8, bottom: -4, lengthMin: 0.5, lengthMax: 0.9, widthMin: 0.008, widthMax: 0.014, counts: [0, 600, 1500, 3000, 4500] }
+    # mid: the former single field
+    - { area: 48, top: 36, bottom: -12, lengthMin: 0.29, lengthMax: 0.87, widthMin: 0.0069, widthMax: 0.0158, counts: [0, 2500, 6000, 10000, 14000] }
+    # far: long sheets that sell distance; fog fades them
+    - { area: 110, top: 60, bottom: -12, lengthMin: 2, lengthMax: 4, widthMin: 0.03, widthMax: 0.05, counts: [0, 400, 1200, 2500, 4000] }
+  levels:
+    fallSpeed: [12, 12, 14, 16, 18]
+    opacity: [0.8, 0.8, 1, 1, 1]
+    hardSplashes: [0, 60, 140, 220, 320]
+    waterSplashes: [0, 40, 80, 120, 180]
 snowfall:
   # Match Gods' End's coverage-driven alpine snowfall even in clear weather.
+  # regionalIntensity 1 = the moderate level (≈ the former full 12 000 flakes).
   regionalIntensity: 1
   regionalMinCoverage: 0.2
   regionalFullCoverage: 0.7
   regionalFadeRate: 1.2
-  count: 12000
   top: 16.2
   bottom: -3.6
   speed: 1.224
@@ -28,6 +39,9 @@ snowfall:
   opacity: 0.95
   color: '#dae6f6'
   layers:
-    - { share: 0.56, area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9 }
-    - { share: 0.43, area: 16.56, sizeMin: 0.0324, sizeMax: 0.0792, opacity: 0.9, speedScale: 1, nearFade: 1.44, softness: 0, brightness: 1 }
-    - { share: 0.012, area: 6.48, sizeMin: 0.108, sizeMax: 0.198, opacity: 0.4, speedScale: 1.3, nearFade: 0.432, softness: 1, brightness: 0.75 }
+    - { area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9, counts: [0, 2000, 6700, 12000, 18000] }
+    - { area: 16.56, sizeMin: 0.0324, sizeMax: 0.0792, opacity: 0.9, speedScale: 1, nearFade: 1.44, softness: 0, brightness: 1, counts: [0, 1500, 5200, 9000, 12000] }
+    # Near-soft flakes wrap their 6.5 m box every 0.4 s in a gale: culled at storm (§3.4).
+    - { area: 6.48, sizeMin: 0.108, sizeMax: 0.198, opacity: 0.4, speedScale: 1.3, nearFade: 0.432, softness: 1, brightness: 0.75, counts: [0, 40, 144, 200, 0] }
+  levels:
+    driftCap: [3, 3, 5, 9, 15]

@@ -8,8 +8,10 @@ import {
   fract,
   mix,
   positionGeometry,
+  select,
   sin,
   smoothstep,
+  float,
   uniform,
   uniformArray,
   vec2,
@@ -27,6 +29,8 @@ export function createSnowfallUniforms(settings = DEFAULT_WEATHER_EFFECTS.snowfa
     drift: uniform(new THREE.Vector2()), intensity: uniform(1),
     color: uniform(new THREE.Color(settings.color)), opacity: uniform(settings.opacity),
     phases: uniformArray(settings.layers.map(() => new THREE.Vector2())),
+    /** Live share of each population (count-based density); flakes ranked above it are culled. */
+    densities: uniformArray(settings.layers.map(() => 0), 'float'),
   };
 }
 
@@ -45,17 +49,19 @@ export function createSnowfallMaterial(uniforms, settings = DEFAULT_WEATHER_EFFE
     cos(phase.mul(0.83)).mul(settings.swayRadius).sub(eddy.mul(0.7)));
   // World-anchored wrapping lets the camera move through the field. Only its
   // bounded window follows the view; seeded flakes do not travel with it.
-  const phaseOffset = uniforms.phases.element(attribute('snowLayer', 'float').toUint());
+  const layer = attribute('snowLayer', 'float').toUint();
+  const phaseOffset = uniforms.phases.element(layer);
   const offset = fract(seed.xy.add(swirl.div(width)).sub(phaseOffset)).sub(0.5).mul(width);
   const flake = vec3(center.x.add(offset.x), center.y.add(y), center.z.add(offset.y));
   const fadeStart = appearance.x.max(0.001);
   const distance = cameraPosition.distance(flake);
   const lens = smoothstep(fadeStart, fadeStart.mul(3), distance);
-  // Coverage fades the field once in opacity, as in Gods' End. Also thinning
-  // instances here would square the effect and erase light regional snowfall.
+  // Density is count, not opacity: a flake ranked above its population's live
+  // share collapses to nothing (four vertices, no fragments).
+  const alive = select(seed.w.lessThan(uniforms.densities.element(layer)), float(1), float(0));
   // Cap the angular size: a world-sized flake a metre from the eye otherwise
   // fills a fifth of the screen as a white blob, and its quad dominates overdraw.
-  const size = shape.z.min(distance.mul(SNOWFLAKE_MAX_ANGULAR_SIZE)).mul(lens);
+  const size = shape.z.min(distance.mul(SNOWFLAKE_MAX_ANGULAR_SIZE)).mul(lens).mul(alive);
   const right = cameraWorldMatrix.element(0).xyz;
   const up = cameraWorldMatrix.element(1).xyz;
   const corner = positionGeometry.xy;
