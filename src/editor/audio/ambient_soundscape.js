@@ -2,8 +2,9 @@
  * Ambient sound from the CC0 bank (after grass-test's ambient system):
  *
  *   beds       looping wind (open and alpine), forest, wetland, jungle by
- *              day and night, surf, stream, lake, night crickets and rain,
- *              each faded toward the weight the surroundings give it;
+ *              day and night, surf, stream, lake and night crickets, each
+ *              faded toward the weight the surroundings give it (rain and
+ *              storm beds live on the weather sub-bus, weather_soundscape.js);
  *   calls      birds, crows, frogs, gulls, single waves, jungle calls and
  *              cicadas at random intervals around the listener, as many
  *              as the surroundings support, panned left and right;
@@ -15,6 +16,7 @@
  */
 
 import { AmbientOneShots } from './ambient_one_shots.js';
+import { BedSet, fadeGain } from './ambient_beds.js';
 
 const numbered = (folder, stem, count) => Array.from(
   { length: count },
@@ -33,9 +35,6 @@ const BEDS = Object.freeze({
   stream: 'ambient/stream.mp3',
   lake: 'ambient/lake-01.mp3',
   nightCrickets: 'ambient/night-crickets.mp3',
-  rainLight: 'ambient/rain-light-01.mp3',
-  rainMedium: 'ambient/rain-medium-01.mp3',
-  rainHeavy: 'ambient/rain-heavy-01.mp3',
 });
 
 const BED_VOLUME = Object.freeze({
@@ -49,9 +48,6 @@ const BED_VOLUME = Object.freeze({
   stream: 0.35,
   lake: 0.35,
   nightCrickets: 0.25,
-  rainLight: 0.4,
-  rainMedium: 0.45,
-  rainHeavy: 0.5,
 });
 
 /**
@@ -76,8 +72,6 @@ const WILDLIFE = Object.freeze({
 
 const FALL_ROAR = 'ambient/lake-01.mp3';
 const FALL_ROAR_RANGE = 220;
-/** Seconds for a bed to cover most of the way to its target level. */
-const FADE_SECONDS = 1.6;
 
 /** Stereo pan (-1 left … 1 right) of a canonical bearing for a listener's yaw. */
 export function panToward(listener, bearing) {
@@ -102,7 +96,7 @@ export class AmbientSoundscape {
     this.volume = volume;
     this.random = random;
     this.bus = null;
-    this.beds = new Map();
+    this.beds = new BedSet(bank, BEDS, BED_VOLUME);
     this.timers = new Map();
     this.wildlife = new AmbientOneShots({ bank, definitions: WILDLIFE, random });
     this.roar = null;
@@ -120,24 +114,12 @@ export class AmbientSoundscape {
     return this.bus;
   }
 
-  /** Ease a gain toward a target over FADE_SECONDS, frame-rate independent. */
   fade(gain, target, dt) {
-    const amount = 1 - Math.exp(-dt * 3 / FADE_SECONDS);
-    gain.value += (target - gain.value) * amount;
+    fadeGain(gain, target, dt);
   }
 
   updateBeds(weights, dt) {
-    for (const [name, path] of Object.entries(BEDS)) {
-      const target = (weights[name] ?? 0) * BED_VOLUME[name];
-      let voice = this.beds.get(name);
-      if (!voice) {
-        if (target <= 0.001) continue;
-        voice = this.bank.loop(path, this.bus);
-        if (!voice) continue;
-        this.beds.set(name, voice);
-      }
-      this.fade(voice.gain.gain, target, dt);
-    }
+    this.beds.update(weights, this.bus, dt);
   }
 
   /** @param {number | null} seaPan -1 left … 1 right, where the sea lies */
@@ -195,13 +177,10 @@ export class AmbientSoundscape {
 
   dispose() {
     this.wildlife.dispose();
-    for (const voice of this.beds.values()) {
-      try { voice.source.stop(); } catch { /* already stopped */ }
-    }
+    this.beds.dispose();
     if (this.roar) {
       try { this.roar.source.stop(); } catch { /* already stopped */ }
     }
     this.bus?.disconnect();
-    this.beds.clear();
   }
 }

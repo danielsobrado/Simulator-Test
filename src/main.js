@@ -1000,12 +1000,14 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   });
   resources.own(waterfallMist);
   // Rain on the ground and wind in the open, for the ambient beds; the sea
-  // reads the same rain.
-  const weatherAudioLevelsScratch = { rain: 0, wind: 0.25 };
+  // reads the same rain. Snow and lightning feed the storm beds and thunder.
+  const weatherAudioLevelsScratch = { rain: 0, wind: 0.25, snow: 0, lightning: 0 };
   const weatherAudioLevels = () => {
     const storm = stormFrame();
     weatherAudioLevelsScratch.rain = Math.min(1, storm.rain);
     weatherAudioLevelsScratch.wind = Math.max(0.25, storm.wind);
+    weatherAudioLevelsScratch.snow = Math.min(1, storm.snow);
+    weatherAudioLevelsScratch.lightning = storm.lightning;
     return weatherAudioLevelsScratch;
   };
   const surfaceWetness = new SurfaceWetness(config.stylizedSurface.wetness);
@@ -1099,6 +1101,11 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     isUnderwater: () => viewModeController.mode === PLAYER_MODE_WALK
       && playerController.isHeadSubmerged(),
     getFallSites: fallSites,
+    getCollisionWorld: () => playerController.collisionRuntime?.world ?? null,
+    getGust: () => {
+      const { position } = viewModeController.camera;
+      return worldWind.sample(position.x, position.z).gust;
+    },
   });
   resources.own(worldSoundscape);
   const waterInteraction = resources.own(new WaterInteractionSurface({ terrainView,
@@ -1133,6 +1140,8 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     })
     : null;
   resources.own(weatherController);
+  // Thunder follows each strike from where its flash was.
+  weatherController?.lightning?.subscribe?.((strike) => worldSoundscape.strike(strike));
   if (weatherController && weatherSettings.weatherMode !== 'off') {
     postProcessingController.notifyReactive(
       POST_PROCESSING_REACTIVE_EVENTS.WEATHER_STARTED,

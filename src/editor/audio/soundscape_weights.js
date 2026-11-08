@@ -29,7 +29,7 @@ function share(values, predicate) {
 export const SILENT_WEIGHTS = Object.freeze({
   meadow: 0, alpine: 0, forest: 0, wetland: 0, jungleDay: 0, jungleNight: 0,
   surf: 0, stream: 0, lake: 0, nightCrickets: 0,
-  rainLight: 0, rainMedium: 0, rainHeavy: 0,
+  rainLight: 0, rainMedium: 0, rainHeavy: 0, canopy: 0,
   birds: 0, crows: 0, crickets: 0, frogs: 0, mosquitoes: 0,
   seagulls: 0, waves: 0, jungleCalls: 0, cicadas: 0,
 });
@@ -41,12 +41,13 @@ export const SILENT_WEIGHTS = Object.freeze({
  * @param {number} surroundings.heightAboveSea metres
  * @param {number} surroundings.rain 0..1
  * @param {number} surroundings.wind 0..1 relative wind strength
+ * @param {number} [surroundings.snow] 0..1 falling snow (the storm's snow channel)
  * @param {number} [surroundings.snowCountry] 0..1 (SnowCountryWeight)
  * @param {boolean} surroundings.night
  * @param {boolean} surroundings.underwater
  */
 export function soundscapeWeights({
-  tiles, water = [], heightAboveSea, rain, wind, snowCountry = 0, night, underwater,
+  tiles, water = [], heightAboveSea, rain, wind, snow: snowfall = 0, snowCountry = 0, night, underwater,
 }) {
   if (underwater) return { ...SILENT_WEIGHTS };
   const forest = share(tiles, (tile) => FOREST.has(tile));
@@ -58,7 +59,9 @@ export function soundscapeWeights({
   const river = share(water, (kind) => kind === WATER_RIVER);
   const snow = clamp01(snowCountry);
   const rainAmount = clamp01(rain);
-  const dry = 1 - rainAmount;
+  // Rain, a blizzard or a gale all send the wildlife to cover.
+  const hush = clamp01(Math.max(rainAmount, snowfall, wind - 0.5));
+  const dry = 1 - hush;
   // Open ground and height both expose you to the wind; snow country has its own.
   const exposure = clamp01(open + clamp01((heightAboveSea - 300) / 900)) * (1 - snow);
   const gust = 0.45 + clamp01(wind) * 0.55;
@@ -84,14 +87,16 @@ export function soundscapeWeights({
     // Calls. Birds by day in trees and meadows, fewer in rain and none on the
     // snowfields; crows over open ground; gulls and single waves at the beach.
     birds: night ? 0 : clamp01((forest + open * 0.5) * dry * lowland),
-    crows: night ? 0 : clamp01(open * 0.6 * (1 - rainAmount * 0.7) * lowland),
+    crows: night ? 0 : clamp01(open * 0.6 * (1 - hush * 0.7) * lowland),
     crickets: night ? clamp01((open + forest * 0.5) * dry * lowland) : 0,
     frogs: clamp01((wetland + jungle * 0.5) * (night ? 1 : 0.35) + lake * 0.3),
     mosquitoes: clamp01(wetland * (night ? 0.8 : 0.3) * dry),
-    seagulls: night ? 0 : clamp01(beach * (1 - rainAmount * 0.5)),
+    seagulls: night ? 0 : clamp01(beach * (1 - hush * 0.5)),
     waves: clamp01(beach * 1.2),
-    jungleCalls: night ? 0 : clamp01(jungle * 1.3 * (1 - rainAmount * 0.6)),
+    jungleCalls: night ? 0 : clamp01(jungle * 1.3 * (1 - hush * 0.6)),
     cicadas: night ? 0 : clamp01((jungle + open * 0.25) * dry * (1 - snow)),
+    // Not a bed: how much tree cover dulls the weather (weather sub-bus).
+    canopy: clamp01(forest + jungle),
   };
 }
 

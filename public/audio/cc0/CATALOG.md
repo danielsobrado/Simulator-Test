@@ -1,6 +1,6 @@
 # Environmental sound bank
 
-114 files, 3340 KB. Every file is CC0 or public domain.
+132 files, 5037 KB. Every file is CC0 or public domain.
 
 Two generations from grass-test:
 
@@ -8,6 +8,8 @@ Two generations from grass-test:
   recordings linked in each row. Loops are crossfaded into themselves; one-shots
   are mono. It replaces v1's footsteps and adds recorded snow and sand steps.
 - **v1** (OpenGameArt.org, CC0): the beds and calls v2 has no counterpart for.
+
+Plus the **storm** set (2026-11-08, storm plan §6), streamed on the first storm.
 
 ## v2
 
@@ -132,3 +134,31 @@ Two generations from grass-test:
 | `transitions/transition-light-01.mp3` | 1.8 | 0.16s | Mono | Light snappy air swish |
 | `transitions/transition-light-02.mp3` | 14.7 | 1.22s | Stereo | Smooth neutral UI interaction chime |
 | `transitions/transition-heavy-01.mp3` | 2.4 | 0.24s | Mono | Heavy dramatic preset whoosh |
+
+## Storm
+
+Cut, peak-normalised to −1 dB and encoded with ffmpeg/LAME: loops 96 kbps stereo
+with a 2 s self-crossfade, one-shots 64 kbps mono with short fades. No CC0
+rain-on-leaves loop was found, so the canopy bed is left empty (canopy only
+dulls the weather sub-bus).
+
+| File | KB | Seconds | Ch | Description | Source | Licence |
+| :--- | ---: | ---: | :---: | :--- | :--- | :--- |
+| `storm/rain-storm.mp3` | 282.0 | 24.03 | 2 | Torrential rain between peals; source 93–119 s, loop-crossfaded | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/rain-roof.mp3` | 282.0 | 24.03 | 2 | Rain on a roof and into a gutter; source 4–30 s, loop-crossfaded | [Ogrebane](https://opengameart.org/content/rain-gutter-loop) | CC0 |
+| `storm/wind-strong.mp3` | 282.0 | 24.03 | 2 | Gale: synthesised strong wind (Pure Data); `wind1.wav` 2–28 s, loop-crossfaded | [Luke.RUSTLTD](https://opengameart.org/content/wind1) | CC0 |
+| `storm/blizzard-howl.mp3` | 205.8 | 17.53 | 2 | Howling wind; `Wind.ogg` + `Wind2.ogg` + `Wind.ogg` joined, loop-crossfaded | [crystalgames](https://opengameart.org/content/wind) | CC0 |
+| `storm/gust-01.mp3` | 21.9 | 2.77 | 1 | Gust swell; `Misc/gust.ogg` | [fvcalderan](https://opengameart.org/content/25-sounds-from-avalanche-minigame) | CC0 |
+| `storm/gust-02.mp3` | 33.7 | 4.28 | 1 | Gust swell; `short wind sound.wav` | [remaxim](https://opengameart.org/content/short-wind-sound) | CC0 |
+| `storm/gust-03.mp3` | 13.9 | 1.75 | 1 | Gust swell; `Wind3.ogg` | [crystalgames](https://opengameart.org/content/wind) | CC0 |
+| `storm/gust-04.mp3` | 27.8 | 3.53 | 1 | Gust swell; `wind1.wav` 30–33.5 s under a sine swell | [Luke.RUSTLTD](https://opengameart.org/content/wind1) | CC0 |
+| `storm/gust-05.mp3` | 31.9 | 4.05 | 1 | Gust swell; `Wind.ogg` 1–5 s under a sine swell | [crystalgames](https://opengameart.org/content/wind) | CC0 |
+| `storm/thunder-near-01.mp3` | 63.1 | 8.05 | 1 | Near thunder crack; source 159.4 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-near-02.mp3` | 55.1 | 7.03 | 1 | Near thunder crack; source 169.4 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-near-03.mp3` | 70.9 | 9.04 | 1 | Near thunder crack; `rain-thunder.ogg` 21.8 s | [WuxiaScrub](https://opengameart.org/content/rain-long-thunder) | CC0 |
+| `storm/thunder-near-04.mp3` | 63.1 | 8.05 | 1 | Near thunder crack; source 2.8 s | [ezwa / pdsounds](https://commons.wikimedia.org/wiki/File:Rain_and_thunder_(1).ogg) | Public domain |
+| `storm/thunder-far-01.mp3` | 51.3 | 6.53 | 1 | Distant rumble; source 6.0 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-far-02.mp3` | 51.3 | 6.53 | 1 | Distant rumble; source 36.8 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-far-03.mp3` | 47.4 | 6.03 | 1 | Distant rumble; source 175.8 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-far-04.mp3` | 63.1 | 8.05 | 1 | Distant rumble; source 228.3 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
+| `storm/thunder-far-05.mp3` | 51.3 | 6.53 | 1 | Distant rumble; source 241.0 s | [stephan / pdsounds](https://commons.wikimedia.org/wiki/File:Thunderstorm_after_hot_summer_day_17_minutes_01_of_04.ogg) | Public domain |
