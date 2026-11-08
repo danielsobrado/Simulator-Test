@@ -82,3 +82,17 @@ test('regional coverage thresholds and intensity are configurable without changi
   assert.equal(snow.flakeCount, count);
   snow.dispose();
 });
+
+test('flakes drift with the world wind, not a separate snow wind', async () => {
+  const { worldWindUniforms } = await import('../src/editor/weather/wind/worldWindState.js');
+  const before = worldWindUniforms.prevailing.value.clone();
+  worldWindUniforms.prevailing.value.set(0, 1);
+  const snow = new SnowWeatherSystem({ scene: new THREE.Scene(), isWebGpu: true });
+  snow.applySettings({ enabled: true, intensity: 1, windX: -3, windZ: 0 });
+  snow.update(0.1, 0, new THREE.Vector3());
+  snow.update(0.1, 1, new THREE.Vector3());
+  const drift = snow.snowMaterial.uniforms.drift.value;
+  assert.ok(drift.y > 0.1 && Math.abs(drift.x) < 1e-6, `drift follows the world wind (${drift.x}, ${drift.y})`);
+  worldWindUniforms.prevailing.value.copy(before);
+  snow.dispose();
+});

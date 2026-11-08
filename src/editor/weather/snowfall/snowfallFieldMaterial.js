@@ -19,6 +19,8 @@ import { DEFAULT_WEATHER_EFFECTS } from '../WeatherEffectsConfig.js';
 import { skyLightUniforms } from '../../stylized/sky/skyLight.js';
 
 const TAU = Math.PI * 2;
+/** Largest flake diameter on screen, in radians (~20 px across at a 60° 1600 px view). */
+export const SNOWFLAKE_MAX_ANGULAR_SIZE = 0.014;
 export function createSnowfallUniforms(settings = DEFAULT_WEATHER_EFFECTS.snowfall) {
   return {
     time: uniform(0), center: uniform(new THREE.Vector3()),
@@ -47,10 +49,13 @@ export function createSnowfallMaterial(uniforms, settings = DEFAULT_WEATHER_EFFE
   const offset = fract(seed.xy.add(swirl.div(width)).sub(phaseOffset)).sub(0.5).mul(width);
   const flake = vec3(center.x.add(offset.x), center.y.add(y), center.z.add(offset.y));
   const fadeStart = appearance.x.max(0.001);
-  const lens = smoothstep(fadeStart, fadeStart.mul(3), cameraPosition.distance(flake));
+  const distance = cameraPosition.distance(flake);
+  const lens = smoothstep(fadeStart, fadeStart.mul(3), distance);
   // Coverage fades the field once in opacity, as in Gods' End. Also thinning
   // instances here would square the effect and erase light regional snowfall.
-  const size = shape.z.mul(lens);
+  // Cap the angular size: a world-sized flake a metre from the eye otherwise
+  // fills a fifth of the screen as a white blob, and its quad dominates overdraw.
+  const size = shape.z.min(distance.mul(SNOWFLAKE_MAX_ANGULAR_SIZE)).mul(lens);
   const right = cameraWorldMatrix.element(0).xyz;
   const up = cameraWorldMatrix.element(1).xyz;
   const corner = positionGeometry.xy;

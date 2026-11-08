@@ -6,11 +6,14 @@ import { createSnowGeometry } from "./rain_geometry.js";
 import { createSnowfallField } from "./snowfall/SnowfallField.js";
 import { clampWindWeatherSettings, isWeatherVisible } from "./weather_settings.js";
 import { DEFAULT_WEATHER_EFFECTS } from './WeatherEffectsConfig.js';
+import { worldWindUniforms } from './wind/worldWindState.js';
 /**
  * Maximum coverage-driven snowfall over snow country with the weather off.
  * Resolved weather-effects settings can override this reference intensity.
  */
 const REGIONAL_SNOW_INTENSITY = DEFAULT_WEATHER_EFFECTS.snowfall.regionalIntensity;
+/** Flake drift (m/s) in the calm reference wind; scales with the world wind's strength. */
+const SNOW_DRIFT_SPEED = Math.hypot(DEFAULT_SNOW_WEATHER_SETTINGS.windX, DEFAULT_SNOW_WEATHER_SETTINGS.windZ);
 class SnowWeatherSystem {
   group = new THREE.Group();
   snowMaterial;
@@ -43,7 +46,6 @@ class SnowWeatherSystem {
   }
   applySettings(settings) {
     this.settings = clampWindWeatherSettings(settings);
-    this.snowMaterial.setWind(this.settings.windX, this.settings.windZ);
     this.refresh();
   }
   /**
@@ -74,6 +76,11 @@ class SnowWeatherSystem {
     this.center.copy(cameraPosition);
     this.snowMaterial.setCenter(this.center);
     this.snowMaterial.setOrigin?.(origin);
+    // Drift with the world wind the grass and trees bend to; the weather's own
+    // wind already steers it while the weather is on.
+    const { prevailing, prevailingStrength, referenceStrength } = worldWindUniforms;
+    const speed = Math.min(5, SNOW_DRIFT_SPEED * prevailingStrength.value / referenceStrength.value);
+    this.snowMaterial.setWind(prevailing.value.x * speed, prevailing.value.y * speed);
     this.snowMaterial.setTime(elapsedSeconds);
   }
   getStats() {
