@@ -2,6 +2,7 @@ import { selectMinimapBurgs } from '../../map/minimapBurgs.js';
 import { createMinimapBurgElements } from '../../map/minimapBurgMarkers.js';
 import { paintRegionMap } from '../../map/regionMapPainter.js';
 import { getWorldVectorModel } from '../../map/worldMapModelCache.js';
+import { findVectorMapCell } from '../../map/worldMapVector.js';
 import { MAP_ZOOM } from './HudMinimap.js';
 
 /** Canvas resolution; the dial shows it at up to ~310 CSS px after the zoom. */
@@ -76,6 +77,28 @@ export class HudRegionMap {
 
   getWindow() {
     return { center: this.center, cells: this.cells };
+  }
+
+  /**
+   * The Azgaar province under a world cell, else its state; id 0 is Azgaar's
+   * "no province" / "Neutrals", which is not a place name.
+   */
+  describeRegion(cellX, cellZ) {
+    const model = this.resolveModel();
+    if (!model) return null;
+    const { target: bounds, sourceWidth, sourceHeight } = this.modelCampaign.source;
+    const index = findVectorMapCell(
+      model,
+      (cellX + 0.5 - bounds.minCellX) * sourceWidth / bounds.widthCells,
+      sourceHeight - (cellZ + 0.5 - bounds.minCellZ) * sourceHeight / bounds.heightCells,
+    );
+    if (index < 0) return null;
+    const { cartography, lookups } = model;
+    const province = cartography.provinces[index];
+    const state = cartography.states[index];
+    return (province ? lookups.provinceById.get(province)?.name : null)
+      ?? (state ? lookups.stateById.get(state)?.name : null)
+      ?? null;
   }
 
   /** Redraws the window around `cell`, an integer world cell. */

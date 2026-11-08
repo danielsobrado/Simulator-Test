@@ -23,6 +23,7 @@ const MARKUP = `
     </div>
     <div class="hud-minimap__compass"><span class="hud-minimap__north">N</span></div>
   </div>
+  <div class="hud-minimap__place hud-minimap__region" hidden></div>
   <div class="hud-minimap__place" hidden><i class="hud-minimap__swatch"></i><span></span></div>
 `;
 
@@ -45,14 +46,16 @@ export class HudMinimap {
    * @param {(cell: { x: number, z: number }) => void} source.recenter
    * @param {() => { x: number, z: number } | null} source.getFocusPoint fractional cell
    * @param {(cellX: number, cellZ: number) => { label: string, color: string } | null} [source.describeCell]
+   * @param {(cellX: number, cellZ: number) => string | null} [source.describeRegion] Azgaar province/state name
    */
-  constructor({ getFrame, getWindow, recenter, getFocusPoint, describeCell = null }) {
+  constructor({ getFrame, getWindow, recenter, getFocusPoint, describeCell = null, describeRegion = null }) {
     this.getFrame = getFrame;
     this.frame = null;
     this.getWindow = getWindow;
     this.recenter = recenter;
     this.getFocusPoint = getFocusPoint;
     this.describeCell = describeCell;
+    this.describeRegion = describeRegion;
     this.home = null;
 
     this.element = document.createElement('div');
@@ -62,7 +65,8 @@ export class HudMinimap {
     this.element.style.setProperty('--hud-map-zoom', String(MAP_ZOOM));
     this.element.innerHTML = MARKUP;
     this.dial = this.element.querySelector('.hud-minimap__dial');
-    this.place = this.element.querySelector('.hud-minimap__place');
+    this.region = this.element.querySelector('.hud-minimap__region');
+    this.place = this.element.querySelector('.hud-minimap__place:not(.hud-minimap__region)');
     this.placeSwatch = this.place.querySelector('.hud-minimap__swatch');
     this.placeLabel = this.place.querySelector('span');
     this.resetReadout();
@@ -123,6 +127,7 @@ export class HudMinimap {
     this.offsetX = Number.NaN;
     this.offsetZ = Number.NaN;
     this.placeSignature = undefined;
+    this.regionName = undefined;
     this.nextPlaceAt = 0;
   }
 
@@ -158,6 +163,13 @@ export class HudMinimap {
   }
 
   updatePlace(point) {
+    const regionName = this.describeRegion?.(Math.floor(point.x), Math.floor(point.z)) ?? null;
+    if (regionName !== this.regionName) {
+      this.regionName = regionName;
+      this.region.hidden = !regionName;
+      // Region names come from the imported world, so they are set as text.
+      this.region.textContent = regionName ?? '';
+    }
     const place = this.describeCell?.(Math.floor(point.x), Math.floor(point.z)) ?? null;
     const signature = place ? `${place.label}|${place.color}` : null;
     if (signature === this.placeSignature) return;

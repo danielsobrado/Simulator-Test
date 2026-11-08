@@ -229,6 +229,12 @@
   display: none;
 }
 
+/* The Azgaar region rides above the dial, clear of the turning north badge. */
+.hud-minimap__region {
+  top: -30px;
+  bottom: auto;
+}
+
 @media (max-width: 760px), (max-height: 500px) {
   .hud-minimap {
     top: var(--hud-phone-top);
@@ -251,5 +257,10 @@
     padding: 2px 7px;
     font-size: 7px;
     letter-spacing: 0.1em;
+  }
+
+  /* The dial sits at the top of a phone screen, so the region hangs below the biome. */
+  .hud-minimap__region {
+    top: calc(100% + 14px);
   }
 }

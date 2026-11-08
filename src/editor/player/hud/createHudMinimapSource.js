@@ -70,6 +70,7 @@ export function createHudMinimapSource({ ui, controller, tileMap, getBaseTerrain
       worldDz: v - 0.5,
       metres: distanceCells * tileMap.tileSize,
     })),
+    describeRegion: (cellX, cellZ) => regionMap.describeRegion(cellX, cellZ),
     describeCell: (cellX, cellZ) => {
       const definition = tileMap.getTileDefinition(tileMap.get(cellX, cellZ));
       return definition ? { label: definition.label, color: definition.color } : null;
