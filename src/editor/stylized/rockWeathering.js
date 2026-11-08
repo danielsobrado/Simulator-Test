@@ -5,6 +5,7 @@ import {
   float,
   mx_noise_float,
   mix,
+  normalLocal,
   normalWorld,
   positionGeometry,
   positionWorld,
@@ -15,6 +16,7 @@ import {
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
 import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
+import { coldStone, snowGrain } from './rockSnowSurface.js';
 import { SNOW_GROUND_COLOR, snowDeposition } from './snowDeposition.js';
 
 /**
@@ -62,9 +64,9 @@ const ALGAE = '#4a5a2a';
 const ROCK_SNOW = '#eef2f6';
 /** Snow-edge noise frequency: a few tears across a metre-scale boulder. */
 const SNOW_TEAR_PER_METRE = 1.4;
-/** How far snow country greys a boulder, and the cold grey it greys toward. */
-const FROST_GREY = 0.75;
-const FROST_TINT = '#c6d0dc';
+/** How far snow country turns a boulder to the crags' stone, and how much of its own shading it keeps. */
+const FROST_STONE = 0.85;
+const FROST_SHADING = 2.2;
 /** Snow on a face tipping away from the sky: a cooler, deeper white. */
 const ROCK_SNOW_SHADE = '#c3cfdc';
 
@@ -196,17 +198,21 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   // Snow country: capped on top, drifted into the lee and the recesses, and
   // buried at the foot in the terrain's own snow (snowDeposition).
   if (look) {
-    // Frost-dulled stone: snow country greys a warm authored texture toward the cold
-    // crags beside it (AlpineRockMaterial's tint), as a biome tint alone could not.
-    const frost = snowGround.smoothstep(0.3, 0.9).mul(FROST_GREY);
-    weathered = mix(weathered, dot(weathered, vec3(0.3, 0.59, 0.11)).mul(color(FROST_TINT)), frost);
+    // Snow country wears the crags' cold stone (rockSnowSurface), lit by the authored
+    // stone's own light and dark so its facets and cracks still read; a tint alone
+    // left warm painted boulders beside blue-grey crags. Object space, so it holds still.
+    const frost = snowGround.smoothstep(0.3, 0.9).mul(FROST_STONE);
+    const shading = dot(weathered, vec3(0.3, 0.59, 0.11)).mul(FROST_SHADING).clamp(0.5, 1.2);
+    weathered = mix(weathered, coldStone(pattern, normalLocal).mul(shading), frost);
     // The sine patches are too smooth to tear an edge: alone, whole facets went white
     // at once and the skirt ran in straight lines across a face.
     const tear = mx_noise_float(pattern.mul(SNOW_TEAR_PER_METRE)).mul(0.6).add(patches.sub(0.5).mul(0.3));
     const { cover, skirt } = snowDeposition({ snow: snowGround, breakup: tear, ...(ground ?? {}) });
-    const snowColor = mix(mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), color(SNOW_GROUND_COLOR), skirt);
+    const grain = snowGrain(pattern, normalLocal);
+    const snowColor = mix(mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), color(SNOW_GROUND_COLOR), skirt)
+      .mul(grain?.tint ?? vec3(1));
     weathered = mix(weathered, snowColor, cover);
-    roughness = mix(roughness, float(0.6), cover);
+    roughness = mix(roughness, float(0.6).add(grain?.roughness ?? 0), cover);
   }
 
   material.colorNode = weathered;
