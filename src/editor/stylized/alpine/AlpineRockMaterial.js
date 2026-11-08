@@ -23,7 +23,8 @@ export function createAlpineRockMaterial() {
   const stone = texture(maps.color, p.zy.mul(scale)).rgb.mul(weights.x)
     .add(texture(maps.color, p.xz.mul(scale)).rgb.mul(weights.y))
     .add(texture(maps.color, p.xy.mul(scale)).rgb.mul(weights.z)).toVar();
-  const breakup = mx_noise_float(p.mul(0.35)).toVar();
+  // A finer octave too: a crag is tens of metres, and the broad one alone ran its skirt as a level band.
+  const breakup = mx_noise_float(p.mul(0.35)).add(mx_noise_float(p.mul(1.4)).mul(0.5)).toVar();
   // Per crag (AlpineRockView): its biome's ground snow or its altitude's, so badlands crags stay bare.
   const { cover: snow, skirt } = snowDeposition({ snow: attribute('instanceSnow', 'float'), breakup: breakup.mul(0.9), centre: [0, 0, 0], groundY: GROUND_Y, height: 1.15 });
   material.colorNode = mix(stone.mul(color(ROCK_TINT)).mul(2), mix(color(SNOW), color(SNOW_GROUND_COLOR), skirt), snow);
