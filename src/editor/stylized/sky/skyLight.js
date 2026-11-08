@@ -24,10 +24,11 @@ export const skyLightUniforms = {
 export const snowLightUniforms = {
   brightness: uniform(0.82),
   shade: uniform(0.35),
-  shadeTint: uniform(new THREE.Color(0.78, 0.88, 1.08)),
+  shadeTint: uniform(new THREE.Color(0.78, 0.836, 0.942)),
 };
 const SNOW_GREY_SHADE = [0.84, 0.86, 0.9];
-const SNOW_BLUE_SHADE = [0.66, 0.8, 1.1];
+// Cool, not cyan: the blue channel leads, green stays near grey.
+const SNOW_BLUE_SHADE = [0.74, 0.82, 0.97];
 
 /** Snow's light for `look` (snowBrightness, snowShade, snowBlue). */
 export function snowLightFor(look) {

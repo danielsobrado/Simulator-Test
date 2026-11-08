@@ -5,6 +5,7 @@ import { createTerrainMaterialBakeConfig } from '../../materials/TerrainMaterial
 import { createTerrainMaterialBakedSurface } from '../../materials/TerrainMaterialBakedNodes.js';
 import { createSnowDetailNodes } from '../../stylized/SnowDetailShading.js';
 import { createSnowSurfaceNodes } from '../../stylized/SnowSurfaceShading.js';
+import { applySnowLighting } from '../../stylized/SnowLightingModel.js';
 import { resolveSnowSurfaceConfig } from '../../stylized/SnowSurfaceConfig.js';
 import { acquireSnowTextures } from '../../assets/godsEnd/snowTextures.js';
 import { worldWindUniforms } from '../../weather/wind/worldWindState.js';
@@ -69,7 +70,10 @@ try {
     material.colorNode = lighting ? surface.apply(detailedColor) : detailedColor;
     material.normalNode = baseNormal;
     material.roughnessNode = detail.roughness(float(0.78));
-    if (lighting) material.emissiveNode = surface.emissive.add(detail.shade);
+    if (lighting) {
+      applySnowLighting(material, surface.sunResponse);
+      material.emissiveNode = detail.shade;
+    }
     return material;
   };
   const settings = resolveSnowSurfaceConfig();

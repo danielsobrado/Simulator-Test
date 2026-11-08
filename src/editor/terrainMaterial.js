@@ -51,6 +51,7 @@ import { createCoastSwashNodes, DEFAULT_COAST_SWASH } from './stylized/CoastSwas
 import { createCoastSandNodes } from './stylized/CoastSandShading.js';
 import { createTerrainWaterContext } from './stylized/TerrainOceanMask.js';
 import { createSnowSurfaceNodes } from './stylized/SnowSurfaceShading.js';
+import { applySnowLighting } from './stylized/SnowLightingModel.js';
 import { createTerrainDriftNodes } from './materials/TerrainDriftNodes.js';
 import { createFrostShading } from './stylized/ambient/FrostShading.js';
 import { applyJungleMist } from './stylized/ambient/jungleMistOutput.js';
@@ -547,9 +548,10 @@ export function createTerrainMaterial({
       : surface.roughness;
     material.roughnessNode = filteredRoughness;
     if (snowSurface) {
-      const snowGlow = snowDetail ? snowSurface.emissive.add(snowDetail.shade) : snowSurface.emissive;
-      // Glints and backscatter belong to the powder, not to the bare ice beside it.
-      material.emissiveNode = glacierIce ? snowGlow.mul(glacierIce.share.oneMinus()) : snowGlow;
+      // Glints and transmitted light belong to the powder, not to the bare ice beside it.
+      const powder = glacierIce ? glacierIce.share.oneMinus() : float(1);
+      applySnowLighting(material, snowSurface.sunResponse.mul(powder));
+      if (snowDetail) material.emissiveNode = snowDetail.shade.mul(powder);
     }
     if (bakedSurface.normal) material.normalNode = footprints.relief(bakedSurface.normal);
     if (snowDetail) {

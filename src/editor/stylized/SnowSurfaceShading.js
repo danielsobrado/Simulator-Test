@@ -27,7 +27,7 @@ import {
 } from 'three/tsl';
 import { latticeHashNode } from '../weather/wind/windNoise.js';
 import { directionFromAngles } from './StylizedGodRaysPostProcess.js';
-import { skyLightUniforms, snowLightUniforms } from './sky/skyLight.js';
+import { snowLightUniforms } from './sky/skyLight.js';
 import { resolveSnowSurfaceConfig } from './SnowSurfaceConfig.js';
 
 /**
@@ -48,6 +48,9 @@ import { resolveSnowSurfaceConfig } from './SnowSurfaceConfig.js';
 const FINE_CELL_METERS = 0.15;
 const COARSE_CELL_METERS = 0.5;
 const FACET_SHARE = 0.38;
+// A cell fades from half a pixel-footprint across to gone at one: below that a
+// facet is a single flickering pixel, which reads as noise, not sparkle.
+const GLINT_FADE = [0.45, 1.1];
 
 function cellHash(originMeters, cell, salt) {
   return latticeHashNode(
@@ -115,6 +118,7 @@ export function createSnowSurfaceNodes({
     chunkCenter.y.negate().sub(chunkWorldSize * 0.5),
   ).round();
   const footprint = length(fwidth(localMeters));
+  const compacted = pathMask.clamp(0, 1);
   const graze = float(1).sub(clamp(dot(normal, view), 0, 1)).pow(3);
   const facingSun = clamp(dot(normal, sun), 0, 1);
   const lightGate = smoothstep(0.02, 0.35, facingSun)
@@ -126,12 +130,13 @@ export function createSnowSurfaceNodes({
     If(snow.greaterThan(0.02).and(normal.y.greaterThanEqual(-1)).and(footprint.greaterThanEqual(0)), () => {
       const fine = glintOctave({
         localMeters, originMeters, cellMeters: FINE_CELL_METERS, salt: 11, normal, halfVector, sharpness: 780,
-      }).mul(float(1).sub(smoothstep(FINE_CELL_METERS * 0.55, FINE_CELL_METERS * 2.2, footprint)));
+      }).mul(float(1).sub(smoothstep(FINE_CELL_METERS * GLINT_FADE[0], FINE_CELL_METERS * GLINT_FADE[1], footprint)));
       const coarse = glintOctave({
         localMeters, originMeters, cellMeters: COARSE_CELL_METERS, salt: 53, normal, halfVector, sharpness: 1500,
-      }).mul(float(1).sub(smoothstep(COARSE_CELL_METERS * 0.55, COARSE_CELL_METERS * 2.2, footprint)))
+      }).mul(float(1).sub(smoothstep(COARSE_CELL_METERS * GLINT_FADE[0], COARSE_CELL_METERS * GLINT_FADE[1], footprint)))
         .mul(1.35);
-      result.assign(fine.add(coarse).mul(graze).mul(lightGate).mul(snow));
+      // Packed snow has lost the loose crystals that glint.
+      result.assign(fine.add(coarse).mul(graze).mul(lightGate).mul(snow).mul(compacted.mul(0.8).oneMinus()));
     });
     return result;
   })();
@@ -142,11 +147,12 @@ export function createSnowSurfaceNodes({
   const backscatter = snow.mul(shade).mul(snowLightUniforms.shade);
   // Backlit powder transmits a small blue lobe. Use direct light radiance so
   // ambient light alone cannot make the ground glow when the sun is gone.
-  const thickness = mix(float(1), float(0.35), pathMask.clamp(0, 1));
+  const thickness = mix(float(1), float(0.35), compacted);
   const transmitted = normalize(sun.add(normal.mul(0.28)));
   const lobe = dot(view, transmitted.negate()).clamp(0, 1)
-    .pow(mix(float(3), float(9), thickness)).mul(mix(float(1), float(0.3), thickness));
-  const transmissionTint = mix(vec3(0.94, 0.965, 1), vec3(0.55, 0.72, 1), thickness);
+    .pow(mix(float(3), float(9), thickness)).mul(mix(float(1), float(0.12), thickness));
+  // Thick snow scatters most of what it transmits: a faint cool tint, never cyan.
+  const transmissionTint = mix(vec3(0.94, 0.965, 1), vec3(0.8, 0.88, 1), thickness);
   const subsurface = transmissionTint.mul(lobe).mul(settings.subsurfaceStrength).mul(snow);
 
   return {
@@ -159,9 +165,9 @@ export function createSnowSurfaceNodes({
       return mix(albedo, albedo.mul(snowLightUniforms.shadeTint), backscatter);
     },
     /**
-     * Sparkle, added as emission so it survives the lit shading — and so it
-     * takes the sky's light itself (1 in the configured look, dim at night).
+     * Sparkle and transmitted light per unit of sun light (SnowLightingModel):
+     * they take the sun's colour and its shadow, so nothing glows in shade.
      */
-    emissive: vec3(glints.mul(2.2)).add(subsurface).mul(skyLightUniforms.sunColor),
+    sunResponse: vec3(glints.mul(2.2)).add(subsurface),
   };
 }

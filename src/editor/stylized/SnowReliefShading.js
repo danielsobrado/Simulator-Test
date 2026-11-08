@@ -6,7 +6,7 @@ import { worldWindUniforms } from '../weather/wind/worldWindState.js';
 import { resolveSnowSurfaceConfig } from './SnowSurfaceConfig.js';
 import { createSnowSurfaceState, snowSurfacePoint } from './SnowSurfaceState.js';
 
-const DRIFT_SKY_LIGHT = vec3(0.05, 0.085, 0.16);
+const DRIFT_SKY_LIGHT = vec3(0.06, 0.078, 0.11);
 
 /** Analytic slopes only: neither terrain height nor collision changes. */
 export function createSnowReliefNodes({ local, chunkCenter, snow, pathMask, worldNormal = vec3(0, 1, 0),

@@ -195,8 +195,8 @@ stylizedSurface:
     windward: 0.6
     pathCompaction: 0.85
     pathColor: '#a3b4c9'
-    baseRoughness: 0.7
-    compactedRoughness: 0.4
+    baseRoughness: 0.9
+    compactedRoughness: 0.65
     toneContrast: 0.06
     # Fresh snow is clean: strong cavities read as marble or concrete.
     cavityStrength: 0.2
@@ -207,7 +207,7 @@ stylizedSurface:
     fineNormal: 0.35
     # How far snow normals lean to a low sun. At 7° real snow glows gold; plain
     # N·L left it in the blue fill, and leaning keeps the shadow map, which emission would not.
-    lowSunWrap: 0.85
+    lowSunWrap: 0.4
   # The trail a walking body cuts through deep snow (grass-test's SnowSurfWake):
   # a banked trench that widens and deepens with speed and settles flat within
   # 25 s. Terrain-only and gated on baked snow, on a live trail and on a circle

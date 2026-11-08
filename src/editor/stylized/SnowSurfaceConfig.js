@@ -7,14 +7,14 @@ export const SNOW_SURFACE_DEFAULTS = Object.freeze({
   windward: 0.6,
   pathCompaction: 0.85,
   pathColor: '#a3b4c9',
-  baseRoughness: 0.7,
-  compactedRoughness: 0.4,
+  baseRoughness: 0.9,
+  compactedRoughness: 0.65,
   toneContrast: 0.06,
   cavityStrength: 0.2,
   subsurfaceStrength: 0.12,
   driftShadow: 0.18,
   fineNormal: 0.35,
-  lowSunWrap: 0.85,
+  lowSunWrap: 0.4,
 });
 
 export function resolveSnowSurfaceConfig(source = {}) {
