@@ -135,3 +135,13 @@ test('the default look is applied on the first frame', () => {
   assert.equal(controller.update(0.1), true);
   assert.equal(applied.at(-1).sunElevation, resolveSkyLook(SKY, 'meadow').sunElevation);
 });
+
+test('a preset chosen after a time blend replaces the blend, even with the same leading preset', () => {
+  const skyView = { config: { sky: SKY }, applyLook: () => {} };
+  const controller = new SkyLookController({ skyView, preset: 'configured' });
+  controller.setTimeBlend({ emberfall: 0.6, moonrise: 0.4 });
+  assert.equal(controller.preset, 'emberfall');
+  controller.setPreset('emberfall');
+  for (let i = 0; i < 40; i += 1) controller.update(0.1);
+  assert.equal(controller.current.directionalIntensity, resolveSkyLook(SKY, 'emberfall').directionalIntensity);
+});

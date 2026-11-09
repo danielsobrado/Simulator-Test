@@ -107,7 +107,8 @@ export class SkyLookController {
   }
 
   setPreset(name) {
-    if (!SKY_PRESETS[name] || name === this.preset) return;
+    // A time blend names its leading preset but shows a mix, so it never counts as a repeat.
+    if (!SKY_PRESETS[name] || (name === this.preset && this.blendKey === null)) return;
     this.blendKey = null;
     this.preset = name;
     // Start from the look on screen, which is the eased mix: re-basing at the

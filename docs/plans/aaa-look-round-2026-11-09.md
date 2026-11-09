@@ -120,6 +120,13 @@ re-selecting before anyone uses them again.
       hard horizontal edge on the near cobbles.
     - Alpha-dithered LODs and the fog are interacting.
 
+17. **Night fog renders as a brown slab.**
+    - Town at hour 21, captured after D: a warm brown band of glowing mist
+      fills the middle of the square, with a hard top edge.
+    - It reads as a box, not as air.
+    - Likely the valley-mist or regional fog colour taken from a night sky
+      look. Belongs to F.
+
 ## Next round: workstreams
 
 Each workstream fits one session. They touch disjoint files except where noted.
@@ -131,9 +138,9 @@ samplers, perf A/B for rendering changes.
 | A | Wet ground and puddles | 1, 9 | `RainWetnessShading.js`, `PuddleShading.js`, terrain wet terms | Cap darkening near 0.6× albedo; puddles reflect the sky colour via existing env and fresnel terms; cobble sheen. Capture wetland, coast and town in rain. |
 | B | Blizzard visibility and snowfall look | 2, 7 | phase 4 fog/whiteout, `snowfall/` | A visibility floor of about 50 m near-field at storm 1; wind-stretched flakes. Capture tundra and taiga snow at 0.5, 0.75 and 1. |
 | C | Snow cover outside snow country | 3 | `SnowCover`, `TerrainStormSnowNodes.js` | Ground accumulation follows `frame.snow`, not the tile share. Same files as B's terrain side: run after B, or merge B and C. |
-| D | Time-of-day capture | 4 | `WorldVisualQa.js`, day–night or sky preset | Diagnose first; then capture dawn, dusk and night with lanterns. Blocks a lighting review. |
+| D | Time-of-day capture | 4 | `WorldVisualQa.js`, `SkyLookController.js` | **Done.** `setLighting` paused the clock and then forced the `highfield` preset, so the hour moved only the sun and moon. Without a named preset it now applies the hour's time blend. A preset chosen after a blend is no longer skipped as a repeat. |
 | E | Storm sea and rain on water | 5, 6 | water and sea shaders | Swell and whitecaps from `seaStorm`; many small varied rain rings. |
-| F | Sky: lit cumulus and storm deck | 8, 10, 11 | `overcastSkyLook`, cloud and sky nodes | Sun-lit cloud tops and shaded bases; storm scud layer; aerial horizon gradient. Phase 4 owns these files, so follow its structure. |
+| F | Sky: lit cumulus and storm deck | 8, 10, 11, 17 | `overcastSkyLook`, cloud and sky nodes | Sun-lit cloud tops and shaded bases; storm scud layer; aerial horizon gradient. Phase 4 owns these files, so follow its structure. |
 | G | Ground variety and transitions | 12, 13 | terrain blend, grass and scatter | Noise-broken biome edges; grass hue and value variance; investigate the ghost bushes. |
 | H | Foliage lighting | 14, 16 | tree and leaf materials, dithered LOD | Inner-crown AO and translucency; storm crown bend; dither and fog speckle. |
 

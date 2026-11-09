@@ -2,6 +2,7 @@ import { WorldVisualMotion,WORLD_VISUAL_MOTION_SCHEMA_VERSION } from './WorldVis
 import { staticLightingComponents,staticLightingChange } from './WorldVisualLighting.js';
 import { worldVisualPreparation } from './WorldVisualPreparation.js';
 import { PerfCounters } from './PerfCounters.js';
+import { presetWeights } from '../../stylized/sky/dayNightCycle.js';
 import { trackedWorldResources } from './WorldVisualResources.js';
 import { treeImpostorIntegrity } from '../../stylized/impostor/TreeImpostorIntegrity.js';
 import { worldVisualNeighborhood } from './WorldVisualNeighborhood.js';
@@ -92,9 +93,11 @@ export class WorldVisualQa {
     }
     throw new Error(`Visual scenery did not settle: ${JSON.stringify(last)}`);
   }
-  async setLighting({preset='highfield',hour=12,weather='off'}={}) {
+  async setLighting({preset=null,hour=12,weather='off'}={}) {
     const e=this.editor;
-    e.dayNightCycle?.setPaused(true);e.dayNightCycle?.setHour(hour);e.skyLooks?.setPreset(preset);
+    e.dayNightCycle?.setPaused(true);e.dayNightCycle?.setHour(hour);
+    // Without a named preset the sky takes the hour's blend; a paused clock never writes it.
+    if(preset)e.skyLooks?.setPreset(preset);else e.skyLooks?.setTimeBlend(presetWeights(hour));
     e.weatherSettings.weatherMode=weather;e.weatherSettings.weatherIntensity=weather==='off'?0:1;
     e.weatherController?.applySettings({ snap: true });
     await e.stylizedSurface.skyView.environment.ready;
