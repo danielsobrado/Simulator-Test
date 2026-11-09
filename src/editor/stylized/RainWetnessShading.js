@@ -17,6 +17,8 @@ export function createRainWetnessShading({ snow, canopy, config }) {
   const wet = surfaceWetnessUniform.mul(exposure);
   return {
     wet,
+    /** 0..1 open to the rain: not snowed over, not under a canopy. */
+    exposure,
     apply(color, roughness) {
       return {
         color: color.mul(float(1).sub(wet.mul(config.darkening))),

@@ -21,6 +21,7 @@ import { createTerrainMaterialFamilyMultiplier } from './TerrainMaterialStochast
 import { bilinearLoad } from './TerrainSlotBindings.js';
 import { createTerrainMaterialGenome } from './TerrainMaterialGenomeNodes.js';
 import { createTerrainTransitionState } from './TerrainTransitionNodes.js';
+import { withStormSnow } from './TerrainStormSnowNodes.js';
 import {
   applyTerrainMaterialFeatureColor,
   createTerrainMaterialFeatureState,
@@ -158,7 +159,7 @@ export function createTerrainMaterialBakedSurface({
     localXZ,
     settings: families.transitions,
   });
-  const weights = transitions.weights;
+  const weights = withStormSnow(transitions.weights, samples);
   const genome = createTerrainMaterialGenome({
     worldXZ,
     biomeColor: tileColor,
@@ -360,6 +361,10 @@ export function createTerrainMaterialBakedSurface({
     /** 0..1 baked canopy over the ground, which shelters it from rain. */
     canopy: select(gpuState.ready.greaterThan(0.5), samples.canopyWater.r, float(0)),
     wetness: select(gpuState.ready.greaterThan(0.5), samples.wetnessShoreline.r, float(0)),
+    /** Baked slope (r, tan) and curvature (g), for the rain's puddles. */
+    shape: samples.terrainShape,
+    /** Baked open water (g) and shoreline, which take no puddles. */
+    water: max(samples.canopyWater.g, samples.wetnessShoreline.g),
   };
 }
 

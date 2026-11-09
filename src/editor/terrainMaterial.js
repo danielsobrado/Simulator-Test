@@ -70,6 +70,7 @@ import { periodicFbm2 } from './stylized/PeriodicNoiseNodes.js';
 import { applyCloudShadow } from './stylized/CloudShadow.js';
 import { spellLightIrradiance, spellWorldEnabled } from './vfx/render/SpellWorldLight.js';
 import { createRainWetnessShading } from './stylized/RainWetnessShading.js';
+import { createPuddleShading } from './stylized/PuddleShading.js';
 import { applyBogGround } from './stylized/bog/BogGroundShading.js';
 import { resolveSurfaceWetnessConfig } from './weather/surfaceWetnessConfig.js';
 import {
@@ -483,14 +484,20 @@ export function createTerrainMaterial({
       wet: waterContext?.damp,
     });
     // Rain darkens and slicks exposed ground; snow and canopy shelter it.
-    const surface = createRainWetnessShading({
+    const rainWetness = createRainWetnessShading({
       snow: bakedSurface.snow ?? float(0),
       canopy: bakedSurface.canopy ?? float(0),
       config: resolveSurfaceWetnessConfig(stylizedConfig.wetness),
-    }).apply(
+    });
+    const wetSurface = rainWetness.apply(
       shoreSurface.color,
       shoreSurface.roughness ?? float(stylizedConfig.materialBake.render.fallbackRoughness),
     );
+    // Standing water on soaked flat hollows; a dry frame skips it with one compare.
+    const puddles = bakedSurface.shape ? createPuddleShading({
+      shape: bakedSurface.shape, exposure: rainWetness.exposure, water: bakedSurface.water, worldXZ,
+    }) : null;
+    const surface = puddles ? puddles.apply(wetSurface.color, wetSurface.roughness) : wetSurface;
     const footprints = createFootprintShading({
       terrainUv,
       chunkWorldSize,
@@ -562,6 +569,7 @@ export function createTerrainMaterial({
       material.roughnessNode = glacierIce.roughness(material.roughnessNode);
       if (material.normalNode) material.normalNode = glacierIce.normal(material.normalNode);
     }
+    if (puddles && material.normalNode) material.normalNode = puddles.normal(material.normalNode);
     // Rime on the up-facing faces, keyed on the same baked snow: the deposition the
     // terrain would otherwise wash out. Needs a surface normal, so it too compiles
     // to nothing where the terrain has no normal to read.

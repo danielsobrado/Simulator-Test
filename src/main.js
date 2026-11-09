@@ -79,6 +79,8 @@ import { createCharacterView } from './editor/character/createCharacterView.js';
 import { audioBus, emitAudio } from './editor/audio/index.js';
 import { WorldSoundscape } from './editor/audio/world_soundscape.js';
 import { SurfaceWetness } from './editor/weather/surfaceWetness.js';
+import { SnowCover } from './editor/weather/storm/SnowCover.js';
+import { stormRainUniform, stormSnowCoverUniform } from './editor/weather/storm/stormGroundUniforms.js';
 import { SkyLookController } from './editor/stylized/sky/SkyLookController.js';
 import { DEFAULT_SKY_PRESET, SKY_PRESETS } from './editor/stylized/sky/SkyPresets.js';
 import { DayNightCycle, TIME_PRESET_ANCHORS } from './editor/stylized/sky/dayNightCycle.js';
@@ -1011,6 +1013,9 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     return weatherAudioLevelsScratch;
   };
   const surfaceWetness = new SurfaceWetness(config.stylizedSurface.wetness);
+  const snowCover = new SnowCover(config.stylizedSurface.snowCover);
+  // A snapped storm (?stormSnap=1) shows the ground it leaves at steady state.
+  const groundSnap = readStormOverride(typeof window === 'undefined' ? '' : window.location.search)?.snap === true;
   let lastWetnessSeconds = null;
   let lastBiomeSurfaceSeconds = null;
   // Time of day, greyed by the weather; the far haze follows the fog colour.
@@ -1860,7 +1865,12 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     const frameSeconds = frameTimestamp / 1000;
     const frameDelta = lastWetnessSeconds === null ? 0 : Math.min(1, frameSeconds - lastWetnessSeconds);
     lastWetnessSeconds = frameSeconds;
-    surfaceWetness.update(frameDelta, frameWeatherAudio.rain);
+    const groundStorm = stormFrame();
+    surfaceWetness.update(groundSnap ? 1e6 : frameDelta, frameWeatherAudio.rain);
+    stormSnowCoverUniform.value = groundSnap
+      ? snowCover.snap(groundStorm.snow)
+      : snowCover.update(frameDelta, groundStorm.snow, groundStorm.snowShare);
+    stormRainUniform.value = frameWeatherAudio.rain;
     skyLooks?.setStorm(stormFrame());
     const snowCountryWeight = snowCountry.update(frameDelta, viewModeController.camera);
     skyLooks?.setSnowCountry(snowCountryWeight);

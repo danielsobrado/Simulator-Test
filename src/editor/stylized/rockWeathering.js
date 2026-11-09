@@ -18,6 +18,7 @@ import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { coldStone, snowGrain } from './rockSnowSurface.js';
 import { SNOW_GROUND_COLOR, snowDeposition } from './snowDeposition.js';
+import { stormSnowCoverUniform } from '../weather/storm/stormGroundUniforms.js';
 
 /**
  * Weathering for the authored rock pack — after grass-test's `rockWeathering`.
@@ -207,7 +208,10 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
     // The sine patches are too smooth to tear an edge: alone, whole facets went white
     // at once and the skirt ran in straight lines across a face.
     const tear = mx_noise_float(pattern.mul(SNOW_TEAR_PER_METRE)).mul(0.6).add(patches.sub(0.5).mul(0.3));
-    const { cover, skirt } = snowDeposition({ snow: snowGround, breakup: tear, ...(ground ?? {}) });
+    const { cover, skirt } = snowDeposition({
+      // A storm's snow settles on any stone; the cold stone stays the biome's.
+      snow: snowGround.max(stormSnowCoverUniform), breakup: tear, ...(ground ?? {}),
+    });
     const grain = snowGrain(pattern, normalLocal);
     const snowColor = mix(mix(color(ROCK_SNOW_SHADE), color(ROCK_SNOW), up.smoothstep(0.6, 0.95)), color(SNOW_GROUND_COLOR), skirt)
       .mul(grain?.tint ?? vec3(1));

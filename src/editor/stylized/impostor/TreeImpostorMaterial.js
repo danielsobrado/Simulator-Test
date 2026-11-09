@@ -33,7 +33,7 @@ import {
   TREE_COLOR_VARIATION_RANGE,
   unpackImpostorWidthNode,
 } from '../forest/TreeAppearance.js';
-import { applyCanopySnow, canopySnowCap, canopySnowTransmission } from '../forest/canopySnow.js';
+import { applyCanopySnow, canopySnowCap, canopySnowTransmission, withStormSnow } from '../forest/canopySnow.js';
 import { foliageMaterialClass } from '../forest/FoliageNodeMaterial.js';
 import { orientedScreenDitherThreshold } from '../lod/screenDither.js';
 import { assignTreeFoliageMaterialData } from '../../../render/postprocessing/PostProcessingMaterialData.js';
@@ -153,7 +153,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance, 
     visibility: decodeTreeCanopyVisibilityNode(normalSample.a), color: crown,
   });
   // The crown's snow cap, on the atlas's own normals and only on foliage texels.
-  const cap = canopySnowCap(canopySnow.mul(foliageMask), worldNormal.y);
+  const cap = canopySnowCap(withStormSnow(canopySnow).mul(foliageMask), worldNormal.y);
   const snowed = applyCanopySnow({
     color: crown,
     emissive: atlas.foliageLighting ? treeFoliageEmission(crown, null, surface.visibility).mul(foliageMask) : null,

@@ -20,6 +20,7 @@ import { createTerrainMaterialBakeConfig } from '../editor/materials/TerrainMate
 import { resolveBiomeLooks } from '../editor/biomes/BiomeLooks.js';
 import { applyBiomeLooks } from '../editor/biomes/applyBiomeLooks.js';
 import { resolveSurfaceWetnessConfig } from '../editor/weather/surfaceWetnessConfig.js';
+import { resolveSnowCoverConfig } from '../editor/weather/storm/SnowCover.js';
 import { resolveAmbientEffectsConfig } from '../editor/stylized/ambient/ambientEffectsConfig.js';
 import {
   applyWaterDomainConfig,
@@ -66,6 +67,7 @@ export function loadEditorConfig() {
     resolveBiomeLooks(structuredClone(biomeLooksConfigSource)?.biomeLooks, { snow: biomeSnow }));
   config.stylizedSurface.materialBake = createTerrainMaterialBakeConfig(terrainMaterialBakeSource);
   config.stylizedSurface.wetness = resolveSurfaceWetnessConfig(config.stylizedSurface.wetness);
+  config.stylizedSurface.snowCover = resolveSnowCoverConfig(config.stylizedSurface.snowCover);
   config.stylizedSurface.ambientEffects = resolveAmbientEffectsConfig(
     structuredClone(ambientEffectsConfigSource)?.ambientEffects,
   );

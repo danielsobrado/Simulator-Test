@@ -10,7 +10,7 @@ import { authoredTexture } from '../AuthoredTextureNode.js';
 import { orientedScreenDitherThreshold } from './screenDither.js';
 import { characterOcclusionKeep } from '../../character/CharacterOcclusion.js';
 import { setPreInstancePosition } from './preInstancePosition.js';
-import { applyCanopySnow, canopySnowCap, canopySnowTransmission, crownUpNode, trunkSnow, trunkSnowCap } from '../forest/canopySnow.js';
+import { applyCanopySnow, canopySnowCap, canopySnowTransmission, crownUpNode, trunkSnow, trunkSnowCap, withStormSnow } from '../forest/canopySnow.js';
 import { applyTreeFoliageSnowSurface } from '../forest/TreeFoliageSurface.js';
 
 export function createSourceOpacityNode(material) {
@@ -102,7 +102,7 @@ export function createDitheredMaterial(sourceMaterial, {
     if (material.emissiveNode) material.emissiveNode = material.emissiveNode.mul(variation);
     if (leafTint) {
       // Snow on the crown's upward faces; w is the tree's canopy snow.
-      const cap = canopySnowCap(leafTint.w, crownUpNode(crownBounds));
+      const cap = canopySnowCap(withStormSnow(leafTint.w), crownUpNode(crownBounds));
       const snowed = applyCanopySnow({
         color: material.colorNode,
         emissive: material.emissiveNode,
@@ -116,9 +116,10 @@ export function createDitheredMaterial(sourceMaterial, {
       material.emissiveNode = snowed.emissive;
     } else if (kind === 'trunk') {
       // The tree's canopy snow, carried in the trunk's morphology x.
-      material.colorNode = trunkSnow(material.colorNode, attribute('instanceMorphology', 'vec3').x);
+      const trunkSnowAmount = withStormSnow(attribute('instanceMorphology', 'vec3').x);
+      material.colorNode = trunkSnow(material.colorNode, trunkSnowAmount);
       if (material.roughnessNode) material.roughnessNode = mix(material.roughnessNode, float(0.95),
-        trunkSnowCap(attribute('instanceMorphology', 'vec3').x));
+        trunkSnowCap(trunkSnowAmount));
     }
   }
   applyMorphology(
