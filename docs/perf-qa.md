@@ -1063,6 +1063,45 @@ lower medians are within the spread between runs, not a measured gain. Six of th
 void for FPS (they ranged 75–146 FPS in both arms); two more aborted on a Vite
 reload from another session's edit.
 
+### Storm weather matrix (2026-11-09)
+
+Closes the "storm, dusk and snow transitions were not captured" gap for storms
+(dusk is still open). This is the §7 matrix of
+`docs/plans/storm-weather-plan-2026-11-08.md` on a frozen snapshot of `b1c8f90f`
+(storm phases 1–7). The runs were `chunk-cross --warmup 8 --duration 12 --settle
+--gpuTimings 1`, headed WebGPU, with
+`?storm=<level>&stormSnap=1&stormKind=<kind>` and `?storm=0` as the A arm, in two
+interleaved rounds. All nine completed runs kept native focus. `rain05-1` did not
+run, because another session held the perf lock.
+
+| Case | GPU avg ms | GPU p95 ms | dt p95 ms | Draws | Weather CPU ms |
+|------|-----------|-----------|-----------|-------|----------------|
+| clear (`storm=0`) | 2.35, 2.21 | 2.92, 2.62 | 12.49 (cold), 9.50 | 203 | 0.036, 0.029 |
+| rain 0.5 | 2.28 | 2.71 | 11.23 | 206 | 0.117 |
+| rain 1 | 2.25, 2.25 | 2.61, 2.64 | 11.80, 10.35 | 206 | 0.122, 0.115 |
+| snow 0.5 | 2.50, 2.53 | 3.01, 3.02 | 9.80, 10.10 | 203–204 | 0.031, 0.033 |
+| snow 1 | 2.52, 2.54 | 2.91, 3.01 | 10.00, 9.60 | 203–204 | 0.029 |
+
+Against the §7 budget, from these numbers:
+
+- **GPU:** rain is level with clear (within run spread). Snow adds about
+  +0.25 ms at both levels, well under +0.8 ms. Snow costs the same at 0.5 and 1,
+  so its cost is a fixed per-pass cost rather than one that grows with particle
+  count.
+- **Draws:** rain adds +3 and snow +0–1, which meets the "≤ 3" budget.
+- **CPU:** rain's weather update adds about +0.09 ms, under +0.15 ms.
+
+The first clear run was cold (2 hitches). Compare against `clear-2`.
+
+`qa:weather:browser` now runs rain and snow at storm 0.25, 0.5, 0.75 and 1, as well
+as the six modes. The modes are snapped too, since a UI change ramps the storm
+over minutes. All 14 cases pass with no shader errors. WGSL compile logs that carry
+only warnings ("code is unreachable") no longer count as shader errors; they had
+been failing the warmup gate on HEAD. The harness camera sits high over the
+ground, so at storm 1 the fog reads as a flat grey card. Judge storm looks from
+ground-level poses instead. Puddles did not show in the phase 7 rain capture, and
+that gap is still open.
+
 ### Renderer GPU preference
 
 `InfiniteTerrainView` requests `powerPreference: 'high-performance'`

@@ -12,6 +12,12 @@ import { terminateChildProcess } from './lib/processLifecycle.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDirectory = path.join(root, 'tmp', 'weather-shader-qa');
 const modes = Object.freeze(['meadow', 'rain', 'snow', 'sandstorm', 'storm', 'wind']);
+// Storm plan §8: each precipitation kind at each level of the storm ladder.
+const STORM_LEVELS = Object.freeze([0.25, 0.5, 0.75, 1]);
+const cases = Object.freeze([
+  ...modes.map((mode) => ({ name: mode, mode, intensity: null })),
+  ...['rain', 'snow'].flatMap((mode) => STORM_LEVELS.map((intensity) => ({ name: `${mode}-${intensity}`, mode, intensity }))),
+]);
 const viewportSelector = 'canvas[aria-label="Drusniel World infinite world editor viewport"]';
 const shaderErrorPattern = /shader|wgsl|webgpu|gpu validation|pipeline|bind.?group|nodematerial|istexture|weather.*precompile/i;
 
@@ -74,15 +80,22 @@ async function waitForServer(server, baseUrl) {
   throw new Error(`Timed out waiting for ${baseUrl}: ${lastError?.message ?? 'unknown error'}`);
 }
 
-async function setWeatherMode(page, mode) {
-  await page.evaluate((nextMode) => {
+// The UI ramps the storm over minutes; QA snaps straight to the target.
+async function setWeatherMode(page, mode, intensity = null) {
+  await page.evaluate(({ nextMode, nextIntensity }) => {
     const select = document.querySelector('[data-weather="mode"]');
     if (!(select instanceof HTMLSelectElement)) {
       throw new Error('Weather mode selector is unavailable.');
     }
+    const slider = document.querySelector('[data-weather="intensity"]');
+    if (nextIntensity !== null && slider instanceof HTMLInputElement) {
+      slider.value = String(nextIntensity);
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     select.value = nextMode;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-  }, mode);
+    window.__editor.weatherController.applySettings({ snap: true });
+  }, { nextMode: mode, nextIntensity: intensity });
   await page.waitForFunction(
     (expected) => document.querySelector('[data-weather="mode"]')?.value === expected,
     mode,
@@ -106,8 +119,12 @@ async function captureViewport(page, mode) {
   }
 }
 
+// WGSL compile logs that only carry warnings (e.g. "code is unreachable") are not failures.
+const isShaderError = (message) => shaderErrorPattern.test(message)
+  && !(/Compilation log/.test(message) && !/error\(s\)|\berror:/i.test(message));
+
 function shaderErrors(messages) {
-  return messages.filter((message) => shaderErrorPattern.test(message));
+  return messages.filter(isShaderError);
 }
 
 async function run() {
@@ -170,7 +187,7 @@ async function run() {
     let shaderErrorCount = 0;
     const recordError = message => {
       report.errorCount = ++errorCount;
-      if (shaderErrorPattern.test(message)) report.shaderErrorCount = ++shaderErrorCount;
+      if (isShaderError(message)) report.shaderErrorCount = ++shaderErrorCount;
       if (runtimeErrors.length < 100) runtimeErrors.push(message);
     };
     page.on('pageerror', (error) => recordError(`pageerror: ${error.message}`));
@@ -213,26 +230,27 @@ async function run() {
     const warmupErrors = shaderErrors(runtimeErrors);
     assert.equal(shaderErrorCount, 0, `Weather shader warmup failed:\n${warmupErrors.slice(0, 3).join('\n')}`);
 
-    for (const mode of modes) {
-      console.log(`Weather QA: ${mode}.`);
+    for (const { name, mode, intensity } of cases) {
+      console.log(`Weather QA: ${name}.`);
       const startedAt = performance.now();
       const errorStart = runtimeErrors.length;
       const shaderErrorStart = shaderErrorCount;
-      await setWeatherMode(page, mode);
+      await setWeatherMode(page, mode, intensity);
       await delay(settleMs);
       const modeErrors = runtimeErrors.slice(errorStart);
       const modeShaderErrors = shaderErrors(modeErrors);
-      const screenshotHash = await captureViewport(page, mode);
+      const screenshotHash = await captureViewport(page, name);
       report.modes.push({
-        mode,
+        mode: name,
         activationMs: performance.now() - startedAt,
         screenshotHash,
         errors: modeErrors,
         shaderErrorCount: shaderErrorCount - shaderErrorStart,
+        storm: await page.evaluate(() => ({ ...window.__editor.weatherController.storm })),
         stats: await page.evaluate(() => window.__editor.weatherController.getStats()),
       });
       assert.equal(shaderErrorCount - shaderErrorStart, 0,
-        `${mode} produced shader/runtime errors:\n${modeShaderErrors.slice(0, 3).join('\n')}`);
+        `${name} produced shader/runtime errors:\n${modeShaderErrors.slice(0, 3).join('\n')}`);
     }
 
     report.errors = runtimeErrors;
