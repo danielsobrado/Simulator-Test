@@ -10,6 +10,6 @@ waterReflections:
   resolution: 256
   intervalMs: 500
   reachMeters: 96
-shadowCascades: 2
+shadowCascades: 1
 snowRelief: true
 roadsideLanterns: false
