@@ -6,6 +6,7 @@ import {
   clamp,
   dot,
   float,
+  max,
   min,
   mix,
   normalize,
@@ -20,6 +21,7 @@ import {
 } from 'three/tsl';
 import { createSeaSwellNodes } from '../water/SeaSwell.js';
 import { seaStateUniforms } from '../water/seaState.js';
+import { rainRoughness } from './RainRippleShading.js';
 
 /** Nearshore normals follow the rendered depth contours and amplitude envelope. */
 function displacedSurfaceSlope() {
@@ -105,7 +107,8 @@ export function createSeaSurfaceNodes({
   const height = (surf?.height ?? swell.height).toVarying('seaSwellHeight');
   const swellSlope = swell.slope.mul(amplitude).toVarying('seaSwellSlope');
   const slope = surf ? mix(displacedSurfaceSlope(), swellSlope, surf.offshore) : swellSlope;
-  const detailed = detail ? slope.add(detail.slope) : slope;
+  // Wind chop: a storm roughly doubles the short waves riding the swell.
+  const detailed = detail ? slope.add(detail.slope.mul(storm.mul(1.2).add(1))) : slope;
   const surfaceSlope = ripple ? detailed.add(ripple) : detailed;
   const normal = normalize(vec3(surfaceSlope.x.negate(), 1, surfaceSlope.y.negate()));
   const sun = normalize(sunDirection);
@@ -122,7 +125,7 @@ export function createSeaSurfaceNodes({
     float(config.stormWhitecapThreshold),
     storm,
   );
-  const roughness = float(0.055).add(storm.mul(0.09))
+  const roughness = float(0.055).add(storm.mul(0.09)).add(rainRoughness(seaStateUniforms.rain))
     .add(sqrt(detail?.variance ?? float(0)).mul(0.16)).clamp(0.05, 0.48);
 
   return {
@@ -139,7 +142,8 @@ export function createSeaSurfaceNodes({
     },
     // How much of this water is sea, 0..1: at sea level and without a current.
     mask: seaMask,
-    surfFoam: surf?.foam.mul(seaMask),
+    // Breakers run longer and whiter in a storm.
+    surfFoam: surf?.foam.mul(seaMask).mul(storm.add(1)),
     shade(color) {
       const shaded = color.mul(float(1).add(lit.mul(config.slopeShading)));
       // A lit crest retains the water's chroma. Blending every carrier peak
@@ -147,7 +151,24 @@ export function createSeaSurfaceNodes({
       return shaded.mul(float(1).add(crest.mul(config.crestLift)));
     },
     whitecap() {
-      return smoothstep(threshold, 1, height).mul(strength).mul(breakup);
+      const crestCap = smoothstep(threshold, 1, height).mul(strength).mul(breakup);
+      // Past a gale the wind tears foam off every wave: drifting patches and
+      // streaks over all open water, not only on the tallest crests.
+      const gale = smoothstep(0.35, 1, storm);
+      const streaks = smoothstep(mix(float(0.78), float(0.5), gale), 0.95, foamNoise)
+        .mul(gale).mul(smoothstep(0.6, 2.5, waterDepth)).mul(seaMask).mul(0.7);
+      return max(crestCap, streaks);
+    },
+    /**
+     * The standing foam line where the sea meets the beach: a laced band over
+     * the last few decimetres of depth, wider and denser in a storm. The swash
+     * front only draws a thin moving wire; this is what reads from afar.
+     */
+    shoreLine() {
+      // Starts just past the waterline fade (0.2 m), so the sheet does not thin it away.
+      const band = smoothstep(0.06, 0.16, waterDepth)
+        .mul(oneMinus(smoothstep(0.3, storm.mul(0.5).add(0.6), waterDepth)));
+      return band.mul(smoothstep(0.3, 0.7, foamNoise)).mul(storm.mul(0.35).add(0.45)).mul(seaMask);
     },
     /**
      * Light coming through a crest, after grass-test's crest transmission.

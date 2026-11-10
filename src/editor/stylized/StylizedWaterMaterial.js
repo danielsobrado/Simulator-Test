@@ -188,12 +188,19 @@ export function createStylizedWaterMaterial({
   );
   const noiseFac = surfaceNoise.x.add(surfaceNoise.y).mul(0.5);
   // Wakes, drops and spells (water/RippleField.js), on the river and sea normals alike.
-  const ripple = water.interaction?.enabled !== false && rippleOrigin
-    // Faded out over the last half metre of depth: on the film over a beach
-    // the rings otherwise drew as bright arcs across the wet sand.
-    ? rippleFieldSlope(rippleOrigin, vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize))
-      .mul(smoothstep(0.1, 0.5, waterDepth)).toVar('waterRippleSlope')
-    : null;
+  // Rain rings, small and many: their slopes roughen the normal, their crests catch light.
+  const rain = water.rainRipples?.enabled && quality.flow && rippleOrigin ? createRainRippleNode({
+    localMeters: vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize),
+    originMeters: rippleOrigin,
+    time,
+    rain: seaStateUniforms.rain,
+  }) : null;
+  const interaction = water.interaction?.enabled !== false && rippleOrigin
+    ? rippleFieldSlope(rippleOrigin, vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize)) : null;
+  const rippleSum = interaction && rain ? interaction.add(rain.slope) : interaction ?? rain?.slope ?? null;
+  // Faded out over the last half metre of depth: on the film over a beach
+  // the rings otherwise drew as bright arcs across the wet sand.
+  const ripple = rippleSum ? rippleSum.mul(smoothstep(0.1, 0.5, waterDepth)).toVar('waterRippleSlope') : null;
   const sea = water.sea?.enabled && quality.flow && seaPhaseOrigin && sunDirection
     ? createSeaSurfaceNodes({
       terrainUv,
@@ -547,15 +554,9 @@ export function createStylizedWaterMaterial({
   // little light of their own: the rings still read from a bridge or a cliff.
   if (ripple) color = color.add(colorNode(water.highlightColor).mul(ripple.length().mul(0.12).clamp(0, 0.05)));
 
-  if (water.rainRipples?.enabled && quality.flow && rippleOrigin) {
-    const ripple = createRainRippleNode({
-      localMeters: vec2(terrainUv.x, terrainUv.y).mul(chunkWorldSize),
-      originMeters: rippleOrigin,
-      time,
-      rain: seaStateUniforms.rain,
-    });
+  if (rain) {
     color = color.add(colorNode(water.highlightColor)
-      .mul(ripple.mul(water.rainRipples.strength).mul(waterCoverage).mul(waterlineFade)));
+      .mul(rain.ring.mul(water.rainRipples.strength).mul(waterCoverage).mul(waterlineFade)));
   }
 
   if (quality.fresnelStrength > 0) {
@@ -587,8 +588,9 @@ export function createStylizedWaterMaterial({
       groundHeight: waterField.g.add(waterSurfaceOrigin).sub(waterField.b),
       config: { ...DEFAULT_COAST_SWASH, ...water.coast }, clock: time,
       shorelineFadeDepth: water.optics.shorelineFadeDepth });
-    const swashFoam = coast ? coast.foam.mul(water.coast?.foamStrength ?? DEFAULT_COAST_SWASH.foamStrength).mul(sea.mask) : float(0);
-    const whitecap = max(max(sea.whitecap(), sea.surfFoam ?? float(0)), swashFoam).mul(waterCoverage);
+    const swashFoam = coast ? coast.foam.mul(water.coast?.foamStrength ?? DEFAULT_COAST_SWASH.foamStrength).mul(sea.mask)
+      .mul(seaStateUniforms.storm.mul(1.5).add(1)) : float(0);
+    const whitecap = max(max(sea.whitecap(), sea.surfFoam ?? float(0)), max(swashFoam, sea.shoreLine())).mul(waterCoverage);
     foamAmount = max(foamAmount, whitecap);
     whitewater = whitewater ? max(whitewater, whitecap) : whitecap;
   }

@@ -99,7 +99,7 @@ water:
       fresnelStrength: 0.85
     # Offshore crest height in metres; a storm multiplies it by stormScale.
     amplitude: 0.9
-    stormScale: 1.65
+    stormScale: 2.6
     choppiness: 4
     # No swell in water shallower than this; never taller than depthRatio of the depth.
     shallowDepth: 1.5

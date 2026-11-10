@@ -21,6 +21,8 @@ import {
 } from 'three/tsl';
 import { periodicFbm2 } from './PeriodicNoiseNodes.js';
 import { surfaceGradient } from './ShoreContactNodes.js';
+import { rainRoughness } from './RainRippleShading.js';
+import { seaStateUniforms } from '../water/seaState.js';
 
 /**
  * grass-test's lake and river surface (`WaterMaterial`, inland branch): its
@@ -228,5 +230,5 @@ export function createRiverSurfaceNodes({
 
   // Callers measure the ripple's tilt from the level base, not from the facets.
   return { fresnel, sky, glint, foam, foamNoise, reflected, normal, baseNormal: shadingBase,
-    roughness: energy.mul(.15).add(.12), visualSpeed, energy };
+    roughness: energy.mul(.15).add(.12).add(rainRoughness(seaStateUniforms.rain)), visualSpeed, energy };
 }
