@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   abs,
@@ -21,7 +22,6 @@ import {
   sin,
   smoothstep,
   texture,
-  uniform,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -196,7 +196,7 @@ export function createStylizedGrassMaterial({
   // no camera to measure from — a capture harness, a budget test — gets coverage of
   // 1 everywhere, which is what the density law says when nothing is overdue for
   // retiring; the uniform is built lazily so those callers do not carry it.
-  const coverageLod = lodCoverage ?? uniform(new THREE.Vector4(0, 1, 1, 1));
+  const coverageLod = lodCoverage ?? frameUniform(new THREE.Vector4(0, 1, 1, 1));
   const coverageT = clamp(
     cameraDistance.sub(coverageLod.x)
       .div(max(coverageLod.y.sub(coverageLod.x), float(1e-3))),

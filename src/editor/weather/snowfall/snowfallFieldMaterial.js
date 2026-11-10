@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 // Adapted from drusniel-gods-end/src/weather/SnowfallSystem.js.
 import * as THREE from 'three/webgpu';
 import {
@@ -27,11 +28,11 @@ export const SNOWFLAKE_MAX_ANGULAR_SIZE = 0.014;
 export const SNOWFLAKE_MAX_STREAK = 0.055;
 export function createSnowfallUniforms(settings = DEFAULT_WEATHER_EFFECTS.snowfall) {
   return {
-    time: uniform(0), center: uniform(new THREE.Vector3()),
-    drift: uniform(new THREE.Vector2()), intensity: uniform(1),
+    time: frameUniform(0), center: uniform(new THREE.Vector3()),
+    drift: frameUniform(new THREE.Vector2()), intensity: frameUniform(1),
     /** Drift velocity (m/s, x and z): flakes streak along it with their fall. */
-    wind: uniform(new THREE.Vector2()), shutter: uniform(settings.streakSeconds ?? 0),
-    color: uniform(new THREE.Color(settings.color)), opacity: uniform(settings.opacity),
+    wind: frameUniform(new THREE.Vector2()), shutter: frameUniform(settings.streakSeconds ?? 0),
+    color: frameUniform(new THREE.Color(settings.color)), opacity: frameUniform(settings.opacity),
     phases: uniformArray(settings.layers.map(() => new THREE.Vector2())),
     /** Live share of each population (count-based density); flakes ranked above it are culled. */
     densities: uniformArray(settings.layers.map(() => 0), 'float'),

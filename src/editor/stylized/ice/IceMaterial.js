@@ -1,8 +1,8 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   cameraPosition, clamp, color, dot, float, max, mix, mx_fractal_noise_float, mx_noise_float, normalWorld, normalize,
-  positionGeometry, positionWorld, smoothstep, uniform,
-} from 'three/tsl';
+  positionGeometry, positionWorld, smoothstep, } from 'three/tsl';
 import { skyLightUniforms } from '../sky/skyLight.js';
 
 const DEEP = '#0b64b8';
@@ -26,7 +26,7 @@ export function createIceMaterial({ sunDirection, seaLevel }) {
   const view = normalize(cameraPosition.sub(positionWorld)).toVar();
   const normal = normalize(normalWorld).toVar();
   const local = positionGeometry.mul(NOISE_SCALE).toVar();
-  const sun = normalize(uniform(sunDirection));
+  const sun = normalize(frameUniform(sunDirection));
   const rim = float(1).sub(clamp(dot(normal, view), 0, 1)).pow(2.5);
   const veins = mx_fractal_noise_float(local.sub(view.mul(INNER_REACH)), 3, 2.1, 0.5).mul(0.9).add(0.5).toVar();
   const clouds = mx_noise_float(local.mul(0.55)).mul(0.5).add(0.5).toVar();

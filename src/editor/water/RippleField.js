@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-  Fn, Loop, exp, float, instanceIndex, int, ivec2, round, smoothstep, textureLoad, textureStore, uniform,
-  uniformArray, vec2, vec4,
+  Fn, Loop, exp, float, instanceIndex, int, ivec2, round, smoothstep, textureLoad, textureStore, uniformArray, vec2, vec4,
 } from 'three/tsl';
 import { frameUniform } from '../../render/FrameUniforms.js';
 
@@ -82,11 +81,11 @@ export const rippleFieldUniforms = Object.freeze({
 });
 
 const step = Object.freeze({
-  c2: uniform(0),
-  damping: uniform(0.99),
+  c2: frameUniform(0),
+  damping: frameUniform(0.99),
   /** The player's texel in the window. */
-  player: uniform(new THREE.Vector2()),
-  count: uniform(0, 'int'),
+  player: frameUniform(new THREE.Vector2()),
+  count: frameUniform(0, 'int'),
   /** Per impulse: texel x, texel z, amplitude (m), ring radius (texels). */
   impulses: uniformArray(Array.from({ length: RIPPLE_IMPULSE_CAPACITY }, () => new THREE.Vector4()), 'vec4'),
   /** Per impulse: ring width (texels). */

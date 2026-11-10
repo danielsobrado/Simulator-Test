@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import {
   abs,
   attribute,
@@ -7,7 +8,6 @@ import {
   positionGeometry,
   positionLocal,
   sin,
-  uniform,
   vec3,
   vec4,
 } from 'three/tsl';
@@ -42,7 +42,7 @@ const PHASE_SPREAD = 0.9;
 export function groundDetailWindPosition(wind, height) {
   // A uniform, not a constant: baked in, each prototype's height would make its
   // shader text unique and every tuft would compile a pipeline of its own.
-  const top = uniform(Math.max(0.05, height));
+  const top = frameUniform(Math.max(0.05, height));
   const r = positionGeometry.y.div(top).clamp(0, 1);
   const bend = r.mul(r);
   const world = modelWorldMatrix.mul(vec4(positionLocal, 1)).xz;

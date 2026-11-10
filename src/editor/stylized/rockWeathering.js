@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import {
   attribute,
   color,
@@ -10,7 +11,6 @@ import {
   positionGeometry,
   positionWorld,
   sin,
-  uniform,
   vec3,
 } from 'three/tsl';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
@@ -174,7 +174,7 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
   // a waterline that makes it read as a tide mark rather than as shadow.
   if ((localWater || Number.isFinite(seaLevel)) && settings.waterline > 0) {
     const contact = localWater ? attribute('instanceSurface', 'vec3') : null;
-    const level = contact ? contact.x : uniform(seaLevel);
+    const level = contact ? contact.x : frameUniform(seaLevel);
     const eligible = contact ? contact.y : float(1);
     const splash = stylizedFbm2(pattern.xz.mul(0.7)).mul(0.5).add(0.5)
       .mul(settings.waterlineHeight).mul(contact ? contact.z.mul(0.5).add(1) : float(1));

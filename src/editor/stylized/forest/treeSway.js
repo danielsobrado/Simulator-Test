@@ -1,5 +1,6 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import {
-  atan, attribute, cos, float, modelWorldMatrix, positionGeometry, positionLocal, sin, smoothstep, uniform, vec2, vec3, vec4,
+  atan, attribute, cos, float, modelWorldMatrix, positionGeometry, positionLocal, sin, smoothstep, vec2, vec3, vec4,
 } from 'three/tsl';
 import { canonicalFromRender, sampleWorldWind, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
 
@@ -22,8 +23,8 @@ const CROWN_TILT = 0.045;
  * reuse.
  */
 export function treeSwayField({ config, time, rootY = 0, topY = 1 }) {
-  const root = uniform(rootY);
-  const height = uniform(Math.max(0.001, topY - rootY));
+  const root = frameUniform(rootY);
+  const height = frameUniform(Math.max(0.001, topY - rootY));
   const r = positionGeometry.y.sub(root).div(height).clamp(0, 1);
   const world = modelWorldMatrix.mul(vec4(positionLocal, 1));
   const field = sampleWorldWind(world.xz);

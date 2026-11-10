@@ -1,6 +1,6 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import { cachedLodPlan } from './lod/CachedLodPlan.js';
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList, normalizeBaseUrl, resolveAssetUrl } from '../assets/assetUrl.js';
 import {
@@ -199,7 +199,7 @@ export class StylizedTreeView {
     this.regionalCharacterField = regionalCharacterField;
     this.prototypeIndicesByAsset = new Map();
     this.textureLoader = new THREE.TextureLoader();
-    this.time = uniform(0);
+    this.time = frameUniform(0);
     this.prototypes = [];
     this.prototypeSignature = null;
     this.impostorFailure = null;

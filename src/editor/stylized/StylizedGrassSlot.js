@@ -1,5 +1,5 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { markAttributeRangeUpdated } from './attributeUpload.js';
 import { createStylizedGrassMaterial } from './StylizedGrassMaterial.js';
@@ -336,13 +336,13 @@ export class StylizedGrassSlot {
     // its nearest and farthest corners call for. `grassLodCoverage` owns the law;
     // the shader only interpolates between the pair by each blade's own distance,
     // so the field thins across a chunk instead of stepping at its edge.
-    this.lodCoverage = uniform(new THREE.Vector4(0, 1, 1, 1));
+    this.lodCoverage = frameUniform(new THREE.Vector4(0, 1, 1, 1));
     this.coverageSettings = config.grass.lod?.coverage ?? {};
     this.coverageEnabled = this.coverageSettings.enabled !== false;
     this.bandDensity = 1;
     this.ringDistance = 0;
-    this.chunkCenter = uniform(new THREE.Vector2());
-    this.time = uniform(0);
+    this.chunkCenter = frameUniform(new THREE.Vector2());
+    this.time = frameUniform(0);
     this.emptyGeometry = new THREE.BufferGeometry();
     this.geometry = null;
     this.nearGeometry = null;

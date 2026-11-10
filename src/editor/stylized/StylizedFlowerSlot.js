@@ -1,5 +1,5 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { markAttributeRangeUpdated } from './attributeUpload.js';
 import { createFlowerCrossGeometry, setFlowerGeometryBounds } from './StylizedFlowerGeometry.js';
@@ -24,8 +24,8 @@ export class StylizedFlowerSlot {
     this.tileSize = terrainView.worldStore.tileSize;
     this.chunkWorldSize = this.chunkSize * this.tileSize;
     this.maxInstances = config.flowers.perChunk;
-    this.chunkCenter = uniform(new THREE.Vector2());
-    this.time = uniform(0);
+    this.chunkCenter = frameUniform(new THREE.Vector2());
+    this.time = frameUniform(0);
     this.geometry = createFlowerCrossGeometry(this.maxInstances);
     this.material = createStylizedFlowerMaterial({
       textures,

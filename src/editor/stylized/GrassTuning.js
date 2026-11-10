@@ -1,5 +1,5 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
 
 /**
  * Live-tunable grass parameters, held as uniforms shared by every grass slot.
@@ -113,14 +113,14 @@ export class GrassTuning {
       const configured = readPath(surfaceConfig, path);
       const value = Number.isFinite(configured) ? configured : fallback;
       this.values[key] = value;
-      this.uniforms[key] = uniform(value);
+      this.uniforms[key] = frameUniform(value);
     }
     for (const { key, path, fallback } of COLOR_SETTINGS) {
       const value = readPath(surfaceConfig, path) ?? fallback;
       this.values[key] = value;
       // `THREE.Color` converts the sRGB hex into the linear working space on
       // construction, which is what the material's old inline colour nodes did.
-      this.uniforms[key] = uniform(new THREE.Color(value));
+      this.uniforms[key] = frameUniform(new THREE.Color(value));
     }
     this.defaults = { ...this.values };
   }

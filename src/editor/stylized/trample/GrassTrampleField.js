@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   float,
@@ -6,7 +7,6 @@ import {
   mix,
   step,
   texture,
-  uniform,
   uniformArray,
   uv,
   vec4,
@@ -153,12 +153,12 @@ export class GrassTrampleField {
        * position into field uv with this and `windowMetres` -- see
        * `windowUv` in trampleMath for the CPU twin of that expression.
        */
-      windowCentreRender: uniform(new THREE.Vector2()),
-      windowMetres: uniform(this.params.windowMetres),
+      windowCentreRender: frameUniform(new THREE.Vector2()),
+      windowMetres: frameUniform(this.params.windowMetres),
       /** Whole-texel scroll, in uv, applied to the previous state. */
-      scrollUv: uniform(new THREE.Vector2()),
-      recovery: uniform(1),
-      freshness: uniform(1),
+      scrollUv: frameUniform(new THREE.Vector2()),
+      recovery: frameUniform(1),
+      freshness: frameUniform(1),
       /** Per contact: window-local X, window-local Z, radius, strength. */
       contacts: uniformArray(contactVectors, 'vec4'),
       /** Per contact: push X, push Z, inner radius fraction, directional blend. */

@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { lensDirt } from 'three/addons/tsl/display/lensDirt.js';
@@ -10,7 +11,6 @@ import {
   sin,
   smoothstep,
   time,
-  uniform,
   texture,
   uv,
   vec2,
@@ -99,14 +99,14 @@ export function resolveCinematicFinish(source) {
 /** Live uniforms for a resolved finish. */
 export function createFinishUniforms(settings) {
   return {
-    saturation: uniform(settings.saturation),
-    contrast: uniform(settings.contrast),
-    lift: uniform(new THREE.Vector3(...settings.lift)),
-    gain: uniform(new THREE.Vector3(...settings.gain)),
-    highlightDesaturation: uniform(settings.highlightDesaturation),
-    vignette: uniform(settings.vignette),
-    grain: uniform(settings.grain),
-    lensDirt: uniform(settings.lensDirt?.intensity ?? 0),
+    saturation: frameUniform(settings.saturation),
+    contrast: frameUniform(settings.contrast),
+    lift: frameUniform(new THREE.Vector3(...settings.lift)),
+    gain: frameUniform(new THREE.Vector3(...settings.gain)),
+    highlightDesaturation: frameUniform(settings.highlightDesaturation),
+    vignette: frameUniform(settings.vignette),
+    grain: frameUniform(settings.grain),
+    lensDirt: frameUniform(settings.lensDirt?.intensity ?? 0),
   };
 }
 

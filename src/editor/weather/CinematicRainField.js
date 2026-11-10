@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 // Adapted from drusniel-gods-end/src/weather/RainSystem.js.
 import * as THREE from 'three/webgpu';
 import {
@@ -43,16 +44,16 @@ export function createRainFieldGeometry(settings = DEFAULT_WEATHER_EFFECTS.rain,
 export function createCinematicRainField(settings = DEFAULT_WEATHER_EFFECTS.rain, seed = 0) {
   const { geometry, slots } = createRainFieldGeometry(settings, seed);
   const center = uniform(new THREE.Vector3());
-  const clock = uniform(0);
-  const intensity = uniform(0);
-  const wind = uniform(new THREE.Vector2());
+  const clock = frameUniform(0);
+  const intensity = frameUniform(0);
+  const wind = frameUniform(new THREE.Vector2());
   // Wind × the shared camera gust (worldWindCamera), and its integral: travel
   // must integrate the gust, or every drop jumps when the gust changes. The fall
   // is integrated the same way, because its speed changes with the level.
-  const vector = uniform(new THREE.Vector2());
-  const drift = uniform(new THREE.Vector2());
-  const fallSpeed = uniform(settings.levels.fallSpeed[1]);
-  const fall = uniform(0);
+  const vector = frameUniform(new THREE.Vector2());
+  const drift = frameUniform(new THREE.Vector2());
+  const fallSpeed = frameUniform(settings.levels.fallSpeed[1]);
+  const fall = frameUniform(0);
   const densities = uniformArray(settings.layers.map(() => 0), 'float');
   const placement = attribute('rainPlacement', 'vec4');
   const shape = attribute('rainSize', 'vec4');

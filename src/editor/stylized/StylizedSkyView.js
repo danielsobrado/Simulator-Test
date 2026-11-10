@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import { CascadedSunShadows } from '../../render/shadows/CascadedSunShadows.js';
 import {
@@ -254,17 +255,17 @@ export class StylizedSkyView {
   constructor({ terrainView, config }) {
     this.terrainView = terrainView;
     this.config = config;
-    this.time = uniform(0);
+    this.time = frameUniform(0);
     this.cameraWorldPosition = uniform(new THREE.Vector2());
     /** Sunlight a cloud takes away; each look sets it (setCloudShadowStrength). */
     this.cloudShadowStrength = config.sky.cloudShadows?.strength ?? 0;
-    this.cloudOcclusion = uniform(
+    this.cloudOcclusion = frameUniform(
       config.sky.godRays?.cloudOcclusion ?? config.sky.cloudOpacity,
     );
     this.sunDirectionValue = directionFromAngles(config.sky.sunElevation, config.sky.sunAzimuth);
     // Live: a new time of day turns this vector in place (applyLook), and every
     // material holding the uniform follows.
-    this.sunDirection = uniform(this.sunDirectionValue);
+    this.sunDirection = frameUniform(this.sunDirectionValue);
     this.look = resolveSkyLook(config.sky);
     this.configuredLook = resolveSkyLook(config.sky, 'configured');
     this.lookUniforms = createSkyLookUniforms(this.look);
@@ -273,20 +274,20 @@ export class StylizedSkyView {
     // and phase are driven by the day/night cycle when it runs, and otherwise
     // stand at the fixed angles in the config so a manually chosen night still has
     // a moon.
-    this.night = uniform(this.look.nightness ?? (this.look.night ? 1 : 0));
+    this.night = frameUniform(this.look.nightness ?? (this.look.night ? 1 : 0));
     const moonConfig = config.sky?.stars?.moon ?? {};
     this.moonDirectionValue = directionFromAngles(
       moonConfig.elevation ?? 25,
       moonConfig.azimuth ?? 20,
     );
-    this.moonDirection = uniform(this.moonDirectionValue);
-    this.moonIllumination = uniform(moonConfig.illumination ?? 1);
+    this.moonDirection = frameUniform(this.moonDirectionValue);
+    this.moonIllumination = frameUniform(moonConfig.illumination ?? 1);
     this.fogDensityScale = 1;
     /** The configured exposure; a look scales it (snow country stops down). */
     this.baseExposure = terrainView.renderer?.toneMappingExposure ?? 1;
     this.baseFogDensity = config.sky.fogDensity;
     /** 1 / the scene exposure scale, mostly (SKY_EXPOSURE_FOLLOW): see createSkyMaterial. */
-    this.exposureCompensation = uniform(1);
+    this.exposureCompensation = frameUniform(1);
     this.geometry = new THREE.SphereGeometry(1, 64, 32);
     this.material = createSkyMaterial({
       config,

@@ -1,5 +1,5 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { uniform } from 'three/tsl';
 import { createMistParticles } from './mistParticles.js';
 import { createSprayPuffTexture } from './sprayPuffTexture.js';
 import { createWaterfallMistMaterial } from './WaterfallMistMaterial.js';
@@ -66,12 +66,12 @@ export class WaterfallMist {
     this.getSkyView = getSkyView;
     this.config = config;
     this.slots = [];
-    this.time = uniform(0);
-    this.intensity = uniform(config.mistIntensity);
+    this.time = frameUniform(0);
+    this.intensity = frameUniform(config.mistIntensity);
     this.light = {
-      sunDirection: uniform(new THREE.Vector3(0.35, 0.85, 0.25).normalize()),
-      sunColor: uniform(new THREE.Color(1, 1, 1)),
-      skyColor: uniform(new THREE.Color(0.6, 0.7, 0.8)),
+      sunDirection: frameUniform(new THREE.Vector3(0.35, 0.85, 0.25).normalize()),
+      sunColor: frameUniform(new THREE.Color(1, 1, 1)),
+      skyColor: frameUniform(new THREE.Color(0.6, 0.7, 0.8)),
     };
     this.puffs = null;
     this.material = null;

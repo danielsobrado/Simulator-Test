@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import {
   Fn,
   If,
@@ -5,7 +6,6 @@ import {
   normalize,
   sin,
   time as timeNode,
-  uniform,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -98,8 +98,8 @@ export const DEFAULT_HEAT_SHIMMER = Object.freeze({
  * strength), `temperature` the heat of the air, 0 cold … 1 full sun.
  */
 export const heatShimmerUniforms = Object.freeze({
-  hot: uniform(0),
-  temperature: uniform(1),
+  hot: frameUniform(0),
+  temperature: frameUniform(1),
 });
 
 function isRecord(value) {

@@ -1,7 +1,8 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   attribute, cameraPosition, cameraWorldMatrix, color, cos, dot, float, fract, mix, normalize, positionGeometry,
-  positionWorld, sin, smoothstep, texture, time, uniform, uv, vec3,
+  positionWorld, sin, smoothstep, texture, time, uv, vec3,
 } from 'three/tsl';
 
 import { presetWeight, windFactor } from './ambientEffectsConfig.js';
@@ -73,12 +74,12 @@ export class RidgePlumes {
     this.settings = settings;
     this.getHeight = getHeight;
     this.getSnowLine = getSnowLine;
-    this.intensity = uniform(0);
+    this.intensity = frameUniform(0);
     this.current = 0;
     this.scanCenter = null;
     this.anchorCount = 0;
-    this.origin = uniform(new THREE.Vector3());
-    this.windAxis = uniform(new THREE.Vector3(1, 0, 0));
+    this.origin = frameUniform(new THREE.Vector3());
+    this.windAxis = frameUniform(new THREE.Vector3(1, 0, 0));
     const total = settings.anchors * settings.puffs;
     this.anchorData = new Float32Array(total * 4);
     const puffIndex = new Float32Array(total);

@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import { assignWeatherNodeOutput } from './weather_node_output.js';
@@ -53,12 +54,12 @@ function tri(x) {
 }
 function createWindNodeMaterial() {
   const uCenter = uniform(new THREE.Vector3());
-  const uTime = uniform(0);
-  const uIntensity = uniform(1);
-  const uWindX = uniform(-2.2);
-  const uWindZ = uniform(0.36);
-  const uColor = uniform(new THREE.Color(12113375));
-  const uOpacity = uniform(0.42);
+  const uTime = frameUniform(0);
+  const uIntensity = frameUniform(1);
+  const uWindX = frameUniform(-2.2);
+  const uWindZ = frameUniform(0.36);
+  const uColor = frameUniform(new THREE.Color(12113375));
+  const uOpacity = frameUniform(0.42);
   const aWindOffset = attribute("aWindOffset", "vec4");
   const aWindShape = attribute("aWindShape", "vec4");
   const localPos = positionGeometry;

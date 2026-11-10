@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import { assignWeatherNodeOutput } from './weather_node_output.js';
@@ -15,7 +16,6 @@ import {
   positionGeometry,
   sin,
   smoothstep,
-  uniform,
   uv,
   vec2,
   vec3,
@@ -157,10 +157,10 @@ function createStormGroundShaderMaterial() {
   };
 }
 function createStormGroundNodeMaterial() {
-  const uTime = uniform(0);
-  const uFlash = uniform(0);
-  const uEmissionPower = uniform(2);
-  const uEffectColor = uniform(EFFECT_COLOR.clone());
+  const uTime = frameUniform(0);
+  const uFlash = frameUniform(0);
+  const uEmissionPower = frameUniform(2);
+  const uEffectColor = frameUniform(EFFECT_COLOR.clone());
   const aCenter = attribute("aLightningCenter", "vec3");
   const aNormal = attribute("aLightningNormal", "vec3");
   const aParams = attribute("aLightningParams", "vec4");

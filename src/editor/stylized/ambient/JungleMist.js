@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import {
   Fn,
   If,
@@ -9,7 +10,6 @@ import {
   positionWorld as positionWorldNode,
   smoothstep,
   time as timeNode,
-  uniform,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -115,10 +115,10 @@ export const DEFAULT_JUNGLE_MIST = Object.freeze({
  * intensity / π) the mist is lit by.
  */
 export const jungleMistUniforms = Object.freeze({
-  weight: uniform(0),
-  ground: uniform(0),
-  sun: uniform(new Color(1, 1, 1)),
-  fill: uniform(new Color(0.5, 0.6, 0.7)),
+  weight: frameUniform(0),
+  ground: frameUniform(0),
+  sun: frameUniform(new Color(1, 1, 1)),
+  fill: frameUniform(new Color(0.5, 0.6, 0.7)),
 });
 
 function isRecord(value) {

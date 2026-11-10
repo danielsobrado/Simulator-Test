@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import {
   Fn,
   If,
@@ -5,7 +6,6 @@ import {
   float,
   positionWorld,
   smoothstep,
-  uniform,
   vec2,
 } from 'three/tsl';
 
@@ -97,10 +97,10 @@ export const DEFAULT_BLOWN_STREAKS = Object.freeze({
  * materials that read them are built long before the ambient system exists.
  */
 export const blownStreakUniforms = Object.freeze({
-  snow: uniform(0),
-  sand: uniform(0),
-  snowTravel: uniform(0),
-  sandTravel: uniform(0),
+  snow: frameUniform(0),
+  sand: frameUniform(0),
+  snowTravel: frameUniform(0),
+  sandTravel: frameUniform(0),
 });
 
 function clamp01(value) {

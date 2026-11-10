@@ -1,8 +1,9 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   abs, cameraPosition, cameraWorldMatrix, color, cos, cross, dot, float, floor, fract, hash,
   instanceIndex, max, mix, normalize, positionGeometry, positionWorld, sin, smoothstep, time as globalTime,
-  uniform, uv, vec2, vec3,
+  uv, vec2, vec3,
 } from 'three/tsl';
 
 import { ambientParticleShapeAlpha } from './AmbientParticleShapes.js';
@@ -84,13 +85,13 @@ export class AmbientParticleField {
     this.name = name;
     this.settings = settings;
     this.clock = clock ?? (settings.burst && settings.waterDepth ? waterVisualClock : globalTime);
-    this.intensity = uniform(0);
+    this.intensity = frameUniform(0);
     this.current = 0;
     this.target = 0;
-    this.center = uniform(new THREE.Vector3());
+    this.center = frameUniform(new THREE.Vector3());
     /** fract((drift - center) / area + 0.5), computed in doubles on the CPU. */
-    this.wrap = uniform(new THREE.Vector2());
-    this.windAxis = uniform(new THREE.Vector3(1, 0, 0));
+    this.wrap = frameUniform(new THREE.Vector2());
+    this.windAxis = frameUniform(new THREE.Vector3(1, 0, 0));
     this.drift = { x: 0, z: 0 };
     this.geometry = new THREE.PlaneGeometry(1, 1);
     this.material = this.createMaterial({ ground, levels, light, sun, puffTexture });

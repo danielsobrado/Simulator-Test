@@ -1,5 +1,6 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { uniform, vec3 } from 'three/tsl';
+import { vec3 } from 'three/tsl';
 
 import { createSprayPuffTexture } from '../mist/sprayPuffTexture.js';
 import { presetWeight, windFactor } from './ambientEffectsConfig.js';
@@ -61,8 +62,8 @@ export class AmbientEffectsSystem {
     this.getWater = getWater;
     this.getGroundHeight = getGroundHeight;
     this.ground = new LocalGroundHeight({ getHeight: getGroundHeight, prepareBounds: prepareGround, getRevision: getGroundRevision });
-    this.levels = { sea: uniform(0), lake: uniform(-1e5), desert: uniform(0) };
-    this.light = { sun: uniform(new THREE.Color(1, 1, 1)), sky: uniform(new THREE.Color(0.5, 0.6, 0.7)) };
+    this.levels = { sea: frameUniform(0), lake: frameUniform(-1e5), desert: frameUniform(0) };
+    this.light = { sun: frameUniform(new THREE.Color(1, 1, 1)), sky: frameUniform(new THREE.Color(0.5, 0.6, 0.7)) };
     this.sun = sunDirection ?? vec3(0.35, 0.85, 0.25).normalize();
     this.puffTexture = createSprayPuffTexture();
     this.regionTimer = Infinity;

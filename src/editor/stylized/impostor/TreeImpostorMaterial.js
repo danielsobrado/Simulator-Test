@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import { applyJungleMist } from '../ambient/jungleMistOutput.js';
 import { treeBarkEmission, treeFoliageEmission } from '../forest/foliageLight.js';
 import { decodeTreeCanopyVisibilityNode, decodeTreeFoliageMaskNode } from './TreeImpostorNormalEncoding.js';
@@ -59,7 +60,7 @@ function createMaterial({ atlas, readTransform, readParameters, readAppearance, 
   const cameraUp = uniform(new THREE.Vector3(0, 1, 0));
   const sphericalBlend = uniform(0);
   const time = uniform(0);
-  const windStrength = uniform(0.03);
+  const windStrength = frameUniform(0.03);
   const transform = readTransform();
   const parameters = readParameters();
   const appearance = readAppearance();

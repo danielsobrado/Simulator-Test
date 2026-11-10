@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import { createFallingLeafTexture } from './FallingLeafTextures.js';
 import * as THREE from 'three/webgpu';
 import {
@@ -30,13 +31,13 @@ const TAU = Math.PI * 2;
 /** Shared uniforms: the camera-centred box the leaves wrap in, time, wind, how many fall. */
 export function createFallingLeavesUniforms({ boxSize, boxHeight, palette = fallingLeafPalette().map(color => color.toArray()) }) {
   return {
-    time: uniform(0),
+    time: frameUniform(0),
     center: uniform(new THREE.Vector3()),
-    wind: uniform(new THREE.Vector2()),
-    amount: uniform(0),
-    boxSize: uniform(boxSize),
-    boxHeight: uniform(boxHeight),
-    palette: palette.map(rgb => uniform(new THREE.Color().fromArray(rgb))),
+    wind: frameUniform(new THREE.Vector2()),
+    amount: frameUniform(0),
+    boxSize: frameUniform(boxSize),
+    boxHeight: frameUniform(boxHeight),
+    palette: palette.map(rgb => frameUniform(new THREE.Color().fromArray(rgb))),
     // Buildings near the camera (fallingLeafPlaces): centre x, z in render
     // space, then yaw cos, sin; and half width, half depth, roof top y. A
     // negative half width is an empty slot.

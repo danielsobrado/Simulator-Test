@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import {
   Fn,
   If,
@@ -20,7 +21,6 @@ import {
   select,
   smoothstep,
   uint,
-  uniform,
   vec2,
   vec3,
   vec4,
@@ -105,7 +105,7 @@ export function createSnowSurfaceNodes({
   // dusk or under the moon a fixed configured sun would still flash the snow
   // from where the midday sun stands.
   const sun = sunDirection
-    ? normalize(uniform(sunDirection))
+    ? normalize(frameUniform(sunDirection))
     : vec3(sunVector.x, sunVector.y, sunVector.z);
   const normal = normalize(baseNormal ? cameraWorldMatrix.mul(vec4(baseNormal, 0)).xyz : normalWorld).toVar();
   const view = normalize(cameraPosition.sub(positionWorld));

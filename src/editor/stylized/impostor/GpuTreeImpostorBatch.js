@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   Fn,
@@ -10,8 +11,7 @@ import {
   storage,
   struct,
   uint,
-  uniform,
-} from 'three/tsl';
+  } from 'three/tsl';
 import { markAttributeRangeUpdated, markAttributeSubrangeUpdated } from '../attributeUpload.js';
 import { writeImpostorAttribute } from './ImpostorAttributeUpdates.js';
 import { createGpuTreeImpostorMaterial, updateImpostorCameraUniforms } from './TreeImpostorMaterial.js';
@@ -81,8 +81,8 @@ export class GpuTreeImpostorBatch {
       offset: 'uint',
     }, 'VegetationDrawBuffer');
     const drawStorage = storage(drawBuffer, drawStruct, drawBuffer.count);
-    const countUniform = uniform(0, 'uint');
-    const originUniform = uniform(new THREE.Vector3());
+    const countUniform = frameUniform(0, 'uint');
+    const originUniform = frameUniform(new THREE.Vector3());
 
     const computeReset = Fn(() => {
       drawStorage.element(0).get('vertexCount').assign(uint(6));

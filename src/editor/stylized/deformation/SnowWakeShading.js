@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   Fn,
@@ -10,7 +11,6 @@ import {
   mix,
   select,
   smoothstep,
-  uniform,
   uniformArray,
   vec2,
   vec3,
@@ -77,8 +77,8 @@ export function createSnowWakeState({
   // metres and the samples are stored relative to it: canonical coordinates run
   // to hundreds of kilometres, where float32 steps by centimetres, but a
   // difference of whole numbers is exact.
-  const bounds = uniform(new THREE.Vector3());
-  const uniforms = { points, axes, count: uniform(0), step: uniform(step), bounds };
+  const bounds = frameUniform(new THREE.Vector3());
+  const uniforms = { points, axes, count: frameUniform(0), step: frameUniform(step), bounds };
 
   return {
     capacity,

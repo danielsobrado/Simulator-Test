@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 // Adapted from drusniel-gods-end/src/rendering/CinematicPipeline.js.
 import * as THREE from 'three/webgpu';
 import {
@@ -37,7 +38,7 @@ export function shaftSourceReference(sky, distance, radius = 0.45) {
 export class GodsEndLightShafts {
   constructor({ depth, sunUv, intensity, samples = 32, decay = 0.965, sourceRadius = 0.45 }) {
     this.aspect = uniform(1);
-    this.radius = uniform(sourceRadius);
+    this.radius = frameUniform(sourceRadius);
     this.disposed = false;
     const active = () => intensity.value > 0;
     this.mask = new ShaftTarget(Fn(() => {

@@ -1,3 +1,4 @@
+import { frameUniform } from '../../render/FrameUniforms.js';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import { assignWeatherNodeOutput } from './weather_node_output.js';
@@ -59,10 +60,10 @@ function makeHandle(mat, uTime, uIntensity, uCenter, uWindX, uWindZ) {
   };
 }
 function createRainNodeMaterial() {
-  const uC = uniform(new THREE.Vector3()), uT = uniform(0), uI = uniform(1);
-  const uWx = uniform(-1.05), uWz = uniform(0.28);
-  const uTop = uniform(20), uBot = uniform(-12);
-  const uCol = uniform(new THREE.Color(12180735)), uOp = uniform(0.46);
+  const uC = uniform(new THREE.Vector3()), uT = frameUniform(0), uI = frameUniform(1);
+  const uWx = frameUniform(-1.05), uWz = frameUniform(0.28);
+  const uTop = frameUniform(20), uBot = frameUniform(-12);
+  const uCol = frameUniform(new THREE.Color(12180735)), uOp = frameUniform(0.46);
   const aOff = attribute("aRainOffset", "vec4"), aShp = attribute("aRainShape", "vec4");
   const rPos = positionGeometry;
   const h = max(uTop.sub(uBot), 1e-3);
@@ -80,10 +81,10 @@ function createRainNodeMaterial() {
   return makeHandle(makeMat("weather-rain-node", frag(), wPos), uT, uI, uC, uWx, uWz);
 }
 function createSnowNodeMaterial() {
-  const uC = uniform(new THREE.Vector3()), uT = uniform(0), uI = uniform(1);
-  const uWx = uniform(-0.62), uWz = uniform(0.21);
-  const uTop = uniform(18), uBot = uniform(-8);
-  const uCol = uniform(new THREE.Color(15857663)), uOp = uniform(0.76);
+  const uC = uniform(new THREE.Vector3()), uT = frameUniform(0), uI = frameUniform(1);
+  const uWx = frameUniform(-0.62), uWz = frameUniform(0.21);
+  const uTop = frameUniform(18), uBot = frameUniform(-8);
+  const uCol = frameUniform(new THREE.Color(15857663)), uOp = frameUniform(0.76);
   const aOff = attribute("aSnowOffset", "vec4"), aShp = attribute("aSnowShape", "vec4");
   const sPos = positionGeometry;
   const h = max(uTop.sub(uBot), 1e-3);
@@ -106,9 +107,9 @@ function createSnowNodeMaterial() {
   return makeHandle(makeMat("weather-snow-node", frag(), wPos), uT, uI, uC, uWx, uWz);
 }
 function createSandstormNodeMaterial() {
-  const uC = uniform(new THREE.Vector3()), uT = uniform(0), uI = uniform(1);
-  const uWx = uniform(-1.8), uWz = uniform(0.24);
-  const uCol = uniform(new THREE.Color(12162903)), uOp = uniform(0.84);
+  const uC = uniform(new THREE.Vector3()), uT = frameUniform(0), uI = frameUniform(1);
+  const uWx = frameUniform(-1.8), uWz = frameUniform(0.24);
+  const uCol = frameUniform(new THREE.Color(12162903)), uOp = frameUniform(0.84);
   const aOff = attribute("aSandOffset", "vec4"), aShp = attribute("aSandShape", "vec4");
   const sPos = positionGeometry;
   const wb = vec3(uWx, 0, uWz);
@@ -138,8 +139,8 @@ function createSandstormNodeMaterial() {
   return makeHandle(makeMat("weather-sandstorm-node", frag(), wPos), uT, uI, uC, uWx, uWz);
 }
 function createSandstormHazeNodeMaterial() {
-  const uT = uniform(0), uI = uniform(1);
-  const uCol = uniform(new THREE.Color(16768149)), uOp = uniform(0.11);
+  const uT = frameUniform(0), uI = frameUniform(1);
+  const uCol = frameUniform(new THREE.Color(16768149)), uOp = frameUniform(0.11);
   const frag = Fn(() => {
     const p = uv();
     const edge = smoothstep(0, 0.12, p.x).mul(float(1).sub(smoothstep(0.88, 1, p.x))).mul(smoothstep(0, 0.1, p.y)).mul(float(1).sub(smoothstep(0.86, 1, p.y)));
@@ -151,8 +152,8 @@ function createSandstormHazeNodeMaterial() {
   return makeHandle(makeMat("weather-sandstorm-haze-node", frag()), uT, uI);
 }
 function createStormNodeMaterial() {
-  const uT = uniform(0), uI = uniform(1);
-  const uEC = uniform(new THREE.Color(0.3, 0.3, 1)), uMC = uniform(new THREE.Color(1, 1, 1));
+  const uT = frameUniform(0), uI = frameUniform(1);
+  const uEC = frameUniform(new THREE.Color(0.3, 0.3, 1)), uMC = frameUniform(new THREE.Color(1, 1, 1));
   const frag = Fn(() => {
     const p = uv();
     const muv = vec2(p.x.mul(2).sub(1), p.y.mul(2).sub(1).mul(4));
@@ -167,8 +168,8 @@ function createStormNodeMaterial() {
 }
 function createSplashNodeMaterial(kind) {
   const profile = RAIN_IMPACT_PROFILE[kind];
-  const uT = uniform(0), uRate = uniform(profile.rate), uI = uniform(1);
-  const uCol = uniform(new THREE.Color(kind === "hard" ? 14282751 : 10479359)), uOp = uniform(profile.opacity);
+  const uT = frameUniform(0), uRate = frameUniform(profile.rate), uI = frameUniform(1);
+  const uCol = frameUniform(new THREE.Color(kind === "hard" ? 14282751 : 10479359)), uOp = frameUniform(profile.opacity);
   const aC = attribute("aSplashCenter", "vec3"), aN = attribute("aSplashNormal", "vec3");
   const aP = attribute("aSplashParams", "vec4"), sPos = positionGeometry;
   const age = fract(uT.mul(uRate).add(aP.y));

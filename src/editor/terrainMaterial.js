@@ -1,3 +1,4 @@
+import { frameUniform } from '../render/FrameUniforms.js';
 import { applyTerrainRockDetail } from './materials/TerrainRockDetail.js';
 import { createSnowDetailNodes } from './stylized/SnowDetailShading.js';
 import { resolveSnowSurfaceConfig } from './stylized/SnowSurfaceConfig.js';
@@ -19,7 +20,6 @@ import {
   select,
   sin,
   smoothstep,
-  uniform,
   uv,
   vec2,
   vec3,
@@ -524,7 +524,7 @@ export function createTerrainMaterial({
     const snowDetail = bakedSurface.snow ? createSnowDetailNodes({
       terrainUv, chunkWorldSize, chunkCenter, snow: bakedSurface.snow, material,
       groundHeight: terrainHeight, pathMask: snowPressed, baseNormal: bakedSurface.normal, settings: snowSettings,
-      sun: sunDirection ? normalize(uniform(sunDirection)) : null,
+      sun: sunDirection ? normalize(frameUniform(sunDirection)) : null,
       reliefEnabled: stylizedConfig.enhancements?.snowRelief === true,
     }) : null;
     const snowNormal = bakedSurface.normal && snowDetail

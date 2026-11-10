@@ -1,5 +1,6 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
-import { texture, uniform, vec2 } from 'three/tsl';
+import { texture, vec2 } from 'three/tsl';
 
 /**
  * The ground under a patch of world around the camera, as a small texture a
@@ -39,9 +40,9 @@ export class LocalGroundHeight {
     this.texture.needsUpdate = true;
     this.uniforms = {
       /** Render-space corner of the patch (minimum x, z). */
-      corner: uniform(new THREE.Vector2()),
-      extent: uniform(extent),
-      base: uniform(0),
+      corner: frameUniform(new THREE.Vector2()),
+      extent: frameUniform(extent),
+      base: frameUniform(0),
     };
     this.center = null;
     this.origin = { x: Number.NaN, z: Number.NaN };

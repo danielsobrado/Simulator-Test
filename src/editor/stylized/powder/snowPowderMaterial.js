@@ -1,3 +1,4 @@
+import { frameUniform } from '../../../render/FrameUniforms.js';
 import * as THREE from 'three/webgpu';
 import {
   attribute,
@@ -12,7 +13,6 @@ import {
   normalize,
   smoothstep,
   step,
-  uniform,
   uniformArray,
   uv,
   vec3,
@@ -32,7 +32,7 @@ const DRAG = 2.2;
  */
 export function createSnowPowderUniforms(slots) {
   return {
-    time: uniform(0),
+    time: frameUniform(0),
     kicks: uniformArray(Array.from({ length: slots }, () => new THREE.Vector4(0, -1e5, 0, -1e3)), 'vec4'),
     motions: uniformArray(Array.from({ length: slots }, () => new THREE.Vector4()), 'vec4'),
   };
@@ -92,7 +92,7 @@ export function createSnowPowderMaterial(uniforms, { lifetime, size, opacity }, 
   // cool. The forward-scatter lobe brightens a puff viewed toward the sun.
   const local = uv().sub(0.5).mul(2);
   const sphereNormal = normalize(vec3(local, dot(local, local).oneMinus().max(0).sqrt()));
-  const sun = uniform(sunDirection ?? new THREE.Vector3(0.35, 0.85, 0.25));
+  const sun = frameUniform(sunDirection ?? new THREE.Vector3(0.35, 0.85, 0.25));
   const lightView = normalize(cameraViewMatrix.mul(vec4(sun, 0)).xyz);
   const diffuse = dot(sphereNormal, lightView).add(0.75).div(1.75).max(0);
   const mu = lightView.z.negate();
