@@ -1521,3 +1521,32 @@ zero browser errors. Reports are `tmp/p5-{forest,town}-{a1,b1,a2,b2}.json`.
 validation errors (`tmp/p5-water-acceptance.json`), but lost native foreground
 focus, so `performanceAuthoritative` is false and its 7.2 ms p95 is rejected as
 pacing evidence. A foreground repeat is pending.
+
+### Quality headroom: two-cascade trial rejected, reflection-only fallback (2026-11-10)
+
+Phase 6 was evaluated after the user explicitly authorized proceeding with
+documented earlier gate failures. The phase-4 experiment remains reverted.
+`d43b6be7` changed only the requested two YAML values: reflection resolution
+128 → 256 and shadow cascades 1 → 2. Mobile overrides were not changed.
+The tree-clock correction is included in the actual trial runtime `48e5ee27`,
+frozen on port 5194.
+
+The first headed NVIDIA WebGPU forest trial, 1280×720,
+`--warmup 8 --duration 12 --settle --gpuTimings 1`, measured **8.027 ms render
+CPU** against the **5.67 ms** ceiling, and **3.369 ms GPU** against 3.75 ms.
+It settled with zero browser errors. Native foreground focus was lost, so
+its pacing/FPS results are rejected; CPU phase time and GPU timestamps remain
+the work order's focus-independent gate evidence. The runner exit was 1 due
+to focus (`tmp/p6-two-cascades-trial.json`). No acceptance pass is claimed for
+this failed trial, and its remaining quality/matrix runs were stopped early.
+
+The prescribed fallback `42f0aa0c` restores **one cascade** and keeps **256 px
+water reflections**, with every other enhancement setting unchanged. It is
+frozen on port 5195; the original pre-phase-1 commit `e437410f` is frozen on
+5190 for the final A/B. This fallback does not ship long-range cascaded shadows.
+The existing shadow-distance setting remains 120 m.
+
+All **4275 tests pass** on the fallback (`tmp/p6-final-tests.log`), using the
+same `node --test` invocation as `npm test`. Its alternating 720p comparisons,
+1440p GPU checks, final visual captures and full headed matrix are running;
+their results will be recorded before handover.
