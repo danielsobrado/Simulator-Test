@@ -1243,7 +1243,8 @@ Forest render CPU averages 5.4925 → 5.2235 ms, a 4.9% reduction. Town means ar
 8.399 → 8.406 ms initially and 8.2225 → 8.342 ms on repeat. The initial town
 control spread alone is 0.730 ms; these results do not establish a town CPU gain.
 The strict per-run town ceiling nevertheless fails in both series, so phase 1
-is **not accepted under the work order**. No subsequent phase was implemented.
+is **not accepted under the work order**. No subsequent phase had been implemented
+at that handover.
 
 The initial forest series is excluded: another automated Chromium with WebGPU
 enabled was observed during it, and three of its four runs lost native focus.
@@ -1352,7 +1353,8 @@ Correctness and visual checks:
 
 The phase 2 draw, CPU, GPU, visual and water gates pass. The full-suite result
 above retains its explicit working-tree provenance; this phase does not include
-the other session's uncommitted fixture correction. Phases 3–6 were not started.
+the other session's uncommitted fixture correction. Phases 3–6 had not started
+at that handover.
 
 ### World uniforms: excluded state retained, strict CPU gate missed (2026-11-10)
 
@@ -1614,5 +1616,49 @@ focus. Both outbound and return runs exist, but share the failed focus monitor
 and runner exit. The other five workloads and water pass their gates. Its
 unaltered reports are retained under `tmp/p6-matrix-first/`, with the matrix in
 `tmp/p6-final-matrix.json`. No town pacing result from that attempt is claimed.
-The complete matrix is being repeated after foreground availability was
-confirmed; no implementation or quality setting was changed for the repeat.
+The complete matrix was repeated after foreground availability was confirmed;
+no implementation or quality setting was changed for the repeat.
+
+The **full headed matrix repeat exits 0**, using the `qa:perf:matrix` script
+on the frozen fallback at port 5195, 1280×720, warmup 8 s, movement 10 s and
+20 s recovery observation. It is a full run, not a water-only refresh.
+`tmp/p6-final-matrix-retry.json` records `gate.passed: true`, no gate failures,
+the correct base URL and all required density multipliers. The raw reports,
+matrix and authoritative water report are archived under `tmp/p6-matrix-final/`.
+
+| Workload | Frame p95 ms | Hitch rate % | Native focus | Collision gate | Browser errors |
+|---|---|---|---|---|---|
+| Standard | 7.4 | 0 | Pass | Pass | 0 |
+| Dense forest | 7.6 | 0 | Pass | Pass | 0 |
+| High grass | 8.3 | 0.06 | Pass | Pass | 0 |
+| Dense mixed | 8.58 | 0.07 | Pass | Pass | 0 |
+| Construction ring | 15.7 | 0.70 | Pass | Pass | 0 |
+| Settlement approach | 13.96 | 0.42 | Pass | Pass | 0 |
+| Settlement return/180° turn | 11.3 | 0.08 | Pass | Pass | 0 |
+| Water acceptance | 6.7 | 0.01 | Pass | Pass | 0 |
+
+All workloads settled. Every p95 is below 33.3 ms and every hitch rate below
+2%; grass coverage/recovery, stress-density and water behavioral gates pass.
+Town outbound and return share one browser and one native focus/error monitor
+that starts before the first run and stops after the return. The table's return
+focus/error values refer to that complete session, not a separate nested
+capture. The matrix water run records `performanceAuthoritative: true` and zero
+GPU validation errors. No FPS/hitch result from a lost-focus attempt is used.
+
+### Performance work order outcome (2026-11-10)
+
+| Phase | Retained result |
+|---|---|
+| 1 | Water bounds/culling retained: 34 → 18 forest water draws. Historical strict town CPU failure remains documented. |
+| 2 | Interior batching retained: 249 → 89 main-pass interior draws; isolated town render saving 1.801 ms. |
+| 3 | 169 world uniforms moved to the frame group; protected camera/reflection/tree clocks retained. CPU/raw-count gate failures retained under the user's explicit exception. |
+| 4 | Reverted as required: texture checks stayed at 25; no experiment remains in the runtime. |
+| 5 | Numeric spacing buckets/scratch list retained: named self time −81.1% (−79.7% including key helper), exact placement fixtures unchanged. Common gate/frozen-water focus misses remain documented. |
+| 6 | 256 px reflections, one cascade. Two cascades rejected at 8.027 ms forest CPU. Final CPU/GPU ceilings, visuals, tests, water and full matrix pass. |
+
+The shipped runtime matches frozen `42f0aa0c` (runtime snapshot SHA-256
+`3ca35b493937c72bb4cfc97acc21fb165667d28bf4bf1aa1fcefae44b2c187c4`).
+Subsequent performance-report commits do not change its runtime files. No
+long-range cascaded-shadow improvement is shipped, and phase 4's later
+performance/visual checks were skipped after its mandatory revert. Earlier
+failed gates were documented and explicitly retained by the user, not relabelled.
