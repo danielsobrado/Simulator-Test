@@ -1551,6 +1551,27 @@ frozen on port 5195; the original pre-phase-1 commit `e437410f` is frozen on
 The existing shadow-distance setting remains 120 m.
 
 All **4275 tests pass** on the fallback (`tmp/p6-final-tests.log`), using the
-same `node --test` invocation as `npm test`. Its alternating 720p comparisons,
-1440p GPU checks, final visual captures and full headed matrix are running;
+same `node --test` invocation as `npm test`. Its headed NVIDIA WebGPU 720p
+comparisons use `--warmup 8 --duration 12 --settle --gpuTimings 1`, forest
+`--x 2005 --z 2941`, A/B/A/B on each route. All eight settled, retained native
+foreground focus and had zero browser errors.
+
+| Route | Metric | Pre-phase-1 A1, A2 | Fallback B1, B2 | Gate |
+|---|---|---|---|---|
+| Forest | Render CPU avg ms | 5.971, 5.554 | 5.347, 5.529 | Pass: both ≤ 5.67 and ≤ A mean 5.7625 |
+| Forest | GPU avg ms | 3.105, 3.031 | 3.021, 3.015 | Pass: both ≤ 3.75 |
+| Forest | Final draw-call gauge | 251, 249 | 234, 235 | Reported |
+| Town | Render CPU avg ms | 8.559, 8.350 | 6.872, 6.957 | Pass: both ≤ 8.85 and ≤ A mean 8.4545 |
+| Town | GPU avg ms | 3.892, 3.906 | 3.865, 3.874 | Pass: within +0.10 ms of A mean |
+| Town | Final draw-call gauge | 548, 548 | 388, 388 | Reported |
+
+Render CPU means are **5.7625 → 5.438 ms** in the forest and
+**8.4545 → 6.9145 ms** in town. These are cumulative comparisons against
+`e437410f`, including the separately committed `a2e7cce8` weather/shader/fixture
+work; they are not isolated phase-6 gains. The original plan's baseline had
+included uncommitted shader edits, so its historical values and this clean
+commit baseline are distinct. The phase-6 fixed ceilings pass in both runs.
+Reports are `tmp/p6-final-{forest,town}-{a1,b1,a2,b2}.json`.
+
+1440p GPU checks, final visual captures and the full headed matrix are running;
 their results will be recorded before handover.
