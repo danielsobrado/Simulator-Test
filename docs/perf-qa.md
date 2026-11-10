@@ -1288,3 +1288,68 @@ Correctness and visual checks:
   against an immutable export of `e437410f` (`tmp/p1-baseline-test.log`). No
   workshop code or fixture was changed. The work order's full-suite gate therefore
   remains unmet as well as its town CPU gate.
+
+### Settlement interiors: 256 m cells and 32-bit indices (2026-11-10)
+
+Phase 2 of [the performance work order](plans/performance-plan-2026-11-10.md).
+`InteriorBatchStore` now uses 256 m cells, a 262140-vertex cap and `Uint32Array`
+indices. Numeric-buffer pages remain 12288 elements, bounding each copy to
+49152 bytes. Generated room geometry, materials, planning and culling code are
+unchanged. Tests also update the existing rendering/numeric-buffer contracts.
+
+Frozen exports of `21a20604` (includes phase 1) and implementation `45cfdebc`,
+served on ports 5186/5187; uncommitted weather and look-harness edits are excluded
+from these runtimes. Headed NVIDIA Lovelace WebGPU, 1280×720,
+`--warmup 8 --duration 12 --settle --gpuTimings 1`. Each route alternates A, B,
+A, B; forest adds `--x 2005 --z 2941`. All eight runs settled with zero browser
+errors. Only town A2 and forest B2 retained native focus, so no FPS or hitch
+figures are claimed; these are the work order's CPU-phase/GPU-timestamp gates.
+
+| Route | Metric | Baseline A1, A2 | Change B1, B2 | Gate |
+|---|---|---|---|---|
+| Town | Render CPU avg ms | 8.645, 8.590 | 6.841, 6.792 | Pass: both ≤ 7.1175 (A mean − 1.5 ms) |
+| Town | GPU avg ms | 3.970, 3.913 | 3.881, 3.869 | Pass: within +0.30 ms of A mean |
+| Town | Final draw-call gauge | 550, 549 | 388, 389 | Reported; includes auxiliary passes |
+| Forest | Render CPU avg ms | 5.588, 5.245 | 5.379, 5.338 | Pass: both ≤ 5.4165 (A mean) |
+| Forest | GPU avg ms | 3.068, 3.011 | 3.000, 2.980 | Pass |
+| Forest | Final draw-call gauge | 236, 235 | 236, 236 | Reported |
+
+Town render CPU averages **8.6175 → 6.8165 ms**, saving 1.801 ms (20.9%). Forest
+timings overlap the control spread; no forest gain is attributed to this phase.
+Reports are `tmp/p2-{town,forest}-{a1,b1,a2,b2}.json`. An earlier unpaired town
+control is retained as `tmp/p2-town-preliminary-a.json`; the balanced series was
+started fresh after another session's environment captures released the GPU lock.
+
+The matching census (`tmp/p2-census-a.json`, `tmp/p2-census-b.json`) gives
+**249 → 89 main-pass interior draws**, passing the ≤ 90 gate. Wood goes 51 → 16,
+plain 38 → 13, and each of the other five roles 32 → 12. Each role's triangle
+count is unchanged, totalling **1.992 M** in both arms.
+
+Correctness and visual checks:
+
+- 31 targeted tests pass. They retain exact expanded attributes/winding and check 256 m
+  positive/negative boundaries, indices above 65535 through 262139, capacity
+  splitting, bounds from emitted vertices, shared-material disposal and a
+  maximum buffer copy of exactly 49152 bytes. ESLint passes for all four JS files.
+- `npm test`: **4268 passed, zero failures** (`tmp/p2-tests.log`). This is a
+  working-tree result: it includes another session's uncommitted correction of
+  the pre-existing `walls: 'default'` recipe fixture failure noted in phase 1.
+  That fixture and the other session's changes are outside this phase's commit.
+- Matched burg 18 doorway and furnished-room captures at hours 12 and 21 pass
+  all eight cases on hardware WebGPU with zero browser errors. Both arms select
+  the same current settlement-plan room and camera poses. Inspected
+  `tmp/p2-town-visual/comparison.png`: open door leaf, furniture, window daylight
+  and night lighting match. Each arm also has a second night-room capture 600 ms
+  later for live flicker; animation phases and fireflies vary between captures.
+  Fixture, poses and readiness are in `tmp/p2-town-visual/report.json`.
+- `qa:water:acceptance --headed` passes every gate on NVIDIA WebGPU with native
+  foreground focus, zero browser/GPU validation errors and 6.9 ms frame p95
+  (`tmp/p2-water-acceptance-foreground.json`). The first attempt lost focus
+  during route discovery and produced no report. A second attempt passed the
+  functional gates but lost focus (`tmp/p2-water-acceptance-retry.json`), so it
+  was rejected as authoritative evidence. The final foreground run exits 0 and
+  records `performanceAuthoritative: true`.
+
+The phase 2 draw, CPU, GPU, visual and water gates pass. The full-suite result
+above retains its explicit working-tree provenance; this phase does not include
+the other session's uncommitted fixture correction. Phases 3–6 were not started.
