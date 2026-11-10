@@ -7,6 +7,8 @@ import { blownStreakUniforms } from '../src/editor/stylized/ambient/BlownStreaks
 import { jungleMistUniforms } from '../src/editor/stylized/ambient/JungleMist.js';
 import { createCpuTreeImpostorMaterial, updateImpostorCameraUniforms } from '../src/editor/stylized/impostor/TreeImpostorMaterial.js';
 import { createSnowfallField } from '../src/editor/weather/snowfall/SnowfallField.js';
+import { StylizedTreeView } from '../src/editor/stylized/StylizedTreeView.js';
+import { registerTreeWindTime, treeWindTimeFor } from '../src/editor/stylized/forest/TreeWindTime.js';
 
 test('world weather and live grass settings share the frame uniform group', () => {
   for (const node of [
@@ -14,6 +16,18 @@ test('world weather and live grass settings share the frame uniform group', () =
     ...Object.values(jungleMistUniforms),
     ...Object.values(new GrassTuning({}).uniforms),
   ]) assert.equal(node.groupNode, frameGroup);
+});
+
+test('the clock shared by tree meshes and proxies keeps the TreeWindTime exclusion', () => {
+  const config = { trees: { leafTop: '#ffffff', weathering: { enabled: false } } };
+  const view = new StylizedTreeView({ terrainView: { scene: new THREE.Scene() }, config });
+  try {
+    registerTreeWindTime(config, view.time);
+    assert.equal(treeWindTimeFor(config), view.time);
+    assert.equal(view.time.groupNode, objectGroup);
+    view.time.value = 2;
+    assert.equal(treeWindTimeFor(config).value, 2);
+  } finally { view.dispose(); }
 });
 
 test('impostor camera state and reflection clocks remain per render', () => {
