@@ -46,26 +46,37 @@ function* createSpacingIndex(candidates) {
     if (candidate.radius > maximumRadius) maximumRadius = candidate.radius;
   }
   const cellSize = maximumRadius > 0 ? maximumRadius * 2 : 1;
+  // Whole-cell rebasing preserves bucket boundaries at imported world coordinates.
+  const originX = Math.floor((candidates[0]?.x ?? 0) / cellSize);
+  const originZ = Math.floor((candidates[0]?.z ?? 0) / cellSize);
+  function bucketKey(cellX, cellZ) {
+    if (Math.abs(cellX) >= 1048576 || Math.abs(cellZ) >= 1048576) {
+      throw new RangeError('Scatter spacing index exceeds its numeric bucket range.');
+    }
+    return (cellX + 1048576) * 2097152 + (cellZ + 1048576);
+  }
   const buckets = new Map();
   for (const candidate of candidates) {
     yield;
-    const cellX = Math.floor(candidate.x / cellSize);
-    const cellZ = Math.floor(candidate.z / cellSize);
-    const key = `${cellX}:${cellZ}`;
+    const cellX = Math.floor(candidate.x / cellSize) - originX;
+    const cellZ = Math.floor(candidate.z / cellSize) - originZ;
+    const key = bucketKey(cellX, cellZ);
     const bucket = buckets.get(key);
     if (bucket) bucket.push(candidate);
     else buckets.set(key, [candidate]);
   }
   return {
-    *neighbours(candidate) {
-      const cellX = Math.floor(candidate.x / cellSize);
-      const cellZ = Math.floor(candidate.z / cellSize);
+    collectNeighbours(candidate, out) {
+      out.length = 0;
+      const cellX = Math.floor(candidate.x / cellSize) - originX;
+      const cellZ = Math.floor(candidate.z / cellSize) - originZ;
       for (let offsetZ = -1; offsetZ <= 1; offsetZ += 1) {
         for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-          const bucket = buckets.get(`${cellX + offsetX}:${cellZ + offsetZ}`);
-          if (bucket) yield* bucket;
+          const bucket = buckets.get(bucketKey(cellX + offsetX, cellZ + offsetZ));
+          if (bucket) for (let index = 0; index < bucket.length; index += 1) out.push(bucket[index]);
         }
       }
+      return out;
     },
   };
 }
@@ -304,6 +315,7 @@ export function createStableChunkManifestBuilder({
   let candidates = [];
   let authoritativeCandidates = null;
   let spacingIndex = null;
+  const neighbours = [];
   let acceptanceIndex = 0;
   const owned = [];
   let result = null;
@@ -379,7 +391,9 @@ export function createStableChunkManifestBuilder({
         acceptanceIndex += 1;
         let accepted = !overlaps(candidate.x, candidate.z, blockers, candidate.radius);
         if (accepted) {
-          for (const other of spacingIndex.neighbours(candidate)) {
+          spacingIndex.collectNeighbours(candidate, neighbours);
+          for (let index = 0; index < neighbours.length; index += 1) {
+            const other = neighbours[index];
             if (other === candidate || !candidateWins(other, candidate)) continue;
             if (candidateOverlaps(candidate, other)) {
               accepted = false;

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildStableChunkManifest,
   createStableChunkManifestBuilder,
+  placementSignature,
 } from '../src/editor/stylized/StableScatterManifest.js';
 
 function manifestOptions() {
@@ -30,6 +31,50 @@ function manifestOptions() {
     ),
   };
 }
+
+test('stable scatter keeps the placement IDs and signature recorded before numeric buckets', () => {
+  const manifest = buildStableChunkManifest(manifestOptions());
+  assert.deepEqual(manifest.map(placement => placement.stableId), [
+    'resume-test:2:-1:0',
+    'resume-test:2:-1:1',
+    'resume-test:2:-1:4',
+    'resume-test:2:-1:5',
+    'resume-test:2:-1:7',
+    'resume-test:2:-1:9',
+    'resume-test:2:-1:10',
+    'resume-test:2:-1:12',
+    'resume-test:2:-1:15',
+  ]);
+  assert.equal(placementSignature(manifest), '9:0236005c');
+});
+
+test('numeric scatter buckets reject a span outside the safe coordinate range', () => {
+  assert.throws(() => buildStableChunkManifest({
+    ...manifestOptions(),
+    radiusForScale: () => 1e-12,
+  }), RangeError);
+});
+
+test('whole-cell rebasing preserves small scatter at imported world coordinates', () => {
+  const manifest = buildStableChunkManifest({
+    ...manifestOptions(),
+    chunkX: 73939,
+    chunkZ: 74206,
+    radiusForScale: scale => scale * 0.08,
+  });
+  assert.deepEqual(manifest.map(placement => placement.stableId), [
+    'resume-test:73939:74206:1',
+    'resume-test:73939:74206:3',
+    'resume-test:73939:74206:4',
+    'resume-test:73939:74206:6',
+    'resume-test:73939:74206:8',
+    'resume-test:73939:74206:10',
+    'resume-test:73939:74206:13',
+    'resume-test:73939:74206:14',
+    'resume-test:73939:74206:16',
+  ]);
+  assert.equal(placementSignature(manifest), '9:4947de17');
+});
 
 test('resumable stable scatter is identical to synchronous generation', () => {
   const expected = buildStableChunkManifest(manifestOptions());
