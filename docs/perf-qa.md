@@ -1586,5 +1586,33 @@ browser/GPU validation errors and **7.0 ms frame p95**
 change, corrected tree clock and reflection fallback together; the earlier
 frozen phase-5 focus failures remain failures above.
 
-Final visual captures and the full headed matrix are running; their results
-will be recorded before handover.
+Visual checks on `42f0aa0c`, NVIDIA WebGPU, 1600×900:
+
+- Forest at hours 7 and 18.6, plus a 35 m overview at hour 7, coast at hour 12
+  and the previously verified Eldara river at hour 12 have ready assets,
+  zero browser errors and the expected one cascade/256 px reflection settings
+  (`tmp/p6-world-visual-p6-final/report.json`). Inspected the forest morning/
+  evening pair, coast and river. One-cascade shadow coverage is retained;
+  no extension beyond the existing 120 m setting or new cascade seam is claimed.
+- The first frame labelled town showed the wooded approach at the performance
+  scenario's starting coordinate, so it is rejected as town visual evidence.
+  The replacement uses the same burg-18 plan-derived fixture as phase 3 and
+  checks a doorway, furnished room and street at hour 12. All three pass with
+  ready assets, exact room camera height, NVIDIA WebGPU and zero errors
+  (`tmp/p6-town-visual/report.json`). Inspected the actual street/building image.
+- A lower river-bank view at hour 12 makes tree reflections visible. Paired
+  reflections-on/off captures at water time 123.4 s show the gold/green canopy
+  silhouettes on the surface when enabled, without obvious blocky edges.
+  The existing water-review harness verifies biome 6, river kind 3, readiness,
+  fixed source and zero browser errors (`tmp/p6-reflection-closeup/report.json`).
+  The earlier steep river overview was insufficient to judge silhouette edges,
+  which is why this additional angle was captured. This is a visual check,
+  not a quantitative aliasing comparison against 128 px.
+
+The first full headed matrix exits 1 because the settlement browser lost native
+focus. Both outbound and return runs exist, but share the failed focus monitor
+and runner exit. The other five workloads and water pass their gates. Its
+unaltered reports are retained under `tmp/p6-matrix-first/`, with the matrix in
+`tmp/p6-final-matrix.json`. No town pacing result from that attempt is claimed.
+The complete matrix is being repeated after foreground availability was
+confirmed; no implementation or quality setting was changed for the repeat.
