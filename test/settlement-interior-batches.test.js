@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Frustum, Group, Matrix4, PerspectiveCamera, Scene } from 'three/webgpu';
 import { InteriorBuilder, INTERIOR_MATERIALS } from '../src/editor/world/settlements/view/interior/InteriorBuilder.js';
-import { INTERIOR_BATCH_MAX_VERTICES, INTERIOR_VERTEX_ATTRIBUTES } from '../src/editor/world/settlements/view/interior/InteriorBatchStore.js';
+import { INTERIOR_BATCH_CELL_METRES, INTERIOR_BATCH_MAX_VERTICES, INTERIOR_VERTEX_ATTRIBUTES } from '../src/editor/world/settlements/view/interior/InteriorBatchStore.js';
 import { createInteriorMeshes } from '../src/editor/world/settlements/view/interior/InteriorMeshes.js';
 import { prepareSurfaceJob } from '../src/editor/world/settlements/view/SettlementPreparationJobs.js';
 import { SettlementSite } from '../src/editor/world/settlements/view/SettlementSite.js';
 import { drainJob } from '../src/editor/world/settlements/SettlementArrayJobs.js';
 import { StreamedDrawPreparation } from '../src/render/preparation/StreamedDrawPreparation.js';
 import { WAIT_FOR_DRAW_PREPARATION } from '../src/render/preparation/StagedDrawPublication.js';
+import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
 
 /** The former six-corner quad emitter, retained as an independent parity oracle. */
 class TriangleInteriorBuilder extends InteriorBuilder {
@@ -87,20 +88,36 @@ test('indexed spatial batches preserve every expanded float32 attribute and tria
   }
 });
 
-test('interior capacity splitting keeps the uint16 primitive-restart index unused', () => {
+test('interior capacity splitting preserves 32-bit indices and bounded copy steps', () => {
+  PerfCounters.reset();
   const builder = new InteriorBuilder();
   builder.enter({ x: 0, z: 0, yaw: 0 });
-  for (let index = 0; index < 16383; index++) builder.slab(0, 1, 0, 1, 0, true, [1, 1, 1]);
+  for (let index = 0; index < 65535; index++) builder.slab(0, 1, 0, 1, 0, true, [1, 1, 1]);
   builder.tri([0, 0, 0], [1, 0, 0], [0, 0, 1], [0, 1, 0], [1, 1, 1]);
   builder.slab(0, 1, 0, 1, 0, true, [1, 1, 1]);
   const batches = builder.arrays();
   assert.equal(batches.length, 2);
   assert.equal(batches[0].positions.length / 3, INTERIOR_BATCH_MAX_VERTICES);
-  assert.ok(batches[0].indices.includes(65534));
+  assert.ok(batches[0].indices.includes(65535));
+  assert.ok(batches[0].indices.includes(65536));
+  assert.ok(batches[0].indices.includes(INTERIOR_BATCH_MAX_VERTICES - 1));
   for (const batch of batches) {
-    assert.ok(batch.indices instanceof Uint16Array);
-    assert.ok(batch.indices.every(index => index !== 0xffff));
+    assert.ok(batch.indices instanceof Uint32Array);
+    assert.ok(batch.indices.every(index => index < batch.positions.length / 3));
   }
+  assert.equal(PerfCounters.get('settlementInteriorBufferMaxCopyBytes'), 49152);
+  assert.throws(() => new InteriorBuilder({ maxVertices: INTERIOR_BATCH_MAX_VERTICES + 1 }), /4–262140 vertices/);
+});
+
+test('whole rooms share 256 m cells with correct positive and negative boundaries', () => {
+  assert.equal(INTERIOR_BATCH_CELL_METRES, 256);
+  const builder = new InteriorBuilder();
+  for (const x of [-257, -256, -1, 0, 255, 256]) {
+    builder.enter({ x, z: 0, yaw: 0 });
+    builder.slab(0, 1, 0, 1, 0, true, [1, 1, 1]);
+  }
+  assert.deepEqual(builder.arrays().map(batch => [batch.cellX, batch.positions.length / 3]),
+    [[-2, 4], [-1, 8], [0, 8], [1, 4]]);
 });
 
 function separatedRooms() {
@@ -131,6 +148,8 @@ test('interior batches cull conservatively under a floating origin and share mat
       assert.equal(mesh.geometry.index.array, batches[index].indices);
       assert.equal(mesh.geometry.attributes.position.array, batches[index].positions);
       assert.ok(mesh.frustumCulled && !mesh.castShadow && !mesh.receiveShadow);
+      assert.deepEqual(mesh.geometry.boundingSphere.center.toArray(), [0, 1.5, index === 0 ? -256 : 256]);
+      assert.equal(mesh.geometry.boundingSphere.radius, Math.sqrt(4.25));
     }
   } finally {
     for (const mesh of meshes) mesh.geometry.dispose();

@@ -331,8 +331,8 @@ test('a town has rooms behind its doors', () => {
     const key = group.materialKey;
     const vertices = group.positions.length / 3;
     assert.ok(vertices > 0 && vertices <= INTERIOR_BATCH_MAX_VERTICES, key);
-    assert.ok(group.indices instanceof Uint16Array && group.indices.length % 3 === 0);
-    assert.ok(group.indices.every(index => index < vertices && index < 0xffff));
+    assert.ok(group.indices instanceof Uint32Array && group.indices.length % 3 === 0);
+    assert.ok(group.indices.every(index => index < vertices));
     assert.equal(group.normals.length, vertices * 3);
     assert.equal(group.colors.length, vertices * 3);
     assert.equal(group.fire.length, vertices * 3);

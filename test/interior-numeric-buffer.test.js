@@ -29,15 +29,15 @@ test('interior appends retain prior pages and yield bounded copies with exact fl
   assert.throws(() => buffer.push(1), /finalized/);
 });
 
-test('production interior pages cap copies at 48 KiB and preserve uint16 indices', () => {
+test('production interior pages cap copies at 48 KiB and preserve uint32 indices', () => {
   const floats = new InteriorNumericBuffer();
   for (let index = 0; index < INTERIOR_BUFFER_PAGE_ELEMENTS + 1; index++) floats.push(index / 9);
   const job = floats.toArrayJob();
   assert.equal(job.next().value, 48 * 1024);
   assert.equal(job.next().value, 4);
   assert.equal(job.next().value.length, INTERIOR_BUFFER_PAGE_ELEMENTS + 1);
-  const indices = new InteriorNumericBuffer(Uint16Array, 3);
-  indices.push(65532, 65533, 65534); indices.push(0, 1, 2);
-  assert.deepEqual(drainJob(indices.toArrayJob()), new Uint16Array([65532, 65533, 65534, 0, 1, 2]));
+  const indices = new InteriorNumericBuffer(Uint32Array, 3);
+  indices.push(65534, 65535, 65536); indices.push(262137, 262138, 262139);
+  assert.deepEqual(drainJob(indices.toArrayJob()), new Uint32Array([65534, 65535, 65536, 262137, 262138, 262139]));
   assert.deepEqual(drainJob(new InteriorNumericBuffer().toArrayJob()), new Float32Array());
 });
