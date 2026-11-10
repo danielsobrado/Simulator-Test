@@ -1461,3 +1461,54 @@ its A/B performance and visual runs were therefore not pursued. The three
 focused binding tests passed, as did ESLint. The integration suite including
 the experiment and phases 3/5 passed all 4275 tests (`tmp/p345-tests.log`).
 The reverted graph test is retained in the experiment commit's history.
+
+### Scatter spacing: numeric buckets and one scratch neighbour list (2026-11-10)
+
+Phase 5 implementation `88cb2a08` replaces string bucket keys and the neighbour
+generator with exact numeric keys and one scratch array per manifest builder.
+Lookup retains offset-Z, offset-X, then bucket order. Candidate positions,
+priorities, accepted order and spacing rules remain unchanged.
+
+An integer bucket origin is subtracted after flooring canonical coordinates.
+This preserves the original bucket boundaries while allowing small scatter
+at imported-world coordinates: using absolute bucket coordinates with the
+proposed ±1048576 guard would reject those normal worlds. The numeric key
+formula and RangeError guard apply to the resulting local bucket coordinates,
+in both fill and lookup. No placement coordinate is rebased.
+
+The five resumable-manifest tests pass, including pre-change literal IDs and
+signatures `9:0236005c` at chunk `(2,-1)` and `9:4947de17` for small objects at
+imported chunk `(73939,74206)`, plus the numeric-span RangeError. The literals
+were recorded before changing the index (`tmp/p5-before.json`). ESLint passes.
+The integration suite including phases 3/4/5 passed all 4275 tests.
+
+Frozen `b8a17e35` and `88cb2a08`, ports 5188/5189. Both arms include the same
+subsequently reverted phase-4 experiment; only the scatter change differs.
+The phase-3 tree-clock follow-up is absent from both arms. Headed NVIDIA
+WebGPU forest runs use `--x 2005 --z 2941 --warmup 8 --duration 12 --settle
+--gpuTimings 1 --cpu-profile <file>`, alternated A/B/A/B. All four settled,
+retained native foreground focus and had zero browser errors.
+
+| Profile | createSpacingIndex self ms | neighbours / collectNeighbours self ms | Sum ms | bucketKey self ms |
+|---|---|---|---|---|
+| A1 | 431.820 | 1749.624 | 2181.444 | 0 |
+| B1 | 189.685 | 209.185 | 398.870 | 48.614 |
+| A2 | 394.703 | 1793.019 | 2187.722 | 0 |
+| B2 | 205.174 | 223.366 | 428.540 | 10.280 |
+
+The gate's sampled self-time mean falls **2184.583 → 413.705 ms**, or 18.9%
+of baseline, passing the ≤50% limit. Including the new key/range helper makes
+the change mean 443.152 ms, still only 20.3% of baseline. Capture durations
+were 54.879/54.418 s for A and 50.229/48.536 s for B; this is whole-profile
+scatter self time, not a frame-time reduction. Profiles are
+`tmp/p5-forest-{a1,b1,a2,b2}.cpuprofile`.
+
+| Route | Metric | Baseline A1, A2 | Change B1, B2 | Gate |
+|---|---|---|---|---|
+| Forest (profiled) | Render CPU avg ms | 5.901, 5.643 | 5.680, 5.827 | B2 fails A mean 5.772 by 0.055 ms |
+| Forest (profiled) | GPU avg ms | 2.997, 2.961 | 2.975, 2.976 | Pass: within +0.10 ms |
+
+The scatter-specific gate passes; the strict common forest CPU gate does not.
+The user's documented acceptance exception retains the safe optimization
+without claiming that failed render gate passed. Town and water checks are
+still running; their results will be appended before handover.
