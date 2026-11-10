@@ -1403,6 +1403,9 @@ Water's protected capture state includes three controller uniforms and three
 PlanarReprojection uniforms; the probe unions labels across material variants.
 These values were preserved rather than moved to satisfy a conflicting count.
 The restored tree clock adds an excluded object uniform to materials that use it.
+The live owner trace in `tmp/p3-world-visual/report.json` confirms all six
+capture values on each of two water variants, plus an object-updated alphaTest
+reference and a built-in mat4: eight entries per variant, fifteen in the union.
 
 The user explicitly authorized retaining safe optimizations, documenting failed
 gates, and evaluating phase 6 against its own CPU/GPU ceilings. This also leaves
@@ -1413,8 +1416,28 @@ the separate `a2e7cce8` commit before this phase's baseline.
 Focused frame-group/camera tests and ESLint passed; `npm test` at `376f1348`
 passed all 4271 tests (`tmp/p3-tests.log`). The later phase-3/4/5 integration
 suite passed 4275 (`tmp/p345-tests.log`); all four uniform-group tests pass
-after the tree-clock correction. Browser visual/weather/water results follow
-after their captures complete.
+after the tree-clock correction.
+
+- Forest/coast at hours 12 and 21: eight matched captures pass on hardware
+  WebGPU with assets/readiness verified and zero browser errors
+  (`tmp/p3-world-visual/report.json`). Inspected the forest noon pair and coast
+  noon/night pairs: scenery and reflected trees/sky match; wind, cloud and
+  reflection-refresh phases vary. Both coast arms report valid cube and planar
+  captures. The forest pose reports valid cube capture and inactive planar
+  capture in both arms. The first visual attempt timed out waiting for the GPU
+  lock and produced no captures; the complete retry supplies this evidence.
+- Town open-door/furnished-room comparisons at hours 12 and 21: all eight pass,
+  with identical fixture/camera selection and zero browser errors. Inspected
+  `tmp/p3-town-visual/comparison.png`: doors, furniture, window daylight and
+  interior night lighting match; animated fireflies/flicker change phase.
+- `qa:weather:browser --headed`: all 14 cases pass on NVIDIA WebGPU with zero
+  shader/runtime errors (`tmp/p3-weather-report.json`). Its 20 recorded console
+  entries are warnings, including Three.js deprecations and unreachable shader
+  code, rather than exceptions or GPU validation errors.
+- `qa:water:acceptance --headed` exits 0, passes every gate, retains native
+  foreground focus and records `performanceAuthoritative: true`, with zero
+  browser/GPU validation errors and 7.3 ms frame p95
+  (`tmp/p3-water-acceptance.json`).
 
 ### Bilinear template-size experiment: reverted (2026-11-10)
 
