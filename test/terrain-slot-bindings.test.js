@@ -5,6 +5,7 @@ import { uniform, uv } from 'three/tsl';
 
 import {
   TERRAIN_SLOT_KEY,
+  bilinearLoad,
   createSlotBakeGpuState,
   slotTexture,
   slotVector2,
@@ -24,6 +25,17 @@ function slotMesh(data, bake = null) {
   if (bake) attachTerrainMaterialBakeGpuState(mesh, bake);
   return mesh;
 }
+
+test('bilinear loads use template dimensions and four texture nodes', () => {
+  const template = new THREE.DataTexture(new Uint8Array(64 * 32 * 4), 64, 32);
+  const graph = bilinearLoad(template, uv(), () => template);
+  const textures = new Set();
+  graph.traverse((node) => {
+    assert.ok(!node.isTextureSizeNode, 'template dimensions need no textureSize node');
+    if (node.isTextureNode) textures.add(node);
+  });
+  assert.equal(textures.size, 4);
+});
 
 test('slot textures follow the drawn mesh and stay per-object updates', () => {
   const template = dataTexture();
