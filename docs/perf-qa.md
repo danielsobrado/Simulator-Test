@@ -1209,3 +1209,82 @@ Also:
 - Chunk-boundary hitch spikes should shrink vs the ~1 s baseline (no main-thread mask storms).
 - `terrainCommit` phase should stay small (memcpy only); large `dt` with `terrainUploadPages` should be rare.
 - Grass/flower rebuilds should follow per-chunk signatures + build-queue budgets, not full resident rebuilds on every focus step.
+
+### Water slots own their surface bounds (2026-11-10; town CPU gate failed)
+
+Phase 1 of [the performance work order](plans/performance-plan-2026-11-10.md).
+Water slots share the terrain plane's buffers but own their culling volumes.
+Each wet upload decodes channel 1's surface-height offsets, adds the page's
+surface origin, and fits local Z bounds with 6 m of swell/surf/storm padding.
+Dry-slot visibility, materials and refraction selection stay unchanged. Terrain
+uses the same bounds calculation with its existing 2 m padding.
+
+Frozen runtime exports of `e437410f` and the phase 1 implementation (tested as
+`4524c8c7`), served on ports 5186 and 5187. These exports exclude the shared
+checkout's uncommitted weather, material and visual-harness edits. Headed NVIDIA
+Lovelace WebGPU, 1280×720, `--warmup 8 --duration 12 --settle --gpuTimings 1`;
+forest is `chunk-cross --x 2005 --z 2941`, town is `settlement-approach`.
+Each series alternates A, B, A, B. All runs in the table settled, recorded zero
+browser errors and passed native foreground focus. No FPS or hitch claim is made.
+
+| Route / series | Metric | Baseline A | Change B | Work-order gate |
+|---|---|---|---|---|
+| Forest repeat | Render CPU avg ms | 5.420, 5.565 | 5.236, 5.211 | Pass: both ≤ 5.4925 |
+| Forest repeat | GPU avg ms | 3.010, 3.019 | 2.992, 2.970 | Pass: both within +0.10 ms of A mean |
+| Forest repeat | Final draw-call gauge | 250, 248 | 448, 233 | Includes auxiliary renders; use the per-pass census below |
+| Town initial | Render CPU avg ms | 8.764, 8.034 | 8.233, 8.579 | Fail: B2 > 8.399 |
+| Town initial | GPU avg ms | 3.914, 3.881 | 3.889, 3.936 | Pass |
+| Town initial | Final draw-call gauge | 549, 548 | 549, 548 | Reported, no draw-reduction claim |
+| Town repeat | Render CPU avg ms | 8.314, 8.131 | 8.441, 8.243 | Fail: both > 8.2225 |
+| Town repeat | GPU avg ms | 3.905, 3.898 | 3.912, 3.905 | Pass |
+| Town repeat | Final draw-call gauge | 548, 548 | 549, 548 | Reported, no draw-reduction claim |
+
+Forest render CPU averages 5.4925 → 5.2235 ms, a 4.9% reduction. Town means are
+8.399 → 8.406 ms initially and 8.2225 → 8.342 ms on repeat. The initial town
+control spread alone is 0.730 ms; these results do not establish a town CPU gain.
+The strict per-run town ceiling nevertheless fails in both series, so phase 1
+is **not accepted under the work order**. No subsequent phase was implemented.
+
+The initial forest series is excluded: another automated Chromium with WebGPU
+enabled was observed during it, and three of its four runs lost native focus.
+Its change B1 measured 7.238 ms render CPU and 3.845 ms GPU. The entire forest
+series was repeated, rather than using that outlier to claim a result.
+Raw reports are `tmp/p1-forest-{a1,b1,a2,b2,a3,b3,a4,b4}.json` and
+`tmp/p1-town-{a1,b1,a2,b2,a3,b3,a4,b4}.json`; the forest timing table
+uses runs 3–4, and both town series are retained above.
+
+The matching forest census (`tmp/p1-census-a.json`, `tmp/p1-census-b.json`)
+reports `output 1280x720||persp :: stylized-water` at **34 → 18 draws** and
+279 k → 147 k triangles. This passes the phase's ≤ 20 main-pass water-draw gate.
+
+Correctness and visual checks:
+
+- The 18 focused bounds/dry-water tests pass, including the five new
+  `test/water-slot-bounds.test.js` cases. ESLint passes for all four changed JS
+  files. Wet heights plus origin/padding, dry uploads, reuse, front/back camera
+  culling, shared buffers and the unchanged terrain box/sphere are covered.
+- `qa:world:visual --suite shore --only marine-coast,marine-coast-overview,original-05-shore`
+  passes all three poses on hardware WebGPU, with assets ready and zero browser
+  errors (`tmp/p1-world-visual/report.json`). Inspected the overview and shoreline.
+- Inspected culling-on/unculled pairs at −60°, 0° and +60° for the coast and a
+  current Eldara river: no missing water at screen edges. Water time was fixed at
+  123.4 s; materials and quality were unchanged. Coast artifacts are in
+  `tmp/p1-water-turns/`; valid river artifacts are in `tmp/p1-river-turns/`.
+  Both reports record NVIDIA WebGPU and zero browser errors.
+- The historical `water-aaa-audit-2026-10-16/manifest.json` river pose resolves to
+  ocean (kind 1) at its old positive Z, so its first captures were rejected as
+  river evidence. Re-selected through the existing `selectImportedWaterPoses`
+  helper and asserted river kind 3 and biome 6. The valid bank is
+  `(-6524373.395576, -1768732.198768)`, targeting
+  `(-6524358.856998, -1768747.654606)`; surface height is 25.200708 m and camera
+  height 38.700708 m. The report preserves this pose and selection metadata.
+- `qa:water:acceptance --headed` passes every gate at high quality with native
+  focus, zero browser/GPU validation errors, and 7.0 ms frame p95
+  (`tmp/p1-water-acceptance.json`).
+- `npm test`: **4262 passed, 1 failed** (`tmp/p1-tests.log`). The unrelated
+  `tests/ProceduralAssetStore.test.js:92` fixture omits `walls: 'default'`, which
+  `normalizeProceduralRecipe` returns. Reproduced the identical assertion using
+  `node --test --test-name-pattern="procedural asset recipes are normalized and bounded"`
+  against an immutable export of `e437410f` (`tmp/p1-baseline-test.log`). No
+  workshop code or fixture was changed. The work order's full-suite gate therefore
+  remains unmet as well as its town CPU gate.

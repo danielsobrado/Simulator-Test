@@ -92,6 +92,19 @@ export function waterFieldHasCoverage(pixels) {
   return false;
 }
 
+/** Surface-height offsets of covered texels, relative to the field's origin. */
+export function waterFieldSurfaceRange(pixels) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let index = 0; index < pixels.length; index += WATER_FIELD_CHANNELS) {
+    if ((pixels[index] & 0x7fff) === 0) continue;
+    const height = halfToFloat(pixels[index + 1]);
+    min = Math.min(min, height);
+    max = Math.max(max, height);
+  }
+  return min === Infinity ? null : { min, max };
+}
+
 function sampleIndex(x, z, width) {
   return z * width + x;
 }

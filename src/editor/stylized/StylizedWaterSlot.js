@@ -9,7 +9,8 @@ import {
   PERF_COUNTER_WATER_UPLOAD_BYTES,
   PerfCounters,
 } from '../performance/qa/PerfCounters.js';
-import { WATER_FLOW_CHANNELS, waterFieldHasCoverage } from '../water/WaterField.js';
+import { WATER_FLOW_CHANNELS, waterFieldHasCoverage, waterFieldSurfaceRange } from '../water/WaterField.js';
+import { createSlotGeometry, fitSlotBoundsToRange } from '../world/TerrainSlotBounds.js';
 import { createStylizedWaterMaterial } from './StylizedWaterMaterial.js';
 import { SEA_SWELL_COMPONENTS, seaSwellPhaseOrigin } from '../water/SeaSwell.js';
 import { waterfallPatternOrigin } from './WaterfallShading.js';
@@ -115,16 +116,11 @@ export class StylizedWaterSlot {
     // and a mip chain, so a session that never nears water must never create it.
     this.refractiveMaterial = null;
     this.refractionPrewarmed = false;
-    this.mesh = new THREE.Mesh(terrainView.geometry, this.material);
+    this.mesh = new THREE.Mesh(createSlotGeometry(terrainView.geometry), this.material);
     this.mesh.userData[WATER_SLOT_OPTIONS] = this.materialOptions;
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.visible = false;
     this.mesh.renderOrder = 2;
-    // Left unculled: the plane is displaced along local Z by the surface height,
-    // so its own bounds are wrong, and a per-slot bounding sphere measured no
-    // faster — the viewport-copy cost is binary in the number of refractive
-    // chunks, not proportional, so culling some of them buys nothing.
-    this.mesh.frustumCulled = false;
     this.mesh.name = `stylized-water-${terrainSlot.slotIndex}`;
     terrainView.scene.add(this.mesh);
   }
@@ -198,6 +194,14 @@ export class StylizedWaterSlot {
     const uploadedBytes = page.waterFieldPixels.byteLength + page.waterFlowPixels.byteLength + page.waterAppearancePixels.byteLength;
     PerfCounters.inc(PERF_COUNTER_WATER_UPLOAD_BYTES, uploadedBytes);
     PerfCounters.inc('textureBytesUploaded', uploadedBytes);
+    if (this.hasWaterCoverage) {
+      const range = waterFieldSurfaceRange(this.waterFieldPixels);
+      const origin = page.waterFieldSurfaceOrigin ?? 0;
+      fitSlotBoundsToRange(
+        this.mesh.geometry, range.min + origin, range.max + origin,
+        this.terrainView.chunkWorldSize, 6,
+      );
+    }
   }
 
   update(timestamp) {

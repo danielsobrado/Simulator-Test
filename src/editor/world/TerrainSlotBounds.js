@@ -39,10 +39,14 @@ export function fitSlotBounds(geometry, heights, chunkWorldSize) {
     if (height < minimum) minimum = height;
     if (height > maximum) maximum = height;
   }
+  // Headroom for anything the material adds on top of the height texture.
+  fitSlotBoundsToRange(geometry, minimum, maximum, chunkWorldSize, 2);
+}
+
+/** Fit local Z bounds to a displaced surface range and its extra headroom. */
+export function fitSlotBoundsToRange(geometry, minimum, maximum, chunkWorldSize, pad) {
   if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return;
   const half = chunkWorldSize * 0.5;
-  // Headroom for anything the material adds on top of the height texture.
-  const pad = 2;
   geometry.boundingBox ??= new THREE.Box3();
   geometry.boundingBox.min.set(-half, -half, minimum - pad);
   geometry.boundingBox.max.set(half, half, maximum + pad);
