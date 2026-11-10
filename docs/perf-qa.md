@@ -1354,6 +1354,68 @@ The phase 2 draw, CPU, GPU, visual and water gates pass. The full-suite result
 above retains its explicit working-tree provenance; this phase does not include
 the other session's uncommitted fixture correction. Phases 3–6 were not started.
 
+### World uniforms: excluded state retained, strict CPU gate missed (2026-11-10)
+
+Phase 3 of [the performance work order](plans/performance-plan-2026-11-10.md).
+Implementation `376f1348` moved 170 plain world-state uniforms to the existing
+frame group. Follow-up `48e5ee27` restored the shared tree mesh/proxy clock to
+the object group, applying the TreeWindTime exclusion to the registered clock
+as well as its fallback. The retained change is 169 calls in 34 modules.
+Camera state, reflection reprojection/validity/origins, per-object callbacks,
+and the work order's excluded files remain outside the migration.
+
+Frozen exports of `a2e7cce8` and `376f1348`, ports 5186/5187, headed NVIDIA
+Lovelace WebGPU, 1280×720, `--warmup 8 --duration 12 --settle --gpuTimings 1`.
+Both routes alternated A/B/A/B. All eight runs settled, retained native focus
+and had zero browser errors. These measurements precede the tree-clock
+follow-up; no phase-3 performance pass is inferred for that follow-up.
+
+| Route | Metric | Baseline A1, A2 | Change B1, B2 | Gate |
+|---|---|---|---|---|
+| Forest | Render CPU avg ms | 5.191, 5.358 | 5.359, 5.639 | Fail: both exceed A mean 5.2745 |
+| Forest | GPU avg ms | 3.003, 2.995 | 3.008, 3.021 | Pass: within +0.10 ms |
+| Forest | Final draw-call gauge | 234, 440 | 393, 237 | Includes captures/auxiliary passes |
+| Town | Render CPU avg ms | 6.918, 6.750 | 6.926, 7.021 | Fail: both exceed A mean 6.834 |
+| Town | GPU avg ms | 3.842, 3.848 | 3.841, 3.877 | Pass: within +0.10 ms |
+| Town | Final draw-call gauge | 388, 389 | 389, 388 | Reported |
+
+Render CPU means are 5.2745 → 5.499 ms in the forest and 6.834 → 6.9735 ms in
+town. The predicted phase-3 CPU saving was not demonstrated. Raw reports are
+`tmp/p3-{forest,town}-{a1,b1,a2,b2}.json`.
+
+The forest uniform probes (`tmp/p3-uniforms-{a,b}.json`) count raw `:none:`
+entries exactly as requested, including built-ins and unions of material
+variants:
+
+| Material | Before | Experiment | Limit | Result |
+|---|---|---|---|---|
+| terrain-slot | 22 | 5 | 6 | Pass |
+| meadow-grass-blades | 29 | 2 | 5 | Pass |
+| Meadow leaves | 17 | 9 | 6 | Fail |
+| stylized-flowers | 10 | 2 | 4 | Pass |
+| stylized-water | 17 | 15 | 6 | Fail |
+
+The leaf owner audit (`tmp/p3-uniform-owners.json`) found Three.js material
+references for alphaTest, metalness and roughness: their inner UniformNode
+reports `none`, but their owner updates per object. Four more values belong
+to camera-derived CharacterOcclusion outside the named migration directories.
+Water's protected capture state includes three controller uniforms and three
+PlanarReprojection uniforms; the probe unions labels across material variants.
+These values were preserved rather than moved to satisfy a conflicting count.
+The restored tree clock adds an excluded object uniform to materials that use it.
+
+The user explicitly authorized retaining safe optimizations, documenting failed
+gates, and evaluating phase 6 against its own CPU/GPU ceilings. This also leaves
+phase 1's historical strict town-gate failure visible above; neither failure is
+being relabelled as a pass. The formerly failing workshop fixture was fixed by
+the separate `a2e7cce8` commit before this phase's baseline.
+
+Focused frame-group/camera tests and ESLint passed; `npm test` at `376f1348`
+passed all 4271 tests (`tmp/p3-tests.log`). The later phase-3/4/5 integration
+suite passed 4275 (`tmp/p345-tests.log`); all four uniform-group tests pass
+after the tree-clock correction. Browser visual/weather/water results follow
+after their captures complete.
+
 ### Bilinear template-size experiment: reverted (2026-11-10)
 
 Phase 4 of [the performance work order](plans/performance-plan-2026-11-10.md)
