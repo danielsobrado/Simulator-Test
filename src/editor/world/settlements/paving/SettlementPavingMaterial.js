@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute, color, dot, float, fract, mix, mx_noise_float, positionWorld, sin, smoothstep, step, texture, uv, vec2, vec3 } from 'three/tsl';
 import { treadPaving } from '../../../../render/materials/townWeathering.js';
+import { TOWN_WET_FAMILIES, wetTownSurface } from '../../../../render/materials/townWetness.js';
 import { buildingShadeEmission } from '../../../stylized/forest/foliageLight.js';
 import { TOWN_GROUND } from '../view/SettlementGrade.js';
 
@@ -75,7 +76,11 @@ export function createPavingMaterial(layer, set, stoneStyle) {
   const grain = fract(sin(dot(positionWorld.xz.mul(31), vec2(12.9898, 78.233))).mul(43758.5453));
   material.opacityNode = step(cut, texture(set.arm, uv()).r.mul(0.38).add(grain.mul(0.58)).add(0.04));
   material.alphaTest = 0.5;
-  material.colorNode = untiledColour(set.color, set.arm, material.color);
+  // Paving lies flat open to the rain: stone's darkening and wet gloss, so a
+  // street in the rain reads wet rather than only foggy.
+  const wet = wetTownSurface(untiledColour(set.color, set.arm, material.color), texture(set.arm, uv()).g, float(1), TOWN_WET_FAMILIES.stone);
+  material.colorNode = wet.color;
+  material.roughnessNode = wet.roughness;
   material.emissiveNode = buildingShadeEmission(material.colorNode, { fill: 1.35, bounce: 0.8 });
   material.name = `settlement-paving-${layer}-${set.name}`;
   return material;

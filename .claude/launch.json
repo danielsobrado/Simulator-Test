@@ -4,45 +4,88 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5174", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
       "port": 5174
     },
     {
       "name": "dev-frozen",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "F:/drusniel-cache/frozen", "run", "dev", "--", "--port", "5190", "--strictPort"],
+      "runtimeArgs": [
+        "--prefix",
+        "F:/drusniel-cache/frozen",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5190",
+        "--strictPort"
+      ],
       "port": 5190
     },
     {
       "name": "tree-qa-baseline",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/serve-world-visual-snapshot.mjs", "83762407^", "5191", "7f95b9b3"],
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "83762407^",
+        "5191",
+        "7f95b9b3"
+      ],
       "port": 5191
     },
     {
       "name": "tree-qa-current",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/serve-world-visual-snapshot.mjs", "7f95b9b3", "5192", "7f95b9b3"],
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "7f95b9b3",
+        "5192",
+        "7f95b9b3"
+      ],
       "port": 5192
     },
     {
       "name": "rootzone-base",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/serve-world-visual-snapshot.mjs", "939f1830^", "5195", "939f1830"],
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "939f1830^",
+        "5195",
+        "939f1830"
+      ],
       "port": 5195,
       "autoPort": false
     },
     {
       "name": "rootzone-change",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/serve-world-visual-snapshot.mjs", "939f1830", "5194", "939f1830"],
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "939f1830",
+        "5194",
+        "939f1830"
+      ],
       "port": 5194,
       "autoPort": false
     },
     {
       "name": "dev-alt",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5182", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5182",
+        "--strictPort"
+      ],
       "port": 5182
     }
   ]

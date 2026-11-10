@@ -88,6 +88,7 @@
     "lint": "eslint .",
     "qa:recovery": "node scripts/run-renderer-recovery-qa.mjs",
     "qa:world:visual": "node scripts/run-world-visual-qa.mjs",
+    "qa:look": "node scripts/run-environment-look-qa.mjs",
     "qa:biome-surface": "node scripts/run-biome-surface-qa.mjs"
   },
   "dependencies": {

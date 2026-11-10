@@ -15,6 +15,7 @@ const recipe = {
   finish: 'masonry',
   shape: 'classic',
   towerSide: 'left',
+  walls: 'default',
   width: 8,
   depth: 2,
   height: 5,

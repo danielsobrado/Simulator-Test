@@ -13,6 +13,7 @@ import {
 import { isAzgaarMacroWorldSource } from '../import/AzgaarMacroWorldSource.js';
 import { createFarAlpineSurface } from './FarAlpineSurface.js';
 import { settlementPreparationFor } from './settlements/SettlementPreparation.js';
+import { stormSnowCoverUniform } from '../weather/storm/stormGroundUniforms.js';
 
 const DEFAULT_RADIUS_METERS = 10000;
 const DEFAULT_INNER_RADIUS_METERS = 256;
@@ -157,7 +158,8 @@ export class MacroFarTerrainView {
     const material = new THREE.MeshLambertNodeMaterial({ fog: true, side: THREE.DoubleSide });
     this.alpine = createFarAlpineSurface({
       vertexColor: attribute('color', 'vec3'),
-      snowCover: attribute('snowCover', 'float'),
+      // A storm's snow lies on the far ground too, or the distance stays green under it.
+      snowCover: attribute('snowCover', 'float').max(stormSnowCoverUniform),
       iceCover: attribute('iceCover', 'float'),
       snowColor: this.snowColor,
     });

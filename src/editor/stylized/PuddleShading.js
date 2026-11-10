@@ -1,23 +1,37 @@
+import { Color } from 'three/webgpu';
 import {
-  Fn, If, cameraViewMatrix, clamp, float, floor, fract, length, mix, normalize, oneMinus, select, smoothstep, time, vec2, vec3, vec4,
+  Fn, If, cameraPosition, cameraViewMatrix, clamp, dot, float, floor, fract, length, mix, normalize, oneMinus, positionWorld, pow, select,
+  smoothstep, time, vec2, vec3, vec4,
 } from 'three/tsl';
 
 import { surfaceWetnessUniform } from '../weather/surfaceWetness.js';
 import { stormRainUniform } from '../weather/storm/stormGroundUniforms.js';
+import { skyLightUniforms } from './sky/skyLight.js';
 
 /** Metres per ripple cell: one ring per cell (storm plan §5.1). */
 const RIPPLE_CELL = 0.5;
 /** Wetness below which no puddle stands, so a dry frame skips the whole block. */
 const PUDDLE_WETNESS = 0.45;
+/** Roughness of standing water: near mirror, short of aliasing the sun. */
+export const PUDDLE_ROUGHNESS = 0.04;
+/** The sky ponds reflect (StylizedWaterMaterial), horizon to zenith, before the look's tint. */
+const SKY_HORIZON = new Color('#81a8b4');
+const SKY_ZENITH = new Color('#38658a');
+
+/** Water's Fresnel (Schlick, F0 0.02) for the cosine between view and surface normal. */
+export function waterFresnel(cosine) {
+  return pow(oneMinus(clamp(cosine, 0, 1)), 5).mul(0.98).add(0.02);
+}
 
 function hash(cell) {
   return fract(cell.dot(vec2(12.9898, 78.233)).sin().mul(43758.5453));
 }
 
 /**
- * Standing water after rain on flat, hollow ground (storm plan §5.1): darker,
- * near-mirror smooth and facing straight up, so the sky and sun reflect through
- * the existing environment lighting — no reflection pass, no viewport texture.
+ * Standing water after rain on flat, hollow ground (storm plan §5.1): near-mirror
+ * smooth and facing straight up, so the sun glints through the existing lighting,
+ * and the current look's sky shows in it by water's Fresnel — no reflection
+ * pass, no viewport texture. Its darkening is the rain wetness's, under one floor.
  * Puddles open in the deepest hollows first and spread as the ground soaks
  * (`surfaceWetnessUniform`), then shrink back as it dries. While rain falls,
  * one ring per 0.5 m cell spreads across them.
@@ -58,10 +72,29 @@ export function createPuddleShading({ shape, exposure, water, worldXZ }) {
     return result;
   })();
 
+  // The sky in the water, lit by the current look. The scene's environment map
+  // is a fixed sunny HDR dimmed with the light, so under a storm a mirror-smooth
+  // puddle reflected almost nothing and read as a hole in the ground.
+  const reflection = Fn(() => {
+    const result = vec3(0).toVar();
+    If(mask.greaterThan(0), () => {
+      const toEye = normalize(cameraPosition.sub(positionWorld));
+      const surface = normalize(vec3(ripple.x, 1, ripple.y));
+      const reflected = toEye.negate().reflect(surface);
+      const sky = mix(vec3(SKY_HORIZON.r, SKY_HORIZON.g, SKY_HORIZON.b), vec3(SKY_ZENITH.r, SKY_ZENITH.g, SKY_ZENITH.b),
+        smoothstep(0, 0.7, reflected.y));
+      result.assign(sky.mul(skyLightUniforms.reflectionTint).mul(skyLightUniforms.brightness)
+        .mul(waterFresnel(dot(toEye, surface))).mul(mask));
+    });
+    return result;
+  })();
+
   return {
     mask,
-    apply(color, roughness) {
-      return { color: mix(color, color.mul(0.6), mask), roughness: mix(roughness, float(0.06), mask) };
+    /** Emissive radiance of the reflected sky; zero off the puddles. */
+    reflection,
+    apply(roughness) {
+      return mix(roughness, float(PUDDLE_ROUGHNESS), mask);
     },
     /** @param {Node} normal view-space surface normal */
     normal(normal) {

@@ -1454,6 +1454,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       waterfallMist,
       worldSoundscape,
       surfaceWetness,
+      snowCover,
       skyLooks,
       fallingLeaves,
       snowPowder,

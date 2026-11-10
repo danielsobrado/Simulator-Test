@@ -489,15 +489,16 @@ export function createTerrainMaterial({
       canopy: bakedSurface.canopy ?? float(0),
       config: resolveSurfaceWetnessConfig(stylizedConfig.wetness),
     });
-    const wetSurface = rainWetness.apply(
-      shoreSurface.color,
-      shoreSurface.roughness ?? float(stylizedConfig.materialBake.render.fallbackRoughness),
-    );
     // Standing water on soaked flat hollows; a dry frame skips it with one compare.
     const puddles = bakedSurface.shape ? createPuddleShading({
       shape: bakedSurface.shape, exposure: rainWetness.exposure, water: bakedSurface.water, worldXZ,
     }) : null;
-    const surface = puddles ? puddles.apply(wetSurface.color, wetSurface.roughness) : wetSurface;
+    const wetSurface = rainWetness.apply(
+      shoreSurface.color,
+      shoreSurface.roughness ?? float(stylizedConfig.materialBake.render.fallbackRoughness),
+      puddles?.mask,
+    );
+    const surface = puddles ? { ...wetSurface, roughness: puddles.apply(wetSurface.roughness) } : wetSurface;
     const footprints = createFootprintShading({
       terrainUv,
       chunkWorldSize,
@@ -592,6 +593,7 @@ export function createTerrainMaterial({
       const spellLight = material.colorNode.mul(spellLightIrradiance(positionWorld, vec3(0, 1, 0)));
       material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(spellLight) : spellLight;
     }
+    if (puddles) material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(puddles.reflection) : puddles.reflection;
     // Valley mist pooling in the gorges below the view, marched against the
     // camera-local height patch. It blends last, over everything, because it sits
     // in the air in front of the ground rather than on it. Null (no config, no

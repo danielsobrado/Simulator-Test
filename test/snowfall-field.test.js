@@ -62,11 +62,11 @@ test('coverage-driven snow fades in with the weather off, and weather snow only 
   const early = snow.getStats().flakes;
   assert.ok(early > 0 && early < 6000, `regional snow starts below its full count (${early})`);
   for (let frame = 2; frame <= 60; frame++) snow.update(0.1, frame / 10, new THREE.Vector3());
-  // Full regional snowfall is the moderate level: about the former 12 000 flakes, fully opaque.
-  assert.ok(Math.abs(snow.getStats().flakes - 12044) < 2, `${snow.getStats().flakes}`);
+  // Full regional snowfall is the moderate level: the former 12 000 flakes plus the curtain, fully opaque.
+  assert.ok(Math.abs(snow.getStats().flakes - 13544) < 2, `${snow.getStats().flakes}`);
   assert.equal(snow.snowMaterial.uniforms.intensity.value, REGIONAL_SNOW_INTENSITY);
   snow.applySettings({ enabled: true, intensity: 1.2, windX: 0, windZ: 0 });
-  assert.equal(snow.getStats().flakes, 30000, 'a storm draws the whole allocation (near-soft culled)');
+  assert.equal(snow.getStats().flakes, 31500, 'a storm draws the whole allocation (near-soft culled)');
   assert.equal(snow.snowMaterial.uniforms.intensity.value, 1.2, 'above 1 only the opacity grows');
   snow.applySettings({ enabled: false, intensity: 1.2, windX: 0, windZ: 0 });
   snow.setRegionalSnow(0);

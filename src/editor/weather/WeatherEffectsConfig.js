@@ -27,11 +27,15 @@ export const DEFAULT_WEATHER_EFFECTS = Object.freeze({
     top: 16.2, bottom: -3.6, speed: 1.224,
     swayRadius: 0.504, swayFrequency: 0.6, turbulence: 0.396,
     opacity: 0.95, color: '#dae6f6',
+    // Shutter of the motion streak: a gale's flakes draw as dashes along the wind.
+    streakSeconds: 0.04,
     layers: Object.freeze([
-      { area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9, counts: [0, 2000, 6700, 12000, 18000] },
+      { area: 46.8, sizeMin: 0.018, sizeMax: 0.0396, opacity: 0.75, speedScale: 0.8, nearFade: 1.44, softness: 0, brightness: 0.9, counts: [0, 2000, 6700, 12000, 14000] },
       { area: 16.56, sizeMin: 0.0324, sizeMax: 0.0792, opacity: 0.9, speedScale: 1, nearFade: 1.44, softness: 0, brightness: 1, counts: [0, 1500, 5200, 9000, 12000] },
       // Near-soft flakes wrap their 6.5 m box every 0.4 s in a gale: culled at storm (§3.4).
       { area: 6.48, sizeMin: 0.108, sizeMax: 0.198, opacity: 0.4, speedScale: 1.3, nearFade: 0.432, softness: 1, brightness: 0.75, counts: [0, 40, 144, 200, 0] },
+      // The falling curtain: large soft flakes from ~25 m out, gathered into drifting sheets.
+      { area: 140, sizeMin: 0.14, sizeMax: 0.3, opacity: 0.32, speedScale: 1, nearFade: 9, softness: 1, brightness: 0.95, sheets: 1, counts: [0, 0, 1500, 3500, 5500] },
     ].map(freezeLayer)),
     levels: Object.freeze({
       driftCap: Object.freeze([3, 3, 5, 9, 15]),
@@ -105,12 +109,14 @@ export function resolveWeatherEffects(source = {}) {
     throw new Error(`${path}.regionalFullCoverage must exceed regionalMinCoverage.`);
   }
   if (!/^#[0-9a-f]{6}$/i.test(snowfall.color)) throw new Error(`${path}.color must be a hex colour.`);
+  number(snowfall.streakSeconds, `${path}.streakSeconds`, 0, 0.2);
   snowfall.layers = fieldLayers(snowfall.layers, `${path}.layers`, (layer, at) => {
     for (const key of ['area', 'sizeMin', 'sizeMax', 'speedScale']) number(layer[key], `${at}.${key}`, 1e-4, 200);
     if (layer.sizeMax < layer.sizeMin) throw new Error(`${at}.sizeMax must be at least sizeMin.`);
     for (const key of ['opacity', 'softness']) number(layer[key], `${at}.${key}`, 0, 1);
     number(layer.nearFade, `${at}.nearFade`, 0, 20);
     number(layer.brightness, `${at}.brightness`, 0, 2);
+    if (layer.sheets !== undefined) number(layer.sheets, `${at}.sheets`, 0, 1);
   });
   const snowLevels = { ...DEFAULT_WEATHER_EFFECTS.snowfall.levels, ...source.snowfall?.levels };
   snowfall.levels = { driftCap: levels(snowLevels.driftCap, `${path}.levels.driftCap`, 0, 40) };

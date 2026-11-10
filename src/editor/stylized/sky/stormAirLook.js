@@ -14,7 +14,12 @@ import { stormLadder } from './SkyLook.js';
 
 /** Metres seen at 5 % contrast per level (clear, light, moderate, heavy, storm). */
 const RAIN_VISIBILITY = Object.freeze([Infinity, 1500, 600, 250, 150]);
-const SNOW_STORM_VISIBILITY = 50;
+/**
+ * A blizzard keeps its near field: FogExp2 at 140 m leaves ~20 % fog at 40 m and
+ * ~60 % at 80 m, so footing and rocks read and only the distance goes; the flakes
+ * and their curtain carry the density (50 m erased everything past ~25 m).
+ */
+const SNOW_STORM_VISIBILITY = 140;
 /** FogExp2: visibility at 5 % contrast ≈ 1.73 / density. */
 const CONTRAST_DISTANCE = 1.73;
 const RAIN_FOG = '#4a535c';

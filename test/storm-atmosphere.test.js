@@ -52,11 +52,11 @@ test('storm fog meets the visibility targets and never thins a look', () => {
   assert.ok(Math.abs(visibility(0.25, 0) - 1500) < 1e-6);
   assert.ok(Math.abs(visibility(0.75, 0) - 250) < 1e-6);
   assert.ok(Math.abs(visibility(1, 0) - 150) < 1e-6);
-  assert.ok(Math.abs(visibility(1, 1) - 50) < 1e-6);
+  assert.ok(Math.abs(visibility(1, 1) - 140) < 1e-6);
   const hazy = { ...day, fogDensityScale: 3 };
   assert.equal(stormAirLook(hazy, { storm: 0.25, snowShare: 0 }, 0.0015).fogDensityScale, 3, 'light rain keeps a hazier look');
   const full = stormAirLook(day, { storm: 1, snowShare: 1 }, 0.0015);
-  assert.ok(Math.abs(0.0015 * full.fogDensityScale - 1.73 / 50) < 1e-9);
+  assert.ok(Math.abs(0.0015 * full.fogDensityScale - 1.73 / 140) < 1e-9);
   assert.equal(stormAirLook(day, { storm: 0, snowShare: 1 }, 0.0015), day, 'clear is the look itself');
 });
 
@@ -81,7 +81,7 @@ test('the controller lays the storm over the look and settles', () => {
   for (let i = 0; i < 60; i += 1) controller.update(0.1);
   const look = applied.at(-1);
   assert.equal(look.whiteout, 1);
-  assert.ok(Math.abs(0.0015 * look.fogDensityScale - 1.73 / 50) < 1e-9);
+  assert.ok(Math.abs(0.0015 * look.fogDensityScale - 1.73 / 140) < 1e-9);
   assert.equal(controller.update(0.1), false, 'settled');
   controller.setStorm({ cloud: 1, storm: 1, snowShare: 1 });
   assert.equal(controller.update(0.1), false, 'a repeated frame writes nothing');

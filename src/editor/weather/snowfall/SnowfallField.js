@@ -58,7 +58,7 @@ export function createSnowfallField(settings = DEFAULT_WEATHER_EFFECTS.snowfall,
   const material = createSnowfallMaterial(uniforms, settings);
   const rng = new Rng(seed);
   const geometry = createSnowfallGeometry(snowfallPopulations(settings), () => rng.float());
-  const wind = new THREE.Vector2(-0.62, 0.21);
+  const wind = uniforms.wind.value.set(-0.62, 0.21);
   const origin = new THREE.Vector2();
   const updatePhases = () => {
     settings.layers.forEach((layer, index) => {

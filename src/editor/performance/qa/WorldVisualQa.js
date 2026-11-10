@@ -9,6 +9,7 @@ import { worldVisualNeighborhood } from './WorldVisualNeighborhood.js';
 import { setWaterTimeOverride } from '../../water/WaterVisualClock.js';
 import { WorldVisualLayerControls, worldVisualVegetation } from './WorldVisualVegetation.js';
 import { findBiomeSurfacePose, holdStagedGrass, liveDryHeading, stageSurfaceDemo } from './WorldVisualSurfaceDemo.js';
+import { findCanopyPose, habitatAt } from './WorldVisualCanopyPose.js';
 const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
 /** Dev-only browser adapter. Navigation uses the engine's transaction, never private predictor fields. */
@@ -100,6 +101,8 @@ export class WorldVisualQa {
     if(preset)e.skyLooks?.setPreset(preset);else e.skyLooks?.setTimeBlend(presetWeights(hour));
     e.weatherSettings.weatherMode=weather;e.weatherSettings.weatherIntensity=weather==='off'?0:1;
     e.weatherController?.applySettings({ snap: true });
+    // A snapped storm shows the ground it leaves at steady state, not after minutes of fall.
+    if(e.weatherController)e.snowCover?.snap(e.weatherController.storm.snow);
     await e.stylizedSurface.skyView.environment.ready;
   }
   setWaterTime(seconds = null) { setWaterTimeOverride(seconds); }
@@ -108,6 +111,8 @@ export class WorldVisualQa {
     return findBiomeSurfacePose(store.generator,store.tileSize??this.editor.config.map.tileSize,tileId,options);
   }
   stageSurfaceDemo(options) { return stageSurfaceDemo(this.editor, options); }
+  findCanopyPose(options) { return findCanopyPose(this.editor, options); }
+  habitatAt(x, z) { return habitatAt(this.editor, x, z); }
   holdStagedGrass() { holdStagedGrass(); }
   liveDryHeading(awayFrom, fallback) { return liveDryHeading(this.editor, awayFrom, fallback); }
   /** The player's own body (and its shadow) out of a capture, or back. */
