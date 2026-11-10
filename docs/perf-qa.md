@@ -1520,7 +1520,11 @@ zero browser errors. Reports are `tmp/p5-{forest,town}-{a1,b1,a2,b2}.json`.
 `qa:water:acceptance --headed` passed every functional gate with zero browser/GPU
 validation errors (`tmp/p5-water-acceptance.json`), but lost native foreground
 focus, so `performanceAuthoritative` is false and its 7.2 ms p95 is rejected as
-pacing evidence. A foreground repeat is pending.
+pacing evidence. The repeat (`tmp/p5-water-acceptance-foreground.json`) also
+passed the functional gates with zero browser/GPU validation errors, but lost
+native focus and exited 1. Its 7.9 ms p95 is likewise rejected. No authoritative
+pacing pass is claimed for this frozen phase-5 arm; final-runtime water and
+matrix checks provide the subsequent integration validation.
 
 ### Quality headroom: two-cascade trial rejected, reflection-only fallback (2026-11-10)
 
