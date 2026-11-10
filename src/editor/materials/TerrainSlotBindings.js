@@ -1,5 +1,5 @@
 import { Matrix3 } from 'three/webgpu';
-import { floor, fract, mix, texture, uniform, vec2 } from 'three/tsl';
+import { floor, fract, mix, texture, textureSize, uniform, vec2 } from 'three/tsl';
 
 import { getTerrainMaterialBakeGpuState } from './TerrainMaterialBakeGpu.js';
 
@@ -54,7 +54,8 @@ export function bilinearLoad(template, uvNode, read = null, transform = null) {
     const load = texture(template, coords).setSampler(false);
     return read ? perObjectTexture(template, null, read, load) : load;
   };
-  const size = vec2(template.image.width, template.image.height);
+  // Only its size is read; without `setSampler(false)` it would still bind one.
+  const size = vec2(textureSize(node(null)));
   const texel = uvNode.mul(size).sub(0.5);
   const base = floor(texel);
   const weight = fract(texel);
