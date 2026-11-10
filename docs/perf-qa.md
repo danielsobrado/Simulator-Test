@@ -1507,8 +1507,17 @@ scatter self time, not a frame-time reduction. Profiles are
 |---|---|---|---|---|
 | Forest (profiled) | Render CPU avg ms | 5.901, 5.643 | 5.680, 5.827 | B2 fails A mean 5.772 by 0.055 ms |
 | Forest (profiled) | GPU avg ms | 2.997, 2.961 | 2.975, 2.976 | Pass: within +0.10 ms |
+| Forest (profiled) | Final draw-call gauge | 235, 236 | 234, 234 | Reported |
+| Town | Render CPU avg ms | 6.866, 7.096 | 7.031, 6.714 | B1 fails A mean 6.981 by 0.050 ms |
+| Town | GPU avg ms | 3.859, 3.860 | 3.851, 3.855 | Pass: within +0.10 ms |
+| Town | Final draw-call gauge | 389, 389 | 387, 388 | Reported |
 
-The scatter-specific gate passes; the strict common forest CPU gate does not.
+The scatter-specific gate passes; the strict common forest/town CPU gates do not.
 The user's documented acceptance exception retains the safe optimization
-without claiming that failed render gate passed. Town and water checks are
-still running; their results will be appended before handover.
+without claiming those failed render gates passed. The town series used the
+same flags without CPU profiling; all four runs settled with native focus and
+zero browser errors. Reports are `tmp/p5-{forest,town}-{a1,b1,a2,b2}.json`.
+`qa:water:acceptance --headed` passed every functional gate with zero browser/GPU
+validation errors (`tmp/p5-water-acceptance.json`), but lost native foreground
+focus, so `performanceAuthoritative` is false and its 7.2 ms p95 is rejected as
+pacing evidence. A foreground repeat is pending.
