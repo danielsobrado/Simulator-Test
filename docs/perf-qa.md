@@ -1573,5 +1573,18 @@ included uncommitted shader edits, so its historical values and this clean
 commit baseline are distinct. The phase-6 fixed ceilings pass in both runs.
 Reports are `tmp/p6-final-{forest,town}-{a1,b1,a2,b2}.json`.
 
-1440p GPU checks, final visual captures and the full headed matrix are running;
-their results will be recorded before handover.
+At 2560×1440, both additional forest runs settle with zero browser errors and
+native focus. GPU averages are **6.975 and 6.917 ms**, both below the **8.3 ms**
+ceiling (`tmp/p6-final-1440p-{b1,b2}.json`). Reported viewport size is
+2560×1440 at device scale 1. These runs also record render CPU of 5.336 and
+5.187 ms; the phase's 1440p gate concerns GPU time.
+
+Final-runtime `qa:water:acceptance --headed` passes every gate and exits 0,
+with native foreground focus, `performanceAuthoritative: true`, zero
+browser/GPU validation errors and **7.0 ms frame p95**
+(`tmp/p6-final-water-acceptance.json`). This validates the retained scatter
+change, corrected tree clock and reflection fallback together; the earlier
+frozen phase-5 focus failures remain failures above.
+
+Final visual captures and the full headed matrix are running; their results
+will be recorded before handover.
