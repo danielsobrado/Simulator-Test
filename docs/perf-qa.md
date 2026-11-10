@@ -1353,3 +1353,26 @@ Correctness and visual checks:
 The phase 2 draw, CPU, GPU, visual and water gates pass. The full-suite result
 above retains its explicit working-tree provenance; this phase does not include
 the other session's uncommitted fixture correction. Phases 3–6 were not started.
+
+### Bilinear template-size experiment: reverted (2026-11-10)
+
+Phase 4 of [the performance work order](plans/performance-plan-2026-11-10.md)
+was implemented in `b8a17e35` and reverted in `99edfd99`. The only runtime edit
+replaced `textureSize(node(null))` with the template image dimensions. Its
+64×32 graph test confirmed four texture nodes and no texture-size node.
+
+Frozen NVIDIA WebGPU forest probes compare phase 3 `376f1348` on port 5187
+with `b8a17e35` on port 5188 (`tmp/p3-uniforms-b.json`,
+`tmp/p4-uniforms-b.json`):
+
+| Terrain metric | Before | Experiment | Required |
+|---|---|---|---|
+| Update nodes per draw | 114 | 105 | ≤ 104 |
+| Object-group textures per check | 25 | 25 | ≤ 23 |
+
+Texture checks did not move, triggering the plan's immediate revert rule.
+No frame-time benefit or visual acceptance is claimed for this experiment;
+its A/B performance and visual runs were therefore not pursued. The three
+focused binding tests passed, as did ESLint. The integration suite including
+the experiment and phases 3/5 passed all 4275 tests (`tmp/p345-tests.log`).
+The reverted graph test is retained in the experiment commit's history.
