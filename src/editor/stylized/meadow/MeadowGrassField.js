@@ -301,6 +301,14 @@ export class MeadowGrassField {
    * so re-basing is not the player moving: scrolling the ink here would smear the
    * trail the player never touched.
    */
+  /** A creature's body on the ground at a render-space point: folds the blades as the player's does. */
+  pressBody(x, z, radius) {
+    this.interaction?.pressDisc(x, z, radius, this.interaction.strength, 0.35);
+  }
+
+  /** Metres from the player the press map reaches; a body farther out leaves no stamp. */
+  get pressReach() { return this.interaction ? this.interaction.worldSize / 2 : 0; }
+
   clearTransientInteraction() {
     this.interaction?.clearPress();this.lastInteractionTime=null;
   }

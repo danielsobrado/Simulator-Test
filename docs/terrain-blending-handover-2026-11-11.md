@@ -90,6 +90,43 @@ they stand on. If they do, the fix is a per-instance canopy term on the sky
 fill, which needs a free instance channel (see the note in
 `biomes/BiomeLooks.js` on the eight-buffer limit) — a separate task.
 
+## Second change: creatures press the grass
+
+Only the player's body used to fold the meadow. Settlement residents and the
+giant serpents now do too, through the same press map
+(`MeadowInteractionMap`, a 27 m window round the player).
+
+- `src/editor/exploration/creatureGrassPress.js` — one ground disc per
+  resident, and one per body radius along a serpent's resting body (a reared
+  head or raised coil presses nothing).
+- `ExplorationRuntime.update` calls it each frame; `MeadowGrassField.pressBody`
+  is the entry point. Walk mode only: with no player body nothing is stamped.
+- Perf counter `creatureGrassPresses` is the discs stamped that frame.
+- No config switch. The A/B control is the parent commit.
+
+### 6. Creature press — what to check
+
+1. Stand in meadow next to a wandering resident: blades fold under them and
+   stand back up behind, as they do behind the player. Report if the fold is
+   too wide, too flat, or pulses.
+2. Find a giant serpent in grass (jungle or meadow species): the body leaves a
+   pressed trail its own width; a reared head does not flatten grass under it.
+3. `creatureGrassPresses` is 0 with no creature within ~13 m and above 0 beside
+   one. A serpent should show tens, not hundreds.
+4. Perf: the press texture (256², uploaded every second frame) now uploads
+   while a creature stands in the window even if the player is on bare ground.
+   Run a settlement approach against the parent commit, same `--warmup`:
+
+   ```bash
+   npm run qa:perf -- --headed --qa settlement-approach --warmup 8 --duration 12 --settle
+   ```
+
+   Report p50/p95 and hitches for both. If a serpent is reachable, also report
+   frame time standing beside it.
+
+Tuning lives in constants at the top of `creatureGrassPress.js`
+(`WALKER_RADIUS_PER_HEIGHT`, `SERPENT_PRESS_GIRTH`, `SERPENT_GROUND_CLEARANCE`).
+
 ## Reviewed and not done
 
 - **Terrain Variation** — already there: `TerrainMaterialStochasticNodes.js` is
