@@ -134,9 +134,17 @@ test('a turned grove keeps its autumn colour instead of compounding with the bio
   // Both are absolute target colours expressed as ratios; multiplying them would
   // land on neither, so autumn has to win outright.
   const inDeciduous = table.tintFor('broadleaf_tall', 0.1, 6);
-  const inTaiga = table.tintFor('broadleaf_tall', 0.1, 9);
-  assert.deepEqual(inDeciduous, inTaiga);
+  assert.deepEqual(inDeciduous, table.tintFor('broadleaf_tall', 0.1, 4));
   assert.deepEqual(inDeciduous, table.tintFor('broadleaf_tall', 0.1));
+});
+
+test('autumn stays in the temperate biomes', () => {
+  const turning = createForestLeafTintTable({ config: config(1) });
+  const green = createForestLeafTintTable({ config: config(0) });
+  // A red grove behind a taiga or in a rainforest is the biome's own hue instead.
+  for (const tileId of [7, 9]) {
+    assert.deepEqual(turning.tintFor('broadleaf_tall', 0.1, tileId), green.tintFor('broadleaf_tall', 0.1, tileId));
+  }
 });
 
 test('biomes outside the table and unknown species stay untinted', () => {

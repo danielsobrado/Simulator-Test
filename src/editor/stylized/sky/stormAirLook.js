@@ -66,7 +66,8 @@ export function stormAirLook(look, { storm = 0, snowShare = 0 } = {}, baseFogDen
   result.fogColor = `#${fogA.set(look.fogColor).lerp(fogB, 0.85 * smoothstep(0.2, 1, s)).getHexString()}`;
   // The dome sinks into the murk with the far trees, or the horizon draws a seam.
   const whiteout = stormWhiteout(s, share);
-  result.skyFog = Math.max(look.skyFog ?? 0, 0.7 * smoothstep(0.4, 1, s), whiteout);
+  // Rain keeps its cloud deck in view (0.45); only snow sinks the dome into the air.
+  result.skyFog = Math.max(look.skyFog ?? 0, (0.45 + 0.25 * share) * smoothstep(0.4, 1, s), whiteout);
   result.whiteout = Math.max(look.whiteout ?? 0, whiteout);
   // Snow light comes from everywhere: the white air lifts the ambient the cloud took.
   result.ambientIntensity = look.ambientIntensity * (1 + 0.35 * share * s);

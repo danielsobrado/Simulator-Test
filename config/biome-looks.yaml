@@ -134,7 +134,8 @@ biomeLooks:
       soil: '#3d3a2b'
       formations: 0.2
       water: { tint: '#bccaca', desaturate: 0.35 }
-      snow: { ground: 0.1, canopy: 0.7, grass: 0.35, air: 0.4, fall: 0.15 }
+      # Canopy 0.7 capped every crown white over green ground (2026-11-10 captures).
+      snow: { ground: 0.1, canopy: 0.3, grass: 0.35, air: 0.4, fall: 0.15 }
       ripples: { speed: 1.5, fade: 2 }
       prints: { ground: 0.35, lifetime: 150, tint: '#9c9488' }
     # A snow carpet, the odd tussock breaking it; trees wear full caps. At 0.8

@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { FOREST_SPECIES_PALETTES } from './ForestSpeciesGeometry.js';
 import { resolveCanopyGrade } from './canopyGrade.js';
 
+/** Biomes whose broadleaf groves turn: grassland and temperate deciduous forest. */
+export const AUTUMN_TILE_IDS = Object.freeze(new Set([4, 6]));
+
 /**
  * Per-grove autumn colour for tree canopies.
  *
@@ -143,7 +146,7 @@ export function createForestLeafTintTable({
       // would recolor the settled snow too, across mesh and impostor bands.
       if (preserveAuthoredColor) return UNTINTED;
       const tables = gradedCrown ? graded : palette;
-      if (autumnShare > 0 && groveSeed < autumnShare) {
+      if (autumnShare > 0 && groveSeed < autumnShare && (tileId === null || AUTUMN_TILE_IDS.has(tileId))) {
         const tints = tables.autumn.get(speciesId);
         if (tints) {
           const position = groveSeed / autumnShare;

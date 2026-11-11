@@ -124,10 +124,13 @@ export function stormLadder(values, storm) {
 export function overcastSkyLook(look, amount, storm = 0) {
   const t = Math.max(0, Math.min(1, amount));
   if (t === 0 && !(storm > 0)) return look;
+  const s = Math.max(0, Math.min(1, storm));
   const result = { ...look };
   // Preserve the weather mix through the regional fog/snow layers for diffuse sky light.
   result.overcastAmount = t;
   for (const key of SKY_LOOK_COLORS) result[key] = greyed(look[key], t * 0.75, OVERCAST_DIMMING[key] ?? 0.15);
+  // Dark bases under a storm: the cloud's core falls further than its lit edge.
+  if (s > 0) result.cloudCore = `#${mixA.set(result.cloudCore).multiplyScalar(1 - 0.35 * s).getHexString()}`;
   result.directionalIntensity = look.directionalIntensity
     * Math.min(1 - 0.85 * t, stormLadder(STORM_LIGHT.directionalIntensity, storm));
   result.ambientIntensity = look.ambientIntensity
@@ -143,9 +146,10 @@ export function overcastSkyLook(look, amount, storm = 0) {
     * Math.min(1 - t, stormLadder(STORM_LIGHT.cloudShadowStrength, storm));
   result.fogDensityScale = look.fogDensityScale * (1 + 0.6 * t);
   // A grey lid: soft-edged, smooth stratus rather than broken cumulus, and the
-  // flat light takes the modelling out of the snow.
-  result.cloudSharpness = look.cloudSharpness + 0.2 * t;
-  result.cloudDetail = look.cloudDetail * (1 - 0.4 * t);
+  // flat light takes the modelling out of the snow. A storm deck is not smooth:
+  // its detail and edges come back.
+  result.cloudSharpness = look.cloudSharpness + 0.2 * t * (1 - 0.6 * s);
+  result.cloudDetail = look.cloudDetail * (1 - 0.4 * t * (1 - 0.75 * s));
   result.mist = Math.min(1, look.mist + 0.3 * t);
   result.snowShade = look.snowShade * (1 - 0.5 * t);
   return result;

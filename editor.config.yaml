@@ -1667,12 +1667,12 @@ stylizedSurface:
         fill: 0.025
         backlight: 1.05
         patchScale: 0.07
-        patchCool: [0.8, 0.98, 0.86]
-        patchWarm: [1.12, 1.02, 0.74]
+        patchCool: [0.74, 0.95, 0.84]
+        patchWarm: [1.16, 1.04, 0.68]
         dryPatchScale: 0.0308
-        dryStart: 0.56
+        dryStart: 0.5
         dryEnd: 0.84
-        dryStrength: 0.22
+        dryStrength: 0.34
         dryColor: '#777455'
         # Thinned bands' survivors widen up to 2x, so a far stand closes over its
         # ground instead of showing it between fewer stems.
@@ -2673,10 +2673,10 @@ stylizedSurface:
       # as litter. Open meadows retain the default population.
       byTileId:
         5: { grassCoreDensity: 0.24, flowerCoreDensity: 0.06 }
-        6: { grassCoreDensity: 0.45, flowerCoreDensity: 0.08 }
+        6: { grassCoreDensity: 0.28, flowerCoreDensity: 0.08 }
         7: { grassCoreDensity: 0.12, grassEdgeDensity: 0.45, flowerCoreDensity: 0.04 }
-        8: { grassCoreDensity: 0.5, flowerCoreDensity: 0.06 }   # rainforest floor: moss and grass islands
-        9: { grassCoreDensity: 0.4, flowerCoreDensity: 0.04 }
+        8: { grassCoreDensity: 0.32, flowerCoreDensity: 0.06 }   # rainforest floor: moss and grass islands
+        9: { grassCoreDensity: 0.28, flowerCoreDensity: 0.04 }
         12: { grassCoreDensity: 0.22, flowerCoreDensity: 0.04 }
       # Core densities are how much ground cover survives under closed canopy.
       # Forest overrides leave room for the shared litter/moss substrate and
