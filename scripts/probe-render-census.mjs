@@ -33,7 +33,12 @@ const result = await page.evaluate(async () => {
   const rows = [...g].map(([k, v]) => ({ k, draws: +(v.draws / frames).toFixed(2), ktris: Math.round(v.tris / frames / 1000) })).sort((a, b) => b.draws - a.draws);
   const byPass = {};
   for (const row of rows) { const p = row.k.split(' :: ')[0]; const e = byPass[p] ??= { draws: 0, ktris: 0 }; e.draws += row.draws; e.ktris += row.ktris; }
-  return { frames, mode: window.__editor.viewModeController.mode, status: window.__perfQa.status, info: { ...r.info.render }, byPass, rows };
+  const tree=window.__editor.stylizedSurface.treeView;
+  const records=[...(tree.manifestStore?.cache.values()??[])].flatMap(entry=>entry.placements??[]);
+  const residentPrototypeIndices=[...new Set(records.map(record=>tree.resolvePalettePrototypeIndex(record)))].sort((a,b)=>a-b);
+  const trees={prototypeCount:tree.prototypes.length,residentRecords:records.length,residentPrototypeIndices,
+    byAsset:Object.fromEntries(tree.prototypeIndicesByAsset),impostors:tree.impostorAtlases.length};
+  return { frames, mode: window.__editor.viewModeController.mode, status: window.__perfQa.status, info: { ...r.info.render }, trees, byPass, rows };
 });
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
 console.log(JSON.stringify({ frames: result.frames, mode: result.mode, status: result.status, info: result.info, byPass: result.byPass }, null, 1));

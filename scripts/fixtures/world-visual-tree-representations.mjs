@@ -14,7 +14,9 @@ import { syncFoliageLight } from '/src/editor/stylized/forest/foliageLight.js';
 import { jungleMistUniforms } from '/src/editor/stylized/ambient/JungleMist.js';
 import { applyFixtureLighting } from './world-visual-fixture-lighting.mjs';
 
-const assets=['/assets/grass-scene.glb','/assets/trees/meadow/tree7.glb','/assets/trees/rainforest/rainforest.glb','/assets/trees/boreal/boreal-spruce.glb','/assets/trees/alpine/tree10.glb'];
+const assets=['/assets/grass-scene.glb','/assets/trees/meadow/tree7.glb','/assets/trees/alpine/tree10.glb',
+ '/assets/trees/boreal/boreal-spruce.glb','/assets/trees/boreal/boreal-pine.glb','/assets/trees/boreal/boreal-snag.glb',
+ '/assets/trees/rainforest/rainforest.glb','/assets/trees/rainforest/palms.glb'];
 class FixtureTreeView extends StylizedTreeView {
  createRenderResources() {
   this.proxyPrototypes=this.prototypes.map(parts=>this.withCloudShadow(createTreeProxyPrototype(parts,this.config).proxyParts));
@@ -51,9 +53,12 @@ export async function runTreeRepresentations({renderer,scene,camera,draw,state,s
   state.report.prototypeSignature=signature;jungleMistUniforms.weight.value=0;
   camera.fov=35;camera.updateProjectionMatrix();sun.intensity=1;fill.intensity=.4;
   const lighting=applyFixtureLighting(original,sun,fill,fixtureLight);
-  for(const asset of assets) {
-   const index=view.prototypeIndicesByAsset.get(asset)?.[0];
-   if(!Number.isInteger(index))throw new Error(`No production prototype for ${asset}.`);
+  const examples=assets.flatMap(asset=>{
+   const indices=view.prototypeIndicesByAsset.get(asset);
+   if(!indices?.length)throw new Error(`No production prototype for ${asset}.`);
+   return (asset.includes('/boreal/')||asset.includes('/rainforest/')?indices:indices.slice(0,1)).map(index=>({asset,index}));
+  });
+  for(const {asset,index} of examples) {
    const parts=view.prototypes[index],atlas=atlases.find(a=>a.prototypeIndex===index),bounds=new THREE.Box3();
    const foliageLighting=parts.some(part=>part.kind==='leaf'&&Boolean(part.material.emissiveNode));
    state.report.checks.push({id:`tree-foliage-lighting-metadata-${index}`,expected:foliageLighting,actual:atlas.foliageLighting,
