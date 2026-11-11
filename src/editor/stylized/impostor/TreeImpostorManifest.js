@@ -124,6 +124,7 @@ export function treeImpostorBakeConfiguration(config) {
     trees: treeBakeConfiguration(config?.trees),
     wind: config?.wind ?? null,
     primaryLeaf: config?.assets?.primaryLeaf ?? null,
+    barkScans: config?.assets?.barkScans ?? null,
     // Biome preference only selects existing prototypes; their baked pixels
     // stay identical, so this must not invalidate the shared atlas.
     treeVariants: config?.assets?.treeVariants?.map(({ preferredTileIds: _preferred, ...variant }) => variant) ?? null,

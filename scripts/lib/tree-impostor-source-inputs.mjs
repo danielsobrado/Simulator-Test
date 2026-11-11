@@ -24,6 +24,7 @@ const SOURCES = [
   'src/editor/stylized/forest/crownEdge.js',
   'src/editor/stylized/forest/ForestSpeciesGeometry.js',
   'src/editor/stylized/forest/ProceduralBarkTextures.js',
+  'src/editor/stylized/forest/ScannedBarkLibrary.js',
   'src/editor/stylized/barkWeathering.js',
   'src/editor/stylized/impostor/TreeImpostorBaker.js',
   'src/editor/stylized/impostor/TreeImpostorAtlasPixels.js',
@@ -39,6 +40,7 @@ export async function treeImpostorSourceInputs(root = process.cwd(), sourceFiles
   const assets = config.assets;
   const assetPaths = [assets.scene, assets.barkColor, assets.barkAo, assets.barkHeight,
     ...(config.trees.cardsPerLobe > 0 ? [assets.foliageCard] : []),
+    ...Object.values(assets.barkScans ?? {}).flatMap(stem => [`${stem}-albedo-height.png`, `${stem}-normal-roughness.png`]),
     ...(assets.treeVariants ?? []).map(value => value.scene)].filter(Boolean);
   const files = [...new Set([...sourceFiles, ...assetPaths.map(value => `public/${value.replace(/^\//, '')}`)])].sort();
   return {
