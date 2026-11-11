@@ -15,7 +15,7 @@ import {
 import { drawnRepresentations, ScatterInstanceRows } from './lod/ScatterInstanceRows.js';
 import { InstanceAnchor } from './lod/InstanceAnchor.js';
 import { ScatterClusterField } from './forest/ScatterClusterField.js';
-import { forestFloorDensity, understoryClusterDensity } from './forest/ForestFloor.js';
+import { canopyShade, forestFloorDensity, understoryClusterDensity } from './forest/ForestFloor.js';
 import { resolveForestSeed } from './forest/ForestRuntimeConfig.js';
 import { createPathClearanceField } from './TreeManifestStore.js';
 import { iterateAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';

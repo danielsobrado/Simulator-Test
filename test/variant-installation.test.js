@@ -64,6 +64,20 @@ for (const kind of ['rock', 'bush', 'detail']) test(`${kind} installation yields
   }
 });
 
+test('bush instance rows shade beneath canopy and retain open-ground brightness without a forest field', t => {
+  const { view } = fixture(t, 'bush');
+  const placement = { x: 16, z: -12, height: 0, rotationY: 0, scale: 1, priority: 0.5, tileId: 6 };
+  view.forestFieldProvider = () => ({ sample: (x, z) => {
+    assert.deepEqual([x, z], [16, -12]);
+    return { patchCoverage: 1 };
+  } });
+  const shaded = view.instanceRows.placementRows(placement).appearance;
+  assert.equal(shaded.seed, 0.5);
+  assert.equal(shaded.colorVariation, 0.72);
+  view.forestFieldProvider = null;
+  assert.equal(view.instanceRows.placementRows({ ...placement }).appearance.colorVariation, 1);
+});
+
 test('cancelled installation disposes extracted geometry without changing the live view', t => {
   const { view, variants } = fixture(t, 'rock');
   const created = [], clone = THREE.BufferGeometry.prototype.clone;
