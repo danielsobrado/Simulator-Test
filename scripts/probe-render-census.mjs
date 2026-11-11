@@ -1,15 +1,20 @@
 // Diagnostic probe for docs/plans/performance-plan-2026-11-10.md. Needs `npm run dev` serving; not a frame-pacing measurement.
 // Usage: node scripts/probe-render-census.mjs <qa-scenario> "<extra query>" <out.json> [baseUrl]
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 const [qa, extra, out, base = 'http://localhost:5173'] = process.argv.slice(2);
 const url = `${base}/?qa=${qa}&warmup=900&duration=5&download=0&autostart=1${extra ?? ''}`;
 const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=default', '--enable-gpu-rasterization'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const browserErrors=[];
+page.on('pageerror',error=>browserErrors.push(error.message));
+page.on('console',message=>{if(message.type()==='error')browserErrors.push(message.text());});
 page.setDefaultTimeout(240000);
 await page.goto(url, { waitUntil: 'commit' });
 await page.waitForFunction(() => window.__perfQa != null && window.__editor?.terrainView?.renderer);
 await page.waitForTimeout(75000);
+await page.waitForFunction(()=>window.__editor.stylizedSurface.getPreparationStatus().ready);
 const result = await page.evaluate(async () => {
   const tv = window.__editor.terrainView; const r = tv.renderer;
   const g = new Map(); let frames = 0;
@@ -45,9 +50,17 @@ const result = await page.evaluate(async () => {
   for(const entry of Object.values(byTileId))entry.prototypeIndices.sort((a,b)=>a-b);
   const trees={prototypeCount:tree.prototypes.length,residentRecords:records.length,residentPrototypeIndices,
     byTileId,byAsset:Object.fromEntries(tree.prototypeIndicesByAsset),impostors:tree.impostorAtlases.length};
-  return { frames, mode: window.__editor.viewModeController.mode, status: window.__perfQa.status, info: { ...r.info.render }, trees, byPass, rows };
+  return { frames, mode: window.__editor.viewModeController.mode, status: window.__perfQa.status,
+    backend:tv.rendererBackendStatus.mode,readiness:window.__editor.stylizedSurface.getPreparationStatus(),
+    info: { ...r.info.render }, trees, byPass, rows };
 });
+result.browserErrors=browserErrors;
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
+assert.equal(result.backend,'webgpu');
+assert.equal(result.readiness.ready,true);
+assert.equal(result.browserErrors.length,0);
+assert.equal(result.trees.impostors,result.trees.prototypeCount);
+assert.equal(Object.values(result.trees.byTileId).reduce((sum,entry)=>sum+entry.records,0),result.trees.residentRecords);
 console.log(JSON.stringify({ frames: result.frames, mode: result.mode, status: result.status, info: result.info, byPass: result.byPass }, null, 1));
 for (const row of result.rows.slice(0, 70)) console.log(String(row.draws).padStart(7), String(row.ktris).padStart(7) + 'k', row.k);
 await browser.close();
