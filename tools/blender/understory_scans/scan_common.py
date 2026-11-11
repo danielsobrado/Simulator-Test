@@ -96,9 +96,11 @@ def crop_ground(mesh, fraction, min_island=0.03):
     bm.free()
 
 
-def keep_largest_plant(mesh, cells=48):
-    """A scan lays several plants side by side: keep the one with the most faces, so it gets the whole budget."""
-    xy = coords(mesh)[:, :2]
+def arrange_plants(mesh, mode, cells=48):
+    """A scan lays several plants out in a row. 'largest' keeps the one with the most faces, so it gets the
+    whole budget; 'clump' slides them together into one patch, largest in the middle. Returns the plant count."""
+    co = coords(mesh)
+    xy = co[:, :2]
     lo, span = xy.min(0), float(np.ptp(xy, 0).max()) or 1.0
     cell = np.minimum(((xy - lo) / span * cells).astype(np.int32), cells - 1)
     occupied = np.zeros((cells, cells), bool)
@@ -119,18 +121,32 @@ def keep_largest_plant(mesh, cells=48):
     if plants < 2:
         return plants
     starts = np.empty(len(mesh.polygons), np.int32)
+    totals = np.empty(len(mesh.polygons), np.int32)
     mesh.polygons.foreach_get('loop_start', starts)
+    mesh.polygons.foreach_get('loop_total', totals)
     loop_verts = np.empty(len(mesh.loops), np.int32)
     mesh.loops.foreach_get('vertex_index', loop_verts)
     face_plant = label[cell[:, 0], cell[:, 1]][loop_verts[starts]]
-    drop = np.nonzero(face_plant != np.bincount(face_plant).argmax())[0]
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    bm.faces.ensure_lookup_table()
-    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in drop], context='FACES')
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
-    bm.to_mesh(mesh)
-    bm.free()
+    by_size = np.argsort(-np.bincount(face_plant, minlength=plants + 1)[1:]) + 1
+    if mode == 'largest':
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[bm.faces[i] for i in np.nonzero(face_plant != by_size[0])[0]], context='FACES')
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+        bm.to_mesh(mesh)
+        bm.free()
+        return plants
+    # A vertex moves with the plant of a face that uses it, so no face is torn.
+    vert_plant = np.zeros(len(co), np.int32)
+    vert_plant[loop_verts] = np.repeat(face_plant, totals)
+    members = [m for m in (vert_plant == p for p in by_size) if m.any()]
+    spacing = 0.8 * float(np.median([np.ptp(xy[m], 0).max() for m in members]))
+    for k, m in enumerate(members):  # sunflower spiral: even spacing without a grid
+        angle, reach = k * 2.39996, spacing * math.sqrt(k)
+        xy[m] += np.array([math.cos(angle), math.sin(angle)], np.float32) * reach - xy[m].mean(0)
+    mesh.vertices.foreach_set('co', co.ravel())
+    mesh.update()
     return plants
 
 

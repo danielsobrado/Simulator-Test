@@ -15,7 +15,7 @@ for extra in (THIS_DIR, os.path.join(THIS_DIR, '..', 'biome_understory')):
         sys.path.insert(0, extra)
 
 from scan_common import (  # noqa: E402
-    build_material, crop_ground, decimate, grade, import_scan, keep_largest_plant, material_sets, normalise,
+    arrange_plants, build_material, crop_ground, decimate, grade, import_scan, material_sets, normalise,
     pack_atlas, shade, silhouette, tri_count, write_px,
 )
 from understory_common import place_and_export, render_preview, save_contact_sheet, setup_scene  # noqa: E402
@@ -80,7 +80,7 @@ def build(asset, preview):
     source_tris = tri_count(obj)
     sets, slot_set = material_sets(obj, src, asset['id'])
     # Both trims come before normalise, so `targetHeight` measures the plant or stump that is kept.
-    plants = keep_largest_plant(obj.data) if asset.get('singlePlant') else 1
+    plants = arrange_plants(obj.data, asset['plants']) if asset.get('plants') else 1
     if asset.get('groundCrop'):
         crop_ground(obj.data, asset['groundCrop'])
     cutout = any(s['alpha'] for s in sets)  # a scan with an alpha map carries cut-out leaves
