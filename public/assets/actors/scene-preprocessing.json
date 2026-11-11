@@ -2,7 +2,7 @@
   "version": 1,
   "settings": "{\"version\":1,\"structures\":{\"detail\":{\"error\":0.001},\"shadow\":{\"error\":0.003}},\"npcRatios\":[1,0.3,0.12,0.04]}",
   "meshoptimizer": "1.2.0",
-  "three": "0.186.1",
+  "three": "0.187.0",
   "data": "assets/actors/scene-preprocessing.bin.gz",
   "sources": {
     "/assets/characters/villager-rugged-blacks.glb": {
@@ -61,5 +61,5 @@
     }
   },
   "dataBytes": 108442,
-  "dataSha256": "d38cbb740ba58958b167b13047dba3ebee11fae0dfdb7db32ad2f4e60d941be3"
+  "dataSha256": "8409ec55135b5b39e11fbb2be836201672d810fb57fe65b5b4bb1b34aa8c8884"
 }
