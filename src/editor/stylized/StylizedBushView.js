@@ -69,10 +69,10 @@ function bushMatrix(placement) {
 }
 
 /** Seed, brightness variation and the understory look of the biome the bush stands in. */
-function bushAppearance(placement, terrainView, looks) {
+function bushAppearance(placement, terrainView, looks, forestField) {
   return {
     seed: placement.priority,
-    colorVariation: 0.84 + placement.priority * 0.32,
+    colorVariation: (0.84 + placement.priority * 0.32) * canopyShade(forestField, placement.x, placement.z),
     biomeLook: biomeLook(looks, 'understory', placementTileId(terrainView, placement)),
   };
 }
@@ -137,7 +137,7 @@ export class StylizedBushView {
     // Instances are written relative to this, not in canonical metres (InstanceAnchor).
     this.instanceAnchor = new InstanceAnchor();
     this.instanceRows = new ScatterInstanceRows('bush', bushMatrix,
-      (placement) => bushAppearance(placement, this.terrainView, this.config.biomeLooks));
+      (placement) => bushAppearance(placement, this.terrainView, this.config.biomeLooks, this.forestFieldProvider?.()));
     this.root.name = 'stylized-bushes';
     terrainView.scene.add(this.root);
   }

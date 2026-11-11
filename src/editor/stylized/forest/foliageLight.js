@@ -1,9 +1,12 @@
 import * as THREE from 'three/webgpu';
-import { cameraViewMatrix, faceDirection, float, mix, normalViewGeometry, normalWorld, positionGeometry, positionView, smoothstep, vec4 } from 'three/tsl';
+import { cameraViewMatrix, faceDirection, float, mix, normalMap, normalView, normalViewGeometry, normalWorld, positionGeometry, positionView, smoothstep, vec2, vec4 } from 'three/tsl';
 import { frameUniform as uniform } from '../../../render/FrameUniforms.js';
+import { authoredTexture } from '../AuthoredTextureNode.js';
 
 /** Share of a plant's normal bent to the sky, leaving a little authored form. */
 const SKYWARD_NORMAL = 0.72;
+/** Strength of a plant's own normal map over the bent normal. */
+const UNDERSTORY_NORMAL_STRENGTH = 0.8;
 /** Crown in-scatter: metres over which it ramps, and its share of the sky fill. */
 const CROWN_AIR_START = 14;
 const CROWN_AIR_END = 220;
@@ -88,8 +91,19 @@ export function foliageSkyFill(color, amount) {
 export function applySkywardNormal(material) {
   const authored = material.normalNode ?? normalViewGeometry.mul(faceDirection);
   const up = cameraViewMatrix.mul(vec4(0, 1, 0, 0)).xyz;
-  material.normalNode = mix(authored, up, SKYWARD_NORMAL).normalize();
+  material.normalNode = withAuthoredNormalMap(material, mix(authored, up, SKYWARD_NORMAL).normalize());
   return material;
+}
+
+/**
+ * A view normal with the material's own normal map laid back over it. Setting
+ * `normalNode` stops a node material sampling its `normalMap`, so the bent normal
+ * is perturbed here by the map's offset from the flat surface normal.
+ */
+export function withAuthoredNormalMap(material, geometricNormal) {
+  if (!material.normalMap) return geometricNormal;
+  const mapped = normalMap(authoredTexture(material.normalMap), vec2(UNDERSTORY_NORMAL_STRENGTH));
+  return geometricNormal.add(mapped.sub(normalView)).normalize();
 }
 
 /**

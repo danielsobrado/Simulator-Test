@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three/webgpu';
-import { diffuseColor, float, positionViewDirection, uniform, vec2, vec3 } from 'three/tsl';
+import { diffuseColor, float, materialRoughness, normalWorld, positionViewDirection, uniform, vec2, vec3 } from 'three/tsl';
 import { evaluateShaderNode as evaluate } from './helpers/evaluateShaderNode.js';
-import { foliageLight, foliageSkyFill, syncFoliageLight } from '../src/editor/stylized/forest/foliageLight.js';
+import { applySkywardNormal, foliageLight, foliageSkyFill, syncFoliageLight, withAuthoredNormalMap } from '../src/editor/stylized/forest/foliageLight.js';
+import { CANOPY_SHADE, canopyShade } from '../src/editor/stylized/forest/ForestFloor.js';
 import { foliageMaterialClass } from '../src/editor/stylized/forest/FoliageNodeMaterial.js';
 import { cloneAuthoredNodeMaterial, applyUnderstoryPalette } from '../src/editor/stylized/AuthoredFoliageMaterial.js';
 import { createDitheredMaterial } from '../src/editor/stylized/lod/StylizedDitheredMaterial.js';
 import { filteredDetailSine } from '../src/editor/materials/TerrainMaterialMicroDetailNodes.js';
 import { filterSpecularRoughness } from '../src/render/materials/specularAntialiasing.js';
 import { wetTownSurface, TOWN_WET_FAMILIES } from '../src/render/materials/townWetness.js';
-import { buildingWetnessUniform } from '../src/editor/weather/surfaceWetness.js';
+import { buildingWetnessUniform, surfaceWetnessUniform } from '../src/editor/weather/surfaceWetness.js';
 import { meadowBladeWorldNormal } from '../src/editor/stylized/meadow/meadowBladeMaterial.js';
 
 test('turning a meadow ribbon turns its shaded edge and tip with its vertices', () => {
@@ -82,6 +83,32 @@ test('authored foliage keeps its PBR channels and emission through lighting and 
   assert.ok(clone.isMeshStandardNodeMaterial);
   assert.equal(clone.emissiveNode, foliage.emissiveNode);
   assert.equal(clone.foliageTransmissionNode, foliage.foliageTransmissionNode);
+});
+
+test('understory keeps its normal map over the skyward bend, shades under canopy and glints when wet', () => {
+  const bent = vec3(0, 1, 0);
+  assert.equal(withAuthoredNormalMap(new THREE.MeshStandardNodeMaterial(), bent), bent);
+  const mapped = new THREE.MeshStandardNodeMaterial({ normalMap: new THREE.Texture() });
+  assert.notEqual(withAuthoredNormalMap(mapped, bent), bent);
+  assert.notEqual(applySkywardNormal(mapped).normalNode, null);
+
+  const field = coverage => ({ sample: () => ({ patchCoverage: coverage }) });
+  assert.equal(canopyShade(null, 0, 0), 1);
+  assert.equal(canopyShade(field(0), 0, 0), 1);
+  assert.equal(canopyShade(field(1), 0, 0), 1 - CANOPY_SHADE);
+  assert.equal(canopyShade(field(3), 0, 0), 1 - CANOPY_SHADE);
+
+  const leaf = applyUnderstoryPalette(cloneAuthoredNodeMaterial(new THREE.MeshStandardNodeMaterial(), { lit: true }), {});
+  const values = new Map([[materialRoughness, 0.8], [normalWorld, [0, 1, 0]]]);
+  surfaceWetnessUniform.value = 0;
+  assert.equal(evaluate(leaf.roughnessNode, { values }), 0.8);
+  surfaceWetnessUniform.value = 1;
+  assert.ok(Math.abs(evaluate(leaf.roughnessNode, { values }) - 0.34) < 1e-6);
+  values.set(materialRoughness, 0.2);
+  assert.ok(Math.abs(evaluate(leaf.roughnessNode, { values }) - 0.2) < 1e-6, 'rain never roughens a leaf');
+  surfaceWetnessUniform.value = 0;
+  const lambert = applyUnderstoryPalette(cloneAuthoredNodeMaterial(new THREE.MeshLambertNodeMaterial(), { lit: true }), {});
+  assert.equal(lambert.roughnessNode ?? null, null);
 });
 
 test('rain changes exposed building surfaces, keeps undersides dry and never increases roughness', () => {

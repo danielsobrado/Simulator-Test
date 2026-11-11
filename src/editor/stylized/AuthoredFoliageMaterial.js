@@ -1,11 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { attribute, dot, float, mix, mx_noise_float, normalWorld, positionWorld, smoothstep, vec3 } from 'three/tsl';
+import { attribute, dot, float, materialRoughness, mix, mx_noise_float, normalWorld, positionWorld, smoothstep, vec3 } from 'three/tsl';
+import { surfaceWetnessUniform } from '../weather/surfaceWetness.js';
 import { LOOK_SNOW_STEPS } from '../biomes/BiomeLooks.js';
 import { authoredTexture } from './AuthoredTextureNode.js';
 import { gradePlantPart, resolveFoliagePalette } from './forest/foliagePalette.js';
 import { understoryShadeEmission } from './forest/foliageLight.js';
 import { foliageMaterialClass } from './forest/FoliageNodeMaterial.js';
 import { applyCloudShadow } from './CloudShadow.js';
+
+/** Roughness of a fully rain-wet leaf. */
+const WET_LEAF_ROUGHNESS = 0.34;
 
 /** Clone authored channels into a node material before assigning foliage nodes. */
 export function cloneAuthoredNodeMaterial(source, { lit = false } = {}) {
@@ -70,5 +74,10 @@ export function applyUnderstoryPalette(material, config, tileId = null, role = '
   material.foliageTransmissionNode = float(blossom ? .16 : .22);
   // Retain any authored emission (e.g. flower centres).
   material.emissiveNode = material.emissiveNode ? material.emissiveNode.add(fill) : fill;
+  if ('roughness' in material) {
+    // Rain film on leaves that face the sky: the sun glints, as on the terrain.
+    const wet = surfaceWetnessUniform.mul(smoothstep(0.1, 0.7, normalWorld.y));
+    material.roughnessNode = mix(materialRoughness, materialRoughness.min(WET_LEAF_ROUGHNESS), wet);
+  }
   return applyCloudShadow(material, config.sky);
 }

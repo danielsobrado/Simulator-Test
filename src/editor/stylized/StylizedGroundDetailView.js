@@ -23,6 +23,7 @@ import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
 import { applyPlantMotion } from './PlantMotionNodes.js';
 import { applyUnderstoryPalette, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { applySkywardNormal } from './forest/foliageLight.js';
+import { canopyShade } from './forest/ForestFloor.js';
 import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
 import { createOceanDistanceField } from '../water/OceanDistanceField.js';
 
@@ -153,7 +154,8 @@ export class StylizedGroundDetailView {
     const range = Math.max(0, Number(this.layerConfig.colorVariation) || 0);
     return {
       seed: placement.priority,
-      colorVariation: 1 - range * 0.5 + placement.priority * range,
+      colorVariation: (1 - range * 0.5 + placement.priority * range)
+        * canopyShade(this.forestFieldProvider?.(), placement.x, placement.z),
       surfaceData: placement.surfaceData,
       biomeLook: biomeLook(this.config.biomeLooks, 'understory', placementTileId(this.terrainView, placement)),
     };

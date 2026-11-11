@@ -65,6 +65,14 @@ export function understoryClusterDensity(clusterDensity, habitat, understory = 0
   return Math.max(clusterDensity, understory * clamp01(habitat?.patchCoverage ?? 0));
 }
 
+/** Share of its light a plant under full canopy loses, on top of the sun's shadow. */
+export const CANOPY_SHADE = 0.28;
+
+/** Per-instance brightness under the canopy at a placement: 1 in the open. */
+export function canopyShade(field, x, z) {
+  return 1 - CANOPY_SHADE * clamp01(field?.sample(x, z)?.patchCoverage ?? 0);
+}
+
 /**
  * Bilinear canopy suppression over one chunk, as a `(localX, localZ) => 0..1`
  * sampler, or null when this chunk has nothing to suppress.
