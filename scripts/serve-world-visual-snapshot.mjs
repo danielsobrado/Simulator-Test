@@ -10,6 +10,8 @@ const root=process.cwd(),revision=execFileSync('git',['rev-parse',process.argv[2
 const port=Number(process.argv[3]??5176);
 // Optional 3rd argument: a harness revision whose scripts/fixtures replace the frozen ones, so an A/B shares one fixture while src stays frozen.
 const harnessRevision=process.argv[4]?execFileSync('git',['rev-parse',process.argv[4]],{encoding:'utf8'}).trim():null;
+// Optional 4th argument: a rebake commit with atlases compatible with the frozen runtime.
+const atlasRevision=process.argv[5]?execFileSync('git',['rev-parse',process.argv[5]],{encoding:'utf8'}).trim():null;
 const files=new Map(),fileHashes={},digest=createHash('sha256');
 const normalize=file=>path.resolve(file).replaceAll('\\','/');
 const isFixture=name=>name.startsWith('scripts/fixtures/');
@@ -27,8 +29,9 @@ for(let offset=0;offset+512<=archive.length;) {
 }
 readArchive(revision,['src','config','scripts','editor.config.yaml','index.html','package.json','package-lock.json','public/assets/impostors/trees'],name=>!harnessRevision||!isFixture(name));
 if(harnessRevision)readArchive(harnessRevision,['scripts/fixtures'],isFixture);
+if(atlasRevision)readArchive(atlasRevision,['public/assets/impostors/trees'],name=>name.startsWith('public/assets/impostors/trees/'));
 for(const name of Object.keys(fileHashes))digest.update(name).update(files.get(normalize(name)));
-const manifest={schemaVersion:1,frozen:true,sourceSha:revision,harnessSha:harnessRevision,sha256:digest.digest('hex'),files:fileHashes,capturedAt:new Date().toISOString()};
+const manifest={schemaVersion:1,frozen:true,sourceSha:revision,harnessSha:harnessRevision,atlasSha:atlasRevision,sha256:digest.digest('hex'),files:fileHashes,capturedAt:new Date().toISOString()};
 const mime=file=>file.endsWith('.png')?'image/png':file.endsWith('.json')?'application/json':file.endsWith('.ktx2')?'image/ktx2':'application/octet-stream';
 const snapshot={name:'immutable-world-visual-snapshot',enforce:'pre',
  load(id) {
