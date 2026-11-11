@@ -63,6 +63,74 @@ def normalise(obj, height):
     return co.min(0), co.max(0)
 
 
+def crop_ground(mesh, fraction, min_island=0.03):
+    """Cut the scanned ground disc: upward faces below `fraction` of the height, then islands under 3 % of the biggest."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    zs = [v.co.z for v in bm.verts]
+    limit = min(zs) + fraction * (max(zs) - min(zs))
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.5 and f.calc_center_median().z < limit], context='FACES')
+    seen, islands = set(), []
+    for f in bm.faces:
+        if f in seen:
+            continue
+        stack, area, faces = [f], 0.0, []
+        seen.add(f)
+        while stack:
+            cur = stack.pop()
+            faces.append(cur)
+            area += cur.calc_area()
+            for e in cur.edges:
+                for nb in e.link_faces:
+                    if nb not in seen:
+                        seen.add(nb)
+                        stack.append(nb)
+        islands.append((area, faces))
+    biggest = max(a for a, _ in islands)
+    bmesh.ops.delete(bm, geom=[f for a, fs in islands if a < min_island * biggest for f in fs], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    bm.to_mesh(mesh)
+    bm.free()
+
+
+def keep_largest_plant(mesh, cells=48):
+    """A scan lays several plants side by side: keep the one with the most faces, so it gets the whole budget."""
+    xy = coords(mesh)[:, :2]
+    lo, span = xy.min(0), float(np.ptp(xy, 0).max()) or 1.0
+    cell = np.minimum(((xy - lo) / span * cells).astype(np.int32), cells - 1)
+    occupied = np.zeros((cells, cells), bool)
+    occupied[cell[:, 0], cell[:, 1]] = True
+    label, plants = np.zeros((cells, cells), np.int32), 0
+    for start in zip(*np.nonzero(occupied)):  # flood fill: plants are blobs of occupied cells with a gap between
+        if label[start]:
+            continue
+        plants += 1
+        label[start], stack = plants, [start]
+        while stack:
+            x, y = stack.pop()
+            for nx in range(max(0, x - 1), min(cells, x + 2)):
+                for ny in range(max(0, y - 1), min(cells, y + 2)):
+                    if occupied[nx, ny] and not label[nx, ny]:
+                        label[nx, ny] = plants
+                        stack.append((nx, ny))
+    if plants < 2:
+        return plants
+    starts = np.empty(len(mesh.polygons), np.int32)
+    mesh.polygons.foreach_get('loop_start', starts)
+    loop_verts = np.empty(len(mesh.loops), np.int32)
+    mesh.loops.foreach_get('vertex_index', loop_verts)
+    face_plant = label[cell[:, 0], cell[:, 1]][loop_verts[starts]]
+    drop = np.nonzero(face_plant != np.bincount(face_plant).argmax())[0]
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in drop], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    bm.to_mesh(mesh)
+    bm.free()
+    return plants
+
+
 def clean(mesh):
     """Drop loose geometry and zero-area triangles: gltfpack drops them and the optimizer asserts parity."""
     bm = bmesh.new()
@@ -207,7 +275,10 @@ def pack_atlas(obj, sets, slot_set):
 
 def grade(tex, cutout, target_luma):
     """AO-multiplied albedo, alpha sharpened round the cutoff, mean luma set by one gamma. Returns (rgba, luma, roughness)."""
-    rgb = tex['diff'][..., :3] * np.power(np.clip(tex['arm'][..., 0:1], 0, 1), 0.6)
+    ao = tex['arm'][..., 0:1]
+    if ao.mean() < 0.05:  # sorrel ships an unbaked (all ~0) AO channel: multiplying by it blacks the plant out
+        ao = np.ones_like(ao)
+    rgb = tex['diff'][..., :3] * np.power(np.clip(ao, 0, 1), 0.6)
     alpha = np.clip((tex['alpha'] - 0.5) * 4 + 0.5, 0, 1) if cutout else np.ones_like(tex['alpha'])
     mask = alpha > 0.5
     luma = lambda c: float((c[mask] @ LUMA).mean())

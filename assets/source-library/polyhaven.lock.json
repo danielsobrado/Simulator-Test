@@ -413,6 +413,17 @@
     },
     {
       "id": "periwinkle_plant",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/textures/periwinkle_plant_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/periwinkle_plant/periwinkle_plant_opacity_2k.png",
+      "md5": "63e47a58bf56a98091302ccc1dd45413",
+      "size": 195845,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
       "map": "gltf",
       "path": "assets/source-cache/polyhaven/periwinkle_plant/periwinkle_plant_2k.gltf",
       "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/periwinkle_plant/periwinkle_plant_2k.gltf",

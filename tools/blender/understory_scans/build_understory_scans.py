@@ -15,7 +15,7 @@ for extra in (THIS_DIR, os.path.join(THIS_DIR, '..', 'biome_understory')):
         sys.path.insert(0, extra)
 
 from scan_common import (  # noqa: E402
-    build_material, decimate, grade, import_scan, material_sets, normalise,
+    build_material, crop_ground, decimate, grade, import_scan, keep_largest_plant, material_sets, normalise,
     pack_atlas, shade, silhouette, tri_count, write_px,
 )
 from understory_common import place_and_export, render_preview, save_contact_sheet, setup_scene  # noqa: E402
@@ -79,6 +79,10 @@ def build(asset, preview):
     obj = import_scan(os.path.join(src, f"{asset['id']}_2k.gltf"))
     source_tris = tri_count(obj)
     sets, slot_set = material_sets(obj, src, asset['id'])
+    # Both trims come before normalise, so `targetHeight` measures the plant or stump that is kept.
+    plants = keep_largest_plant(obj.data) if asset.get('singlePlant') else 1
+    if asset.get('groundCrop'):
+        crop_ground(obj.data, asset['groundCrop'])
     tris, coverage, attempt = reduce_with_coverage(obj, asset)
     shade(obj, cutout)
     tex = pack_atlas(obj, sets, slot_set)
@@ -106,7 +110,7 @@ def build(asset, preview):
     bpy.data.objects.remove(root)
     target = asset['targetTriangles']
     return {'name': name, 'id': asset['id'], 'path': os.path.relpath(out_path, ROOT).replace('\\', '/'),
-            'sourceTriangles': source_tris, 'targetTriangles': target, 'finalTriangles': glb['triangles'],
+            'sourceTriangles': source_tris, 'plantsInScan': plants, 'targetTriangles': target, 'finalTriangles': glb['triangles'],
             'retries': attempt, 'coverage': None if coverage is None else round(coverage, 3), 'luma': round(luma, 3),
             'roughness': round(rough, 3), 'glb': glb, 'bytes': os.path.getsize(out_path),
             'belowCoverage': cutout and coverage < COVERAGE_MIN,
