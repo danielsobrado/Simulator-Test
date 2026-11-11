@@ -767,7 +767,7 @@ export class StylizedSurfaceView {
     if (this.runDeferredWork) this.runDeferredWork(updateVariants);
     else updateVariants();
     this.skyView?.update(timestamp, camera);
-    syncFoliageLight(this.skyView);
+    syncFoliageLight(this.skyView, this.skyView?.sunHazeFog?.skyFog?.color);
     this.wildlifeView?.update(timestamp, camera);
     // Aquatic plants remain visible while land preparation stands down. Their
     // clock must keep matching the water surface during swimming and diving.

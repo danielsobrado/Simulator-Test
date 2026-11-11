@@ -39,6 +39,11 @@ export const foliageLight = Object.freeze({
   /** Sky fill lifting the canopy's shaded interior. */
   fill: uniform(0.3),
   skyColor: uniform(new THREE.Color('#ffffff')),
+  /**
+   * Distance in-scatter: the scene fog's hue at the sky fill's level, so far crowns
+   * lean to the horizon they stand against and not to the zenith (look bible, rule 4).
+   */
+  airColor: uniform(new THREE.Color('#ffffff')),
   /** The hemisphere's ground colour: light coming back up off the forest floor. */
   groundColor: uniform(new THREE.Color('#000000')),
   sunDirection: uniform(new THREE.Vector3(0, 1, 0)),
@@ -48,11 +53,16 @@ export const foliageLight = Object.freeze({
  * Copies the hemisphere's linear colour and capped intensity into the fill.
  *
  * @param {{ directional?: THREE.DirectionalLight, hemisphere?: THREE.HemisphereLight } | null} sky
+ * @param {?THREE.Color} fogColor the sky's own fog colour; without it the air keeps the sky colour
  */
-export function syncFoliageLight(sky) {
+export function syncFoliageLight(sky, fogColor = null) {
   const hemisphere = sky?.hemisphere;
   if (hemisphere) foliageLight.skyColor.value.copy(hemisphere.color);
   else foliageLight.skyColor.value.setRGB(0, 0, 0);
+  const air = foliageLight.airColor.value.copy(foliageLight.skyColor.value);
+  const fogLuminance = fogColor ? luminance(fogColor) : 0;
+  // The fog's hue, the sky fill's energy: fog colour alone is over twice as bright.
+  if (fogLuminance > 1e-4) air.copy(fogColor).multiplyScalar(luminance(foliageLight.skyColor.value) / fogLuminance);
   if (hemisphere) foliageLight.groundColor.value.copy(hemisphere.groundColor);
   else foliageLight.groundColor.value.setRGB(0, 0, 0);
   foliageLight.fill.value = Math.min(Math.max(hemisphere?.intensity ?? 0, 0) * 0.35, 0.7);
@@ -60,6 +70,10 @@ export function syncFoliageLight(sky) {
   foliageLight.strength.value = sky?.directional ? 0.12 : 0;
   if (sky?.directional) foliageLight.sunDirection.value.copy(sky.directional.position)
     .sub(sky.directional.target.position).normalize();
+}
+
+function luminance(colour) {
+  return colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
 }
 
 export function foliageSkyFill(color, amount) {
@@ -89,7 +103,8 @@ export function treeFoliageEmission(crown, skyEdge = null, visibility = float(1)
   const underside = normalWorld.y.negate().max(0);
   return foliageSkyFill(crown, CROWN_FILL).mul(visibility)
     .add(crown.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(underside).mul(CROWN_BOUNCE).mul(visibility))
-    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(air.add(edge)));
+    .add(foliageLight.airColor.mul(foliageLight.fill).mul(air))
+    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(edge));
 }
 
 function treeAir() {
@@ -105,7 +120,7 @@ export function treeBarkEmission(bark, { height = positionGeometry.y, up = norma
   const facing = up.negate().mul(0.5).add(0.5);
   return foliageSkyFill(bark, BARK_FILL)
     .add(bark.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(low).mul(BARK_BOUNCE))
-    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+    .add(foliageLight.airColor.mul(foliageLight.fill).mul(treeAir()));
 }
 
 /** Sky fill and floor bounce for scattered stones, which sit wholly in the bounce. */
@@ -113,7 +128,7 @@ export function rockShadeEmission(stone) {
   const facing = normalWorld.y.negate().mul(0.5).add(0.5);
   return foliageSkyFill(stone, ROCK_FILL)
     .add(stone.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(ROCK_BOUNCE))
-    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+    .add(foliageLight.airColor.mul(foliageLight.fill).mul(treeAir()));
 }
 
 /**
@@ -126,7 +141,7 @@ export function understoryShadeEmission(plant, { blossom = false } = {}) {
   const facing = normalWorld.y.negate().mul(0.5).add(0.5);
   return foliageSkyFill(plant, fill)
     .add(plant.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(bounce))
-    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+    .add(foliageLight.airColor.mul(foliageLight.fill).mul(treeAir()));
 }
 
 /**
@@ -138,5 +153,5 @@ export function buildingShadeEmission(surface, { fill = BUILDING_FILL, bounce = 
   const facing = normalWorld.y.negate().mul(0.5).add(0.5);
   return foliageSkyFill(surface, fill)
     .add(surface.mul(foliageLight.groundColor).mul(foliageLight.fill).mul(facing).mul(bounce))
-    .add(foliageLight.skyColor.mul(foliageLight.fill).mul(treeAir()));
+    .add(foliageLight.airColor.mul(foliageLight.fill).mul(treeAir()));
 }

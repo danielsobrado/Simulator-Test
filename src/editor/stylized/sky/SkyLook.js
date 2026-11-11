@@ -128,6 +128,8 @@ export function overcastSkyLook(look, amount, storm = 0) {
   const result = { ...look };
   // Preserve the weather mix through the regional fog/snow layers for diffuse sky light.
   result.overcastAmount = t;
+  // For the grade (lookGrade.js): a storm drains colour further than a dry lid.
+  result.stormAmount = s;
   for (const key of SKY_LOOK_COLORS) result[key] = greyed(look[key], t * 0.75, OVERCAST_DIMMING[key] ?? 0.15);
   // Dark bases under a storm: the cloud's core falls further than its lit edge.
   if (s > 0) result.cloudCore = `#${mixA.set(result.cloudCore).multiplyScalar(1 - 0.35 * s).getHexString()}`;

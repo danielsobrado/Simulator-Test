@@ -27,6 +27,7 @@ import { applySceneEnvironment, environmentLightScale } from './sky/sceneEnviron
 import { sceneExposure } from '../../render/sceneExposure.js';
 import { resolveSunHazeConfig, sunHazeColor, SunHazeFog } from './sky/sunHaze.js';
 import { lightningFlash, litCloudColorNode, resolveCloudLightingConfig } from './sky/cloudLighting.js';
+import { writeLookGrade } from './sky/lookGrade.js';
 
 /** How far past the cloud threshold the noise must climb for a cloud's body to be fully in its own shade. */
 const CLOUD_BODY_DEPTH = 0.32;
@@ -444,6 +445,7 @@ export class StylizedSkyView {
     // Snow country stops the exposure down (sceneExposure). While the post
     // graph owns the output it reads the scale itself and the renderer stays
     // at its neutral 1, so only write the renderer when it tone-maps.
+    writeLookGrade(look);
     sceneExposure.scale = Number.isFinite(look.exposure) ? look.exposure : 1;
     this.exposureCompensation.value = sceneExposure.scale ** -(1 - SKY_EXPOSURE_FOLLOW);
     const renderer = this.terrainView.renderer;

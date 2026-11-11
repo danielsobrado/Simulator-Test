@@ -122,9 +122,6 @@ function validateAerial(aerial) {
   if (aerial.heightCeiling <= aerial.heightFloor) {
     throw new Error('Invalid editor configuration: aerial heightCeiling must exceed heightFloor.');
   }
-  if (typeof aerial.horizonColor !== 'string' || aerial.horizonColor.length === 0) {
-    throw new Error('Invalid editor configuration: aerial horizonColor is required.');
-  }
 }
 
 /**

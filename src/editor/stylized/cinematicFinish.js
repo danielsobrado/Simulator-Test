@@ -18,6 +18,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { getLensDirtTexture } from './lensDirtTexture.js';
+import { lookGrade } from './sky/lookGrade.js';
 
 /**
  * The walking view's finish, ported from grass-test's cinematic pipeline
@@ -112,13 +113,15 @@ export function createFinishUniforms(settings) {
 
 /** The donor's grade, in linear light. */
 export function gradeNode(input, grade) {
-  const saturated = mix(vec3(dot(input, LUMA)), input, grade.saturation);
+  // The sky look leans each term (sky/lookGrade.js); all four are 1 at clear noon.
+  const saturated = mix(vec3(dot(input, LUMA)), input, lookGrade.saturation.mul(grade.saturation));
   const pivot = float(0.18);
   // A power curve through the pivot, not a linear stretch: (v − 0.18)·c + 0.18
   // clipped every linear value under ~0.02 to black, which blacked out the
   // whole floor of a dim bog. Same pivot, same midtone slope, darks stay dark.
-  const contrasted = saturated.max(1e-6).div(pivot).pow(grade.contrast).mul(pivot);
-  const shaped = contrasted.mul(grade.gain).add(grade.lift.mul(contrasted.oneMinus().max(0)));
+  const contrasted = saturated.max(1e-6).div(pivot).pow(lookGrade.contrast.mul(grade.contrast)).mul(pivot);
+  const shaped = contrasted.mul(lookGrade.gain.mul(grade.gain))
+    .add(lookGrade.lift.mul(grade.lift).mul(contrasted.oneMinus().max(0)));
   const shapedLuma = dot(shaped, LUMA);
   const rolled = mix(shaped, vec3(shapedLuma), smoothstep(0.55, 1.4, shapedLuma).mul(grade.highlightDesaturation));
   const vignette = smoothstep(0.18, 0.95, uv().sub(0.5).length()).mul(grade.vignette).oneMinus();

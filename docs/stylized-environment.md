@@ -158,7 +158,7 @@ stylizedSurface:
   cannot spike a frame or tear the mesh.
 - `sky.aerial` adds aerial perspective to that backdrop in the shader (not baked into
   vertex colours, so it tracks the camera between origin snaps): distance hazes toward
-  `horizonColor`, and `heightFalloff` keeps peaks clearer than valley floors so ranges
+  the scene's fog colour, the same haze everything else fades to, and `heightFalloff` keeps peaks clearer than valley floors so ranges
   layer front-to-back.
 - Paths blend through a **tread and a verge** rather than one hard stripe, with optional
   ruts. Trees, bushes and boulders are cleared from roads by

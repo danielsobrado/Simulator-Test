@@ -169,12 +169,9 @@ export class MacroFarTerrainView {
     const aerial = config.stylizedSurface?.sky?.aerial;
     if (!aerial || !(aerial.strength > 0)) return material;
 
-    // A uniform so the haze follows the sky's look (setFogColor).
-    this.horizonBase = new THREE.Color(
-      aerial.horizonColor ?? config.stylizedSurface?.sky?.fogColor ?? '#8ecef2',
-    );
-    this.fogBase = new THREE.Color(config.stylizedSurface?.sky?.fogColor ?? '#8ecef2');
-    this.horizonColor = uniform(this.horizonBase.clone());
+    // One haze per view: the backdrop fades to the scene's fog colour, which the
+    // sky's look writes (setFogColor). A separate horizon colour drew far land cyan.
+    this.horizonColor = uniform(new THREE.Color(config.stylizedSurface?.sky?.fogColor ?? '#91bfd9'));
     const horizon = this.horizonColor;
     const distanceHaze = smoothstep(
       aerial.startDistance ?? this.innerRadius,
@@ -489,18 +486,10 @@ export class MacroFarTerrainView {
   }
 
   /**
-   * Tint the haze as the scene fog changes colour (a new time of day or
-   * weather). The configured horizon keeps its relation to the configured fog.
+   * Follow the scene fog as it changes colour (a new time of day or weather).
    */
   setFogColor(fogColor) {
-    if (!this.horizonColor) return;
-    const fog = new THREE.Color(fogColor);
-    const ratio = (channel) => (this.fogBase[channel] > 1e-4 ? fog[channel] / this.fogBase[channel] : 1);
-    this.horizonColor.value.setRGB(
-      Math.min(1, this.horizonBase.r * ratio('r')),
-      Math.min(1, this.horizonBase.g * ratio('g')),
-      Math.min(1, this.horizonBase.b * ratio('b')),
-    );
+    this.horizonColor?.value.set(fogColor);
   }
 
   isActive() {

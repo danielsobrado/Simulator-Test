@@ -2909,7 +2909,9 @@ stylizedSurface:
     cloudWorldScale: 180
     cloudDensity: 0.58
     cloudSharpness: 0.24
-    cloudCore: '#b8c6d2'
+    # A core nearly as light as the edge left every cloud flat white: the body
+    # shade (CLOUD_SELF_SHADOW) mixes toward this, so it has to be darker to read.
+    cloudCore: '#8e9db0'
     cloudEdge: '#f7fbff'
     cloudRim: '#fff3dc'
     cloudOpacity: 0.62
@@ -3027,13 +3029,12 @@ stylizedSurface:
     environment:
       url: /assets/environment/zwartkops_straight_morning_1k.hdr
       intensity: 0.3
-    # Aerial perspective on the far-terrain backdrop. Distance hazes toward
-    # horizonColor; heightFalloff lets peaks stay clearer than valley floors, so
+    # Aerial perspective on the far-terrain backdrop. Distance hazes toward the
+    # scene's fog colour (one haze per view, docs/look-bible.md); heightFalloff lets peaks stay clearer than valley floors, so
     # ranges layer front-to-back instead of flattening into one silhouette.
     # farDensityScale replaces the old hardcoded 1.5 / farTerrainRadius.
     aerial:
       strength: 0.9
-      horizonColor: '#8ecef2'
       startDistance: 900
       endDistance: 42000
       heightFalloff: 0.55
