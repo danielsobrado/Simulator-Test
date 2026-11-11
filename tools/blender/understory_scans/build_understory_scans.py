@@ -30,23 +30,23 @@ opt = lambda flag: args[args.index(flag) + 1] if flag in args else None
 COVERAGE_MIN, RETRIES = 0.9, 2
 
 
-def reduce_with_coverage(obj, asset):
+def reduce_with_coverage(obj, asset, cutout):
     """Decimate to the target; for cutouts raise the target 25 % (twice at most) while the silhouette shrinks."""
-    bounds = normalise(obj, asset['targetHeight'])
+    bounds = normalise(obj, asset.get('targetHeight'))
     original = obj.data.copy()
-    before = silhouette(obj, bounds) if asset['cutout'] else None
+    before = silhouette(obj, bounds) if cutout else None
     target, coverage = asset['targetTriangles'], None
     for attempt in range(RETRIES + 1):
         obj.data = original.copy()
         tris = decimate(obj, target)
-        if not asset['cutout']:
+        if not cutout:
             break
         after = silhouette(obj, bounds)
         coverage = min(a / b for a, b in zip(after, before))
         if coverage >= COVERAGE_MIN:
             break
         target *= 1.25
-    return tris, coverage, attempt
+    return tris, coverage, attempt, [float(hi - lo) for lo, hi in zip(*bounds)]
 
 
 def patch_alpha_mask(path):
@@ -74,7 +74,7 @@ def inspect_glb(path):
 
 
 def build(asset, preview):
-    name, cutout = asset['name'], asset['cutout']
+    name = asset['name']
     src = os.path.join(CACHE, asset['id'])
     obj = import_scan(os.path.join(src, f"{asset['id']}_2k.gltf"))
     source_tris = tri_count(obj)
@@ -83,7 +83,8 @@ def build(asset, preview):
     plants = keep_largest_plant(obj.data) if asset.get('singlePlant') else 1
     if asset.get('groundCrop'):
         crop_ground(obj.data, asset['groundCrop'])
-    tris, coverage, attempt = reduce_with_coverage(obj, asset)
+    cutout = any(s['alpha'] for s in sets)  # a scan with an alpha map carries cut-out leaves
+    tris, coverage, attempt, size = reduce_with_coverage(obj, asset, cutout)
     shade(obj, cutout)
     tex = pack_atlas(obj, sets, slot_set)
     rgba, luma, rough = grade(tex, cutout, 0.32 if asset['kind'] == 'wood' or 'moss' in name else 0.42)
@@ -102,18 +103,18 @@ def build(asset, preview):
         patch_alpha_mask(out_path)
     png = os.path.join(WORK, 'previews', f'{name}.png')
     if preview:
-        h = asset['targetHeight']
-        render_preview(root, png, max(0.6, h * 1.7), h * 0.45)
+        h = size[2]
+        render_preview(root, png, max(0.6, max(size) * 1.3, h * 1.7), h * 0.45)  # frame wide patches too
     glb = inspect_glb(out_path)
     for child in list(root.children):
         bpy.data.objects.remove(child)
     bpy.data.objects.remove(root)
     target = asset['targetTriangles']
     return {'name': name, 'id': asset['id'], 'path': os.path.relpath(out_path, ROOT).replace('\\', '/'),
-            'sourceTriangles': source_tris, 'plantsInScan': plants, 'targetTriangles': target, 'finalTriangles': glb['triangles'],
+            'sourceTriangles': source_tris, 'plantsInScan': plants, 'cutout': cutout, 'sizeMetres': [round(v, 2) for v in size], 'targetTriangles': target, 'finalTriangles': glb['triangles'],
             'retries': attempt, 'coverage': None if coverage is None else round(coverage, 3), 'luma': round(luma, 3),
             'roughness': round(rough, 3), 'glb': glb, 'bytes': os.path.getsize(out_path),
-            'belowCoverage': cutout and coverage < COVERAGE_MIN,
+            'belowCoverage': bool(cutout and coverage < COVERAGE_MIN),
             'withinTarget': glb['triangles'] <= target * (1.5625 if attempt else 1.05),
             'singleDraw': glb['meshes'] == 1 and glb['primitives'] == 1 and glb['materials'] == 1, 'preview': png}
 
@@ -132,7 +133,7 @@ def main():
     for asset in config:
         r = build(asset, preview)
         report.append(r)
-        print(f"{r['name']}: source {r['sourceTriangles']} final {r['finalTriangles']} coverage {r['coverage']} "
+        print(f"{r['name']}: source {r['sourceTriangles']} final {r['finalTriangles']} coverage {r['coverage']} size {r['sizeMetres']} cutout {r['cutout']} "
               f"luma {r['luma']} roughness {r['roughness']}", flush=True)
     if not opt('--only'):
         json.dump(report, open(os.path.join(WORK, 'report.json'), 'w'), indent=2)

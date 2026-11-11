@@ -80,8 +80,11 @@ test('every published ambient ground detail stays cheap enough to stream', async
   for (const variant of config.stylizedSurface.assets.groundDetailVariants) {
     const triangles = trianglesByScene.get(variant.scene);
     assert.ok(triangles !== undefined, `${variant.scene} is neither a published extraction nor a runtime asset`);
+    // Painted props stay under 350. Poly Haven scans are gated to forest biomes and
+    // canopy and carry their own budget (scripts/understory-sources.config.mjs).
+    const budget = variant.scene.startsWith('/assets/ground/scans/') ? 2600 : 350;
     assert.ok(
-      triangles <= 350,
+      triangles <= budget,
       `${variant.scene} streams ${triangles} triangles as ambient ground cover`,
     );
   }
