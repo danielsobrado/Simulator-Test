@@ -15,7 +15,7 @@ const result = await page.evaluate(async () => {
   if (!b || !nodes) return { error: 'no _bindings/_nodes', keys: Object.keys(r).filter(k => k.startsWith('_')) };
   const mats = new Map(); let cur = null; let frames = 0;
   const key = ro => (ro.material?.name || ro.object?.name || ro.material?.type || '?').replace(/[-_:\s]?-?\d+([,.:_-]-?\d+)*/g, '').slice(0, 40);
-  const oUFR = b.updateForRender, oU = b._update, oN = nodes.updateForRender, oB = nodes.updateBefore;
+  const oUFR = b.updateForRender, oU = b._update, oN = nodes.updateForRender;
   b.updateForRender = function (ro) {
     cur = mats.get(key(ro)); if (!cur) mats.set(key(ro), cur = { draws: 0, t: 0, nodeT: 0, updateNodes: 0, groups: {}, objU: new Map() });
     cur.draws++; const t0 = performance.now(); const res = oUFR.apply(this, arguments); cur.t += performance.now() - t0; cur = null; return res;

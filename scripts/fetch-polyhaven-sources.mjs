@@ -15,7 +15,6 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const cacheDir = path.join(rootDir, 'assets', 'source-cache', 'polyhaven');
 const HEADERS = { 'User-Agent': 'world-builder-asset-fetch/1.0' };
 
 function option(flag) {

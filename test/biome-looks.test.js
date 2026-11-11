@@ -91,7 +91,8 @@ test('a tree carries its biome canopy snow, or the snow band at its height', () 
   const biome = (tile) => LOOKS.snow.canopy[tile];
   assert.equal(resolve(biome(6), 100, 0.5), 0, 'a lowland deciduous tree is bare');
   assert.ok(resolve(biome(TUNDRA), 100, 0.5) > 0.8, 'tundra crowns are capped');
-  assert.ok(resolve(biome(TAIGA), 100, 0.5) > 0.5);
+  const taiga = resolve(biome(TAIGA), 100, 0.5);
+  assert.ok(taiga > 0 && taiga < 0.5, 'taiga crowns carry a light dusting');
   assert.equal(resolve(biome(6), 1000, 0.5), 1, 'above the snow band every crown is white');
   assert.ok(resolve(biome(TAIGA), 100, 0) < resolve(biome(TAIGA), 100, 1), 'trees in a stand differ');
   assert.equal(resolve(Number.NaN, Number.NaN, Number.NaN), 0);
