@@ -425,6 +425,10 @@ const fs = require('fs');
       screenshot: ${JSON.stringify(screenshotReportPath)},
       cpuProfile: ${JSON.stringify(cpuProfileReportPath)},
     };
+    report.capture.assetIntegrity = await page.evaluate(async () => {
+      const { treeImpostorIntegrity } = await import('/src/editor/stylized/impostor/TreeImpostorIntegrity.js');
+      return treeImpostorIntegrity(window.__editor.stylizedSurface.treeView);
+    });
     // On-demand accounting after movement AND recovery; never in frame timing.
     if (${hasFlag('resources')}) report.capture.resourcesAfterRecovery = await page.evaluate(async () => {
       const { trackedWorldResources } = await import('/src/editor/performance/qa/WorldVisualResources.js');
@@ -437,6 +441,10 @@ const fs = require('fs');
     const { perfPreparationFailures } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'scripts/lib/perf-preparation-gates.mjs')).href)});
     for (const failure of perfPreparationFailures(report, ${hasFlag('settle')})) {
       console.error('Perf QA invalid: ' + failure + '; inspect the saved report.');
+      process.exitCode = 1;
+    }
+    if (!report.capture.assetIntegrity.ready) {
+      console.error('Perf QA invalid: tree assets or impostors are incomplete; inspect capture.assetIntegrity.');
       process.exitCode = 1;
     }
     if (report.capture.browserErrors.count > 0) {

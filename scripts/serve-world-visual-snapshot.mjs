@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {existsSync,readFileSync} from 'node:fs';
 import {createServer} from 'vite';
 import base from '../vite.config.js';
 import {compileYamlModule} from './compiled-yaml-plugin.mjs';
@@ -27,9 +28,24 @@ for(let offset=0;offset+512<=archive.length;) {
  files.set(normalize(filename),bytes);fileHashes[filename]=createHash('sha256').update(bytes).digest('hex');
 }
 }
-readArchive(revision,['src','config','scripts','editor.config.yaml','index.html','package.json','package-lock.json','public/assets/impostors/trees'],name=>!harnessRevision||!isFixture(name));
+readArchive(revision,['src','config','scripts','editor.config.yaml','index.html','package.json','package-lock.json','assets/runtime-asset-manifest.json','public/assets/impostors/trees'],name=>!harnessRevision||!isFixture(name));
 if(harnessRevision)readArchive(harnessRevision,['scripts/fixtures'],isFixture);
 if(atlasRevision)readArchive(atlasRevision,['public/assets/impostors/trees'],name=>name.startsWith('public/assets/impostors/trees/'));
+const scanDirectory='public/assets/textures/bark/scans';
+if(execFileSync('git',['ls-tree','-r','--name-only',revision,'--',scanDirectory],{encoding:'utf8'}).trim())readArchive(revision,[scanDirectory],()=>true);
+const runtimeAssets=JSON.parse(files.get(normalize('assets/runtime-asset-manifest.json')));
+for(const asset of runtimeAssets.assets) {
+ if(!normalize(asset.output).startsWith(`${normalize(root)}/public/assets/`)||!/^[0-9a-f]{64}$/.test(asset.cacheKey))throw new Error(`Invalid frozen asset: ${asset.scene}`);
+ // shortcut: optimizer cache v2; update this path if its cache layout changes.
+ const candidates=[asset.output,path.join('tmp','runtime-asset-cache','v2',asset.cacheKey,'output.glb')];
+ let bytes;
+ for(const file of candidates)if(existsSync(file)) {
+  const candidate=readFileSync(file);
+  if(createHash('sha256').update(candidate).digest('hex')===asset.outputSha256){bytes=candidate;break;}
+ }
+ if(!bytes)throw new Error(`Frozen asset missing or changed: ${asset.scene}. Restore its optimizer cache before capturing.`);
+ files.set(normalize(asset.output),bytes);fileHashes[asset.output]=asset.outputSha256;
+}
 for(const name of Object.keys(fileHashes))digest.update(name).update(files.get(normalize(name)));
 const manifest={schemaVersion:1,frozen:true,sourceSha:revision,harnessSha:harnessRevision,atlasSha:atlasRevision,sha256:digest.digest('hex'),files:fileHashes,capturedAt:new Date().toISOString()};
 const mime=file=>file.endsWith('.png')?'image/png':file.endsWith('.json')?'application/json':file.endsWith('.ktx2')?'image/ktx2':'application/octet-stream';
@@ -51,9 +67,9 @@ const snapshot={name:'immutable-world-visual-snapshot',enforce:'pre',
   server.middlewares.use((req,res,next)=>{
    const url=new URL(req.url,'http://localhost');
    if(url.pathname==='/__worldVisualSource'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(manifest));return;}
-   if(url.pathname.startsWith('/assets/impostors/trees/')) {
+   if(url.pathname.startsWith('/assets/')) {
     const file=`public${decodeURIComponent(url.pathname)}`,bytes=files.get(normalize(file));
-    if(!bytes){res.statusCode=404;res.end('Atlas missing from frozen revision');return;}
+    if(!bytes){if(url.pathname.startsWith('/assets/impostors/trees/')){res.statusCode=404;res.end('Atlas missing from frozen revision');return;}next();return;}
     res.setHeader('Content-Type',mime(file));res.end(bytes);return;
    }
    next();

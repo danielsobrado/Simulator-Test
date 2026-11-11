@@ -93,6 +93,7 @@ try {
             mist: look?.mist, nightness: look?.nightness }, readiness: d.readiness, assetIntegrity: d.assetIntegrity };
       }, pose));
       if (pose.tileId !== undefined && result.actualBiomeId !== pose.tileId) result.failure = `Expected biome ${pose.tileId}, got ${result.actualBiomeId}`;
+      if (!result.assetIntegrity?.ready) result.failure = `Tree assets incomplete: ${JSON.stringify(result.assetIntegrity)}`;
       if (pose.canopy && !(result.habitat?.patchCoverage >= 0.75)) result.failure = 'Resolved pose lost closed canopy';
       const png = path.join(out, `${name}.png`);
       await captureWorldCanvas(page, png);

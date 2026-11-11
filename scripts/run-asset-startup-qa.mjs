@@ -140,6 +140,9 @@ try {
     if (run === runCount) {
       await page.screenshot({ path: screenshotPath, fullPage: true });
     }
+    runs.push({ run, adapter, cachePolicy: repeatCache
+      ? (run === 1 ? 'fresh-context-cache-enabled' : 'repeat-context-cache-enabled')
+      : 'fresh-context-cache-disabled', ...report });
     if (errors.length > 0) {
       throw new Error(`Browser errors during asset startup:\n${errors.join('\n')}`);
     }
@@ -156,9 +159,6 @@ try {
         || report.ktx2.gpuTextureBytes === 0) {
       throw new Error('Asset startup telemetry did not observe Meshopt and KTX2 work.');
     }
-    runs.push({ run, adapter, cachePolicy: repeatCache
-      ? (run === 1 ? 'fresh-context-cache-enabled' : 'repeat-context-cache-enabled')
-      : 'fresh-context-cache-disabled', ...report });
     console.log(
       `asset startup ${run}/${runCount}: assets ${report.navigationToAssetsReadyMs} ms, `
       + `first frame ${report.navigationToFirstFrameMs} ms, `
@@ -167,6 +167,9 @@ try {
     if (repeatCache) await page.close();
     else await context.close();
   }
+} catch (error) {
+  fs.writeFileSync(outputPath, `${JSON.stringify({ version: 1, kind: 'simcity-dnd-asset-startup-qa-suite', generatedAt: new Date().toISOString(), url: baseUrl, runs, failure: error.stack }, null, 2)}\n`);
+  throw error;
 } finally {
   await browser.close();
 }
