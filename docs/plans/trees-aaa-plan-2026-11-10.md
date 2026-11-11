@@ -794,3 +794,31 @@ one uniform read.
 What decides whether it reads as AAA is the two contact sheets of phase 2
 (each with the scanned tree beside the built one), the bark sheet of phase 3
 and the capture pairs of phase 4. All go to the user.
+
+## 12. Implementation record — 2026-11-11
+
+Phases 1 to 5 are implemented on `main`. The code, the five GLBs and the bark
+scans exist and the unit tests this plan asked for pass. **None of the visual
+or performance gates were run**: no baseline (phase 0), no impostor rebake, no
+census, no A/B, no captures. Those are the next agent's job.
+
+Where the build departed from the text above, and why:
+
+| Section | Plan | Built | Why |
+| --- | --- | --- | --- |
+| §5.3 rectangles | `FT [163,365,501,511]`, `P1 [18,23,110,225]`, `P2 [334,175,478,264]`, `J1 [83,13,505,240]`, `J2 [188,302,511,412]` | `FT [163,428,501,511]`, `P1 [18,23,110,216]`, `P2 [350,176,478,264]`, `J1 [150,13,505,240]`, `J2 [215,302,511,505]` | Checked against the 2k maps: `FT` caught the tips of two sprays, `P1` and `P2` sat in the bark blobs, `J2` held only the upper half of its frond |
+| §5.3 self-check | 8–65 % cover, at most one edge over 5 % opaque | 5–75 % cover, at most one edge over 35 % opaque | The rectangles are tight boxes, so foliage grazes every edge; the 5 % rule failed every one of them |
+| §5.4 `bake_sprays` | Orthographic emission render | The same flat quads composited in numpy (`tree_sprays.py`) | Exact colour, no scene state, byte-stable |
+| §5.4 palm colours | Linear RGB, encoded | Stored as written | Encoded they came out pale mint |
+| §5.5 conifer density | 4–5 stations of two crossed cards; pines 3 per whorl, 2 stations | 6 stations of three cards with a little splay; pines 5 per whorl, 3 stations of five | At the table's values the crowns were bare spokes with two thirds of the card budget unspent |
+| §5.6 crown cards | At branch tips only | Also at 45 % and 75 % of each fine branch (mid-storey: 50 %) | Tips alone left the crowns see-through |
+| §5.6 lianas | One loose turn round the bole | Hang free | Not modelled |
+| §5.6 palms | Ten trunk points each | Ten and nine | Identical topology made the exporter share one index buffer, which the asset optimizer then reports as growth |
+| §6.1 palm bark | Tileable | Mirrored along the trunk (`mirror: true`) | The scan failed the seam check vertically |
+| §7.1 variants | No pivot | `pivot: trunk` on all five | As the other kit-built trees: a leaning trunk must stand on its placement |
+| §7.1 retired tests | — | `snow-biome-ecology`, `taiga-prototype-selection`, `stylized-environment` and the tree-representation fixture now name the new trees | They named the six retired entries |
+| §9 record | perf-qa tables | Not written | Nothing was measured |
+
+Triangles as built (bark + cards): spruce-01 4 802, spruce-02 5 117, fir-01
+4 316, pine-01 1 802, pine-02 1 538, snag-01 431, emergent-01 5 154,
+emergent-02 4 329, midstorey-01 1 710, palm-01 380, palm-02 340.

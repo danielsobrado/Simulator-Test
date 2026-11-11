@@ -3,6 +3,7 @@ import {
   atan, attribute, cos, float, modelWorldMatrix, positionGeometry, positionLocal, sin, smoothstep, vec2, vec3, vec4,
 } from 'three/tsl';
 import { canonicalFromRender, sampleWorldWind, windWaveCoordinates } from '../../weather/wind/worldWindState.js';
+import { stormLevelUniform } from '../../weather/storm/stormGroundUniforms.js';
 
 const TWO_PI = Math.PI * 2;
 /** Share of a tree's height its bole sweeps off plumb at the top, and wanders. */
@@ -10,6 +11,14 @@ const BOLE_SWEEP = 0.05;
 const BOLE_WANDER = 0.018;
 /** Share of a tree's height one side of its crown rides above the other. */
 const CROWN_TILT = 0.045;
+/** Bend limit in calm air, and how far a full storm opens it. */
+export const CALM_BEND = 0.1;
+export const STORM_BEND = 0.07;
+
+/** Radians a tree may bend at storm level `storm` (0..1). Calm air keeps the old limit. */
+export function treeBendLimit(storm) {
+  return CALM_BEND + STORM_BEND * storm;
+}
 
 /**
  * The slow, whole-tree layer of tree wind, shared by bark and crown so the crown
@@ -41,8 +50,10 @@ export function treeSwayField({ config, time, rootY = 0, topY = 1 }) {
   const travelling = wave.along.mul(0.06);
   const sway = sin(time.mul(speed).add(phase).add(travelling)).mul(0.65)
     .add(sin(time.mul(speed * 1.73).add(phase.mul(1.9)).add(1.3)).mul(0.35));
+  // The storm already raises the wind; only this limit was holding the crowns still.
+  const limit = float(CALM_BEND).add(stormLevelUniform.mul(STORM_BEND));
   const angle = sway.mul(trees.swayAmplitude ?? 0.2).add(trees.windLean ?? 0.35)
-    .mul(strength).mul(gust).mul(compliance).clamp(-0.1, 0.1);
+    .mul(strength).mul(gust).mul(compliance).clamp(limit.negate(), limit);
   // Bend grows with the square of height above the root: the base stays planted
   // and the trunk curves into the crown instead of hinging.
   const bend = angle.mul(r.mul(r));

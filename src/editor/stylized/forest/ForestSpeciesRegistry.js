@@ -100,6 +100,7 @@ export class ForestSpeciesRegistry {
     prototypeIndexBySpecies = null,
     prototypeTileIds = null,
     prototypePreferredTileIds = null,
+    prototypeAgeClasses = null,
     groveMix = DEFAULT_GROVE_MIX,
   } = {}) {
     this.species = new Map();
@@ -123,6 +124,10 @@ export class ForestSpeciesRegistry {
     // it a species of its own.
     this.prototypeTileIds = prototypeTileIds?.size > 0 ? prototypeTileIds : null;
     this.prototypePreferredTileIds = prototypePreferredTileIds?.size > 0 ? prototypePreferredTileIds : null;
+    // Age classes a prototype is reserved for, by prototype index (a snag for
+    // `dead`). A tagged prototype is drawn only for those trees, and they draw
+    // nothing else while one exists for their species and biome.
+    this.prototypeAgeClasses = prototypeAgeClasses?.size > 0 ? prototypeAgeClasses : null;
     this.prototypeTileCache = new Map();
     this.groveMix = Math.min(1, Math.max(0, Number(groveMix) || 0));
     this.signature = JSON.stringify({
@@ -139,31 +144,44 @@ export class ForestSpeciesRegistry {
       prototypePreferredTileIds: this.prototypePreferredTileIds
         ? [...this.prototypePreferredTileIds.entries()].map(([index, tiles]) => [index, [...tiles]])
         : null,
+      prototypeAgeClasses: this.prototypeAgeClasses
+        ? [...this.prototypeAgeClasses.entries()].map(([index, ages]) => [index, [...ages]])
+        : null,
     });
   }
 
   /**
-   * Prototype indices able to render `speciesId` in `tileId`, in ascending
-   * order, preferring authored specialists for that biome when available.
+   * Prototype indices able to render `speciesId` in `tileId` at `ageClass`, in
+   * ascending order, preferring authored specialists for that biome when available.
    * A restriction that would leave the species with nothing is ignored
    * rather than applied, so a tree always has something to draw.
    */
-  prototypesFor(speciesId, tileId = null) {
+  prototypesFor(speciesId, tileId = null, ageClass = null) {
     if (!this.prototypeIndexBySpecies) return null;
     const configured = this.prototypeIndexBySpecies.map.get(speciesId);
     const indices = configured?.length > 0 ? configured : this.prototypeIndexBySpecies.fallback;
-    if ((!this.prototypeTileIds && !this.prototypePreferredTileIds) || tileId === null || tileId === undefined) return indices;
-    const cacheKey = `${speciesId}:${tileId}`;
+    const byTile = (this.prototypeTileIds || this.prototypePreferredTileIds) && tileId !== null && tileId !== undefined;
+    if (!byTile && !this.prototypeAgeClasses) return indices;
+    const cacheKey = `${speciesId}:${tileId}:${ageClass}`;
     const cached = this.prototypeTileCache.get(cacheKey);
     if (cached) return cached;
-    const allowed = indices.filter((index) => {
-      const tiles = this.prototypeTileIds?.get(index);
-      return !tiles || tiles.has(tileId);
-    });
-    // Biome specialists replace generic prototypes without changing species,
-    // morphology, or instance pools. Preferences never bypass eligibility.
-    const preferred = allowed.filter(index => this.prototypePreferredTileIds?.get(index)?.has(tileId));
-    const result = preferred.length > 0 ? preferred : allowed.length > 0 ? allowed : indices;
+    let result = indices;
+    if (byTile) {
+      const allowed = indices.filter((index) => {
+        const tiles = this.prototypeTileIds?.get(index);
+        return !tiles || tiles.has(tileId);
+      });
+      // Biome specialists replace generic prototypes without changing species,
+      // morphology, or instance pools. Preferences never bypass eligibility.
+      const preferred = allowed.filter(index => this.prototypePreferredTileIds?.get(index)?.has(tileId));
+      result = preferred.length > 0 ? preferred : allowed.length > 0 ? allowed : indices;
+    }
+    const ages = this.prototypeAgeClasses;
+    if (ages) {
+      const tagged = result.filter((index) => ages.get(index)?.has(ageClass));
+      const untagged = result.filter((index) => !ages.has(index));
+      result = tagged.length > 0 ? tagged : untagged.length > 0 ? untagged : result;
+    }
     this.prototypeTileCache.set(cacheKey, result);
     return result;
   }
@@ -223,7 +241,7 @@ export class ForestSpeciesRegistry {
       );
     const age = AGE_CLASSES[ageClass];
     const individualVariation = 0.9 + stableUnit(candidate.stableId, 47) * 0.2;
-    const speciesPrototypes = this.prototypesFor(speciesId, habitat.tileId);
+    const speciesPrototypes = this.prototypesFor(speciesId, habitat.tileId, ageClass);
     const prototypeRoll = stableUnit(`${speciesId}:${candidate.stableId}`, 53);
     const prototypeIndex = speciesPrototypes
       ? speciesPrototypes[Math.min(

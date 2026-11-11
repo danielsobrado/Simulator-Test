@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 
 const BARK_RESOLUTION = 128;
 
-export const BARK_PROFILES = Object.freeze({
+const BASE_BARK_PROFILES = {
   spruce: Object.freeze({
     plates: [16, 4],
     warp: 0.5,
@@ -115,6 +115,19 @@ export const BARK_PROFILES = Object.freeze({
     roughness: 0.7,
     roughnessVariation: 0.15,
     normalStrength: 3,
+  }),
+};
+
+export const BARK_PROFILES = Object.freeze({
+  ...BASE_BARK_PROFILES,
+  // Palms wear a scan (barkScans); this is the fallback when it is missing:
+  // wide, shallow horizontal plates in pale grey. A later scanned-only profile
+  // is added the same way, as a spread of the nearest existing one.
+  palm: Object.freeze({
+    ...BASE_BARK_PROFILES.beech,
+    plates: [3, 14],
+    deep: [0.2, 0.19, 0.17],
+    high: [0.4, 0.38, 0.34],
   }),
 });
 
@@ -335,6 +348,11 @@ function createTexture(pixels, resolution, name) {
     THREE.RGBAFormat,
     THREE.UnsignedByteType,
   );
+  return configureBarkPairTexture(texture, name);
+}
+
+/** Sampling state shared by the procedural and the scanned bark pair. */
+function configureBarkPairTexture(texture, name) {
   texture.name = name;
   texture.colorSpace = THREE.NoColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
@@ -345,6 +363,21 @@ function createTexture(pixels, resolution, name) {
   texture.anisotropy = 4;
   texture.needsUpdate = true;
   return texture;
+}
+
+/**
+ * Wraps a scanned pair (scripts/build-bark-scans.mjs) in the shape and sampling
+ * state of the procedural one, so the bark material cannot tell them apart.
+ */
+export function createScannedBarkTextures({ profile, albedoHeight, normalRoughness }) {
+  if (!BARK_PROFILES[profile]) {
+    throw new Error(`Unknown bark profile for a scanned texture: ${profile}.`);
+  }
+  return Object.freeze({
+    profile,
+    albedoHeight: configureBarkPairTexture(albedoHeight, `tree-bark-${profile}-albedo-height`),
+    normalRoughness: configureBarkPairTexture(normalRoughness, `tree-bark-${profile}-normal-roughness`),
+  });
 }
 
 export function createProceduralBarkTextures(options = {}) {

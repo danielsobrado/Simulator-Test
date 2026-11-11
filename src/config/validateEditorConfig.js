@@ -121,6 +121,11 @@ function assertNonNegativeInteger(config, path) {
   }
 }
 
+/** Mirrors BARK_PROFILES (ProceduralBarkTextures.js), which pulls in three and stays out of validation. */
+const TREE_BARK_PROFILES = new Set(['spruce', 'pine', 'beech', 'birch', 'karst_gnarl', 'snag', 'swamp', 'palm']);
+/** Mirrors FOREST_AGE_CLASSES (ForestSpeciesRegistry.js). */
+const TREE_AGE_CLASSES = new Set(['sapling', 'young', 'mature', 'ancient', 'dead']);
+
 function assertTileIds(value, fieldName) {
   if (!Array.isArray(value)
       || value.length === 0
@@ -684,6 +689,21 @@ function validateStylizedSurface(config) {
   }
   assertDensityByTile(surface.bushes?.densityByTile, 'stylizedSurface.bushes.densityByTile');
 
+  const barkScans = surface.assets?.barkScans;
+  if (barkScans !== undefined) {
+    if (!barkScans || typeof barkScans !== 'object' || Array.isArray(barkScans)) {
+      throw new Error('Invalid editor configuration: stylizedSurface.assets.barkScans must be an object.');
+    }
+    for (const [profile, stem] of Object.entries(barkScans)) {
+      if (!TREE_BARK_PROFILES.has(profile)) {
+        throw new Error(`Invalid editor configuration: stylizedSurface.assets.barkScans.${profile} is not a bark profile.`);
+      }
+      if (typeof stem !== 'string' || !stem.startsWith('/assets/')) {
+        throw new Error(`Invalid editor configuration: stylizedSurface.assets.barkScans.${profile} must be a path under /assets/.`);
+      }
+    }
+  }
+
   const treeVariants = surface.assets?.treeVariants ?? [];
   if (!Array.isArray(treeVariants)) {
     throw new Error(
@@ -714,16 +734,7 @@ function validateStylizedSurface(config) {
       throw new Error(`Invalid editor configuration: ${path}.scale must be positive.`);
     }
     if (variant.barkProfile !== undefined) {
-      const barkProfiles = new Set([
-        'spruce',
-        'pine',
-        'beech',
-        'birch',
-        'karst_gnarl',
-        'snag',
-        'swamp',
-      ]);
-      if (!barkProfiles.has(variant.barkProfile)) {
+      if (!TREE_BARK_PROFILES.has(variant.barkProfile)) {
         throw new Error(`Invalid editor configuration: ${path}.barkProfile is unsupported.`);
       }
     }
@@ -756,6 +767,12 @@ function validateStylizedSurface(config) {
     // the forest habitat field that placed the tree.
     if (variant.tileIds !== undefined) {
       assertTileIds(variant.tileIds, `${path}.tileIds`);
+    }
+    // A prototype reserved for trees of these age classes (a snag for `dead`).
+    if (variant.ageClasses !== undefined
+        && (!Array.isArray(variant.ageClasses) || variant.ageClasses.length === 0
+          || variant.ageClasses.some((age) => !TREE_AGE_CLASSES.has(age)))) {
+      throw new Error(`Invalid editor configuration: ${path}.ageClasses must list forest age classes.`);
     }
     if (variant.preferredTileIds !== undefined) {
       assertTileIds(variant.preferredTileIds, `${path}.preferredTileIds`);

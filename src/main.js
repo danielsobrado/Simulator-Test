@@ -80,7 +80,7 @@ import { audioBus, emitAudio } from './editor/audio/index.js';
 import { WorldSoundscape } from './editor/audio/world_soundscape.js';
 import { SurfaceWetness } from './editor/weather/surfaceWetness.js';
 import { SnowCover } from './editor/weather/storm/SnowCover.js';
-import { stormRainUniform, stormSnowCoverUniform } from './editor/weather/storm/stormGroundUniforms.js';
+import { stormLevelUniform, stormRainUniform, stormSnowCoverUniform } from './editor/weather/storm/stormGroundUniforms.js';
 import { SkyLookController } from './editor/stylized/sky/SkyLookController.js';
 import { DEFAULT_SKY_PRESET, SKY_PRESETS } from './editor/stylized/sky/SkyPresets.js';
 import { DayNightCycle, TIME_PRESET_ANCHORS } from './editor/stylized/sky/dayNightCycle.js';
@@ -1872,6 +1872,7 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
       ? snowCover.snap(groundStorm.snow)
       : snowCover.update(frameDelta, groundStorm.snow, groundStorm.snowShare);
     stormRainUniform.value = frameWeatherAudio.rain;
+    stormLevelUniform.value = groundStorm.storm;
     skyLooks?.setStorm(stormFrame());
     const snowCountryWeight = snowCountry.update(frameDelta, viewModeController.camera);
     skyLooks?.setSnowCountry(snowCountryWeight);

@@ -14,7 +14,7 @@ import { syncFoliageLight } from '/src/editor/stylized/forest/foliageLight.js';
 import { jungleMistUniforms } from '/src/editor/stylized/ambient/JungleMist.js';
 import { applyFixtureLighting } from './world-visual-fixture-lighting.mjs';
 
-const assets=['/assets/grass-scene.glb','/assets/trees/meadow/tree7.glb','/assets/trees/tree-scene/tree-02.glb','/assets/trees/forest-pack/tree-narrow-01.glb','/assets/trees/alpine/tree10.glb'];
+const assets=['/assets/grass-scene.glb','/assets/trees/meadow/tree7.glb','/assets/trees/rainforest/rainforest.glb','/assets/trees/boreal/boreal-spruce.glb','/assets/trees/alpine/tree10.glb'];
 class FixtureTreeView extends StylizedTreeView {
  createRenderResources() {
   this.proxyPrototypes=this.prototypes.map(parts=>this.withCloudShadow(createTreeProxyPrototype(parts,this.config).proxyParts));

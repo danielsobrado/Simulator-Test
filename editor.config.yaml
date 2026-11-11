@@ -462,75 +462,83 @@ stylizedSurface:
     # Additional authored tree prototypes. Their embedded textures are retained
     # and each entry joins the configured species' deterministic prototype pool.
     treeVariants:
-      - scene: /assets/trees/forest-pack/tree-wide-01.glb
-        trunkMaterial: Tree_Trunk_01
-        leafMaterial: Tree_Branches_01
-        species: conifer_wide
+      # Boreal conifers (tools/blender/boreal_trees/build_boreal_trees.py): whorled
+      # spruces, a fir and two pines carrying scanned needle sprays, 1.5k-5k
+      # triangles. Trees that share a bark profile and a leaf atlas ship in one
+      # GLB, one root per tree (`prototypeGroups`). `preferredTileIds` makes
+      # them replace the primary scene's pines in taiga and temperate rainforest;
+      # the pines are taiga only, because a preferred prototype takes every tree
+      # of its species in that biome (docs/plans/trees-aaa-plan-2026-11-10.md).
+      - scene: /assets/trees/boreal/boreal-spruce.glb
+        trunkMaterial: Boreal bark
+        leafMaterial: Boreal needles
+        species: [conifer_narrow, conifer_wide]
+        barkProfile: spruce
+        barkScale: 0.8
+        barkSeed: 311
         scale: 1
-        leafGain: 2
-      # Two more distinct conifer crowns from the same pack, 630 and 624
-      # triangles. Verified distinct rather than transforms of tree-wide-01.
-      # Both are broad, broadleaf-shaped crowns on a 1.8 m low-poly stem, so they
-      # stay in temperate rainforest. Preferring the pack in taiga also shut out
-      # the primary spruces there, and a boreal wood grew oak silhouettes.
-      - scene: /assets/trees/forest-pack/tree-wide-02.glb
-        trunkMaterial: Tree_Trunk_01
-        leafMaterial: Tree_Branches_01
-        species: conifer_wide
+        tileIds: [8, 9]
+        preferredTileIds: [8, 9]
+        prototypeGroups: [[spruce-01], [spruce-02], [fir-01]]
+        pivot: trunk
+      - scene: /assets/trees/boreal/boreal-pine.glb
+        trunkMaterial: Boreal bark
+        leafMaterial: Boreal needles
+        species: [conifer_narrow, conifer_wide]
+        barkProfile: pine
+        barkScale: 0.8
+        barkSeed: 367
         scale: 1
-        tileIds: [8]
-        leafGain: 2
-      - scene: /assets/trees/forest-pack/tree-wide-03.glb
-        trunkMaterial: Tree_Trunk_01
-        leafMaterial: Tree_Branches_01
-        species: conifer_wide
+        tileIds: [9]
+        preferredTileIds: [9]
+        prototypeGroups: [[pine-01], [pine-02]]
+        pivot: trunk
+      # The 2.5 % of trees the registry rolls `dead` draw this snag instead of a
+      # shrunken live crown: `ageClasses` reserves it for them. Its bare twigs
+      # keep the scan's grey-brown (`canopyGrade: false`).
+      - scene: /assets/trees/boreal/boreal-snag.glb
+        trunkMaterial: Boreal bark
+        leafMaterial: Boreal dead twigs
+        canopyGrade: false
+        ageClasses: [dead]
+        species: [conifer_narrow, conifer_wide]
+        barkProfile: snag
+        barkScale: 0.8
+        barkSeed: 397
         scale: 1
-        tileIds: [8]
-        leafGain: 2
-      - scene: /assets/trees/forest-pack/tree-narrow-01.glb
-        trunkMaterial: Tree_Trunk_02
-        leafMaterial: Tree_Branches_02
-        species: conifer_narrow
-        scale: 1
-        # A narrow green crown that reads as broadleaf: kept to the boreal biomes,
-        # so the bog's conifer stands are the scene's dark spruces.
-        tileIds: [9, 10]
-        # The forest-pack crowns tile a small leaf texture ~16x per card, so
-        # they read as the texture's average: grey sage (wide) and brown
-        # (narrow), ~0.05 linear luminance, under the canopy grade's dark-texel
-        # guard and kept their raw hue. Brightened they take the shared green
-        # ramp; the wide crowns at 2x stay a darker taiga green, the brown
-        # narrow one needs 3x to lose its brown.
-        leafGain: 3
-      # Two genuinely distinct tree geometries extracted from the 42.8 MB whole
-      # scene. Its other placements remain saved as individual offline GLBs.
-      # These two carry every broadleaf species. `species` is a list because one
-      # crown serves several: the registry gives each species its own crown
-      # aspect, spacing, trunk proportion and age curve, and the canopy takes the
-      # hue of the biome it stands in, so a tropical emergent and a temperate
-      # beech read apart without a second mesh. Covering all four broadleaf
-      # species here is also what retires the generated lobe-and-cylinder
-      # archetypes: they are now built only for a species nothing authored claims.
-      - scene: /assets/trees/tree-scene/tree-02.glb
-        trunkMaterial: Bark
-        leafMaterial: Leaves
-        species: [broadleaf_round, tropical_tall]
+        tileIds: [8, 9]
+        preferredTileIds: [8, 9]
+        prototypeGroups: [[snag-01]]
+        pivot: trunk
+      # Rainforest trees (tools/blender/rainforest_trees/build_rainforest_trees.py):
+      # two buttressed emergents with lianas and epiphytes over a feathery
+      # mid-storey tree. They are the whole rainforest canopy.
+      - scene: /assets/trees/rainforest/rainforest.glb
+        trunkMaterial: Rainforest bark
+        leafMaterial: Rainforest leaves
+        species: [tropical_tall, broadleaf_tall, broadleaf_round]
         barkProfile: beech
-        barkScale: 0.9
-        barkSeed: 113
+        barkScale: 0.6
+        barkSeed: 401
         scale: 1
-        # The meadow biomes wear grass-test's trees (below); this crown keeps the
-        # rainforest, where the donor has nothing of its own.
         tileIds: [7]
-      - scene: /assets/trees/tree-scene/tree-03.glb
-        trunkMaterial: Bark
-        leafMaterial: Leaves
-        species: broadleaf_tall
-        barkProfile: birch
-        barkScale: 0.72
-        barkSeed: 127
+        preferredTileIds: [7]
+        prototypeGroups: [[emergent-01], [emergent-02], [midstorey-01]]
+        pivot: trunk
+      # Palms take the tropical seasonal forest's tall trees, which is what sets
+      # that biome apart from the rainforest; its round crowns stay the meadow's.
+      - scene: /assets/trees/rainforest/palms.glb
+        trunkMaterial: Palm bark
+        leafMaterial: Palm fronds
+        species: tropical_tall
+        barkProfile: palm
+        barkScale: 0.5
+        barkSeed: 457
         scale: 1
-        tileIds: [8]
+        tileIds: [5]
+        preferredTileIds: [5]
+        prototypeGroups: [[palm-01], [palm-02]]
+        pivot: trunk
       # grass-test's meadow trees (tree1-tree9), prepared by
       # scripts/prepare-meadow-tree-assets.mjs: billboards stripped, bark UV
       # transforms baked, branches and roots decimated to ~3 500 triangles, leaf
@@ -609,7 +617,7 @@ stylizedSurface:
       # scripts/prepare-alpine-tree-assets.mjs: billboards stripped, needles and
       # settled snow merged into one vertex-coloured leaf part, leaves decimated to
       # 2 000 triangles (5 666 and 3 596 in all). The crown keeps its painted snow
-      # (COLOR_0), so they stay in tundra; spruces and forest-pack crowns serve taiga.
+      # (COLOR_0), so they stay in tundra; the boreal conifers serve taiga.
       - scene: /assets/trees/alpine/tree10.glb
         trunkMaterial: Alpine bark
         leafMaterial: Evergreen needles
@@ -1558,6 +1566,14 @@ stylizedSurface:
     barkColor: /assets/textures/bark/bark_color.png
     barkAo: /assets/textures/bark/bark_AO.png
     barkHeight: /assets/textures/bark/bark_height.png
+    # Scanned bark per profile (scripts/build-bark-scans.mjs); a profile not
+    # listed keeps its procedural texture.
+    barkScans:
+      spruce: /assets/textures/bark/scans/spruce
+      pine: /assets/textures/bark/scans/pine
+      beech: /assets/textures/bark/scans/beech
+      swamp: /assets/textures/bark/scans/swamp
+      palm: /assets/textures/bark/scans/palm
     # CC0 foliage alpha card. Its RGB is a hard mask and its alpha the antialiased
     # one, so only the alpha channel is read; colour comes from the species palette.
     foliageCard: /assets/textures/leaf/foliage_512a.png

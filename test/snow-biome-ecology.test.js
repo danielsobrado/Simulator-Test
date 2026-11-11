@@ -56,11 +56,17 @@ test('authored snowfall matches reference coverage tuning and rejects inverted c
 });
 
 
-test('broadleaf-shaped forest-pack crowns stay out of taiga while alpine assets are limited to tundra',()=>{
- const pack=name=>surface.assets.treeVariants.find(v=>v.scene===`/assets/trees/forest-pack/${name}.glb`);
- for(const name of ['tree-wide-01','tree-wide-02','tree-wide-03','tree-narrow-01'])assert.equal(pack(name).preferredTileIds,undefined);
- for(const name of ['tree-wide-02','tree-wide-03'])assert.deepEqual(pack(name).tileIds,[8]);
- for(const variant of surface.assets.treeVariants.filter(v=>v.scene.includes('/alpine/'))) {
-  assert.deepEqual(variant.tileIds,[10]);assert.deepEqual(variant.preferredTileIds,[10]);
- }
+test('boreal conifers are preferred in the cold forests while alpine assets are limited to tundra', () => {
+  const boreal = (name) => surface.assets.treeVariants.find((v) => v.scene === `/assets/trees/boreal/${name}.glb`);
+  for (const name of ['boreal-spruce', 'boreal-snag']) {
+    assert.deepEqual(boreal(name).tileIds, [8, 9]);
+    assert.deepEqual(boreal(name).preferredTileIds, [8, 9]);
+  }
+  assert.deepEqual(boreal('boreal-pine').preferredTileIds, [9]);
+  assert.deepEqual(boreal('boreal-snag').ageClasses, ['dead']);
+  assert.ok(!surface.assets.treeVariants.some((v) => v.scene.includes('/forest-pack/')), 'placeholder cones are retired');
+  for (const variant of surface.assets.treeVariants.filter((v) => v.scene.includes('/alpine/'))) {
+    assert.deepEqual(variant.tileIds, [10]);
+    assert.deepEqual(variant.preferredTileIds, [10]);
+  }
 });

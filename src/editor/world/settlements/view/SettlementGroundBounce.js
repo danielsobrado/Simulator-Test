@@ -16,6 +16,9 @@ import * as THREE from 'three/webgpu';
 export const TOWN_BOUNCE = Object.freeze(new THREE.Color('#7d6d58'));
 /** How much of the town's ground replaces the look's, at the heart of a town. */
 const STRENGTH = 0.85;
+const luminance = (colour) => colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
+/** The daylight ground the town colour was tuned against (the highfield look's `#696b53`). */
+const DAY_GROUND_LUMINANCE = luminance(new THREE.Color('#696b53'));
 /** From the town's edge (in town radii) the bounce fades out over this far. */
 const FADE = Object.freeze({ inner: 0.85, outer: 1.35 });
 
@@ -39,6 +42,7 @@ export class SettlementGroundBounce {
     this.getLight = getLight;
     this.base = new THREE.Color();
     this.written = new THREE.Color();
+    this.target = new THREE.Color();
     this.light = null;
   }
 
@@ -51,7 +55,11 @@ export class SettlementGroundBounce {
       this.light = light;
       this.base.copy(ground);
     }
-    this.written.copy(this.base).lerp(TOWN_BOUNCE, townBounceWeight(town));
+    // The town changes the bounce's hue, not how much light there is: at the
+    // look's own level, or a night street glows brown under a moon.
+    const level = Math.min(1, luminance(this.base) / DAY_GROUND_LUMINANCE);
+    this.target.copy(TOWN_BOUNCE).multiplyScalar(level);
+    this.written.copy(this.base).lerp(this.target, townBounceWeight(town));
     ground.copy(this.written);
   }
 }

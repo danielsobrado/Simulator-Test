@@ -24,6 +24,16 @@ test('the bounce keeps the look as its base and re-bases when the look writes a 
   assert.ok(light.groundColor.equals(new THREE.Color('#00ff00')), 'leaving town restores the look');
   light.groundColor.set('#0000ff');
   bounce.update(centre);
-  const expected = new THREE.Color('#0000ff').lerp(TOWN_BOUNCE, townBounceWeight(centre));
+  const luminance = (colour) => colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
+  const level = Math.min(1, luminance(new THREE.Color('#0000ff')) / luminance(new THREE.Color('#696b53')));
+  const expected = new THREE.Color('#0000ff').lerp(TOWN_BOUNCE.clone().multiplyScalar(level), townBounceWeight(centre));
   assert.ok(light.groundColor.equals(expected), 'a new look colour becomes the base');
+});
+
+test('a night ground keeps the town bounce near its own level', () => {
+  const luminance = (colour) => colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
+  const light = new THREE.HemisphereLight('#ffffff', '#151c1b', 1);
+  const base = luminance(light.groundColor);
+  new SettlementGroundBounce(() => light).update({ distance: 0, radius: 100 });
+  assert.ok(luminance(light.groundColor) <= base * 2);
 });

@@ -80,6 +80,10 @@ x carries the snow. Bark weathering's own snow band now reads the world height:
 it compared the trunk-local height with the 700 m line, so trunks never
 whitened.
 
+Taiga's conifers are the kit-built `trees/boreal` spruces, fir and pines
+(`docs/authored-natural-assets.md`); a storm also opens their bend limit
+(`treeSway.js`, `stormLevelUniform`), so crowns lean with the gusts.
+
 ## Snow-country air
 
 `SnowCountryWeight` samples rings at 0, 60 and 180 m, weighted 4 : 1 : 0.5 per

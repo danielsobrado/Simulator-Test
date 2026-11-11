@@ -2559,9 +2559,9 @@
       }
     },
     {
-      "scene": "/assets/trees/forest-pack/tree-wide-01.glb",
-      "source": "assets/extracted/trees/low-poly-forest-pack/tree-wide-01.glb",
-      "output": "public/assets/trees/forest-pack/tree-wide-01.glb",
+      "scene": "/assets/trees/boreal/boreal-spruce.glb",
+      "source": "assets/runtime-sources/trees/boreal/boreal-spruce.glb",
+      "output": "public/assets/trees/boreal/boreal-spruce.glb",
       "profile": "alphaCritical",
       "optimizerArgs": [
         "-cc",
@@ -2584,116 +2584,118 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "af0b9eee50297e469b7323b0240c16d85bec14178143879962ee76502d6d4e68",
-      "sourceSha256": "567631349886c5ab5f2172e2c3f3bdccdcd43637b974bfbf94b250a42c9776d2",
-      "outputSha256": "b4b86301a1ba3aab3a266573730b31078e74dd53500773e76d96dc4792cc017e",
-      "sourceBytes": 866384,
-      "outputBytes": 1901840,
-      "gzipBytes": 1891844,
-      "brotliBytes": 1895776,
+      "cacheKey": "3a013f9fad0dec3dcfbc73d702eabe21fa6924bb782e55e672314855ecf3e089",
+      "sourceSha256": "8834547549ed9e7b2fb57a9886fee0421bb9ce3db1076d89a9aeb3f04813198a",
+      "outputSha256": "73c141b4dd8519eebaae74d7c15548c101f095d921d22854f775e3cc2d7e2e15",
+      "sourceBytes": 2377588,
+      "outputBytes": 1041276,
+      "gzipBytes": 950210,
+      "brotliBytes": 945177,
       "sourceStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 9,
+        "meshes": 6,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 624,
-        "renderedTriangles": 624,
-        "drawParts": 2,
+        "triangles": 14235,
+        "renderedTriangles": 14235,
+        "drawParts": 6,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 286,
-          "Tree_Trunk_01": 338
+          "Boreal bark": 4719,
+          "Boreal needles": 9516
         },
         "sceneBounds": {
           "min": [
-            -2.9559936510333102,
-            -2.4768324768942307e-7,
-            -2.7324228276485245
+            -4.736103534698486,
+            -0.015140505507588387,
+            -4.678523063659668
           ],
           "max": [
-            2.9559936536541898,
-            10.337585492841733,
-            2.7324224371040278
+            3.989382028579712,
+            21.014995574951172,
+            4.625080585479736
           ]
         },
-        "bufferBytes": 861544,
-        "logicalAccessorBytes": 111704,
-        "logicalVertexBytes": 104216,
-        "logicalIndexBytes": 7488,
-        "geometryBufferBytes": 111704,
-        "imageBufferBytes": 749808,
+        "bufferBytes": 2371188,
+        "logicalAccessorBytes": 989602,
+        "logicalVertexBytes": 904192,
+        "logicalIndexBytes": 85410,
+        "geometryBufferBytes": 989602,
+        "imageBufferBytes": 1381583,
         "nodeNames": [
-          "Tree_Branches_01.001",
-          "Tree_Branches_01.001_Tree_Branches_01_0",
-          "Tree_Trunk_01",
-          "Tree_Trunk_01_Tree_Trunk_01_0",
-          "tree-wide-01"
+          "fir-01",
+          "fir-01-Bark",
+          "fir-01-Leaves",
+          "spruce-01",
+          "spruce-01-Bark",
+          "spruce-01-Leaves",
+          "spruce-02",
+          "spruce-02-Bark",
+          "spruce-02-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal needles"
         ],
         "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
+        "extensionsUsed": [],
+        "extensionsRequired": []
       },
       "outputStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 9,
+        "meshes": 6,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 624,
-        "renderedTriangles": 624,
-        "drawParts": 2,
+        "triangles": 14235,
+        "renderedTriangles": 14235,
+        "drawParts": 6,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 286,
-          "Tree_Trunk_01": 338
+          "Boreal bark": 4719,
+          "Boreal needles": 9516
         },
         "sceneBounds": {
           "min": [
-            -2.95596697,
-            -0.00003622872858777271,
-            -2.73246436909068
+            -4.73608398,
+            -0.0151405334,
+            -4.6784668
           ],
           "max": [
-            2.9560203400000002,
-            10.337569403143657,
-            2.7323804498891993
+            3.98937988,
+            21.0146484,
+            4.625
           ]
         },
-        "bufferBytes": 1939268,
-        "logicalAccessorBytes": 42253,
-        "logicalVertexBytes": 38509,
-        "logicalIndexBytes": 3744,
-        "geometryBufferBytes": 43764,
-        "imageBufferBytes": 1872653,
+        "bufferBytes": 1639884,
+        "logicalAccessorBytes": 581691,
+        "logicalVertexBytes": 496281,
+        "logicalIndexBytes": 85410,
+        "geometryBufferBytes": 604626,
+        "imageBufferBytes": 786456,
         "nodeNames": [
-          "Tree_Branches_01.001",
-          "Tree_Branches_01.001_Tree_Branches_01_0",
-          "Tree_Trunk_01",
-          "Tree_Trunk_01_Tree_Trunk_01_0",
-          "tree-wide-01"
+          "fir-01",
+          "fir-01-Bark",
+          "fir-01-Leaves",
+          "spruce-01",
+          "spruce-01-Bark",
+          "spruce-01-Leaves",
+          "spruce-02",
+          "spruce-02-Bark",
+          "spruce-02-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal needles"
         ],
         "animationNames": [],
         "extensionsUsed": [
           "EXT_meshopt_compression",
-          "KHR_materials_specular",
           "KHR_mesh_quantization",
           "KHR_texture_basisu",
           "KHR_texture_transform"
@@ -2708,46 +2710,46 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 12,
+        "knownKtx2Limitations": 2,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 8,
+        "infos": 3,
         "hints": 0,
-        "drawCalls": 2,
-        "vertices": 1511,
-        "triangles": 624
+        "drawCalls": 6,
+        "vertices": 22935,
+        "triangles": 14235
       },
       "report": {
         "generator": "gltfpack 1.2",
         "scene": {
-          "nodeCount": 5,
-          "meshCount": 2,
+          "nodeCount": 9,
+          "meshCount": 6,
           "materialCount": 2,
-          "textureCount": 6,
+          "textureCount": 1,
           "animationCount": 0
         },
         "render": {
-          "drawCount": 2,
-          "instanceCount": 2,
-          "triangleCount": 624
+          "drawCount": 6,
+          "instanceCount": 6,
+          "triangleCount": 14235
         },
         "data": {
-          "json": 6191,
-          "binary": 1895504,
+          "json": 5873,
+          "binary": 1035256,
           "buffers": {
-            "vertex": 22136,
-            "index": 700,
+            "vertex": 234454,
+            "index": 14340,
             "animation": 0,
             "transform": 0,
-            "image": 1872653
+            "image": 786456
           }
         }
       }
     },
     {
-      "scene": "/assets/trees/forest-pack/tree-wide-02.glb",
-      "source": "assets/extracted/trees/low-poly-forest-pack/tree-wide-02.glb",
-      "output": "public/assets/trees/forest-pack/tree-wide-02.glb",
+      "scene": "/assets/trees/boreal/boreal-pine.glb",
+      "source": "assets/runtime-sources/trees/boreal/boreal-pine.glb",
+      "output": "public/assets/trees/boreal/boreal-pine.glb",
       "profile": "alphaCritical",
       "optimizerArgs": [
         "-cc",
@@ -2770,116 +2772,112 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "7247951b3a94e28ea15c6994d7ce36f1a10eb6b7e89cb6a326090f7c3c0bee5b",
-      "sourceSha256": "3f4412f8f095238bccfa07972659465aecc66f6b4af25149f3f271ec056d55c1",
-      "outputSha256": "64c3e4aa28ec15bf10d14c52970fb4d09abcd762171181edb779e8e3ec80d649",
-      "sourceBytes": 870284,
-      "outputBytes": 1901020,
-      "gzipBytes": 1890244,
-      "brotliBytes": 1894203,
+      "cacheKey": "876ac67208ae1aa96e5825406d741c03e7bc9e221b4186f02e1de73f4485804e",
+      "sourceSha256": "716ab42cd49d8555bb51028aa4d7732011feee23a97dbaff33c49fbd470c5e1b",
+      "outputSha256": "0bdff128e1aec70516098a8c78453f0823996f78346183a9978876355c2d105f",
+      "sourceBytes": 1652396,
+      "outputBytes": 895152,
+      "gzipBytes": 875814,
+      "brotliBytes": 874564,
       "sourceStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 6,
+        "meshes": 4,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 630,
-        "renderedTriangles": 630,
-        "drawParts": 2,
+        "triangles": 3340,
+        "renderedTriangles": 3340,
+        "drawParts": 4,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 366,
-          "Tree_Trunk_01": 264
+          "Boreal bark": 1682,
+          "Boreal needles": 1658
         },
         "sceneBounds": {
           "min": [
-            -3.904052726214104,
-            -5.284238930869378e-7,
-            -3.743532127787834
+            -4.645135879516602,
+            -0.02450607344508171,
+            -5.095101833343506
           ],
           "max": [
-            3.904052742535896,
-            25.41252022656136,
-            3.7435317509471417
+            5.131595134735107,
+            19.014976501464844,
+            4.798248767852783
           ]
         },
-        "bufferBytes": 865352,
-        "logicalAccessorBytes": 115512,
-        "logicalVertexBytes": 107952,
-        "logicalIndexBytes": 7560,
-        "geometryBufferBytes": 115512,
-        "imageBufferBytes": 749808,
+        "bufferBytes": 1647904,
+        "logicalAccessorBytes": 197736,
+        "logicalVertexBytes": 177696,
+        "logicalIndexBytes": 20040,
+        "geometryBufferBytes": 197736,
+        "imageBufferBytes": 1450165,
         "nodeNames": [
-          "Tree_Branches_01",
-          "Tree_Branches_01_Tree_Branches_01_0",
-          "Tree_Trunk_01.001",
-          "Tree_Trunk_01.001_Tree_Trunk_01_0",
-          "tree-wide-02"
+          "pine-01",
+          "pine-01-Bark",
+          "pine-01-Leaves",
+          "pine-02",
+          "pine-02-Bark",
+          "pine-02-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal needles"
         ],
         "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
+        "extensionsUsed": [],
+        "extensionsRequired": []
       },
       "outputStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 6,
+        "meshes": 4,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 630,
-        "renderedTriangles": 630,
-        "drawParts": 2,
+        "triangles": 3340,
+        "renderedTriangles": 3340,
+        "drawParts": 4,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 366,
-          "Tree_Trunk_01": 264
+          "Boreal bark": 1682,
+          "Boreal needles": 1658
         },
         "sceneBounds": {
           "min": [
-            -3.9040527299999996,
-            0.00007532979175639554,
-            -3.743569984941075
+            -4.64501953,
+            -0.0245056152,
+            -5.09521484
           ],
           "max": [
-            3.9041748099999998,
-            25.412561508575962,
-            3.7434930727086275
+            5.1315918,
+            19.0146484,
+            4.79833984
           ]
         },
-        "bufferBytes": 1938020,
-        "logicalAccessorBytes": 42066,
-        "logicalVertexBytes": 38286,
-        "logicalIndexBytes": 3780,
-        "geometryBufferBytes": 43484,
-        "imageBufferBytes": 1872653,
+        "bufferBytes": 1010332,
+        "logicalAccessorBytes": 115358,
+        "logicalVertexBytes": 95318,
+        "logicalIndexBytes": 20040,
+        "geometryBufferBytes": 119944,
+        "imageBufferBytes": 841547,
         "nodeNames": [
-          "Tree_Branches_01",
-          "Tree_Branches_01_Tree_Branches_01_0",
-          "Tree_Trunk_01.001",
-          "Tree_Trunk_01.001_Tree_Trunk_01_0",
-          "tree-wide-02"
+          "pine-01",
+          "pine-01-Bark",
+          "pine-01-Leaves",
+          "pine-02",
+          "pine-02-Bark",
+          "pine-02-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal needles"
         ],
         "animationNames": [],
         "extensionsUsed": [
           "EXT_meshopt_compression",
-          "KHR_materials_specular",
           "KHR_mesh_quantization",
           "KHR_texture_basisu",
           "KHR_texture_transform"
@@ -2894,46 +2892,46 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 12,
+        "knownKtx2Limitations": 2,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 8,
+        "infos": 3,
         "hints": 0,
-        "drawCalls": 2,
-        "vertices": 1418,
-        "triangles": 630
+        "drawCalls": 4,
+        "vertices": 4586,
+        "triangles": 3340
       },
       "report": {
         "generator": "gltfpack 1.2",
         "scene": {
-          "nodeCount": 5,
-          "meshCount": 2,
+          "nodeCount": 6,
+          "meshCount": 4,
           "materialCount": 2,
-          "textureCount": 6,
+          "textureCount": 1,
           "animationCount": 0
         },
         "render": {
-          "drawCount": 2,
-          "instanceCount": 2,
-          "triangleCount": 630
+          "drawCount": 4,
+          "instanceCount": 4,
+          "triangleCount": 3340
         },
         "data": {
-          "json": 6339,
-          "binary": 1894536,
+          "json": 4617,
+          "binary": 890388,
           "buffers": {
-            "vertex": 21147,
-            "index": 721,
+            "vertex": 45359,
+            "index": 3470,
             "animation": 0,
             "transform": 0,
-            "image": 1872653
+            "image": 841547
           }
         }
       }
     },
     {
-      "scene": "/assets/trees/forest-pack/tree-wide-03.glb",
-      "source": "assets/extracted/trees/low-poly-forest-pack/tree-wide-03.glb",
-      "output": "public/assets/trees/forest-pack/tree-wide-03.glb",
+      "scene": "/assets/trees/boreal/boreal-snag.glb",
+      "source": "assets/runtime-sources/trees/boreal/boreal-snag.glb",
+      "output": "public/assets/trees/boreal/boreal-snag.glb",
       "profile": "alphaCritical",
       "optimizerArgs": [
         "-cc",
@@ -2956,116 +2954,106 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "759d2267a8790d98fefdda822973fce58ab050077635754f99a776042ab97ba5",
-      "sourceSha256": "9e08041113b2d9308355bdc9fba0a032780092d6321dbd4ffac1db599c4f864d",
-      "outputSha256": "8ade556da5d0d49aa79fa92a7b6c78cd32af6f2528cc4db2b0921006ac6add85",
-      "sourceBytes": 875428,
-      "outputBytes": 1902920,
-      "gzipBytes": 1892005,
-      "brotliBytes": 1902928,
+      "cacheKey": "b2df31a535aa2ac3608f9fb7f950990496ffaeb549a43eb8af4bdda07dff63d4",
+      "sourceSha256": "de487a7278f5849ed6aa9efff86cc16b74179ce7a83b4141503039dd3d674f1d",
+      "outputSha256": "ba3d7d57ad3d0e2d5675cd1930d9d40213c348efe5ac2d3c80a255dd353d637f",
+      "sourceBytes": 1352712,
+      "outputBytes": 768712,
+      "gzipBytes": 765419,
+      "brotliBytes": 768717,
       "sourceStats": {
         "scenes": 1,
-        "nodes": 5,
+        "nodes": 3,
         "meshes": 2,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 624,
-        "renderedTriangles": 624,
+        "triangles": 431,
+        "renderedTriangles": 431,
         "drawParts": 2,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 286,
-          "Tree_Trunk_01": 338
+          "Boreal bark": 403,
+          "Boreal dead twigs": 28
         },
         "sceneBounds": {
           "min": [
-            -5.0314941377860976,
-            -2.496218325376276e-7,
-            -5.034486813011758
+            -2.4366164207458496,
+            -0.009783108718693256,
+            -3.469818592071533
           ],
           "max": [
-            5.0314941434639024,
-            18.458089213415683,
-            5.034485618200811
+            2.9165170192718506,
+            13.059966087341309,
+            2.8082704544067383
           ]
         },
-        "bufferBytes": 870480,
-        "logicalAccessorBytes": 120640,
-        "logicalVertexBytes": 113152,
-        "logicalIndexBytes": 7488,
-        "geometryBufferBytes": 120640,
-        "imageBufferBytes": 749808,
+        "bufferBytes": 1350080,
+        "logicalAccessorBytes": 15130,
+        "logicalVertexBytes": 12544,
+        "logicalIndexBytes": 2586,
+        "geometryBufferBytes": 15130,
+        "imageBufferBytes": 1334947,
         "nodeNames": [
-          "Tree_Branches_01.002",
-          "Tree_Branches_01.002_Tree_Branches_01_0",
-          "Tree_Trunk_01.002",
-          "Tree_Trunk_01.002_Tree_Trunk_01_0",
-          "tree-wide-03"
+          "snag-01",
+          "snag-01-Bark",
+          "snag-01-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal dead twigs"
         ],
         "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
+        "extensionsUsed": [],
+        "extensionsRequired": []
       },
       "outputStats": {
         "scenes": 1,
-        "nodes": 5,
+        "nodes": 3,
         "meshes": 2,
         "materials": 2,
-        "textures": 6,
-        "images": 6,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 624,
-        "renderedTriangles": 624,
+        "triangles": 431,
+        "renderedTriangles": 431,
         "drawParts": 2,
         "materialTriangleCounts": {
-          "Tree_Branches_01": 286,
-          "Tree_Trunk_01": 338
+          "Boreal bark": 403,
+          "Boreal dead twigs": 28
         },
         "sceneBounds": {
           "min": [
-            -5.031551320000002,
-            0.00006290924225815786,
-            -5.0343676091760665
+            -2.43664551,
+            -0.00978326797,
+            -3.46984863
           ],
           "max": [
-            5.031436969999998,
-            18.458308605760205,
-            5.034481938873496
+            2.91650391,
+            13.0600586,
+            2.80822754
           ]
         },
-        "bufferBytes": 1942424,
-        "logicalAccessorBytes": 44460,
-        "logicalVertexBytes": 40716,
-        "logicalIndexBytes": 3744,
-        "geometryBufferBytes": 45968,
-        "imageBufferBytes": 1872653,
+        "bufferBytes": 773756,
+        "logicalAccessorBytes": 8209,
+        "logicalVertexBytes": 5623,
+        "logicalIndexBytes": 2586,
+        "geometryBufferBytes": 8554,
+        "imageBufferBytes": 761892,
         "nodeNames": [
-          "Tree_Branches_01.002",
-          "Tree_Branches_01.002_Tree_Branches_01_0",
-          "Tree_Trunk_01.002",
-          "Tree_Trunk_01.002_Tree_Trunk_01_0",
-          "tree-wide-03"
+          "snag-01",
+          "snag-01-Bark",
+          "snag-01-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_01",
-          "Tree_Trunk_01"
+          "Boreal bark",
+          "Boreal dead twigs"
         ],
         "animationNames": [],
         "extensionsUsed": [
           "EXT_meshopt_compression",
-          "KHR_materials_specular",
           "KHR_mesh_quantization",
           "KHR_texture_basisu",
           "KHR_texture_transform"
@@ -3080,46 +3068,46 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 12,
+        "knownKtx2Limitations": 2,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 8,
+        "infos": 3,
         "hints": 0,
         "drawCalls": 2,
-        "vertices": 1508,
-        "triangles": 624
+        "vertices": 345,
+        "triangles": 431
       },
       "report": {
         "generator": "gltfpack 1.2",
         "scene": {
-          "nodeCount": 5,
+          "nodeCount": 3,
           "meshCount": 2,
           "materialCount": 2,
-          "textureCount": 6,
+          "textureCount": 1,
           "animationCount": 0
         },
         "render": {
           "drawCount": 2,
           "instanceCount": 2,
-          "triangleCount": 624
+          "triangleCount": 431
         },
         "data": {
-          "json": 6317,
-          "binary": 1896456,
+          "json": 3367,
+          "binary": 765200,
           "buffers": {
-            "vertex": 23092,
-            "index": 698,
+            "vertex": 2825,
+            "index": 476,
             "animation": 0,
             "transform": 0,
-            "image": 1872653
+            "image": 761892
           }
         }
       }
     },
     {
-      "scene": "/assets/trees/forest-pack/tree-narrow-01.glb",
-      "source": "assets/extracted/trees/low-poly-forest-pack/tree-narrow-01.glb",
-      "output": "public/assets/trees/forest-pack/tree-narrow-01.glb",
+      "scene": "/assets/trees/rainforest/rainforest.glb",
+      "source": "assets/runtime-sources/trees/rainforest/rainforest.glb",
+      "output": "public/assets/trees/rainforest/rainforest.glb",
       "profile": "alphaCritical",
       "optimizerArgs": [
         "-cc",
@@ -3142,116 +3130,118 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "8c355a3749bbb27c4e2de37d8958cbd38301bdc8c23e504cc3d08ea247018e0e",
-      "sourceSha256": "d11a10a366b328475beabf57cc93b1c5ab2d520a801a6485dc272d3955bb87af",
-      "outputSha256": "ff2eab4f303ecaf45ee7edbe646905c80768e0ea6bc287c870ff79352f487332",
-      "sourceBytes": 668876,
-      "outputBytes": 1635200,
-      "gzipBytes": 1628249,
-      "brotliBytes": 1631256,
+      "cacheKey": "7075fc615ad6154754b91b11ea449a7f3b0a23c12b16f55772b51aafc25397e5",
+      "sourceSha256": "e9681e49067165f9c3ccf2bb5467067eb39f6e868e09153d8fc00978d14362d5",
+      "outputSha256": "17ea4d77c655019136a339e01b29f32cf3bceb10f6873b366c5622ca8637c18b",
+      "sourceBytes": 2151624,
+      "outputBytes": 372756,
+      "gzipBytes": 328080,
+      "brotliBytes": 325862,
       "sourceStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 9,
+        "meshes": 6,
         "materials": 2,
-        "textures": 5,
-        "images": 5,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 285,
-        "renderedTriangles": 285,
-        "drawParts": 2,
+        "triangles": 11193,
+        "renderedTriangles": 11193,
+        "drawParts": 6,
         "materialTriangleCounts": {
-          "Tree_Branches_02": 156,
-          "Tree_Trunk_02": 129
+          "Rainforest bark": 6793,
+          "Rainforest leaves": 4400
         },
         "sceneBounds": {
           "min": [
-            -3.307699202753348,
-            -3.0801358708032467e-7,
-            -3.831017300805296
+            -6.99350643157959,
+            -0.3499999940395355,
+            -6.250626564025879
           ],
           "max": [
-            3.307699204229074,
-            11.866035985249281,
-            3.8310173357485544
+            6.814716339111328,
+            27.40225601196289,
+            6.231870174407959
           ]
         },
-        "bufferBytes": 664200,
-        "logicalAccessorBytes": 57924,
-        "logicalVertexBytes": 54504,
-        "logicalIndexBytes": 3420,
-        "geometryBufferBytes": 57924,
-        "imageBufferBytes": 606264,
+        "bufferBytes": 2145196,
+        "logicalAccessorBytes": 616918,
+        "logicalVertexBytes": 549760,
+        "logicalIndexBytes": 67158,
+        "geometryBufferBytes": 616918,
+        "imageBufferBytes": 1528275,
         "nodeNames": [
-          "Tree_Branches_02",
-          "Tree_Branches_02_Tree_Branches_02_0",
-          "Tree_Trunk_02",
-          "Tree_Trunk_02_Tree_Trunk_02_0",
-          "tree-narrow-01"
+          "emergent-01",
+          "emergent-01-Bark",
+          "emergent-01-Leaves",
+          "emergent-02",
+          "emergent-02-Bark",
+          "emergent-02-Leaves",
+          "midstorey-01",
+          "midstorey-01-Bark",
+          "midstorey-01-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_02",
-          "Tree_Trunk_02"
+          "Rainforest bark",
+          "Rainforest leaves"
         ],
         "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
+        "extensionsUsed": [],
+        "extensionsRequired": []
       },
       "outputStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 9,
+        "meshes": 6,
         "materials": 2,
-        "textures": 5,
-        "images": 5,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 285,
-        "renderedTriangles": 285,
-        "drawParts": 2,
+        "triangles": 11193,
+        "renderedTriangles": 11193,
+        "drawParts": 6,
         "materialTriangleCounts": {
-          "Tree_Branches_02": 156,
-          "Tree_Trunk_02": 129
+          "Rainforest bark": 6793,
+          "Rainforest leaves": 4400
         },
         "sceneBounds": {
           "min": [
-            -3.3076695999999997,
-            -0.00003155223039819077,
-            -3.8310705317970495
+            -6.9934082,
+            -0.350006104,
+            -6.25073242
           ],
           "max": [
-            3.3076868400000006,
-            11.86602060680416,
-            3.8309177952922315
+            6.81469727,
+            27.4023438,
+            6.23193359
           ]
         },
-        "bufferBytes": 1651504,
-        "logicalAccessorBytes": 21589,
-        "logicalVertexBytes": 19879,
-        "logicalIndexBytes": 1710,
-        "geometryBufferBytes": 22394,
-        "imageBufferBytes": 1617516,
+        "bufferBytes": 732864,
+        "logicalAccessorBytes": 351848,
+        "logicalVertexBytes": 284690,
+        "logicalIndexBytes": 67158,
+        "geometryBufferBytes": 366134,
+        "imageBufferBytes": 228922,
         "nodeNames": [
-          "Tree_Branches_02",
-          "Tree_Branches_02_Tree_Branches_02_0",
-          "Tree_Trunk_02",
-          "Tree_Trunk_02_Tree_Trunk_02_0",
-          "tree-narrow-01"
+          "emergent-01",
+          "emergent-01-Bark",
+          "emergent-01-Leaves",
+          "emergent-02",
+          "emergent-02-Bark",
+          "emergent-02-Leaves",
+          "midstorey-01",
+          "midstorey-01-Bark",
+          "midstorey-01-Leaves"
         ],
         "materialNames": [
-          "Tree_Branches_02",
-          "Tree_Trunk_02"
+          "Rainforest bark",
+          "Rainforest leaves"
         ],
         "animationNames": [],
         "extensionsUsed": [
           "EXT_meshopt_compression",
-          "KHR_materials_specular",
           "KHR_mesh_quantization",
           "KHR_texture_basisu",
           "KHR_texture_transform"
@@ -3266,46 +3256,46 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 10,
+        "knownKtx2Limitations": 2,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 7,
+        "infos": 3,
         "hints": 0,
-        "drawCalls": 2,
-        "vertices": 805,
-        "triangles": 285
+        "drawCalls": 6,
+        "vertices": 14286,
+        "triangles": 11193
       },
       "report": {
         "generator": "gltfpack 1.2",
         "scene": {
-          "nodeCount": 5,
-          "meshCount": 2,
+          "nodeCount": 9,
+          "meshCount": 6,
           "materialCount": 2,
-          "textureCount": 5,
+          "textureCount": 1,
           "animationCount": 0
         },
         "render": {
-          "drawCount": 2,
-          "instanceCount": 2,
-          "triangleCount": 285
+          "drawCount": 6,
+          "instanceCount": 6,
+          "triangleCount": 11193
         },
         "data": {
-          "json": 5946,
-          "binary": 1629108,
+          "json": 5883,
+          "binary": 366728,
           "buffers": {
-            "vertex": 11242,
-            "index": 339,
+            "vertex": 126337,
+            "index": 11462,
             "animation": 0,
             "transform": 0,
-            "image": 1617516
+            "image": 228922
           }
         }
       }
     },
     {
-      "scene": "/assets/trees/tree-scene/tree-02.glb",
-      "source": "assets/extracted/trees/low-poly-tree-scene/tree-02.glb",
-      "output": "public/assets/trees/tree-scene/tree-02.glb",
+      "scene": "/assets/trees/rainforest/palms.glb",
+      "source": "assets/runtime-sources/trees/rainforest/palms.glb",
+      "output": "public/assets/trees/rainforest/palms.glb",
       "profile": "alphaCritical",
       "optimizerArgs": [
         "-cc",
@@ -3328,116 +3318,112 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "e8eb86db7de59e0c85293ca14b506b47bd0f379987107dae1144e15f6cea328c",
-      "sourceSha256": "9ac92e8b2a70ef532111a7e3f3efce3c54192945c4ca7270d2285b5133575532",
-      "outputSha256": "c8c6304d3381f719a6841fde8e83d52e39797c91a480f466df8d7a8cac0c3479",
-      "sourceBytes": 1676248,
-      "outputBytes": 3839960,
-      "gzipBytes": 3807957,
-      "brotliBytes": 3814346,
+      "cacheKey": "169586508fecfee69c9340929ad2f0d6b2f4549aa87b50117ed96149b58bf58e",
+      "sourceSha256": "bed97c65126dbc60f1625b0ddb6680feb8edddcc1fd49cd0fcaab3e333259239",
+      "outputSha256": "5976241746b8920118a9bb77774e88a738d9331641deae57b2dbb38319b93e5e",
+      "sourceBytes": 121444,
+      "outputBytes": 74664,
+      "gzipBytes": 67461,
+      "brotliBytes": 66436,
       "sourceStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 6,
+        "meshes": 4,
         "materials": 2,
-        "textures": 5,
-        "images": 5,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 4599,
-        "renderedTriangles": 4599,
-        "drawParts": 2,
+        "triangles": 720,
+        "renderedTriangles": 720,
+        "drawParts": 4,
         "materialTriangleCounts": {
-          "Bark": 2775,
-          "Leaves": 1824
+          "Palm bark": 288,
+          "Palm fronds": 432
         },
         "sceneBounds": {
           "min": [
-            -3.1444498352941155,
-            -3.4954963734329473e-7,
-            -3.4719961719005625
+            -3.491424560546875,
+            -0.04195137694478035,
+            -2.2446186542510986
           ],
           "max": [
-            3.1444498352940977,
-            8.72431277576656,
-            3.4719968923377396
+            3.118605613708496,
+            12.159653663635254,
+            4.575648307800293
           ]
         },
-        "bufferBytes": 1671448,
-        "logicalAccessorBytes": 471540,
-        "logicalVertexBytes": 416352,
-        "logicalIndexBytes": 55188,
-        "geometryBufferBytes": 471540,
-        "imageBufferBytes": 1199894,
+        "bufferBytes": 117020,
+        "logicalAccessorBytes": 44864,
+        "logicalVertexBytes": 40544,
+        "logicalIndexBytes": 4320,
+        "geometryBufferBytes": 44864,
+        "imageBufferBytes": 72156,
         "nodeNames": [
-          "Bark.001_2669",
-          "Leaves_2668",
-          "Object_5340",
-          "Object_5342",
-          "tree-02"
+          "palm-01",
+          "palm-01-Bark",
+          "palm-01-Leaves",
+          "palm-02",
+          "palm-02-Bark",
+          "palm-02-Leaves"
         ],
         "materialNames": [
-          "Bark",
-          "Leaves"
+          "Palm bark",
+          "Palm fronds"
         ],
         "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
+        "extensionsUsed": [],
+        "extensionsRequired": []
       },
       "outputStats": {
         "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
+        "nodes": 6,
+        "meshes": 4,
         "materials": 2,
-        "textures": 5,
-        "images": 5,
+        "textures": 1,
+        "images": 1,
         "skins": 0,
         "animations": 0,
-        "triangles": 4599,
-        "renderedTriangles": 4599,
-        "drawParts": 2,
+        "triangles": 720,
+        "renderedTriangles": 720,
+        "drawParts": 4,
         "materialTriangleCounts": {
-          "Bark": 2775,
-          "Leaves": 1824
+          "Palm bark": 288,
+          "Palm fronds": 432
         },
         "sceneBounds": {
           "min": [
-            -3.144482970662404,
-            -2.814753782357241e-7,
-            -3.472048627342404
+            -3.49145508,
+            -0.0419521332,
+            -2.24462891
           ],
           "max": [
-            3.1444589539563803,
-            8.724381759864603,
-            3.4720498165902405
+            3.11865234,
+            12.159668,
+            4.57568359
           ]
         },
-        "bufferBytes": 4004192,
-        "logicalAccessorBytes": 164007,
-        "logicalVertexBytes": 136413,
-        "logicalIndexBytes": 27594,
-        "geometryBufferBytes": 169938,
-        "imageBufferBytes": 3756189,
+        "bufferBytes": 97804,
+        "logicalAccessorBytes": 26787,
+        "logicalVertexBytes": 22467,
+        "logicalIndexBytes": 4320,
+        "geometryBufferBytes": 27824,
+        "imageBufferBytes": 59370,
         "nodeNames": [
-          "Bark.001_2669",
-          "Leaves_2668",
-          "Object_5340",
-          "Object_5342",
-          "tree-02"
+          "palm-01",
+          "palm-01-Bark",
+          "palm-01-Leaves",
+          "palm-02",
+          "palm-02-Bark",
+          "palm-02-Leaves"
         ],
         "materialNames": [
-          "Bark",
-          "Leaves"
+          "Palm bark",
+          "Palm fronds"
         ],
         "animationNames": [],
         "extensionsUsed": [
           "EXT_meshopt_compression",
-          "KHR_materials_specular",
           "KHR_mesh_quantization",
           "KHR_texture_basisu",
           "KHR_texture_transform"
@@ -3452,224 +3438,38 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 10,
+        "knownKtx2Limitations": 2,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 7,
+        "infos": 3,
         "hints": 0,
-        "drawCalls": 2,
-        "vertices": 5931,
-        "triangles": 4599
+        "drawCalls": 4,
+        "vertices": 1037,
+        "triangles": 720
       },
       "report": {
         "generator": "gltfpack 1.2",
         "scene": {
-          "nodeCount": 5,
-          "meshCount": 2,
+          "nodeCount": 6,
+          "meshCount": 4,
           "materialCount": 2,
-          "textureCount": 5,
+          "textureCount": 1,
           "animationCount": 0
         },
         "render": {
-          "drawCount": 2,
-          "instanceCount": 2,
-          "triangleCount": 4599
+          "drawCount": 4,
+          "instanceCount": 4,
+          "triangleCount": 720
         },
         "data": {
-          "json": 5562,
-          "binary": 3834252,
+          "json": 4539,
+          "binary": 69980,
           "buffers": {
-            "vertex": 73083,
-            "index": 4967,
+            "vertex": 9830,
+            "index": 773,
             "animation": 0,
             "transform": 0,
-            "image": 3756189
-          }
-        }
-      }
-    },
-    {
-      "scene": "/assets/trees/tree-scene/tree-03.glb",
-      "source": "assets/extracted/trees/low-poly-tree-scene/tree-03.glb",
-      "output": "public/assets/trees/tree-scene/tree-03.glb",
-      "profile": "alphaCritical",
-      "optimizerArgs": [
-        "-cc",
-        "-kn",
-        "-km",
-        "-ke",
-        "-vpf",
-        "-tq",
-        "8",
-        "-tl",
-        "color,normal",
-        "1024",
-        "-tl",
-        "attrib",
-        "512",
-        "-tj",
-        "1",
-        "-tc",
-        "attrib",
-        "-tu",
-        "color,normal"
-      ],
-      "cacheKey": "dec2ebdf7e92fb897d985fd8d8ab7287bfc418b0b7f9d3d50ad7bd78ae3ad717",
-      "sourceSha256": "aeb6fe37bf0fcff161ff778bd1cdb462cc64c2ce499235bdca6b91669c4f7b49",
-      "outputSha256": "502d37a67cec0d956bdfc7585e0375c20c06a3ab768ee145d7d3cb01f93d3fb9",
-      "sourceBytes": 1444516,
-      "outputBytes": 3808884,
-      "gzipBytes": 3786124,
-      "brotliBytes": 3792646,
-      "sourceStats": {
-        "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
-        "materials": 2,
-        "textures": 5,
-        "images": 5,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 1806,
-        "renderedTriangles": 1806,
-        "drawParts": 2,
-        "materialTriangleCounts": {
-          "Bark": 276,
-          "Leaves": 1530
-        },
-        "sceneBounds": {
-          "min": [
-            -2.2629068850535763,
-            -2.800063016311638e-7,
-            -2.209544732818183
-          ],
-          "max": [
-            2.2629068850535767,
-            7.454905062892934,
-            2.2095448544562792
-          ]
-        },
-        "bufferBytes": 1439736,
-        "logicalAccessorBytes": 239832,
-        "logicalVertexBytes": 218160,
-        "logicalIndexBytes": 21672,
-        "geometryBufferBytes": 239832,
-        "imageBufferBytes": 1199894,
-        "nodeNames": [
-          "Bark_2671",
-          "Leaves.001_2670",
-          "Object_5344",
-          "Object_5346",
-          "tree-03"
-        ],
-        "materialNames": [
-          "Bark",
-          "Leaves"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
-      },
-      "outputStats": {
-        "scenes": 1,
-        "nodes": 5,
-        "meshes": 2,
-        "materials": 2,
-        "textures": 5,
-        "images": 5,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 1806,
-        "renderedTriangles": 1806,
-        "drawParts": 2,
-        "materialTriangleCounts": {
-          "Bark": 276,
-          "Leaves": 1530
-        },
-        "sceneBounds": {
-          "min": [
-            -2.2629437140513122,
-            -1.679713653515713e-7,
-            -2.209529025113486
-          ],
-          "max": [
-            2.26287930758844,
-            7.4547867075930645,
-            2.209545241818308
-          ]
-        },
-        "bufferBytes": 3894160,
-        "logicalAccessorBytes": 87633,
-        "logicalVertexBytes": 76797,
-        "logicalIndexBytes": 10836,
-        "geometryBufferBytes": 90972,
-        "imageBufferBytes": 3756189,
-        "nodeNames": [
-          "Bark_2671",
-          "Leaves.001_2670",
-          "Object_5344",
-          "Object_5346",
-          "tree-03"
-        ],
-        "materialNames": [
-          "Bark",
-          "Leaves"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_meshopt_compression",
-          "KHR_materials_specular",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu",
-          "KHR_texture_transform"
-        ],
-        "extensionsRequired": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu"
-        ]
-      },
-      "officialValidation": {
-        "validatorVersion": "2.0.0-dev.3.10",
-        "errors": 0,
-        "warnings": 0,
-        "knownKtx2Limitations": 10,
-        "inheritedWarnings": 0,
-        "inheritedWarningCodes": [],
-        "infos": 7,
-        "hints": 0,
-        "drawCalls": 2,
-        "vertices": 3339,
-        "triangles": 1806
-      },
-      "report": {
-        "generator": "gltfpack 1.2",
-        "scene": {
-          "nodeCount": 5,
-          "meshCount": 2,
-          "materialCount": 2,
-          "textureCount": 5,
-          "animationCount": 0
-        },
-        "render": {
-          "drawCount": 2,
-          "instanceCount": 2,
-          "triangleCount": 1806
-        },
-        "data": {
-          "json": 5550,
-          "binary": 3803188,
-          "buffers": {
-            "vertex": 45137,
-            "index": 1848,
-            "animation": 0,
-            "transform": 0,
-            "image": 3756189
+            "image": 59370
           }
         }
       }
@@ -22218,15 +22018,15 @@
     }
   ],
   "totals": {
-    "sourceBytes": 68629648,
-    "outputBytes": 40317784,
-    "gzipBytes": 38492548,
-    "brotliBytes": 38447686,
-    "logicalSourceVertexBytes": 31436888,
-    "logicalOutputVertexBytes": 15578427,
-    "logicalSourceIndexBytes": 4315020,
-    "logicalOutputIndexBytes": 4037748,
-    "savedBytes": 28311864,
-    "reductionRatio": 0.412531
+    "sourceBytes": 69883676,
+    "outputBytes": 28480520,
+    "gzipBytes": 26583109,
+    "brotliBytes": 26497287,
+    "logicalSourceVertexBytes": 32107288,
+    "logicalOutputVertexBytes": 16132206,
+    "logicalSourceIndexBytes": 4391718,
+    "logicalOutputIndexBytes": 4165854,
+    "savedBytes": 41403156,
+    "reductionRatio": 0.592458
   }
 }

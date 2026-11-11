@@ -10,7 +10,7 @@ view distances.
 |---|---:|---|
 | Rocks | 12 | Four standalone rocks plus four ruined-fence stones and four forest-pack stones, each loaded from an individual GLB |
 | Bushes | 5 | One grounded prototype per authored bush GLB; authored cutout textures in near and proxy bands |
-| Trees | 14 total | Source-GLB conifers, four forest-pack conifers and the two distinct whole-scene crowns; near geometry, proxy geometry, then baked impostors |
+| Trees | 23 variants | Source-GLB conifers, the meadow and alpine trees, and the Blender-built swamp, savanna, boreal, rainforest and palm trees; near geometry, proxy geometry, then baked impostors |
 | Ground detail | 17 | Tufts, blades, blossoms and sprouts under 350 triangles each, gated per biome over the procedural blade carpet |
 | Aquatic plants | 6 | Two rooted wetland plants, two broadly scattered weed silhouettes and two low-poly lotus leaves restricted to deterministic shoreline colonies |
 | Distant birds | Up to 10 | Generated three-triangle silhouettes in intermittent flocks; one instanced draw only while visible |
@@ -34,6 +34,38 @@ Comparing rotation- and scale-invariant shape signatures (surface area ÷ height
 with vertex counts) shows `tree-02` repeated 14 times and `tree-03` repeated 8,
 differing only by node transform, which the scatter already randomises.
 `tree-01` is a third geometry but carries no leaf material.
+
+### Kit-built trees with scanned sprays
+
+Taiga, temperate rainforest, tropical rainforest and tropical seasonal forest
+wear trees built headless in Blender (`tools/blender/boreal_trees`,
+`tools/blender/rainforest_trees`) on the `tree_kit.py` skeleton. They replaced
+the four forest-pack cones and the two whole-scene crowns, which are no longer
+configured. Geometry is generated; only textures come from scans (Poly Haven,
+CC0, fetched by `npm run fetch:tree-sources` and pinned in
+`assets/source-library/polyhaven-trees.lock.json`):
+
+- `tree_kit_scans.py` cuts measured rectangles (`tree_regions.py`) out of a
+  scan's branch atlas, bakes its normal map and occlusion into brightness (the
+  runtime samples no leaf normal map) and normalises the result to a mean luma
+  of 0.36 for the canopy grade. Each rectangle is self-checked at build time.
+- `tree_sprays.py` composes what no scan provides as a sheet: broadleaf sprays
+  from single scanned leaves, and palm fronds.
+- Trees that share a bark profile and a leaf atlas ship in one GLB, one root
+  empty per tree, listed in the variant's `prototypeGroups`. Lianas are part of
+  the bark mesh and epiphytes of the leaf mesh, so they cost no draw.
+- A variant with `ageClasses: [dead]` is reserved for the trees the species
+  registry rolls dead (`boreal-snag.glb`); they used to draw a shrunken live
+  crown.
+
+Scanned bark replaces the 128 px procedural texture for the `spruce`, `pine`,
+`beech`, `swamp` and `palm` profiles. `npm run build:bark-scans` packs each
+scan at 512 px into the procedural pair's own channel layout
+(`public/assets/textures/bark/scans/`), moves its mean albedo onto the
+profile's, and fails on a visible wrap seam; `assets.barkScans` maps profile to
+file stem. A profile without a scan, or whose scan fails to load, keeps its
+procedural texture. Changing the tree pool invalidates the impostor atlases:
+rebake with `npm run bake:impostors`.
 
 `stylized-oak` is decimated at extraction time from 182 154 to 62 883 triangles
 and kept as an offline library asset: savanna now uses the Blender-built acacias

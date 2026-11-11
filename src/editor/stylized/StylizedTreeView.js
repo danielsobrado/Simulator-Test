@@ -26,7 +26,7 @@ import {
 } from './forest/ForestSpeciesGeometry.js';
 import { createForestLeafTintTable } from './forest/forestLeafTint.js';
 import { biomeCanopySnowAt, createCanopySnowResolver, setCanopySnowColor } from './forest/canopySnow.js';
-import { createProceduralBarkTextures } from './forest/ProceduralBarkTextures.js';
+import { barkTexturesForVariant, loadScannedBarkTextures } from './forest/ScannedBarkLibrary.js';
 import { instanceCapacity } from './scatterMath.js';
 import { TreeManifestStore } from './TreeManifestStore.js';
 import { iterateTreeLod } from './TreeLodAssembler.js';
@@ -206,6 +206,7 @@ export class StylizedTreeView {
     this.speciesPrototypeIndex = null;
     this.prototypeTileIds = null;
     this.prototypePreferredTileIds = null;
+    this.prototypeAgeClasses = null;
     this.preservePrototypeLeafColor = [];
     this.gradedPrototypeLeaf = [];
     this.leafTints = createForestLeafTintTable({ config });
@@ -299,10 +300,20 @@ export class StylizedTreeView {
   async buildFromScene(scene, authoredVariants = []) {
     if (!this.config.trees.enabled || !scene || this.disposed) return;
     const textureStart = this.textures.length;
-    const [barkResult, foliageResult] = await Promise.allSettled([
+    const [barkResult, foliageResult, scanResult] = await Promise.allSettled([
       this.loadBarkTextures(),
       this.loadFoliageCard(),
+      // Trees are the one layer that may block the first frame, so the scanned
+      // bark they wear loads here rather than streaming in under them.
+      loadScannedBarkTextures({
+        scans: this.config.assets.barkScans,
+        loadTexture: (url) => this.textureLoader.loadAsync(url),
+        resolveUrl: (path) => this.resolveUrl(path),
+      }),
     ]);
+    const barkScans = scanResult.status === 'fulfilled' ? scanResult.value : new Map();
+    // One pair per profile, shared by every variant that names it.
+    for (const scan of barkScans.values()) this.textures.push(scan.albedoHeight, scan.normalRoughness);
     const failure = barkResult.status === 'rejected'
       ? barkResult.reason
       : foliageResult.status === 'rejected'
@@ -337,6 +348,7 @@ export class StylizedTreeView {
     const additionalPrototypeIndicesBySpecies = new Map();
     const prototypeTileIds = new Map();
     const prototypePreferredTileIds = new Map();
+    const prototypeAgeClasses = new Map();
     for (const { scene: variantScene, definition: inputDefinition } of authoredVariants) {
       const definition = inferTreeMaterials(variantScene, inputDefinition);
       const extractionConfig = {
@@ -348,13 +360,8 @@ export class StylizedTreeView {
         },
       };
       const firstIndex = this.prototypes.length;
-      const authoredBarkTextures = definition.barkProfile
-        ? createProceduralBarkTextures({
-          profile: definition.barkProfile,
-          seed: definition.barkSeed,
-        })
-        : null;
-      if (authoredBarkTextures) {
+      const { textures: authoredBarkTextures, owned: ownsBarkTextures } = barkTexturesForVariant(definition, barkScans);
+      if (ownsBarkTextures) {
         this.textures.push(
           authoredBarkTextures.albedoHeight,
           authoredBarkTextures.normalRoughness,
@@ -392,6 +399,11 @@ export class StylizedTreeView {
         const tiles = new Set(definition.preferredTileIds);
         for (const index of indices) prototypePreferredTileIds.set(index, tiles);
       }
+      if (definition.ageClasses) {
+        // A snag: drawn only for trees of these age classes, and they draw nothing else.
+        const ages = new Set(definition.ageClasses);
+        for (const index of indices) prototypeAgeClasses.set(index, ages);
+      }
       // One geometry can serve several species. We have three authored broadleaf
       // crowns, not six, so a tropical emergent and a temperate beech share a
       // mesh and are told apart by the species registry's crown aspect, spacing
@@ -423,6 +435,7 @@ export class StylizedTreeView {
     });
     this.prototypeTileIds = prototypeTileIds;
     this.prototypePreferredTileIds = prototypePreferredTileIds;
+    this.prototypeAgeClasses = prototypeAgeClasses;
     this.preservePrototypeLeafColor = this.prototypes.map(parts => parts.some(part =>
       part.kind === 'leaf' && Boolean(part.geometry.getAttribute('color'))));
     this.gradedPrototypeLeaf = this.prototypes.map(parts => parts.some(part =>
@@ -704,6 +717,7 @@ export class StylizedTreeView {
       prototypeIndexBySpecies: this.speciesPrototypeIndex ?? null,
       prototypeTileIds: this.prototypeTileIds ?? null,
       prototypePreferredTileIds: this.prototypePreferredTileIds ?? null,
+      prototypeAgeClasses: this.prototypeAgeClasses ?? null,
       objectMap: this.objectMap,
       regionalCharacterField: this.regionalCharacterField,
       onBuilt: () => {
