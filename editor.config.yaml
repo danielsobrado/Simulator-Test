@@ -459,6 +459,28 @@ stylizedSurface:
         tileIds: [12, 8]
         character: scrub
         canopy: edge
+      # Poly Haven shrub scans, sized by their builder.
+      - scene: /assets/bushes/bush-forest-scan-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 1.2
+        tileIds: [5, 6, 8]
+        character: forest
+        canopy: core
+      - scene: /assets/bushes/bush-meadow-scan-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 1.0
+        tileIds: [3, 4, 6]
+        character: scrub
+        canopy: edge
+      - scene: /assets/bushes/bush-arid-rooibos-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 1.0
+        tileIds: [1, 2, 3, 32]
+        character: scrub
+        canopy: open
     # Additional authored tree prototypes. Their embedded textures are retained
     # and each entry joins the configured species' deterministic prototype pool.
     treeVariants:
@@ -817,16 +839,6 @@ stylizedSurface:
         canopy: core
         prototypeGroups:
           - [swamp-fern-01]
-      # The same fern in dry woods, on the forest grade rather than the bog's.
-      - scene: /assets/ground/swamp/swamp-fern-01.glb
-        materialRoles: { Swamp fern: foliage }
-        motion: grass-tuft
-        scale: 1.7
-        weight: 2.6
-        tileIds: [6, 5, 7, 8, 9]
-        canopy: core
-        prototypeGroups:
-          - [swamp-fern-01]
       - scene: /assets/ground/swamp/swamp-log-01.glb
         motion: rigid
         conform: true
@@ -927,15 +939,6 @@ stylizedSurface:
         prototypeGroups:
           - [flower-02]
       # --- Leafy weeds and sprouts: shaded floor and cold thin ground. --------
-      - scene: /assets/ground/grass-chunks/chunk-01.glb
-        motion: broadleaf
-        scale: 1
-        weight: 2.2
-        tileIds: [5, 6, 7, 8]
-        character: forest
-        canopy: core
-        prototypeGroups:
-          - [chunk-01]
       # 12 triangles each. Small enough that a tundra or a cold desert can be
       # given cover without it reading as vegetation cover at all.
       - scene: /assets/ground/grass-chunks/chunk-05.glb
@@ -1074,16 +1077,118 @@ stylizedSurface:
           - [meadow-thistle-stone-01]
       # Temperate & Rainforest floor kit (biomes 6, 8, 9): bracken crowns, fly-agaric
       # & chanterelle nurse logs, peeling birch logs, and arching berry brambles.
-      - scene: /assets/ground/forest/forest-bracken-01.glb
+      # Poly Haven scans (docs/plans/understory-aaa-plan-2026-11-10.md): real leaf
+      # shape, cutout and normal; hue still comes from the understory ramp. The
+      # builder sizes each mesh, so scale stays 1.
+      - scene: /assets/ground/scans/forest-fern-02.glb
         motion: fern-frond
-        scale: 1.25
-        weight: 1.35
-        tileIds: [6, 8, 9]
+        scale: 1
+        weight: 1.6
+        tileIds: [5, 6, 7, 8, 9]
         character: forest
         characterStrength: 1.8
         canopy: core
         prototypeGroups:
-          - [forest-bracken-01]
+          - [forest-fern-02]
+      - scene: /assets/ground/scans/forest-sorrel-01.glb
+        motion: broadleaf
+        scale: 1
+        weight: 1.4
+        tileIds: [6, 8]
+        character: forest
+        characterStrength: 1.6
+        canopy: core
+        prototypeGroups:
+          - [forest-sorrel-01]
+      - scene: /assets/ground/scans/forest-periwinkle-01.glb
+        motion: broadleaf
+        scale: 1
+        weight: 1.0
+        tileIds: [6, 8]
+        character: forest
+        characterStrength: 1.6
+        canopy: core
+        prototypeGroups:
+          - [forest-periwinkle-01]
+      - scene: /assets/ground/scans/forest-nettle-01.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 1.0
+        tileIds: [4, 6, 8]
+        character: scrub
+        characterStrength: 1.6
+        canopy: edge
+        prototypeGroups:
+          - [forest-nettle-01]
+      - scene: /assets/ground/scans/meadow-weed-02.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 0.8
+        tileIds: [4, 6, 14]
+        character: meadow
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [meadow-weed-02]
+      - scene: /assets/ground/scans/tropical-calathea-01.glb
+        motion: broadleaf
+        scale: 1
+        weight: 1.4
+        tileIds: [5, 7]
+        character: forest
+        characterStrength: 1.8
+        canopy: core
+        prototypeGroups:
+          - [tropical-calathea-01]
+      - scene: /assets/ground/scans/tropical-anthurium-01.glb
+        motion: broadleaf
+        scale: 1
+        weight: 1.1
+        tileIds: [7]
+        character: forest
+        characterStrength: 1.8
+        canopy: core
+        prototypeGroups:
+          - [tropical-anthurium-01]
+      - scene: /assets/ground/scans/forest-stump-01.glb
+        motion: rigid
+        conform: true
+        sway: false
+        scale: 1
+        heightOffset: -0.05
+        weight: 0.35
+        tileIds: [6, 8, 9]
+        character: forest
+        characterStrength: 1.6
+        canopy: any
+        prototypeGroups:
+          - [forest-stump-01]
+      - scene: /assets/ground/scans/forest-deadfall-02.glb
+        motion: rigid
+        conform: true
+        sway: false
+        scale: 1
+        heightOffset: -0.03
+        weight: 0.6
+        tileIds: [5, 6, 8, 9, 10]
+        character: forest
+        characterStrength: 1.6
+        canopy: any
+        prototypeGroups:
+          - [forest-deadfall-02]
+      - scene: /assets/ground/scans/forest-roots-01.glb
+        motion: rigid
+        conform: true
+        sway: false
+        scale: 1
+        heightOffset: -0.06
+        weight: 0.4
+        tileIds: [6, 7, 8, 12]
+        character: forest
+        characterStrength: 1.6
+        canopy: core
+        prototypeGroups:
+          - [forest-roots-01]
       - scene: /assets/ground/forest/forest-mushrooms-01.glb
         motion: rigid
         conform: true
@@ -1163,18 +1268,6 @@ stylizedSurface:
         canopy: any
         prototypeGroups:
           - [taiga-berry-moss-01]
-      - scene: /assets/ground/boreal/taiga-deadfall-01.glb
-        motion: rigid
-        conform: true
-        scale: 1.1
-        weight: 0.75
-        tileIds: [9, 10]
-        character: rocky
-        characterStrength: 2.1
-        canopy: any
-        sway: false
-        prototypeGroups:
-          - [taiga-deadfall-01]
       - scene: /assets/ground/boreal/tundra-cushion-01.glb
         motion: flexible-stem
         scale: 1.15

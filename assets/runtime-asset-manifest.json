@@ -2559,6 +2559,516 @@
       }
     },
     {
+      "scene": "/assets/bushes/bush-forest-scan-01.glb",
+      "source": "assets/runtime-sources/bushes/bush-forest-scan-01.glb",
+      "output": "public/assets/bushes/bush-forest-scan-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "6d2013039128bc0642b88efe8d1975af73ad4075d74fd1d82e3f931525deca43",
+      "sourceSha256": "21a9a25fa01eff277dc0f8ca4c2594a9524cc1cdebacb06c0b09dbaf6d7489aa",
+      "outputSha256": "9eccf7fc888c98d437ecf4b6ab6c416db1229b6bbf36d934b5d7334fbd6a9e03",
+      "sourceBytes": 2737364,
+      "outputBytes": 450904,
+      "gzipBytes": 445453,
+      "brotliBytes": 444541,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1800,
+        "renderedTriangles": 1800,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-forest-scan-01": 1800
+        },
+        "sceneBounds": {
+          "min": [
+            -2.545260429382324,
+            0.0000063527454585710075,
+            -0.2815154790878296
+          ],
+          "max": [
+            2.545260190963745,
+            1.5,
+            0.2815462648868561
+          ]
+        },
+        "bufferBytes": 2735476,
+        "logicalAccessorBytes": 115152,
+        "logicalVertexBytes": 104352,
+        "logicalIndexBytes": 10800,
+        "geometryBufferBytes": 115152,
+        "imageBufferBytes": 2620324,
+        "nodeNames": [
+          "bush-forest-scan-01",
+          "bush-forest-scan-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-forest-scan-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1800,
+        "renderedTriangles": 1800,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-forest-scan-01": 1800
+        },
+        "sceneBounds": {
+          "min": [
+            -2.54528809,
+            0.00000635278411,
+            -0.281509399
+          ],
+          "max": [
+            2.54528809,
+            1.5,
+            0.281539917
+          ]
+        },
+        "bufferBytes": 510548,
+        "logicalAccessorBytes": 60779,
+        "logicalVertexBytes": 49979,
+        "logicalIndexBytes": 10800,
+        "geometryBufferBytes": 62952,
+        "imageBufferBytes": 420498,
+        "nodeNames": [
+          "bush-forest-scan-01",
+          "bush-forest-scan-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-forest-scan-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 2173,
+        "triangles": 1800
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1800
+        },
+        "data": {
+          "json": 3163,
+          "binary": 447596,
+          "buffers": {
+            "vertex": 25257,
+            "index": 1832,
+            "animation": 0,
+            "transform": 0,
+            "image": 420498
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/bushes/bush-meadow-scan-01.glb",
+      "source": "assets/runtime-sources/bushes/bush-meadow-scan-01.glb",
+      "output": "public/assets/bushes/bush-meadow-scan-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "918735ae8b08fd3ab9814c2758db70211b9595b6069cd44d34c43037afe28092",
+      "sourceSha256": "0bc93d2a16c589741b1ed4d38845c69443a639dd9a7879ccd3e6e850abc673f6",
+      "outputSha256": "051350d2695c4b92f81fc8bffb4f341fbb43663009a5abb19ee4b6fed85b8925",
+      "sourceBytes": 2800724,
+      "outputBytes": 498652,
+      "gzipBytes": 488956,
+      "brotliBytes": 487878,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2000,
+        "renderedTriangles": 2000,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-meadow-scan-01": 2000
+        },
+        "sceneBounds": {
+          "min": [
+            -2.1237363815307617,
+            0.008094841614365578,
+            -0.8053081631660461
+          ],
+          "max": [
+            2.123922824859619,
+            1.2004917860031128,
+            0.8042339086532593
+          ]
+        },
+        "bufferBytes": 2798820,
+        "logicalAccessorBytes": 168336,
+        "logicalVertexBytes": 156336,
+        "logicalIndexBytes": 12000,
+        "geometryBufferBytes": 168336,
+        "imageBufferBytes": 2630479,
+        "nodeNames": [
+          "bush-meadow-scan-01",
+          "bush-meadow-scan-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-meadow-scan-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2000,
+        "renderedTriangles": 2000,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-meadow-scan-01": 2000
+        },
+        "sceneBounds": {
+          "min": [
+            -2.1237793,
+            0.0080947876,
+            -0.805297852
+          ],
+          "max": [
+            2.12390137,
+            1.20050049,
+            0.804229736
+          ]
+        },
+        "bufferBytes": 585480,
+        "logicalAccessorBytes": 86888,
+        "logicalVertexBytes": 74888,
+        "logicalIndexBytes": 12000,
+        "geometryBufferBytes": 90144,
+        "imageBufferBytes": 454332,
+        "nodeNames": [
+          "bush-meadow-scan-01",
+          "bush-meadow-scan-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-meadow-scan-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 3256,
+        "triangles": 2000
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 2000
+        },
+        "data": {
+          "json": 3173,
+          "binary": 495336,
+          "buffers": {
+            "vertex": 38973,
+            "index": 2018,
+            "animation": 0,
+            "transform": 0,
+            "image": 454332
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/bushes/bush-arid-rooibos-01.glb",
+      "source": "assets/runtime-sources/bushes/bush-arid-rooibos-01.glb",
+      "output": "public/assets/bushes/bush-arid-rooibos-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "fceb86ee0e47a90e5266fc4025069d4f5a54dcfbf3504902b3f857295deea5e6",
+      "sourceSha256": "0e16ef9a84a830cc015f16946e089ad751e5ba7474a5c8fa42a376f01519d98b",
+      "outputSha256": "8318873d434a2fa6fb78930befd770f9e051e31bd4f3c140e76e54b2e46854c9",
+      "sourceBytes": 2877988,
+      "outputBytes": 442016,
+      "gzipBytes": 401464,
+      "brotliBytes": 398532,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 5000,
+        "renderedTriangles": 5000,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-arid-rooibos-01": 5000
+        },
+        "sceneBounds": {
+          "min": [
+            -2.315708637237549,
+            -0.006237500347197056,
+            -0.8568504452705383
+          ],
+          "max": [
+            2.3023202419281006,
+            1.0991804599761963,
+            0.8570392727851868
+          ]
+        },
+        "bufferBytes": 2876068,
+        "logicalAccessorBytes": 625200,
+        "logicalVertexBytes": 595200,
+        "logicalIndexBytes": 30000,
+        "geometryBufferBytes": 625200,
+        "imageBufferBytes": 2250866,
+        "nodeNames": [
+          "bush-arid-rooibos-01",
+          "bush-arid-rooibos-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-arid-rooibos-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 5000,
+        "renderedTriangles": 5000,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan bush-arid-rooibos-01": 5000
+        },
+        "sceneBounds": {
+          "min": [
+            -2.31567383,
+            -0.00623750687,
+            -0.856842041
+          ],
+          "max": [
+            2.30236816,
+            1.09918213,
+            0.857025146
+          ]
+        },
+        "bufferBytes": 766272,
+        "logicalAccessorBytes": 315200,
+        "logicalVertexBytes": 285200,
+        "logicalIndexBytes": 30000,
+        "geometryBufferBytes": 327600,
+        "imageBufferBytes": 313931,
+        "nodeNames": [
+          "bush-arid-rooibos-01",
+          "bush-arid-rooibos-01-mesh"
+        ],
+        "materialNames": [
+          "Scan bush-arid-rooibos-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 12400,
+        "triangles": 5000
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 5000
+        },
+        "data": {
+          "json": 3198,
+          "binary": 438672,
+          "buffers": {
+            "vertex": 119714,
+            "index": 5017,
+            "animation": 0,
+            "transform": 0,
+            "image": 313931
+          }
+        }
+      }
+    },
+    {
       "scene": "/assets/trees/boreal/boreal-spruce.glb",
       "source": "assets/runtime-sources/trees/boreal/boreal-spruce.glb",
       "output": "public/assets/trees/boreal/boreal-spruce.glb",
@@ -10131,186 +10641,6 @@
       }
     },
     {
-      "scene": "/assets/ground/grass-chunks/chunk-01.glb",
-      "source": "assets/extracted/ground/simple-grass-chunks/chunk-01.glb",
-      "output": "public/assets/ground/grass-chunks/chunk-01.glb",
-      "profile": "alphaCriticalScatter",
-      "optimizerArgs": [
-        "-cc",
-        "-kn",
-        "-km",
-        "-ke",
-        "-vpf",
-        "-tq",
-        "8",
-        "-tl",
-        "color,normal",
-        "512",
-        "-tl",
-        "attrib",
-        "512",
-        "-tj",
-        "1",
-        "-tc",
-        "attrib",
-        "-tu",
-        "color,normal"
-      ],
-      "cacheKey": "15406b601435af4f932734f0994ab7c75014b67420d54a9d20a96a320bc8a6db",
-      "sourceSha256": "89a7972d0a104acbeed860fa713448821578e8a13a4910d49255d6ef59827cee",
-      "outputSha256": "f9ef274468b4df7e3cd2712b54904d058467c0f9111eb5efffb3a344659ffd55",
-      "sourceBytes": 60372,
-      "outputBytes": 121152,
-      "gzipBytes": 117700,
-      "brotliBytes": 116960,
-      "sourceStats": {
-        "scenes": 1,
-        "nodes": 3,
-        "meshes": 1,
-        "materials": 1,
-        "textures": 3,
-        "images": 3,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 37,
-        "renderedTriangles": 37,
-        "drawParts": 1,
-        "materialTriangleCounts": {
-          "rostlinka_07c": 37
-        },
-        "sceneBounds": {
-          "min": [
-            -0.13980808048984922,
-            0,
-            -0.17002840592837912
-          ],
-          "max": [
-            0.13980808048984922,
-            0.5638676933317593,
-            0.17002840592837912
-          ]
-        },
-        "bufferBytes": 57280,
-        "logicalAccessorBytes": 3260,
-        "logicalVertexBytes": 2816,
-        "logicalIndexBytes": 444,
-        "geometryBufferBytes": 3260,
-        "imageBufferBytes": 54014,
-        "nodeNames": [
-          "chunk-01",
-          "rostlinka_07c",
-          "rostlinka_07c_rostlinka_07c_0"
-        ],
-        "materialNames": [
-          "rostlinka_07c"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_texture_webp",
-          "KHR_materials_ior",
-          "KHR_materials_specular"
-        ],
-        "extensionsRequired": [
-          "EXT_texture_webp"
-        ]
-      },
-      "outputStats": {
-        "scenes": 1,
-        "nodes": 3,
-        "meshes": 1,
-        "materials": 1,
-        "textures": 3,
-        "images": 3,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 37,
-        "renderedTriangles": 37,
-        "drawParts": 1,
-        "materialTriangleCounts": {
-          "rostlinka_07c": 37
-        },
-        "sceneBounds": {
-          "min": [
-            -0.13980640520154688,
-            0.0000026242183092661797,
-            -0.1700288205550291
-          ],
-          "max": [
-            0.13980752052503123,
-            0.5638687224674153,
-            0.1700267519305992
-          ]
-        },
-        "bufferBytes": 118152,
-        "logicalAccessorBytes": 1234,
-        "logicalVertexBytes": 1012,
-        "logicalIndexBytes": 222,
-        "geometryBufferBytes": 1278,
-        "imageBufferBytes": 115986,
-        "nodeNames": [
-          "chunk-01",
-          "rostlinka_07c",
-          "rostlinka_07c_rostlinka_07c_0"
-        ],
-        "materialNames": [
-          "rostlinka_07c"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_meshopt_compression",
-          "KHR_materials_ior",
-          "KHR_materials_specular",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu",
-          "KHR_texture_transform"
-        ],
-        "extensionsRequired": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu"
-        ]
-      },
-      "officialValidation": {
-        "validatorVersion": "2.0.0-dev.3.10",
-        "errors": 0,
-        "warnings": 0,
-        "knownKtx2Limitations": 6,
-        "inheritedWarnings": 0,
-        "inheritedWarningCodes": [],
-        "infos": 5,
-        "hints": 0,
-        "drawCalls": 1,
-        "vertices": 44,
-        "triangles": 37
-      },
-      "report": {
-        "generator": "gltfpack 1.2",
-        "scene": {
-          "nodeCount": 3,
-          "meshCount": 1,
-          "materialCount": 1,
-          "textureCount": 3,
-          "animationCount": 0
-        },
-        "render": {
-          "drawCount": 1,
-          "instanceCount": 1,
-          "triangleCount": 37
-        },
-        "data": {
-          "json": 4138,
-          "binary": 116872,
-          "buffers": {
-            "vertex": 824,
-            "index": 54,
-            "animation": 0,
-            "transform": 0,
-            "image": 115986
-          }
-        }
-      }
-    },
-    {
       "scene": "/assets/ground/grass-chunks/chunk-05.glb",
       "source": "assets/extracted/ground/simple-grass-chunks/chunk-05.glb",
       "output": "public/assets/ground/grass-chunks/chunk-05.glb",
@@ -12229,9 +12559,9 @@
       }
     },
     {
-      "scene": "/assets/ground/forest/forest-bracken-01.glb",
-      "source": "assets/runtime-sources/ground/forest/forest-bracken-01.glb",
-      "output": "public/assets/ground/forest/forest-bracken-01.glb",
+      "scene": "/assets/ground/scans/forest-fern-02.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-fern-02.glb",
+      "output": "public/assets/ground/scans/forest-fern-02.glb",
       "profile": "alphaCriticalScatter",
       "optimizerArgs": [
         "-cc",
@@ -12254,96 +12584,96 @@
         "-tu",
         "color,normal"
       ],
-      "cacheKey": "b382e1a432d04c29cd72a1018779ee1a395c63f1516164be37fe526cdb3d5d64",
-      "sourceSha256": "8ed5b45c05a7fe4f768ff41add17d499ae8ba8bcb105d34322b694e15b2f13ed",
-      "outputSha256": "48ae4de452b7f795c91007f3aa8662005e1e7a8c5de35bac5dfb1b6d762825d3",
-      "sourceBytes": 28400,
-      "outputBytes": 40124,
-      "gzipBytes": 38176,
-      "brotliBytes": 37751,
+      "cacheKey": "a68ae92ce3afaadebd4cb75d7ec4d2a1d669d30bc1b9cc730004bcff0855e4e9",
+      "sourceSha256": "c069b494fa96b35da4905c1586d832eefbd590dacc6bc606694230eeb05c1da9",
+      "outputSha256": "80726c9c5921000057bab98ed09e0c18e2da373378db03627d8b38834eca1a12",
+      "sourceBytes": 2441916,
+      "outputBytes": 368200,
+      "gzipBytes": 363850,
+      "brotliBytes": 362648,
       "sourceStats": {
-        "scenes": 1,
+        "scenes": 2,
         "nodes": 2,
         "meshes": 1,
         "materials": 1,
-        "textures": 1,
-        "images": 1,
+        "textures": 2,
+        "images": 2,
         "skins": 0,
         "animations": 0,
-        "triangles": 60,
-        "renderedTriangles": 60,
+        "triangles": 1200,
+        "renderedTriangles": 1200,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "ForestBracken": 60
+          "Scan forest-fern-02": 1200
         },
         "sceneBounds": {
           "min": [
-            -0.8509841561317444,
-            0.029999999329447746,
-            -0.9081676602363586
+            -1.7284311056137085,
+            -0.0033170487731695175,
+            -1.5023813247680664
           ],
           "max": [
-            0.7966294884681702,
-            0.6003336310386658,
-            0.7934929132461548
+            1.7310047149658203,
+            0.7585621476173401,
+            1.5248889923095703
           ]
         },
-        "bufferBytes": 26872,
-        "logicalAccessorBytes": 3240,
-        "logicalVertexBytes": 2880,
-        "logicalIndexBytes": 360,
-        "geometryBufferBytes": 3240,
-        "imageBufferBytes": 23629,
+        "bufferBytes": 2440044,
+        "logicalAccessorBytes": 65712,
+        "logicalVertexBytes": 58512,
+        "logicalIndexBytes": 7200,
+        "geometryBufferBytes": 65712,
+        "imageBufferBytes": 2374326,
         "nodeNames": [
-          "forest-bracken-01",
-          "forest-bracken-01-mesh"
+          "forest-fern-02",
+          "forest-fern-02-mesh"
         ],
         "materialNames": [
-          "ForestBracken"
+          "Scan forest-fern-02"
         ],
         "animationNames": [],
         "extensionsUsed": [],
         "extensionsRequired": []
       },
       "outputStats": {
-        "scenes": 1,
+        "scenes": 2,
         "nodes": 2,
         "meshes": 1,
         "materials": 1,
-        "textures": 1,
-        "images": 1,
+        "textures": 2,
+        "images": 2,
         "skins": 0,
         "animations": 0,
-        "triangles": 60,
-        "renderedTriangles": 60,
+        "triangles": 1200,
+        "renderedTriangles": 1200,
         "drawParts": 1,
         "materialTriangleCounts": {
-          "ForestBracken": 60
+          "Scan forest-fern-02": 1200
         },
         "sceneBounds": {
           "min": [
-            -0.850982666,
-            0.029999733,
-            -0.908172607
+            -1.72845459,
+            -0.00331699848,
+            -1.50238037
           ],
           "max": [
-            0.796630859,
-            0.600341797,
-            0.793487549
+            1.73101807,
+            0.758575439,
+            1.52490234
           ]
         },
-        "bufferBytes": 39724,
-        "logicalAccessorBytes": 2070,
-        "logicalVertexBytes": 1710,
-        "logicalIndexBytes": 360,
-        "geometryBufferBytes": 2160,
-        "imageBufferBytes": 36270,
+        "bufferBytes": 401368,
+        "logicalAccessorBytes": 35237,
+        "logicalVertexBytes": 28037,
+        "logicalIndexBytes": 7200,
+        "geometryBufferBytes": 36456,
+        "imageBufferBytes": 348818,
         "nodeNames": [
-          "forest-bracken-01",
-          "forest-bracken-01-mesh"
+          "forest-fern-02",
+          "forest-fern-02-mesh"
         ],
         "materialNames": [
-          "ForestBracken"
+          "Scan forest-fern-02"
         ],
         "animationNames": [],
         "extensionsUsed": [
@@ -12362,14 +12692,14 @@
         "validatorVersion": "2.0.0-dev.3.10",
         "errors": 0,
         "warnings": 0,
-        "knownKtx2Limitations": 2,
+        "knownKtx2Limitations": 4,
         "inheritedWarnings": 0,
         "inheritedWarningCodes": [],
-        "infos": 3,
+        "infos": 4,
         "hints": 0,
         "drawCalls": 1,
-        "vertices": 90,
-        "triangles": 60
+        "vertices": 1219,
+        "triangles": 1200
       },
       "report": {
         "generator": "gltfpack 1.2",
@@ -12377,23 +12707,1553 @@
           "nodeCount": 2,
           "meshCount": 1,
           "materialCount": 1,
-          "textureCount": 1,
+          "textureCount": 2,
           "animationCount": 0
         },
         "render": {
           "drawCount": 1,
           "instanceCount": 1,
-          "triangleCount": 60
+          "triangleCount": 1200
         },
         "data": {
-          "json": 2419,
-          "binary": 37564,
+          "json": 3142,
+          "binary": 364912,
           "buffers": {
-            "vertex": 1208,
-            "index": 77,
+            "vertex": 14802,
+            "index": 1283,
             "animation": 0,
             "transform": 0,
-            "image": 36270
+            "image": 348818
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-sorrel-01.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-sorrel-01.glb",
+      "output": "public/assets/ground/scans/forest-sorrel-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "1f1ca089289f8867af6bedab6bbc917b0798f5f664d895d8d8f9801f7a4c8e47",
+      "sourceSha256": "677e8381d5819fec5ef7d37458b845b0bf91856ee598f022f1816167bf57c0cc",
+      "outputSha256": "1b91e8584ab3c49b24e175d170017e16a856331be5a3aebaa7eee602b4d75548",
+      "sourceBytes": 2905436,
+      "outputBytes": 502848,
+      "gzipBytes": 495573,
+      "brotliBytes": 494575,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1875,
+        "renderedTriangles": 1875,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-sorrel-01": 1875
+        },
+        "sceneBounds": {
+          "min": [
+            -0.48562347888946533,
+            -0.0000212810373341199,
+            -0.20193253457546234
+          ],
+          "max": [
+            0.48562347888946533,
+            0.1599999964237213,
+            0.20193256437778473
+          ]
+        },
+        "bufferBytes": 2903548,
+        "logicalAccessorBytes": 108258,
+        "logicalVertexBytes": 97008,
+        "logicalIndexBytes": 11250,
+        "geometryBufferBytes": 108258,
+        "imageBufferBytes": 2795284,
+        "nodeNames": [
+          "forest-sorrel-01",
+          "forest-sorrel-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-sorrel-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1875,
+        "renderedTriangles": 1875,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-sorrel-01": 1875
+        },
+        "sceneBounds": {
+          "min": [
+            -0.485626221,
+            -0.0000212807208,
+            -0.201934814
+          ],
+          "max": [
+            0.485626221,
+            0.160003662,
+            0.201934814
+          ]
+        },
+        "bufferBytes": 559300,
+        "logicalAccessorBytes": 57733,
+        "logicalVertexBytes": 46483,
+        "logicalIndexBytes": 11250,
+        "geometryBufferBytes": 59754,
+        "imageBufferBytes": 474029,
+        "nodeNames": [
+          "forest-sorrel-01",
+          "forest-sorrel-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-sorrel-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 2021,
+        "triangles": 1875
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1875
+        },
+        "data": {
+          "json": 3160,
+          "binary": 499544,
+          "buffers": {
+            "vertex": 23495,
+            "index": 2009,
+            "animation": 0,
+            "transform": 0,
+            "image": 474029
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-periwinkle-01.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-periwinkle-01.glb",
+      "output": "public/assets/ground/scans/forest-periwinkle-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "0928e0a37aae670a20b70044ad9428ee683e61107dd836bf4d8bd66dfb7de41e",
+      "sourceSha256": "f37e0712388afd5650b253e03eae0bf273889b56624504b7a74d30870b4f14a9",
+      "outputSha256": "738994359be102ebe2c622657912c40a7bac49e5a1e929764d0361439142a692",
+      "sourceBytes": 2798480,
+      "outputBytes": 471436,
+      "gzipBytes": 458080,
+      "brotliBytes": 457042,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2400,
+        "renderedTriangles": 2400,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-periwinkle-01": 2400
+        },
+        "sceneBounds": {
+          "min": [
+            -0.3308012783527374,
+            -0.000007744370122964028,
+            -0.08590129762887955
+          ],
+          "max": [
+            0.3309379518032074,
+            0.2145630419254303,
+            0.08546548336744308
+          ]
+        },
+        "bufferBytes": 2796568,
+        "logicalAccessorBytes": 223392,
+        "logicalVertexBytes": 208992,
+        "logicalIndexBytes": 14400,
+        "geometryBufferBytes": 223392,
+        "imageBufferBytes": 2573173,
+        "nodeNames": [
+          "forest-periwinkle-01",
+          "forest-periwinkle-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-periwinkle-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2400,
+        "renderedTriangles": 2400,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-periwinkle-01": 2400
+        },
+        "sceneBounds": {
+          "min": [
+            -0.330795288,
+            -0.00000774441287,
+            -0.0859031677
+          ],
+          "max": [
+            0.330932617,
+            0.214561462,
+            0.0854644775
+          ]
+        },
+        "bufferBytes": 586996,
+        "logicalAccessorBytes": 114542,
+        "logicalVertexBytes": 100142,
+        "logicalIndexBytes": 14400,
+        "geometryBufferBytes": 118896,
+        "imageBufferBytes": 417144,
+        "nodeNames": [
+          "forest-periwinkle-01",
+          "forest-periwinkle-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-periwinkle-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 4354,
+        "triangles": 2400
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 2400
+        },
+        "data": {
+          "json": 3192,
+          "binary": 468100,
+          "buffers": {
+            "vertex": 48525,
+            "index": 2418,
+            "animation": 0,
+            "transform": 0,
+            "image": 417144
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-nettle-01.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-nettle-01.glb",
+      "output": "public/assets/ground/scans/forest-nettle-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "4ef5dbcbb1872da9ef7f94029683bbd3535a57d453ac05fcb500ce7b623fe75f",
+      "sourceSha256": "196c5c5bfd56e850e30d500c4465790b240405d9d111c9786643c0cf24ab2c3a",
+      "outputSha256": "b48f11afa86fa39341794d3ee76241c4f69a5681b401104dd826a0993cab7f87",
+      "sourceBytes": 3066184,
+      "outputBytes": 495212,
+      "gzipBytes": 490192,
+      "brotliBytes": 489137,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1999,
+        "renderedTriangles": 1999,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-nettle-01": 1999
+        },
+        "sceneBounds": {
+          "min": [
+            -0.18225248157978058,
+            0.0007617975352331996,
+            -0.20905351638793945
+          ],
+          "max": [
+            0.18153777718544006,
+            0.8493021726608276,
+            0.20933927595615387
+          ]
+        },
+        "bufferBytes": 3064296,
+        "logicalAccessorBytes": 141642,
+        "logicalVertexBytes": 129648,
+        "logicalIndexBytes": 11994,
+        "geometryBufferBytes": 141642,
+        "imageBufferBytes": 2922646,
+        "nodeNames": [
+          "forest-nettle-01",
+          "forest-nettle-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-nettle-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1999,
+        "renderedTriangles": 1999,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-nettle-01": 1999
+        },
+        "sceneBounds": {
+          "min": [
+            -0.182250977,
+            0.000761806965,
+            -0.20905304
+          ],
+          "max": [
+            0.181541443,
+            0.849304199,
+            0.209342957
+          ]
+        },
+        "bufferBytes": 568464,
+        "logicalAccessorBytes": 73864,
+        "logicalVertexBytes": 61870,
+        "logicalIndexBytes": 11994,
+        "geometryBufferBytes": 76554,
+        "imageBufferBytes": 459831,
+        "nodeNames": [
+          "forest-nettle-01",
+          "forest-nettle-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-nettle-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 2690,
+        "triangles": 1999
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1999
+        },
+        "data": {
+          "json": 3160,
+          "binary": 491908,
+          "buffers": {
+            "vertex": 30010,
+            "index": 2054,
+            "animation": 0,
+            "transform": 0,
+            "image": 459831
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/meadow-weed-02.glb",
+      "source": "assets/runtime-sources/ground/scans/meadow-weed-02.glb",
+      "output": "public/assets/ground/scans/meadow-weed-02.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "12b8a380f10e72b081c5d3d01d042042450faedfd40e58550b979b628222613c",
+      "sourceSha256": "e24b67892644be603d24c62f54944bc68f6d001446bf777594af7f46b948e3d6",
+      "outputSha256": "fde747d2d72b5263f1679e60a563e0c4709d0809f19581e42acaaf6cf65e95d7",
+      "sourceBytes": 3412552,
+      "outputBytes": 521564,
+      "gzipBytes": 517643,
+      "brotliBytes": 516874,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 874,
+        "renderedTriangles": 874,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan meadow-weed-02": 874
+        },
+        "sceneBounds": {
+          "min": [
+            -7.805088996887207,
+            0.0005418795626610518,
+            -1.0689575672149658
+          ],
+          "max": [
+            7.788356304168701,
+            0.5458401441574097,
+            1.0695427656173706
+          ]
+        },
+        "bufferBytes": 3410684,
+        "logicalAccessorBytes": 68412,
+        "logicalVertexBytes": 63168,
+        "logicalIndexBytes": 5244,
+        "geometryBufferBytes": 68412,
+        "imageBufferBytes": 3342269,
+        "nodeNames": [
+          "meadow-weed-02",
+          "meadow-weed-02-mesh"
+        ],
+        "materialNames": [
+          "Scan meadow-weed-02"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 874,
+        "renderedTriangles": 874,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan meadow-weed-02": 874
+        },
+        "sceneBounds": {
+          "min": [
+            -7.80517578,
+            0.000541865826,
+            -1.06896973
+          ],
+          "max": [
+            7.78833008,
+            0.545837402,
+            1.06951904
+          ]
+        },
+        "bufferBytes": 555032,
+        "logicalAccessorBytes": 35443,
+        "logicalVertexBytes": 30199,
+        "logicalIndexBytes": 5244,
+        "geometryBufferBytes": 36756,
+        "imageBufferBytes": 501831,
+        "nodeNames": [
+          "meadow-weed-02",
+          "meadow-weed-02-mesh"
+        ],
+        "materialNames": [
+          "Scan meadow-weed-02"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 1313,
+        "triangles": 874
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 874
+        },
+        "data": {
+          "json": 3145,
+          "binary": 518276,
+          "buffers": {
+            "vertex": 15523,
+            "index": 911,
+            "animation": 0,
+            "transform": 0,
+            "image": 501831
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/tropical-calathea-01.glb",
+      "source": "assets/runtime-sources/ground/scans/tropical-calathea-01.glb",
+      "output": "public/assets/ground/scans/tropical-calathea-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "cec73739a0825e0cd783c9dfc93e6a3da2e81f1eb1ea12dc6d09d54f016dcba3",
+      "sourceSha256": "1917c3a2ffdd29497d682d08dc48a3ddba6a7185c7cb4a7abfa74ab6c3655c83",
+      "outputSha256": "6f82388144d0ce484d2390106e6a448d4cc1e0398d7a1c09366f5ca9caddadd5",
+      "sourceBytes": 3409468,
+      "outputBytes": 542528,
+      "gzipBytes": 539077,
+      "brotliBytes": 542533,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1199,
+        "renderedTriangles": 1199,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan tropical-calathea-01": 1199
+        },
+        "sceneBounds": {
+          "min": [
+            -2.057905435562134,
+            0.0009131078259088099,
+            -0.9866784811019897
+          ],
+          "max": [
+            2.054959535598755,
+            0.699999988079071,
+            0.9858977198600769
+          ]
+        },
+        "bufferBytes": 3407564,
+        "logicalAccessorBytes": 56970,
+        "logicalVertexBytes": 49776,
+        "logicalIndexBytes": 7194,
+        "geometryBufferBytes": 56970,
+        "imageBufferBytes": 3350589,
+        "nodeNames": [
+          "tropical-calathea-01",
+          "tropical-calathea-01-mesh"
+        ],
+        "materialNames": [
+          "Scan tropical-calathea-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1199,
+        "renderedTriangles": 1199,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan tropical-calathea-01": 1199
+        },
+        "sceneBounds": {
+          "min": [
+            -2.05786133,
+            0.000913113356,
+            -0.986663818
+          ],
+          "max": [
+            2.05493164,
+            0.700012207,
+            0.985900879
+          ]
+        },
+        "bufferBytes": 571288,
+        "logicalAccessorBytes": 31045,
+        "logicalVertexBytes": 23851,
+        "logicalIndexBytes": 7194,
+        "geometryBufferBytes": 32082,
+        "imageBufferBytes": 525673,
+        "nodeNames": [
+          "tropical-calathea-01",
+          "tropical-calathea-01-mesh"
+        ],
+        "materialNames": [
+          "Scan tropical-calathea-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 1037,
+        "triangles": 1199
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1199
+        },
+        "data": {
+          "json": 3178,
+          "binary": 539204,
+          "buffers": {
+            "vertex": 12237,
+            "index": 1284,
+            "animation": 0,
+            "transform": 0,
+            "image": 525673
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/tropical-anthurium-01.glb",
+      "source": "assets/runtime-sources/ground/scans/tropical-anthurium-01.glb",
+      "output": "public/assets/ground/scans/tropical-anthurium-01.glb",
+      "profile": "alphaCriticalScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "attrib",
+        "-tu",
+        "color,normal"
+      ],
+      "cacheKey": "5e301371f6e999c684f9a3b766af21f0be321982ca070a4eb4472688b9453337",
+      "sourceSha256": "4fa22f4897a5322b5b18976f5f036c35a4e2780a7ac47e90d4231821a4ea07e0",
+      "outputSha256": "094afbf2ae0127471701f067a238e180cae79c61d283da5011f5763b332b05b5",
+      "sourceBytes": 3313512,
+      "outputBytes": 521496,
+      "gzipBytes": 517497,
+      "brotliBytes": 516377,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1500,
+        "renderedTriangles": 1500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan tropical-anthurium-01": 1500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.7176364064216614,
+            0.00030010403133928776,
+            -0.9147362112998962
+          ],
+          "max": [
+            0.7180559635162354,
+            0.7994911074638367,
+            0.913902759552002
+          ]
+        },
+        "bufferBytes": 3311600,
+        "logicalAccessorBytes": 80136,
+        "logicalVertexBytes": 71136,
+        "logicalIndexBytes": 9000,
+        "geometryBufferBytes": 80136,
+        "imageBufferBytes": 3231458,
+        "nodeNames": [
+          "tropical-anthurium-01",
+          "tropical-anthurium-01-mesh"
+        ],
+        "materialNames": [
+          "Scan tropical-anthurium-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1500,
+        "renderedTriangles": 1500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan tropical-anthurium-01": 1500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.717651367,
+            0.000300109386,
+            -0.914733887
+          ],
+          "max": [
+            0.718048096,
+            0.799499512,
+            0.913909912
+          ]
+        },
+        "bufferBytes": 562688,
+        "logicalAccessorBytes": 43040,
+        "logicalVertexBytes": 34040,
+        "logicalIndexBytes": 9000,
+        "geometryBufferBytes": 44520,
+        "imageBufferBytes": 499678,
+        "nodeNames": [
+          "tropical-anthurium-01",
+          "tropical-anthurium-01-mesh"
+        ],
+        "materialNames": [
+          "Scan tropical-anthurium-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 1480,
+        "triangles": 1500
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1500
+        },
+        "data": {
+          "json": 3183,
+          "binary": 518168,
+          "buffers": {
+            "vertex": 16855,
+            "index": 1624,
+            "animation": 0,
+            "transform": 0,
+            "image": 499678
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-stump-01.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-stump-01.glb",
+      "output": "public/assets/ground/scans/forest-stump-01.glb",
+      "profile": "standardScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "color,attrib",
+        "-tu",
+        "normal"
+      ],
+      "cacheKey": "27771b0d056382bdec47fd9ea9f15d020e3d873ff5ec53d31d98347c6420aae8",
+      "sourceSha256": "f8a7b5caf400a8e3c2dcdfad05e0207338b93ca201ca9d4c1e27415b82cc7a08",
+      "outputSha256": "388d4e518dceac76a3a02acec373dfcba589ea1dcde8e5946d053411c5837b0c",
+      "sourceBytes": 5096160,
+      "outputBytes": 446924,
+      "gzipBytes": 442068,
+      "brotliBytes": 441110,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2500,
+        "renderedTriangles": 2500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-stump-01": 2500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.8264285922050476,
+            0.005585907492786646,
+            -0.8557747006416321
+          ],
+          "max": [
+            0.822310745716095,
+            0.6969043612480164,
+            0.8525688648223877
+          ]
+        },
+        "bufferBytes": 5094320,
+        "logicalAccessorBytes": 112680,
+        "logicalVertexBytes": 97680,
+        "logicalIndexBytes": 15000,
+        "geometryBufferBytes": 112680,
+        "imageBufferBytes": 4981640,
+        "nodeNames": [
+          "forest-stump-01",
+          "forest-stump-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-stump-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2500,
+        "renderedTriangles": 2500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-stump-01": 2500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.826416016,
+            0.00558590889,
+            -0.855773926
+          ],
+          "max": [
+            0.822296143,
+            0.696899414,
+            0.85256958
+          ]
+        },
+        "bufferBytes": 507484,
+        "logicalAccessorBytes": 61805,
+        "logicalVertexBytes": 46805,
+        "logicalIndexBytes": 15000,
+        "geometryBufferBytes": 63840,
+        "imageBufferBytes": 416937,
+        "nodeNames": [
+          "forest-stump-01",
+          "forest-stump-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-stump-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 2035,
+        "triangles": 2500
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 2500
+        },
+        "data": {
+          "json": 3137,
+          "binary": 443644,
+          "buffers": {
+            "vertex": 23889,
+            "index": 2807,
+            "animation": 0,
+            "transform": 0,
+            "image": 416937
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-deadfall-02.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-deadfall-02.glb",
+      "output": "public/assets/ground/scans/forest-deadfall-02.glb",
+      "profile": "standardScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "color,attrib",
+        "-tu",
+        "normal"
+      ],
+      "cacheKey": "dcfe68e983140a57a10192eb0f1f577134f39422f4a5c7be4ac7922af9268124",
+      "sourceSha256": "03d5da37c16e637e32ac4499c2cf4346c89c70d33397a583548a3cb0e995abb7",
+      "outputSha256": "9d511d4715f769ae6f7e52ac23590b0c8a646bd7493fff6455355a60aa23e13f",
+      "sourceBytes": 4963056,
+      "outputBytes": 438272,
+      "gzipBytes": 434085,
+      "brotliBytes": 433348,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1999,
+        "renderedTriangles": 1999,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-deadfall-02": 1999
+        },
+        "sceneBounds": {
+          "min": [
+            -0.5400794148445129,
+            0.0012255996698513627,
+            -0.6643927097320557
+          ],
+          "max": [
+            0.54234379529953,
+            0.3502648174762726,
+            0.6654159426689148
+          ]
+        },
+        "bufferBytes": 4961200,
+        "logicalAccessorBytes": 100938,
+        "logicalVertexBytes": 88944,
+        "logicalIndexBytes": 11994,
+        "geometryBufferBytes": 100938,
+        "imageBufferBytes": 4860257,
+        "nodeNames": [
+          "forest-deadfall-02",
+          "forest-deadfall-02-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-deadfall-02"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 1999,
+        "renderedTriangles": 1999,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-deadfall-02": 1999
+        },
+        "sceneBounds": {
+          "min": [
+            -0.54006958,
+            0.00122559071,
+            -0.664398193
+          ],
+          "max": [
+            0.542358398,
+            0.350265503,
+            0.665405273
+          ]
+        },
+        "bufferBytes": 491448,
+        "logicalAccessorBytes": 54613,
+        "logicalVertexBytes": 42619,
+        "logicalIndexBytes": 11994,
+        "geometryBufferBytes": 56466,
+        "imageBufferBytes": 411480,
+        "nodeNames": [
+          "forest-deadfall-02",
+          "forest-deadfall-02-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-deadfall-02"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 1853,
+        "triangles": 1999
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 1999
+        },
+        "data": {
+          "json": 3147,
+          "binary": 434980,
+          "buffers": {
+            "vertex": 21232,
+            "index": 2260,
+            "animation": 0,
+            "transform": 0,
+            "image": 411480
+          }
+        }
+      }
+    },
+    {
+      "scene": "/assets/ground/scans/forest-roots-01.glb",
+      "source": "assets/runtime-sources/ground/scans/forest-roots-01.glb",
+      "output": "public/assets/ground/scans/forest-roots-01.glb",
+      "profile": "standardScatter",
+      "optimizerArgs": [
+        "-cc",
+        "-kn",
+        "-km",
+        "-ke",
+        "-vpf",
+        "-tq",
+        "8",
+        "-tl",
+        "color,normal",
+        "512",
+        "-tl",
+        "attrib",
+        "512",
+        "-tj",
+        "1",
+        "-tc",
+        "color,attrib",
+        "-tu",
+        "normal"
+      ],
+      "cacheKey": "14bbeef5c28ffe9c9e2a0b133e0065af7b3e9c2e7ebe3ac0b2b8f8247334dfa9",
+      "sourceSha256": "579aba6dfd92a321c43a019159bb34100da90ac0cb85d52f62019ce8d635549c",
+      "outputSha256": "a663bce143463a3e82b91a1a682abb484c36c41679f15e46cd6cc6f2c771e5e4",
+      "sourceBytes": 5198332,
+      "outputBytes": 439820,
+      "gzipBytes": 435332,
+      "brotliBytes": 434440,
+      "sourceStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2500,
+        "renderedTriangles": 2500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-roots-01": 2500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.620732307434082,
+            0.0018791371257975698,
+            -0.3602275252342224
+          ],
+          "max": [
+            0.6205270290374756,
+            0.44914230704307556,
+            0.35859981179237366
+          ]
+        },
+        "bufferBytes": 5196488,
+        "logicalAccessorBytes": 103512,
+        "logicalVertexBytes": 88512,
+        "logicalIndexBytes": 15000,
+        "geometryBufferBytes": 103512,
+        "imageBufferBytes": 5092970,
+        "nodeNames": [
+          "forest-roots-01",
+          "forest-roots-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-roots-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [],
+        "extensionsRequired": []
+      },
+      "outputStats": {
+        "scenes": 2,
+        "nodes": 2,
+        "meshes": 1,
+        "materials": 1,
+        "textures": 2,
+        "images": 2,
+        "skins": 0,
+        "animations": 0,
+        "triangles": 2500,
+        "renderedTriangles": 2500,
+        "drawParts": 1,
+        "materialTriangleCounts": {
+          "Scan forest-roots-01": 2500
+        },
+        "sceneBounds": {
+          "min": [
+            -0.620727539,
+            0.00187915564,
+            -0.360229492
+          ],
+          "max": [
+            0.620513916,
+            0.449142456,
+            0.358596802
+          ]
+        },
+        "bufferBytes": 495748,
+        "logicalAccessorBytes": 57366,
+        "logicalVertexBytes": 42366,
+        "logicalIndexBytes": 15000,
+        "geometryBufferBytes": 59208,
+        "imageBufferBytes": 412611,
+        "nodeNames": [
+          "forest-roots-01",
+          "forest-roots-01-mesh"
+        ],
+        "materialNames": [
+          "Scan forest-roots-01"
+        ],
+        "animationNames": [],
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu",
+          "KHR_texture_transform"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "KHR_mesh_quantization",
+          "KHR_texture_basisu"
+        ]
+      },
+      "officialValidation": {
+        "validatorVersion": "2.0.0-dev.3.10",
+        "errors": 0,
+        "warnings": 0,
+        "knownKtx2Limitations": 4,
+        "inheritedWarnings": 0,
+        "inheritedWarningCodes": [],
+        "infos": 4,
+        "hints": 0,
+        "drawCalls": 1,
+        "vertices": 1842,
+        "triangles": 2500
+      },
+      "report": {
+        "generator": "gltfpack 1.2",
+        "scene": {
+          "nodeCount": 2,
+          "meshCount": 1,
+          "materialCount": 1,
+          "textureCount": 2,
+          "animationCount": 0
+        },
+        "render": {
+          "drawCount": 1,
+          "instanceCount": 1,
+          "triangleCount": 2500
+        },
+        "data": {
+          "json": 3136,
+          "binary": 436540,
+          "buffers": {
+            "vertex": 21069,
+            "index": 2849,
+            "animation": 0,
+            "transform": 0,
+            "image": 412611
           }
         }
       }
@@ -13590,178 +15450,6 @@
             "animation": 0,
             "transform": 0,
             "image": 40955
-          }
-        }
-      }
-    },
-    {
-      "scene": "/assets/ground/boreal/taiga-deadfall-01.glb",
-      "source": "assets/runtime-sources/ground/boreal/taiga-deadfall-01.glb",
-      "output": "public/assets/ground/boreal/taiga-deadfall-01.glb",
-      "profile": "standardScatter",
-      "optimizerArgs": [
-        "-cc",
-        "-kn",
-        "-km",
-        "-ke",
-        "-vpf",
-        "-tq",
-        "8",
-        "-tl",
-        "color,normal",
-        "512",
-        "-tl",
-        "attrib",
-        "512",
-        "-tj",
-        "1",
-        "-tc",
-        "color,attrib",
-        "-tu",
-        "normal"
-      ],
-      "cacheKey": "dbb310dfb76576b917e5f00556ead13fdac6c8fd71ace2ae994151cad74580ec",
-      "sourceSha256": "9b858c7bd84da5d3f3e5b8e3769282b46a19016f19092c6526999fc3aef3a99c",
-      "outputSha256": "03c3936c5a2b8f1ae9573d219cf6ccb9e2ecca6b1a0b53df15fbbe7120d5358e",
-      "sourceBytes": 72780,
-      "outputBytes": 18412,
-      "gzipBytes": 15832,
-      "brotliBytes": 15432,
-      "sourceStats": {
-        "scenes": 1,
-        "nodes": 2,
-        "meshes": 1,
-        "materials": 1,
-        "textures": 2,
-        "images": 2,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 182,
-        "renderedTriangles": 182,
-        "drawParts": 1,
-        "materialTriangleCounts": {
-          "TaigaDeadfall": 182
-        },
-        "sceneBounds": {
-          "min": [
-            -0.7799072861671448,
-            -0.04456896707415581,
-            -0.5971465110778809
-          ],
-          "max": [
-            0.7978556752204895,
-            0.6324981451034546,
-            0.4359876215457916
-          ]
-        },
-        "bufferBytes": 71104,
-        "logicalAccessorBytes": 5668,
-        "logicalVertexBytes": 4576,
-        "logicalIndexBytes": 1092,
-        "geometryBufferBytes": 5668,
-        "imageBufferBytes": 65434,
-        "nodeNames": [
-          "taiga-deadfall-01",
-          "taiga-deadfall-01-mesh"
-        ],
-        "materialNames": [
-          "TaigaDeadfall"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [],
-        "extensionsRequired": []
-      },
-      "outputStats": {
-        "scenes": 1,
-        "nodes": 2,
-        "meshes": 1,
-        "materials": 1,
-        "textures": 2,
-        "images": 2,
-        "skins": 0,
-        "animations": 0,
-        "triangles": 182,
-        "renderedTriangles": 182,
-        "drawParts": 1,
-        "materialTriangleCounts": {
-          "TaigaDeadfall": 182
-        },
-        "sceneBounds": {
-          "min": [
-            -0.779907227,
-            -0.0445690155,
-            -0.597137451
-          ],
-          "max": [
-            0.797851562,
-            0.632507324,
-            0.43598938
-          ]
-        },
-        "bufferBytes": 19476,
-        "logicalAccessorBytes": 3809,
-        "logicalVertexBytes": 2717,
-        "logicalIndexBytes": 1092,
-        "geometryBufferBytes": 3952,
-        "imageBufferBytes": 13597,
-        "nodeNames": [
-          "taiga-deadfall-01",
-          "taiga-deadfall-01-mesh"
-        ],
-        "materialNames": [
-          "TaigaDeadfall"
-        ],
-        "animationNames": [],
-        "extensionsUsed": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu",
-          "KHR_texture_transform"
-        ],
-        "extensionsRequired": [
-          "EXT_meshopt_compression",
-          "KHR_mesh_quantization",
-          "KHR_texture_basisu"
-        ]
-      },
-      "officialValidation": {
-        "validatorVersion": "2.0.0-dev.3.10",
-        "errors": 0,
-        "warnings": 0,
-        "knownKtx2Limitations": 4,
-        "inheritedWarnings": 1,
-        "inheritedWarningCodes": [
-          "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE"
-        ],
-        "infos": 4,
-        "hints": 0,
-        "drawCalls": 1,
-        "vertices": 143,
-        "triangles": 182
-      },
-      "report": {
-        "generator": "gltfpack 1.2",
-        "scene": {
-          "nodeCount": 2,
-          "meshCount": 1,
-          "materialCount": 1,
-          "textureCount": 2,
-          "animationCount": 0
-        },
-        "render": {
-          "drawCount": 1,
-          "instanceCount": 1,
-          "triangleCount": 182
-        },
-        "data": {
-          "json": 2744,
-          "binary": 15524,
-          "buffers": {
-            "vertex": 1699,
-            "index": 217,
-            "animation": 0,
-            "transform": 0,
-            "image": 13597
           }
         }
       }
@@ -22018,15 +23706,15 @@
     }
   ],
   "totals": {
-    "sourceBytes": 69883676,
-    "outputBytes": 28480520,
-    "gzipBytes": 26583109,
-    "brotliBytes": 26497287,
-    "logicalSourceVertexBytes": 32107288,
-    "logicalOutputVertexBytes": 16132206,
-    "logicalSourceIndexBytes": 4391718,
-    "logicalOutputIndexBytes": 4165854,
-    "savedBytes": 41403156,
-    "reductionRatio": 0.592458
+    "sourceBytes": 114743296,
+    "outputBytes": 34440704,
+    "gzipBytes": 32440671,
+    "brotliBytes": 32346179,
+    "logicalSourceVertexBytes": 33906280,
+    "logicalOutputVertexBytes": 16993246,
+    "logicalSourceIndexBytes": 4550898,
+    "logicalOutputIndexBytes": 4325256,
+    "savedBytes": 80302592,
+    "reductionRatio": 0.699846
   }
 }

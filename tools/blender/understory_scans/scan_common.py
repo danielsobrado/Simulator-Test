@@ -43,6 +43,8 @@ def import_scan(gltf_path):
     obj = bpy.context.view_layer.objects.active
     for layer in list(obj.data.uv_layers)[1:]:
         obj.data.uv_layers.remove(layer)
+    for attr in list(obj.data.color_attributes):  # periwinkle ships COLOR_0/COLOR_1; the exporter emits a discontinuous set
+        obj.data.color_attributes.remove(attr)
     return obj
 
 
@@ -53,11 +55,12 @@ def coords(mesh):
 
 
 def normalise(obj, height):
-    """Lowest point at z = 0, xy centred, uniform scale to `height` (units vary per scan)."""
+    """Lowest point at z = 0, xy centred, uniform scale to `height`; no height keeps the scan's own (metric) size."""
     co = coords(obj.data)
     lo, hi = co.min(0), co.max(0)
     co -= np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]], np.float32)
-    co *= height / (hi[2] - lo[2])
+    if height:
+        co *= height / (hi[2] - lo[2])
     obj.data.vertices.foreach_set('co', co.ravel())
     obj.data.update()
     return co.min(0), co.max(0)
