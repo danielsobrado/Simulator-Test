@@ -36,8 +36,15 @@ const result = await page.evaluate(async () => {
   const tree=window.__editor.stylizedSurface.treeView;
   const records=[...(tree.manifestStore?.cache.values()??[])].flatMap(entry=>entry.placements??[]);
   const residentPrototypeIndices=[...new Set(records.map(record=>tree.resolvePalettePrototypeIndex(record)))].sort((a,b)=>a-b);
+  const byTileId={};
+  for(const record of records) {
+    const tile=tree.tileIdAt(record.x,record.z),index=tree.resolvePalettePrototypeIndex(record);
+    const entry=byTileId[tile]??={records:0,prototypeIndices:[]};entry.records++;
+    if(!entry.prototypeIndices.includes(index))entry.prototypeIndices.push(index);
+  }
+  for(const entry of Object.values(byTileId))entry.prototypeIndices.sort((a,b)=>a-b);
   const trees={prototypeCount:tree.prototypes.length,residentRecords:records.length,residentPrototypeIndices,
-    byAsset:Object.fromEntries(tree.prototypeIndicesByAsset),impostors:tree.impostorAtlases.length};
+    byTileId,byAsset:Object.fromEntries(tree.prototypeIndicesByAsset),impostors:tree.impostorAtlases.length};
   return { frames, mode: window.__editor.viewModeController.mode, status: window.__perfQa.status, info: { ...r.info.render }, trees, byPass, rows };
 });
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
