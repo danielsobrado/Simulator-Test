@@ -20,6 +20,7 @@
     "prepare:construction-textures": "node scripts/prepare-construction-textures.mjs",
     "fetch:settlement-textures": "node scripts/fetch-settlement-textures.mjs",
     "fetch:tree-sources": "node scripts/fetch-polyhaven-sources.mjs --config scripts/tree-sources.config.mjs",
+    "build:understory-scans": "node -e \"import('./scripts/understory-sources.config.mjs').then(m=>{const fs=require('fs');fs.mkdirSync('tmp/understory',{recursive:true});fs.writeFileSync('tmp/understory/sources.json',JSON.stringify(m.assets))})\" && \"F:\\Blender 5.2\\blender.exe\" -b --factory-startup --python tools/blender/understory_scans/build_understory_scans.py -- --config tmp/understory/sources.json",
     "fetch:understory-sources": "node scripts/fetch-polyhaven-sources.mjs --config scripts/understory-sources.config.mjs",
     "build:bark-scans": "node scripts/build-bark-scans.mjs",
     "generate:settlement-doors": "node scripts/generate-settlement-doors.mjs",

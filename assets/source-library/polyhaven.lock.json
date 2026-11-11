@@ -468,6 +468,18 @@
     },
     {
       "id": "pine_sapling_small",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/pine_sapling_small/pine_sapling_small_twig_alpha_2k.png",
+      "md5": "90189603eb9fb879a097d726cfff43e1",
+      "size": 334535,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
       "map": "gltf",
       "path": "assets/source-cache/polyhaven/pine_sapling_small/pine_sapling_small_2k.gltf",
       "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/pine_sapling_small/pine_sapling_small_2k.gltf",

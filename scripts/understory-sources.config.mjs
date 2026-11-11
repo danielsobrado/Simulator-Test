@@ -19,7 +19,7 @@ export const assets = [
   scan('weed_plant_02', 'meadow-weed-02', 'ground', 'herb', 700, 0.55),
   scan('calathea_orbifolia_01', 'tropical-calathea-01', 'ground', 'herb', 1200, 0.7),
   scan('anthurium_botany_01', 'tropical-anthurium-01', 'ground', 'herb', 900, 0.8),
-  scan('moss_01', 'forest-moss-01', 'ground', 'floor', 400, 0.12, false),
+  scan('moss_01', 'forest-moss-01', 'ground', 'floor', 400, 0.12),
   scan('tree_stump_01', 'forest-stump-01', 'ground', 'wood', 800, 0.7, false),
   scan('dry_branches_medium_01', 'forest-deadfall-02', 'ground', 'wood', 700, 0.35, false),
   scan('root_cluster_01', 'forest-roots-01', 'ground', 'wood', 800, 0.45, false),

@@ -52,7 +52,8 @@ function modelEntries(id, files, resolution, authors) {
     entry('gltf', `${id}_${resolution}.gltf`, gltf),
     ...Object.entries(gltf.include ?? {}).map(([relative, file]) => entry(relative, relative, file)),
   ];
-  const alpha = files.Alpha?.[resolution];
+  const alphaKey = Object.keys(files).find((k) => /^(\w+_)?alpha$/i.test(k)); // pine_sapling_small names it twig_alpha
+  const alpha = alphaKey ? files[alphaKey][resolution] : undefined;
   const format = alpha?.png ? 'png' : 'jpg';
   if (alpha?.[format]) entries.push(entry('alpha', `textures/${id}_alpha_${resolution}.${format}`, alpha[format]));
   return entries;

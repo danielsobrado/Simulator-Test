@@ -291,7 +291,7 @@ def finish_mesh(name, bm, materials):
     return mesh, tris
 
 
-def place_and_export(name, mesh, out_path):
+def place_and_export(name, mesh, out_path, tangents=False):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     root = bpy.data.objects.new(name, None)
     bpy.context.scene.collection.objects.link(root)
@@ -308,5 +308,81 @@ def place_and_export(name, mesh, out_path):
         use_selection=True,
         export_apply=True,
         export_yup=True,
+        export_tangents=tangents,
     )
     return root
+
+
+def render_preview(root, path, distance, look_z=0.35):
+    scene = bpy.context.scene
+    for o in scene.objects:
+        o.hide_render = not (o == root or o.parent == root or o.type in {'CAMERA', 'LIGHT'} or o.name == 'Ground')
+    cam = scene.camera
+    cam.location = Vector((distance, -distance, distance * 0.62))
+    cam.rotation_euler = (Vector((0, 0, look_z)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+
+
+def save_contact_sheet(preview_paths, out_path, cols=5):
+    """Assemble rendered previews into a single contact sheet PNG."""
+    imgs = []
+    for p in preview_paths:
+        if os.path.exists(p):
+            img = bpy.data.images.load(p)
+            w, h = img.size
+            arr = np.array(img.pixels[:], dtype=np.float32).reshape((h, w, 4))
+            imgs.append(np.flipud(arr))
+            bpy.data.images.remove(img)
+    if not imgs:
+        return
+    h, w, _ = imgs[0].shape
+    rows = math.ceil(len(imgs) / cols)
+    sheet = np.zeros((rows * h, cols * w, 4), dtype=np.float32)
+    sheet[:, :, 3] = 1.0
+    for idx, arr in enumerate(imgs):
+        r, c = divmod(idx, cols)
+        sheet[r * h:(r + 1) * h, c * w:(c + 1) * w] = arr
+    save_image('understory_contact_sheet', sheet, out_path)
+
+
+def setup_scene():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    try:
+        scene.render.engine = 'BLENDER_EEVEE_NEXT'
+    except TypeError:
+        scene.render.engine = 'BLENDER_EEVEE'
+    scene.render.resolution_x, scene.render.resolution_y = 480, 360
+    world = bpy.data.worlds.new('World')
+    scene.world = world
+    world.use_nodes = True
+    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.36, 0.42, 0.46, 1.0)
+
+    sun = bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN'))
+    sun.data.energy = 3.4
+    sun.rotation_euler = (0.72, 0.22, 0.62)
+    scene.collection.objects.link(sun)
+
+    fill = bpy.data.objects.new('Fill', bpy.data.lights.new('Fill', 'SUN'))
+    fill.data.energy = 1.1
+    fill.rotation_euler = (0.95, -0.45, -2.1)
+    scene.collection.objects.link(fill)
+
+    cam = bpy.data.objects.new('Camera', bpy.data.cameras.new('Camera'))
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+
+    ground = bpy.data.meshes.new('ground')
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=12)
+    bm.to_mesh(ground)
+    bm.free()
+    g = bpy.data.objects.new('Ground', ground)
+    gm = bpy.data.materials.new('ground_mat')
+    gm.use_nodes = True
+    bsdf = next(n for n in gm.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    bsdf.inputs['Base Color'].default_value = (0.09, 0.085, 0.075, 1.0)
+    bsdf.inputs['Roughness'].default_value = 0.92
+    ground.materials.append(gm)
+    scene.collection.objects.link(g)
