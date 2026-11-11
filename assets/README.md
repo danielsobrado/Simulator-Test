@@ -144,7 +144,7 @@ tree pool invalidates the impostor atlases: rebake with `npm run bake:impostors`
 
 ## Poly Haven understory scans
 
-The ground-detail plants and shrubs are decimated from fifteen Poly Haven photoscans
+The ground-detail plants and shrubs are decimated from thirty-three Poly Haven photoscans
 (CC0 1.0), planned in `docs/plans/understory-aaa-plan-2026-11-10.md`. The 2k glTF
 sets download into the git-ignored `assets/source-cache/polyhaven/`;
 `assets/source-library/polyhaven.lock.json` pins every URL and checksum.
@@ -166,6 +166,24 @@ sets download into the git-ignored `assets/source-cache/polyhaven/`;
 | [`tree_stump_01`](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel |
 | [`weed_plant_02`](https://polyhaven.com/a/weed_plant_02) | Rico Cilliers, Rob Tuytel |
 | [`wild_rooibos_bush`](https://polyhaven.com/a/wild_rooibos_bush) | James Ray Cock, Jenelle van Heerden |
+| [`celandine_01`](https://polyhaven.com/a/celandine_01) | Rico Cilliers, Rob Tuytel |
+| [`cheiridopsis_succulent`](https://polyhaven.com/a/cheiridopsis_succulent) | James Ray Cock, Jenelle van Heerden |
+| [`crystalline_iceplant`](https://polyhaven.com/a/crystalline_iceplant) | James Ray Cock, Jenelle van Heerden |
+| [`dandelion_01`](https://polyhaven.com/a/dandelion_01) | Rico Cilliers, Rob Tuytel |
+| [`dead_quiver_branch_01`](https://polyhaven.com/a/dead_quiver_branch_01) | Greg Zaal, Jenelle van Heerden |
+| [`dead_quiver_trunk`](https://polyhaven.com/a/dead_quiver_trunk) | Dario Barresi, James Ray Cock, Rico Cilliers |
+| [`dead_tree_trunk`](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel |
+| [`dead_tree_trunk_02`](https://polyhaven.com/a/dead_tree_trunk_02) | Jenelle van Heerden, Rico Cilliers |
+| [`didelta_spinosa`](https://polyhaven.com/a/didelta_spinosa) | Jenelle van Heerden |
+| [`flower_empodium`](https://polyhaven.com/a/flower_empodium) | Jenelle van Heerden, Rico Cilliers |
+| [`flower_gazania`](https://polyhaven.com/a/flower_gazania) | James Ray Cock, Jenelle van Heerden |
+| [`flower_ursinia`](https://polyhaven.com/a/flower_ursinia) | Jenelle van Heerden, Rico Cilliers |
+| [`pachira_aquatica_01`](https://polyhaven.com/a/pachira_aquatica_01) | Rico Cilliers, Rob Tuytel |
+| [`pine_roots`](https://polyhaven.com/a/pine_roots) | Rob Tuytel |
+| [`shrub_01`](https://polyhaven.com/a/shrub_01) | Rico Cilliers |
+| [`shrub_04`](https://polyhaven.com/a/shrub_04) | Rico Cilliers |
+| [`single_root`](https://polyhaven.com/a/single_root) | Jenelle van Heerden |
+| [`tree_stump_02`](https://polyhaven.com/a/tree_stump_02) | Rob Tuytel |
 
 ```bash
 npm run fetch:understory-sources
