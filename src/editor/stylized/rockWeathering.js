@@ -11,6 +11,7 @@ import {
   positionGeometry,
   positionWorld,
   sin,
+  varying,
   vec3,
 } from 'three/tsl';
 import { stylizedFbm2 } from './StylizedNoiseNodes.js';
@@ -70,6 +71,8 @@ const FROST_STONE = 0.85;
 const FROST_SHADING = 2.2;
 /** Snow on a face tipping away from the sky: a cooler, deeper white. */
 const ROCK_SNOW_SHADE = '#c3cfdc';
+/** Soil-line noise frequency: a few lobes round a metre-scale boulder. */
+const SOIL_EDGE_PER_METRE = 1.1;
 
 export const DEFAULT_ROCK_WEATHERING = Object.freeze({
   enabled: true,
@@ -85,6 +88,12 @@ export const DEFAULT_ROCK_WEATHERING = Object.freeze({
   /** Green in the upper half of the splash band, where a tide mark grows. */
   algae: 0.45,
   algaeColor: ALGAE,
+  /** Ground duff carried up the stone's foot; 0 leaves the foot bare. */
+  soil: 0.7,
+  /** How far up it reaches, as a share of the stone's height above the ground line. */
+  soilHeight: 0.16,
+  // The linear value of terrainMaterial's contact-shade earth, so foot and floor agree.
+  soilColor: '#7b653d',
 });
 
 /**
@@ -93,14 +102,16 @@ export const DEFAULT_ROCK_WEATHERING = Object.freeze({
 export function resolveRockWeathering(configured) {
   if (configured?.enabled === false) return null;
   const settings = { ...DEFAULT_ROCK_WEATHERING, ...(configured ?? {}) };
-  for (const key of ['toning', 'moss', 'dust', 'waterline', 'algae', 'undersideShade']) {
+  for (const key of ['toning', 'moss', 'dust', 'waterline', 'algae', 'undersideShade', 'soil']) {
     const value = Number(settings[key]);
     if (!Number.isFinite(value) || value < 0 || value > 1) {
       throw new Error(`Invalid editor configuration: rocks.weathering.${key} must be within [0, 1].`);
     }
   }
-  if (!(Number(settings.waterlineHeight) > 0)) {
-    throw new Error('Invalid editor configuration: rocks.weathering.waterlineHeight must be positive.');
+  for (const key of ['waterlineHeight', 'soilHeight']) {
+    if (!(Number(settings[key]) > 0)) {
+      throw new Error(`Invalid editor configuration: rocks.weathering.${key} must be positive.`);
+    }
   }
   return settings;
 }
@@ -168,6 +179,23 @@ export function applyRockWeathering(material, { settings, seaLevel = null, local
     .mul(patches.oneMinus())
     .mul(settings.dust);
   weathered = mix(weathered, color(DUST).mul(shade), dust);
+
+  // The floor's duff carried up the foot. The terrain paints the same duff under a
+  // stone (terrainMaterial's contact shade), so the two meet in one colour and
+  // the stone grows out of the ground. No scene depth: a `viewportDepthTexture`
+  // blend would cost a whole-frame copy (CLAUDE.md), and the ground line is known.
+  if (ground && settings.soil > 0) {
+    const level = varying(positionGeometry.y.sub(ground.groundY).div(Math.max(1e-3, ground.height)));
+    const top = stylizedFbm2(pattern.xz.mul(SOIL_EDGE_PER_METRE)).mul(0.7).add(0.3).max(0.15).mul(settings.soilHeight);
+    const soil = level.smoothstep(top.mul(0.35), top).oneMinus().mul(settings.soil);
+    // The terrain's own duff recipe: half the surface dulled and darkened, half earth.
+    const dull = mix(vec3(dot(weathered, vec3(0.3, 0.59, 0.11))), weathered, 0.5).mul(vec3(1, 0.94, 0.76));
+    // shortcut: earth leans to the biome through the rock tint, not the tile's soil colour;
+    // upgrade to a per-instance soil colour if a biome's foot reads off against its ground.
+    const earth = color(settings.soilColor).mul(look ? look.rgb : vec3(1));
+    weathered = mix(weathered, mix(dull.mul(0.45), earth, 0.5), soil);
+    roughness = roughness.max(soil.mul(0.95));
+  }
 
   // Wet, dark and glossy up to a ragged local splash line, with the green
   // that grows just above it. The donor darkens the band; the tint is the half of

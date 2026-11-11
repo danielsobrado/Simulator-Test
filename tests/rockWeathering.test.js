@@ -48,6 +48,20 @@ test('an out-of-range strength fails loudly rather than washing the rocks out', 
   assert.throws(() => resolveRockWeathering({ toning: -0.1 }), /must be within \[0, 1\]/);
   assert.throws(() => resolveRockWeathering({ undersideShade: 1.1 }), /must be within \[0, 1\]/);
   assert.throws(() => resolveRockWeathering({ waterlineHeight: 0 }), /must be positive/);
+  assert.throws(() => resolveRockWeathering({ soil: 1.5 }), /must be within \[0, 1\]/);
+  assert.throws(() => resolveRockWeathering({ soilHeight: 0 }), /must be positive/);
+});
+
+test('the soil foot assembles with a ground line, and switches off', () => {
+  for (const soil of [0, 0.7]) {
+    const material = rockMaterial();
+    applyRockWeathering(material, {
+      settings: resolveRockWeathering({ ...shippedRocks().weathering, soil }),
+      ground: { groundY: 0.1, height: 1.2, centre: [0, 0.5, 0] },
+    });
+    assert.ok(material.colorNode, `soil ${soil} should assemble`);
+    material.dispose();
+  }
 });
 
 test('the waterline carries algae, and can be switched off on its own', () => {

@@ -2141,6 +2141,12 @@ stylizedSurface:
       # the algae is what makes it read as a tide mark rather than as shadow.
       algae: 0.45
       algaeColor: '#4a5a2a'
+      # Ground duff carried up each stone's foot so it grows out of the floor:
+      # strength, reach as a share of the stone's height, and the earth colour
+      # (the terrain's contact-shade earth). `soil: 0` is the A/B control.
+      soil: 0.7
+      soilHeight: 0.16
+      soilColor: '#7b653d'
     # Compact high-density scree pockets with genuinely empty ground between.
     # The higher candidate budget supplies several stones to each small core;
     # it no longer spends that budget across dozens of diffuse singleton patches.
