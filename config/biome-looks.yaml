@@ -114,12 +114,16 @@ biomeLooks:
       # Dry-season thorn scrub, olive going to straw.
       understory: { tint: '#e6d6a0', tone: 1.05, saturation: 0.7 }
       prints: { ground: 0.4, lifetime: 90, tint: '#8a6a48' }
-    4: { name: grassland, canopy: '#86b04a', formations: 0.12 }
-    5: { name: tropical seasonal forest, canopy: '#6fae3e' }
-    6: { name: temperate deciduous forest, canopy: '#6da03c', formations: 0.08 }
+    # Soils for the green biomes (docs/look-bible.md, rule 2). Without one, bare
+    # ground between thin grass showed the Azgaar map colour: pale lime in
+    # grassland, neon green (#29bc56) in a temperate wood. Loam, laterite, leaf
+    # mould and peat, in the family of the forest floor's litter.
+    4: { name: grassland, canopy: '#86b04a', soil: '#6b5d3e', formations: 0.12 }
+    5: { name: tropical seasonal forest, canopy: '#6fae3e', soil: '#5d4a30' }
+    6: { name: temperate deciduous forest, canopy: '#6da03c', soil: '#4f4230', formations: 0.08 }
     # Canopy drip keeps rainforest pools stippled with rings.
-    7: { name: tropical rainforest, canopy: '#3f8f34', rock: { moss: 1.4 }, ripples: { drops: 6, fade: 2.2 } }
-    8: { name: temperate rainforest, canopy: '#4c9142', rock: { moss: 1.4 }, ripples: { drops: 4, fade: 2.4 } }
+    7: { name: tropical rainforest, canopy: '#3f8f34', soil: '#3d2f20', rock: { moss: 1.4 }, ripples: { drops: 6, fade: 2.2 } }
+    8: { name: temperate rainforest, canopy: '#4c9142', soil: '#3a3324', rock: { moss: 1.4 }, ripples: { drops: 4, fade: 2.4 } }
     # Boreal forest in its winter: peat and needle litter, snow only in the
     # hollows, along the tops of the crowns and as frost on the grass. Ground
     # snow at 0.3 lay as a thin grey film over the map colour, reading as bare

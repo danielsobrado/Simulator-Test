@@ -311,13 +311,22 @@ export function createTerrainMaterial({
   if (stylizedConfig.contactShade?.enabled !== false) {
     const dull = mix(vec3(dot(groundColor, vec3(0.3, 0.59, 0.11))), groundColor, 0.5)
       .mul(vec3(1, 0.94, 0.76));
-    const duff = mix(
-      dull.mul(0.45),
+    // Earth is one family per biome (docs/look-bible.md): half the duff's brown is
+    // the tile's own soil, so the floor under a tree matches the bare ground beside it.
+    const earth = mix(
       colorNode(pathPaintSettings?.color ?? '#b7a476').mul(vec3(0.42, 0.35, 0.26)),
+      tileColor.mul(0.6),
       0.5,
     );
-    groundColor = mix(groundColor, duff, smoothstep(0.02, 0.35, contactShade));
-    groundColor = groundColor.mul(oneMinus(smoothstep(0.1, 0.6, contactShade).mul(0.4)));
+    const duff = mix(dull.mul(0.45), earth, 0.5);
+    // A ragged edge, not a ruled disc: the ground's own variation and grain push
+    // the contact weight in and out before the ramps.
+    const contact = contactShade.mul(variation.mul(0.8).add(grain.mul(0.4)).add(1)).clamp(0, 1);
+    // Duff is a wood's floor. A lone meadow tree or boulder shades its grass and
+    // keeps most of it: from the air every tree stood on a brown disc.
+    const duffShare = mix(float(0.35), float(1), smoothstep(0.15, 0.6, forestFloor));
+    groundColor = mix(groundColor, duff, smoothstep(0.02, 0.35, contact).mul(duffShare));
+    groundColor = groundColor.mul(oneMinus(smoothstep(0.1, 0.6, contact).mul(0.4)));
   }
   groundColor = max(groundColor, vec3(0));
   const proceduralColor = groundColor.mul(heightShade);

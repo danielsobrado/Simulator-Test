@@ -1636,7 +1636,9 @@ stylizedSurface:
       # bottom/top pair suits the painted terrain and the clump system; the
       # meadow's lit blades need the paler, yellower field grass.
       palette:
-        base: '#5f8f34'
+        # The donor's '#5f8f34' was the most saturated colour in the frame: the
+        # 2026-11-10 forest capture's ground measured saturation 0.68 (look bible: 0.55).
+        base: '#62883c'
         tip: '#c4d27a'
         brightness: 1
         # Biomes the donor's single meadow never had: its lime field is the base,
