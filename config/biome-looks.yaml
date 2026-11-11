@@ -118,9 +118,25 @@ biomeLooks:
     # ground between thin grass showed the Azgaar map colour: pale lime in
     # grassland, neon green (#29bc56) in a temperate wood. Loam, laterite, leaf
     # mould and peat, in the family of the forest floor's litter.
-    4: { name: grassland, canopy: '#86b04a', soil: '#6b5d3e', formations: 0.12 }
-    5: { name: tropical seasonal forest, canopy: '#6fae3e', soil: '#5d4a30' }
-    6: { name: temperate deciduous forest, canopy: '#6da03c', soil: '#4f4230', formations: 0.08 }
+    # Shared shrubs wear a wood's palette, which leans to the canopy's teal shade:
+    # in open grassland they read teal-grey against the sward. The understory tint
+    # is per instance, so a bush takes the look of the tile it stands on. Stones
+    # get a warm limestone grey in the open and a darker, cooler one under trees:
+    # untinted, the donor pack read pale and pasted on.
+    4:
+      name: grassland
+      canopy: '#86b04a'
+      soil: '#6b5d3e'
+      formations: 0.12
+      rock: { tint: '#cfc6b4', tone: 0.9 }
+      understory: { tint: '#e6e2b0', tone: 1.05, saturation: 0.9 }
+    5: { name: tropical seasonal forest, canopy: '#6fae3e', soil: '#5d4a30', rock: { tint: '#cdbfa6', tone: 0.9 } }
+    6:
+      name: temperate deciduous forest
+      canopy: '#6da03c'
+      soil: '#4f4230'
+      formations: 0.08
+      rock: { tint: '#c4bfb2', tone: 0.86 }
     # Canopy drip keeps rainforest pools stippled with rings.
     7: { name: tropical rainforest, canopy: '#3f8f34', soil: '#3d2f20', rock: { moss: 1.4 }, ripples: { drops: 6, fade: 2.2 } }
     8: { name: temperate rainforest, canopy: '#4c9142', soil: '#3a3324', rock: { moss: 1.4 }, ripples: { drops: 4, fade: 2.4 } }
@@ -137,6 +153,8 @@ biomeLooks:
       canopy: '#4a7a55'
       soil: '#3d3a2b'
       formations: 0.2
+      # Cold grey granite, between the wood's warm stone and the tundra's blue-grey.
+      rock: { tint: '#bcc0c2', tone: 0.9 }
       water: { tint: '#bccaca', desaturate: 0.35 }
       # Canopy 0.7 capped every crown white over green ground (2026-11-10 captures).
       snow: { ground: 0.1, canopy: 0.3, grass: 0.35, air: 0.4, fall: 0.15 }

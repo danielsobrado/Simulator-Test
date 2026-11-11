@@ -657,6 +657,7 @@ export class StylizedTreeView {
       capacity: nearCapacity,
       name: 'stylized-pine-near',
       castShadow: true,
+      castLeafShadow: this.config.enhancements?.crownShadows === true,
       tintLeaves: true,
     });
     this.proxyRenderers = createInstancedRenderers({

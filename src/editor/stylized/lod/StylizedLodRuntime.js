@@ -104,6 +104,9 @@ export function* iterateInstancedRenderers({
   capacity,
   name,
   castShadow,
+  // Crowns cast no shadow by default: only trunks do. A trial switch
+  // (render-enhancements `crownShadows`), unmeasured as of 2026-11-11.
+  castLeafShadow = false,
   tintLeaves = false,
   renderer = null,
   reuseVertexArrays = false,
@@ -156,7 +159,7 @@ export function* iterateInstancedRenderers({
       mesh.count = 0;
       mesh.visible = false;
       mesh.matrixAutoUpdate = false;
-      mesh.castShadow = Boolean(castShadow && part.kind !== 'leaf');
+      mesh.castShadow = Boolean(castShadow && (castLeafShadow || part.kind !== 'leaf'));
       mesh.receiveShadow = true;
       mesh.frustumCulled = true;
       mesh.name = `${name}-${prototypeIndex}-${partIndex}`;

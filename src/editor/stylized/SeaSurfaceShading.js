@@ -166,9 +166,11 @@ export function createSeaSurfaceNodes({
      */
     shoreLine() {
       // Starts just past the waterline fade (0.2 m), so the sheet does not thin it away.
+      // In calm weather it ends by 0.34 m of depth: out to 0.6 m a shallow beach
+      // drew it metres wide, and it read as a milky smear, not a line of foam.
       const band = smoothstep(0.06, 0.16, waterDepth)
-        .mul(oneMinus(smoothstep(0.3, storm.mul(0.5).add(0.6), waterDepth)));
-      return band.mul(smoothstep(0.3, 0.7, foamNoise)).mul(storm.mul(0.35).add(0.45)).mul(seaMask);
+        .mul(oneMinus(smoothstep(0.2, storm.mul(0.76).add(0.34), waterDepth)));
+      return band.mul(smoothstep(0.42, 0.72, foamNoise)).mul(storm.mul(0.35).add(0.45)).mul(seaMask);
     },
     /**
      * Light coming through a crest, after grass-test's crest transmission.

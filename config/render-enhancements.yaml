@@ -11,5 +11,8 @@ waterReflections:
   intervalMs: 500
   reachMeters: 96
 shadowCascades: 1
+# Trial (coherence-polish plan, stage 6): near tree crowns cast sun shadows, for
+# shade and dapple under a wood. Off until measured; A/B with ?crownShadows=1.
+crownShadows: false
 snowRelief: true
 roadsideLanterns: false
