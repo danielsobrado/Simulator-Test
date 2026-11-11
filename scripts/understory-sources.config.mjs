@@ -25,8 +25,10 @@ export const assets = [
   scan('periwinkle_plant', 'forest-periwinkle-01', 'ground', 'floor', 2400, 0.22, CLUMP),
   scan('nettle_plant', 'forest-nettle-01', 'ground', 'herb', 2000, 0.85, ONE),
   scan('weed_plant_02', 'meadow-weed-02', 'ground', 'herb', 1200, null, ONE),
-  scan('calathea_orbifolia_01', 'tropical-calathea-01', 'ground', 'herb', 1500, 0.7, ONE),
-  scan('anthurium_botany_01', 'tropical-anthurium-01', 'ground', 'herb', 1500, 0.8, ONE),
+  // Pot plants: the scan's soil mound showed as a green disc. Cropped at the next build;
+  // drop the `heightOffset` on their editor.config.yaml rows once the GLBs are rebuilt.
+  scan('calathea_orbifolia_01', 'tropical-calathea-01', 'ground', 'herb', 1500, 0.7, { ...ONE, groundCrop: 0.12 }),
+  scan('anthurium_botany_01', 'tropical-anthurium-01', 'ground', 'herb', 1500, 0.8, { ...ONE, groundCrop: 0.12 }),
   // The glTF is one 204-triangle tuft of cards (the dense mesh ships only as .blend). Built, not placed.
   scan('moss_01', 'forest-moss-01', 'ground', 'floor', 400, 0.12),
   scan('tree_stump_01', 'forest-stump-01', 'ground', 'wood', 2500, 0.7, { groundCrop: 0.3 }),

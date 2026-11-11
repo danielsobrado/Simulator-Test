@@ -1,5 +1,21 @@
 import { hash32 } from '../scatterMath.js';
 import { deriveForestPlacementMorphology } from './morphology/index.js';
+import { valueNoise } from '../../world/valueNoise2d.js';
+
+/** Metres across one grove or gap. */
+const GROVE_SCALE = 48;
+const GROVE_SEED = 0x67726f76;
+
+/**
+ * A slow field on the spacing radius, 0.55 in a grove to 1.3 in a gap, so a wood
+ * masses into stands and clearings instead of an even grid of crowns (coherence
+ * plan, stage 8). A placement without a position keeps its species' spacing.
+ */
+export function groveSpacingFactor(x, z) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 1;
+  const grove = valueNoise(x / GROVE_SCALE, z / GROVE_SCALE, GROVE_SEED) * 0.5 + 0.5;
+  return 0.55 + grove * 0.75;
+}
 
 const AGE_CLASSES = Object.freeze({
   sapling: Object.freeze({ height: 0.48, trunk: 0.58, crown: 0.55, spacing: 0.55 }),
@@ -270,7 +286,7 @@ export class ForestSpeciesRegistry {
       * morphology.rootFlare;
     const crownFlattening = morphology.crownFlattening * form.aspect;
     const crownAspect = species.crownAspect * crownFlattening;
-    const spacingRadius = species.spacing * age.spacing * crownScale;
+    const spacingRadius = species.spacing * age.spacing * crownScale * groveSpacingFactor(candidate.x, candidate.z);
     return Object.freeze({
       speciesId,
       prototypeIndex,

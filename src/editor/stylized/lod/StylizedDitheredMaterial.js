@@ -128,10 +128,13 @@ export function createDitheredMaterial(sourceMaterial, {
     morphologyPivot ?? { x: 0, y: morphologyPivotY, z: 0 },
   );
   // Canopy between the third-person camera and the player dithers open around
-  // the player's silhouette. Leaves only: they cast no shadow, so the shadow
-  // pass's fallback to maskNode never sees the view-space cut.
+  // the player's silhouette. Leaves only. The cut is measured from the view
+  // camera and means nothing in the shadow pass, so crowns that cast
+  // (`crownShadows`) get a shadow mask without it.
   if (kind === 'leaf') {
-    const keep = characterOcclusionKeep().and(attribute('instanceMorphology', 'vec3').y.greaterThan(0));
+    const alive = attribute('instanceMorphology', 'vec3').y.greaterThan(0);
+    const keep = characterOcclusionKeep().and(alive);
+    material.maskShadowNode = material.maskNode ? material.maskNode.and(alive) : alive;
     material.maskNode = material.maskNode ? material.maskNode.and(keep) : keep;
   }
   material.alphaTest = sourceOpacity

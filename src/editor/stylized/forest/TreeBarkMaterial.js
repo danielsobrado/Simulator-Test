@@ -72,7 +72,10 @@ function barkProjection(textures, scale, surface) {
     ? barkParallax(textures.albedoHeight, coord, 'a', surface.parallax) : { uv: coord, shadow: null });
   const cache = new Map();
   const samples = map => {
-    if (!cache.has(map)) cache.set(map, relief.map(item => texture(map, item.uv)));
+    // Gradients from the unshifted projection: the relief shift is a per-pixel
+    // loop result, and its screen derivatives are noise within each 2x2 quad.
+    if (!cache.has(map)) cache.set(map, relief.map((item, i) => texture(map, item.uv)
+      .grad(coordinates[i].dFdx(), coordinates[i].dFdy())));
     return cache.get(map);
   };
   const sample = map => {
@@ -81,7 +84,7 @@ function barkProjection(textures, scale, surface) {
   };
   const shadow = relief[0].shadow
     ? relief[0].shadow.mul(weights.x).add(relief[1].shadow.mul(weights.y)).add(relief[2].shadow.mul(weights.z)) : null;
-  return { sample, samples, shadow, relief, weights };
+  return { sample, samples, shadow, coordinates, weights };
 }
 
 export function createAuthoredTrunkMaterial({
@@ -115,7 +118,7 @@ export function createAuthoredTrunkMaterial({
     material = new (foliageMaterialClass(THREE.MeshStandardNodeMaterial))({ side: source?.side ?? THREE.FrontSide });
     material.colorNode = mix(colorNode(source?.color ?? '#6b4a30'), decodedAlbedo.mul(1.35), 0.72)
       .mul(albedoHeight.a.mul(0.45).add(0.68));
-    const samples = projection.samples(barkTextures.normalRoughness).map((packed, i) => barkPackedNormal(packed, projection.relief[i].uv));
+    const samples = projection.samples(barkTextures.normalRoughness).map((packed, i) => barkPackedNormal(packed, projection.coordinates[i]));
     const packedNormal = samples[0].mul(projection.weights.x).add(samples[1].mul(projection.weights.y)).add(samples[2].mul(projection.weights.z));
     material.normalNode = packedNormal.add(barkBumpNormal(albedoHeight.a.mul(0.025)).sub(normalViewGeometry)).normalize();
     material.treeSurfaceShadowNode = projection.shadow;
@@ -132,10 +135,13 @@ export function createStylizedTrunkMaterial({ textures, config, palette = null, 
   const surface = resolveTreeBarkSettings(config.trees);
   const reliefCoords = surface.enabled && surface.parallax.enabled
     ? barkParallax(textures.height, uv().mul(config.trees.barkScale), 'r', surface.parallax) : null;
-  const coords = reliefCoords?.uv ?? uv().mul(config.trees.barkScale);
-  const bark = texture(textures.color, coords).rgb;
-  const ao = texture(textures.ao, coords).r;
-  const relief = texture(textures.height, coords).r;
+  const baseCoords = uv().mul(config.trees.barkScale);
+  const coords = reliefCoords?.uv ?? baseCoords;
+  // As in barkProjection: mip selection from the unshifted coordinates.
+  const tap = map => reliefCoords ? texture(map, coords).grad(baseCoords.dFdx(), baseCoords.dFdy()) : texture(map, coords);
+  const bark = tap(textures.color).rgb;
+  const ao = tap(textures.ao).r;
+  const relief = tap(textures.height).r;
   const material = surface.enabled
     ? new (foliageMaterialClass(THREE.MeshStandardNodeMaterial))({ roughness: surface.roughness })
     : new THREE.MeshLambertNodeMaterial();

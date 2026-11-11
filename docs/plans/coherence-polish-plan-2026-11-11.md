@@ -77,6 +77,55 @@ work to land first.
 5. The numbers in `docs/look-bible.md` are drafts. Confirm them, then turn
    them into fixture gates.
 
+## Second pass — 2026-11-11 evening, from the understory QA captures
+
+Source: `tmp/understory-qa-2026-11-11/screenshots/` and `forest.png`. Ranked
+review in the session plan; this records what changed. **Nothing was run**: no
+tests, captures or perf. Files were syntax-checked only.
+
+### Changed
+
+| What | Where | Confidence |
+| --- | --- | --- |
+| Near trunks and vines drew as black-and-white speckle (new with the scanned bark). The scan PNGs keep height in alpha and were decoded through premultiplied alpha, so normal and roughness were lost in the crevices. They now load as straight-alpha bitmaps. | `forest/straightAlphaTexture.js`, `StylizedTreeView.js` | Likely cause, unverified |
+| Same symptom, second cause: the packed-normal tangent frame and the texture mip were taken from the parallax-shifted UV, whose screen derivatives are noise inside the 4-14 m relief band. Both now use the unshifted projection. | `forest/TreeBarkMaterial.js` | Correct in itself; share of the symptom unknown |
+| Crown shadows on by default, and leaves get a `maskShadowNode` without the character-occlusion cut (it is view-space and would punch the shadow). | `config/render-enhancements.yaml`, `lod/StylizedDitheredMaterial.js` | **Cost unmeasured** |
+| Groves and gaps: spacing radius times a 48 m value-noise field, 0.55-1.3. Tree scale 0.85-1.15 becomes 0.7-1.35. | `forest/ForestSpeciesRegistry.js`, `editor.config.yaml`, `tests/groveSpacingFactor.test.js` | Stage 8.1 and 8.2 as planned |
+| Green discs on the rainforest floor: the calathea and anthurium scans keep their potting-soil mound. Sunk 0.1 m now; `groundCrop: 0.12` set for the next asset build. | `editor.config.yaml`, `scripts/understory-sources.config.mjs` | Plant identified by eye |
+
+### For the QA pass
+
+1. `npm test`. New: `tests/groveSpacingFactor.test.js`. May need new expected
+   values: anything asserting tree counts, spacing or scale in a forest
+   manifest; `test/tree-impostor-source-inputs.test.js` (one input added).
+2. Tree impostors are stale (bark material and loader are bake inputs):
+   `npm run bake:impostors`, then `assetIntegrity`.
+3. Rebuild the two tropical scans (`tools/blender/understory_scans/`), check
+   the mound is gone, then delete their `heightOffset: -0.1` rows.
+4. Captures of the same poses. Check first: the trunk nearest the camera in
+   `core-rainforest`, `core-taiga`, `core-temperate-rainforest`; dapple and
+   crown self-shadowing; whether groves read or the wood just thinned.
+5. Perf A/B per `docs/perf-qa.md`: `?crownShadows=0` against default at the
+   forest and town poses; the chunk-cross run for the tree scatter change.
+   Turn `crownShadows` off again if it is over budget, and try stage 6 trial B.
+
+### Seen in the captures, not changed — needs a live look
+
+- **Black mottled patches on near grass blades** (deciduous floor). Already in
+  the 2026-11-10 baseline, so not the bark bug. Not found in the pigment, mark
+  or fade code. Start with `receiveShadow` off on the blade batch, then the
+  publication fade.
+- **Pale flat slab in taiga** (left of `core-taiga-eye`) and **two pale teal
+  bushes in grassland**. Rock snow already ramps (0.08-0.3) and tile 4 has an
+  understory row, so neither earlier fix explains them. Suspects: the bush
+  proxy's palette ramp (`BushRenderAssets.js`, tip colour from the variant's
+  first tile) and a scanned ground slab (`forest-roots-01`) graded pale.
+- **Conifers all leaning downhill** in taiga: `slopeLean` in
+  `forest/morphology/constants.js`. Real trunks stay plumb on a slope.
+- **Hovering fallen log**, sparse near grass over a smeared ground texture,
+  blob clouds, hard horizon outside the rainforest, wide shore smear, and the
+  HUD: all need a capture to tune. Stages 2, 3, 4 and 7 cover them.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA

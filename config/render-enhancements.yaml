@@ -11,8 +11,10 @@ waterReflections:
   intervalMs: 500
   reachMeters: 96
 shadowCascades: 1
-# Trial (coherence-polish plan, stage 6): near tree crowns cast sun shadows, for
-# shade and dapple under a wood. Off until measured; A/B with ?crownShadows=1.
-crownShadows: false
+# Coherence-polish plan, stage 6: near tree crowns cast sun shadows, for shade
+# and dapple under a wood. On since 2026-11-11 from the evenly lit forest floors
+# in that day's captures, but its frame cost is NOT measured yet: A/B against
+# ?crownShadows=0 at the forest and town poses, and turn it off if over budget.
+crownShadows: true
 snowRelief: true
 roadsideLanterns: false

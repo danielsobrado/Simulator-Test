@@ -973,6 +973,10 @@ stylizedSurface:
       - scene: /assets/ground/scans/tropical-calathea-01.glb
         motion: broadleaf
         scale: 1
+        # The scan keeps its potting-soil mound, which the understory grade turns
+        # into a flat green disc on the floor (2026-11-11 rainforest captures).
+        # Buried until the mesh is rebuilt with `groundCrop` (understory-sources).
+        heightOffset: -0.1
         weight: 1.4
         tileIds: [5, 7]
         character: forest
@@ -983,6 +987,10 @@ stylizedSurface:
       - scene: /assets/ground/scans/tropical-anthurium-01.glb
         motion: broadleaf
         scale: 1
+        # The scan keeps its potting-soil mound, which the understory grade turns
+        # into a flat green disc on the floor (2026-11-11 rainforest captures).
+        # Buried until the mesh is rebuilt with `groundCrop` (understory-sources).
+        heightOffset: -0.1
         weight: 1.1
         tileIds: [7]
         character: forest
@@ -2645,8 +2653,9 @@ stylizedSurface:
       # ground between them takes this leaf-litter tone instead of meadow green.
       litterColor: '#6e5435'
       litterStrength: 0.78
-    minScale: 0.85
-    maxScale: 1.15
+    # Size classes (coherence plan, stage 8): 0.85-1.15 gave a wood of one height.
+    minScale: 0.7
+    maxScale: 1.35
     # Share of trees that ignore their grove's dominant species. 0 gives strict
     # single-species stands; the biome mix only reasserts itself across groves.
     groveMix: 0.16

@@ -27,6 +27,7 @@ import {
 import { createForestLeafTintTable } from './forest/forestLeafTint.js';
 import { biomeCanopySnowAt, createCanopySnowResolver, setCanopySnowColor } from './forest/canopySnow.js';
 import { barkTexturesForVariant, loadScannedBarkTextures } from './forest/ScannedBarkLibrary.js';
+import { loadStraightAlphaTexture } from './forest/straightAlphaTexture.js';
 import { instanceCapacity } from './scatterMath.js';
 import { TreeManifestStore } from './TreeManifestStore.js';
 import { iterateTreeLod } from './TreeLodAssembler.js';
@@ -307,7 +308,7 @@ export class StylizedTreeView {
       // bark they wear loads here rather than streaming in under them.
       loadScannedBarkTextures({
         scans: this.config.assets.barkScans,
-        loadTexture: (url) => this.textureLoader.loadAsync(url),
+        loadTexture: loadStraightAlphaTexture,
         resolveUrl: (path) => this.resolveUrl(path),
       }),
     ]);

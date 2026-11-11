@@ -25,6 +25,7 @@ const SOURCES = [
   'src/editor/stylized/forest/ForestSpeciesGeometry.js',
   'src/editor/stylized/forest/ProceduralBarkTextures.js',
   'src/editor/stylized/forest/ScannedBarkLibrary.js',
+  'src/editor/stylized/forest/straightAlphaTexture.js',
   'src/editor/stylized/barkWeathering.js',
   'src/editor/stylized/impostor/TreeImpostorBaker.js',
   'src/editor/stylized/impostor/TreeImpostorAtlasPixels.js',
