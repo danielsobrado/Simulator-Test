@@ -1,5 +1,82 @@
 # Coherence and polish round — plan (2026-11-11)
 
+## Status — 2026-11-11, first implementation pass
+
+Written without running anything, at the user's instruction: no unit tests, no
+captures, no performance runs. A later pass does all acceptance. Edited files
+were syntax-checked with `node --check` and the YAML files were parsed; that is
+the only verification.
+
+### Landed
+
+| Commit | What |
+| --- | --- |
+| `7aa756ce` | Stage 0: `docs/look-bible.md`; `look-metrics.mjs` gains `sat` and `hue` per region, a `horizon` region, `satP95` and `mudShare`. |
+| `afadbcfb` | Stage 1: coherence phase 2 §5.1 (town bounce level), phase 3 §6.1 and §6.2 (autumn confined, taiga canopy 0.3), phase 4 (config values), phase 5 (storm deck). |
+| `3b7fc3c1` | Stage 2: one haze colour for tree, rock, plant and building in-scatter and for the far backdrop; `sky/lookGrade.js`; cloud core `#8e9db0`. |
+| `824dfa4b` | Stage 3 and 4.1: soils for tiles 4–8, default meadow base `#62883c`, duff half from the tile's soil, ragged contact-shade discs. |
+| `a34eb72c` | Stage 4.2: grass stands to snow 0.75 and meets the drift, `DRIFT_EDGE` 0.12, thaw `tintMix` 0.55, rock snow ramp 0.08–0.3. Coverage recipe revision 5. |
+| `9b607b4d` | Stage 4.4, 5.1, 5.3 and the stage 6 switch: narrower calm shore line; understory row for tile 4; rock rows for tiles 4, 5, 6, 9; `crownShadows` (off). |
+
+### Changed from the plan, with the reason
+
+- **No second cloud-noise sample** (stage 2.4). `StylizedSkyView.js` records
+  that it was tried and cost 0.4 ms a frame. The darker core works through the
+  existing body term. `cloudSharpness` stays 0.24: the config records 0.16 as
+  reading cartoon.
+- **The grade is derived, not authored** (stage 2.5). `resolveLookGrade` reads
+  `nightness`, `overcastAmount`, a new `stormAmount` and `sunElevation` from
+  the finished look. No preset gained a field.
+- **Tree air keeps its energy** (stage 2.1). It takes the fog's hue at the sky
+  fill's luminance; the fog colour itself is over twice as bright and would
+  have paled far crowns further.
+- **Bushes use the existing per-instance biome look** (stage 5.1). A tile 4
+  `understory` row was enough; no code change in `StylizedBushView.js`.
+- **Crown shadows are a switch, default off** (stage 6). Enabling them blind
+  risks both the frame budget and noisy self-shadowing on crowns that were
+  tuned without it. Trial with `?crownShadows=1`.
+- **`swamp-thatch` and `timber-thatch` are not undefined** (stage 9.4).
+  `SettlementProfile.js:109` maps both to the goblin style. Item dropped.
+- **Coherence phase 3 §6.3 skipped by its own rule**: the baseline's
+  `legacy-rainforest-off-12` reads `elevationWeight` 1.
+
+### Not done
+
+Each of these needs a capture to judge, an asset build, or another session's
+work to land first.
+
+- Stage 0: the palette lint test and the `round3-baseline` capture run.
+- Stage 1: coherence phase 1 (another session's) and the phase 2 band bisection.
+- Stage 2: the horizon tuning, the sea's far edge, the `fogColor`/`lowColor`
+  preset test, any gate.
+- Stage 3: the path tread's lean to soil; soils for tiles 1, 10 and 11.
+- Stage 4: taiga snow patch size, the 6 m grass seam, submerged props.
+- Stage 5: scanned boulders, rebuilt swamp knees, building contact shade.
+- Stage 6: trial B (sun-offset canopy shade), and the measurement of trial A.
+- Stages 7, 8, 10 entirely. Stage 9 except the doc correction: the paving and
+  defence tints are taste changes that interact with the phase 1 town gates.
+
+### For the acceptance pass
+
+1. `npm test`. Tests edited by hand and never run:
+   `test/settlement-ground-bounce.test.js`, `tests/forestLeafTint.test.js`,
+   `test/grass-habitat-coverage.test.js`. Tests that may assert values this
+   pass changed: anything reading `cloudCore`, the meadow palette base, taiga
+   `snow.canopy`, `sky.aerial.horizonColor`, `forestFloor.byTileId`.
+2. `npm run qa:look`, then compare with `docs/qa/environment-look/baseline/`.
+   Look first at: far crowns and far land (one haze), `forest-off-12` ground
+   saturation (was 0.68), the aerial shots (tree discs, snow rims),
+   `core-taiga-off-12` boulders, `grassland-off-7` bushes, `coast-off-12`
+   shore line, cloud bodies at noon, and the dusk, night and storm shots for
+   the grade.
+3. Performance A/B per `docs/perf-qa.md` for `3b7fc3c1` and `824dfa4b` (shader
+   terms on foliage, the finish and terrain) and for `a34eb72c` (chunk bake).
+   None adds a pass, a draw, a light or a sampler.
+4. `?crownShadows=1` at the forest and town poses: frame cost, and whether
+   crowns darken or flicker from their own shadows.
+5. The numbers in `docs/look-bible.md` are drafts. Confirm them, then turn
+   them into fixture gates.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA

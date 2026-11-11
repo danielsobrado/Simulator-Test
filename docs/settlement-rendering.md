@@ -320,8 +320,9 @@ joint shadow do the drawing.
 - **`SettlementGrade`.** Every building material is pulled toward one daylight
   per family, then weathered by `render/materials/townWeathering.js`, the same
   node the medieval kit's towns use: moss on sky-facing ledges and slates, rain
-  runs down faces, and a damp foot over the bottom metre. Renders keep 55% of
-  their hue and stone 45% (the workshop's finishes are paint-box bright, its
+  runs down faces, and a damp foot over the bottom metre. Dressed stone keeps
+  78% of its hue, render 72%, wood 65% and rubble 55% (`KIT_HUE` in
+  `render/materials/townGrade.js`; the workshop's finishes are paint-box bright, its
   stone palettes lean teal), bare masonry's joint mortar is darkened below its
   stone, and vertex colours are folded into the graded colour: three applies
   them after `colorNode`, which would undo the grade. The paving's earth layer
