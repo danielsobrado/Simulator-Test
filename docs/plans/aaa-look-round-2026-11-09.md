@@ -149,3 +149,100 @@ parallel; then F, G and H.
 
 After each workstream, recapture with `tmp/aaa-look2.mjs` at the same poses
 and append before/after pairs here.
+
+## Environment coherence: phase 1 stop (2026-11-11)
+
+Implementation of the [environment coherence work order](environment-coherence-plan-2026-11-10.md)
+stopped at its phase 1 taiga rule. The user explicitly confirmed this stop;
+phases 2–6 were not implemented. The tracked `qa:look` harness, canopy-pose
+helpers, metric tests and initial storm-ground/blizzard edits had already
+landed together in shared-checkout commit `a2e7cce8`. This section records
+their acceptance status; workstreams A, B and C remain open.
+
+The first 38-shot attempt on 2026-11-10 used `45cfdebc` plus the then-pending
+environment edits. It captured 36 shots on NVIDIA Lovelace WebGPU with zero
+browser errors. Both `core-wetland` shots rejected the supplied anchor
+`(-5773, -7687)`: no canopy coverage of at least 0.75 existed within its
+480 m search. A separate, wider diagnostic search selected `(-4365, -7367)`
+in biome 12 with coverage 0.933. The fixture now uses that anchor; the
+production search limit and coverage threshold remain 480 m and 0.75.
+The original report is retained at
+`docs/qa/environment-look/baseline/report.json`; it is a failed baseline,
+not an accepted 38-shot reference.
+
+### Confirmed stop condition
+
+At resolved taiga pose `(-7047, 10475)`, biome 9, canopy coverage 0.878,
+`core-taiga-snow-12` measured ground mean **75.831** against the required
+**150**. An isolated repeat measured **77.271**. In that repeat both
+`editor.snowCover.value` and `stormSnowCoverUniform.value` were **1**, and
+the storm's `snow` and `snowShare` were **1**. `setLighting` already calls
+`snowCover.snap(...)`. This meets the work order's explicit instruction to
+stop and report, rather than tune another snow control.
+
+The isolated evidence is retained locally as `tmp/look-taiga-snow-cover.json`
+and `tmp/look-taiga-snow-cover.png`. The tracked harness now also records
+both snow-cover values in each shot's report. The phase 1 gate limits are
+retained unchanged in `scripts/fixtures/environment-look-shots.json`;
+a failing look run must continue to exit non-zero.
+
+### Verification on resume
+
+The resumed source was `e92e9d23`, including subsequent performance work from
+the other session. No environment renderer or tuning values were changed on
+resume. Comparisons with the first attempt are repeated observations across
+those source states, not an isolated before/after claim for the storm edits.
+
+- Full suite: **4,275 passed**, zero failures
+  (`tmp/environment-phase1-tests.log`).
+- Focused ESLint passed for the look runner, metrics, canopy adapter and their
+  tests, plus the wet-ground tests. All 38 fixture shot names are unique and
+  every gate and comparison reference validates.
+- Weather shader acceptance: **14/14 cases passed** on NVIDIA Lovelace hardware
+  WebGPU, zero shader errors (`tmp/weather-shader-qa/report.json`, finished
+  2026-11-11). The runner also recorded 20 warnings, including WGSL
+  unreachable-code warnings; these are not reported as zero browser messages.
+
+No storm knob was advanced after the stop condition. No phase 2 night-bounce
+fix, phase 3 biome changes, phase 4 ground tuning or phase 5 storm-sky tuning
+was applied. Visual acceptance of phase 1 remains unmet.
+
+### Resumed look gate results
+
+The targeted repeat completed **12/12 captures**, all settled, with zero
+browser errors and every declared biome/canopy check passing. Both corrected
+wetland views resolve to biome 12 at coverage **0.933**. The 24 shared
+full-image mean checks all pass: the selected shots range from **51.650** to
+**207.929**, within 25–235. Of **35** numeric gate checks, **28 pass and 7
+fail**; six shots fail overall. `qa:look` correctly exits **1**.
+
+| Shot / metric | Nov 10 attempt | Nov 11 repeat | Required | Repeat |
+| --- | ---: | ---: | ---: | --- |
+| `wetland-rain-12` ground mean | 17.014 | 16.342 | ≥ 35 | Fail |
+| `wetland-rain-12` ground p95 | 32.146 | 28.147 | ≥ 70 | Fail |
+| `wetland-rain-12` ground mean / clear | 0.287 | 0.272 | ≤ 0.8 | Pass |
+| `coast-storm-12` ground mean | 47.456 | 53.160 | ≥ 40 | Pass |
+| `town-rain-12` ground p95 | 117.791 | 117.791 | ≥ 135 | Fail |
+| `tundra-snow-12` ground contrast | 22.353 | 22.353 | ≥ 30 | Fail |
+| `snow-eye-snow-12` ground contrast | 23.353 | 23.566 | ≥ 30 | Fail |
+| `tundra-snow-12` full-image deviation | 12.331 | 12.363 | ≥ 12 | Pass |
+| `core-taiga-snow-12` ground mean | 75.831 | 75.873 | ≥ 150 | Fail |
+| `core-taiga-air-snow-12` ground mean | 181.195 | 181.299 | ≥ 150 | Pass |
+| `town-off-21` full mean / noon | 0.507 | 0.525 | ≤ 0.5 | Fail |
+
+The repeat again records snow cover and its shader uniform at **1** in both
+taiga shots. The eye-level capture visibly retains its dark foreground; the
+aerial gate passing does not satisfy the eye-level gate. Wetland brightness,
+puddle highlights, wet-town highlights, blizzard ground contrast and town
+night brightness also remain open. None of these limits was relaxed or
+removed after the user confirmed the stop.
+
+Local artifacts (the capture directory is git-ignored):
+
+- [Resumed report](../qa/environment-look/phase1-stop-2026-11-11/report.json)
+- [Contact sheet](../qa/environment-look/phase1-stop-2026-11-11/contact-sheet.jpg)
+- [Taiga at eye level](../qa/environment-look/phase1-stop-2026-11-11/core-taiga-snow-12.jpg)
+
+The contact sheet and corrected wetland eye-level view were inspected. A new
+accepted 38-shot baseline and phases 2–6 remain outstanding; this stop record
+does not mark any of those phases complete.

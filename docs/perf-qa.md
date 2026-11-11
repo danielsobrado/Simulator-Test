@@ -184,6 +184,12 @@ Report kind: `simcity-dnd-perf-qa` (version `2`).
 | `npm run qa:perf` | `scripts/run-perf-qa.mjs` — Playwright Chromium, waits for `window.__perfQa.status === 'done'`, writes `tmp/perf-qa-latest.json` |
 | `npm run qa:perf:matrix` | Runs standard/dense-forest/high-grass/dense-mixed, the construction corridor, imported settlement approach and camera-turn revisit, then the deterministic water acceptance route; writes `tmp/perf-matrix-latest.json` |
 | `npm run qa:perf:parse` | `scripts/parse-perf-qa.mjs` — prints a short summary from a report or CDP extract JSON |
+| `npm run qa:look` | `scripts/run-environment-look-qa.mjs` — 38 biome, hour and weather shots with canopy checks and luminance gates; writes PNGs, JPEGs, a contact sheet and `report.json` |
+
+`qa:look` requires the dev server on port 5174 and holds the shared
+`tmp/perf-browser-<platform>.lock` for its entire headed hardware WebGPU run.
+It exits non-zero on failed look gates, biome/canopy checks or browser errors;
+its captures are visual evidence, not performance measurements.
 
 `--resources` on the movement runner or matrix records
 `capture.resourcesAfterRecovery` using the existing tracked-world accounting.
