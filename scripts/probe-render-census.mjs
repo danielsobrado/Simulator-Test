@@ -56,6 +56,7 @@ const result = await page.evaluate(async () => {
 });
 result.browserErrors=browserErrors;
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
+await browser.close();
 assert.equal(result.backend,'webgpu');
 assert.equal(result.readiness.ready,true);
 assert.equal(result.browserErrors.length,0);
@@ -63,4 +64,3 @@ assert.equal(result.trees.impostors,result.trees.prototypeCount);
 assert.equal(Object.values(result.trees.byTileId).reduce((sum,entry)=>sum+entry.records,0),result.trees.residentRecords);
 console.log(JSON.stringify({ frames: result.frames, mode: result.mode, status: result.status, info: result.info, byPass: result.byPass }, null, 1));
 for (const row of result.rows.slice(0, 70)) console.log(String(row.draws).padStart(7), String(row.ktris).padStart(7) + 'k', row.k);
-await browser.close();
