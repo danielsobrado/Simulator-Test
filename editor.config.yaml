@@ -415,28 +415,6 @@ stylizedSurface:
         weight: 1.4
         tileIds: [7, 5]
       # Authored biome-specific shrubs (tools/blender/biome_understory/builders_extra.py)
-      - scene: /assets/bushes/bush-arid-ocotillo-01.glb
-        motion: woody-shrub
-        paletteTileId: 10
-        scale: 0.9
-        weight: 0.85
-        tileIds: [1, 32]
-        character: scrub
-        canopy: open
-      - scene: /assets/bushes/bush-savanna-thorn-01.glb
-        motion: woody-shrub
-        scale: 0.95
-        weight: 1.0
-        tileIds: [3, 5]
-        character: scrub
-        canopy: open
-      - scene: /assets/bushes/bush-meadow-gorse-01.glb
-        motion: woody-shrub
-        scale: 0.9
-        weight: 0.95
-        tileIds: [4, 6, 14]
-        character: meadow
-        canopy: edge
       - scene: /assets/bushes/bush-boreal-juniper-01.glb
         motion: woody-shrub
         paletteTileId: 9
@@ -445,13 +423,6 @@ stylizedSurface:
         tileIds: [9, 10, 2]
         character: scrub
         canopy: any
-      - scene: /assets/bushes/bush-tropical-hibiscus-01.glb
-        motion: woody-shrub
-        scale: 0.95
-        weight: 1.0
-        tileIds: [7, 5, 8]
-        character: forest
-        canopy: edge
       - scene: /assets/bushes/bush-swamp-buttonbush-01.glb
         motion: woody-shrub
         scale: 0.95
@@ -481,6 +452,13 @@ stylizedSurface:
         tileIds: [1, 2, 3, 32]
         character: scrub
         canopy: open
+      - scene: /assets/bushes/bush-tropical-pachira-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 1.0
+        tileIds: [5, 7, 8]
+        character: forest
+        canopy: edge
     # Additional authored tree prototypes. Their embedded textures are retained
     # and each entry joins the configured species' deterministic prototype pool.
     treeVariants:
@@ -829,33 +807,7 @@ stylizedSurface:
       # which is what lets a wetland be lush and a savanna dry without new
       # geometry. Green stays full height as reeds; dry is scaled to tuft height.
       # --- Bog floor (tools/blender/swamp_trees/build_swamp_understory.py):
-      # ferns under the swamp giants, fallen mossy logs, broken stumps, cypress
-      # knees standing out of the mud and glowing fungi. Grukmar's bogs only.
-      - scene: /assets/ground/swamp/swamp-fern-01.glb
-        motion: grass-tuft
-        scale: 1
-        weight: 2.2
-        tileIds: [12]
-        canopy: core
-        prototypeGroups:
-          - [swamp-fern-01]
-      - scene: /assets/ground/swamp/swamp-log-01.glb
-        motion: rigid
-        conform: true
-        scale: 1
-        weight: 0.35
-        tileIds: [12]
-        sway: false
-        prototypeGroups:
-          - [swamp-log-01]
-      - scene: /assets/ground/swamp/swamp-stump-01.glb
-        motion: rigid
-        scale: 1
-        weight: 0.3
-        tileIds: [12]
-        sway: false
-        prototypeGroups:
-          - [swamp-stump-01]
+      # cypress knees standing out of the mud. Grukmar's bogs only.
       - scene: /assets/ground/swamp/swamp-knees-01.glb
         motion: rigid
         scale: 1
@@ -864,17 +816,6 @@ stylizedSurface:
         sway: false
         prototypeGroups:
           - [swamp-knees-01]
-      # Bioluminescent toadstools on rotten stubs: an emissive cap material that
-      # blooms after dark. Light comes from the glow itself, never a scene light.
-      - scene: /assets/ground/swamp/swamp-fungi-01.glb
-        motion: rigid
-        scale: 1
-        weight: 0.45
-        tileIds: [12]
-        canopy: core
-        sway: false
-        prototypeGroups:
-          - [swamp-fungi-01]
       - scene: /assets/ground/weeds/grass-blade-01.glb
         motion: grass-tuft
         scale: 1
@@ -975,108 +916,6 @@ stylizedSurface:
           - [SM_Rocks_07]
           - [SM_Rocks_10]
           - [SM_Rocks_11]
-      # --- Authored biome understory kits (tools/blender/biome_understory/) ----
-      # Arid & Stonehold Badlands kit (biomes 1, 2, 32): cacti, agave, sagebrush
-      # and weathered sandstone deadwood separated by regional character district.
-      - scene: /assets/ground/arid/desert-prickly-pear-01.glb
-        motion: woody-shrub
-        paletteTileId: 10
-        scale: 1.0
-        heightOffset: -0.03
-        weight: 0.85
-        tileIds: [1, 32]
-        character: scrub
-        characterStrength: 1.8
-        canopy: open
-        sway: false
-        prototypeGroups:
-          - [desert-prickly-pear-01]
-      - scene: /assets/ground/arid/desert-agave-01.glb
-        motion: woody-shrub
-        paletteTileId: 10
-        scale: 1.05
-        heightOffset: -0.03
-        weight: 0.85
-        tileIds: [1, 2, 3, 32]
-        character: rocky
-        characterStrength: 1.8
-        canopy: open
-        prototypeGroups:
-          - [desert-agave-01]
-      - scene: /assets/ground/arid/desert-sagebrush-01.glb
-        motion: woody-shrub
-        # Silvery sage, graded with the tundra's dusty palette: the deserts have no
-        # meadow palette of their own, and the default lime read as a green shrub.
-        paletteTileId: 10
-        scale: 0.92
-        heightOffset: -0.04
-        weight: 1.15
-        tileIds: [1, 2, 32]
-        character: scrub
-        characterStrength: 2.0
-        canopy: any
-        prototypeGroups:
-          - [desert-sagebrush-01]
-      - scene: /assets/ground/arid/badlands-deadwood-01.glb
-        motion: rigid
-        conform: true
-        scale: 1.0
-        heightOffset: -0.04
-        weight: 0.45
-        tileIds: [1, 2, 32]
-        character: rocky
-        characterStrength: 2.2
-        canopy: any
-        sway: false
-        prototypeGroups:
-          - [badlands-deadwood-01]
-      # Savanna & Meadow kit (biomes 3, 4, 6, 14): torch-lily aloes, wild lupines,
-      # moorland heather hummocks, and rocky lichen fieldstones with Scotch thistles.
-      - scene: /assets/ground/meadow/savanna-aloe-01.glb
-        motion: flexible-stem
-        scale: 0.88
-        heightOffset: -0.03
-        weight: 0.85
-        tileIds: [3]
-        character: meadow
-        characterStrength: 1.9
-        canopy: open
-        prototypeGroups:
-          - [savanna-aloe-01]
-      - scene: /assets/ground/meadow/meadow-lupine-01.glb
-        motion: flexible-stem
-        scale: 0.88
-        heightOffset: -0.03
-        weight: 0.8
-        tileIds: [4, 6, 14]
-        character: meadow
-        characterStrength: 2.0
-        canopy: open
-        prototypeGroups:
-          - [meadow-lupine-01]
-      - scene: /assets/ground/meadow/meadow-heather-01.glb
-        motion: woody-shrub
-        scale: 0.92
-        heightOffset: -0.03
-        weight: 0.95
-        tileIds: [4, 6, 9, 14]
-        character: scrub
-        characterStrength: 1.9
-        canopy: edge
-        prototypeGroups:
-          - [meadow-heather-01]
-      - scene: /assets/ground/meadow/meadow-thistle-stone-01.glb
-        motion: woody-shrub
-        scale: 1.1
-        weight: 0.75
-        tileIds: [3, 4, 6, 14]
-        character: rocky
-        characterStrength: 2.2
-        canopy: open
-        prototypeGroups:
-          - [meadow-thistle-stone-01]
-      # Temperate & Rainforest floor kit (biomes 6, 8, 9): bracken crowns, fly-agaric
-      # & chanterelle nurse logs, peeling birch logs, and arching berry brambles.
       # Poly Haven scans (docs/plans/understory-aaa-plan-2026-11-10.md): real leaf
       # shape, cutout and normal; hue still comes from the understory ramp. The
       # builder sizes each mesh, so scale stays 1.
@@ -1084,7 +923,7 @@ stylizedSurface:
         motion: fern-frond
         scale: 1
         weight: 1.6
-        tileIds: [5, 6, 7, 8, 9]
+        tileIds: [5, 6, 7, 8, 9, 12]
         character: forest
         characterStrength: 1.8
         canopy: core
@@ -1157,7 +996,7 @@ stylizedSurface:
         scale: 1
         heightOffset: -0.05
         weight: 0.35
-        tileIds: [6, 8, 9]
+        tileIds: [6, 8, 9, 12]
         character: forest
         characterStrength: 1.6
         canopy: any
@@ -1176,88 +1015,128 @@ stylizedSurface:
         canopy: any
         prototypeGroups:
           - [forest-deadfall-02]
-      - scene: /assets/ground/scans/forest-roots-01.glb
+      # Second batch of scans: logs, meadow flowers and dryland plants, at their scanned size.
+      - scene: /assets/ground/scans/forest-log-01.glb
         motion: rigid
         conform: true
         sway: false
         scale: 1
-        heightOffset: -0.06
+        heightOffset: -0.04
         weight: 0.4
+        tileIds: [5, 6, 8, 9, 12]
+        character: forest
+        characterStrength: 1.6
+        canopy: any
+        prototypeGroups:
+          - [forest-log-01]
+      - scene: /assets/ground/scans/forest-log-02.glb
+        motion: rigid
+        conform: true
+        sway: false
+        scale: 1
+        heightOffset: -0.08
+        weight: 0.2
         tileIds: [6, 7, 8, 12]
         character: forest
         characterStrength: 1.6
         canopy: core
         prototypeGroups:
-          - [forest-roots-01]
-      - scene: /assets/ground/forest/forest-mushrooms-01.glb
-        motion: rigid
-        conform: true
-        scale: 1.05
-        heightOffset: -0.03
-        weight: 0.6
-        tileIds: [6, 8, 9]
-        character: forest
-        characterStrength: 2.0
-        canopy: core
-        sway: false
-        prototypeGroups:
-          - [forest-mushrooms-01]
-      - scene: /assets/ground/forest/forest-birch-log-01.glb
-        motion: rigid
-        conform: true
-        scale: 0.95
-        weight: 0.4
-        tileIds: [6, 8, 9]
-        character: forest
-        characterStrength: 1.8
-        canopy: core
-        sway: false
-        prototypeGroups:
-          - [forest-birch-log-01]
-      - scene: /assets/ground/forest/forest-berry-bramble-01.glb
-        motion: woody-shrub
-        scale: 1.15
-        weight: 1.05
-        tileIds: [4, 6, 8]
-        character: scrub
-        characterStrength: 1.8
-        canopy: edge
-        prototypeGroups:
-          - [forest-berry-bramble-01]
-      # Tropical rainforest & seasonal kit (biomes 5, 7): scarlet bromeliad rosettes,
-      # lobster-claw heliconia ginger blooms, and fenestrated Monstera clusters.
-      - scene: /assets/ground/tropical/tropical-bromeliad-01.glb
+          - [forest-log-02]
+      - scene: /assets/ground/scans/meadow-dandelion-01.glb
         motion: broadleaf
-        scale: 1.2
-        weight: 1.15
-        tileIds: [5, 7]
-        character: forest
-        characterStrength: 1.8
-        canopy: core
-        prototypeGroups:
-          - [tropical-bromeliad-01]
-      - scene: /assets/ground/tropical/tropical-heliconia-01.glb
-        motion: broadleaf
-        scale: 1.25
-        weight: 1.1
-        tileIds: [5, 7]
+        scale: 1
+        weight: 1.0
+        tileIds: [4, 6, 14]
         character: meadow
-        characterStrength: 1.8
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [meadow-dandelion-01]
+      - scene: /assets/ground/scans/meadow-celandine-01.glb
+        motion: broadleaf
+        scale: 1
+        weight: 1.0
+        tileIds: [4, 6, 8, 12]
+        character: meadow
+        characterStrength: 1.6
         canopy: edge
         prototypeGroups:
-          - [tropical-heliconia-01]
-      - scene: /assets/ground/tropical/tropical-monstera-01.glb
-        motion: broadleaf
-        scale: 1.25
-        weight: 1.3
-        tileIds: [5, 7, 8]
-        character: forest
-        characterStrength: 1.9
-        canopy: core
+          - [meadow-celandine-01]
+      - scene: /assets/ground/scans/meadow-flower-01.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 0.9
+        tileIds: [4, 6, 14]
+        character: meadow
+        characterStrength: 1.6
+        canopy: edge
         prototypeGroups:
-          - [tropical-monstera-01]
+          - [meadow-flower-01]
+      - scene: /assets/ground/scans/desert-succulent-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 0.9
+        tileIds: [1, 2, 3, 32]
+        character: rocky
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [desert-succulent-01]
+      - scene: /assets/ground/scans/desert-iceplant-01.glb
+        motion: woody-shrub
+        scale: 1
+        weight: 1.0
+        tileIds: [1, 2, 32]
+        character: scrub
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [desert-iceplant-01]
+      - scene: /assets/ground/scans/savanna-gazania-01.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 0.9
+        tileIds: [1, 3]
+        character: meadow
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [savanna-gazania-01]
+      - scene: /assets/ground/scans/steppe-ursinia-01.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 0.9
+        tileIds: [2, 3, 4, 14]
+        character: meadow
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [steppe-ursinia-01]
+      - scene: /assets/ground/scans/savanna-empodium-01.glb
+        motion: flexible-stem
+        scale: 1
+        weight: 0.7
+        tileIds: [3, 4]
+        character: meadow
+        characterStrength: 1.6
+        canopy: open
+        prototypeGroups:
+          - [savanna-empodium-01]
+      - scene: /assets/ground/scans/badlands-trunk-01.glb
+        motion: rigid
+        sway: false
+        scale: 1
+        heightOffset: -0.05
+        weight: 0.2
+        tileIds: [1, 2, 3, 32]
+        character: rocky
+        characterStrength: 1.6
+        canopy: any
+        prototypeGroups:
+          - [badlands-trunk-01]
+      # --- Painted biome kits (tools/blender/biome_understory/) that no scan replaces yet.
       # Boreal Taiga & Arctic Tundra kit (biomes 9, 10): reindeer-lichen & lingonberry
-      # cushions, frosted granite deadfall, purple saxifrage cushions, and dwarf willow.
+      # cushions, purple saxifrage cushions, and dwarf willow.
       - scene: /assets/ground/boreal/taiga-berry-moss-01.glb
         motion: woody-shrub
         scale: 1.15
@@ -1288,28 +1167,6 @@ stylizedSurface:
         canopy: open
         prototypeGroups:
           - [tundra-dwarf-willow-01]
-      # Wetland / Grukmar Bog additions (biome 12): carnivorous Sarracenia pitcher
-      # plant trumpets and glossy marsh marigold clusters.
-      - scene: /assets/ground/swamp/swamp-pitcher-01.glb
-        motion: flexible-stem
-        scale: 1.15
-        weight: 1.1
-        tileIds: [12]
-        character: meadow
-        characterStrength: 1.8
-        canopy: open
-        prototypeGroups:
-          - [swamp-pitcher-01]
-      - scene: /assets/ground/swamp/swamp-marigold-01.glb
-        motion: broadleaf
-        scale: 1.15
-        weight: 1.2
-        tileIds: [12]
-        character: scrub
-        characterStrength: 1.7
-        canopy: edge
-        prototypeGroups:
-          - [swamp-marigold-01]
       # Coastal & Shoreline understory kit (biomes 0, 12): sea-oats on driftwood,
       # barnacle tidepool boulders with coral/kelp, and weathered shipwreck ribs.
       - scene: /assets/ground/coastal/coastal-dune-oats-01.glb
@@ -1401,8 +1258,7 @@ stylizedSurface:
         canopy: open
         prototypeGroups:
           - [alpine-edelweiss-stone-01]
-      # Savanna & Settled Farmland kit (biomes 3, 5, 4, 14): cathedral termite mounds,
-      # swollen Adenium desert rose, sun-bleached beast ribcages, and poppy-wheat sheaves.
+      # Savanna landmarks (biomes 1, 2, 3, 32): cathedral termite mounds and sun-bleached ribcages.
       - scene: /assets/ground/savanna/savanna-termite-mound-01.glb
         motion: rigid
         scale: 0.95
@@ -1415,17 +1271,6 @@ stylizedSurface:
         sway: false
         prototypeGroups:
           - [savanna-termite-mound-01]
-      - scene: /assets/ground/savanna/savanna-desert-rose-01.glb
-        motion: woody-shrub
-        scale: 0.85
-        heightOffset: -0.03
-        weight: 0.65
-        tileIds: [3, 1, 5]
-        character: scrub
-        characterStrength: 1.9
-        canopy: open
-        prototypeGroups:
-          - [savanna-desert-rose-01]
       - scene: /assets/ground/savanna/savanna-sunbleached-ribcage-01.glb
         motion: rigid
         conform: true
@@ -1439,16 +1284,6 @@ stylizedSurface:
         sway: false
         prototypeGroups:
           - [savanna-sunbleached-ribcage-01]
-      - scene: /assets/ground/savanna/farmland-poppy-wheat-01.glb
-        motion: flexible-stem
-        scale: 1.15
-        weight: 1.35
-        tileIds: [14, 4]
-        character: meadow
-        characterStrength: 2.0
-        canopy: open
-        prototypeGroups:
-          - [farmland-poppy-wheat-01]
       # Biome Micro-Structures, Shrines & Ruins (`ground/structures/`): ancient waystones,
       # toppled columns, roadside milestones, dwarven cairns, bog totems, and jungle idols.
       - scene: /assets/ground/structures/structure-waystone-shrine-01.glb

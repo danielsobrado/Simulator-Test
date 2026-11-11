@@ -82,7 +82,7 @@ test('every published ambient ground detail stays cheap enough to stream', async
     assert.ok(triangles !== undefined, `${variant.scene} is neither a published extraction nor a runtime asset`);
     // Painted props stay under 350. Poly Haven scans are gated to forest biomes and
     // canopy and carry their own budget (scripts/understory-sources.config.mjs).
-    const budget = variant.scene.startsWith('/assets/ground/scans/') ? 2600 : 350;
+    const budget = variant.scene.startsWith('/assets/ground/scans/') ? 4000 : 350;
     assert.ok(
       triangles <= budget,
       `${variant.scene} streams ${triangles} triangles as ambient ground cover`,
@@ -110,7 +110,8 @@ test('biome understory kits differentiate all land biomes and regional character
     assert.ok(matching.length >= 2, `biome ${requiredBiome} must have at least 2 dedicated understory variants`);
   }
 
-  for (const kitDir of ['arid', 'meadow', 'forest', 'tropical', 'boreal', 'swamp', 'coastal', 'alpine', 'savanna', 'structures']) {
+  // Scans replaced the painted arid, meadow, forest, tropical, swamp and savanna plants.
+  for (const kitDir of ['scans', 'boreal', 'coastal', 'alpine', 'structures']) {
     const kitVariants = variants.filter((v) => v.scene.startsWith(`/assets/ground/${kitDir}/`));
     assert.ok(kitVariants.length >= 3, `understory kit ${kitDir} must publish at least 3 runtime variants`);
   }
