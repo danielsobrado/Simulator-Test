@@ -19,7 +19,9 @@ leaf image; every named tree has one bark mesh and one foliage mesh.
 | palm-02 | 136 | 204 | 340 | Pass |
 
 The source cache contains 36 texture maps and four reference previews, totaling
-84.7 MiB. Checksum validation passes and a normal fetch downloads zero files.
+84.7 MiB. Checksum validation passes. A forced cache miss downloaded one alpha
+map with its exact pinned MD5; the next fetch downloaded zero files and left the
+lock file unchanged.
 The bark packer passes its displacement seam checks for all five profiles at
 512 px, including the mirrored palm scan.
 
