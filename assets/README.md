@@ -108,6 +108,40 @@ repeated 14 times and `tree-03` repeated 8, differing by node transform, which
 the scatter already randomises — so publishing more of them buys nothing. All
 four forest-pack trees are distinct and all four are published.
 
+## Poly Haven tree textures
+
+The Blender-built conifers, rainforest trees and palms take their needle and
+leaf cutouts, and five bark profiles their relief, from Poly Haven scans
+(CC0 1.0). Only texture maps are fetched, never a scan's geometry. The
+downloads live in the git-ignored `assets/source-cache/`;
+`assets/source-library/polyhaven-trees.lock.json` pins every URL and checksum.
+
+| Asset | Authors |
+|---|---|
+| [`bark_brown_02`](https://polyhaven.com/a/bark_brown_02) | Rob Tuytel |
+| [`fir_tree_01`](https://polyhaven.com/a/fir_tree_01) | Rico Cilliers, Rob Tuytel |
+| [`island_tree_02`](https://polyhaven.com/a/island_tree_02) | Rico Cilliers, Rob Tuytel |
+| [`jacaranda_tree`](https://polyhaven.com/a/jacaranda_tree) | Rico Cilliers, Rob Tuytel |
+| [`japanese_zelkova_bark`](https://polyhaven.com/a/japanese_zelkova_bark) | Charlotte Baglioni |
+| [`knotted_pine_bark`](https://polyhaven.com/a/knotted_pine_bark) | Dimitrios Savva |
+| [`palm_tree_bark`](https://polyhaven.com/a/palm_tree_bark) | Dimitrios Savva, Rico Cilliers |
+| [`pine_bark`](https://polyhaven.com/a/pine_bark) | Dimitrios Savva |
+| [`pine_tree_01`](https://polyhaven.com/a/pine_tree_01) | Rico Cilliers, Rob Tuytel |
+
+```bash
+npm run fetch:tree-sources
+"F:\Blender 5.2lender.exe" -b --factory-startup --python tools/blender/boreal_trees/build_boreal_trees.py
+"F:\Blender 5.2lender.exe" -b --factory-startup --python tools/blender/rainforest_trees/build_rainforest_trees.py
+npm run build:bark-scans
+npm run optimize:runtime-assets
+```
+
+`node scripts/fetch-polyhaven-sources.mjs --config scripts/tree-sources.config.mjs --check`
+verifies the cache against the lock without downloading. The two builders write
+grouped GLBs to `assets/runtime-sources/trees/{boreal,rainforest}/`;
+`build:bark-scans` writes `public/assets/textures/bark/scans/`. Changing the
+tree pool invalidates the impostor atlases: rebake with `npm run bake:impostors`.
+
 ## Rocks
 
 | Download | Place downloaded GLB at | Licence |
