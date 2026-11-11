@@ -13,6 +13,7 @@ export function prepareGrassHabitatHalo({halo,haloSize,searchRadius,chunkSize,he
   const seed = snowSettings ? terrainBakeMacroSeed(snowSettings.seedOffset,maskConfig.worldSeed) : 0;
   const eligibility = new Uint8Array(halo.length);
   const water = new Float32Array(halo.length);
+  const snowed = new Uint8Array(halo.length);
   const hCache = new Map(), wCache = new Map();
   const heightAt = (x,z) => {
     const lx=x-originX,lz=z-originZ;
@@ -48,6 +49,8 @@ export function prepareGrassHabitatHalo({halo,haloSize,searchRadius,chunkSize,he
         worldX:(cx+.5)*tileSize,worldZ:-(cz+.5)*tileSize},snowSettings.classification,seed);
     }
     eligibility[i]=grassHabitatEligible({tileId,snow,water:occupancy},tileIds)?1:0;
+    // Grass ground lost to a drift, not to a barren biome: the sward runs up to it.
+    snowed[i]=!eligibility[i]&&occupancy<1&&tileIds.has(tileId)?1:0;
   }
-  return {eligibility,water};
+  return {eligibility,water,snowed};
 }

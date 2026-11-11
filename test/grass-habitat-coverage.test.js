@@ -53,8 +53,8 @@ test('seedless all-eligible and all-ineligible fields produce exact finite bytes
   assert.deepEqual([...grassHabitatCoverage(new Uint8Array(81).fill(1),9,9,2)],new Array(81).fill(255));
   assert.deepEqual([...grassHabitatCoverage(new Uint8Array(81),9,9,2)],new Array(81).fill(0));
   const ids=new Set([4]);
-  assert.equal(grassHabitatEligible({tileId:4,snow:.5},ids),false);
-  assert.equal(grassHabitatEligible({tileId:4,snow:.499,water:.999},ids),true);
+  assert.equal(grassHabitatEligible({tileId:4,snow:.75},ids),false);
+  assert.equal(grassHabitatEligible({tileId:4,snow:.749,water:.999},ids),true);
   assert.equal(grassHabitatEligible({tileId:4,water:1},ids),false);
 });
 

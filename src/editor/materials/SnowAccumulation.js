@@ -25,8 +25,11 @@ export const PREVAILING_WIND = Object.freeze([0.8, 0.6]);
 /** Offset of the snow drift noise from the bake's macro seed. */
 const SNOW_PATCH_SEED = 53;
 const SLOPE_BREAKUP = 0.8;
-/** Half-width of the drift edge where partial biome cover turns from bare to snow. */
-const DRIFT_EDGE = 0.06;
+/**
+ * Half-width of the drift edge where partial biome cover turns from bare to snow.
+ * At 0.06 a drift ended at a line; wider, it thins out through the grass.
+ */
+const DRIFT_EDGE = 0.12;
 /** Drift lookup warp, as a share of the patch scale, and the spread restored after the octave mix. */
 const DRIFT_WARP = 0.9;
 const DRIFT_STRETCH = 1.45;

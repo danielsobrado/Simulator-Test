@@ -1,5 +1,5 @@
 /** Derived field; canonical terrain IDs and the RGBA mask layout stay unchanged. */
-export const GRASS_COVERAGE_RECIPE_REVISION = 4;
+export const GRASS_COVERAGE_RECIPE_REVISION = 5;
 /**
  * Metres over which grass thins toward water, snow, or anything it cannot grow
  * on. At 8 m, with the fade starting half a cell inland, every pond sat in a
@@ -18,8 +18,14 @@ export function grassHabitatHaloCells(tileSize) {
   if (!(tileSize > 0) || !Number.isFinite(tileSize)) throw new Error('Grass habitat tileSize must be positive.');
   return Math.ceil(Math.max(GRASS_HABITAT_EDGE_METERS, GRASS_BARREN_EDGE_METERS) / tileSize) + 2;
 }
+/**
+ * Snow weight a sward gives up at. At 0.5, with snow counted as barren land, grass
+ * stopped 20 m short of every drift and a dark rim of bare thaw ringed the snow from
+ * the air; grass now stands through thin snow and meets the drift (snowEdge below).
+ */
+export const GRASS_SNOW_LIMIT = .75;
 export function grassHabitatEligible({tileId, snow = 0, water = 0}, tileIds) {
-  return tileIds.has(tileId) && snow < .5 && water < 1;
+  return tileIds.has(tileId) && snow < GRASS_SNOW_LIMIT && water < 1;
 }
 /** `inset` cells of bare ground before the fade starts: half a cell toward barren land, none at a bank. */
 export function grassHabitatEdge(distance, tileSize, edgeMeters = GRASS_HABITAT_EDGE_METERS, inset = .5) {

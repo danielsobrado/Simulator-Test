@@ -145,7 +145,8 @@ families:
     litter: {roughness: 0.97, wetRoughness: 0.72, color: '#63513d', tintMix: 0.40}
     mud: {roughness: 0.87, wetRoughness: 0.43, color: '#555747', tintMix: 0.40}
     # Tundra and glacier ground bared between the drifts: dark damp earth.
-    thaw: {roughness: 0.84, wetRoughness: 0.50, color: '#3a332c', tintMix: 0.82}
+    # tintMix 0.82 drew a near-black rim round every drift from the air.
+    thaw: {roughness: 0.84, wetRoughness: 0.50, color: '#3a332c', tintMix: 0.55}
   profiles:
     grass:
       contrast: 0.26

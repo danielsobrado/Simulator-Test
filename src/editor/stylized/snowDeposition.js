@@ -96,8 +96,9 @@ export function snowDeposition({ snow, breakup = float(0), centre = null, ground
   const facing = dot(normalWorld.xz, WIND);
   const lee = facing.clamp(0, 1);
   const depth = snow.clamp(0, 1);
-  // Only a trace switches it off; any real fall is drawn at full white where it lies.
-  const present = depth.smoothstep(0.02, 0.12);
+  // A trace switches it off, and taiga's 0.1 is a trace: at smoothstep(0.02, 0.12) its
+  // boulders stood capped white on green ground. Any real fall is drawn at full white.
+  const present = depth.smoothstep(0.08, 0.3);
   const cavity = centre
     // A convex stone's faces sit well out along their radius; only faces turned in from it are recesses.
     // Per vertex: it varies smoothly over a stone, and the fragment pass is the expensive one.

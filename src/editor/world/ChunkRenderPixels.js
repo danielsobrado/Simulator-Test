@@ -287,10 +287,11 @@ export function buildSurfaceMaskPixels({
   const habitat = prepareGrassHabitatHalo({halo,haloSize,searchRadius,chunkSize,heights,
     originX,originZ,maskConfig,sampleHeight,sampleWater,snowCover,
     coreWater:usableWaterField ? (x,z)=>sampleCellWaterOccupancy(usableWaterField,x,z,waterlineDepth) : null});
-  // Barren land — not water, and not a road, whose verge has its own blend —
-  // fades the sward over the wider barren edge.
+  // Barren land — not water, not a road, whose verge has its own blend, and not
+  // a snow drift on grass ground, which the sward meets — fades the sward over
+  // the wider barren edge.
   const barren = Uint8Array.from(habitat.eligibility, (eligible, i) => (
-    !eligible && habitat.water[i] < 1 && halo[i] !== roadTileId ? 1 : 0));
+    !eligible && habitat.water[i] < 1 && halo[i] !== roadTileId && !habitat.snowed[i] ? 1 : 0));
   const coverage = grassHabitatCoverage(habitat.eligibility,haloSize,haloSize,tileSize,barren);
   const densityByTile = maskConfig.grassDensityByTile ?? null;
   const worldSeed = maskConfig.worldSeed ?? 0;
