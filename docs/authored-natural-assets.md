@@ -9,12 +9,48 @@ view distances.
 | Layer | Authored prototypes | Runtime strategy |
 |---|---:|---|
 | Rocks | 12 | Four standalone rocks plus four ruined-fence stones and four forest-pack stones, each loaded from an individual GLB |
-| Bushes | 5 | One grounded prototype per authored bush GLB; authored cutout textures in near and proxy bands |
+| Bushes | 11 | One grounded prototype per bush GLB: five authored bushes, two painted biome shrubs and four Poly Haven scans; cutout textures in near and proxy bands |
 | Trees | 23 variants | Source-GLB conifers, the meadow and alpine trees, and the Blender-built swamp, savanna, boreal, rainforest and palm trees; near geometry, proxy geometry, then baked impostors |
-| Ground detail | 17 | Tufts, blades, blossoms and sprouts under 350 triangles each, gated per biome over the procedural blade carpet |
+| Ground detail | 56 | Tufts, blades, blossoms and painted props under 350 triangles each, plus 20 Poly Haven scans under 4 000, gated per biome over the procedural blade carpet |
 | Aquatic plants | 6 | Two rooted wetland plants, two broadly scattered weed silhouettes and two low-poly lotus leaves restricted to deterministic shoreline colonies |
 | Distant birds | Up to 10 | Generated three-triangle silhouettes in intermittent flocks; one instanced draw only while visible |
 | Close wildlife | 2 optional | Flight-only animated crow and seagull GLBs behind `wildlife.authored.enabled: false` |
+
+### Scanned understory
+
+Ferns, herbs, flowers, logs and shrubs are Poly Haven photoscans (CC0 1.0), not
+painted props. Three commands rebuild them; the GLBs are git-ignored:
+
+```bash
+npm run fetch:understory-sources
+npm run build:understory-scans
+npm run optimize:runtime-assets
+```
+
+- **Fetch** (`scripts/fetch-polyhaven-sources.mjs`, list in
+  `scripts/understory-sources.config.mjs`) downloads each scan's 2k glTF into
+  `assets/source-cache/` and pins it in `assets/source-library/polyhaven.lock.json`.
+- **Build** (`tools/blender/understory_scans/`, headless Blender) decimates each
+  scan to its triangle target, keeps its own albedo, alpha and normal map in one
+  material, and writes one draw per GLB. A scan usually lays several plants out in
+  a row: `plants: 'clump'` slides them into one patch, `plants: 'largest'` keeps
+  one so it gets the whole budget. `groundCrop` cuts away the scanned ground disc.
+  The build's contact sheet (`tmp/understory/scans/contact-sheet.png`) is the
+  review: a scan that does not read as its plant there is not placed.
+- **Publish** is the ordinary optimizer; scans stream through
+  `StylizedVariantResidency` like every other variant.
+
+The triangle rule has two tiers. Painted props and tufts stay under 350. Scans
+carry the target set in the config, capped at 4 000 by
+`tests/authoredAssetExtraction.test.js`; they are gated by biome and canopy so
+only a few are resident at once. A scan's hue still comes from the understory
+ramp; its leaf shape, cutout and normal map are what it adds, and the shader
+keeps the normal map through the skyward bend (`withAuthoredNormalMap`).
+
+Built but not placed: `forest-moss-01` (the glTF is one 204-triangle tuft),
+`bush-taiga-sapling-01` (needle cards do not survive collapse decimation) and
+`forest-roots-01` (a slab of scanned soil). Boreal, tundra, coastal and alpine
+plants are still the painted kit: Poly Haven has no scans for them.
 
 The procedural grass carpet remains the dense base. Replacing it with imported
 grass meshes would multiply instance-build work and discard the measured shared

@@ -2177,7 +2177,7 @@ stylizedSurface:
     edgeAffinity: 0.5
     # Cluster density a wood's interior keeps at full canopy, wherever the cluster
     # field has no thicket: a closed forest has a shrub layer throughout.
-    understoryDensity: 0.9
+    understoryDensity: 1.0
     clusterSupercellSize: 74
     clusterSampleSpacing: 5
     clusterDensity: 0.88
@@ -2227,7 +2227,11 @@ stylizedSurface:
     # against perChunk 24. Both sets carried one outlier run, and the difference
     # sits inside that spread — the layer rebuilds once per chunk window and is
     # cached, so the extra candidates cost placement work, not per-frame work.
-    perChunk: 240
+    #
+    # 320 since the scanned understory (understory-aaa-plan-2026-11-10 §8): one
+    # plant about every 7 m, so a closed wood has a floor layer and not accents.
+    # Temperate woods (6, 8) keep the full budget; densityByTile cannot exceed 1.
+    perChunk: 320
     # Deserts (1, 2), Stonehold badlands (32), and tundra (10) join the layer so
     # they stop being bare ground; densityByTile is what keeps them looking like
     # deserts, badlands, and tundra.

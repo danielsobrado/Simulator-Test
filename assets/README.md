@@ -21,13 +21,21 @@ files live under `public/assets/`.
    node scripts/prepare-character-assets.mjs
    ```
 
-5. Publish every configured runtime GLB through the Meshopt/KTX2 optimizer:
+5. Fetch and build the Poly Haven understory scans (needs Blender; see
+   "Poly Haven understory scans" below):
+
+   ```bash
+   npm run fetch:understory-sources
+   npm run build:understory-scans
+   ```
+
+6. Publish every configured runtime GLB through the Meshopt/KTX2 optimizer:
 
    ```bash
    npm run optimize:runtime-assets
    ```
 
-6. Validate the complete source and runtime library:
+7. Validate the complete source and runtime library:
 
    ```bash
    npm run validate:assets:production
