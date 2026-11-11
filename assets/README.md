@@ -142,6 +142,40 @@ grouped GLBs to `assets/runtime-sources/trees/{boreal,rainforest}/`;
 `build:bark-scans` writes `public/assets/textures/bark/scans/`. Changing the
 tree pool invalidates the impostor atlases: rebake with `npm run bake:impostors`.
 
+## Poly Haven understory scans
+
+The ground-detail plants and shrubs are decimated from fifteen Poly Haven photoscans
+(CC0 1.0), planned in `docs/plans/understory-aaa-plan-2026-11-10.md`. The 2k glTF
+sets download into the git-ignored `assets/source-cache/polyhaven/`;
+`assets/source-library/polyhaven.lock.json` pins every URL and checksum.
+
+| Asset | Authors |
+|---|---|
+| [`anthurium_botany_01`](https://polyhaven.com/a/anthurium_botany_01) | Rico Cilliers, Rob Tuytel |
+| [`calathea_orbifolia_01`](https://polyhaven.com/a/calathea_orbifolia_01) | Rico Cilliers, Rob Tuytel |
+| [`dry_branches_medium_01`](https://polyhaven.com/a/dry_branches_medium_01) | Rico Cilliers |
+| [`fern_02`](https://polyhaven.com/a/fern_02) | Rico Cilliers, Rob Tuytel |
+| [`moss_01`](https://polyhaven.com/a/moss_01) | Rob Tuytel |
+| [`nettle_plant`](https://polyhaven.com/a/nettle_plant) | Rico Cilliers, Rob Tuytel |
+| [`periwinkle_plant`](https://polyhaven.com/a/periwinkle_plant) | Amal Kumar |
+| [`pine_sapling_small`](https://polyhaven.com/a/pine_sapling_small) | Rico Cilliers, Rob Tuytel |
+| [`root_cluster_01`](https://polyhaven.com/a/root_cluster_01) | Jenelle van Heerden, Rico Cilliers |
+| [`shrub_02`](https://polyhaven.com/a/shrub_02) | Rico Cilliers |
+| [`shrub_03`](https://polyhaven.com/a/shrub_03) | Rico Cilliers |
+| [`shrub_sorrel_01`](https://polyhaven.com/a/shrub_sorrel_01) | Rico Cilliers |
+| [`tree_stump_01`](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel |
+| [`weed_plant_02`](https://polyhaven.com/a/weed_plant_02) | Rico Cilliers, Rob Tuytel |
+| [`wild_rooibos_bush`](https://polyhaven.com/a/wild_rooibos_bush) | James Ray Cock, Jenelle van Heerden |
+
+```bash
+npm run fetch:understory-sources
+npm run build:understory-scans
+```
+
+`npm run fetch:understory-sources -- --check` verifies the cache against the lock
+without downloading. The builder writes GLBs to
+`assets/runtime-sources/ground/scans/` and `assets/runtime-sources/bushes/`.
+
 ## Rocks
 
 | Download | Place downloaded GLB at | Licence |

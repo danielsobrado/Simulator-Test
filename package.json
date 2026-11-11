@@ -20,6 +20,7 @@
     "prepare:construction-textures": "node scripts/prepare-construction-textures.mjs",
     "fetch:settlement-textures": "node scripts/fetch-settlement-textures.mjs",
     "fetch:tree-sources": "node scripts/fetch-polyhaven-sources.mjs --config scripts/tree-sources.config.mjs",
+    "fetch:understory-sources": "node scripts/fetch-polyhaven-sources.mjs --config scripts/understory-sources.config.mjs",
     "build:bark-scans": "node scripts/build-bark-scans.mjs",
     "generate:settlement-doors": "node scripts/generate-settlement-doors.mjs",
     "generate:settlement-gates": "node scripts/generate-settlement-gates.mjs",

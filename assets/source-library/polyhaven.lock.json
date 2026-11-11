@@ -1,0 +1,1023 @@
+{
+  "source": "https://polyhaven.com",
+  "license": "CC0-1.0",
+  "files": [
+    {
+      "id": "anthurium_botany_01",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/textures/anthurium_botany_01_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/anthurium_botany_01/anthurium_botany_01_alpha_2k.png",
+      "md5": "2a14dde9381b983427adcba195c7d6c6",
+      "size": 95881,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "anthurium_botany_01",
+      "map": "anthurium_botany_01.bin",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/anthurium_botany_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/anthurium_botany_01/anthurium_botany_01.bin",
+      "md5": "121f1e490c98ea71ebb1a61a2246c585",
+      "size": 1744256,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "anthurium_botany_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/anthurium_botany_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/anthurium_botany_01/anthurium_botany_01_2k.gltf",
+      "md5": "3d277dfee757d3709b222dd72bc73379",
+      "size": 10675,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "anthurium_botany_01",
+      "map": "textures/anthurium_botany_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/textures/anthurium_botany_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/anthurium_botany_01/anthurium_botany_01_arm_2k.jpg",
+      "md5": "5e327c9486f0470a7808b6cea99993b4",
+      "size": 1833646,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "anthurium_botany_01",
+      "map": "textures/anthurium_botany_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/textures/anthurium_botany_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/anthurium_botany_01/anthurium_botany_01_diff_2k.jpg",
+      "md5": "0fc12b2b2db969ff4f5cc783ffdb807c",
+      "size": 1565878,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "anthurium_botany_01",
+      "map": "textures/anthurium_botany_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/anthurium_botany_01/textures/anthurium_botany_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/anthurium_botany_01/anthurium_botany_01_nor_gl_2k.jpg",
+      "md5": "d91661ccf57f931fbc22d5b1cd1db92b",
+      "size": 1900025,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/textures/calathea_orbifolia_01_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/calathea_orbifolia_01/calathea_orbifolia_01_alpha_2k.png",
+      "md5": "389226faf0cbd6f4be2064ce073b0e73",
+      "size": 126330,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "calathea_orbifolia_01.bin",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/calathea_orbifolia_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/calathea_orbifolia_01/calathea_orbifolia_01.bin",
+      "md5": "71dd2ea7aaba98bbd675db12ae382bbd",
+      "size": 407968,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/calathea_orbifolia_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/calathea_orbifolia_01/calathea_orbifolia_01_2k.gltf",
+      "md5": "7251c23c59a6db7ce5c1cfaad27d7d65",
+      "size": 9309,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "textures/calathea_orbifolia_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/textures/calathea_orbifolia_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/calathea_orbifolia_01/calathea_orbifolia_01_arm_2k.jpg",
+      "md5": "cc5a8335c59ade77774317c5887445e3",
+      "size": 1426349,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "textures/calathea_orbifolia_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/textures/calathea_orbifolia_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/calathea_orbifolia_01/calathea_orbifolia_01_diff_2k.jpg",
+      "md5": "5b0decf990d22c320f0f605e95597716",
+      "size": 1584695,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "calathea_orbifolia_01",
+      "map": "textures/calathea_orbifolia_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/calathea_orbifolia_01/textures/calathea_orbifolia_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/calathea_orbifolia_01/calathea_orbifolia_01_nor_gl_2k.jpg",
+      "md5": "724c07c81ee421650af108280630929c",
+      "size": 2319308,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "map": "dry_branches_medium_01.bin",
+      "path": "assets/source-cache/polyhaven/dry_branches_medium_01/dry_branches_medium_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dry_branches_medium_01/dry_branches_medium_01.bin",
+      "md5": "10de852c8bf38e3f3ca5fb1d6c8de9d0",
+      "size": 465172,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/dry_branches_medium_01/dry_branches_medium_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/dry_branches_medium_01/dry_branches_medium_01_2k.gltf",
+      "md5": "48cebd47ff47f1c166e32bf2846fc5f8",
+      "size": 5844,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "map": "textures/dry_branches_medium_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/dry_branches_medium_01/textures/dry_branches_medium_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dry_branches_medium_01/dry_branches_medium_01_arm_2k.jpg",
+      "md5": "7610240aa1aafb3c6cfa5c7f89051c33",
+      "size": 2959483,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "map": "textures/dry_branches_medium_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/dry_branches_medium_01/textures/dry_branches_medium_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dry_branches_medium_01/dry_branches_medium_01_diff_2k.jpg",
+      "md5": "5f7ca4d25884545bd9b2063e43c0595c",
+      "size": 2815859,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "map": "textures/dry_branches_medium_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/dry_branches_medium_01/textures/dry_branches_medium_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/dry_branches_medium_01/dry_branches_medium_01_nor_gl_2k.jpg",
+      "md5": "385022548e1a3b84be6c4ab2e103aa4f",
+      "size": 4559165,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/fern_02/textures/fern_02_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/fern_02/fern_02_alpha_2k.png",
+      "md5": "ff18f7e8e869c58eac8f9c7d7c519f4a",
+      "size": 230089,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "fern_02.bin",
+      "path": "assets/source-cache/polyhaven/fern_02/fern_02.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fern_02/fern_02.bin",
+      "md5": "c061e9255f7d36ae9ce0e92ef3e100b2",
+      "size": 176176,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/fern_02/fern_02_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/fern_02/fern_02_2k.gltf",
+      "md5": "904c73900125e017f5e76ac1cdd906fe",
+      "size": 6899,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "textures/fern_02_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/fern_02/textures/fern_02_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fern_02/fern_02_arm_2k.jpg",
+      "md5": "7f7b46e813a3cb4811405191de0ecdce",
+      "size": 850856,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "textures/fern_02_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/fern_02/textures/fern_02_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fern_02/fern_02_diff_2k.jpg",
+      "md5": "ba8bbb9dc9ff55bdc081565cd926d776",
+      "size": 993703,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "fern_02",
+      "map": "textures/fern_02_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/fern_02/textures/fern_02_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fern_02/fern_02_nor_gl_2k.jpg",
+      "md5": "00936dff4661dc9fe1f2fbe6c000615a",
+      "size": 1365615,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/moss_01/textures/moss_01_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/moss_01/moss_01_alpha_2k.png",
+      "md5": "838476c334c1c70807d9c3b999b81186",
+      "size": 167941,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/moss_01/moss_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/moss_01/moss_01_2k.gltf",
+      "md5": "2a4fd6d96cbe0bbc3f65a657df64ad94",
+      "size": 18481,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "moss_01.bin",
+      "path": "assets/source-cache/polyhaven/moss_01/moss_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/moss_01/moss_01.bin",
+      "md5": "cdb092878a81b3208a162d79546892fe",
+      "size": 7260,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "textures/moss_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/moss_01/textures/moss_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/moss_01/moss_01_arm_2k.jpg",
+      "md5": "427fabe137e96a5e9f9087fc2220407c",
+      "size": 1095803,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "textures/moss_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/moss_01/textures/moss_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/moss_01/moss_01_diff_2k.jpg",
+      "md5": "268c4ea561fa189fead481250ab5835c",
+      "size": 511727,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "moss_01",
+      "map": "textures/moss_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/moss_01/textures/moss_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/moss_01/moss_01_nor_gl_2k.jpg",
+      "md5": "96db55f825bbaefa2ded5c8d1cc6abbe",
+      "size": 1632699,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/nettle_plant/textures/nettle_plant_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/nettle_plant/nettle_plant_alpha_2k.png",
+      "md5": "e41081a23ef3480364649e152b0a09b3",
+      "size": 421402,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/nettle_plant/nettle_plant_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/nettle_plant/nettle_plant_2k.gltf",
+      "md5": "b684bcbe68aa98aa7988e3fa3b40ffd1",
+      "size": 10450,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "nettle_plant.bin",
+      "path": "assets/source-cache/polyhaven/nettle_plant/nettle_plant.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/nettle_plant/nettle_plant.bin",
+      "md5": "975cb59d9f42871bb448de70aeecbc01",
+      "size": 956560,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "textures/nettle_plant_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/nettle_plant/textures/nettle_plant_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/nettle_plant/nettle_plant_arm_2k.jpg",
+      "md5": "dee323f552417bf65614c1f9bbb73214",
+      "size": 1566589,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "textures/nettle_plant_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/nettle_plant/textures/nettle_plant_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/nettle_plant/nettle_plant_diff_2k.jpg",
+      "md5": "bd08db8a634d02c12a0cf4f4daac8937",
+      "size": 1197929,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "nettle_plant",
+      "map": "textures/nettle_plant_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/nettle_plant/textures/nettle_plant_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/nettle_plant/nettle_plant_nor_gl_2k.jpg",
+      "md5": "f9c7a2f400685159583a75221e06bfa8",
+      "size": 2356297,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/periwinkle_plant_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/periwinkle_plant/periwinkle_plant_2k.gltf",
+      "md5": "44360496e88a0d45c8264b7038bbd145",
+      "size": 15189,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
+      "map": "periwinkle_plant.bin",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/periwinkle_plant.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/periwinkle_plant/periwinkle_plant.bin",
+      "md5": "dd2ff3280b0d69c3b03fed2753a6ee84",
+      "size": 1859752,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
+      "map": "textures/periwinkle_plant_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/textures/periwinkle_plant_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/periwinkle_plant/periwinkle_plant_arm_2k.jpg",
+      "md5": "dc02c1e078231764a07b34c4b37589cc",
+      "size": 923660,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
+      "map": "textures/periwinkle_plant_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/textures/periwinkle_plant_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/periwinkle_plant/periwinkle_plant_diff_2k.jpg",
+      "md5": "b09235daae59c35d2053c69d7f07ef5d",
+      "size": 1025276,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "periwinkle_plant",
+      "map": "textures/periwinkle_plant_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/periwinkle_plant/textures/periwinkle_plant_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/periwinkle_plant/periwinkle_plant_nor_gl_2k.jpg",
+      "md5": "1155b5e4229b0ad518e9581da6a880e9",
+      "size": 1321652,
+      "authors": [
+        "Amal Kumar"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/pine_sapling_small_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/pine_sapling_small/pine_sapling_small_2k.gltf",
+      "md5": "adfea6822fe6b16db26a1036530b7555",
+      "size": 11442,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "pine_sapling_small.bin",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/pine_sapling_small.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/pine_sapling_small/pine_sapling_small.bin",
+      "md5": "76dd1802d8de128c812f2e124a258b35",
+      "size": 17771796,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_bark_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_bark_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_arm_2k.jpg",
+      "md5": "218f22567f42e7918afc25c7e3450be8",
+      "size": 2941366,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_bark_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_bark_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_diff_2k.jpg",
+      "md5": "f420cb9ca2e845cd988f3bcf03c41a85",
+      "size": 2700448,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_bark_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_bark_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_bark_nor_gl_2k.jpg",
+      "md5": "da6eb7bc3c4eafea4e8ed696f7891a73",
+      "size": 3373886,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_twig_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_twig_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_arm_2k.jpg",
+      "md5": "20b41bc76f1e40e11d1847b39779c015",
+      "size": 1251644,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_twig_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_twig_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_diff_2k.jpg",
+      "md5": "acb5a3388d67a8cfcdcfcf9c66539fd0",
+      "size": 1542464,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "pine_sapling_small",
+      "map": "textures/pine_sapling_small_twig_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/pine_sapling_small/textures/pine_sapling_small_twig_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/pine_sapling_small/pine_sapling_small_twig_nor_gl_2k.jpg",
+      "md5": "07d9fbb7a95f16a0d733f06efbca56a7",
+      "size": 2557993,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "root_cluster_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/root_cluster_01/root_cluster_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/root_cluster_01/root_cluster_01_2k.gltf",
+      "md5": "cfed27a4c46c61ebd124494fe4eaede1",
+      "size": 2827,
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "root_cluster_01",
+      "map": "root_cluster_01.bin",
+      "path": "assets/source-cache/polyhaven/root_cluster_01/root_cluster_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/root_cluster_01/root_cluster_01.bin",
+      "md5": "0e64cb42ea471829b95151e08888d8e1",
+      "size": 6464764,
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "root_cluster_01",
+      "map": "textures/root_cluster_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/root_cluster_01/textures/root_cluster_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/root_cluster_01/root_cluster_01_arm_2k.jpg",
+      "md5": "e7d5c143f9a1c968c6e86c91eae38869",
+      "size": 3297801,
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "root_cluster_01",
+      "map": "textures/root_cluster_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/root_cluster_01/textures/root_cluster_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/root_cluster_01/root_cluster_01_diff_2k.jpg",
+      "md5": "6115a68677c10ee6867f85f60f69b009",
+      "size": 3014259,
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "root_cluster_01",
+      "map": "textures/root_cluster_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/root_cluster_01/textures/root_cluster_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/root_cluster_01/root_cluster_01_nor_gl_2k.jpg",
+      "md5": "9251fc177b386568e4782afe03b408ed",
+      "size": 5418365,
+      "authors": [
+        "Jenelle van Heerden",
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/shrub_02/textures/shrub_02_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/shrub_02/shrub_02_alpha_2k.png",
+      "md5": "315b0231f87e4f3aad07f1493a79bcb9",
+      "size": 198771,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/shrub_02/shrub_02_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/shrub_02/shrub_02_2k.gltf",
+      "md5": "bbfba4bf08416fe5f61b827be9474cd6",
+      "size": 8083,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "shrub_02.bin",
+      "path": "assets/source-cache/polyhaven/shrub_02/shrub_02.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/shrub_02/shrub_02.bin",
+      "md5": "683b5475238310899eac1458520903e6",
+      "size": 758692,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "textures/shrub_02_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_02/textures/shrub_02_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_02/shrub_02_arm_2k.jpg",
+      "md5": "24991af167d016ff6c71a59c140b22e7",
+      "size": 1039322,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "textures/shrub_02_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_02/textures/shrub_02_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_02/shrub_02_diff_2k.jpg",
+      "md5": "c236bcd930367aa3a96efa01e0e503be",
+      "size": 1319985,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_02",
+      "map": "textures/shrub_02_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_02/textures/shrub_02_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_02/shrub_02_nor_gl_2k.jpg",
+      "md5": "056418e8291602db325a5741ace9b14e",
+      "size": 1667532,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/shrub_03/textures/shrub_03_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/shrub_03/shrub_03_alpha_2k.png",
+      "md5": "1e5c462538f13c649693dbe727f1f169",
+      "size": 183836,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/shrub_03/shrub_03_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/shrub_03/shrub_03_2k.gltf",
+      "md5": "9423a0213b3450e5d7a47dc728a98467",
+      "size": 7296,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "shrub_03.bin",
+      "path": "assets/source-cache/polyhaven/shrub_03/shrub_03.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/shrub_03/shrub_03.bin",
+      "md5": "c26c6ed23b0034664eab5a0e3ee00f6a",
+      "size": 238684,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "textures/shrub_03_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_03/textures/shrub_03_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_03/shrub_03_arm_2k.jpg",
+      "md5": "f8fd965fc3fd25dc1e7f47ece82d0139",
+      "size": 1205240,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "textures/shrub_03_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_03/textures/shrub_03_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_03/shrub_03_diff_2k.jpg",
+      "md5": "27f9a6beb620a60bd5036e8d3bfff0af",
+      "size": 1520137,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_03",
+      "map": "textures/shrub_03_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_03/textures/shrub_03_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_03/shrub_03_nor_gl_2k.jpg",
+      "md5": "731088ec8f2a4e57e7e959876e667509",
+      "size": 1526365,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/textures/shrub_sorrel_01_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/shrub_sorrel_01/shrub_sorrel_01_alpha_2k.png",
+      "md5": "103c750f2bcac491ea47b4efea48477c",
+      "size": 152339,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/shrub_sorrel_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/shrub_sorrel_01/shrub_sorrel_01_2k.gltf",
+      "md5": "ac909c509e20613f8f1fdab2db3b49e7",
+      "size": 17428,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "shrub_sorrel_01.bin",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/shrub_sorrel_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/shrub_sorrel_01/shrub_sorrel_01.bin",
+      "md5": "5b6481fc43f4dc36ab4e80d79a19119f",
+      "size": 110936,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "textures/shrub_sorrel_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/textures/shrub_sorrel_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_arm_2k.jpg",
+      "md5": "b157675c3fba855286cba25b5e01a84a",
+      "size": 613088,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "textures/shrub_sorrel_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/textures/shrub_sorrel_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_diff_2k.jpg",
+      "md5": "8fd8dac54992e90fb4d6548cc24ac627",
+      "size": 1208902,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "shrub_sorrel_01",
+      "map": "textures/shrub_sorrel_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/shrub_sorrel_01/textures/shrub_sorrel_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/shrub_sorrel_01/shrub_sorrel_01_nor_gl_2k.jpg",
+      "md5": "c78a33b5d4c11f007fbd43aef8daca98",
+      "size": 1751781,
+      "authors": [
+        "Rico Cilliers"
+      ]
+    },
+    {
+      "id": "tree_stump_01",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/tree_stump_01/tree_stump_01_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/tree_stump_01/tree_stump_01_2k.gltf",
+      "md5": "5af8eb57d53722ad13a5b06f8910563e",
+      "size": 2793,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "tree_stump_01",
+      "map": "textures/tree_stump_01_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/tree_stump_01/textures/tree_stump_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tree_stump_01/tree_stump_01_arm_2k.jpg",
+      "md5": "07f544eae11d9a255bef25e82510a91f",
+      "size": 2801595,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "tree_stump_01",
+      "map": "textures/tree_stump_01_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/tree_stump_01/textures/tree_stump_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tree_stump_01/tree_stump_01_diff_2k.jpg",
+      "md5": "5e061f6985b34f3c36824e63473ed1c9",
+      "size": 3189746,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "tree_stump_01",
+      "map": "textures/tree_stump_01_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/tree_stump_01/textures/tree_stump_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tree_stump_01/tree_stump_01_nor_gl_2k.jpg",
+      "md5": "78c30fd8b3b070596e92e7969c78eaa7",
+      "size": 4415649,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "tree_stump_01",
+      "map": "tree_stump_01.bin",
+      "path": "assets/source-cache/polyhaven/tree_stump_01/tree_stump_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/tree_stump_01/tree_stump_01.bin",
+      "md5": "acb292727949126b92e58217fd50fca9",
+      "size": 965380,
+      "authors": [
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/textures/weed_plant_02_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/weed_plant_02/weed_plant_02_alpha_2k.png",
+      "md5": "47efb600ae3dc785c2978bf65f84c15b",
+      "size": 420666,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/weed_plant_02_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/weed_plant_02/weed_plant_02_2k.gltf",
+      "md5": "d8a430593da2222596743f19868a384f",
+      "size": 9128,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "textures/weed_plant_02_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/textures/weed_plant_02_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/weed_plant_02/weed_plant_02_arm_2k.jpg",
+      "md5": "0849fef5384b7b0d6d1aaadec40eb459",
+      "size": 2042103,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "textures/weed_plant_02_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/textures/weed_plant_02_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/weed_plant_02/weed_plant_02_diff_2k.jpg",
+      "md5": "97165d40d029a652ada297f06f382c4f",
+      "size": 1566453,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "textures/weed_plant_02_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/textures/weed_plant_02_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/weed_plant_02/weed_plant_02_nor_gl_2k.jpg",
+      "md5": "c9141036671d1b13841a17df18945359",
+      "size": 2569183,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "weed_plant_02",
+      "map": "weed_plant_02.bin",
+      "path": "assets/source-cache/polyhaven/weed_plant_02/weed_plant_02.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/weed_plant_02/weed_plant_02.bin",
+      "md5": "31440e5d2ad17eff90fcf83f3dbe989e",
+      "size": 330884,
+      "authors": [
+        "Rico Cilliers",
+        "Rob Tuytel"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "alpha",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/textures/wild_rooibos_bush_alpha_2k.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/wild_rooibos_bush/wild_rooibos_bush_alpha_2k.png",
+      "md5": "54f2820a6fce80d83ce013f57ce6421a",
+      "size": 206554,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "gltf",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/wild_rooibos_bush_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wild_rooibos_bush/wild_rooibos_bush_2k.gltf",
+      "md5": "72698fe321de65c3958cbc6d53bfe887",
+      "size": 23122,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "textures/wild_rooibos_bush_arm_2k.jpg",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/textures/wild_rooibos_bush_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_arm_2k.jpg",
+      "md5": "0934d20e828feefac3ca5accb3aca52f",
+      "size": 1415231,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "textures/wild_rooibos_bush_diff_2k.jpg",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/textures/wild_rooibos_bush_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_diff_2k.jpg",
+      "md5": "620baee5986d736ab68603c4a2e938eb",
+      "size": 1383104,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "textures/wild_rooibos_bush_nor_gl_2k.jpg",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/textures/wild_rooibos_bush_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_nor_gl_2k.jpg",
+      "md5": "d03a229d64ce136e9bd1b8f723b41d6a",
+      "size": 1916171,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "map": "wild_rooibos_bush.bin",
+      "path": "assets/source-cache/polyhaven/wild_rooibos_bush/wild_rooibos_bush.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wild_rooibos_bush/wild_rooibos_bush.bin",
+      "md5": "0d6c39ac444bac0381ecdff32a191a9c",
+      "size": 1236928,
+      "authors": [
+        "James Ray Cock",
+        "Jenelle van Heerden"
+      ]
+    }
+  ]
+}

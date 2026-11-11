@@ -3,11 +3,13 @@
  * Downloads named texture maps of Poly Haven assets (CC0 1.0) into the
  * git-ignored source cache and records them in a committed lock file.
  *
- * Map mode only: it reads `response[map][resolution][format]` and never the
- * `gltf`, `fbx`, `usd` or `blend` keys, so no scan geometry is fetched.
+ * Map mode (`maps`) reads `response[map][resolution][format]` and fetches no
+ * scan geometry. Model mode (`model: true`) fetches the scan's glTF with every
+ * file it includes, plus its separate alpha map when it has one.
  *
  * Usage: node scripts/fetch-polyhaven-sources.mjs --config <config.mjs> [--check]
- * The config exports `assets` ([{ id, maps, preview? }]), `lockFile` and `resolution`.
+ * The config exports `assets` ([{ id, maps, preview? } | { id, model: true }]),
+ * `lockFile` and `resolution`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -37,10 +39,30 @@ function isCached(entry) {
   return fs.existsSync(file) && (!entry.md5 || md5(fs.readFileSync(file)) === entry.md5);
 }
 
-async function resolveAsset({ id, maps, preview }, resolution) {
+/** The scan's glTF, every file it includes (kept at the relative path the glTF names) and its alpha map. */
+function modelEntries(id, files, resolution, authors) {
+  const gltf = files.gltf?.[resolution]?.gltf;
+  if (!gltf?.url) throw new Error(`Poly Haven asset ${id} has no ${resolution} glTF.`);
+  const entry = (map, relative, file) => {
+    // Include keys come from the API: never let one leave the asset's folder.
+    if (path.isAbsolute(relative) || relative.split(/[\\/]/).includes('..')) throw new Error(`Poly Haven asset ${id} names an unsafe path "${relative}".`);
+    return { id, map, path: `assets/source-cache/polyhaven/${id}/${relative}`, url: file.url, md5: file.md5, size: file.size, authors };
+  };
+  const entries = [
+    entry('gltf', `${id}_${resolution}.gltf`, gltf),
+    ...Object.entries(gltf.include ?? {}).map(([relative, file]) => entry(relative, relative, file)),
+  ];
+  const alpha = files.Alpha?.[resolution];
+  const format = alpha?.png ? 'png' : 'jpg';
+  if (alpha?.[format]) entries.push(entry('alpha', `textures/${id}_alpha_${resolution}.${format}`, alpha[format]));
+  return entries;
+}
+
+async function resolveAsset({ id, maps, preview, model }, resolution) {
   const files = JSON.parse((await download(`https://api.polyhaven.com/files/${id}`)).toString('utf8'));
   const info = JSON.parse((await download(`https://api.polyhaven.com/info/${id}`)).toString('utf8'));
   const authors = Object.keys(info.authors ?? {}).sort();
+  if (model) return modelEntries(id, files, resolution, authors);
   const entries = maps.map((map) => {
     const format = formatFor(map);
     const file = files[map]?.[resolution]?.[format];
