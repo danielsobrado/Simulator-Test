@@ -19,6 +19,14 @@ Backward compatibility with the former plains/forest/desert/swamp/snow tile-ID
 scheme is not required. Do not add legacy remapping or migration code unless a
 future task explicitly asks for it.
 
+## Biomes
+
+A biome is rows in tables, never a tile-id branch in a shader or view. To add or
+re-dress one, follow [adding a biome](docs/adding-a-biome.md): its palette rules,
+the three plant layers, border behaviour and streaming. `tests/biomeContract.test.js`
+enforces the checklist; a missing piece is fixed in the biome's rows, and waived
+there only with a reason.
+
 ## QA and performance
 
 Before changing terrain generation, chunk streaming, rendering, or residency
