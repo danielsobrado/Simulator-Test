@@ -31,12 +31,16 @@ export function resolveFoliagePalette(config = {}, tileId = null) {
   if (tileId !== null && OPEN_DRY_BIOMES.has(tileId)) {
     base.lerp(shadowColor, 0.06);
     tip.lerp(lightColor, 0.12);
+  // The canopy grade is one pair for the whole world, so a strong lean gave
+  // every wood's plants the same tips whatever its grass: a wetland's read
+  // #91a956 over sedge tipped #6b7a3c. Plants stay in their own ground's hue
+  // family and only nod to the crowns (was 0.18/0.36 and 0.3/0.55).
   } else if (tileId !== null && MEADOW_BIOMES.has(tileId)) {
-    base.lerp(shadowColor, 0.18);
-    tip.lerp(lightColor, 0.36);
+    base.lerp(shadowColor, 0.1);
+    tip.lerp(lightColor, 0.2);
   } else {
-    base.lerp(shadowColor, 0.3);
-    tip.lerp(lightColor, 0.55);
+    base.lerp(shadowColor, 0.2);
+    tip.lerp(lightColor, 0.3);
   }
   return { base, tip, exposure: config.understory?.paletteExposure ?? 1.15 };
 }

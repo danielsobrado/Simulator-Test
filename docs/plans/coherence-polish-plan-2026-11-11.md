@@ -198,6 +198,28 @@ and third blade silhouette in `meadowGrassShapes.js` mixed inside one biome
 (the shape id is per blade already, so no extra draw), or more kit scans —
 there are none built and unplaced for the tropics.
 
+### One hue family per biome — 2026-11-12
+
+The user's references share one trait across jungle and savanna: grass, ground
+plants and shrubs are one hue family per biome, and only value and height
+separate them. Two changes toward that, neither seen in a browser:
+
+- `forest/foliagePalette.js`: plants lean less to the world-wide canopy grade
+  (woods 0.3/0.55 → 0.2/0.3, meadows 0.18/0.36 → 0.1/0.2), so their ramp stays
+  near the local grass palette. Wetland tips went from `#91a956` to `#81964c`
+  against sedge tipped `#6b7a3c`.
+- `grass.meadow.appearance.patchCool` / `patchWarm` narrowed, so a field varies
+  in value more than in hue.
+
+Known and not fixed: a shared shrub's ramp is built once, from the first tile
+in its `tileIds` (`paletteTileId ?? tileIds[0]`), and the per-instance
+`understory` look can only multiply it. A shrub listed `[6, 4, 5, 8, 14]` wears
+the deciduous ramp everywhere. The proper fix is to carry the standing tile's
+ramp per instance; it needs a second instance colour or a palette lookup by
+tile id in the shader, and a live look. This is not the cause of the pale
+teal grassland shrubs: computed, their colour comes out olive (`#3e5d2a` to
+`#99b14f`), so something after the palette pales them.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA

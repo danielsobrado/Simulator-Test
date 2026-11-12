@@ -1610,8 +1610,11 @@ stylizedSurface:
         fill: 0.025
         backlight: 1.05
         patchScale: 0.07
-        patchCool: [0.74, 0.95, 0.84]
-        patchWarm: [1.16, 1.04, 0.68]
+        # Narrowed 2026-11-12 (was [0.74, 0.95, 0.84] / [1.16, 1.04, 0.68]): a
+        # stand read as lime and straw patches side by side, two hue families in
+        # one field. Patches now vary a field's value more than its hue.
+        patchCool: [0.86, 0.96, 0.9]
+        patchWarm: [1.08, 1.03, 0.84]
         dryPatchScale: 0.0308
         dryStart: 0.5
         dryEnd: 0.84
