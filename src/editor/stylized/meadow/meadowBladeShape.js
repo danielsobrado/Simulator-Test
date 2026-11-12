@@ -31,6 +31,7 @@ import { MEADOW_SHAPE_COUNT } from './meadowGrassShapes.js';
 import { MAX_MEADOW_PALETTES } from './meadowPalettes.js';
 import { MEADOW_MAX_BODY_BEND } from './meadowInteractionBend.js';
 import { meadowGrowthNodes } from './meadowGrowthNodes.js';
+import { meadowPlantNodes } from './meadowPlantNodes.js';
 
 const HALF_PI = Math.PI * 0.5;
 const HIDDEN = 1e9;
@@ -93,7 +94,11 @@ function silhouette(shape, r) {
   const slender = oneMinus(r);
   const reed = oneMinus(pow(r, 5)).mul(0.55);
   const broadleaf = sqrt(max(float(0), oneMinus(r.mul(r)))).mul(0.85);
-  return shape.lessThan(0.5).select(slender, shape.lessThan(1.5).select(reed, broadleaf));
+  // Accent-only silhouettes (MEADOW_PLANT_SHAPES): a stalked leaf and a strap.
+  const lance = pow(r.mul(oneMinus(r)).mul(4), 0.7).mul(0.9).max(0.06);
+  const strap = oneMinus(pow(r, 3)).mul(0.7);
+  return shape.lessThan(0.5).select(slender, shape.lessThan(1.5).select(reed,
+    shape.lessThan(2.5).select(broadleaf, shape.lessThan(3.5).select(lance, strap))));
 }
 
 /**
@@ -218,7 +223,8 @@ export function createMeadowBladePosition({ uniforms, tuning, config, bandCount,
       const profile = meadowGrowthNodes(uniforms,blade);
       const tufts = uniforms.tufts;
       const occupancy = profile.tuft.occupancy.toVar();
-      const height = profile.height.mul(growth).toVar();
+      const plant = meadowPlantNodes(uniforms, blade);
+      const height = profile.height.mul(growth).mul(plant.height).toVar();
       // A short plant is a narrow one: width follows the stem's own height, so
       // short growth and worn ground read as slender blades, not broad wedges.
       const stature = height.div(profile.tallHeight.max(1e-3)).clamp(0, 1).toVar();
@@ -230,7 +236,8 @@ export function createMeadowBladePosition({ uniforms, tuning, config, bandCount,
         .mul(uniforms.widthScale)
         .mul(mix(float(1), uniforms.taper, r))
         .mul(mix(0.88, 1.12, blade.variation))
-        .mul(silhouette(blade.shape, r))
+        .mul(plant.width)
+        .mul(silhouette(plant.shape, r))
         .mul(lod.width);
       local.x.assign(positionLocal.x.mul(width));
       local.y.assign(r.mul(height));

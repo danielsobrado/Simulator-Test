@@ -25,6 +25,11 @@ export function createMeadowUniforms(settings, interaction = null, spellGround =
       density: uniformArray(Array.from({length:16},(_,i)=>new THREE.Vector4(...meadowGrowthResponse(growth.profiles[i] ?? growth.profiles[0]))),'vec4'),
       // How much of the area field each biome wears: a rainforest stays lush.
       areaStyle: uniformArray(Array.from({length:16},(_,i)=>(growth.profiles[i] ?? growth.profiles[0]).areaStyle),'float'),
+      // The plants mixed into each stand (meadowPlantNodes.js).
+      // One array, high rows then low rows: the blade's vertex stage sits at
+      // WebGPU's twelve uniform buffers, and a second array was the thirteenth.
+      accents: uniformArray(Array.from({length:32},(_,i)=>new THREE.Vector4(
+        ...meadowAccentRows(growth.profiles[i%16] ?? growth.profiles[0])[i<16?'high':'low'])),'vec4'),
       maxHeight: growth.maxHeight, maxWidth: growth.maxWidth,
     },
     // The player's body stamp and its render-space window. The centre is the
@@ -113,4 +118,4 @@ export function createMeadowUniforms(settings, interaction = null, spellGround =
     patchWarm: vec3(...appearance.patchWarm),
   };
 }
-import { meadowGrowthResponse } from './meadowGrassShapes.js';
+import { meadowAccentRows, meadowGrowthResponse } from './meadowGrassShapes.js';

@@ -135,6 +135,13 @@ until the player is near it.
   code, so raising it again means checking the code still fits its float.
   Frosted biomes count as their frosted pair.
 - **Sixteen growth profiles** (`MAX_MEADOW_GROWTH_PROFILES`), ten in use.
-- **Three blade silhouettes** (`meadowGrassShapes.js`). A biome's floor is one
-  silhouette; variety comes from the accent layer.
+- **Three stand silhouettes, five plant silhouettes** (`meadowGrassShapes.js`).
+  A biome's own grass is slender, reed or broadleaf. Its growth row may add up
+  to two `accents`: other plants mixed in as clumps, each a silhouette (those
+  three, or `lance` and `strap`), a share of the stems, and a height and width
+  against the stand's. Give every grass biome at least one; a floor of one
+  shape reads as a lawn.
+- **Twelve uniform buffers in the blade's vertex stage** (WebGPU). It is at the
+  limit: a new per-profile table goes into an existing array, as the accents
+  did, or the pipeline fails to compile.
 - **Per-layer `perChunk` caps** in `validateStylizedLodConfig.js`.

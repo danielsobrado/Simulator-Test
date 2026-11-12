@@ -39,8 +39,10 @@ export function applyMeadowGrowth(field,next) {
     field.uniforms.growth.dimensions.array[i].set(p.shortHeight,p.tallHeight,p.width,p.patchMeters);
     field.uniforms.growth.areaStyle.array[i]=p.areaStyle;
 field.uniforms.growth.density.array[i].set(...meadowGrowthResponse(p));
+    const accents=meadowAccentRows(p);
+    field.uniforms.growth.accents.array[i].set(...accents.high);field.uniforms.growth.accents.array[i+16].set(...accents.low);
   }
   field.uniforms.growth.maxHeight=growth.maxHeight;field.uniforms.growth.maxWidth=growth.maxWidth;
   field.ground.setGrowth(growth,looks);
 }
-import { meadowGrowthResponse } from './meadowGrassShapes.js';
+import { meadowAccentRows, meadowGrowthResponse } from './meadowGrassShapes.js';

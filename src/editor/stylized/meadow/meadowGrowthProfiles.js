@@ -1,4 +1,4 @@
-import { meadowShapeId } from './meadowGrassShapes.js';
+import { MEADOW_PLANT_SHAPES, meadowShapeId } from './meadowGrassShapes.js';
 export const MAX_MEADOW_GROWTH_PROFILES = 16;
 const row = (shortHeight,tallHeight,width,density,patchMeters,shape='slender',areaStyle=1) =>
   Object.freeze({shortHeight,tallHeight,width,density,patchMeters,shape,areaStyle});
@@ -21,6 +21,17 @@ function validate(source,path) {
   if(p.density>0 && p.width<=0)throw new Error(`Invalid editor configuration: ${path}.width must be positive for nonzero density.`);
   if(p.patchMeters<2||p.patchMeters>64)throw new Error(`Invalid editor configuration: ${path}.patchMeters must be in [2,64].`);
   if(!['slender','reed','broadleaf'].includes(p.shape))throw new Error(`Invalid editor configuration: ${path}.shape is unknown.`);
+  if(p.accents!==undefined) {
+    if(!Array.isArray(p.accents)||p.accents.length>2)throw new Error(`Invalid editor configuration: ${path}.accents must list at most two plants.`);
+    p.accents=Object.freeze(p.accents.map((accent,i)=>{
+      const at=`${path}.accents.${i}`,{shape,share,height=1,width=1}=accent??{};
+      if(!(shape in MEADOW_PLANT_SHAPES))throw new Error(`Invalid editor configuration: ${at}.shape is unknown.`);
+      if(!(share>0&&share<=.45))throw new Error(`Invalid editor configuration: ${at}.share must be in (0,0.45].`);
+      if(!(height>=.3&&height<=2.5))throw new Error(`Invalid editor configuration: ${at}.height must be in [0.3,2.5].`);
+      if(!(width>=.3&&width<=4))throw new Error(`Invalid editor configuration: ${at}.width must be in [0.3,4].`);
+      return Object.freeze({shape,share,height,width});
+    }));
+  }
   return Object.freeze(p);
 }
 /** Index zero is grassland fallback. Exact records deduplicate in ascending ID order. */
@@ -32,7 +43,9 @@ export function resolveMeadowGrowth(source={},path='stylizedSurface.grass.meadow
     byId[id]=validate({...(MEADOW_GROWTH_DEFAULTS[id]??MEADOW_GROWTH_DEFAULTS[4]),...value},`${path}.byTileId.${key}`);
   }
   const profiles=[validate(byId[4],`${path}.byTileId.4`)],table=new Uint8Array(256),shapes=new Uint8Array(256);
-  const signature=p=>JSON.stringify([p.shortHeight,p.tallHeight,p.width,p.density,p.patchMeters,p.shape,p.areaStyle]);
+  const signature=p=>JSON.stringify([p.shortHeight,p.tallHeight,p.width,p.density,p.patchMeters,p.shape,p.areaStyle,p.accents]);
+  // An accent plant may stand taller or wider than its stand: page bounds must cover it.
+  const reach=(p,key)=>Math.max(1,...(p.accents??[]).map(accent=>accent[key]));
   const indices=new Map([[signature(profiles[0]),0]]);
   shapes.fill(meadowShapeId(profiles[0].shape));
   for(const id of Object.keys(byId).map(Number).sort((a,b)=>a-b)) {
@@ -45,5 +58,5 @@ export function resolveMeadowGrowth(source={},path='stylizedSurface.grass.meadow
   }
   return Object.freeze({profiles:Object.freeze(profiles),table,shapes,
     revision:profiles.map(signature).join('|')+':'+Array.from(table).join(','),
-    maxHeight:Math.max(...profiles.map(p=>p.tallHeight)),maxWidth:Math.max(...profiles.map(p=>p.width))});
+    maxHeight:Math.max(...profiles.map(p=>p.tallHeight*reach(p,'height'))),maxWidth:Math.max(...profiles.map(p=>p.width*reach(p,'width')))});
 }

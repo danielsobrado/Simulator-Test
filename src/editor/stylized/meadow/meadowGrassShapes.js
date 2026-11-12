@@ -25,6 +25,43 @@ export function meadowGrowthResponse(profile) {
   return [profile.density, shape.wind, shape.rest, shape.curve];
 }
 
+/**
+ * Silhouettes an accent plant may wear (a growth profile's `accents`): the three
+ * a biome's own grass can be, plus leaves that only make sense as plants in the
+ * sward. The extra ones have no far-card art, so they are never a profile's
+ * `shape`, and the look code's radix (MEADOW_SHAPE_COUNT) is unchanged.
+ */
+export const MEADOW_PLANT_SHAPES = Object.freeze({
+  slender: 0, reed: 1, broadleaf: 2,
+  /** A leaf on a stalk: pinched at the foot, widest at mid height, pointed. */
+  lance: 3,
+  /** A long strap leaf: full width most of the way up, then a short taper. */
+  strap: 4,
+});
+
+/** The noise that sorts stems into plants: clump size, and an offset clear of the tuft field's. */
+export const MEADOW_PLANT_FIELD = Object.freeze({ meters: 0.9, offset: Object.freeze([17.3, 53.9]) });
+/** Spread of meadowNoise round 0.5, for turning a share of stems into a threshold. */
+const PLANT_NOISE_SD = 0.14;
+
+/** Standard normal quantile (Tukey's lambda approximation); enough for a share. */
+function quantile(p) {
+  return 4.91 * (p ** 0.14 - (1 - p) ** 0.14);
+}
+
+/**
+ * A profile's accents as the two uniform rows the shader reads:
+ * `[shape id, noise threshold, height scale, width scale]`. The first accent
+ * takes the noise's high tail and the second its low tail; an absent accent's
+ * threshold is out of the noise's range.
+ */
+export function meadowAccentRows(profile) {
+  const row = (accent, sign) => (accent
+    ? [MEADOW_PLANT_SHAPES[accent.shape], 0.5 + sign * PLANT_NOISE_SD * quantile(1 - accent.share), accent.height ?? 1, accent.width ?? 1]
+    : [0, sign * 9, 1, 1]);
+  return { high: row(profile.accents?.[0], 1), low: row(profile.accents?.[1], -1) };
+}
+
 export const DEFAULT_MEADOW_SHAPE = 'slender';
 /** Shapes a look code spans before its palette index: code = shape + count × palette. */
 export const MEADOW_SHAPE_COUNT = Object.keys(MEADOW_GRASS_SHAPES).length;

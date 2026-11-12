@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { MEADOW_GROWTH_DEFAULTS, resolveMeadowGrowth } from '../src/editor/stylized/meadow/meadowGrowthProfiles.js';
+import { MEADOW_PLANT_SHAPES, meadowAccentRows } from '../src/editor/stylized/meadow/meadowGrassShapes.js';
 import { meadowGrowthHeight, acceptsMeadowHabitat } from '../src/editor/stylized/meadow/meadowGrowthMath.js';
 import { MEADOW_CARD_HEIGHT_CONTRAST, MEADOW_SHORT_FLOOR } from '../src/editor/stylized/meadow/meadowTuftField.js';
 import { encodeLookTable } from '../src/editor/stylized/meadow/meadowPalettes.js';
@@ -24,15 +25,33 @@ test('all thirteen shipped growth rows match their exact specification and custo
  const g=resolveMeadowGrowth(surface.grass.meadow.growth);
  const configured={5:{density:.95},6:{density:.95},8:{density:.88},9:{density:.88},
   7:{shortHeight:.2,tallHeight:.6,width:.085,density:.9,patchMeters:9}};
+ // Accent plants ride on a row without changing its stand (covered below).
+ const plain=({accents,...rest})=>rest;
  for(let id=0;id<13;id++) {
   assert.deepEqual(MEADOW_GROWTH_DEFAULTS[id],record(rows[id]));
-  assert.deepEqual(g.profiles[g.table[id]],{...record(rows[id]),...configured[id]});
+  assert.deepEqual(plain(g.profiles[g.table[id]]),{...record(rows[id]),...configured[id]});
  }
  assert.equal(g.table[14],0);assert.equal(g.table[254],0);
- assert.deepEqual(g.profiles[0],record(rows[4]));
+ assert.deepEqual(plain(g.profiles[0]),record(rows[4]));
  const custom=resolveMeadowGrowth({byTileId:{254:{tallHeight:.8,density:.3,shape:'reed'}}});
  assert.equal(custom.profiles[custom.table[254]].tallHeight,.8);assert.equal(custom.shapes[254],1);
- assert.equal(resolveMeadowGrowth({byTileId:{32:{...MEADOW_GROWTH_DEFAULTS[9]}}}).table[32],g.table[9]);
+ const shared=resolveMeadowGrowth({byTileId:{32:{...MEADOW_GROWTH_DEFAULTS[9]}}});
+ assert.equal(shared.table[32],shared.table[9]);
+});
+test('accent plants validate, keep their profile distinct and widen the page bounds',()=>{
+ const accents=[{shape:'lance',share:.2,height:1.5,width:2},{shape:'strap',share:.1}];
+ const g=resolveMeadowGrowth({byTileId:{9:{accents},32:{...MEADOW_GROWTH_DEFAULTS[9]}}});
+ assert.notEqual(g.table[9],g.table[32],'the same stand with other plants is another profile');
+ assert.deepEqual(g.profiles[g.table[9]].accents[1],{shape:'strap',share:.1,height:1,width:1});
+ const plain=resolveMeadowGrowth({});
+ assert.ok(resolveMeadowGrowth({byTileId:{4:{accents:[{shape:'reed',share:.1,height:2}]}}}).maxHeight>plain.maxHeight*1.9);
+ const rows=meadowAccentRows(g.profiles[g.table[9]]);
+ assert.equal(rows.high[0],MEADOW_PLANT_SHAPES.lance);assert.ok(rows.high[1]>.5&&rows.high[1]<.75);
+ assert.equal(rows.low[0],MEADOW_PLANT_SHAPES.strap);assert.ok(rows.low[1]<.5&&rows.low[1]>.2);
+ assert.ok(meadowAccentRows(plain.profiles[0]).high[1]>1&&meadowAccentRows(plain.profiles[0]).low[1]<0,'no accents: thresholds out of range');
+ for(const bad of [[{shape:'fern',share:.1}],[{shape:'lance',share:.6}],[{shape:'lance',share:.1,height:3}],[1,2,3].map(()=>({shape:'lance',share:.1}))]) {
+  assert.throws(()=>resolveMeadowGrowth({byTileId:{9:{accents:bad}}}),/byTileId\.9\.accents/);
+ }
 });
 test('invalid growth values and excessive distinct profiles name their exact config path',()=>{
  for(const [key,value] of [['shortHeight',NaN],['tallHeight',-.1],['width',0],['density',1.01],['patchMeters',1.99],['patchMeters',64.01],['shape','fern']]) {
