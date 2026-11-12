@@ -299,14 +299,14 @@ function validateRockAppearance(rocks) {
   validateClusterField(rocks, 'stylizedSurface.rocks');
 }
 
-function validateGroundDetailLayer(layer, path) {
+function validateGroundDetailLayer(layer, path, maxPerChunk = 256) {
   if (!layer) return;
   assertBoolean(layer.enabled, `${path}.enabled`);
   if (!layer.enabled) return;
   assertNonNegativeInteger(layer.residentRadius, `${path}.residentRadius`);
   assertPositiveInteger(layer.perChunk, `${path}.perChunk`);
-  if (layer.perChunk > 256) {
-    throw new Error(`Invalid editor configuration: ${path}.perChunk must not exceed 256.`);
+  if (layer.perChunk > maxPerChunk) {
+    throw new Error(`Invalid editor configuration: ${path}.perChunk must not exceed ${maxPerChunk}.`);
   }
   assertPositive(layer.minScale, `${path}.minScale`);
   assertPositive(layer.maxScale, `${path}.maxScale`);
@@ -686,7 +686,7 @@ export function validateStylizedLodConfig(config) {
   validateValleyFog(surface.sky);
   validateBushes(surface.bushes);
   validateRockAppearance(surface.rocks);
-  validateGroundDetailLayer(surface.groundDetails, 'stylizedSurface.groundDetails');
+  validateGroundDetailLayer(surface.groundDetails, 'stylizedSurface.groundDetails', 400);
   validateGroundDetailLayer(surface.aquaticPlants, 'stylizedSurface.aquaticPlants');
   validateGroundDetailLayer(surface.tropicalKit, 'stylizedSurface.tropicalKit');
   validateAquaticFlora(surface.aquaticPlants);

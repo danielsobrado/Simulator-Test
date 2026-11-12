@@ -126,3 +126,16 @@ test('ground detail layers gate on a known regional character channel', () => {
   value.stylizedSurface.tropicalKit.regionalChannel = 'jungle';
   assert.throws(() => validateStylizedLodConfig(value), /tropicalKit\.regionalChannel/);
 });
+
+test('ground accents accept the authored 400 budget while other detail layers keep their cap', () => {
+  for (const [name, maximum] of [['groundDetails', 400], ['aquaticPlants', 256], ['tropicalKit', 256]]) {
+    const value = config();
+    const layer = value.stylizedSurface[name] = {
+      enabled: true, residentRadius: 1, perChunk: maximum, minScale: 0.8, maxScale: 1.25,
+      radius: 0.6, heightOffset: 0, colorVariation: 0.12, castShadow: false, tileIds: [7],
+    };
+    assert.equal(validateStylizedLodConfig(value), value);
+    layer.perChunk++;
+    assert.throws(() => validateStylizedLodConfig(value), new RegExp(`${name}\\.perChunk must not exceed ${maximum}`));
+  }
+});
