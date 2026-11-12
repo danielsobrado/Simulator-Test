@@ -280,6 +280,32 @@ taiga 97 / 63 / 0.37. Frame cost not measured.
 - `forest-air-off-12`: groves read from the air, and snow patches end in soft
   edges. Nothing changed there.
 
+### Grass/shadow performance check — 2026-11-12
+
+[Full paired results](../grass-shadow-perf-2026-11-12.md), `6f297b70` →
+`11484f90`, 16 accepted headed NVIDIA WebGPU captures at 720p, two alternating
+pairs per route. This covers the later mixed grass shapes, closed rainforest
+carpet, porous crown shadows, 0.7 shadow intensity and accompanying changes;
+the morning density raises are already in the baseline.
+
+| Route | Current average FPS range | Render CPU mean delta | GPU mean delta |
+| --- | ---: | ---: | ---: |
+| Grassland | 118.67–120.65 | −0.156 ms | +0.113 ms |
+| Closed rainforest | 109.90–110.45 | +0.032 ms | +0.691 ms |
+| Forest | 103.74–105.74 | +0.075 ms | +0.551 ms |
+| Town | 91.99–99.49 | +0.144 ms | +0.048 ms |
+
+All current frame p95 values are below 16.667 ms and collision/grass recovery
+gates pass. Individual spikes remain (worst current frame 98.6 ms), so an
+uninterrupted 60 FPS floor is not established. Forest and rainforest exceed
+the normal GPU stage budget; their shadow-map/depth time decreases by
+0.023 / 0.033 ms, with the increase in other render passes. One town CPU
+sample is 0.025 ms over the normal stage budget. Costs are recorded for the
+standing visual-gain tradeoff; no visual setting was tuned in this check.
+CPU deltas are within the observed sample spread, not claimed speed gains.
+The planned atlas rebake, isolated per-commit attribution, native-resolution
+measurement and full stress matrix remain separate work.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA

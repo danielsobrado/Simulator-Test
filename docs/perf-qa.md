@@ -2,6 +2,19 @@
 
 Deterministic harness for reproducing and measuring player-mode stutter while moving across the streamed world.
 
+> The 2026-11-12 grass/shadow comparison is recorded in
+> [grass-shadow-perf-2026-11-12.md](grass-shadow-perf-2026-11-12.md): 16 accepted
+> headed NVIDIA WebGPU captures, A/B/A/B at grassland, closed rainforest,
+> forest and town, `6f297b70` against `11484f90`. Current averages are
+> 118.7–120.7, 109.9–110.5, 103.7–105.7 and 92.0–99.5 FPS respectively at
+> 1280 × 720. All current collision and two-second recovery gates pass;
+> frame p95 is below 16.667 ms, but individual frame spikes remain, up to
+> 98.6 ms in town. GPU mean deltas are +0.113 / +0.691 / +0.551 / +0.048 ms:
+> the two forest cases exceed the normal +0.20 ms stage budget, mainly in
+> non-shadow render passes. One town sample exceeds the +0.25 ms CPU budget
+> by 0.025 ms. The report preserves rejected focus-loss attempts, the shared
+> stale-atlas limitation and the exact scope; this is not a full stress matrix.
+
 > Dense-meadow buffer changes, the 21 test-fixture corrections, repeated hardware
 > captures, and the passing 2026-10-07 matrix are recorded in
 > [dense-grass-test-fixes-2026-10-07.md](dense-grass-test-fixes-2026-10-07.md).
