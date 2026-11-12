@@ -30,7 +30,10 @@ export function frostMeadowPalette(palette, looks) {
       tip: frosted(own.tip, looks.frostColor, frost * TIP_FROST),
     };
   }
-  return { ...palette, byTileId };
+  // Plants read `unfrosted` (forest/foliagePalette.js): they carry their own snow
+  // cap, and a ramp built from frosted grass tips came out near-white — tundra
+  // plants standing in taiga read as pale blue slabs (2026-11-12 captures).
+  return { ...palette, byTileId, unfrosted: palette.unfrosted ?? palette };
 }
 
 /** Share of a stand's height a fully frosted biome loses: snow settles it. */

@@ -346,6 +346,7 @@ export class StylizedSkyView {
     this.directional.shadow.bias = config.sky.shadowBias;
     this.directional.shadow.normalBias = config.sky.shadowNormalBias;
     this.directional.shadow.radius = config.sky.shadowRadius ?? 2.4;
+    this.directional.shadow.intensity = config.sky.shadowIntensity ?? 1;
     this.directional.shadow.camera.near = 1;
     this.directional.shadow.camera.far = config.sky.shadowDistance * 2;
     const extent = config.sky.shadowDistance;

@@ -19,7 +19,8 @@ function bleached(color, lift = 0.42, hueKeep = 0.7) {
 
 /** Understory bridges the meadow and canopy, using their configured pigments. */
 export function resolveFoliagePalette(config = {}, tileId = null) {
-  const meadow = config.grass?.meadow?.palette;
+  // The grass palette before frost was folded into it (applyBiomeLooks).
+  const meadow = config.grass?.meadow?.palette?.unfrosted ?? config.grass?.meadow?.palette;
   const grass = meadow?.byTileId?.[tileId] ?? meadow?.byTileId?.[FALLBACK_PALETTE_TILE[tileId]] ?? meadow;
   const canopy = resolveCanopyGrade(config.trees?.canopyGrade);
   const base = new THREE.Color(grass?.base ?? config.color?.bottom ?? '#50852b');

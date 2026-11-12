@@ -2957,6 +2957,10 @@ stylizedSurface:
     # Softens the sun's contact shadows to match the workshop preview stage.
     # Hard shadow edges fight the baked crevice occlusion on masonry.
     shadowRadius: 2.4
+    # Share of the sun a shadow removes. At 1 grass in crown shade drew near-black
+    # over ground that stayed green; 0.7 keeps shaded blades green and the shade
+    # still clearly reads (2026-11-12 live A/B at the taiga pose).
+    shadowIntensity: 0.7
     # Matched to the sky's horizon band so terrain fades into the sky instead of
     # meeting it at a visible colour seam.
     fogColor: '#91bfd9'

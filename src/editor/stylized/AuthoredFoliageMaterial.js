@@ -55,8 +55,12 @@ export function biomeUnderstoryColor(color) {
   const saturation = look.w.sub(snowSteps.mul(4));
   const tinted = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, saturation).mul(look.xyz);
   const clumps = mx_noise_float(positionWorld.mul(2.7)).mul(0.5).add(0.5);
+  // A trace of snow switches it off, as on the rocks (snowDeposition): taiga's 0.1
+  // mixed 13% white into dark leaves, which in linear light doubled their value
+  // and drew every shrub, plant and log there pale blue (2026-11-12 captures).
+  const depth = snowSteps.div(LOOK_SNOW_STEPS);
   const cap = smoothstep(0.15, 0.55, normalWorld.y.add(clumps.sub(0.5).mul(0.5)))
-    .mul(snowSteps.div(LOOK_SNOW_STEPS).mul(1.2).clamp(0, 1));
+    .mul(depth.mul(1.2).clamp(0, 1)).mul(depth.smoothstep(0.08, 0.3));
   return mix(tinted, vec3(0.9, 0.93, 0.97), cap.mul(0.9));
 }
 

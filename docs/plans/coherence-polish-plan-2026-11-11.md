@@ -239,6 +239,30 @@ Five poses through `qa:look`, all gates passing, no browser errors.
   the shrub ramp shift, so they are not a palette problem.
 - Not measured: frame cost of the rainforest carpet.
 
+### Live diagnosis — 2026-11-12, `tmp/reference-check-2026-11-12e`
+
+Found by hiding scene layers and toggling lights in a scripted browser at the
+`core-taiga` pose.
+
+- **Pale props were the snow cap.** `biomeUnderstoryColor` mixed up to 13% white
+  into upward-facing foliage for taiga's trace snow (0.1). In linear light that
+  doubles a dark leaf's value. It now switches off for a trace, as the rocks'
+  deposition does. The juniper, the plants and the log are green and brown again.
+- **Plant ramps read the unfrosted grass palette** (`palette.unfrosted`). A ramp
+  built from frosted tips was pale before any snow cap.
+- **Black grass was shadow depth, not a bug.** It vanished with sun shadows off.
+  `sky.shadowIntensity: 0.7` keeps shaded blades green. Cost: `groundContrast`
+  fell to 47 in `core-deciduous` and 63 in `core-taiga`, under the look bible's
+  70. Either the target or this value has to move; `CROWN_SHADOW_COVER` is the
+  other lever.
+- Still open: `bush-boreal-juniper-01` is one blob card and reads as a slab even
+  in the right colour (asset rebuild); grassland's pale shrubs; the bare earth
+  patch in `core-rainforest`; conifer lean; plant variety.
+
+Ground mean / contrast / saturation in the final run: forest 128 / 90 / 0.58,
+grassland 138 / 70 / 0.44, deciduous 70 / 47 / 0.37, rainforest 101 / 69 / 0.41,
+taiga 97 / 63 / 0.37. Frame cost not measured.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA
