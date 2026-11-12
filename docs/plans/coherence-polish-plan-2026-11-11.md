@@ -263,6 +263,23 @@ Ground mean / contrast / saturation in the final run: forest 128 / 90 / 0.58,
 grassland 138 / 70 / 0.44, deciduous 70 / 47 / 0.37, rainforest 101 / 69 / 0.41,
 taiga 97 / 63 / 0.37. Frame cost not measured.
 
+### Second live pass — 2026-11-12, `tmp/reference-check-2026-11-12f` to `-12h`
+
+- **Conifer lean is not a bug.** Dropping the calm-air bend limit from 0.1 to
+  0.035 changed nothing in `core-taiga`, and the trees in the middle of the
+  frame stand plumb: the edge trees lean outward, which is the 68° field of
+  view. The trial was reverted.
+- **Wet sand.** The damp band above the waterline was 0.9 m of height, which on
+  a flat beach is a wide strip, and at roughness 0.42 it mirrored the sky as a
+  milky patch on dry sand. Now 0.5 m at 0.62 (film 0.3 → 0.42) in
+  `CoastSwashShading.js`. The patch on dry sand is gone in `coast-off-12`.
+- **Not fixed: the pale band along the waterline itself.** It is on the water
+  side, so it belongs to the sea surface's shore fade, not the ground. The
+  `coast` pose also shows the sea as near-transparent with a dark far band;
+  that is a water-surface pass of its own, not a foam setting.
+- `forest-air-off-12`: groves read from the air, and snow patches end in soft
+  edges. Nothing changed there.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA
