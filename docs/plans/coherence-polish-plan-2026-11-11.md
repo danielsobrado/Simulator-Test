@@ -123,6 +123,15 @@ tests, captures or perf. Files were syntax-checked only.
 
 ### Seen in the captures, not changed — needs a live look
 
+**Capture handoff, 2026-11-12:** [52 review images, exact-pose comparisons,
+four valid performance samples and the seven failed visual gates](../coherence-capture-handoff-2026-11-12.md).
+Crown-shadow OFF/ON samples at 720p cost +0.257 ms render / +0.019 ms GPU in
+the forest and +0.233 / +0.167 ms in town. Enabled runs average 113.94 and
+100.52 FPS, with frame p95 12.175 and 13.600 ms; individual slower frames
+remain in both controls and enabled runs. These are single pairs on the
+current stale atlases, not final acceptance. The bark stipple remains in the
+new images. No visual setting was tuned by this capture pass.
+
 - **Black mottled patches on near grass blades** (deciduous floor). Already in
   the 2026-11-10 baseline, so not the bark bug. Not found in the pigment, mark
   or fade code. Start with `receiveShadow` off on the blade batch, then the
