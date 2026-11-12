@@ -118,9 +118,10 @@ biomeLooks:
     # ground between thin grass showed the Azgaar map colour: pale lime in
     # grassland, neon green (#29bc56) in a temperate wood. Loam, laterite, leaf
     # mould and peat, in the family of the forest floor's litter.
-    # Shared shrubs wear a wood's palette, which leans to the canopy's teal shade:
-    # in open grassland they read teal-grey against the sward. The understory tint
-    # is per instance, so a bush takes the look of the tile it stands on. Stones
+    # A shared shrub takes the ramp of the tile it stands on (understoryRampLooks.js),
+    # so grassland needs no understory tint of its own: its former '#e6e2b0' x 1.05
+    # only pulled a wood's teal ramp back toward the sward. An `understory` row is
+    # now a style on top of the biome's own ramp, as the dry biomes use it. Stones
     # get a warm limestone grey in the open and a darker, cooler one under trees:
     # untinted, the donor pack read pale and pasted on.
     4:
@@ -129,7 +130,6 @@ biomeLooks:
       soil: '#6b5d3e'
       formations: 0.12
       rock: { tint: '#cfc6b4', tone: 0.9 }
-      understory: { tint: '#e6e2b0', tone: 1.05, saturation: 0.9 }
     5: { name: tropical seasonal forest, canopy: '#6fae3e', soil: '#5d4a30', rock: { tint: '#cdbfa6', tone: 0.9 } }
     6:
       name: temperate deciduous forest

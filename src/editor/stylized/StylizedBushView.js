@@ -2,6 +2,7 @@ import { completeIterator, ITERATOR_PENDING } from './ResumableIterator.js';
 import { cachedLodPlan } from './lod/CachedLodPlan.js';
 import { stepViewRebuild } from './StagedViewRebuild.js';
 import * as THREE from 'three/webgpu';
+import { understoryLookAt } from '../biomes/understoryRampLooks.js';
 import { PerfCounters } from '../performance/qa/PerfCounters.js';
 import { materialList } from '../assets/assetUrl.js';
 import { instanceCapacity } from './scatterMath.js';
@@ -21,7 +22,7 @@ import { createPathClearanceField } from './TreeManifestStore.js';
 import { iterateAuthoredMeshPrototypes } from './StylizedPrototypeBake.js';
 import { registerPrototypeIndices } from './BiomeAssetPalette.js';
 import { createBiomePrototypeSelector } from './BiomePrototypeSelector.js';
-import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
+import { placementTileId } from '../biomes/BiomeLooks.js';
 import {
   BUSH_CAST_SHADOW,
   cloneBushMaterial,
@@ -69,11 +70,11 @@ function bushMatrix(placement) {
 }
 
 /** Seed, brightness variation and the understory look of the biome the bush stands in. */
-function bushAppearance(placement, terrainView, looks, forestField) {
+function bushAppearance(placement, terrainView, config, rules, forestField) {
   return {
     seed: placement.priority,
     colorVariation: (0.84 + placement.priority * 0.32) * canopyShade(forestField, placement.x, placement.z),
-    biomeLook: biomeLook(looks, 'understory', placementTileId(terrainView, placement)),
+    biomeLook: understoryLookAt(config, rules[placement.prototypeIndex]?.paletteTileId, placementTileId(terrainView, placement)),
   };
 }
 
@@ -137,7 +138,7 @@ export class StylizedBushView {
     // Instances are written relative to this, not in canonical metres (InstanceAnchor).
     this.instanceAnchor = new InstanceAnchor();
     this.instanceRows = new ScatterInstanceRows('bush', bushMatrix,
-      (placement) => bushAppearance(placement, this.terrainView, this.config.biomeLooks, this.forestFieldProvider?.()));
+      (placement) => bushAppearance(placement, this.terrainView, this.config, this.prototypeBiomeRules, this.forestFieldProvider?.()));
     this.root.name = 'stylized-bushes';
     terrainView.scene.add(this.root);
   }

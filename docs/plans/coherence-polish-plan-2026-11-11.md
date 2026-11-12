@@ -211,7 +211,10 @@ separate them. Two changes toward that, neither seen in a browser:
 - `grass.meadow.appearance.patchCool` / `patchWarm` narrowed, so a field varies
   in value more than in hue.
 
-Known and not fixed: a shared shrub's ramp is built once, from the first tile
+Fixed later the same day (`biomes/understoryRampLooks.js`): each instance's look
+now carries the ratio of the standing tile's ramp to the home one, and
+grassland's compensating `understory` row is gone. Unit-tested, not seen in a
+browser. The original note: a shared shrub's ramp is built once, from the first tile
 in its `tileIds` (`paletteTileId ?? tileIds[0]`), and the per-instance
 `understory` look can only multiply it. A shrub listed `[6, 4, 5, 8, 14]` wears
 the deciduous ramp everywhere. The proper fix is to carry the standing tile's

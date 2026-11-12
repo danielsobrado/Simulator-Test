@@ -24,7 +24,8 @@ import { applyPlantMotion } from './PlantMotionNodes.js';
 import { applyUnderstoryPalette, cloneAuthoredNodeMaterial } from './AuthoredFoliageMaterial.js';
 import { applySkywardNormal } from './forest/foliageLight.js';
 import { canopyShade } from './forest/ForestFloor.js';
-import { biomeLook, placementTileId } from '../biomes/BiomeLooks.js';
+import { placementTileId } from '../biomes/BiomeLooks.js';
+import { understoryLookAt } from '../biomes/understoryRampLooks.js';
 import { createOceanDistanceField } from '../water/OceanDistanceField.js';
 
 const DETAIL_UP = new THREE.Vector3(0, 1, 0);
@@ -157,7 +158,8 @@ export class StylizedGroundDetailView {
       colorVariation: (1 - range * 0.5 + placement.priority * range)
         * canopyShade(this.forestFieldProvider?.(), placement.x, placement.z),
       surfaceData: placement.surfaceData,
-      biomeLook: biomeLook(this.config.biomeLooks, 'understory', placementTileId(this.terrainView, placement)),
+      biomeLook: understoryLookAt(this.config, this.prototypeBiomeRules[placement.prototypeIndex]?.paletteTileId,
+        placementTileId(this.terrainView, placement)),
     };
   }
 
@@ -198,6 +200,8 @@ export class StylizedGroundDetailView {
         this.prototypeShoreRules.push(null);
         this.prototypeBiomeRules.push({
           tileIds: definition.tileIds ?? null,
+          // The tile the part materials' ramp is built for (cloneDetailMaterial below).
+          paletteTileId: definition.paletteTileId ?? definition.tileIds?.[0],
           weight: definition.prototypeWeights?.[groupIndex] ?? definition.weight ?? 1,
           character: definition.character ?? null,
           characterStrength: definition.characterStrength,

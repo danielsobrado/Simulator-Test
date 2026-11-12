@@ -38,7 +38,7 @@ to three things.
 | 5 | Layer membership | `tileIds` of `grass`, `groundDetails`, `bushes`, `rocks`, `trees`, and `flowers`, `forestDebris`, `tropicalKit` where they apply | A layer that does not list the id places nothing there. |
 | 6 | Layer density | each layer's `densityByTile` | Absent means the full `perChunk` budget. This is what makes a desert sparse and a wood full. |
 | 7 | Objects | `assets.groundDetailVariants`, `bushVariants`, `treeVariants`, `rockVariants` | Add the id to the `tileIds` of existing variants that belong, then add new ones. Minimums are in the next table. |
-| 8 | Understory look | `understory` in the look row | Only when shared shrubs read wrong: `tint`, `tone`, `saturation`, applied per instance by the tile it stands on. |
+| 8 | Understory look | `understory` in the look row | A style on top of the biome's own ramp (dusty, frost-dulled, greyed): `tint`, `tone`, `saturation`. Not for matching the grass; shared shrubs already take the local ramp. |
 | 9 | Weather and surface | `snow`, `water`, `ripples`, `prints`, `arid`, `dunes` in the look row | Optional; unlisted columns are neutral. |
 | 10 | Sky | [sky-regions.md](sky-regions.md) | Only if the biome needs its own air. |
 
@@ -86,17 +86,17 @@ for free as long as it is expressed through its rows:
 | --- | --- |
 | Terrain colour and meadow ground pigment | The biome tile is read through a noise nudge of up to `ecotoneReachCells` cells (`terrainMaterial.js`), so two grounds interlock in lobes. |
 | Grass | Each blade takes the palette and habit of the tile under it, on the same nudged lattice, so the grass edge follows the ground edge. |
-| Shrubs and ground plants | Per instance: the `understory` look of the tile the plant stands on. |
+| Shrubs and ground plants | Per instance: the ramp of the tile the plant stands on, as a ratio against the ramp its material was built for (`biomes/understoryRampLooks.js`), times that tile's `understory` look. |
 | Snow on ground and crowns | Blurred over one shared kernel (`biomeCanopySnowAt`), so a border tree carries what the ground under it does. |
 | Ripples, prints | Regional, eased over about 1.5 s round the player ([biome-looks.md](biome-looks.md)). |
 | Sky, fog, light | Regional and eased ([sky-regions.md](sky-regions.md)). |
 
 What does not blend, and so limits what neighbours can look like:
 
-- A shared shrub's colour ramp is built once, from the first id in its
-  `tileIds`. The per-instance look can only multiply it. Put the biome the
-  shrub belongs to first, and give a strongly different neighbour its own
-  variant or an `understory` row.
+- A shared shrub's ramp shift is one multiplier for the whole plant, taken from
+  the middle of the two ramps. It moves the hue family; it does not reshape the
+  ramp, so a shrub from a dark wood stays a little flatter on a pale steppe
+  than a plant authored for it.
 - Trees and props are placed by the tile they stand on, with no mixing band.
   Two woods of very different species meet at the lobed ground edge and no
   softer. Listing one or two species in both biomes softens it.
