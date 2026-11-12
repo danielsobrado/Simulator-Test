@@ -22,10 +22,11 @@ const rows=[
 const record=values=>Object.fromEntries(['shortHeight','tallHeight','width','density','patchMeters','shape','areaStyle'].map((k,i)=>[k,values[i]]));
 test('all thirteen shipped growth rows match their exact specification and custom IDs use grassland',()=>{
  const g=resolveMeadowGrowth(surface.grass.meadow.growth);
- const configuredDensities={5:.95,6:.95,8:.88,9:.88};
+ const configured={5:{density:.95},6:{density:.95},8:{density:.88},9:{density:.88},
+  7:{shortHeight:.2,tallHeight:.6,width:.085,density:.9,patchMeters:9}};
  for(let id=0;id<13;id++) {
   assert.deepEqual(MEADOW_GROWTH_DEFAULTS[id],record(rows[id]));
-  assert.deepEqual(g.profiles[g.table[id]],{...record(rows[id]),density:configuredDensities[id]??rows[id][3]});
+  assert.deepEqual(g.profiles[g.table[id]],{...record(rows[id]),...configured[id]});
  }
  assert.equal(g.table[14],0);assert.equal(g.table[254],0);
  assert.deepEqual(g.profiles[0],record(rows[4]));

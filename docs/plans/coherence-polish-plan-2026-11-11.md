@@ -181,6 +181,23 @@ at the creature grass press (`ede8ba86`) rather than the pigment — but the
 scattered black stems in taiga do not fit that, and the baseline had them
 before that commit.
 
+### Jungle floor direction — 2026-11-12
+
+The user's reference for the rainforest is a floor closed over by broad leaves:
+plants every half metre at two or three heights, several species, one green
+family, soil only in small gaps. Ours is the opposite of what tile 7 was tuned
+for, so its growth row changed: density 0.45 → 0.9, heights 0.14–0.48 →
+0.2–0.6 m, width 0.065 → 0.085, patches 12 → 9 m. The meadow carries the
+carpet because it is one instanced draw; the scanned kit stays the accent
+layer at its 256 cap. Unmeasured: broad blades are fill-bound, so A/B the
+`core-rainforest` pose and pull this row back first if it loses 60 FPS.
+
+What the row cannot give is the species count. The reference reads as five or
+six plants; the carpet is one blade shape. Getting there needs either a second
+and third blade silhouette in `meadowGrassShapes.js` mixed inside one biome
+(the shape id is per blade already, so no extra draw), or more kit scans —
+there are none built and unplaced for the tropics.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA
