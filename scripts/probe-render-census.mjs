@@ -3,15 +3,27 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { acquirePerfRunLock } from './perf-run-lock.mjs';
+import { focusPerfBrowser } from './lib/perf-browser-focus.mjs';
+import { createBrowserErrorMonitor } from './lib/perf-browser-errors.mjs';
 const [qa, extra, out, base = 'http://localhost:5173'] = process.argv.slice(2);
+if (!qa || !out) throw new Error('Usage: probe-render-census.mjs <qa-scenario> "<extra query>" <out.json> [baseUrl]');
+const root = fileURLToPath(new URL('../', import.meta.url));
+fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+const release = acquirePerfRunLock(path.join(root, 'tmp', `perf-browser-${process.platform}.lock`));
+let browser;
+try {
 const url = `${base}/?qa=${qa}&warmup=900&duration=5&download=0&autostart=1${extra ?? ''}`;
-const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=default', '--enable-gpu-rasterization'] });
+browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=default', '--enable-gpu-rasterization'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const browserErrors=[];
-page.on('pageerror',error=>browserErrors.push(error.message));
-page.on('console',message=>{if(message.type()==='error')browserErrors.push(message.text());});
+const browserErrors = createBrowserErrorMonitor(page);
 page.setDefaultTimeout(240000);
+const startupFocus = await focusPerfBrowser(browser, page, { headed: true });
+assert.equal((await startupFocus()).passed, true);
 await page.goto(url, { waitUntil: 'commit' });
+const captureFocus = await focusPerfBrowser(browser, page, { headed: true });
 await page.waitForFunction(() => window.__perfQa != null && window.__editor?.terrainView?.renderer);
 await page.waitForTimeout(75000);
 await page.waitForFunction(()=>window.__editor.stylizedSurface.getPreparationStatus().ready);
@@ -54,13 +66,17 @@ const result = await page.evaluate(async () => {
     backend:tv.rendererBackendStatus.mode,readiness:window.__editor.stylizedSurface.getPreparationStatus(),
     info: { ...r.info.render }, trees, byPass, rows };
 });
-result.browserErrors=browserErrors;
+result.capture = { focus: await captureFocus(), browserErrors: browserErrors.snapshot() };
+fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
-await browser.close();
 assert.equal(result.backend,'webgpu');
 assert.equal(result.readiness.ready,true);
-assert.equal(result.browserErrors.length,0);
+assert.equal(result.capture.browserErrors.count,0);
+assert.equal(result.capture.focus.passed,true);
 assert.equal(result.trees.impostors,result.trees.prototypeCount);
 assert.equal(Object.values(result.trees.byTileId).reduce((sum,entry)=>sum+entry.records,0),result.trees.residentRecords);
 console.log(JSON.stringify({ frames: result.frames, mode: result.mode, status: result.status, info: result.info, byPass: result.byPass }, null, 1));
 for (const row of result.rows.slice(0, 70)) console.log(String(row.draws).padStart(7), String(row.ktris).padStart(7) + 'k', row.k);
+} finally {
+  try { await browser?.close(); } finally { release(); }
+}

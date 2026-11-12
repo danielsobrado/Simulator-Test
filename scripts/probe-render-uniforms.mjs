@@ -2,14 +2,31 @@
 // Usage: node scripts/probe-render-uniforms.mjs <qa-scenario> "<extra query>" <out.json> [baseUrl]
 import fs from 'node:fs';
 import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { acquirePerfRunLock } from './perf-run-lock.mjs';
+import { focusPerfBrowser } from './lib/perf-browser-focus.mjs';
+import { createBrowserErrorMonitor } from './lib/perf-browser-errors.mjs';
 const [qa, extra, out, base = 'http://localhost:5173'] = process.argv.slice(2);
+if (!qa || !out) throw new Error('Usage: probe-render-uniforms.mjs <qa-scenario> "<extra query>" <out.json> [baseUrl]');
+const root = fileURLToPath(new URL('../', import.meta.url));
+fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
+const release = acquirePerfRunLock(path.join(root, 'tmp', `perf-browser-${process.platform}.lock`));
+let browser;
+try {
 const url = `${base}/?qa=${qa}&warmup=900&duration=5&download=0&autostart=1${extra ?? ''}`;
-const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=default', '--enable-gpu-rasterization'] });
+browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=default', '--enable-gpu-rasterization'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const browserErrors = createBrowserErrorMonitor(page);
 page.setDefaultTimeout(240000);
+const startupFocus = await focusPerfBrowser(browser, page, { headed: true });
+assert.equal((await startupFocus()).passed, true);
 await page.goto(url, { waitUntil: 'commit' });
+const captureFocus = await focusPerfBrowser(browser, page, { headed: true });
 await page.waitForFunction(() => window.__perfQa != null && window.__editor?.terrainView?.renderer);
 await page.waitForTimeout(75000);
+await page.waitForFunction(() => window.__editor.stylizedSurface.getPreparationStatus().ready);
 const result = await page.evaluate(async () => {
   const r = window.__editor.terrainView.renderer; const b = r._bindings; const nodes = r._nodes;
   if (!b || !nodes) return { error: 'no _bindings/_nodes', keys: Object.keys(r).filter(k => k.startsWith('_')) };
@@ -50,11 +67,23 @@ const result = await page.evaluate(async () => {
     groups: Object.fromEntries(Object.entries(v.groups).map(([g, e]) => [g, { checksPerDraw: +(e.checks / v.draws).toFixed(2), uniformsPerCheck: +(e.uniforms / e.checks).toFixed(1), texturesPerCheck: +(e.textures / e.checks).toFixed(1) }])),
     objectUniforms: [...v.objU].map(([l, c]) => `${l} x${(c / v.draws).toFixed(2)}`),
   })).sort((a, b2) => (b2.bindMsPerFrame + b2.nodeMsPerFrame) - (a.bindMsPerFrame + a.nodeMsPerFrame));
-  return { frames, rows };
+  const { treeImpostorIntegrity } = await import('/src/editor/stylized/impostor/TreeImpostorIntegrity.js');
+  return { frames, rows, backend: window.__editor.terrainView.rendererBackendStatus.mode,
+    readiness: window.__editor.stylizedSurface.getPreparationStatus(),
+    assetIntegrity: treeImpostorIntegrity(window.__editor.stylizedSurface.treeView) };
 });
+result.capture = { focus: await captureFocus(), browserErrors: browserErrors.snapshot() };
+fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(result, null, 1));
+assert.equal(result.backend, 'webgpu');
+assert.equal(result.readiness.ready, true);
+assert.equal(result.assetIntegrity.ready, true);
+assert.equal(result.capture.browserErrors.count, 0);
+assert.equal(result.capture.focus.passed, true);
 if (result.error) { console.log(JSON.stringify(result)); } else {
   console.log('frames', result.frames);
   for (const row of result.rows.slice(0, 40)) console.log(`${row.k.padEnd(40)} draws ${String(row.draws).padStart(6)} bind ${row.bindMsPerFrame} node ${row.nodeMsPerFrame} updNodes/draw ${row.updateNodesPerDraw} ${JSON.stringify(row.groups)}`);
 }
-await browser.close();
+} finally {
+  try { await browser?.close(); } finally { release(); }
+}

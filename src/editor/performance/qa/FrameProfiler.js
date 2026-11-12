@@ -147,6 +147,7 @@ export class FrameProfiler {
       phases[name] = {
         totalMs: values.reduce((sum, value) => sum + value, 0),
         avgMs: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0,
+        p50Ms: percentile(values, 0.5),
         p95Ms: percentile(values, 0.95),
         maxMs: values.at(-1) ?? 0,
       };

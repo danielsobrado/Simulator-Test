@@ -29,48 +29,38 @@ from reports already on disk:
 The profile predates the understory scans, the density raise and crown shadows,
 so its percentages are a guide to *where to look*, not gates.
 
-## 2. Where the frame stands
+## 2. Where the frame stands — measured phase 0 baseline
 
-1280×720, NVIDIA Lovelace, headed WebGPU, `--warmup 8 --duration 12 --settle`.
+The fresh 2026-11-12 baseline supersedes the reports used to write this plan.
+Headed NVIDIA WebGPU, 1280 × 720, native focus held, `--settle` and
+`--cpu-profile`, unchanged visual settings. Full counters, probe tables,
+commands, source identity and limitations are in
+[perf-qa.md](../perf-qa.md#critical-path-baseline--2026-11-12-phase-0).
 
-| Route | Render CPU avg | Scenery CPU avg / p95 | GPU avg | Frames over 16.7 ms | Worst frame |
-| --- | --- | --- | --- | --- | --- |
-| Forest `--x 2005 --z 2941` | 5.85 ms | — | 2.88 ms | 0.73% | 35.6 ms |
-| Town `settlement-approach` | 6.04 ms | — | 4.13 ms | 2.66% | 64.5 ms |
-| Grassland `--x -1869 --z -4003` | 5.38 ms | 2.62 / 5.0 ms | 2.97 ms | 2.79% | 53.5 ms |
-| Construction ring (11-11) | 6.36 ms | — | — | 4.34% | 179 ms |
-| Standard, dense forest, dense mixed, high grass (11-11) | 4.6–4.9 ms | — | — | 0% | < 8 ms |
+| Route | Frames / avg FPS | Render avg / p50 / p95 / max ms | GPU avg ms | dt p95 / max ms | Frames >16.667 ms | Attributed render spikes |
+| --- | --- | --- | --- | --- | --- | --- |
+| forest | 1129 / 94.19 | 6.883 / 6.500 / 9.900 / 60.200 | 3.665 | 14.4 / 68.8 | 32 (2.834%) | 19/20 |
+| town | 1108 / 92.46 | 6.725 / 6.600 / 7.600 / 20.600 | 4.416 | 13.965 / 35.9 | 23 (2.076%) | 11/11 |
+| grassland | 1352 / 112.76 | 5.024 / 4.800 / 6.645 / 23.900 | 3.166 | 12.645 / 35.8 | 26 (1.923%) | 9/9 |
+| construction | 896 / 74.85 | 6.942 / 6.700 / 9.125 / 48.900 | 3.243 | 20.125 / 76.8 | 64 (7.143%) | 17/17 |
 
-Findings:
 
-1. **The average is not the problem; the tail is.** The median frame callback
-   is 6–10 ms on every route. The 60 FPS floor is broken only by spikes, and
-   in 77 of the 97 over-budget frames examined the callback itself was long
-   (the rest lost their time outside it: GC, compositor, focus).
-2. **The spikes are in `render`.** It is the largest phase in 74 of the 77
-   long callbacks. Scenery work stays inside its budget.
-3. **Water reflection captures are one named cause.** On the grassland route
-   26 capture frames cost 4.4 ms avg, 21.1 ms worst; render p50 is 5.1 ms
-   without a capture and 8.9 ms with one. 6 of that route's 14 render spikes
-   are capture frames. Routes with no water in reach have none.
-4. **Most spikes are still unattributed.** On town and construction ring, 31 of
-   32 render spikes carry no counter that explains them (no capture, no staged
-   first draw, small uploads). The last plan guessed "first draws of newly
-   streamed meshes"; nothing on disk confirms or refutes that.
-5. **Upload volume does not drive render time.** Grassland uploads 262 MB of
-   meadow attributes in 12 s (86 MB of it repacking), yet render time per frame
-   is flat against bytes uploaded (fit: −0.4 ms per MB).
-6. **Steady-state CPU, from the profile:** per-draw binding and node updates
-   about 28% of main-thread time; budgeted scatter manifests 18%
-   (`StableScatterManifest.step`); sun shadow pass 5.7%; **`performance.now()`
-   4.1%** (yield checks in `FrameSlack` and `StylizedBuildQueue`); bloom's
-   passes 3.2%; `updateMatrixWorld` 1.7% self.
-7. **CPU phase times are not immune to contention.** `grassland-a1` and its
-   retry are the same code and pose: 9.84 ms vs 5.38 ms render. The earlier
-   rule "CPU phase time does not depend on focus" is unsafe; the two-cascade
-   rejection (8.03 ms, focus lost) rested on it.
+Town's 11/11 and construction's 17/17 render spikes have cause counters. No
+resources are created in those spikes: draw submission dominates, including
+a 40.4 ms meadow-blade submission in construction. This names a stage for
+phase 2; it does not establish GC as the root cause.
+
+Grassland captures average 3.967 ms, p95 5.850 ms, worst 18.2 ms. The worst
+capture creates 151 render objects, 353 buffers, 309 bind groups and one
+pipeline, and shares a frame with a staged first draw. Its callback is 28 ms.
+The valid-focus two-cascade repeat fails both old ceilings (8.984 ms render
+CPU / 4.255 ms GPU); production stays at one.
 
 ## 3. Phase 0 — make the spikes explain themselves
+
+**Completed.** Attribution 100% on town and construction, all six probes valid,
+all 4320 tests pass; QA-off runtime has no added hooks. See the measured
+[phase 0 record](../perf-qa.md#critical-path-baseline--2026-11-12-phase-0).
 
 Nothing else in this plan can be gated honestly until this lands.
 

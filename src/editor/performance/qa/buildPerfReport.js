@@ -155,6 +155,7 @@ export function buildPerfReport({
       if (index % sampleStride === 0 || frame.hitch) {
         return true;
       }
+      if ((frame.phases.render ?? 0) > (summary.phases.render?.p50Ms ?? 0) + 5) return true;
       const phaseMax = Math.max(0, ...Object.values(frame.phases ?? {}));
       if (phaseMax >= 8) {
         return true;

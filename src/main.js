@@ -1537,6 +1537,12 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     invalidateHistory: () => postProcessingController.invalidate(POST_PROCESSING_RESET_REASONS.MANUAL_RESET) });
   resources.own(drawPreparation);
   drawPreparation.markInitialScene(); terrainView.drawPreparation = drawPreparation;
+  if (perfQaConfig) {
+    const reflections = stylizedSurface.reflections;
+    const targets = new Map((reflections?.targets ?? []).map((target, index) => [target, `waterReflectionCube${index}`]));
+    if (reflections?.planarTarget) targets.set(reflections.planarTarget, 'waterReflectionPlanar');
+    creationDiagnostics.attachPerfCounters(targets, terrainView.scene);
+  }
   const exploration = new ExplorationRuntime({ config, terrainView, viewModeController, container: ui.viewport,
     sceneLoader: stylizedSurface.sceneAssets?.loader,
     grass: () => stylizedSurface.meadowGrass ?? null,

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderSpikeReport, RENDER_CREATION_COUNTERS } from '../src/editor/performance/qa/renderSpikeReport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -33,6 +34,20 @@ console.log(`hitches: ${summary.hitchCount}  rate: ${summary.hitchRate}`);
 console.log(`counters: ${JSON.stringify(counters)}`);
 console.log(`phase max stylized/render: ${summary.phases?.stylized?.maxMs} / ${summary.phases?.render?.maxMs}`);
 console.log(`phase max terrainCommit: ${summary.phases?.terrainCommit?.maxMs}`);
+const renderSpikes = renderSpikeReport(data);
+console.log('--- render spikes: render p50 + 5 ms ---');
+if (!renderSpikes.available) console.log(renderSpikes.reason);
+else {
+  console.log(`render p50=${renderSpikes.p50Ms} ms; threshold=${renderSpikes.thresholdMs} ms; attributed=${renderSpikes.attributed}/${renderSpikes.spikes.length} (${(renderSpikes.attributedShare * 100).toFixed(1)}%)`);
+  console.log(`exclusive stage p50 ms: ${JSON.stringify(renderSpikes.stageP50)}`);
+  console.table(renderSpikes.spikes.map(frame => ({
+    frame: frame.index, dtMs: frame.dtMs, renderMs: frame.renderMs,
+    ...Object.fromEntries(Object.entries(RENDER_CREATION_COUNTERS).map(([label, name]) => [label, frame.counters[name] ?? 0])),
+    auxiliary: Object.entries(frame.counters).filter(([name, value]) => name.startsWith('renderScene:') && value > 0)
+      .map(([name, value]) => `${name.slice('renderScene:'.length)}=${value}`).join(', '),
+    causes: JSON.stringify(frame.causes),
+  })));
+}
 console.log(`hitch dts: ${hitchFrames.map((frame) => frame.dtMs).join(', ')}`);
 
 if (collision) {

@@ -1681,3 +1681,142 @@ Subsequent performance-report commits do not change its runtime files. No
 long-range cascaded-shadow improvement is shipped, and phase 4's later
 performance/visual checks were skipped after its mandatory revert. Earlier
 failed gates were documented and explicitly retained by the user, not relabelled.
+
+## Critical-path baseline — 2026-11-12 (phase 0)
+
+This replaces §2 of the November 12 plan. All five captures are headed NVIDIA
+Lovelace WebGPU at 1280 × 720, with native foreground focus held, zero browser
+errors, settled scenery/collision and 40 loaded tree atlases. Production grass,
+understory, shadows, capture intervals and resolutions are unchanged. The
+previously documented stale-atlas limitation remains; neither arm rebaked them.
+
+Frozen working source: base `6abc7f8e1891f106c6f0cb5f388fc721a4069aca`, runtime manifest
+SHA-256 `75173a7592a2f357aa932df70c63842e3cb89a36f9c6a34153d19c7a61b7656b`. The manifest lists the phase 0 working-file
+overrides; these are the bytes committed with this report. Profiles cover the
+runner's profiling window (including settling), rather than just the 12 measured
+seconds. No tests, builds or other GPU probes ran alongside a timed capture.
+
+Town and construction **pass the ≥80% attribution gate: 11/11 and 17/17**.
+The first creation-only town attempt had 0/14 attributable spikes. Routine shadow
+presence was not accepted as a cause. Exclusive scene setup, matrix walk, draw
+submission and command submission counters were then added, with reusable
+timing state and a bounded set of slow-draw names. An excess is attributed only
+when resource creation occurs, an auxiliary scene accounts for the excess, or
+exclusive stages account for ≥80% of the excess above their complete-run
+medians. This identifies the expensive stage; it does not prove GC or a driver
+stall as the root cause. All wrappers are installed only under perf QA.
+
+| Route | Frames / avg FPS | Render avg / p50 / p95 / max ms | GPU avg ms | dt p95 / max ms | Frames >16.667 ms | Attributed render spikes |
+| --- | --- | --- | --- | --- | --- | --- |
+| forest | 1129 / 94.19 | 6.883 / 6.500 / 9.900 / 60.200 | 3.665 | 14.4 / 68.8 | 32 (2.834%) | 19/20 |
+| town | 1108 / 92.46 | 6.725 / 6.600 / 7.600 / 20.600 | 4.416 | 13.965 / 35.9 | 23 (2.076%) | 11/11 |
+| grassland | 1352 / 112.76 | 5.024 / 4.800 / 6.645 / 23.900 | 3.166 | 12.645 / 35.8 | 26 (1.923%) | 9/9 |
+| construction | 896 / 74.85 | 6.942 / 6.700 / 9.125 / 48.900 | 3.243 | 20.125 / 76.8 | 64 (7.143%) | 17/17 |
+
+Forest and grassland use `chunk-cross` at (2005, 2941) and
+(−1869, −4003), with grassland yaw 142.55359° / pitch −4.58366°. Town uses
+`settlement-approach`. Construction approaches the walls from (0, −100),
+yaw 180°, with 40 s warmup; other routes use 8 s. Each measures 12 s with
+`--settle --gpuTimings 1 --hitchMs 16.667 --cpu-profile`. The table is a new
+instrumented baseline, not an optimization comparison with older QA builds.
+
+### Every town and construction render spike
+
+Threshold is run render p50 + 5 ms. Creation counts (render objects, pipelines,
+buffers/bytes and bind groups) are **all zero on every row below**. Draw CPU is
+the main excess on both routes. The construction frame 159 includes a
+40.4 ms `meadow-grass-blades` submission; the profile is retained for phase 2.
+The matching parser output preserves every target name and counter.
+
+| Route / frame | Render ms | Draw submission ms | Scene setup ms | Matrix walk ms | Command submission ms |
+| --- | --- | --- | --- | --- | --- |
+| town / 53 | 14.000 | 11.400 | 1.500 | 0.800 | 0.300 |
+| town / 54 | 17.300 | 14.100 | 2.600 | 0.600 | 0.200 |
+| town / 57 | 13.700 | 11.400 | 1.900 | 0.500 | 0.000 |
+| town / 58 | 14.000 | 10.600 | 2.400 | 1.100 | 0.100 |
+| town / 839 | 12.900 | 11.000 | 1.400 | 0.400 | 0.200 |
+| town / 842 | 15.000 | 12.000 | 2.300 | 0.800 | 0.100 |
+| town / 843 | 20.600 | 17.400 | 2.200 | 0.700 | 0.300 |
+| town / 844 | 16.700 | 12.600 | 2.700 | 1.500 | 0.000 |
+| town / 845 | 12.800 | 9.900 | 2.200 | 0.900 | 0.300 |
+| town / 847 | 14.500 | 11.700 | 1.700 | 0.500 | 0.700 |
+| town / 848 | 12.600 | 10.000 | 2.000 | 0.700 | 0.100 |
+| construction / 4 | 11.900 | 9.900 | 1.800 | 0.300 | 0.000 |
+| construction / 21 | 12.200 | 10.100 | 1.800 | 0.300 | 0.100 |
+| construction / 22 | 12.200 | 10.400 | 1.400 | 0.300 | 0.100 |
+| construction / 24 | 12.200 | 9.800 | 1.900 | 0.400 | 0.200 |
+| construction / 25 | 12.900 | 10.100 | 1.800 | 0.800 | 0.300 |
+| construction / 26 | 12.400 | 10.500 | 1.300 | 0.800 | 0.000 |
+| construction / 29 | 13.300 | 11.700 | 1.300 | 0.300 | 0.100 |
+| construction / 30 | 12.100 | 10.000 | 1.600 | 0.500 | 0.200 |
+| construction / 32 | 20.100 | 17.500 | 1.900 | 0.500 | 0.400 |
+| construction / 33 | 12.200 | 10.200 | 1.600 | 0.200 | 0.300 |
+| construction / 159 | 48.900 | 47.300 | 1.000 | 0.200 | 0.300 |
+| construction / 441 | 12.100 | 10.100 | 1.700 | 0.200 | 0.100 |
+| construction / 444 | 13.600 | 11.000 | 2.200 | 0.400 | 0.200 |
+| construction / 447 | 12.200 | 10.200 | 1.100 | 0.600 | 0.300 |
+| construction / 454 | 13.500 | 11.100 | 2.300 | 0.300 | 0.000 |
+| construction / 459 | 13.900 | 11.900 | 1.400 | 0.500 | 0.100 |
+| construction / 461 | 13.800 | 11.500 | 2.000 | 0.200 | 0.100 |
+
+### Reflection baseline and two-cascade repeat
+
+| Route | Capture count | CPU avg / p95 / max ms | Longest capture callback ms |
+| --- | --- | --- | --- |
+| forest | 54 | 4.087 / 5.640 / 19.200 | 27.200 |
+| grassland | 27 | 3.967 / 5.850 / 18.200 | 28.000 |
+
+Grassland frame 415 spends 18.2 ms capturing (17.2 ms in cube face 0),
+creating 151 render objects, 353 GPU buffers / 310,304 bytes, 309 bind groups
+and one pipeline. It also runs a staged first draw. Its callback totals 28 ms.
+The frame's own dt is only 7.5 ms because dt measures the preceding RAF
+interval: phase 1 must check callback cost as well as dt, rather than hide the
+stall behind that indexing difference.
+
+The single fresh `?shadowCascades=2` forest trial has valid native focus and
+zero errors: render CPU **8.984 ms** versus the old **5.67 ms** ceiling;
+GPU **4.255 ms** versus **3.75 ms**. It fails both. The earlier
+focus-invalid rejection is not reused; this valid current-workload trial does
+not justify promoting two cascades. Production stays at one.
+
+### Settled census and uniform probes
+
+Both probe scripts acquire `tmp/perf-browser-win32.lock` before launching
+Chromium, release it on every exit, reject lost native foreground focus and
+browser errors, and require complete scenery and tree assets. Each static
+probe samples 3 s after its existing 75 s wait and readiness check. These are
+draw/binding diagnostics, not FPS measurements.
+
+| Pose | Census frames | Draws/frame by render target | Uniform frames | Binding / node CPU ms/frame |
+| --- | --- | --- | --- | --- |
+| forest | 170 | main: 259.000; shadow: 46.000; cube: 8.350; planar: 0.000; other: 16.000 | 171 | 3.320 / 1.251 |
+| grassland | 171 | main: 170.000; shadow: 30.000; cube: 0.000; planar: 0.000; other: 17.740 | 171 | 2.100 / 0.901 |
+| town | 171 | main: 297.000; shadow: 41.650; cube: 0.000; planar: 0.000; other: 16.000 | 171 | 2.542 / 1.012 |
+
+Largest binding/node families (per frame, instrumented):
+
+| Pose | Material / object | Draws | Binding ms | Node ms |
+| --- | --- | --- | --- | --- |
+| forest | terrain-slot | 24.4 | 0.443 | 0.284 |
+| forest | stylized-water | 18 | 0.301 | 0.119 |
+| forest | ShadowMaterial | 46 | 0.275 | 0.129 |
+| forest | stylized-pine-impostor-fallback | 18.6 | 0.186 | 0.046 |
+| forest | stylized-pine-impostor | 14 | 0.193 | 0.029 |
+| grassland | terrain-slot | 18 | 0.337 | 0.220 |
+| grassland | ShadowMaterial | 30 | 0.177 | 0.129 |
+| grassland | stylized-pine-impostor-fallback | 18 | 0.166 | 0.043 |
+| grassland | Meadow leaves | 9 | 0.132 | 0.038 |
+| grassland | stylized-water | 4 | 0.112 | 0.038 |
+| town | terrain-slot | 18 | 0.328 | 0.205 |
+| town | ShadowMaterial | 44.9 | 0.194 | 0.146 |
+| town | stylized-pine-impostor-fallback | 14 | 0.163 | 0.036 |
+| town | settlement-grey\|granite-slate-low\|house\| | 15 | 0.104 | 0.050 |
+| town | RocksStylized_M | 12 | 0.102 | 0.046 |
+
+Artifacts: `tmp/perf-phase0-2026-11-12/` contains the five profiles, five perf reports,
+screenshots, six raw probes, source manifest and per-run logs. The preliminary
+creation-only town run is retained separately and is not the baseline.
+
+Validation: all 4320 tests pass, including actual probe lock contention,
+wrapper restoration, QA-off inactivity, nested render timing, spike retention
+and conservative attribution. No production visual setting changed.
