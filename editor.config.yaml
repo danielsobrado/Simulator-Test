@@ -1554,12 +1554,12 @@ stylizedSurface:
           # Savanna: tussocks over bare laterite, not an even sward.
           3: {shortHeight: 0.25, tallHeight: 0.85, width: 0.05, density: 0.62, patchMeters: 8, shape: slender}
           4: {shortHeight: 0.24, tallHeight: 0.82, width: 0.045, density: 0.92, patchMeters: 17, shape: slender}
-          5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.85, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
-          6: {shortHeight: 0.16, tallHeight: 0.44, width: 0.042, density: 0.85, patchMeters: 10, shape: slender, areaStyle: 0.85}
+          5: {shortHeight: 0.16, tallHeight: 0.5, width: 0.06, density: 0.95, patchMeters: 11, shape: broadleaf, areaStyle: 0.6}
+          6: {shortHeight: 0.16, tallHeight: 0.44, width: 0.042, density: 0.95, patchMeters: 10, shape: slender, areaStyle: 0.85}
           # Rainforest floor is litter and understory with grass islands, not a sward.
           7: {shortHeight: 0.14, tallHeight: 0.48, width: 0.065, density: 0.45, patchMeters: 12, shape: broadleaf, areaStyle: 0.25}
-          8: {shortHeight: 0.18, tallHeight: 0.52, width: 0.062, density: 0.78, patchMeters: 10, shape: broadleaf, areaStyle: 0.3}
-          9: {shortHeight: 0.13, tallHeight: 0.34, width: 0.05, density: 0.8, patchMeters: 12, shape: slender, areaStyle: 0.7}
+          8: {shortHeight: 0.18, tallHeight: 0.52, width: 0.062, density: 0.88, patchMeters: 10, shape: broadleaf, areaStyle: 0.3}
+          9: {shortHeight: 0.13, tallHeight: 0.34, width: 0.05, density: 0.88, patchMeters: 12, shape: slender, areaStyle: 0.7}
           10: {shortHeight: 0.06, tallHeight: 0.16, width: 0.028, density: 0.28, patchMeters: 7, shape: slender, areaStyle: 0.8}
           11: {shortHeight: 0, tallHeight: 0, width: 0, density: 0, patchMeters: 12, shape: slender}
           # Bog: sedge tussocks on the islands, patchy over moss rather than a field.
@@ -1645,7 +1645,7 @@ stylizedSurface:
         valueSpread: 0.16
         # Share of a short stand's stragglers that drop out between tufts, so a
         # forest floor grows plants over litter rather than an even speckle.
-        gapCut: 0.9
+        gapCut: 0.75
       # The ground between stems (meadow/meadowGroundDetailConfig.js): litter
       # drifts, moss hollows, soil pockets and fallen-blade streaks, procedural on
       # the terrain's transition lattice (no sampler), fading to plain turf by
@@ -1686,8 +1686,10 @@ stylizedSurface:
       # grass-test's "high" profile in metres: detail is blade segments, density
       # stems per metre along a tile side, distance a share of maxDistance.
       lod:
-        high: { detail: 5, density: 12.6, distance: 0.12 }
-        medium: { detail: 3, density: 12.6, distance: 0.28 }
+        # 14 since 2026-11-12 (was 12.6): the eye-level captures showed ground between
+        # stems inside 14 m. Unmeasured; 60 FPS is the limit.
+        high: { detail: 5, density: 14, distance: 0.12 }
+        medium: { detail: 3, density: 14, distance: 0.28 }
         low: { detail: 3, density: 5.6, distance: 0.6 }
         veryLow: { detail: 2, density: 2.8, distance: 1 }
       interaction:
@@ -2171,7 +2173,8 @@ stylizedSurface:
   bushes:
     enabled: true
     residentRadius: 2
-    perChunk: 180
+    # 216 since 2026-11-12 (was 180): woods were empty between trunks at eye level.
+    perChunk: 216
     # Biomes 1, 2, 10, 12, 32 now carry dedicated sparse desert ocotillo, boreal
     # juniper, and wetland buttonbush shrubs controlled by densityByTile below.
     tileIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 32]
@@ -2239,7 +2242,8 @@ stylizedSurface:
     # 320 since the scanned understory (understory-aaa-plan-2026-11-10 §8): one
     # plant about every 7 m, so a closed wood has a floor layer and not accents.
     # Temperate woods (6, 8) keep the full budget; densityByTile cannot exceed 1.
-    perChunk: 320
+    # 400 since 2026-11-12, unmeasured: one plant about every 6.4 m.
+    perChunk: 400
     # Deserts (1, 2), Stonehold badlands (32), and tundra (10) join the layer so
     # they stop being bare ground; densityByTile is what keeps them looking like
     # deserts, badlands, and tundra.
@@ -2297,9 +2301,10 @@ stylizedSurface:
     residentRadius: 1
     # A rainforest floor under closed canopy is understory, not lawn: 128 a
     # 128 m chunk left one plant every ~11 m and the floor read as bare park.
-    # Seasonal forest keeps its former 128 through densityByTile.
+    # Seasonal forest takes 0.65 of it (166; 128 until 2026-11-12). Rainforest is
+    # at the validator's 256 cap for this layer.
     perChunk: 256
-    densityByTile: { 5: 0.5 }
+    densityByTile: { 5: 0.65 }
     # Understory grows with the wood, not with the meadow districts that thin
     # floor accents (the meadow channel sat near 0.33 across rainforest).
     regionalChannel: forest

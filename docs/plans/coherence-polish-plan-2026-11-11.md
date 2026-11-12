@@ -107,6 +107,13 @@ tests, captures or perf. Files were syntax-checked only.
    crown self-shadowing; whether groves read or the wood just thinned.
 5. Perf A/B per `docs/perf-qa.md`: `?crownShadows=0` against default at the
    forest and town poses; the chunk-cross run for the tree scatter change.
+   Also A/B the 2026-11-12 density raises in `editor.config.yaml`, each
+   revertible on its own: meadow `lod.high/medium.density` 12.6 → 14 (the
+   costliest draw; measure at the grassland pose), forest-tile growth density
+   (5, 6 → 0.95; 8, 9 → 0.88) and `tufts.gapCut` 0.9 → 0.75,
+   `groundDetails.perChunk` 320 → 400, `bushes.perChunk` 180 → 216, and
+   `tropicalKit.densityByTile.5` 0.5 → 0.65. Rainforest understory was not
+   raised: `tropicalKit.perChunk` sits at the validator's 256 cap.
    The hard limit is 60 FPS: every pose and the chunk-cross run must stay
    above it. Inside that limit, the +0.25 / +0.20 ms budget of the rules below
    may be raised a little for a change whose visual gain is significant (user,
