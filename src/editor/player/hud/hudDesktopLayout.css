@@ -1,0 +1,143 @@
+/*
+ * Desktop arrangement of the walking HUD (2026-11-12): the corners carry the
+ * state and the middle of the screen stays empty. Map and place top right,
+ * vitals top left under the mode switch, the dock alone at the bottom, the
+ * controls as bare type bottom left. A phone already hangs its HUD from the
+ * top (the widgets' own max-width rules), so this file leaves it alone.
+ *
+ * Imported last: it only re-places and quietens what the widget files define.
+ */
+@media (min-width: 761px) and (min-height: 501px) {
+  /* The dock no longer stands on the vitals. */
+  :root {
+    --hud-vitals-height: 0px;
+  }
+
+  /* ── Map and place, top right ──────────────────────────────────────────── */
+  .hud-minimap {
+    top: var(--hud-inset-y);
+    bottom: auto;
+  }
+
+  /* Both names hang under the dial; above it there is only the screen edge. */
+  .hud-minimap__region {
+    top: calc(100% + 18px);
+    bottom: auto;
+    border: 0;
+    background: none;
+    font-size: 11px;
+    text-shadow: var(--hud-text-shadow);
+  }
+
+  /* The dial's rim already carries north and the bearing ticks. */
+  .hud-compass {
+    display: none;
+  }
+
+  /* Under the mode switch, which sits top centre while choosing a spawn. */
+  .player-hud[data-hud-phase='walking'] .hud-status {
+    top: 64px;
+  }
+
+  /* ── Vitals, top left: one bar a row, all filling from the left ────────── */
+  .hud-vitals {
+    top: 64px;
+    bottom: auto;
+    left: var(--hud-inset-x);
+    grid-template-columns: 1fr;
+    gap: 3px;
+    width: 220px;
+    transform: none;
+  }
+
+  .hud-vitals::before {
+    display: none;
+  }
+
+  .hud-vital--mana i::before,
+  .hud-vital--mana i::after,
+  .hud-vital--energy i::before,
+  .hud-vital--energy i::after {
+    right: auto;
+    left: 0;
+  }
+
+  .hud-vital--mana {
+    --vital-fill: linear-gradient(90deg, #323f5e, #5b7398 70%, #8ea3c2);
+    --vital-from: left;
+  }
+
+  .hud-vital--energy {
+    --vital-fill: linear-gradient(90deg, #7d6c4e, #bfae86);
+    --vital-from: left;
+  }
+
+  /* ── Controls and readout: type on the world, no plate ─────────────────── */
+  .hud-legend,
+  .hud-metrics {
+    padding: 0;
+    border: 0;
+    background: none;
+    text-shadow: var(--hud-text-shadow);
+  }
+
+  .hud-legend {
+    gap: 6px;
+    max-width: calc(50vw - 220px);
+  }
+
+  .hud-legend__scene strong {
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .hud-keys {
+    gap: 4px 14px;
+  }
+
+  .hud-keys dt,
+  .hud-keys dd {
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .hud-metrics {
+    right: var(--hud-inset-x);
+    bottom: var(--hud-inset-y);
+  }
+}
+
+/*
+ * Dock slots: flat dark glass with the key as a badge on the lower edge, so the
+ * glyph has the whole face. The element tint stays as a low glow.
+ */
+.spell-dock .spell-slot {
+  background:
+    radial-gradient(110% 90% at 50% 100%, rgb(var(--spell-tint) / var(--spell-glow)), transparent 72%),
+    rgb(18 20 22 / 68%);
+  box-shadow:
+    inset 0 0 0 1px rgb(233 233 230 / 22%),
+    0 2px 6px rgb(0 0 0 / 35%);
+}
+
+.spell-dock .spell-slot[aria-pressed='true'] {
+  box-shadow:
+    inset 0 0 0 1.5px var(--hud-trim-light),
+    0 2px 6px rgb(0 0 0 / 35%);
+}
+
+.spell-dock .spell-slot__key {
+  top: auto;
+  bottom: -6px;
+  left: 50%;
+  min-width: 8px;
+  padding: 2px 4px;
+  translate: -50% 0;
+  border-radius: 2px;
+  background: var(--hud-trim-light);
+  color: #1c1d1f;
+  font: 700 9px/1 var(--hud-font, system-ui, sans-serif);
+  text-align: center;
+  text-shadow: none;
+}

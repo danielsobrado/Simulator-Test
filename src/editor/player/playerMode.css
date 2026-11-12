@@ -5,6 +5,7 @@
 @import './hud/hudCompass.css';
 @import './hud/hudVitals.css';
 @import './mobileControls.css';
+@import './hud/hudDesktopLayout.css';
 
 /* The Edit / Play switch floats over the viewport in every mode. */
 .view-mode-switcher {
