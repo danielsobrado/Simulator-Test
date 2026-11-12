@@ -2635,7 +2635,9 @@ stylizedSurface:
       byTileId:
         5: { grassCoreDensity: 0.24, flowerCoreDensity: 0.06 }
         6: { grassCoreDensity: 0.28, flowerCoreDensity: 0.08 }
-        7: { grassCoreDensity: 0.12, grassEdgeDensity: 0.45, flowerCoreDensity: 0.04 }
+        # A rainforest floor is a closed broadleaf carpet under the canopy too (was
+        # 0.12 / 0.45, which left it bare litter: 2026-11-12 captures).
+        7: { grassCoreDensity: 0.85, grassEdgeDensity: 0.95, flowerCoreDensity: 0.04 }
         8: { grassCoreDensity: 0.32, flowerCoreDensity: 0.06 }   # rainforest floor: moss and grass islands
         9: { grassCoreDensity: 0.28, flowerCoreDensity: 0.04 }
         12: { grassCoreDensity: 0.22, flowerCoreDensity: 0.04 }

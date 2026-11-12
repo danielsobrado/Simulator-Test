@@ -223,6 +223,22 @@ tile id in the shader, and a live look. This is not the cause of the pale
 teal grassland shrubs: computed, their colour comes out olive (`#3e5d2a` to
 `#99b14f`), so something after the palette pales them.
 
+### First live check — 2026-11-12, `tmp/reference-check-2026-11-12` and `-12b`
+
+Five poses through `qa:look`, all gates passing, no browser errors.
+
+- Trunk stipple is gone in `core-rainforest` and `core-taiga`: the bump slope cap was the fix.
+- The rainforest carpet only appeared once `forestFloor.byTileId.7` rose from
+  0.12 / 0.45 to 0.85 / 0.95; the growth row alone left the canopy floor bare.
+  A bare earth patch remains mid-frame at that pose.
+- Blades read near-black in crown shade over ground that stays green
+  (`core-deciduous`, `core-taiga`). Raising `appearance.fill` from 0.025 to 0.12
+  changed nothing visible and was reverted. The ground and the blades take the
+  same shadow map, so the difference is in what each adds in shade; not found.
+- Pale slab and plants in taiga and pale shrubs in grassland are unchanged by
+  the shrub ramp shift, so they are not a palette problem.
+- Not measured: frame cost of the rainforest carpet.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA
