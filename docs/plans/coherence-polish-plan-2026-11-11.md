@@ -107,7 +107,12 @@ tests, captures or perf. Files were syntax-checked only.
    crown self-shadowing; whether groves read or the wood just thinned.
 5. Perf A/B per `docs/perf-qa.md`: `?crownShadows=0` against default at the
    forest and town poses; the chunk-cross run for the tree scatter change.
-   Turn `crownShadows` off again if it is over budget, and try stage 6 trial B.
+   The hard limit is 60 FPS: every pose and the chunk-cross run must stay
+   above it. Inside that limit, the +0.25 / +0.20 ms budget of the rules below
+   may be raised a little for a change whose visual gain is significant (user,
+   2026-11-12) — record the new cost next to the change. Turn `crownShadows`
+   off again only if it breaks 60 FPS or costs far more than the shade is
+   worth, and then try stage 6 trial B.
 
 ### Seen in the captures, not changed — needs a live look
 
@@ -195,7 +200,9 @@ fixture. So "fold in" cannot mean "take over" for those two. Rule used below:
    tree counts or shaders runs the A/B of `docs/perf-qa.md` against the commit
    before it, same `--warmup`. Budget, as in the coherence plan §6.4:
    `summary.phases.render.avgMs` within +0.25 ms and `gpuRender.total.avgMs`
-   within +0.20 ms unless the stage states its own budget. Config-value-only
+   within +0.20 ms unless the stage states its own budget. A significant
+   visual gain may go a little over, as long as the run stays above 60 FPS
+   (user, 2026-11-12); state the measured cost. Config-value-only
    stages need no run.
 5. `npm test` passes before every commit.
 6. After each stage, send the user the before/after of that stage's shots.

@@ -14,7 +14,8 @@ shadowCascades: 1
 # Coherence-polish plan, stage 6: near tree crowns cast sun shadows, for shade
 # and dapple under a wood. On since 2026-11-11 from the evenly lit forest floors
 # in that day's captures, but its frame cost is NOT measured yet: A/B against
-# ?crownShadows=0 at the forest and town poses, and turn it off if over budget.
+# ?crownShadows=0 at the forest and town poses. It may go a little over the
+# stage budget, but turn it off if those poses do not stay above 60 FPS.
 crownShadows: true
 snowRelief: true
 roadsideLanterns: false
