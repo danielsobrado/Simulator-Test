@@ -195,10 +195,53 @@ Small, independent items; each is its own commit and its own A/B.
 **Gate.** Each item: render CPU avg not higher than the baseline arm's mean in
 both runs, forest and town; item 2 and 3 also lower the census draw count.
 
-## 9. Not in this plan
+## 9. Phase 6 — selection stays on the GPU, nothing read back
 
-- **Meadow upload volume** (262 MB per 12 s). Finding 5: it does not move the
-  frame. Worth its own look for memory-bus and battery reasons, not for FPS.
+**Why.** The frame is CPU-bound with about 13 ms of GPU headroom at 720p, so
+work that only decides *what to draw* belongs on the GPU. The runtime already
+reads nothing back: the only `mapAsync` is the diagnostics path of
+`src/render/occlusion/GpuOcclusion.js`, and the only pixel readbacks are the
+impostor baker and the town-kit atlas build. That stays a rule: **no runtime
+decision may wait on a readback.** `GpuOcclusion` is the pattern to copy — a
+compute pass writes indirect draw arguments, the main pass draws through them.
+
+**Candidates, in order.** Each is its own commit and A/B.
+
+1. **Meadow band selection.** Today a tile's rows are compacted and repacked
+   in a worker and re-uploaded when its band or visibility changes: 262 MB of
+   uploads per 12 s on the grassland route, 86 MB of it repacking, plus
+   `MeadowBandBatch` publication on the main thread. Instead, upload each
+   tile's full row page once, and let a compute pass per band write the
+   visible-instance index list and the indirect instance count from the
+   camera, band distances and the tile's fade state. Band changes then cost no
+   upload at all. Same blades, same bands, same fades.
+2. **Scatter view culling.** The instanced tree, bush, rock and ground-detail
+   views compare and repack instance rows on the CPU
+   (`stylizedInstanceRowsCompared`, the "view-cull repacks" `FrameSlack` was
+   written for). Keep every resident row on the GPU and cull per instance in
+   compute, as `GpuTreeImpostorBatch` already does for impostors; retire the
+   CPU path for the main view and for reflection captures
+   (`treeImpostorAuxiliary*`).
+3. **`detailVisibility`** (Hi-Z occlusion, off in
+   `config/render-enhancements.yaml`). With phase 0's baseline, A/B it at the
+   forest and town poses: it removes draws the player cannot see, which is
+   free quality-wise. Turn it on only if render CPU falls in both runs.
+
+**What stays on the CPU, deliberately.** Scatter *placement* (manifests):
+collision, gameplay and the editor need those positions, so generating them on
+the GPU would force exactly the readback this phase forbids. Phase 4 covers it.
+
+**Gate.** Item 1: `meadowRepackBytes` zero and `meadowAttributeBytesUploaded`
+down by at least half on the grassland route; grass coverage and recovery
+gates pass; blade and card captures at grassland and high-grass poses match
+the baseline; GPU time within +0.3 ms. Item 2: `stylizedInstanceRowsCompared`
+zero while moving; scenery CPU p95 lower; reflections show the same trees.
+All items: render CPU avg not higher than the baseline arm's mean, and no
+`mapAsync` or `readRenderTargetPixels` call reachable with diagnostics off
+(add a test that greps the runtime modules for them).
+
+## 10. Not in this plan
+
 - **Updating the sun shadow map less often.** It would save about 5% CPU and
   crown shadows sway with the wind, so a held map is a visible quality change.
 - **Render bundles (`BundleGroup`) for town interiors and shells.** Plausible,
@@ -209,7 +252,7 @@ both runs, forest and town; item 2 and 3 also lower the census draw count.
   2026-11-10.
 - Any change to densities, distances, resolutions, cascades or post effects.
 
-## 10. Expected result
+## 11. Expected result
 
 | | Now | After phases 0–3 | Basis |
 | --- | --- | --- | --- |
