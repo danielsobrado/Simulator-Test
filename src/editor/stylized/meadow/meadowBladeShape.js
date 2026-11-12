@@ -28,6 +28,7 @@ import { sampleWorldWindCanonical, windWaveCoordinates } from '../../weather/win
 import { groundDeformationNode } from '../deformation/groundDeformationNode.js';
 import { stylizedDirtMask, stylizedPathWearMask } from '../StylizedNoiseNodes.js';
 import { MEADOW_SHAPE_COUNT } from './meadowGrassShapes.js';
+import { MAX_MEADOW_PALETTES } from './meadowPalettes.js';
 import { MEADOW_MAX_BODY_BEND } from './meadowInteractionBend.js';
 import { meadowGrowthNodes } from './meadowGrowthNodes.js';
 
@@ -47,11 +48,11 @@ export function meadowInstance(originUniform, { cards = false } = {}) {
   const tile = publication.xy;
   const data = attribute('instanceData', 'vec4');
   const base = vec3(tile.x.add(position.x), position.y, tile.y.add(position.z));
-  // The look code: shape + 3 × (palette + 8 × growth).
+  // The look code: shape + 3 × (palette + MAX_MEADOW_PALETTES × growth).
   const code = cards ? floor(data.x.div(4)) : floor(data.x);
   const combined = floor(code.div(MEADOW_SHAPE_COUNT));
-  const growth = floor(combined.div(8));
-  const palette = combined.mod(8);
+  const growth = floor(combined.div(MAX_MEADOW_PALETTES));
+  const palette = combined.mod(MAX_MEADOW_PALETTES);
   const shape = code.mod(MEADOW_SHAPE_COUNT);
   return {
     base,

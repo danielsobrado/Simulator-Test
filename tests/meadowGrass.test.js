@@ -345,10 +345,10 @@ test('per-biome palettes ride in the look code beside the shape', () => {
   assert.equal(settings.palette.palettes.length, 3);
   const count = 3;
   assert.equal(settings.shapeTable[4], 0, 'default shape, default palette');
-  assert.equal(settings.shapeTable[9], 0 + count * (1 + 8 * settings.growth.table[9]));
-  assert.equal(Math.floor(settings.shapeTable[10] / 3) % 8, 1);
+  assert.equal(settings.shapeTable[9], 0 + count * (1 + 16 * settings.growth.table[9]));
+  assert.equal(Math.floor(settings.shapeTable[10] / 3) % 16, 1);
   assert.notEqual(settings.shapeTable[10], settings.shapeTable[9], 'taiga and tundra have distinct growth');
-  assert.equal(settings.shapeTable[12], 1 + count * (2 + 8 * settings.growth.table[12]), 'reed keeps its shape under its palette');
+  assert.equal(settings.shapeTable[12], 1 + count * (2 + 16 * settings.growth.table[12]), 'reed keeps its shape under its palette');
   // Without palette overrides the growth code still carries the natural shape.
   assert.equal(resolveMeadowGrassConfig({ shapes: { byTileId: { 12: 'reed' } } }).shapeTable[12] % 3, 1);
 });

@@ -130,10 +130,10 @@ until the player is near it.
 
 ## Limits to know before starting
 
-- **Eight meadow palettes** (`MAX_MEADOW_PALETTES`): the base plus seven
-  distinct `byTileId` pairs, and all seven are in use (3, 5 and 6 together, 7,
-  8, 9, 10, 12). A new grass biome must share an existing pair or the limit
-  must be raised first. Frosted biomes count as their frosted pair.
+- **Sixteen meadow palettes** (`MAX_MEADOW_PALETTES`): the base plus fifteen
+  distinct `byTileId` pairs, eight in use. It is the radix of the blade's look
+  code, so raising it again means checking the code still fits its float.
+  Frosted biomes count as their frosted pair.
 - **Sixteen growth profiles** (`MAX_MEADOW_GROWTH_PROFILES`), ten in use.
 - **Three blade silhouettes** (`meadowGrassShapes.js`). A biome's floor is one
   silhouette; variety comes from the accent layer.

@@ -1,4 +1,5 @@
-import { encodeLookTable } from './meadowPalettes.js';
+import { encodeLookTable, MAX_MEADOW_PALETTES } from './meadowPalettes.js';
+import { MEADOW_SHAPE_COUNT } from './meadowGrassShapes.js';
 
 export const meadowGrowthSignature = p => JSON.stringify([
   p.shortHeight,p.tallHeight,p.width,p.density,p.patchMeters,p.shape,
@@ -30,7 +31,7 @@ export function meadowPageGrowthKey(tiles,growth,looks) {
 }
 export function applyMeadowGrowth(field,next) {
   const previous=field.settings.growth,growth=reconcileMeadowGrowth(previous,next);
-  const palette=Uint8Array.from(field.settings.shapeTable,code=>Math.floor(code/3)%8);
+  const palette=Uint8Array.from(field.settings.shapeTable,code=>Math.floor(code/MEADOW_SHAPE_COUNT)%MAX_MEADOW_PALETTES);
   const looks=encodeLookTable(growth.shapes,palette,growth.table);
   field.settings.growth=growth;field.settings.shapeTable=looks;
   for(let i=0;i<16;i++) {

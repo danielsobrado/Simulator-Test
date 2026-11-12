@@ -6,11 +6,16 @@ import { MEADOW_SHAPE_COUNT } from './meadowGrassShapes.js';
  * grass-test paints one field, so it has one blade base and tip. A world of
  * biomes wants its taiga cooler and its savanna drier than that meadow, without
  * a draw per colour. So each biome's palette index rides in the stem's look code
- * beside its silhouette — `code = shape + 3 × (palette + 8 × growth)`, one
+ * beside its silhouette — `code = shape + 3 × (palette + 16 × growth)`, one
  * small integer per tile id — and the pigment reads its base and tip from a
  * uniform array by that index. No attribute is added; the batch stays one draw.
+ *
+ * The limit is the packing's radix, not a GPU bound: the uniform arrays are as
+ * long as the palettes in use. 16 (was 8, full with the standard biomes) keeps
+ * the largest code at 767, exact in the float that carries it with the path
+ * fraction (blades) or the atlas cell (cards, code × 4).
  */
-export const MAX_MEADOW_PALETTES = 8;
+export const MAX_MEADOW_PALETTES = 16;
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 

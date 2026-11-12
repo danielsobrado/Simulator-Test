@@ -44,11 +44,11 @@ test('invalid growth values and excessive distinct profiles name their exact con
  assert.throws(()=>resolveMeadowGrowth({byTileId:overrides}),/growth exceeds 16 profiles/);
 });
 test('every shape/palette/growth/card variant round trips exactly through Uint16 look codes and float storage',()=>{
- for(let growth=0;growth<16;growth++)for(let palette=0;palette<8;palette++)for(let shape=0;shape<3;shape++) {
+ for(let growth=0;growth<16;growth++)for(let palette=0;palette<16;palette++)for(let shape=0;shape<3;shape++) {
   const codes=encodeLookTable(new Uint8Array(256).fill(shape),new Uint8Array(256).fill(palette),new Uint8Array(256).fill(growth));
   assert.ok(codes instanceof Uint16Array);
   for(let id=0;id<256;id++) {
-   const code=codes[id];assert.equal(code%3,shape);assert.equal(Math.floor(code/3)%8,palette);assert.equal(Math.floor(code/24),growth);
+   const code=codes[id];assert.equal(code%3,shape);assert.equal(Math.floor(code/3)%16,palette);assert.equal(Math.floor(code/48),growth);
    for(let variant=0;variant<4;variant++) {
     const packed=Math.fround(code*4+variant),unpacked=Math.floor(packed/4);
     assert.equal(unpacked,code);assert.equal((unpacked%3)*4+packed%4,shape*4+variant);
