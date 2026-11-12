@@ -51,7 +51,7 @@ a 40.4 ms meadow-blade submission in construction. This names a stage for
 phase 2; it does not establish GC as the root cause.
 
 Grassland captures average 3.967 ms, p95 5.850 ms, worst 18.2 ms. The worst
-capture creates 151 render objects, 353 buffers, 309 bind groups and one
+capture's frame creates 151 render objects, 353 buffers, 309 bind groups and one
 pipeline, and shares a frame with a staged first draw. Its callback is 28 ms.
 The valid-focus two-cascade repeat fails both old ceilings (8.984 ms render
 CPU / 4.255 ms GPU); production stays at one.
@@ -90,6 +90,12 @@ non-zero cause counter. `npm test` passes. No runtime behaviour change with
 perf QA off.
 
 ## 4. Phase 1 — reflection captures never share a frame with other spikes
+
+**Rejected and reverted after measurement.** Preparation alone reaches
+5.4 ms worst capture but misses p95 (4.6 ms >4 ms). Bounded deferral and
+ground-detail/flower omission also miss timing gates; omission does not
+preserve the river image pair. All phase 1 code was restored to phase 0.
+Retained water acceptance passes. See [trial results and captures](../performance-phase0-1-2026-11-12.md).
 
 **Why.** Finding 3. A capture is a second scene render in its own render
 context, so its first use of each material pays pipeline and bind-group

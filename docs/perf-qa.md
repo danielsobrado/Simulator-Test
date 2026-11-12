@@ -1820,3 +1820,19 @@ creation-only town run is retained separately and is not the baseline.
 Validation: all 4320 tests pass, including actual probe lock contention,
 wrapper restoration, QA-off inactivity, nested render timing, spike retention
 and conservative attribution. No production visual setting changed.
+
+## Critical-path phase 1 outcome — 2026-11-12
+
+**Rejected and reverted.** Preparation alone reduces the observed worst
+grassland capture from 18.2 to 5.4 ms, but p95 4.6 ms misses the 4 ms gate.
+Adding bounded deferral yields p95 5.78 ms and a 19 ms capture callback.
+Adding ground-detail/flower omission yields p95 5.04 ms and a 25.4 ms callback,
+and the river image pair does not preserve visible near-bank detail. All
+three trials have valid native focus, complete scenery and zero errors; each
+contains 27 captures. None passes every phase 1 gate.
+
+The [full trial record and image pairs](performance-phase0-1-2026-11-12.md)
+include exact runtime hashes, callback/RAF indexing, tests and skipped gates.
+Only phase 0 remains. Retained water acceptance passes every gate on NVIDIA
+WebGPU with native focus, zero GPU errors and 7.9 ms frame p95. Existing long
+frames remain; this is not a 60 FPS tail fix.
