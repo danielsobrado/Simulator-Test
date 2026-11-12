@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { attribute, context, mix, normalGeometry, normalViewGeometry, positionGeometry, positionView, texture, uv, vec3 } from 'three/tsl';
+import { attribute, context, float, mix, normalGeometry, normalViewGeometry, positionGeometry, positionView, texture, uv, vec3 } from 'three/tsl';
 import { authoredTexture } from '../AuthoredTextureNode.js';
 import { applyBarkWeathering } from '../barkWeathering.js';
 import { gradeBark, resolveBarkGrade } from './barkGrade.js';
@@ -13,12 +13,22 @@ import { applyTreeBarkWetSurface } from './TreeWetSurface.js';
 
 const colorNode = value => vec3(...new THREE.Color(value).toArray());
 
+/** tan of the steepest tilt the height bump may add: about 31°. */
+const MAX_BUMP_SLOPE = 0.6;
+
 export function barkBumpNormal(height) {
   const dx = positionView.dFdx(), dy = positionView.dFdy();
   const tangentX = dy.cross(normalViewGeometry), tangentY = normalViewGeometry.cross(dx);
   const determinant = dx.dot(tangentX);
-  const gradient = determinant.sign().mul(height.dFdx().mul(tangentX).add(height.dFdy().mul(tangentY)));
-  return determinant.abs().mul(normalViewGeometry).sub(gradient).normalize();
+  // Slope of the height field, as a view-space vector in the surface plane.
+  const slope = determinant.sign().mul(height.dFdx().mul(tangentX).add(height.dFdy().mul(tangentY)))
+    .div(determinant.abs().max(1e-12));
+  // Capped: a scanned bark's height steps a third of its range between texels,
+  // which is a 70° tilt at 2.4 mm a texel, and the screen derivative is per 2x2
+  // quad. Uncapped, near trunks drew as black-and-white blocks where the normal
+  // tipped past the light (2026-11-12 captures, core-rainforest and core-taiga).
+  const limited = slope.mul(float(MAX_BUMP_SLOPE).div(slope.length().max(MAX_BUMP_SLOPE)));
+  return normalViewGeometry.sub(limited).normalize();
 }
 
 /** Packed RG normals decoded in each projection's derivative tangent frame. */

@@ -1,7 +1,12 @@
 import {
   attribute,
+  dot,
   float,
+  floor,
+  fract,
   mix,
+  positionGeometry,
+  sin,
   step,
   smoothstep,
   vec3,
@@ -12,6 +17,19 @@ import { characterOcclusionKeep } from '../../character/CharacterOcclusion.js';
 import { setPreInstancePosition } from './preInstancePosition.js';
 import { applyCanopySnow, canopySnowCap, canopySnowTransmission, crownUpNode, trunkSnow, trunkSnowCap, withStormSnow } from '../forest/canopySnow.js';
 import { applyTreeFoliageSnowSurface } from '../forest/TreeFoliageSurface.js';
+
+/**
+ * Share of a crown's 25 cm cells that cast a sun shadow. A crown is porous: with
+ * every leaf casting, a closed deciduous wood halved its ground brightness
+ * (101 to 56) and lost its lit-to-shade contrast (2026-11-12 captures). The
+ * cells sit in the prototype's own space, so the dapple does not swim.
+ */
+const CROWN_SHADOW_COVER = 0.6;
+
+function crownShadowCell() {
+  const cell = floor(positionGeometry.mul(4));
+  return fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))).mul(43758.5453)).lessThan(CROWN_SHADOW_COVER);
+}
 
 export function createSourceOpacityNode(material) {
   if (material.opacityNode) return material.opacityNode;
@@ -134,7 +152,8 @@ export function createDitheredMaterial(sourceMaterial, {
   if (kind === 'leaf') {
     const alive = attribute('instanceMorphology', 'vec3').y.greaterThan(0);
     const keep = characterOcclusionKeep().and(alive);
-    material.maskShadowNode = material.maskNode ? material.maskNode.and(alive) : alive;
+    const casts = alive.and(crownShadowCell());
+    material.maskShadowNode = material.maskNode ? material.maskNode.and(casts) : casts;
     material.maskNode = material.maskNode ? material.maskNode.and(keep) : keep;
   }
   material.alphaTest = sourceOpacity

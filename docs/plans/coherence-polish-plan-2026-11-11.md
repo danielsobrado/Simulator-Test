@@ -147,6 +147,40 @@ new images. No visual setting was tuned by this capture pass.
   blob clouds, hard horizon outside the rainforest, wide shore smear, and the
   HUD: all need a capture to tune. Stages 2, 3, 4 and 7 cover them.
 
+## Third pass — 2026-11-12, from the coherence capture handoff
+
+Read from `docs/coherence-capture-handoff-2026-11-12.md` and its captures.
+Code only again: nothing below was run.
+
+| Seen | Change | Where |
+| --- | --- | --- |
+| Trunk stipple survived the second pass (`core-rainforest`, `core-taiga`). The blocks are 2×2 pixels, which is a screen derivative, not a texture. | The height bump's slope is capped at 0.6 (about 31°). A scanned height steps far more than that between texels, and the bump normal tipped past the light. The second-pass loader and gradient changes stay; neither is confirmed as needed. | `forest/TreeBarkMaterial.js` `barkBumpNormal` |
+| Crown shadows halve the ground under a closed wood: `core-deciduous-off-12` ground mean 101 with crowns off, 56 on, and contrast fell from 76 to 55, under the look bible's 70. | Crowns cast through 60% of their 25 cm cells (`CROWN_SHADOW_COVER`), fixed in the prototype's space. Tune that one number against `groundContrast` ≥ 70. | `lod/StylizedDitheredMaterial.js` |
+
+For the next QA pass:
+
+1. Same poses. The nearest trunk in `core-rainforest-off-12` and
+   `core-taiga-off-12` first. If stipple remains, capture once with
+   `trees.barkSurface.parallax.enabled: false`: that separates the relief
+   march from the bump.
+2. `core-deciduous-off-12` and `wetland-off-12` ground mean and contrast, crowns
+   on and off. Wetland fell from 59 to 25 and has no crowns-off control yet.
+3. `npm run bake:impostors` is still owed, now also for these two files.
+
+Not explained by crown shadows, and not changed: `coast-storm-12` has no trees
+near it and still fell from 47 to 38 against the 2026-11-10 baseline, so the
+storm shots darkened for another reason, somewhere in the commits between.
+`tundra-snow`, `snow-eye-snow` and `town-rain-12` failed the same gates in the
+baseline with near-identical values; they are not regressions of this work.
+
+Still open from the second pass, unchanged: the pale slab and pale plants in
+taiga, the pale shrubs in grassland, the plant mounds (scan rebuild owed), and
+the black blades. One new observation on the last: in `grassland-off-12` the
+black blades form one patch a few metres across beside an animal, which points
+at the creature grass press (`ede8ba86`) rather than the pigment — but the
+scattered black stems in taiga do not fit that, and the baseline had them
+before that commit.
+
 ## Context
 
 The request: plan, from the existing captures, how to bring the look to an AAA
