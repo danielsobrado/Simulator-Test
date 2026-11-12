@@ -39,10 +39,16 @@ capture of a changed tree before turning them into gates.
 | --- | --- | --- |
 | Vegetated ground at clear noon, `ground.sat` | 0.30–0.55 | 0.16–0.68 |
 | Temperate grass, `ground.hue` | 65°–95° | 47°–112° |
-| Lit to shade under sun, `groundContrast` | at least 70 | 50–86 |
+| Lit to shade under sun, `groundContrast` | at least 45 under closed canopy, 70 in the open | 50–86 |
 | Sky zenith, `sky.sat` | 0.35–0.50 | 0.23–0.50 |
 | Horizon band on open ground, `horizon.sat` | at least 0.15 | 0.05–0.19 |
 | Dark bare earth from the air, `mudShare` | half the baseline | not measured |
+
+The canopy figure was 70 until 2026-11-12. Crown shadows at full strength met it
+but drew shaded grass near-black; `sky.shadowIntensity: 0.7` keeps shaded grass
+green and measures 47 in `core-deciduous`, 63 in `core-taiga`, 69 in
+`core-rainforest`, against 70 on open grassland and 90 at the forest edge. Shade
+that stays in the biome's hue family outranks the number (user, 2026-11-12).
 
 ## What this rules out
 

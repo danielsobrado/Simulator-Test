@@ -253,8 +253,8 @@ Found by hiding scene layers and toggling lights in a scripted browser at the
 - **Black grass was shadow depth, not a bug.** It vanished with sun shadows off.
   `sky.shadowIntensity: 0.7` keeps shaded blades green. Cost: `groundContrast`
   fell to 47 in `core-deciduous` and 63 in `core-taiga`, under the look bible's
-  70. Either the target or this value has to move; `CROWN_SHADOW_COVER` is the
-  other lever.
+  70. Decided 2026-11-12: 0.7 stays and the look bible's canopy target is 45.
+  `CROWN_SHADOW_COVER` is the other lever.
 - Still open: `bush-boreal-juniper-01` is one blob card and reads as a slab even
   in the right colour (asset rebuild); grassland's pale shrubs; the bare earth
   patch in `core-rainforest`; conifer lean; plant variety.
