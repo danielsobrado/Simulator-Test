@@ -11,6 +11,82 @@ line 1622): terrain commit → scenery preparation → player → streaming →
 `stylizedSurface.update` → ambience → `drawPreparation.flushBudgeted` →
 `terrainView.render`.
 
+## 0. Revision — 2026-11-13, after phases 0 and 1
+
+Phase 0 landed (`5d2798c2`); phase 1 was rejected and reverted
+([record](../performance-phase0-1-2026-11-12.md)). The
+[phase 0 baseline](../perf-qa.md#critical-path-baseline--2026-11-12-phase-0)
+replaces §2. Three things in this plan change because of it.
+
+### 0.1 Phase 1's gate was wrong; re-land preparation alone
+
+The p95 ≤ 4 ms gate in §4 was this plan's mistake. Preparing the capture
+context can only remove *first-use* cost; it was never going to move the
+steady cost of a capture, which is what p95 measures. Preparation alone did
+what it was for and was thrown away on that number:
+
+| Grassland | Baseline | Preparation only |
+| --- | --- | --- |
+| Worst capture | 18.2 ms | 5.4 ms |
+| Longest capture callback | 28.0 ms | 14.3 ms |
+| Capture avg / p95 | 3.97 / 5.85 ms | 3.30 / 4.60 ms |
+| Render CPU avg | 5.02 ms | 4.88 ms |
+
+That is one ordered trial, not an A/B. **Phase 1b:** re-apply the
+preparation-only patch kept in `tmp/perf-phase1-2026-11-12/`, and run the
+A/B/A/B on grassland and forest. New gate, in every change-arm run: worst
+capture ≤ 6 ms; no capture callback over 16.7 ms (callback cost, not dt —
+phase 0 showed dt hides it); capture p95 and render CPU avg not higher than
+the baseline arm's mean; water acceptance passes. Deferral and omission stay
+rejected: deferral made the worst callback worse, and omission removed a
+visible near-bank reflection.
+
+### 0.2 Phase 2 is narrower than §5 guessed
+
+Phase 0 attributed all 28 town and construction spikes, and **none creates a
+resource**: no pipelines, buffers, bind groups or render objects. Three of
+§5's four rows are therefore dead. The excess is draw submission, 10–17 ms
+against a normal 4–5 ms, arriving in runs of consecutive frames (town 53–58
+and 839–848; construction 21–33 and 441–461). Two different things are in
+there:
+
+1. **Buffer uploads inside draws (construction).** One `meadow-grass-blades`
+   draw took 40.4 ms on its own. A rough slice of the phase 0 profile (spike
+   renders against normal ones — crude segmentation, direction only) puts
+   `writeBuffer` at about +3.4 ms per spike render there. Uploads do not move
+   the *average* frame (§2 finding 5) but a large one landing in a single draw
+   is a spike. Fix: no meadow publication may upload more than the sliced
+   initial-upload path allows per frame (`meadowInitialGpuUploadMaxFrameBytes`
+   is the existing bound; publications and repacks do not honour it). §9
+   item 1 removes the cause; this bounds it meanwhile.
+2. **The same draws costing several times more (town).** In the same rough
+   slice every per-draw function grows together, with no upload or creation
+   behind it, plus 1.2–1.5 ms of garbage collection per spike render that
+   normal renders do not have. That pattern fits either many objects taking a
+   full refresh at once or the same work running slower; the counters cannot
+   tell which. **Before any fix,** add two per-frame counters under perf QA:
+   draws by refresh type (`FULL` / `SHARED` / `NONE` from `needsRefresh`) and
+   draws per callback. If `FULL` jumps in the spike runs, find what bumps
+   those objects (a shared uniform, a material version, a matrix) and stop it.
+   If it does not, take an allocation profile of the town route and remove
+   the per-frame garbage it names.
+
+Phase 2's gate in §5 stands, measured against the phase 0 baseline:
+frames over 16.7 ms are 2.8% forest, 2.1% town, 1.9% grassland, 7.1%
+construction.
+
+### 0.3 Two cascades are closed
+
+The valid-focus repeat measured 8.98 ms render CPU against the 5.67 ms
+ceiling. The earlier rejection was right; §2 finding 7's doubt about it is
+withdrawn. The finding itself (contention moves CPU phase time) stands.
+
+### 0.4 Order from here
+
+1b (preparation, corrected gate) → 2 (upload bound, then the refresh
+counters) → 3 → 4 → 6 item 1 → 5 → the rest of 6. Phase 6 item 1 moves ahead
+of phase 5 because it now removes a measured spike, not just upload volume.
+
 ## 1. Evidence, and what it is not
 
 **No new measurement was taken for this plan.** Another session was running a
