@@ -1,8 +1,9 @@
 import { beveledBox, quarterTurnUv } from '../ProceduralWorkshopGeometry.js';
-import { buildWallCourses } from '../ProceduralWorkshopMasonry.js';
-import { boxFacades, facadeBeam, facadePoint } from './HouseFacade.js';
+import { buildWallCourses, stackCourses } from '../ProceduralWorkshopMasonry.js';
+import { createRandom, mixSeed } from '../ProceduralRandom.js';
+import { addFacadeColumn, boxFacades, facadeBeam, facadePoint } from './HouseFacade.js';
 import { buildOpenings } from './HouseOpenings.js';
-import { timberFrame } from './HouseTimberFrame.js';
+import { stoneTimberFrame, timberFrame } from './HouseTimberFrame.js';
 import { layLogWall } from './HouseLogWall.js';
 
 /** Masonry is laid this far below the ground line so a gentle slope never shows a gap. */
@@ -106,26 +107,70 @@ export function layStoneWall(kit, facade, { thickness, openings = [], ground = f
   for (const stone of stones) kit.add('stone', stone.translate(0, y0, 0));
 }
 
-/** Alternating long-and-short dressed corner stones at both ends of a facade. */
-export function layQuoins(kit, facade, { thickness, ground = false }) {
+/**
+ * Heavy sculpted corner boulder quoins at both ends of a facade.
+ *
+ * Courses vary in height with a broader battered foundation boulder at the base,
+ * deeply pillowed bevels, alternating long-and-short reach, and a chiseled cap
+ * tenon at the top of the corner stack.
+ */
+export function layQuoins(kit, facade, { thickness, ground = false, roofed = false, sideWall = false }) {
   const y0 = facade.y0 - (ground ? GROUND_SINK : 0);
-  const course = 0.34;
-  const count = Math.max(2, Math.round((facade.y1 - y0) / course));
-  const height = (facade.y1 - y0) / count;
+  const totalHeight = facade.y1 - y0;
+  const courses = stackCourses(
+    totalHeight,
+    0.45,
+    createRandom(mixSeed(kit.recipe.seed, kit.seedOffset() + (sideWall ? 0x51de : 0x901a))),
+  );
+  const count = courses.length;
+  const inset = sideWall ? thickness : 0;
   for (const end of [0, 1]) {
     for (let row = 0; row < count; row += 1) {
-      const long = (row + end) % 2 === 0;
-      const length = long ? 0.62 : 0.36;
-      const u = end === 0 ? length / 2 - 0.02 : facade.length - length / 2 + 0.02;
-      // A quoin is a dressed stone, so it keeps the reduced jitter the
-      // irregularity kernel reserves for structural dressings.
+      const course = courses[row];
+      const isBase = ground && row === 0;
+      const long = (row + end + (sideWall ? 1 : 0)) % 2 === 0;
+      const baseLength = sideWall
+        ? (long ? 0.44 : 0.28)
+        : (long ? 0.74 : 0.48);
+      const lengthJitter = 0.92 + (((row * 37 + end * 19) % 17) / 17) * 0.16;
+      const length = Math.min(
+        (facade.length - inset * 2) * 0.36,
+        baseLength * lengthJitter * (isBase ? 1.15 : 1),
+      );
+      if (length < 0.18) continue;
+      const outerProud = isBase ? 0.115 : long ? 0.088 : 0.062;
+      const stoneDepth = thickness + outerProud;
+      const centerD = -thickness / 2 + outerProud / 2;
+      const edgeProtrusion = sideWall ? -0.01 : 0.045;
+      const u = end === 0
+        ? inset + length / 2 - edgeProtrusion
+        : facade.length - inset - length / 2 + edgeProtrusion;
       kit.stone({
         width: length,
-        height: height * 0.94,
-        depth: long ? thickness + 0.06 : thickness * 0.8,
-        position: facadePoint(facade, u, y0 + height * (row + 0.5), -thickness / 2 + 0.035),
+        height: course.height * (isBase ? 0.97 : 0.94),
+        depth: stoneDepth,
+        position: facadePoint(facade, u, y0 + course.y, centerD),
         rotation: [0, facade.yaw, 0],
-      }, { category: 'quoin', heightRatio: row / count });
+        batter: isBase ? 0.22 : row === count - 1 ? 0.08 : 0.04,
+      }, {
+        category: isBase || long ? 'boulder' : 'quoin',
+        heightRatio: row / Math.max(1, count),
+      });
+    }
+    // Sculpted pyramidal corner tenon cap stone on primary facades, as in the modular cottage reference.
+    if (!sideWall && count >= 3) {
+      const capSize = 0.22;
+      const capHeight = 0.12;
+      const capU = end === 0 ? capSize * 0.65 : facade.length - capSize * 0.65;
+      const capY = facade.y1 - (roofed ? ROOF_SEAT : 0) + capHeight * 0.42;
+      kit.stone({
+        width: capSize,
+        height: capHeight,
+        depth: capSize,
+        position: facadePoint(facade, capU, capY, -thickness * 0.28),
+        rotation: [0, facade.yaw, 0],
+        batter: 0.34,
+      }, { category: 'quoin', heightRatio: 1 });
     }
   }
 }
@@ -146,9 +191,8 @@ export function layPlasterWall(kit, facade, { thickness }) {
 }
 
 /**
- * Vertical board cladding: a backing panel with battens over the joints,
- * broken around openings, and corner posts. Openings are proud inserts, as on
- * a plaster wall.
+ * Vertical board cladding: a backing panel with varied-width hand-sawn planks
+ * and battens over the joints, broken around openings, and heavy corner columns.
  */
 export function layBoardWall(kit, facade, { thickness, openings = [] }) {
   const span = wallSpan(facade, thickness);
@@ -172,8 +216,11 @@ export function layBoardWall(kit, facade, { thickness, openings = [] }) {
       y0: facade.y0 + opening.bottom - 0.12,
     };
   });
-  const pitch = 0.26;
-  for (let u = pitch / 2; u < facade.length; u += pitch) {
+  let boardIndex = 0;
+  for (let u = 0.16; u < facade.length - 0.12;) {
+    const pitch = 0.21 + ((boardIndex * 29) % 11) * 0.011;
+    const battenWidth = 0.055 + ((boardIndex * 13) % 7) * 0.004;
+    const battenProud = 0.03 + ((boardIndex * 17) % 5) * 0.004;
     const blockers = extents.filter(({ u0, u1 }) => u > u0 && u < u1).sort((a, b) => a.y0 - b.y0);
     let start = facade.y0;
     const segments = [];
@@ -184,11 +231,21 @@ export function layBoardWall(kit, facade, { thickness, openings = [] }) {
     if (facade.y1 > start) segments.push([start, facade.y1]);
     for (const [a, b] of segments) {
       if (b - a < 0.1) continue;
-      kit.add('wood', facadeBeam(facade, [u, a, 0.01], [u, b, 0.01], 0.06, { proud: 0.03 }));
+      kit.add('wood', facadeBeam(facade, [u, a, 0.012], [u, b, 0.012], battenWidth, { proud: battenProud }));
     }
+    u += pitch;
+    boardIndex += 1;
   }
-  for (const u of [0.07, facade.length - 0.07]) {
-    kit.add('wood', facadeBeam(facade, [u, facade.y0, 0.02], [u, facade.y1, 0.02], 0.14, { proud: 0.08 }));
+  for (const u of [0.09, facade.length - 0.09]) {
+    addFacadeColumn(kit, facade, u, facade.y0, facade.y1, {
+      size: 0.18,
+      proud: 0.1,
+      d: 0.025,
+      foot: true,
+      capital: true,
+      tenon: false,
+      pegs: true,
+    });
   }
 }
 
@@ -200,9 +257,10 @@ function frameFor(storey, side) {
 /**
  * Build every wall of a storey with the openings the resolver placed on it.
  *
- * A stone storey lays coursed walls with voids, quoins and dressed openings; a
- * plaster storey lays a shell per face, half-timbering around its openings and
- * casements proud of it. Each wall is emitted as its own facade host.
+ * A stone storey lays coursed walls with voids, quoins, structural timber
+ * columns/wall plates and dressed openings; a plaster storey lays a shell per
+ * face, half-timbering around its openings and casements proud of it. Each wall
+ * is emitted as its own facade host.
  */
 export function buildStorey(kit, storey, resolved) {
   // A log-built town (recipe `walls: 'logs'`) raises every timber or plaster storey in logs.
@@ -220,9 +278,18 @@ export function buildStorey(kit, storey, resolved) {
     kit.within(host, () => {
       if (storey.wall === 'stone') {
         layStoneWall(kit, facade, { thickness, openings, ground: storey.ground });
-        if (storey.quoins !== false && (side === 'front' || side === 'back')) {
-          layQuoins(kit, facade, { thickness, ground: storey.ground });
+        if (storey.quoins !== false) {
+          layQuoins(kit, facade, {
+            thickness,
+            ground: storey.ground,
+            roofed: storey.roofed ?? false,
+            sideWall: side === 'left' || side === 'right',
+          });
         }
+        stoneTimberFrame(kit, framing[side], {
+          openings,
+          roofed: storey.roofed ?? false,
+        });
       } else if (storey.wall === 'boards') {
         layBoardWall(kit, facade, { thickness, openings });
       } else if (storey.wall === 'logs') {

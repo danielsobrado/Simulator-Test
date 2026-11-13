@@ -131,12 +131,7 @@ export function buildingRecipe(style, kind, variantIndex, { detail = 2, finishIn
     walls: castleLike ? 'default' : (style.walls ?? 'default'),
     roofPitch: style.roofPitch ?? 40,
     weathering: 0.3,
-    // Coursed and tidy. At the workshop's default (0.45) every stone is turned,
-    // skewed and pushed out by up to a hand's breadth, and a street of such
-    // walls reads as blocks jostling each other. A town is dressed stone: the
-    // bevel on each block and the shadow in each joint draw it, as on the glade
-    // walls (construction/), so the blocks themselves stay in their courses.
-    irregularity: 0.14,
+    irregularity: castleLike ? 0.14 : 0.38,
     windows: true,
     ivy: false,
     remesh: true,

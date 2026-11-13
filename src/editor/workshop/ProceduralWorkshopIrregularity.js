@@ -47,12 +47,14 @@ export const DEFAULT_IRREGULARITY = 0.45;
  * as cut stone while field masonry goes rough (04-…md §8, §10).
  */
 export const IRREGULARITY_CATEGORY_SCALE = Object.freeze({
+  rubble: 1.18,
   field: 1,
   shingle: 1,
+  boulder: 0.78,
   coping: 0.5,
   ashlar: 0.45,
-  quoin: 0.35,
-  voussoir: 0.3,
+  quoin: 0.58,
+  voussoir: 0.35,
   // Crenellation ornaments: slightly quieter than field rubble so the crown
   // reads as worked stone without the full field jitter budget.
   merlon: 0.55,
@@ -115,6 +117,7 @@ export function offsetAlongLocalY(rotation, distance) {
 const HASH_SHAPE = 0x5f3759df;
 const HASH_ROTATION = 0x9e3779b9;
 const HASH_SKEW = 0x85ebca6b;
+const HASH_QUAD = 0xc2b2ae35;
 
 function laneSigned(hash, shift) {
   return ((((hash >>> shift) & 255) / 255) - 0.5) * 2;
@@ -200,4 +203,59 @@ export function stoneJitter(recipe, params, stableIndex, category = 'field', {
     ],
     protrusion,
   };
+}
+
+/**
+ * Pillowed bevel ratio for hand-cut workshop masonry units (rubble, boulders,
+ * quoins and field stone), giving stones rounded, shadow-catching arrises
+ * rather than razor-sharp box edges.
+ */
+export function pillowedBevelRatio(recipe, params, shaped, stableIndex, category = 'field') {
+  if (Number.isFinite(params?.bevelRatio)) return params.bevelRatio;
+  const amount = irregularityAmount(recipe, category);
+  const quadHash = mixSeed((recipe?.seed ?? 1) ^ HASH_QUAD, stableIndex);
+  const base = category === 'boulder' || category === 'quoin'
+    ? 0.155
+    : category === 'rubble' || category === 'field'
+      ? 0.135
+      : 0.095;
+  return Math.min(0.24, base + laneUnit(quadHash, 0) * (0.045 + 0.05 * amount));
+}
+
+/**
+ * Derive a 4-corner planar quad `[bottomLeft, bottomRight, topRight, topLeft]`
+ * for a masonry stone so its head joints lean independently and its top/bottom
+ * bed edges slope and taper organically instead of lying on a rigid grid.
+ */
+export function stoneQuadCorners(recipe, params, shaped, stableIndex, category = 'field') {
+  const amount = irregularityAmount(recipe, category);
+  const quadHash = mixSeed((recipe?.seed ?? 1) ^ HASH_QUAD, stableIndex);
+  const skewHash = mixSeed((recipe?.seed ?? 1) ^ HASH_SKEW, stableIndex);
+  if (Array.isArray(params?.corners) && params.corners.length === 4) {
+    const nudgeX = Math.min(0.018, shaped.width * 0.035) * amount;
+    const nudgeY = Math.min(0.014, shaped.height * 0.035) * amount;
+    return [
+      [params.corners[0][0] + laneSigned(quadHash, 0) * nudgeX, params.corners[0][1] + laneSigned(quadHash, 8) * nudgeY],
+      [params.corners[1][0] + laneSigned(quadHash, 16) * nudgeX, params.corners[1][1] + laneSigned(quadHash, 24) * nudgeY],
+      [params.corners[2][0] + laneSigned(skewHash, 16) * nudgeX, params.corners[2][1] + laneSigned(skewHash, 24) * nudgeY],
+      [params.corners[3][0] + laneSigned(skewHash, 0) * nudgeX, params.corners[3][1] + laneSigned(skewHash, 8) * nudgeY],
+    ];
+  }
+  const halfW = Math.max(0.04, shaped.width / 2);
+  const halfH = Math.max(0.04, shaped.height / 2);
+  const batter = Number.isFinite(params?.batter) ? params.batter : 0;
+  const bottomSpread = halfW * (1 + batter * 0.5);
+  const topSpread = halfW * Math.max(0.45, 1 - batter * 0.5);
+  const [skewTop, skewBottom] = shaped.skew ?? [0, 0];
+  const leftLean = laneSigned(quadHash, 8) * halfW * 0.11 * amount;
+  const rightLean = laneSigned(quadHash, 16) * halfW * 0.11 * amount;
+  const bottomSlope = laneSigned(quadHash, 24) * halfH * 0.12 * amount;
+  const topSlope = laneSigned(skewHash, 16) * halfH * 0.12 * amount;
+  const pinch = laneSigned(skewHash, 24) * halfH * 0.06 * amount;
+  return [
+    [-bottomSpread + skewBottom + leftLean, -halfH - bottomSlope + pinch],
+    [bottomSpread + skewBottom + rightLean, -halfH + bottomSlope - pinch],
+    [topSpread + skewTop - rightLean * 0.6, halfH + topSlope + pinch],
+    [-topSpread + skewTop - leftLean * 0.6, halfH - topSlope - pinch],
+  ];
 }

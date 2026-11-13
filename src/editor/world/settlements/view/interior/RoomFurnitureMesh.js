@@ -37,11 +37,34 @@ const DRAW = {
   hearth(b, p, floor, ceiling) {
     const { x, z } = p;
     b.use('stone');
-    // Jambs, a heavy lintel, a breast running up to the ceiling, and a raised hearthstone.
-    b.box(x - 0.85, x - 0.5, z, z + 0.6, floor, floor + 1.25, HEARTH_STONE);
-    b.box(x + 0.5, x + 0.85, z, z + 0.6, floor, floor + 1.25, HEARTH_STONE);
-    b.box(x - 0.95, x + 0.95, z, z + 0.66, floor + 1.25, floor + 1.6, shade(HEARTH_STONE, 1.08), { underside: true });
-    b.box(x - 0.7, x + 0.7, z, z + 0.42, floor + 1.6, floor + ceiling, shade(HEARTH_STONE, 0.92));
+    // Multi-course irregular stone jambs, arched/stepped lintel, and coursed chimney breast up to the ceiling.
+    const jambCourses = [
+      [0.0, 0.34, 0.42, 0.64, 0.94],
+      [0.34, 0.66, 0.36, 0.58, 1.04],
+      [0.66, 0.96, 0.40, 0.62, 0.96],
+      [0.96, 1.25, 0.37, 0.60, 1.02],
+    ];
+    for (const [y0, y1, w, d, tint] of jambCourses) {
+      b.box(x - 0.48 - w, x - 0.48, z, z + d, floor + y0, floor + y1 - 0.015, shade(HEARTH_STONE, tint));
+      b.box(x + 0.48, x + 0.48 + w, z, z + d - 0.02, floor + y0, floor + y1 - 0.015, shade(HEARTH_STONE, 2 - tint));
+    }
+    // Heavy multi-block stone mantel/lintel course.
+    b.box(x - 0.96, x - 0.28, z, z + 0.68, floor + 1.25, floor + 1.58, shade(HEARTH_STONE, 1.08), { underside: true });
+    b.box(x - 0.26, x + 0.26, z, z + 0.72, floor + 1.23, floor + 1.62, shade(HEARTH_STONE, 1.14), { underside: true });
+    b.box(x + 0.28, x + 0.96, z, z + 0.67, floor + 1.25, floor + 1.58, shade(HEARTH_STONE, 1.04), { underside: true });
+    // Stepped irregular stone courses up the chimney breast to the ceiling.
+    let breastY = 1.6;
+    let row = 0;
+    while (breastY < ceiling - 0.05) {
+      const courseH = Math.min(ceiling - breastY, 0.32 + (row % 3) * 0.06);
+      const halfW = Math.max(0.54, 0.76 - row * 0.035);
+      const depth = Math.max(0.38, 0.52 - row * 0.02);
+      const splitX = x + ((row % 2 === 0 ? -1 : 1) * 0.14);
+      b.box(x - halfW, splitX - 0.012, z, z + depth, floor + breastY, floor + breastY + courseH - 0.015, shade(HEARTH_STONE, 0.92 + (row % 2) * 0.08));
+      b.box(splitX + 0.012, x + halfW, z, z + depth - 0.02, floor + breastY, floor + breastY + courseH - 0.015, shade(HEARTH_STONE, 1.0 - (row % 2) * 0.07));
+      breastY += courseH;
+      row += 1;
+    }
     b.box(x - 0.95, x + 0.95, z + 0.6, z + 0.95, floor, floor + 0.08, shade(HEARTH_STONE, 0.8));
     b.wall(x - 0.5, z + 0.03, x + 0.5, z + 0.03, floor, floor + 1.25, [0, 1], SOOT);
     b.use('wood');

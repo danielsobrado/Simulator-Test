@@ -2,10 +2,10 @@ import * as THREE from 'three/webgpu';
 import { archedPanel, beveledBox, leaf, quarterTurnUv } from '../ProceduralWorkshopGeometry.js';
 import { FOLIAGE_BASE_COLOR } from '../ProceduralWorkshopMaterials.js';
 import { tagOpeningGeometry } from '../ProceduralWorkshopSemantics.js';
-import { facadeBeam, facadeMatrix, facadePoint } from './HouseFacade.js';
+import { facadeBeam, facadeMatrix, facadePeg, facadePoint } from './HouseFacade.js';
 
-const FRAME = 0.09;
-const FRAME_PROUD = 0.07;
+const FRAME = 0.115;
+const FRAME_PROUD = 0.095;
 const STONE_DRESSING_DEPTH = 0.3;
 
 /** Facade-space geometry of a resolved opening. */
@@ -48,14 +48,16 @@ function panel(facade, frame, d, depth, { inset = 0 } = {}) {
   return quarterTurnUv(geometry.applyMatrix4(facadeMatrix(facade)));
 }
 
-/** Timber members around the opening, with the arch head as a segmented curve. */
-function timberSurround(facade, frame, d, size) {
+/** Timber members around the opening, with overhanging eared lintels, pegs, and segmented arch heads. */
+function timberSurround(facade, frame, d, size, { sill = false } = {}) {
   const beams = [];
-  const beam = (a, b) => beams.push(facadeBeam(facade, a, b, size, { proud: FRAME_PROUD }));
+  const beam = (a, b, memberSize = size, proud = FRAME_PROUD) => (
+    beams.push(facadeBeam(facade, a, b, memberSize, { proud }))
+  );
   const left = frame.u - frame.width / 2 - size / 2;
   const right = frame.u + frame.width / 2 + size / 2;
-  beam([left, frame.bottom, d], [left, frame.springY, d]);
-  beam([right, frame.bottom, d], [right, frame.springY, d]);
+  beam([left, frame.bottom - (sill ? size * 0.35 : 0), d], [left, frame.springY + size * 0.25, d]);
+  beam([right, frame.bottom - (sill ? size * 0.35 : 0), d], [right, frame.springY + size * 0.25, d]);
   if (frame.arched) {
     const segments = 7;
     const radius = frame.radius + size / 2;
@@ -68,15 +70,35 @@ function timberSurround(facade, frame, d, size) {
       );
     }
   } else {
-    beam([left - size / 2, frame.springY + size / 2, d], [right + size / 2, frame.springY + size / 2, d]);
+    const ear = size * 0.72;
+    beam(
+      [left - ear, frame.springY + size * 0.55, d + 0.012],
+      [right + ear, frame.springY + size * 0.55, d + 0.012],
+      size * 1.18,
+      FRAME_PROUD * 1.18,
+    );
+    beams.push(facadePeg(facade, left, frame.springY + size * 0.55, d + FRAME_PROUD * 0.65));
+    beams.push(facadePeg(facade, right, frame.springY + size * 0.55, d + FRAME_PROUD * 0.65));
+  }
+  if (sill) {
+    const sillEar = size * 0.68;
+    beam(
+      [left - sillEar, frame.bottom - size * 0.48, d + 0.018],
+      [right + sillEar, frame.bottom - size * 0.48, d + 0.018],
+      size * 1.12,
+      FRAME_PROUD * 1.24,
+    );
   }
   return beams;
 }
 
-/** Glazing bars: a transom and mullions, including the joins of a multi-panel assembly. */
+/**
+ * Glazing bars: a transom, mullions, and diagonal diamond-lattice muntins across
+ * each casement pane, matching the diamond-leaded cottage windows in the reference.
+ */
 function glazingBars(facade, frame, opening, d) {
   const bars = [];
-  const bar = (a, b) => bars.push(facadeBeam(facade, a, b, 0.045, { proud: 0.035 }));
+  const bar = (a, b, size = 0.045, proud = 0.035) => bars.push(facadeBeam(facade, a, b, size, { proud }));
   const members = opening.memberOpenings ?? [];
   const boundaries = [];
   for (let index = 1; index < members.length; index += 1) {
@@ -89,6 +111,24 @@ function glazingBars(facade, frame, opening, d) {
   for (const u of boundaries) bar([u, frame.bottom, d], [u, frame.springY, d]);
   const transom = frame.bottom + (frame.springY - frame.bottom) * 0.62;
   bar([frame.u - frame.width / 2, transom, d], [frame.u + frame.width / 2, transom, d]);
+
+  // Diamond-lattice diagonal muntin bars inside each pane.
+  const paneEdges = [frame.u - frame.width / 2, ...boundaries, frame.u + frame.width / 2];
+  const y0 = frame.bottom + 0.03;
+  const y1 = frame.springY - 0.03;
+  const yMid = (y0 + y1) / 2;
+  for (let i = 0; i < paneEdges.length - 1; i += 1) {
+    const u0 = paneEdges[i] + 0.03;
+    const u1 = paneEdges[i + 1] - 0.03;
+    if (u1 - u0 < 0.14 || y1 - y0 < 0.22) continue;
+    const uMid = (u0 + u1) / 2;
+    bar([u0, yMid, d], [uMid, y1, d], 0.03, 0.024);
+    bar([uMid, y1, d], [u1, yMid, d], 0.03, 0.024);
+    bar([u1, yMid, d], [uMid, y0, d], 0.03, 0.024);
+    bar([uMid, y0, d], [u0, yMid, d], 0.03, 0.024);
+    bar([u0, y0, d], [u1, y1, d], 0.028, 0.022);
+    bar([u1, y0, d], [u0, y1, d], 0.028, 0.022);
+  }
   return bars;
 }
 
@@ -101,18 +141,19 @@ function facadeRoll(facade, roll) {
   return [euler.x, euler.y, euler.z];
 }
 
-/** Voussoirs round an arch, or a lintel over a square head, plus a sill. */
-function stoneDressings(kit, facade, frame, thickness, { sill }) {
-  const d = -thickness / 2 + 0.03;
+/** Voussoirs round an arch, or an overhanging eared lintel over a square head, plus jamb blocks and sill. */
+function stoneDressings(kit, facade, frame, thickness, { sill, door = false }) {
+  const outerProud = 0.06;
+  const d = -thickness / 2 + outerProud / 2;
   if (frame.arched) {
     const ringRadius = frame.radius + STONE_DRESSING_DEPTH / 2;
-    const count = Math.max(5, 2 * Math.round(Math.PI * ringRadius / 0.52) + 1);
+    const count = Math.max(5, 2 * Math.round(Math.PI * ringRadius / 0.48) + 1);
     for (let index = 0; index < count; index += 1) {
       const angle = Math.PI * (index + 0.5) / count;
       kit.stone({
-        width: Math.PI * ringRadius / count * 0.9,
+        width: Math.PI * ringRadius / count * 0.92,
         height: STONE_DRESSING_DEPTH,
-        depth: thickness + 0.04,
+        depth: thickness + outerProud,
         position: facadePoint(
           facade,
           frame.u + Math.cos(angle) * ringRadius,
@@ -124,21 +165,40 @@ function stoneDressings(kit, facade, frame, thickness, { sill }) {
     }
   } else {
     kit.stone({
-      width: frame.width + 0.5,
+      width: frame.width + 0.56,
       height: 0.28,
-      depth: thickness + 0.04,
-      position: facadePoint(facade, frame.u, frame.springY + 0.14, d),
+      depth: thickness + outerProud + 0.03,
+      position: facadePoint(facade, frame.u, frame.springY + 0.14, d + 0.015),
       rotation: [0, facade.yaw, 0],
-    }, { category: 'ashlar', heightRatio: 0.7 });
+    }, { category: 'quoin', heightRatio: 0.7 });
+  }
+  // Alternating sculpted stone jamb blocks on windows (doorways have heavy timber jamb columns).
+  if (!door) {
+    const jambRows = Math.max(2, Math.round((frame.springY - frame.bottom) / 0.28));
+    const rowHeight = (frame.springY - frame.bottom) / jambRows;
+    for (const side of [-1, 1]) {
+      for (let row = 0; row < jambRows; row += 1) {
+        const long = (row + (side > 0 ? 1 : 0)) % 2 === 0;
+        const jambWidth = long ? 0.24 : 0.17;
+        const u = frame.u + side * (frame.width / 2 + jambWidth / 2);
+        kit.stone({
+          width: jambWidth,
+          height: rowHeight * 0.94,
+          depth: thickness + outerProud + (long ? 0.025 : 0.01),
+          position: facadePoint(facade, u, frame.bottom + rowHeight * (row + 0.5), d + 0.01),
+          rotation: [0, facade.yaw, 0],
+        }, { category: 'quoin', heightRatio: 0.5 });
+      }
+    }
   }
   if (sill) {
     kit.stone({
-      width: frame.width + 0.22,
-      height: 0.12,
-      depth: thickness + 0.12,
-      position: facadePoint(facade, frame.u, frame.bottom - 0.06, d + 0.05),
+      width: frame.width + 0.36,
+      height: 0.15,
+      depth: thickness + 0.15,
+      position: facadePoint(facade, frame.u, frame.bottom - 0.075, d + 0.055),
       rotation: [0, facade.yaw, 0],
-    }, { category: 'ashlar', heightRatio: 0.3 });
+    }, { category: 'quoin', heightRatio: 0.3 });
   }
 }
 
@@ -240,16 +300,19 @@ export function buildWindow(kit, facade, opening, {
     const d = -thickness * 0.6;
     pieces.push(['recess', panel(facade, frame, d, 0.04)]);
     for (const bar of glazingBars(facade, frame, opening, d + 0.03)) pieces.push(['wood', bar]);
-    stoneDressings(kit, facade, frame, thickness, { sill: true });
+    if (!frame.arched) {
+      for (const beam of timberSurround(facade, frame, 0.015, FRAME * 0.85, { sill: true })) pieces.push(['wood', beam]);
+    }
+    stoneDressings(kit, facade, frame, thickness, { sill: true, door: false });
   } else {
     pieces.push(['recess', panel(facade, frame, 0.015, 0.03)]);
-    for (const beam of timberSurround(facade, frame, 0.03, FRAME)) pieces.push(['wood', beam]);
+    for (const beam of timberSurround(facade, frame, 0.03, FRAME, { sill: true })) pieces.push(['wood', beam]);
     for (const bar of glazingBars(facade, frame, opening, 0.04)) pieces.push(['wood', bar]);
     pieces.push(['wood', beveledBox({
-      width: frame.width + 0.24,
-      height: 0.07,
-      depth: 0.15,
-      position: facadePoint(facade, frame.u, frame.bottom - 0.035, 0.07),
+      width: frame.width + 0.28,
+      height: 0.08,
+      depth: 0.17,
+      position: facadePoint(facade, frame.u, frame.bottom - 0.04, 0.08),
       rotation: [0, facade.yaw, 0],
       detail: 1,
     })]);
@@ -311,9 +374,9 @@ export function buildDoor(kit, facade, opening, { wall = 'plaster', thickness = 
     })]);
   }
   if (wall === 'stone') {
-    stoneDressings(kit, facade, frame, thickness, { sill: false });
+    stoneDressings(kit, facade, frame, thickness, { sill: false, door: true });
   } else {
-    for (const beam of timberSurround(facade, frame, 0.03, 0.12)) pieces.push(['wood', beam]);
+    for (const beam of timberSurround(facade, frame, 0.03, 0.13)) pieces.push(['wood', beam]);
   }
   emit(kit, pieces, { ...opening, door: true });
   if (step && opening.bottom < 0.05) {

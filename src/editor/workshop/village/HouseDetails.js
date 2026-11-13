@@ -1,9 +1,11 @@
 import { beveledBox, cylinder } from '../ProceduralWorkshopGeometry.js';
-import { buildWallCourses } from '../ProceduralWorkshopMasonry.js';
+import { buildWallCourses, stackCourses } from '../ProceduralWorkshopMasonry.js';
+import { createRandom, mixSeed } from '../ProceduralRandom.js';
 import { beamBetween, boxFacades, facadeBeam, facadePoint } from './HouseFacade.js';
 
 /**
- * A coursed stone chimney stack with a coping slab and clay pots.
+ * A coursed stone chimney stack with chunky corner quoin boulders, a stepped
+ * necking band, a coping slab and clay pots.
  *
  * Each face is laid with the same packed courses as the walls, around a mortar
  * core, so the stack reads as built stone rather than a textured box.
@@ -34,11 +36,37 @@ export function buildChimney(kit, { x, z, width = 0.9, depth = 0.9, y0, y1, pots
       kit.add('stone', stone.translate(0, y0, 0));
     }
   }
+  // Sculpted irregular corner boulders along the front and back faces of the chimney stack.
+  const quoinCourses = stackCourses(
+    y1 - y0,
+    0.42,
+    createRandom(mixSeed(kit.recipe.seed, kit.seedOffset() + 0xc413)),
+  );
+  for (const side of ['front', 'back']) {
+    const facade = facades[side];
+    for (const end of [0, 1]) {
+      for (let row = 0; row < quoinCourses.length; row += 1) {
+        const course = quoinCourses[row];
+        const long = (row + end) % 2 === 0;
+        const length = Math.min(facade.length * 0.48, long ? 0.38 : 0.26);
+        const u = end === 0 ? length / 2 - 0.02 : facade.length - length / 2 + 0.02;
+        kit.stone({
+          width: length,
+          height: course.height * 0.94,
+          depth: shell + 0.07,
+          position: facadePoint(facade, u, y0 + course.y, -shell / 2 + 0.035),
+          rotation: [0, facade.yaw, 0],
+          batter: row === 0 ? 0.14 : 0.04,
+        }, { category: 'boulder', heightRatio: row / Math.max(1, quoinCourses.length) });
+      }
+    }
+  }
   kit.stone({
-    width: width + 0.16,
-    height: 0.14,
-    depth: depth + 0.16,
-    position: [x, y1 + 0.07, z],
+    width: width + 0.18,
+    height: 0.15,
+    depth: depth + 0.18,
+    position: [x, y1 + 0.075, z],
+    batter: 0.12,
   }, { category: 'coping', heightRatio: 1 });
   for (let index = 0; index < pots; index += 1) {
     const offset = pots === 1 ? 0 : (index / (pots - 1) - 0.5) * width * 0.5;

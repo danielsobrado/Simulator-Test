@@ -66,10 +66,9 @@ export function houseShell(building) {
 }
 
 /**
- * One wall of the room, from inside: a stone base course, daub above, posts
- * standing proud of it and a rail where the two meet — a timber frame, drawn in
- * a few strips. The wall runs from (ax, az) to (bx, bz); `facing` points into
- * the room.
+ * One wall of the room, from inside: a coursed stone base plinth, daub above,
+ * 3D hand-hewn timber columns standing proud of it, and a rail/wall plate where
+ * they meet. The wall runs from (ax, az) to (bx, bz); `facing` points into the room.
  */
 function framedWall(b, ax, az, bx, bz, facing, floor, top) {
   const base = floor + FRAME.base;
@@ -78,41 +77,79 @@ function framedWall(b, ax, az, bx, bz, facing, floor, top) {
   const length = Math.hypot(bx - ax, bz - az);
   if (length < 0.3) return;
   const [ux, uz] = [(bx - ax) / length, (bz - az) / length];
-  const proud = 0.05;
-  const strip = (from, to, bottom, upper) => {
-    b.wall(ax + ux * from + facing[0] * proud, az + uz * from + facing[1] * proud,
-      ax + ux * to + facing[0] * proud, az + uz * to + facing[1] * proud, bottom, upper, facing, BEAM, 0.9);
+  const proud = 0.085;
+  const beamBox = (from, to, bottom, upper, depth = proud, color = BEAM) => {
+    const xA = ax + ux * from;
+    const zA = az + uz * from;
+    const xB = ax + ux * to;
+    const zB = az + uz * to;
+    const minX = Math.min(xA, xB, xA + facing[0] * depth, xB + facing[0] * depth);
+    const maxX = Math.max(xA, xB, xA + facing[0] * depth, xB + facing[0] * depth);
+    const minZ = Math.min(zA, zB, zA + facing[1] * depth, zB + facing[1] * depth);
+    const maxZ = Math.max(zA, zB, zA + facing[1] * depth, zB + facing[1] * depth);
+    b.box(minX, maxX, minZ, maxZ, bottom, upper, color, { underside: true, density: 0.9 });
   };
+  // Irregular coursed stone relief blocks along the interior plinth base.
+  b.use('stone');
+  let cursor = 0.04;
+  let stoneIdx = 0;
+  while (cursor < length - 0.18) {
+    const stoneW = Math.min(length - cursor - 0.04, 0.34 + ((stoneIdx * 19) % 7) * 0.055);
+    const split = stoneIdx % 3 === 1;
+    if (split) {
+      const midY = floor + (base - floor) * (0.46 + ((stoneIdx * 11) % 5) * 0.03);
+      beamBox(cursor, cursor + stoneW - 0.025, floor + 0.01, midY - 0.012, 0.038, shade(BASE_STONE, 0.94 + (stoneIdx % 3) * 0.05));
+      beamBox(cursor, cursor + stoneW - 0.025, midY + 0.012, base - 0.01, 0.034, shade(BASE_STONE, 1.04 - (stoneIdx % 2) * 0.06));
+    } else {
+      beamBox(cursor, cursor + stoneW - 0.025, floor + 0.01, base - 0.01, 0.036, shade(BASE_STONE, 0.96 + (stoneIdx % 3) * 0.04));
+    }
+    cursor += stoneW;
+    stoneIdx += 1;
+  }
   b.use('wood');
-  strip(0, length, base - 0.07, base + 0.07);
-  strip(0, length, top - 0.16, top);
+  beamBox(0, length, base - 0.07, base + 0.08, proud);
+  beamBox(0, length, top - 0.18, top, proud * 1.12);
   const posts = Math.max(1, Math.round(length / FRAME.posts));
   // A knee brace from a post up to the wall plate, where the bay is wide enough to take one.
   const brace = (at, toward) => {
     const point = (along, y) => [ax + ux * along + facing[0] * proud, y, az + uz * along + facing[1] * proud];
-    b.quad(point(at, top - 0.76), point(at, top - 0.62), point(at + toward * 0.6, top - 0.16), point(at + toward * 0.7, top - 0.16),
+    b.quad(point(at, top - 0.78), point(at, top - 0.62), point(at + toward * 0.6, top - 0.18), point(at + toward * 0.72, top - 0.18),
       [facing[0], 0, facing[1]], BEAM, 0.9);
   };
   for (let post = 0; post <= posts; post += 1) {
-    const at = Math.min(length - 0.07, Math.max(0.07, length * post / posts));
-    strip(at - 0.07, at + 0.07, base, top);
+    const at = Math.min(length - 0.09, Math.max(0.09, length * post / posts));
+    // Full-height 3D timber column with flared foot collar.
+    beamBox(at - 0.1, at + 0.1, floor, floor + 0.22, proud * 1.24, shade(BEAM, 0.92));
+    beamBox(at - 0.085, at + 0.085, floor + 0.22, top, proud * 1.08, BEAM);
     if (length / posts < 1.5 || top - base < 1.4) continue;
-    if (post > 0) brace(at - 0.07, -1);
-    if (post < posts) brace(at + 0.07, 1);
+    if (post > 0) brace(at - 0.08, -1);
+    if (post < posts) brace(at + 0.08, 1);
   }
 }
 
-/** A window in a side wall, from inside: daylight behind a leaded frame, over a deep sill. */
+/** A window in a side wall, from inside: daylight behind a diamond-lattice leaded frame, over a deep eared sill. */
 function sideWindow(b, x, facing, shell, sill) {
   const middle = (shell.back + shell.inner) / 2;
   const inset = x + facing * 0.07;
   b.use('sky').wall(inset, middle - 0.45, inset, middle + 0.45, sill, sill + 0.8, [facing, 0], GLASS);
   b.use('wood');
-  const frame = inset + facing * 0.012;
-  for (const [z0, z1, bottom, top] of [[-0.53, -0.45, -0.08, 0.88], [0.45, 0.53, -0.08, 0.88], [-0.53, 0.53, 0.8, 0.88], [-0.03, 0.03, 0, 0.8], [-0.45, 0.45, 0.37, 0.43]]) {
+  const frame = inset + facing * 0.015;
+  for (const [z0, z1, bottom, top] of [[-0.55, -0.44, -0.09, 0.89], [0.44, 0.55, -0.09, 0.89], [-0.62, 0.62, 0.8, 0.92], [-0.03, 0.03, 0, 0.8], [-0.45, 0.45, 0.37, 0.43]]) {
     b.wall(frame, middle + z0, frame, middle + z1, sill + bottom, sill + top, [facing, 0], BEAM, 0.9);
   }
-  b.box(Math.min(x, x + facing * 0.2), Math.max(x, x + facing * 0.2), middle - 0.55, middle + 0.55, sill - 0.12, sill - 0.06, BEAM, { underside: true });
+  // Diamond-lattice diagonal muntin bars inside the window opening.
+  for (const [zA, yA, zB, yB] of [[-0.44, 0.02, 0, 0.78], [0, 0.02, 0.44, 0.78], [-0.44, 0.78, 0, 0.02], [0, 0.78, 0.44, 0.02]]) {
+    b.quad(
+      [frame, sill + yA, middle + zA],
+      [frame, sill + yA + 0.04, middle + zA],
+      [frame, sill + yB + 0.04, middle + zB],
+      [frame, sill + yB, middle + zB],
+      [facing, 0, 0],
+      BEAM,
+      0.9,
+    );
+  }
+  b.box(Math.min(x, x + facing * 0.22), Math.max(x, x + facing * 0.22), middle - 0.6, middle + 0.6, sill - 0.13, sill - 0.05, BEAM, { underside: true });
 }
 
 function shade(color, factor) {

@@ -68,8 +68,8 @@ export function buildVillageHouse(recipe, sets) {
  */
 export function estimateVillageHouseParts(recipe) {
   const perimeter = 2 * (recipe.width + recipe.depth) + 8;
-  const courses = Math.ceil(recipe.height * 0.6 / 0.36);
-  const stones = Math.ceil(perimeter / 0.5) * courses + 160;
+  const courses = Math.ceil(recipe.height * 0.65 / 0.28);
+  const stones = Math.ceil(perimeter / 0.34) * courses + 260;
   const tiles = recipe.detail >= 3 ? TILES_PER_ROOF * 2 : 0;
   return stones + tiles;
 }
