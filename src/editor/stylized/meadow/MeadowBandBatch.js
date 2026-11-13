@@ -127,10 +127,11 @@ export class MeadowBandBatch {
       for (const range of sourceRanges) this.writeSource(tile, range);
       for (const range of metadata ? ranges : sourceRanges) this.writeOrigins(tile, range);
       changed ||= metadata;
-      const slot = this.slots.get(tile) ?? {};
-      Object.assign(slot, { ranges, count, source, renderX: tile.renderX, renderZ: tile.renderZ,
-        revealTime: tile.revealTime, revealRank: tile.revealRank });
-      this.slots.set(tile, slot);
+      let slot = this.slots.get(tile);
+      if (!slot) this.slots.set(tile, slot = {});
+      slot.ranges = ranges; slot.count = count; slot.source = source;
+      slot.renderX = tile.renderX; slot.renderZ = tile.renderZ;
+      slot.revealTime = tile.revealTime; slot.revealRank = tile.revealRank;
     }
     PerfCounters.inc('meadowRepackBytes', plan.repackBytes);
     this.geometry.instanceCount = plan.count;

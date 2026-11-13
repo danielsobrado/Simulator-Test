@@ -1,5 +1,15 @@
 import { meadowPageTileCapacity, MeadowBandBatch } from './MeadowBandBatch.js';
 
+const NO_TILES = Object.freeze([]);
+
+/** Whether `set` was filled from exactly `tiles`, in order. */
+function filledFrom(set, tiles) {
+  if (set.size !== tiles.length) return false;
+  let i = 0;
+  for (const tile of set) if (tile !== tiles[i++]) return false;
+  return true;
+}
+
 /** Keep tile assignments stable and bound the buffers affected by an update. */
 class MeadowBandPages {
   constructor(options) {
@@ -50,8 +60,12 @@ class MeadowBandPages {
   }
 
   retireTiles(tiles) {
-    this.present.clear();
-    for (const tile of tiles) this.present.add(tile);
+    // Clearing reallocates the Set's table every commit (per-frame garbage); an
+    // unchanged member list already produced exactly this Set.
+    if (!filledFrom(this.present, tiles)) {
+      this.present.clear();
+      for (const tile of tiles) this.present.add(tile);
+    }
     for (const [tile, page] of this.slots) {
       if (this.present.has(tile)) continue;
       page.memberCount -= 1;
@@ -59,7 +73,7 @@ class MeadowBandPages {
     }
     // A wholly retired page costs no upload: hide it before another band can
     // reuse it, even when its future source publication must wait.
-    for (const page of this.pages) if (page.memberCount === 0) page.update([]);
+    for (const page of this.pages) if (page.memberCount === 0) page.update(NO_TILES);
   }
 
   update(tiles, budget) {
