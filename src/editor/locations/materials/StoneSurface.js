@@ -75,16 +75,19 @@ export function stoneSurface(profile, maps, mask = null) {
 
   let albedo = triplanarSample(maps.color, samplePoint, weights, scale).rgb.mul(color(profile.tint));
   const detailAlbedo = triplanarSample(maps.color, samplePoint.add(vec3(0.37, 0.71, 0.19)), weights, scale * 2.7).rgb;
-  albedo = albedo.mul(mix(float(1), detailAlbedo.mul(1.18), float(0.32)));
+  albedo = albedo.mul(mix(float(1), detailAlbedo.mul(1.16), float(0.34)));
 
   let normal = triplanarNormal(maps.normal, samplePoint, geometryNormal, weights, scale, profile.normalStrength ?? 1);
+  normal = triplanarNormal(maps.normal, samplePoint.add(vec3(0.41, 0.17, 0.63)), normal, weights, scale * 2.35, (profile.normalStrength ?? 1) * 0.32);
   let roughness = triplanarSample(maps.rough, samplePoint, weights, scale).g.mul(profile.roughness ?? 1);
+  const detailRough = triplanarSample(maps.rough, samplePoint.add(vec3(0.23, 0.59, 0.11)), weights, scale * 2.3).g;
+  roughness = roughness.mul(mix(float(0.86), float(1.14), detailRough));
   let f0 = float(profile.f0 ?? 0.04);
   let emissive = vec3(0);
 
   // Metre-scale variation so the eye never finds the texture's repeat.
   const macro = mx_noise_float(point.mul(0.09)).mul(0.5).add(0.5);
-  albedo = albedo.mul(mix(float(0.76), float(1.16), macro));
+  albedo = albedo.mul(mix(float(0.78), float(1.14), macro));
 
   if (profile.strata) {
     const warp = mx_noise_float(point.mul(0.13)).mul(profile.strata.warp ?? 4);
@@ -97,13 +100,17 @@ export function stoneSurface(profile, maps, mask = null) {
   if (blocks) {
     const cut = dressed.mul(blocks.gap);
     const bevelEdge = dressed.mul(blocks.bevel);
-    const stoneTone = mix(color('#c4c6ca'), color('#b5b1ab'), blocks.id2).mul(mix(float(0.86), float(1.12), blocks.id));
+    const toolMarks = mx_noise_float(vec3(point.x.mul(14), point.y.mul(4.5), point.z.mul(14))).mul(0.5).add(0.5);
+    const stoneTone = mix(color('#c6c8cc'), color('#b5b1ab'), blocks.id2).mul(mix(float(0.88), float(1.11), blocks.id));
     albedo = albedo.mul(mix(float(1), stoneTone, dressed));
-    albedo = albedo.mul(mix(float(1), float(1.15), bevelEdge.mul(0.78)));
-    albedo = mix(albedo, albedo.mul(color('#363432')), cut.mul(0.72));
-    normal = bumpNormal(normal, blocks.height.mul(0.032).mul(dressed), profile.masonry.relief ?? 1.6);
-    roughness = roughness.mul(mix(float(1), mix(float(0.88), float(1.12), blocks.id2), dressed));
-    roughness = mix(roughness, float(0.96), cut);
+    albedo = albedo.mul(mix(float(1), mix(float(0.95), float(1.04), toolMarks), dressed));
+    albedo = albedo.mul(mix(float(1), float(1.12), bevelEdge.mul(0.78)));
+    albedo = mix(albedo, albedo.mul(color('#423f3c')), cut.mul(0.58));
+    const microHeight = blocks.height.add(toolMarks.sub(0.5).mul(0.06)).mul(0.032).mul(dressed);
+    normal = bumpNormal(normal, microHeight, profile.masonry.relief ?? 1.6);
+    roughness = roughness.mul(mix(float(1), mix(float(0.86), float(1.12), blocks.id2), dressed));
+    roughness = roughness.mul(mix(float(1), float(0.86), bevelEdge.mul(0.65)));
+    roughness = mix(roughness, float(0.95), cut);
   }
 
   if (mask) {

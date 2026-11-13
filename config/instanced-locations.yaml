@@ -137,19 +137,27 @@ instancedLocations:
       masonry: { courseHeight: 0.55, blockLength: 1.3, jointWidth: 0.035, relief: 1.6 }
     stonehold_granite:
       surface: granite
-      scale: 0.22
-      tint: '#b4b6ba'
-      normalStrength: 1.05
-      roughness: 0.94
-      dressedRoughness: 0.84
+      scale: 0.25
+      tint: '#a6abb4'
+      normalStrength: 1.15
+      roughness: 0.92
+      dressedRoughness: 0.82
       sootColor: '#141314'
-      masonry: { courseHeight: 0.95, blockLength: 2.2, jointWidth: 0.04, relief: 1.7 }
+      masonry: { courseHeight: 1.05, blockLength: 2.35, jointWidth: 0.036, relief: 1.85 }
     stonehold_ashlar:
       surface: dressed-stone
-      scale: 0.28
-      tint: '#bebfc2'
-      roughness: 0.88
-      masonry: { courseHeight: 0.9, blockLength: 2.1, jointWidth: 0.032, relief: 1.5 }
+      scale: 0.3
+      tint: '#b8bdc6'
+      normalStrength: 1.1
+      roughness: 0.86
+      masonry: { courseHeight: 0.88, blockLength: 2.05, jointWidth: 0.03, relief: 1.55 }
+    stonehold_carved:
+      surface: dressed-stone
+      scale: 0.36
+      tint: '#9da3ad'
+      normalStrength: 1.18
+      roughness: 0.8
+      masonry: { courseHeight: 0.65, blockLength: 1.5, jointWidth: 0.022, relief: 1.4 }
     bronze:
       surface: iron
       scale: 0.7
@@ -247,12 +255,12 @@ instancedLocations:
       exposure: 1.35
       absorption: { rock: [5, 5, 5], ice: [0.55, 0.085, 0.03] }
     stonehold_forge:
-      background: '#090a0d'
-      fog: { color: '#141519', density: 0.0058 }
-      ambientUp: '#323540'
-      ambientDown: '#201e20'
-      carried: { color: '#ffecd4', intensity: 1.15, range: 14 }
-      exposure: 1.24
+      background: '#08090c'
+      fog: { color: '#111216', density: 0.0062 }
+      ambientUp: '#2d313c'
+      ambientDown: '#1a191c'
+      carried: { color: '#ffebd2', intensity: 1.0, range: 13 }
+      exposure: 1.22
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     frostgard_ice:
       background: '#061423'
@@ -361,6 +369,7 @@ instancedLocations:
       materials:
         terrain: { kind: stone, profile: stonehold_granite }
         masonry: { kind: stone, profile: stonehold_ashlar, masked: false }
+        carved: { kind: stone, profile: stonehold_carved, masked: false }
         timber: { kind: stone, profile: timber, masked: false }
         iron: { kind: stone, profile: iron, masked: false }
         bronze: { kind: stone, profile: bronze, masked: false }

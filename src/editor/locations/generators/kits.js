@@ -182,52 +182,128 @@ export function bridge(b, a, c, width, { footY, material = 'masonry', tint = 0xf
 }
 
 /**
- * A monumental Dwarven column: broad chamfered plinth and octagonal base,
- * continuous octagonal shaft with non-intersecting engaged cardinal ribs,
- * bronze necking band, and a clean corbelled capital. Blocks the walker.
+ * A monumental Dwarven column in three intentional variants (`structural`,
+ * `ceremonial`, `reinforced`): broad layered plinth and octagonal base,
+ * continuous octagonal shaft with slim flush pilasters, geometric collar bands,
+ * bronze necking trim, and a load-bearing stepped capital. Blocks the walker.
  */
-export function pillar(b, at, height, radius, { material = 'masonry', tint = 0xffffff, sides = 8 } = {}) {
-  // Broad square plinth + stepped octagonal base + recessed transition collar.
-  b.prop(material, stoneBlock(radius * 2.85, 0.72, radius * 2.85, at, { bevel: 0.08, batter: 0.14, irregular: 0.06 }), tint);
-  b.prop(material, rod(up(at, 0.72), up(at, 1.32), radius * 1.32, radius * 1.16, sides), 0xebe9e6);
-  b.prop(material, rod(up(at, 1.32), up(at, 1.64), radius * 1.06, radius * 0.96, sides), 0xdedcdd);
+export function pillar(b, at, height, radius, {
+  material = 'masonry',
+  trimMaterial = material,
+  tint = 0xffffff,
+  sides = 8,
+  variant = 'structural',
+} = {}) {
+  const reinforced = variant === 'reinforced';
+  const ceremonial = variant === 'ceremonial';
+  const plinthScale = reinforced ? 3.05 : 2.85;
 
-  // Continuous octagonal shaft with slim cardinal pilasters flush on each face.
-  const shaftStart = 1.64;
-  const shaftEnd = height - 1.85;
+  // 1. Layered foundation base.
+  b.prop(trimMaterial, stoneBlock(radius * plinthScale, 0.68, radius * plinthScale, at, { bevel: 0.08, batter: 0.14, irregular: 0.05 }), 0xf4f2ef);
+  b.prop(trimMaterial, rod(up(at, 0.68), up(at, 1.24), radius * (reinforced ? 1.38 : 1.3), radius * 1.14, sides), 0xeae8e4);
+  if (ceremonial || reinforced) {
+    b.prop('bronze', rod(up(at, 1.24), up(at, 1.36), radius * 1.15, radius * 1.15, sides), 0xdcb97f);
+    b.prop(material, rod(up(at, 1.36), up(at, 1.68), radius * 1.04, radius * 0.96, sides), 0xdedcdd);
+  } else {
+    b.prop(material, rod(up(at, 1.24), up(at, 1.64), radius * 1.06, radius * 0.96, sides), 0xdedcdd);
+  }
+
+  // 2. Coherent continuous octagonal shaft with flush cardinal pilasters rooted into the base collar.
+  const shaftStart = ceremonial || reinforced ? 1.68 : 1.64;
+  const shaftEnd = height - 1.95;
   const shaftH = Math.max(0.8, shaftEnd - shaftStart);
   b.prop(material, rod(up(at, shaftStart), up(at, shaftEnd), radius * 0.96, radius * 0.9, sides), tint);
-  const ribW = radius * 0.34;
-  const ribDepth = radius * 0.14;
+  const ribW = radius * (ceremonial ? 0.38 : 0.32);
+  const ribDepth = radius * 0.1;
+  const ribOverlap = 0.26;
   for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     b.prop(material, stoneBlock(
       dx !== 0 ? ribDepth : ribW,
-      shaftH,
+      shaftH + ribOverlap,
       dz !== 0 ? ribDepth : ribW,
-      { x: at.x + dx * radius * 0.92, y: at.y + shaftStart, z: at.z + dz * radius * 0.92 },
-      { bevel: 0.03, batter: 0.03, irregular: 0.04 },
-    ), 0xf2f0ed);
+      { x: at.x + dx * radius * 0.9, y: at.y + shaftStart - ribOverlap * 0.7, z: at.z + dz * radius * 0.9 },
+      { bevel: 0.03, batter: 0.04, irregular: 0.04 },
+    ), 0xf0eeeb);
   }
-  const midY = shaftStart + shaftH * 0.5;
-  b.prop(material, rod(up(at, midY - 0.11), up(at, midY + 0.11), radius * 0.99, radius * 0.99, sides), 0xdad8d5);
+  if (reinforced) {
+    // Grounded corner haunch buttresses seated completely inside the bronze collar ledge (y = 1.36).
+    const spurH = Math.min(1.9, shaftH * 0.34);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      b.prop(trimMaterial, stoneBlock(radius * 0.38, spurH, radius * 0.38, {
+        x: at.x + sx * radius * 0.6, y: at.y + 1.36, z: at.z + sz * radius * 0.6,
+      }, { yaw: Math.PI / 4, bevel: 0.045, batter: 0.24, irregular: 0.04 }), 0xe8e5e0);
+    }
+  }
+  const bandFrac = ceremonial ? 0.52 : 0.5;
+  const bandY = shaftStart + shaftH * bandFrac;
+  b.prop(trimMaterial, rod(up(at, bandY - 0.14), up(at, bandY + 0.14), radius * 1.0, radius * 1.0, sides), 0xe6e4e0);
+  if (ceremonial) {
+    b.prop('bronze', rod(up(at, bandY - 0.04), up(at, bandY + 0.04), radius * 1.02, radius * 1.02, sides), 0xd8b478);
+  }
 
-  // Capital: necking ring, bronze geometric band, flared bell, stepped abacus and impost.
-  b.prop(material, rod(up(at, shaftEnd), up(at, shaftEnd + 0.26), radius * 0.94, radius * 1.08, sides), 0xdedcdd);
-  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.06, radius * 1.06, sides), 0xe6c896);
-  b.prop(material, rod(up(at, shaftEnd + 0.26), up(at, height - 0.92), radius * 1.08, radius * 1.36, sides), 0xebe9e6);
-  b.prop(material, stoneBlock(radius * 2.65, 0.48, radius * 2.65, up(at, height - 0.92), { bevel: 0.08, batter: -0.06, irregular: 0.06 }), tint);
-  b.prop(material, stoneBlock(radius * 2.95, 0.44, radius * 2.95, up(at, height - 0.44), { bevel: 0.07, irregular: 0.06 }), 0xf2f0ed);
+  // 3. Load-bearing capital: necking collar, bronze fillet, flared bell, abacus, stepped corbels, impost.
+  b.prop(trimMaterial, rod(up(at, shaftEnd), up(at, shaftEnd + 0.26), radius * 0.94, radius * 1.08, sides), 0xe4e2de);
+  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.06, radius * 1.06, sides), 0xe4c288);
+  b.prop(trimMaterial, rod(up(at, shaftEnd + 0.26), up(at, height - 0.96), radius * 1.08, radius * 1.38, sides), 0xebe9e6);
+  if (ceremonial || reinforced) {
+    // Stepped angular corbel brackets on cardinal faces under the abacus.
+    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      b.prop(trimMaterial, stoneBox(
+        dx !== 0 ? radius * 0.54 : radius * 0.48,
+        0.48,
+        dz !== 0 ? radius * 0.54 : radius * 0.48,
+        { x: at.x + dx * radius * 1.08, y: height - 1.18, z: at.z + dz * radius * 1.08 },
+        { bevel: 0.045, batter: -0.16, irregular: 0.04 },
+      ), 0xe8e5e0);
+    }
+  }
+  b.prop(trimMaterial, stoneBlock(radius * 2.7, 0.48, radius * 2.7, up(at, height - 0.96), { bevel: 0.08, batter: -0.06, irregular: 0.05 }), 0xf2f0ed);
+  b.prop(material, stoneBlock(radius * 2.98, 0.48, radius * 2.98, up(at, height - 0.48), { bevel: 0.07, irregular: 0.05 }), tint);
   b.nav.block(at, radius * 1.45, height);
 }
 
-/** A fire bowl on a stepped, chamfered plinth. */
-export function brazier(b, at, { tint = '#ffd29e', intensity = 7.5, range = 24, size = 1 } = {}) {
-  b.prop('masonry', stoneBlock(1.05 * size, 0.35 * size, 1.05 * size, at, { bevel: 0.04, batter: 0.15, irregular: 0.12 }));
-  b.prop('masonry', stoneBlock(0.84 * size, 0.6 * size, 0.84 * size, up(at, 0.35 * size), { bevel: 0.04, batter: 0.08, irregular: 0.12 }));
-  b.prop('iron', rod(up(at, 0.92 * size), up(at, 1.32 * size), 0.35 * size, 0.76 * size, 10), 0x2c2824);
-  b.prop('glow', rod(up(at, 1.28 * size), up(at, 1.62 * size), 0.62 * size, 0.1 * size, 8), '#ff9c42', 5);
-  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 2.3, halo: 3.0 * size });
-  b.nav.block(at, 0.8 * size, 2);
+/** A heavy forged brazier on a chamfered pedestal, with a glowing coal bed and layered flame tongues. */
+export function brazier(b, at, {
+  tint = '#ffd29e',
+  intensity = 6.5,
+  range = 24,
+  size = 1,
+  trimMaterial = 'masonry',
+  bronzeRim = false,
+} = {}) {
+  b.prop(trimMaterial, stoneBlock(1.12 * size, 0.34 * size, 1.12 * size, at, { bevel: 0.05, batter: 0.14, irregular: 0.08 }));
+  b.prop(trimMaterial, stoneBlock(0.84 * size, 0.58 * size, 0.84 * size, up(at, 0.34 * size), { bevel: 0.045, batter: 0.08, irregular: 0.08 }));
+  // Fluted iron fire basin + wide flared lip + optional bronze collar rim.
+  b.prop('iron', rod(up(at, 0.9 * size), up(at, 1.24 * size), 0.34 * size, 0.68 * size, 8), 0x2a2623);
+  b.prop('iron', rod(up(at, 1.24 * size), up(at, 1.38 * size), 0.72 * size, 0.78 * size, 8), 0x35302c);
+  if (bronzeRim) {
+    b.prop('bronze', rod(up(at, 1.26 * size), up(at, 1.36 * size), 0.75 * size, 0.75 * size, 8), 0xd8b478);
+  }
+  // Glowing ember mound cupped inside an iron grate basket (replaces jagged low-poly flame cones).
+  b.prop('iron', rod(up(at, 1.54 * size), up(at, 1.6 * size), 0.66 * size, 0.66 * size, 8), 0x2b2622);
+  for (let i = 0; i < 6; i += 1) {
+    const a = (i / 6) * Math.PI * 2;
+    const bx = at.x + Math.cos(a) * 0.62 * size;
+    const bz = at.z + Math.sin(a) * 0.62 * size;
+    b.prop('iron', rod({ x: bx, y: at.y + 1.3 * size, z: bz }, { x: bx, y: at.y + 1.58 * size, z: bz }, 0.032 * size, 0.028 * size, 5), 0x2a2521);
+  }
+  b.prop('glow', rod(up(at, 1.24 * size), up(at, 1.44 * size), 0.56 * size, 0.36 * size, 8), '#c9400e', 2.2);
+  b.prop('glow', rod(up(at, 1.3 * size), up(at, 1.5 * size), 0.34 * size, 0.16 * size, 8), '#ff922e', 2.5);
+  const coals = [
+    [0.18, 0.12, 0.14],
+    [-0.19, 0.09, 0.13],
+    [0.05, -0.2, 0.13],
+    [-0.14, -0.15, 0.12],
+  ];
+  for (const [ox, oz, r] of coals) {
+    b.prop('glow', rod(
+      { x: at.x + ox * size, y: at.y + 1.28 * size, z: at.z + oz * size },
+      { x: at.x + ox * 0.6 * size, y: at.y + 1.46 * size, z: at.z + oz * 0.6 * size },
+      r * size, r * 0.45 * size, 6,
+    ), '#ff7b1c', 1.8);
+  }
+  b.light(up(at, 1.85 * size), tint, intensity, range, { radius: 2.3, halo: 2.15 * size });
+  b.nav.block(at, 0.82 * size, 2);
 }
 
 /** A cluster of pale crystal shards that light the way. */
