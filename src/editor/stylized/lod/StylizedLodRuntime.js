@@ -1,11 +1,11 @@
 import * as THREE from 'three/webgpu';
 import {
-  clampLodToRadii,
-  projectedPixelHeight,
-  quantizeFade,
-  selectProjectedLod,
-  updateLodTransition,
+  advanceLodTransition,
+  clampBandToRadii,
+  projectedPixelHeightAt,
+  selectLodBand,
 } from './projectedLod.js';
+import { chunkEntrySignature, chunkKey } from './chunkLodSignature.js';
 import { createDitheredMaterial } from './StylizedDitheredMaterial.js';
 import { markAttributeSubrangeUpdated } from '../attributeUpload.js';
 import { PerfCounters } from '../../performance/qa/PerfCounters.js';
@@ -437,7 +437,7 @@ export function buildChunkLodPlan({
   onTransition = null,
 }) {
   const entries = [];
-  let signature = '';
+  const signatures = [];
   const origin = floatingOrigin.getState();
   const needsReadyAnchor = typeof positionForChunk === 'function';
 
@@ -452,21 +452,12 @@ export function buildChunkLodPlan({
       LOD_WORLD_POSITION.x = canonicalX - origin.x;
       LOD_WORLD_POSITION.y = (anchor?.y ?? 0) + worldHeight * 0.5;
       LOD_WORLD_POSITION.z = canonicalZ - origin.z;
-      const pixels = projectedPixelHeight({
-        camera,
-        worldPosition: LOD_WORLD_POSITION,
-        worldHeight,
-        viewportHeight,
-      });
-      const key = `${chunkX}:${chunkZ}`;
+      const pixels = projectedPixelHeightAt(camera, LOD_WORLD_POSITION, worldHeight, viewportHeight);
+      const key = chunkKey(chunkX, chunkZ);
       const storedState = transitionStates.get(key) ?? null;
       const previous = storedState?.target ?? null;
-      const selected = selectProjectedLod({ pixels, previous, ...thresholds });
-      const target = clampLodToRadii({
-        band: selected,
-        chunkDistance: distanceForChunk?.(chunkX, chunkZ) ?? chunkDistance,
-        ...radii,
-      });
+      const selected = selectLodBand(pixels, previous, thresholds, thresholds.hysteresisRatio);
+      const target = clampBandToRadii(selected, distanceForChunk?.(chunkX, chunkZ) ?? chunkDistance, radii);
       if (previous !== null && previous !== target) {
         onTransition?.({
           chunkX,
@@ -482,12 +473,8 @@ export function buildChunkLodPlan({
           ? storedState
           : waitingState(target, timestamp);
       } else {
-        state = updateLodTransition({
-          state: storedState?.waitingForData ? null : storedState,
-          target,
-          timestamp,
-          durationMs: transitionMs,
-        });
+        state = advanceLodTransition(storedState?.waitingForData ? null : storedState,
+          target, timestamp, transitionMs);
       }
       transitionStates.set(key, state);
       entries.push({
@@ -499,23 +486,16 @@ export function buildChunkLodPlan({
         representations: state.representations,
         lodAnchor: Object.freeze({ x: canonicalX, y: anchor?.y ?? 0, z: canonicalZ }),
       });
-
-      let entrySignature = `${key}:${target}:${ready ? 'ready' : 'waiting'}`;
-      for (const representation of state.representations) {
-        entrySignature += `:${representation.band}:${
-          quantizeFade(representation.fade, fadeSteps)
-        }:${representation.ditherDirection}`;
-      }
-      signature += signature.length === 0 ? entrySignature : `|${entrySignature}`;
+      signatures.push(chunkEntrySignature(key, target, ready, state.representations, fadeSteps));
     }
   }
 
-  return { entries, signature };
+  return { entries, signature: signatures.join('|') };
 }
 
 export function pruneStateMap(states, entries) {
   const active = new Set();
-  for (const entry of entries) active.add(`${entry.chunkX}:${entry.chunkZ}`);
+  for (const entry of entries) active.add(chunkKey(entry.chunkX, entry.chunkZ));
   for (const key of states.keys()) {
     if (!active.has(key)) states.delete(key);
   }

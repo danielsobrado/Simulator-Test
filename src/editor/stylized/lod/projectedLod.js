@@ -83,6 +83,11 @@ function representation(band, fade, ditherDirection = 1) {
 }
 
 export function projectedPixelHeight({ camera, worldPosition, worldHeight, viewportHeight }) {
+  return projectedPixelHeightAt(camera, worldPosition, worldHeight, viewportHeight);
+}
+
+/** Positional `projectedPixelHeight`, so per-chunk loops need no options object. */
+export function projectedPixelHeightAt(camera, worldPosition, worldHeight, viewportHeight) {
   if (!camera || !Number.isFinite(worldHeight) || worldHeight <= 0
       || !Number.isFinite(viewportHeight) || viewportHeight <= 0) {
     return 0;
@@ -104,6 +109,11 @@ export function selectProjectedLod({
   hysteresisRatio = 0.15,
   ...thresholds
 }) {
+  return selectLodBand(pixels, previous, thresholds, hysteresisRatio);
+}
+
+/** `selectProjectedLod` without its option spread; `thresholds` may carry extra keys. */
+export function selectLodBand(pixels, previous, thresholds, hysteresisRatio = 0.15) {
   const next = baseBand(pixels, thresholds);
   if (!previous || previous === next) return next;
 
@@ -140,13 +150,11 @@ function promotedBand(pixels, thresholds, hysteresisRatio) {
  * representation. This prevents transitions such as proxy → impostor from writing
  * the same proxy mesh twice when a layer only implements near/proxy rendering.
  */
-export function normalizeLodBandForRadii({
-  band,
-  meshRadius,
-  proxyRadius,
-  impostorRadius,
-  clusterRadius,
-}) {
+export function normalizeLodBandForRadii(options) {
+  return normalizeBand(options.band, options);
+}
+
+function normalizeBand(band, { meshRadius, proxyRadius, impostorRadius, clusterRadius }) {
   let result = band;
   if (result === 'cluster' && clusterRadius <= impostorRadius) result = 'impostor';
   if (result === 'impostor' && impostorRadius <= proxyRadius) result = 'proxy';
@@ -154,15 +162,16 @@ export function normalizeLodBandForRadii({
   return result;
 }
 
-export function clampLodToRadii({
-  band,
-  chunkDistance,
-  meshRadius,
-  proxyRadius,
-  impostorRadius,
-  clusterRadius,
-  forceNearWithinMeshRadius = false,
-}) {
+export function clampLodToRadii(options) {
+  return clampBandToRadii(options.band, options.chunkDistance, options);
+}
+
+/**
+ * `clampLodToRadii` with band and distance passed beside `radii` ({ meshRadius, proxyRadius,
+ * impostorRadius, clusterRadius, forceNearWithinMeshRadius }), which may carry extra keys.
+ */
+export function clampBandToRadii(band, chunkDistance, radii) {
+  const { meshRadius, proxyRadius, impostorRadius, clusterRadius, forceNearWithinMeshRadius } = radii;
   // Chunk-center projection can underestimate a layer whose instances span the
   // whole chunk. Layers opting into a physical near guarantee keep full geometry
   // around the player even when the chunk center itself projects very small.
@@ -181,21 +190,15 @@ export function clampLodToRadii({
     result = 'cluster';
   }
 
-  return normalizeLodBandForRadii({
-    band: result,
-    meshRadius,
-    proxyRadius,
-    impostorRadius,
-    clusterRadius,
-  });
+  return normalizeBand(result, radii);
 }
 
-export function updateLodTransition({
-  state,
-  target,
-  timestamp,
-  durationMs,
-}) {
+export function updateLodTransition({ state, target, timestamp, durationMs }) {
+  return advanceLodTransition(state, target, timestamp, durationMs);
+}
+
+/** Positional `updateLodTransition`, so per-chunk loops need no options object. */
+export function advanceLodTransition(state, target, timestamp, durationMs) {
   if (state?.complete && state.from === target && state.target === target) {
     return state;
   }
