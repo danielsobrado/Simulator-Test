@@ -208,21 +208,21 @@ export function pillar(b, at, height, radius, {
     b.prop(material, rod(up(at, 1.24), up(at, 1.64), radius * 1.06, radius * 0.96, sides), 0xdedcdd);
   }
 
-  // 2. Coherent continuous octagonal shaft with flush cardinal pilasters rooted into the base collar.
+  // 2. Coherent continuous octagonal shaft with deeply seated cardinal pilasters rooted into the base collar.
   const shaftStart = ceremonial || reinforced ? 1.68 : 1.64;
   const shaftEnd = height - 1.95;
   const shaftH = Math.max(0.8, shaftEnd - shaftStart);
   b.prop(material, rod(up(at, shaftStart), up(at, shaftEnd), radius * 0.96, radius * 0.9, sides), tint);
-  const ribW = radius * (ceremonial ? 0.38 : 0.32);
-  const ribDepth = radius * 0.1;
-  const ribOverlap = 0.26;
+  const ribW = radius * (ceremonial ? 0.38 : 0.34);
+  const ribDepth = radius * 0.14;
+  const ribOverlap = 0.28;
   for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     b.prop(material, stoneBlock(
       dx !== 0 ? ribDepth : ribW,
       shaftH + ribOverlap,
       dz !== 0 ? ribDepth : ribW,
-      { x: at.x + dx * radius * 0.9, y: at.y + shaftStart - ribOverlap * 0.7, z: at.z + dz * radius * 0.9 },
-      { bevel: 0.03, batter: 0.04, irregular: 0.04 },
+      { x: at.x + dx * radius * 0.84, y: at.y + shaftStart - ribOverlap * 0.72, z: at.z + dz * radius * 0.84 },
+      { bevel: 0.035, batter: 0.04, irregular: 0.03 },
     ), 0xf0eeeb);
   }
   if (reinforced) {
@@ -242,8 +242,8 @@ export function pillar(b, at, height, radius, {
   }
 
   // 3. Sculpted load-bearing Dwarven capital: astragal, dentil collar lugs, flared bell, flying knee corbels, bronze-bound impost.
-  b.prop(trimMaterial, rod(up(at, shaftEnd), up(at, shaftEnd + 0.24), radius * 0.94, radius * 1.12, sides), 0xe4e2de);
-  b.prop('bronze', rod(up(at, shaftEnd + 0.05), up(at, shaftEnd + 0.19), radius * 1.09, radius * 1.09, sides), 0xe4c288);
+  b.prop(trimMaterial, rod(up(at, shaftEnd), up(at, shaftEnd + 0.24), radius * 0.94, radius * 1.1, sides), 0xe4e2de);
+  b.prop('bronze', rod(up(at, shaftEnd + 0.05), up(at, shaftEnd + 0.17), radius * 1.04, radius * 1.04, sides), 0xc29858);
   // Radial dentil lugs around the necking astragal catching firelight.
   for (let i = 0; i < sides; i += 1) {
     const a = (i / sides) * Math.PI * 2 + Math.PI / sides;

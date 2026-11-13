@@ -138,26 +138,26 @@ instancedLocations:
     stonehold_granite:
       surface: granite
       scale: 0.25
-      tint: '#a6abb4'
-      normalStrength: 1.15
+      tint: '#9ca2ac'
+      normalStrength: 1.18
       roughness: 0.92
       dressedRoughness: 0.82
       sootColor: '#141314'
-      masonry: { courseHeight: 1.05, blockLength: 2.35, jointWidth: 0.036, relief: 1.85 }
+      masonry: { courseHeight: 0.82, blockLength: 1.95, jointWidth: 0.036, relief: 1.9 }
     stonehold_ashlar:
       surface: dressed-stone
       scale: 0.3
-      tint: '#b8bdc6'
-      normalStrength: 1.1
+      tint: '#aab0ba'
+      normalStrength: 1.14
       roughness: 0.86
-      masonry: { courseHeight: 0.88, blockLength: 2.05, jointWidth: 0.03, relief: 1.55 }
+      masonry: { courseHeight: 0.82, blockLength: 1.95, jointWidth: 0.032, relief: 1.6 }
     stonehold_carved:
       surface: dressed-stone
       scale: 0.36
-      tint: '#9da3ad'
-      normalStrength: 1.18
+      tint: '#9298a3'
+      normalStrength: 1.2
       roughness: 0.8
-      masonry: { courseHeight: 0.65, blockLength: 1.5, jointWidth: 0.022, relief: 1.4 }
+      masonry: { courseHeight: 0.65, blockLength: 1.5, jointWidth: 0.024, relief: 1.45 }
     bronze:
       surface: iron
       scale: 0.7

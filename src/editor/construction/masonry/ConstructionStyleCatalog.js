@@ -478,6 +478,44 @@ export const CONSTRUCTION_STYLES = Object.freeze({
   }),
 });
 
+export const STONEHOLD_ASHLAR_STYLE = defineConstructionStyle({
+  key: 'stonehold-ashlar',
+  label: 'Stonehold dwarven ashlar',
+  coarseLayout: 'preserve',
+  courseHeight: 0.82,
+  targetWidth: 1.95,
+  minWidth: 0.68,
+  irregularity: 0.14,
+  detail: 2,
+  merlonSpacing: 2.0,
+  stonePalette: 'granite',
+  // Precision-cut cyclopean mountain blocks: nearly level courses, tight plumb joints.
+  bedAmplitude: 0.025,
+  jointTilt: 0.025,
+  splitChance: 0.16,
+  splitMaxDepth: 1,
+  splitMinHeight: 0.36,
+  depthScaleMin: 0.96,
+  depthScaleMax: 1.0,
+  faceOffsetAmplitude: 0.022,
+  faceOffsetCoherence: 0.6,
+  openingBlockScale: 1.9,
+  footing: {
+    heightRatio: 1.35,
+    widthRatio: 1.18,
+    splitChance: 0.08,
+    plinth: 0.025,
+    burialMargin: 0,
+    burialMax: 0,
+  },
+  coping: {
+    height: 0.34,
+    oversail: 1.06,
+    widthRatio: 1.05,
+    crownVariation: 0.04,
+  },
+});
+
 export const DEFAULT_CONSTRUCTION_STYLE_KEY = 'rounded-fieldstone';
 
 export const CONSTRUCTION_STYLE_KEYS = Object.freeze(Object.keys(CONSTRUCTION_STYLES));

@@ -1,4 +1,5 @@
-import { arch, beam, block, box, coursedWall, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
+import { coursedMasonryWall, emitRadialArch } from '../gen/dwarvenMasonry.js';
+import { beam, block, box, coursedWall, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
 import { hall, shaft } from '../gen/shapes.js';
 import { brazier, bridge, crate, pillar, stairs } from './kits.js';
 import { buildEntranceHall, buildFloorInlay, buildHeroGateway, buildVaultedCeiling, buildWallBay } from './stoneholdArchitecture.js';
@@ -33,7 +34,7 @@ export function generate(b, params) {
     b.grid.carve(hall(P(sign * galleryX, galleryY, avenueZ), { halfLength: halfLength - 4, halfWidth: 4.4, height: 4, vaultRise: 1.2, yaw: ALONG_Z }));
   }
   b.grid.carve(hall(P(0, -chasm.depth, chasm.z), { halfLength: halfWidth + 0.5, halfWidth: chasm.half, height: chasm.depth }));
-  b.passage(P(0, 0, farZ + 4), P(0, 0, farZ - 5), { width: 9, height: 8.5, arch: 0.35 });
+  b.passage(P(0, 0, farZ + 4), P(0, 0, farZ - 5), { width: 9.2, height: 10.8, arch: 0.48 });
   b.grid.carve(hall(forge, { halfLength: 25, halfWidth: 12, height: 9, vaultRise: 5 }));
   b.grid.carve(shaft(lift, { radius: 3, bottomY: -18, topY: 13 }));
   b.grid.roughen({ amp: 0.4, scale: 0.4, seed: b.seed, octaves: 2, ampAt: (x, y) => (y < -1 ? 1 : 0.07) });
@@ -60,13 +61,15 @@ export function generate(b, params) {
   // --- Gate ---------------------------------------------------------------
   for (const sign of [-1, 1]) {
     const gx = sign * 5.2;
-    b.prop('masonry', stoneBlock(2.7, 1.1, 1.9, P(gx, 0, 3.4), { bevel: 0.08, batter: 0.16, irregular: 0.14 }));
-    b.prop('masonry', coursedWall(P(gx - 1.2, 1.1, 3.4), P(gx + 1.2, 1.1, 3.4), 7.2, 1.6, {
-      courseHeight: 0.72, stoneWidth: 1.05, irregular: 0.14, quoins: true, bevel: 0.06,
-    }));
-    b.prop('masonry', stoneBlock(2.65, 0.7, 1.85, P(gx, 8.3, 3.4), { bevel: 0.07, batter: -0.08, irregular: 0.12 }));
+    b.prop('masonry', stoneBlock(2.7, 1.1, 1.9, P(gx, 0, 3.4), { bevel: 0.08, batter: 0.16, irregular: 0.12 }));
+    coursedMasonryWall(b, P(gx - 1.2, 1.1, 3.4), P(gx + 1.2, 1.1, 3.4), 7.2, 1.6, {
+      courseHeight: 0.82, baseTint: 0xe6e4e0, trimTint: 0xf0ede7,
+    });
+    b.prop('masonry', stoneBlock(2.65, 0.7, 1.85, P(gx, 8.3, 3.4), { bevel: 0.07, batter: -0.08, irregular: 0.1 }));
   }
-  b.prop('masonry', arch(P(-4, 7, 3.4), P(4, 7, 3.4), 3, 1.2, 1.6, 13, { pointed: 0.18, irregular: 0.14 }));
+  emitRadialArch(b, 'masonry', P(-4, 7, 3.4), P(4, 7, 3.4), 3, 1.25, 1.6, 13, {
+    pointed: 0.18, tint: 0xe8e5e0, keystoneTint: 0xf4f1eb, irregular: 0.06,
+  });
   for (const sign of [-1, 1]) {
     b.prop('bronze', stoneBox(3.9, 9.6, 0.44, P(sign * 2, 4.8, 3.9), { bevel: 0.04, irregular: 0.06 }), 0xffffff);
     // Recessed coffer framing stiles on each bronze gate leaf.
@@ -84,8 +87,12 @@ export function generate(b, params) {
     pillar(b, P(sign * 5.2, 0, -15), 8, 1.1, { variant: 'reinforced', trimMaterial: 'carved' });
     brazier(b, P(sign * 3.2, 0, -1.8), { tint: '#ffcf98', intensity: 4.8, range: 20, trimMaterial: 'carved', bronzeRim: true });
   }
-  b.prop('carved', arch(P(-5.2, 7.7, -6), P(5.2, 7.7, -6), 3.3, 0.95, 1.35, 15, { pointed: 0.2, irregular: 0.06 }));
-  b.prop('carved', arch(P(-5.2, 7.7, -15), P(5.2, 7.7, -15), 3.3, 0.95, 1.35, 15, { pointed: 0.2, irregular: 0.06 }));
+  emitRadialArch(b, 'carved', P(-5.2, 7.7, -6), P(5.2, 7.7, -6), 3.3, 1.0, 1.35, 15, {
+    pointed: 0.2, tint: 0xe6e3de, keystoneTint: 0xf4f0ea, irregular: 0.04,
+  });
+  emitRadialArch(b, 'carved', P(-5.2, 7.7, -15), P(5.2, 7.7, -15), 3.3, 1.0, 1.35, 15, {
+    pointed: 0.2, tint: 0xe6e3de, keystoneTint: 0xf4f0ea, irregular: 0.04,
+  });
   b.light(P(0, 10.5, -10.5), '#a4b2c6', 1.25, 26, { flat: true });
   b.light(P(0, 3.2, -10.5), '#9aa6b8', 0.55, 22, { flat: true });
 
@@ -101,26 +108,23 @@ export function generate(b, params) {
         : (index === 0 || index === 3 || index === 4) ? 'ceremonial' : 'structural';
       pillar(b, P(sign * rowX, 0, z), height, pillarRadius, { variant: pVariant, trimMaterial: 'carved' });
       // Structural wall buttress aligned with each bay.
-      b.prop('carved', stoneBlock(1.15, 1.0, 1.5, P(sign * (halfWidth - 0.2), 0, z), { bevel: 0.06, batter: 0.1, irregular: 0.08 }));
-      b.prop('carved', stoneBlock(0.88, height - 1.0, 1.24, P(sign * (halfWidth - 0.18), 1.0, z), { bevel: 0.05, irregular: 0.08 }), 0xe8e4dc);
-      // Aisle rib to the wall, and the arcade to the next pier.
-      b.prop('carved', arch(P(sign * rowX, height - 0.1, z), P(sign * (halfWidth + 0.25), height - 0.1, z), 2.7, 0.85, 1.25, 11, {
-        pointed: 0.16, irregular: 0.06,
-      }));
+      b.prop('carved', stoneBlock(1.35, 1.05, 1.48, P(sign * (halfWidth - 0.35), 0, z), { bevel: 0.06, batter: 0.1, irregular: 0.06 }));
+      b.prop('carved', stoneBlock(1.08, height - 1.05, 1.18, P(sign * (halfWidth - 0.3), 1.05, z), { bevel: 0.05, irregular: 0.05 }), 0xe8e4dc);
+      // Radial voussoir aisle rib to the wall, and arcade arch to the next pier.
+      emitRadialArch(b, 'carved', P(sign * rowX, height - 0.2, z), P(sign * (halfWidth + 0.15), height - 0.2, z), 2.7, 0.88, 1.25, 11, {
+        pointed: 0.16, tint: 0xe6e3de, keystoneTint: 0xf4f0ea, irregular: 0.04,
+      });
       if (index < bays.length - 1) {
         const next = bays[index + 1];
-        b.prop('carved', arch(P(sign * rowX, height - 4.1, z - pillarRadius), P(sign * rowX, height - 4.1, next + pillarRadius), 3.4, 0.95, 1.55, 13, {
-          pointed: 0.18, irregular: 0.06,
-        }));
+        emitRadialArch(b, 'carved', P(sign * rowX, height - 4.1, z - pillarRadius), P(sign * rowX, height - 4.1, next + pillarRadius), 3.4, 0.98, 1.55, 13, {
+          pointed: 0.18, tint: 0xe6e3de, keystoneTint: 0xf4f0ea, irregular: 0.04,
+        });
         const variant = bayVariants[index] ?? 'structural';
-        buildWallBay(b, sign, halfWidth, z, next, variant, index);
+        buildWallBay(b, sign, halfWidth, height, galleryY, z, next, variant, index, chasm);
       }
     });
     b.prop('carved', stoneBox(1.85, 1.15, halfLength * 2 - 2, P(sign * rowX, height + 0.25, avenueZ), { bevel: 0.08, irregular: 0.08 }));
-    // Wall dressings: segmented coursed plinth, corbelled gallery sill, pilastered parapet, springing cornice.
-    b.prop('masonry', coursedWall(P(sign * (halfWidth - 0.2), 0, avenueZ - halfLength), P(sign * (halfWidth - 0.2), 0, avenueZ + halfLength), 1.15, 0.72, {
-      courseHeight: 0.55, stoneWidth: 1.6, irregular: 0.14, bevel: 0.06,
-    }));
+    // Elevated gallery sill, pilastered parapet, and springing cornice (lower wall bays now own 0..galleryY cleanly).
     b.prop('masonry', coursedWall(P(sign * (halfWidth - 0.15), galleryY - 0.5, avenueZ - halfLength + 4), P(sign * (halfWidth - 0.15), galleryY - 0.5, avenueZ + halfLength - 4), 0.52, 0.9, {
       courseHeight: 0.52, stoneWidth: 1.5, irregular: 0.12, bevel: 0.05,
     }));
@@ -230,7 +234,9 @@ export function generate(b, params) {
     }));
     b.prop('masonry', stoneBlock(4.1, 1.6, 2.9, P(at.x, 4.6, at.z), { bevel: 0.08, batter: 0.12, irregular: 0.26 }));
     b.prop('masonry', stoneBlock(2.3, 9, 2.3, P(at.x, 6.2, at.z - 0.2), { bevel: 0.08, batter: 0.08, irregular: 0.26 }));
-    b.prop('masonry', arch(P(at.x - 1.4, 0.4, at.z + 1.85), P(at.x + 1.4, 0.4, at.z + 1.85), 1.7, 0.52, 0.52, 9));
+    emitRadialArch(b, 'masonry', P(at.x - 1.4, 0.4, at.z + 1.85), P(at.x + 1.4, 0.4, at.z + 1.85), 1.7, 0.52, 0.52, 9, {
+      pointed: 0.15, irregular: 0.08,
+    });
     b.prop('glow', box(2.3, 1.7, 0.2, P(at.x, 1.1, at.z + 1.75)), forgeTint, 4.5);
     b.prop('iron', stoneBox(5.7, 0.26, 3.9, P(at.x, 3.2, at.z), { bevel: 0.03, irregular: 0.06 }), 0x2b2724);
     b.light(P(at.x, 1.6, at.z + 3.2), forgeTint, 15, 28, { radius: 2, halo: 4.5 });
