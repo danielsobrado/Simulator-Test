@@ -16,16 +16,17 @@ const frame = (a, c) => {
 };
 const side = (p, f, offset) => ({ x: p.x + f.nx * offset, y: p.y, z: p.z + f.nz * offset });
 
-/** A caged lamp: iron frame, glowing pane, and the light it casts. `at` is the lamp body. */
+/** A caged oil lantern: tapered iron hood, base saucer, guard rods, live flame, and baked light. */
 export function lantern(b, at, { tint = '#ffb061', intensity = 5, range = 13, halo = 1.5, hung = 0 } = {}) {
-  b.prop('iron', stoneBox(0.28, 0.06, 0.28, up(at, 0.2), { bevel: 0.02, irregular: 0.1 }), 0x2a2623);
-  b.prop('iron', stoneBox(0.26, 0.06, 0.26, up(at, -0.2), { bevel: 0.02, irregular: 0.1 }), 0x2a2623);
+  b.prop('iron', rod(up(at, 0.16), up(at, 0.27), 0.2, 0.05, 8), 0x6c717a);
+  b.prop('iron', rod(up(at, -0.22), up(at, -0.14), 0.16, 0.19, 8), 0x6c717a);
   for (const [dx, dz] of [[-0.1, -0.1], [0.1, -0.1], [-0.1, 0.1], [0.1, 0.1]]) {
-    b.prop('iron', rod({ x: at.x + dx, y: at.y - 0.18, z: at.z + dz }, { x: at.x + dx, y: at.y + 0.18, z: at.z + dz }, 0.014, 0.014, 4), 0x2a2623);
+    b.prop('iron', rod({ x: at.x + dx, y: at.y - 0.15, z: at.z + dz }, { x: at.x + dx, y: at.y + 0.17, z: at.z + dz }, 0.014, 0.014, 4), 0x666b74);
   }
-  if (hung > 0) b.prop('iron', rod(up(at, 0.22), up(at, 0.22 + hung), 0.015, 0.015, 5), 0x2a2623);
-  b.prop('glow', box(0.18, 0.34, 0.18, at), tint, 4);
-  b.light(at, tint, intensity, range, { radius: 1.2, halo });
+  if (hung > 0) b.prop('iron', rod(up(at, 0.26), up(at, 0.26 + hung), 0.016, 0.016, 5), 0x626670);
+  b.prop('glow', rod(up(at, -0.13), up(at, 0.06), 0.075, 0.065, 8), '#e67822', 1.25);
+  b.flame(up(at, -0.07), { width: 0.18, height: 0.26, core: '#fff3c4', outer: '#ff5c10', speed: 1.15 });
+  b.light(at, tint, intensity, range, { radius: 1.2, halo: halo * 0.55 });
 }
 
 /**
@@ -79,7 +80,7 @@ export function timberSet(b, at, yaw, width, height, tint = 0x7d6044) {
 export function rails(b, a, c, gauge = 0.9) {
   const f = frame(a, c);
   for (const offset of [-gauge / 2, gauge / 2]) {
-    b.prop('iron', hewnBeam(up(side(a, f, offset), 0.13), up(side(c, f, offset), 0.13), 0.075, 0.1, { bevel: 0.018, irregular: 0.06 }), 0x4a4038);
+    b.prop('iron', hewnBeam(up(side(a, f, offset), 0.13), up(side(c, f, offset), 0.13), 0.075, 0.1, { bevel: 0.018, irregular: 0.06 }), 0x747984);
   }
   for (let d = 0.4; d < f.length; d += 0.85) {
     const jitterD = d + b.range(-0.07, 0.07);
@@ -104,8 +105,8 @@ export function crate(b, at, size = 0.8, yaw = 0) {
     const px = at.x + c * lx + s * lz, pz = at.z - s * lx + c * lz;
     b.prop('timber', stoneBlock(0.11, h, 0.11, { x: px, y: at.y, z: pz }, { yaw, bevel: 0.02, irregular: 0.15 }), 0x947551);
   }
-  b.prop('iron', stoneBlock(size + 0.03, 0.06, size + 0.03, up(at, h * 0.44), { yaw, bevel: 0.015, irregular: 0.05 }), 0x3a332e);
-  b.prop('iron', stoneBlock(size + 0.03, 0.06, size + 0.03, up(at, h * 0.82), { yaw, bevel: 0.015, irregular: 0.05 }), 0x3a332e);
+  b.prop('iron', stoneBlock(size + 0.03, 0.06, size + 0.03, up(at, h * 0.44), { yaw, bevel: 0.015, irregular: 0.05 }), 0x6a6e78);
+  b.prop('iron', stoneBlock(size + 0.03, 0.06, size + 0.03, up(at, h * 0.82), { yaw, bevel: 0.015, irregular: 0.05 }), 0x6a6e78);
 }
 
 export function barrel(b, at, radius = 0.36, height = 0.95) {
@@ -114,7 +115,7 @@ export function barrel(b, at, radius = 0.36, height = 0.95) {
   b.prop('timber', rod(mid, up(at, height), radius, radius * 0.84, 12), 0x86633f);
   for (const frac of [0.16, 0.34, 0.66, 0.84]) {
     const r = radius * (frac < 0.25 || frac > 0.75 ? 0.93 : 1.0);
-    b.prop('iron', rod(up(at, height * frac), up(at, height * (frac + 0.055)), r, r, 12), 0x35302b);
+    b.prop('iron', rod(up(at, height * frac), up(at, height * (frac + 0.055)), r, r, 12), 0x686c74);
   }
 }
 

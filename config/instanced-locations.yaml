@@ -78,29 +78,34 @@ instancedLocations:
     mine_rock:
       surface: cave-rock
       scale: 0.26
-      tint: '#fff4e4'
-      normalStrength: 1.1
-      roughness: 1
-      strata: { frequency: 1.5, warp: 4, dip: 0.22, dark: '#b5a892', light: '#fff6e6', relief: 1.2 }
-      # Broad, dull seams: ore is a body in the rock, and it does not glow.
-      vein: { color: '#57452a', scale: 0.7, sharpness: 2.5, roughness: 0.42, f0: 0.3, glow: 0 }
+      tint: '#ebe3d6'
+      normalStrength: 1.18
+      roughness: 0.94
+      cavityShade: 0.72
+      strata: { frequency: 1.35, warp: 2.4, dip: 0.18, dark: '#7c756c', light: '#cfc8be', relief: 1.25 }
+      # Crisp fractured pyrite/copper seams anchored to rock crevices without continuous loops.
+      vein: { color: '#8f6534', scale: 4.4, sharpness: 12.0, roughness: 0.34, f0: 0.36, glow: 0 }
     ore_rubble:
       surface: rubble
-      scale: 0.7
-      tint: '#b9997a'
-      f0: 0.12
+      scale: 0.72
+      tint: '#b59978'
+      roughness: 0.56
+      f0: 0.28
+      vein: { color: '#a8783a', scale: 5.2, sharpness: 10.5, roughness: 0.28, f0: 0.42, glow: 0 }
     still_water:
       surface: iron
-      scale: 0.12
-      tint: '#06090a'
-      normalStrength: 0.06
-      roughness: 0.08
-      f0: 0.1
+      scale: 0.42
+      tint: '#03080b'
+      normalStrength: 0.12
+      roughness: 0.56
+      f0: 0.025
+      water: true
     timber:
       surface: timber
       scale: 0.55
       tint: '#ffffff'
-      normalStrength: 0.9
+      normalStrength: 1.0
+      roughness: 0.88
     sod_roof:
       surface: timber
       scale: 0.5
@@ -253,13 +258,13 @@ instancedLocations:
   # carried lamp, and fog. absorption: how the bake dims light crossing solid.
   lightingProfiles:
     mine_lanterns:
-      background: '#030201'
-      fog: { color: '#0d0a07', density: 0.02 }
-      ambientUp: '#3a3027'
-      ambientDown: '#1c1713'
-      carried: { color: '#ffd7a6', intensity: 2.4, range: 12 }
-      exposure: 1.5
-      bakeGain: 4.5
+      background: '#050403'
+      fog: { color: '#0d0a08', density: 0.0115 }
+      ambientUp: '#42382f'
+      ambientDown: '#201b16'
+      carried: { color: '#ffd9ad', intensity: 1.65, range: 13 }
+      exposure: 1.35
+      bakeGain: 3.4
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     umbra_pale:
       background: '#020308'

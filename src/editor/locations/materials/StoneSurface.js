@@ -147,6 +147,14 @@ export function stoneSurface(profile, maps, mask = null) {
     roughness = roughness.mul(mix(float(1), float(0.85), ridgeWear.mul(profile.cavityShade)));
   }
 
+  if (profile.water) {
+    // Subterranean still pool: organic multi-scale surface ripples over dark mineral depths.
+    const r1 = mx_noise_float(vec3(point.x.mul(1.8), point.z.mul(1.8), point.x.add(point.z).mul(0.35)));
+    const r2 = mx_noise_float(vec3(point.x.mul(4.6), point.z.mul(4.6), point.x.sub(point.z).mul(0.6)));
+    normal = bumpNormal(geometryNormal, r1.mul(0.016).add(r2.mul(0.008)), float(0.8));
+    albedo = color(profile.tint).mul(mix(float(0.6), float(1.1), r1.mul(0.5).add(0.5)));
+  }
+
   if (profile.metalness > 0.2) {
     // Forged hammer pit variation & directional brushed tooling without high-frequency derivative aliasing.
     const hammer = mx_noise_float(point.mul(4.6)).mul(0.5).add(0.5);
@@ -158,17 +166,18 @@ export function stoneSurface(profile, maps, mask = null) {
 
   if (mask) {
     if (profile.vein) {
-      const warp = mx_noise_float(point.mul(profile.vein.scale * 0.4)).mul(1.6);
-      const line = pow(abs(mx_noise_float(point.mul(profile.vein.scale).add(warp))).oneMinus(), profile.vein.sharpness ?? 9);
-      const vein = smoothstep(0.35, 0.8, line.mul(mask.x.mul(1.6)));
-      albedo = mix(albedo, color(profile.vein.color), vein);
+      const warp = mx_noise_float(point.mul(profile.vein.scale * 0.35)).mul(1.25);
+      const line = pow(abs(mx_noise_float(point.mul(profile.vein.scale).add(warp))).oneMinus(), profile.vein.sharpness ?? 12);
+      const pocket = smoothstep(0.38, 0.78, detailAlbedo.g.mul(0.6).add(grainMix.mul(0.4))).mul(smoothstep(0.28, 0.72, midPatch));
+      const vein = smoothstep(0.28, 0.75, line.mul(mask.x.mul(1.4)).mul(pocket));
+      albedo = mix(albedo, albedo.mul(color(profile.vein.color)).mul(1.85), vein.mul(0.75));
       roughness = mix(roughness, float(profile.vein.roughness ?? 0.3), vein);
       f0 = mix(f0, float(profile.vein.f0 ?? 0.5), vein);
       emissive = color(profile.vein.color).mul(vein).mul(profile.vein.glow ?? 0);
     }
-    const damp = mask.y.mul(smoothstep(0.2, 0.7, macro.add(mask.y.mul(0.5))));
-    albedo = albedo.mul(mix(float(1), float(0.55), damp));
-    roughness = mix(roughness, float(0.18), damp);
+    const damp = mask.y.mul(smoothstep(0.25, 0.75, macro.add(mask.y.mul(0.45))));
+    albedo = albedo.mul(mix(float(1), float(0.68), damp));
+    roughness = mix(roughness, float(0.42), damp);
     albedo = albedo.mul(mix(vec3(1), color(profile.sootColor ?? '#1a1512'), mask.z.mul(0.85)));
     roughness = mix(roughness, roughness.mul(profile.dressedRoughness ?? 0.8), dressed);
   }
