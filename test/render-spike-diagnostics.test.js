@@ -6,7 +6,7 @@ import { PerfCounters } from '../src/editor/performance/qa/PerfCounters.js';
 import { FrameProfiler } from '../src/editor/performance/qa/FrameProfiler.js';
 import { buildPerfReport } from '../src/editor/performance/qa/buildPerfReport.js';
 import { parseQaParams } from '../src/editor/performance/qa/parseQaParams.js';
-import { renderSpikeReport, RENDER_CREATION_COUNTERS as C } from '../src/editor/performance/qa/renderSpikeReport.js';
+import { renderSpikeReport, RENDER_CREATION_COUNTERS as C, RENDER_REFRESH_COUNTERS as R } from '../src/editor/performance/qa/renderSpikeReport.js';
 
 test('perf hooks count real allocations, preserve async return values and restore inherited methods', async () => {
   PerfCounters.reset();
@@ -99,6 +99,7 @@ test('exclusive render stages account for nested work without clocking scene upd
   const scene = { updateMatrixWorld() { time += 2; } };
   const renderer = { isRenderer: true, backend: { finishRender() { time++; } },
     _objects: { createRenderObject() {} }, getRenderTarget: () => null,
+    _nodes: { needsRefresh: object => object.refresh },
     _renderObjectDirect() { time += 4; },
     _renderScene() { time++; scene.updateMatrixWorld(); this._renderObjectDirect({ name: 'tree-123' }, {}); this.backend.finishRender(); },
     render() { this._renderScene(); } };
@@ -112,7 +113,20 @@ test('exclusive render stages account for nested work without clocking scene upd
   assert.equal(PerfCounters.get('renderStageCpuMs:drawSubmission'), 4);
   assert.equal(PerfCounters.get('renderStageCpuMs:commandSubmission'), 1);
   assert.equal(PerfCounters.get('renderSlowDraw:tree'), 4);
+  assert.equal(PerfCounters.get(R.draws), 1);
+  const needsRefresh = renderer._nodes.needsRefresh;
+  for (const refresh of [0, 1, 2, 2]) assert.equal(needsRefresh({ refresh }), refresh, 'verdict passes through');
+  assert.deepEqual([R.none, R.shared, R.full].map(name => PerfCounters.get(name)), [1, 1, 2]);
   adapter.dispose(); PerfCounters.reset();
+  assert.notEqual(renderer._nodes.needsRefresh, needsRefresh, 'hook restored');
+});
+
+test('spike rows carry refresh medians for comparison', () => {
+  const samples = Array.from({ length: 9 }, (_, index) => ({ index, dtMs: 10, phases: { render: index === 8 ? 15 : 5 },
+    countersDelta: { [R.draws]: 200, [R.full]: index === 8 ? 180 : 20 } }));
+  const result = renderSpikeReport({ summary: { frameCount: 9, phases: { render: { p50Ms: 5 } } }, samples });
+  assert.deepEqual(result.refreshP50, { draws: 200, full: 20, shared: 0, none: 0 });
+  assert.equal(result.spikes[0].counters[R.full], 180);
 });
 
 test('stage attribution requires complete samples and accounts for excess above stage medians', () => {

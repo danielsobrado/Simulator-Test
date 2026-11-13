@@ -1,5 +1,5 @@
 import { PerfCounters } from '../editor/performance/qa/PerfCounters.js';
-import { RENDER_CREATION_COUNTERS } from '../editor/performance/qa/renderSpikeReport.js';
+import { RENDER_CREATION_COUNTERS, RENDER_REFRESH_COUNTERS } from '../editor/performance/qa/renderSpikeReport.js';
 
 /** The only adapter using Three's internal creation hooks. Restored on renderer disposal. */
 export class RendererCreationDiagnostics {
@@ -121,6 +121,7 @@ export class RendererCreationDiagnostics {
           if (parent) parent.childrenMs += elapsed;
           const ownMs = Math.max(0, elapsed - frame.childrenMs);
           PerfCounters.inc(`renderStageCpuMs:${label}`, ownMs);
+          if (draw) PerfCounters.inc(RENDER_REFRESH_COUNTERS.draws);
           if (draw && ownMs >= 1) {
             let family = (args[1]?.name || args[0]?.name || 'unnamed').replace(/[-_:\s]?-?\d+([,.:_-]-?\d+)*/g, '').slice(0, 48);
             if (slowDrawNames.size < 64 || slowDrawNames.has(family)) slowDrawNames.add(family);
@@ -133,6 +134,13 @@ export class RendererCreationDiagnostics {
       stage(renderer, '_renderObjectDirect', 'drawSubmission', true);
       stage(renderer.backend, 'finishRender', 'commandSubmission');
       if (scene) stage(scene, 'updateMatrixWorld', 'matrixWorld');
+      // Three's own verdict per draw: 0 none, 1 shared, 2 full (RenderObjectRefreshType).
+      const refresh = [RENDER_REFRESH_COUNTERS.none, RENDER_REFRESH_COUNTERS.shared, RENDER_REFRESH_COUNTERS.full];
+      wrap(renderer._nodes, 'needsRefresh', function (original, args) {
+        const type = original.apply(this, args);
+        PerfCounters.inc(refresh[type] ?? RENDER_REFRESH_COUNTERS.full);
+        return type;
+      });
     }
     wrap(renderer, 'render', function (original, args) {
       const target = this.getRenderTarget();

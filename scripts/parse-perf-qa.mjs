@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderSpikeReport, RENDER_CREATION_COUNTERS } from '../src/editor/performance/qa/renderSpikeReport.js';
+import { renderSpikeReport, RENDER_CREATION_COUNTERS, RENDER_REFRESH_COUNTERS } from '../src/editor/performance/qa/renderSpikeReport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -40,9 +40,11 @@ if (!renderSpikes.available) console.log(renderSpikes.reason);
 else {
   console.log(`render p50=${renderSpikes.p50Ms} ms; threshold=${renderSpikes.thresholdMs} ms; attributed=${renderSpikes.attributed}/${renderSpikes.spikes.length} (${(renderSpikes.attributedShare * 100).toFixed(1)}%)`);
   console.log(`exclusive stage p50 ms: ${JSON.stringify(renderSpikes.stageP50)}`);
+  console.log(`draws per callback p50, by refresh type: ${JSON.stringify(renderSpikes.refreshP50)}`);
   console.table(renderSpikes.spikes.map(frame => ({
     frame: frame.index, dtMs: frame.dtMs, renderMs: frame.renderMs,
     ...Object.fromEntries(Object.entries(RENDER_CREATION_COUNTERS).map(([label, name]) => [label, frame.counters[name] ?? 0])),
+    ...Object.fromEntries(Object.entries(RENDER_REFRESH_COUNTERS).map(([label, name]) => [label, frame.counters[name] ?? 0])),
     auxiliary: Object.entries(frame.counters).filter(([name, value]) => name.startsWith('renderScene:') && value > 0)
       .map(([name, value]) => `${name.slice('renderScene:'.length)}=${value}`).join(', '),
     causes: JSON.stringify(frame.causes),

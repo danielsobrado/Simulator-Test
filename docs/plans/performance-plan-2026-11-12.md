@@ -86,6 +86,23 @@ Phase 2's gate in §5 stands, measured against the phase 0 baseline:
 frames over 16.7 ms are 2.8% forest, 2.1% town, 1.9% grassland, 7.1%
 construction.
 
+**Counters added, 2026-11-13.** Perf QA now records `renderDraws`,
+`renderRefreshFull`, `renderRefreshShared` and `renderRefreshNone` per frame,
+and `parse-perf-qa.mjs` prints them on each spike row beside the run's
+medians. A first live look (forest pose in the dev Browser pane, scenery not
+yet settled — not a timed run) already answers the question: **all 392 draws
+sampled took a full refresh**, 386 of them because three's
+`NodeMaterialObserver.containsNode` returns true for any material that has a
+node-valued property, which every material in this renderer does. The refresh
+type therefore never varies, so a jump in `FULL` cannot be what the spike runs
+are. That leaves "the same full refreshes running slower" plus the extra
+garbage collection: the next step is the allocation profile of the town
+route, and `renderDraws` on the spike rows of the next timed run to confirm
+the draw count itself is flat. It also explains the steady cost: three's cheap
+`SHARED`/`NONE` paths are unreachable here, which is why binding and node
+updates are about 28% of main-thread time. Making static draws eligible for
+them is a possible later phase, not something to try inside phase 2.
+
 ### 0.3 Two cascades are closed
 
 The valid-focus repeat measured 8.98 ms render CPU against the 5.67 ms

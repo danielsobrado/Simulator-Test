@@ -4,7 +4,12 @@ export const RENDER_CREATION_COUNTERS = Object.freeze({
   bindGroups: 'renderBindGroupsCreated',
 });
 
-const creationNames = new Set(Object.values(RENDER_CREATION_COUNTERS));
+/** Draws per frame callback, split by the refresh three chose for each. */
+export const RENDER_REFRESH_COUNTERS = Object.freeze({
+  draws: 'renderDraws', full: 'renderRefreshFull', shared: 'renderRefreshShared', none: 'renderRefreshNone',
+});
+
+const creationNames =new Set(Object.values(RENDER_CREATION_COUNTERS));
 const mainTargets = new Set(['canvas', 'output']);
 
 /** Creation or an auxiliary scene that accounts for the render-time excess. */
@@ -18,6 +23,9 @@ export function renderSpikeReport(report) {
   const stageP50 = report.summary.frameCount === measured.length
     ? Object.fromEntries([...stageNames].map(name => [name,
       percentileSorted(measured.map(frame => frame.countersDelta?.[name] ?? 0).sort((a, b) => a - b), .5)])) : {};
+  // Medians over whatever frames the report kept: context for a spike row, not a gate.
+  const refreshP50 = Object.fromEntries(Object.entries(RENDER_REFRESH_COUNTERS).map(([label, name]) => [label,
+    percentileSorted(measured.map(frame => frame.countersDelta?.[name] ?? 0).sort((a, b) => a - b), .5)]));
   const spikes = [...frames.values()].filter(frame => frame.dtMs > 0 && frame.phases?.render > p50Ms + 5)
     .sort((a, b) => a.index - b.index).map(frame => {
       const counters = frame.countersDelta ?? {};
@@ -35,7 +43,7 @@ export function renderSpikeReport(report) {
         renderMs: frame.phases.render, counters, causes: Object.fromEntries(causes), attributed: causes.length > 0 };
     });
   const attributed = spikes.filter(frame => frame.attributed).length;
-  return { available: true, p50Ms, thresholdMs: p50Ms + 5, stageP50, spikes, attributed,
+  return { available: true, p50Ms, thresholdMs: p50Ms + 5, stageP50, refreshP50, spikes, attributed,
     attributedShare: spikes.length ? attributed / spikes.length : 1 };
 }
 import { percentileSorted } from './FrameProfiler.js';
