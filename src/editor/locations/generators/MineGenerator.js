@@ -206,6 +206,8 @@ export function generate(b, params) {
   b.prop('timber', stoneBlock(0.34, 1.5, 0.34, P(-1.2, -9, -81), { bevel: 0.03, batter: 0.08, irregular: 0.25 }), 0x5a442f);
   b.prop('timber', hewnBeam(P(-3, waterY + 0.1, -84), P(-3.6, waterY + 0.4, -88), 0.3, 0.3, { irregular: 0.3 }), 0x4a3828);
 
+  // A lamp left burning on the far side shows how far the water goes.
+  lantern(b, P(4.5, -7.6, -90), { intensity: 3.5, range: 15, halo: 1.2 });
   b.spawn('entry', P(0, 0, 3.5), 0);
   b.exit('adit', P(0, 0, 5.6), { label: 'Leave the workings' });
 }

@@ -37,7 +37,7 @@ export class LocationScene {
       if (builder.exits.length === 0) throw new Error(`Location "${site.id}" generated no exit.`);
 
       await progress('bake-lighting');
-      location.scene.add(builder.build({ materials, absorption: site.lighting.absorption }));
+      location.scene.add(builder.build({ materials, absorption: site.lighting.absorption, bakeGain: site.lighting.bakeGain ?? 1 }));
       if (builder.halos.length > 0) location.scene.add(createHalos(builder.halos));
       if (builder.flames.length > 0) location.scene.add(createFlames(builder.flames));
       for (const shaft of builder.shafts) location.scene.add(createLightShaft(shaft));

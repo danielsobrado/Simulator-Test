@@ -1,7 +1,7 @@
 import { beam, block, box, rod } from '../gen/propKit.js';
 import { fbm3 } from '../gen/noise.js';
 import { chamber, column, plateau, slab } from '../gen/shapes.js';
-import { bridge, crystal, house } from './kits.js';
+import { bridge, crystal, house, lantern } from './kits.js';
 
 /**
  * An Umbra'kor cavern city. The cavern comes first — a void far larger than
@@ -22,7 +22,7 @@ export function generate(b, params) {
   const gate = P(0, 16, 7), ledge = P(0, 16, -23);
   const market = P(0, 8, -72);
   const west = P(-41, 14, -72), east = P(41, 2, -78), beds = P(0, -6, -113);
-  const lamp = (at, size = 1, power = 2.2) => crystal(b, at, size, { tint: crystalTint, intensity: power * 1.6, range: 16 * size, gain: 1.1 });
+  const lamp = (at, size = 1, power = 2.2) => crystal(b, at, size, { tint: crystalTint, intensity: power * 1.6, range: 16 * size, gain: 0.5 });
 
   // The void.
   b.grid.carve(chamber(P(0, 20, -72), { rx: 57, ry: 41, rz: 55, floorY: LAKE }));
@@ -87,7 +87,7 @@ export function generate(b, params) {
   // --- Water and the light that shows the void ------------------------------
   b.prop('water', box(140, 0.05, 140, P(0, LAKE + 2.6, -72)));
   for (const [x, y, z, power] of [[32, LAKE + 6, -40, 1.6], [-36, LAKE + 6, -102, 1.6], [0, 46, -40, 1.5], [-30, 40, -80, 1.3], [34, 40, -92, 1.3], [0, 30, -110, 1.2], [-44, 20, -40, 1], [44, 14, -100, 1]]) {
-    b.light(P(x, y, z), '#5b82c4', power, 80, { flat: true });
+    b.light(P(x, y, z), '#8496b8', power, 80, { flat: true });
   }
 
   // --- Gate ledge -------------------------------------------------------------
@@ -125,11 +125,17 @@ export function generate(b, params) {
     const angle = index / 6 * Math.PI * 2;
     lamp(P(market.x + Math.cos(angle) * 8.6, market.y, market.z + Math.sin(angle) * 8.6), 0.9, 2);
   }
+  // Warm lamps where people trade and live: the only fire-coloured light in the city.
+  for (const [x, y, z] of [[-6, 8, -62], [7, 8, -80], [-9, 8, -79], [10, 8, -66], [-36, 14, -58], [-36, 14, -84], [37, 2, -70]]) {
+    b.prop('iron', rod(P(x, y, z), P(x, y + 2.6, z), 0.05, 0.04, 6), 0x23262d);
+    lantern(b, P(x, y + 2.8, z), { tint: windowTint, intensity: 5, range: 14, halo: 1.4 });
+    b.nav.block(P(x, y, z), 0.35, 3);
+  }
   // The Spindle's lamp: a hanging mass of crystal over the market.
   for (let index = 0; index < 9; index += 1) {
     const angle = index / 9 * Math.PI * 2;
     b.prop('glow', rod(P(spindleTip.x + Math.cos(angle) * 1.2, spindleTip.y + 2.5, spindleTip.z + Math.sin(angle) * 1.2),
-      P(spindleTip.x + Math.cos(angle) * b.range(0.3, 2.4), spindleTip.y - b.range(1.5, 5), spindleTip.z + Math.sin(angle) * b.range(0.3, 2.4)), 0.5, 0.03, 5), crystalTint, 1.3);
+      P(spindleTip.x + Math.cos(angle) * b.range(0.3, 2.4), spindleTip.y - b.range(1.5, 5), spindleTip.z + Math.sin(angle) * b.range(0.3, 2.4)), 0.5, 0.03, 5), crystalTint, 0.6);
   }
   b.light(P(spindleTip.x, spindleTip.y - 3, spindleTip.z), crystalTint, 70, 70, { radius: 4, halo: 7 });
 

@@ -150,9 +150,10 @@ export class LocationBuilder {
    * @param {object} options
    * @param {Record<string, { material: Material, ice?: number }>} options.materials `terrain` plus one per prop key
    * @param {{ rock: number[], ice: number[] }} options.absorption
+   * @param {number} [options.bakeGain] scales every baked light: the lighting profile's overall lamp strength
    * @returns {THREE.Group}
    */
-  build({ materials, absorption }) {
+  build({ materials, absorption, bakeGain = 1 }) {
     const group = new THREE.Group();
     const surface = extractSurface(this.grid);
     const count = surface.positions.length / 3;
@@ -170,6 +171,7 @@ export class LocationBuilder {
       grid: this.grid, positions: surface.positions, normals: surface.normals, lights: this.lights,
       iceAt: (v) => ice[v], absorption,
     });
+    for (let i = 0; i < baked.light.length; i += 1) baked.light[i] *= bakeGain;
     smoothAttribute(surface.indices, baked.light, 3, 1);
     smoothAttribute(surface.indices, baked.shade, 2, 2);
     const chunks = splitByColumns({
@@ -200,6 +202,7 @@ export class LocationBuilder {
         grid: this.grid, positions: geometry.attributes.position.array, normals: geometry.attributes.normal.array,
         lights: this.lights, iceAt: () => entry.ice ?? 0, absorption,
       });
+      for (let i = 0; i < lit.light.length; i += 1) lit.light[i] *= bakeGain;
       geometry.setAttribute('bakeLight', new THREE.BufferAttribute(lit.light, 3));
       geometry.setAttribute('bakeDir', new THREE.BufferAttribute(lit.dir, 3));
       geometry.setAttribute('bakeShade', new THREE.BufferAttribute(lit.shade, 2));
