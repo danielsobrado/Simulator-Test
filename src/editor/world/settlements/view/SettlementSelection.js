@@ -4,6 +4,7 @@ import { writeInstances } from '../../../stylized/lod/StylizedLodRuntime.js';
 import { PerfCounters } from '../../../performance/qa/PerfCounters.js';
 
 const SLICE = 32;
+let passes = 0;
 
 /** A paved site is not a replacement for its still-loading building silhouettes. */
 export function settlementSiteDrawn(view, site) {
@@ -47,7 +48,8 @@ function publish(view, key, changes) {
 /** Bounded classification and row publication. Unvisited placements keep their
  * last complete instance; no whole-town buffer comparison on every fade frame. */
 export function* settlementSelectionJob(view, focus, timestamp, settings) {
-  const seen = new Map(), pending = new Map();
+  // Rows remember the pass that last saw each id: a per-pass set of ids was garbage on every placement.
+  const pass = ++passes, pending = new Map();
   const epoch = view.coverageEpoch ?? 0;
   let fading = false, shown = 0, buildings = 0, props = 0, units = 0;
   const flush = function* () {
@@ -58,7 +60,9 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
     if (!site.surfaces) continue;
     const coverage = { epoch, complete: Boolean(site.placements) && !site.job, required: new Map() };
     const source = { style: site.plan.profile.style, kind: '', variant: 0, surfaces: site.surfaces };
-    for (const [index, placement] of (site.placements ?? []).entries()) {
+    const placements = site.placements ?? [];
+    for (let index = 0; index < placements.length; index += 1) {
+      const placement = placements[index];
       const id = placement.objectId ??= `${site.id}:${index}`, distance = Math.hypot(placement.x - focus.x, placement.z - focus.z);
       const range = placement.small ? settings.smallRange : settings.farRange;
       const inView = !view.culls || view.inView(placement);
@@ -83,12 +87,12 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
         placement.blend = blend; placement.shown = visible;
         let rows = view.rows.get(placement.key);
         if (!rows) {
-          rows = { entry, storage: new InstanceLodRows(['near', 'far']), anchor: new InstanceAnchor(), published: {}, tiers: new Map() };
+          rows = { entry, storage: new InstanceLodRows(['near', 'far']), anchor: new InstanceAnchor(), published: {}, tiers: new Map(),
+            seenAt: new Map() };
           view.rows.set(placement.key, rows);
         }
         rows.entry = entry;
-        if (!seen.has(placement.key)) seen.set(placement.key, new Set());
-        seen.get(placement.key).add(id);
+        rows.seenAt.set(id, pass);
         const drawn = visible > 0 && inView;
         const nearFade = drawn ? visible * blend : 0, farFade = drawn && entry.far ? visible * (1 - blend) : 0;
         if (drawn) {
@@ -130,7 +134,7 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
     for (const band of ['near', 'far']) for (const id of rows.storage.indices[band].keys()) {
       if (!inspected.has(id)) {
         inspected.add(id);
-        if (!seen.get(key)?.has(id)) remove.set(id, []);
+        if (rows.seenAt.get(id) !== pass) { remove.set(id, []); rows.seenAt.delete(id); }
       }
       // Scan retained IDs under the same budget, even when none need removal.
       PerfCounters.inc('settlementRetirementRowsChecked');
