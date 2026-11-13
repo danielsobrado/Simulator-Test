@@ -1844,6 +1844,7 @@ earlier preparation-only source and uses the corrected gates. The full
 candidate suite passes 4326 tests. Grassland A/B/A/B is focus-valid, but B2
 fails with a 12.2 ms capture and 25.1 ms callback despite better p95 and mean
 render CPU. Forest B1 also fails (9.3 / 22.1 ms). No runtime change is promoted.
-Two forest A2 attempts lost native focus and are excluded; the remaining
-forest pair and candidate water check await an uninterrupted foreground window.
+Four forest A2 attempts lost native focus and are excluded, including two
+retries after foreground readiness was confirmed. The remaining forest pair
+and candidate water check are incomplete; the retry queue was stopped.
 The report preserves the accepted rows, rejected attempts and clean patch.

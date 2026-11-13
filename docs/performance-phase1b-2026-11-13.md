@@ -63,15 +63,17 @@ separate work. No new optimization, deferral or layer omission was added.
 ## Validity, source identity and remaining checks
 
 All rows above pass native focus, settled scenery, loaded-tree integrity and
-zero-browser-error checks. Two attempted forest A2 runs were rejected after
+zero-browser-error checks. Four attempted forest A2 runs were rejected after
 Search/Explorer/Snipping Tool or another window took focus. Their unaltered
 reports, profiles, screenshots and logs are preserved as
 `forest-a2-focus-rejected*` and excluded from the table.
 
-The final forest pair and candidate water acceptance are pending an
-uninterrupted foreground window. No matching-visual acceptance or full stress
-matrix is claimed. These missing checks cannot turn the valid failures above
-into a pass.
+The final forest pair and candidate water acceptance remain incomplete.
+After the user confirmed readiness, two more baseline attempts were made;
+Snipping Tool and another Chrome window again took foreground focus. Both
+were excluded, and the retry queue was stopped. No matching-visual acceptance
+or full stress matrix is claimed. These missing checks cannot turn the valid
+failures above into a pass.
 
 Baseline commit: `410ff1785c3ba7673d8fb3a476f32fdc63de48b8`. Frozen manifests:
 

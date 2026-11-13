@@ -24,8 +24,9 @@ replaces §2. Three things in this plan change because of it.
 was restored and passed 4326 tests. Six accepted hardware captures already
 contain corrected-gate failures: grassland B2 reaches 12.2 ms capture / 25.1 ms
 callback, and forest B1 reaches 9.3 / 22.1 ms. The second forest pair and
-candidate water check are pending foreground-window coordination after two
-forest baselines lost native focus. Runtime edits were reverted; the clean
+candidate water check remain incomplete after four forest baselines lost
+native focus, including two retries after foreground readiness was confirmed.
+Runtime edits were reverted; the clean
 preparation-only patch is retained. See [fresh retest evidence](../performance-phase1b-2026-11-13.md).
 
 The p95 ≤ 4 ms gate in §4 was this plan's mistake. Preparing the capture
