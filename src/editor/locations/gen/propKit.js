@@ -125,15 +125,15 @@ function buildChamferedPrism(width, height, depth, {
   pushQuad(vX[1], vZ[1], vZ[5], vX[5]); // +X/-Z
   pushQuad(vZ[0], vX[0], vX[4], vZ[4]); // -X/-Z
 
-  // 8 corner triangles:
-  pushTri(vY[0], vZ[0], vX[0]);
-  pushTri(vY[1], vX[1], vZ[1]);
-  pushTri(vY[2], vZ[2], vX[2]);
-  pushTri(vY[3], vX[3], vZ[3]);
-  pushTri(vY[4], vX[4], vZ[4]);
-  pushTri(vY[5], vZ[5], vX[5]);
-  pushTri(vY[6], vX[6], vZ[6]);
-  pushTri(vY[7], vZ[7], vX[7]);
+  // 8 corner triangles (outward CCW):
+  pushTri(vY[0], vX[0], vZ[0]);
+  pushTri(vY[1], vZ[1], vX[1]);
+  pushTri(vY[2], vX[2], vZ[2]);
+  pushTri(vY[3], vZ[3], vX[3]);
+  pushTri(vY[4], vZ[4], vX[4]);
+  pushTri(vY[5], vX[5], vZ[5]);
+  pushTri(vY[6], vZ[6], vX[6]);
+  pushTri(vY[7], vX[7], vZ[7]);
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));

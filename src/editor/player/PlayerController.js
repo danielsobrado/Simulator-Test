@@ -53,6 +53,8 @@ export class PlayerController {
     this.paused = false;
     /** Set by the composition root; makes wall tops walkable. */
     this.constructionGround = null;
+    /** `{ heightAt(x, z, footY), resolve(request) }` while inside an instanced location, else null. */
+    this.groundOverride = null;
     this.uiBlocked = false;
     this.keys = new Set();
     this.jumpQueued = false;
@@ -103,7 +105,9 @@ export class PlayerController {
   }
 
   getStatus() {
-    const collision = this.characterMotor?.getStatus() ?? INACTIVE_COLLISION_STATUS;
+    const collision = this.groundOverride
+      ? INACTIVE_COLLISION_STATUS
+      : (this.characterMotor?.getStatus() ?? INACTIVE_COLLISION_STATUS);
     return Object.freeze({
       enabled: this.enabled,
       harnessActive: this.harnessActive,
@@ -281,9 +285,24 @@ export class PlayerController {
     return createPlayerState({
       x,
       z,
-      groundHeight: this.terrainView.getWorldHeight(x, z),
+      groundHeight: this.getGroundHeight(x, z),
       eyeHeight: this.config.eyeHeight,
     });
+  }
+
+  /**
+   * Stands the player at a point in a scene that is not the world — an
+   * instanced location. Unlike `setPose` it announces no teleport: the world's
+   * streaming must not chase coordinates that are not the world's.
+   */
+  placeAt({ x, y, z, yaw = this.yaw, pitch = 0 }) {
+    this.state = createPlayerState({ x, z, groundHeight: y, eyeHeight: this.config.eyeHeight });
+    this.yaw = yaw;
+    this.pitch = pitch;
+    this.lastTimestamp = null;
+    this.resetInput();
+    this.applyCameraState();
+    this.emit();
   }
 
   setPose({ x, z, yaw = this.yaw, pitch = this.pitch } = {}) {
@@ -404,7 +423,7 @@ export class PlayerController {
     const deltaSeconds = this.lastTimestamp === null ? 0 : (current - this.lastTimestamp) / 1000;
     this.lastTimestamp = current;
 
-    if (this.collisionRuntime) {
+    if (this.collisionRuntime && !this.groundOverride) {
       const focus = this.terrainView.floatingOrigin.toCanonical(this.state.x, this.state.z);
       this.collisionRuntime.update(focus, current);
     }
@@ -448,12 +467,14 @@ export class PlayerController {
       forward: this.forward,
       right: this.right,
       getGroundHeight: (x, z) => this.getGroundHeight(x, z),
-      getWaterSample: typeof this.terrainView.getWorldWater === 'function'
+      getWaterSample: !this.groundOverride && typeof this.terrainView.getWorldWater === 'function'
         ? (x, z) => this.terrainView.getWorldWater(x, z)
         : null,
-      resolveHorizontalMotion: this.characterMotor
-        ? (request) => this.resolveHorizontalMotion(request)
-        : null,
+      resolveHorizontalMotion: this.groundOverride
+        ? (request) => this.groundOverride.resolve(request)
+        : this.characterMotor
+          ? (request) => this.resolveHorizontalMotion(request)
+          : null,
     });
     const waterChanged = nextState.waterState !== previousState.waterState
       || nextState.headSubmerged !== previousState.headSubmerged
@@ -482,6 +503,8 @@ export class PlayerController {
    * on.
    */
   getGroundHeight(x, z) {
+    // Inside an instanced location the ground is the location's, at the level the feet are on.
+    if (this.groundOverride) return this.groundOverride.heightAt(x, z, this.state.footY ?? this.state.y - this.config.eyeHeight);
     const terrain = this.terrainView.getWorldHeight(x, z);
     if (!this.constructionGround) return terrain;
     const canonical = this.terrainView.floatingOrigin.toCanonical(x, z);

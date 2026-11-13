@@ -138,18 +138,18 @@ instancedLocations:
     stonehold_granite:
       surface: granite
       scale: 0.22
-      tint: '#a59f97'
-      normalStrength: 1
-      roughness: 0.95
-      dressedRoughness: 0.85
-      sootColor: '#141110'
-      masonry: { courseHeight: 0.8, blockLength: 1.9, jointWidth: 0.05, relief: 1.8 }
+      tint: '#b4b6ba'
+      normalStrength: 1.05
+      roughness: 0.94
+      dressedRoughness: 0.84
+      sootColor: '#141314'
+      masonry: { courseHeight: 0.95, blockLength: 2.2, jointWidth: 0.04, relief: 1.7 }
     stonehold_ashlar:
       surface: dressed-stone
-      scale: 0.3
-      tint: '#b3a898'
-      roughness: 0.9
-      masonry: { courseHeight: 0.6, blockLength: 1.4, jointWidth: 0.04, relief: 1.6 }
+      scale: 0.28
+      tint: '#bebfc2'
+      roughness: 0.88
+      masonry: { courseHeight: 0.9, blockLength: 2.1, jointWidth: 0.032, relief: 1.5 }
     bronze:
       surface: iron
       scale: 0.7
@@ -247,12 +247,12 @@ instancedLocations:
       exposure: 1.35
       absorption: { rock: [5, 5, 5], ice: [0.55, 0.085, 0.03] }
     stonehold_forge:
-      background: '#080706'
-      fog: { color: '#161311', density: 0.0068 }
-      ambientUp: '#2c2c34'
-      ambientDown: '#1c1815'
-      carried: { color: '#ffe0b8', intensity: 1.45, range: 13 }
-      exposure: 1.28
+      background: '#090a0d'
+      fog: { color: '#141519', density: 0.0058 }
+      ambientUp: '#323540'
+      ambientDown: '#201e20'
+      carried: { color: '#ffecd4', intensity: 1.15, range: 14 }
+      exposure: 1.24
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     frostgard_ice:
       background: '#061423'

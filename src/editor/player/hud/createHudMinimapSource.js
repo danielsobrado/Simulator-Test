@@ -20,8 +20,11 @@ const COMPASS_RANGE_FACTOR = 12;
  * @param {{ focusProvider?: () => { x: number, z: number }, campaign?: object | null }} deps.controller
  * @param {{ tileSize: number, get: Function, getTileDefinition: Function }} deps.tileMap
  * @param {() => object | null} [deps.getBaseTerrain]
+ * @param {() => { label: string, color: string } | null} [deps.getLocationLabel] active instanced location label
  */
-export function createHudMinimapSource({ ui, controller, tileMap, getBaseTerrain = () => null }) {
+export function createHudMinimapSource({
+  ui, controller, tileMap, getBaseTerrain = () => null, getLocationLabel = () => null,
+}) {
   const editorMap = Object.freeze({
     frame: ui.minimapFrame ?? null,
     getWindow: () => ui.minimapPublishedWindow ?? ({ center: ui.minimapCenter, cells: ui.minimapCells }),
@@ -70,8 +73,10 @@ export function createHudMinimapSource({ ui, controller, tileMap, getBaseTerrain
       worldDz: v - 0.5,
       metres: distanceCells * tileMap.tileSize,
     })),
-    describeRegion: (cellX, cellZ) => regionMap.describeRegion(cellX, cellZ),
+    describeRegion: (cellX, cellZ) => (getLocationLabel() ? null : regionMap.describeRegion(cellX, cellZ)),
     describeCell: (cellX, cellZ) => {
+      const locationLabel = getLocationLabel();
+      if (locationLabel) return locationLabel;
       const definition = tileMap.getTileDefinition(tileMap.get(cellX, cellZ));
       return definition ? { label: definition.label, color: definition.color } : null;
     },

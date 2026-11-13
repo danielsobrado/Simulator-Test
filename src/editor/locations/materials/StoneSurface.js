@@ -97,10 +97,10 @@ export function stoneSurface(profile, maps, mask = null) {
   if (blocks) {
     const cut = dressed.mul(blocks.gap);
     const bevelEdge = dressed.mul(blocks.bevel);
-    const stoneTone = mix(color('#c6c2bc'), color('#b0b5bc'), blocks.id2).mul(mix(float(0.84), float(1.14), blocks.id));
+    const stoneTone = mix(color('#c4c6ca'), color('#b5b1ab'), blocks.id2).mul(mix(float(0.86), float(1.12), blocks.id));
     albedo = albedo.mul(mix(float(1), stoneTone, dressed));
-    albedo = albedo.mul(mix(float(1), float(1.12), bevelEdge.mul(0.75)));
-    albedo = mix(albedo, albedo.mul(color('#3b3630')), cut.mul(0.72));
+    albedo = albedo.mul(mix(float(1), float(1.15), bevelEdge.mul(0.78)));
+    albedo = mix(albedo, albedo.mul(color('#363432')), cut.mul(0.72));
     normal = bumpNormal(normal, blocks.height.mul(0.032).mul(dressed), profile.masonry.relief ?? 1.6);
     roughness = roughness.mul(mix(float(1), mix(float(0.88), float(1.12), blocks.id2), dressed));
     roughness = mix(roughness, float(0.96), cut);

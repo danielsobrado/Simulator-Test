@@ -28,6 +28,7 @@ import { EditorCamera } from './editor/EditorCamera.js';
 import { EditorUi } from './editor/EditorUi.js';
 import { InfiniteTerrainView } from './editor/InfiniteTerrainView.js';
 import { MacroFarTerrainView } from './editor/world/MacroFarTerrainView.js';
+import { createLocationRuntime } from './editor/locations/createLocationRuntime.js';
 import { CameraCutCoordinator } from './editor/world/CameraCutCoordinator.js';
 import { WorldMapController } from './editor/map/WorldMapController.js';
 import { WorldMapUi } from './editor/map/WorldMapUi.js';
@@ -688,6 +689,12 @@ const kitTowns = kitTownsEnabled();
     ...streamingProbe,
   });
 
+  const locations = createLocationRuntime({
+    renderer: terrainView.renderer, loading, playerController, viewModeController, cameraCutCoordinator,
+    floatingOrigin, walkMode: PLAYER_MODE_WALK, baseUrl: import.meta.env.BASE_URL,
+  });
+  resources.own(locations);
+
   controller = new TerrainAwareEditorController({
     tileMap,
     heightField,
@@ -918,13 +925,20 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     hud: {
       vitals: playerVitals,
       minimap: createHudMinimapSource({
-        ui, controller, tileMap, getBaseTerrain: () => worldMapController.getBaseTerrain(),
+        ui,
+        controller,
+        tileMap,
+        getBaseTerrain: () => worldMapController.getBaseTerrain(),
+        getLocationLabel: () => {
+          const site = locations.runtime.activeSite;
+          return site ? { label: site.title, color: site.theme?.accent ?? '#ff9a4a' } : null;
+        },
       }),
       getRenderer: () => terrainView.renderer,
       // The time of day titles the legend, as the donor's scene preset did:
       // "Emberfall (golden hour)" reads as "Emberfall". Read lazily — the sky
       // looks are built after the HUD.
-      getSceneLabel: () => sceneLabel(skyLooks?.preset),
+      getSceneLabel: () => locations.runtime.activeSite?.title ?? sceneLabel(skyLooks?.preset),
     },
   });
   resources.own(viewModeUi);
@@ -1552,6 +1566,8 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
   if (import.meta.env.DEV && window.__editor) Object.assign(window.__editor, { exploration, deferredWork, drawPreparation });
   if (restoreState) await startup.wait(restoreEditorRecoveryState(restoreState, { controller, editorCamera, playerController, viewModeController, proceduralWorkshop }));
   boot.finish();
+  if (import.meta.env.DEV && window.__editor) window.__editor.locations = locations.runtime;
+  void locations.runtime.restore(window.location.search);
 
   if (perfQaConfig?.scenarioId === 'settlement-approach') {
     const { prepareSettlementApproach } = await import('./editor/performance/qa/SettlementApproachFixture.js');
@@ -1636,6 +1652,12 @@ const settlementGroundBounce = new SettlementGroundBounce(() => stylizedSurface?
     // failed validation, and towns rendered nothing but terrain.
     terrainView.renderer.setRenderTarget(null);
     terrainView.renderer.setMRT?.(null);
+    // Inside an instanced location the world is not drawn or advanced; it resumes where it stopped.
+    if (locations.runtime.active) {
+      locations.runtime.frame(frameTimestamp);
+      viewModeUi.update(frameTimestamp);
+      return;
+    }
     deferredWork.beginFrame();
     const profiling = perfQa?.beginFrame(frameTimestamp) ?? false;
     drawPreparation.beginFrame(deferredWork);

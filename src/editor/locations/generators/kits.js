@@ -182,57 +182,51 @@ export function bridge(b, a, c, width, { footY, material = 'masonry', tint = 0xf
 }
 
 /**
- * A monumental Dwarven column: stepped chamfered plinth and octagonal base,
- * continuous octagonal shaft with engaged vertical ribs and horizontal bands,
- * and a corbelled capital with a bronze necking band. Blocks the walker.
+ * A monumental Dwarven column: broad chamfered plinth and octagonal base,
+ * continuous octagonal shaft with non-intersecting engaged cardinal ribs,
+ * bronze necking band, and a clean corbelled capital. Blocks the walker.
  */
 export function pillar(b, at, height, radius, { material = 'masonry', tint = 0xffffff, sides = 8 } = {}) {
   // Broad square plinth + stepped octagonal base + recessed transition collar.
-  b.prop(material, stoneBlock(radius * 2.85, 0.72, radius * 2.85, at, { bevel: 0.08, batter: 0.14, irregular: 0.1 }), tint);
-  b.prop(material, rod(up(at, 0.72), up(at, 1.32), radius * 1.32, radius * 1.16, sides), 0xe8e4dc);
-  b.prop(material, rod(up(at, 1.32), up(at, 1.62), radius * 1.06, radius * 0.96, sides), 0xdad5cd);
+  b.prop(material, stoneBlock(radius * 2.85, 0.72, radius * 2.85, at, { bevel: 0.08, batter: 0.14, irregular: 0.06 }), tint);
+  b.prop(material, rod(up(at, 0.72), up(at, 1.32), radius * 1.32, radius * 1.16, sides), 0xebe9e6);
+  b.prop(material, rod(up(at, 1.32), up(at, 1.64), radius * 1.06, radius * 0.96, sides), 0xdedcdd);
 
-  // Continuous octagonal shaft with engaged cardinal ribs (recessed panels) and horizontal bands.
-  const shaftStart = 1.62;
-  const shaftEnd = height - 1.95;
+  // Continuous octagonal shaft with slim cardinal pilasters flush on each face.
+  const shaftStart = 1.64;
+  const shaftEnd = height - 1.85;
   const shaftH = Math.max(0.8, shaftEnd - shaftStart);
   b.prop(material, rod(up(at, shaftStart), up(at, shaftEnd), radius * 0.96, radius * 0.9, sides), tint);
-  const ribW = radius * 0.42;
-  const ribSpan = radius * 2.04;
-  b.prop(material, stoneBlock(ribW, shaftH, ribSpan, up(at, shaftStart), { bevel: 0.05, batter: 0.04, irregular: 0.06 }), 0xf2efe9);
-  b.prop(material, stoneBlock(ribSpan, shaftH, ribW, up(at, shaftStart), { bevel: 0.05, batter: 0.04, irregular: 0.06 }), 0xf2efe9);
-  for (const frac of [0.34, 0.68]) {
-    const bandY = shaftStart + shaftH * frac;
-    const bandR = radius * (1.03 - frac * 0.05);
-    b.prop(material, rod(up(at, bandY - 0.12), up(at, bandY + 0.12), bandR, bandR, sides), 0xd8d3cb);
-  }
-
-  // Capital: necking ring, bronze geometric band, flared bell, stepped abacus, corbel brackets, impost.
-  b.prop(material, rod(up(at, shaftEnd), up(at, shaftEnd + 0.28), radius * 0.94, radius * 1.08, sides), 0xdad5cd);
-  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.05, radius * 1.05, sides), 0xe6c896);
-  b.prop(material, rod(up(at, shaftEnd + 0.28), up(at, height - 0.95), radius * 1.08, radius * 1.38, sides), 0xeae6de);
-  b.prop(material, stoneBlock(radius * 2.75, 0.52, radius * 2.75, up(at, height - 0.95), { bevel: 0.08, batter: -0.06, irregular: 0.08 }), tint);
-  b.prop(material, stoneBlock(radius * 3.05, 0.43, radius * 3.05, up(at, height - 0.43), { bevel: 0.07, irregular: 0.08 }), 0xf2efe9);
-  // Four cardinal corbel brackets supporting the abacus.
+  const ribW = radius * 0.34;
+  const ribDepth = radius * 0.14;
   for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-    b.prop(material, stoneBox(
-      dx !== 0 ? radius * 0.65 : radius * 0.55,
-      0.58,
-      dz !== 0 ? radius * 0.65 : radius * 0.55,
-      { x: at.x + dx * radius * 1.15, y: height - 1.18, z: at.z + dz * radius * 1.15 },
-      { bevel: 0.05, batter: -0.14, irregular: 0.08 },
-    ), 0xdcd7cf);
+    b.prop(material, stoneBlock(
+      dx !== 0 ? ribDepth : ribW,
+      shaftH,
+      dz !== 0 ? ribDepth : ribW,
+      { x: at.x + dx * radius * 0.92, y: at.y + shaftStart, z: at.z + dz * radius * 0.92 },
+      { bevel: 0.03, batter: 0.03, irregular: 0.04 },
+    ), 0xf2f0ed);
   }
+  const midY = shaftStart + shaftH * 0.5;
+  b.prop(material, rod(up(at, midY - 0.11), up(at, midY + 0.11), radius * 0.99, radius * 0.99, sides), 0xdad8d5);
+
+  // Capital: necking ring, bronze geometric band, flared bell, stepped abacus and impost.
+  b.prop(material, rod(up(at, shaftEnd), up(at, shaftEnd + 0.26), radius * 0.94, radius * 1.08, sides), 0xdedcdd);
+  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.06, radius * 1.06, sides), 0xe6c896);
+  b.prop(material, rod(up(at, shaftEnd + 0.26), up(at, height - 0.92), radius * 1.08, radius * 1.36, sides), 0xebe9e6);
+  b.prop(material, stoneBlock(radius * 2.65, 0.48, radius * 2.65, up(at, height - 0.92), { bevel: 0.08, batter: -0.06, irregular: 0.06 }), tint);
+  b.prop(material, stoneBlock(radius * 2.95, 0.44, radius * 2.95, up(at, height - 0.44), { bevel: 0.07, irregular: 0.06 }), 0xf2f0ed);
   b.nav.block(at, radius * 1.45, height);
 }
 
 /** A fire bowl on a stepped, chamfered plinth. */
-export function brazier(b, at, { tint = '#ffb668', intensity = 10, range = 22, size = 1 } = {}) {
-  b.prop('masonry', stoneBlock(1.05 * size, 0.35 * size, 1.05 * size, at, { bevel: 0.04, batter: 0.15, irregular: 0.25 }));
-  b.prop('masonry', stoneBlock(0.84 * size, 0.6 * size, 0.84 * size, up(at, 0.35 * size), { bevel: 0.04, batter: 0.08, irregular: 0.25 }));
+export function brazier(b, at, { tint = '#ffd29e', intensity = 7.5, range = 24, size = 1 } = {}) {
+  b.prop('masonry', stoneBlock(1.05 * size, 0.35 * size, 1.05 * size, at, { bevel: 0.04, batter: 0.15, irregular: 0.12 }));
+  b.prop('masonry', stoneBlock(0.84 * size, 0.6 * size, 0.84 * size, up(at, 0.35 * size), { bevel: 0.04, batter: 0.08, irregular: 0.12 }));
   b.prop('iron', rod(up(at, 0.92 * size), up(at, 1.32 * size), 0.35 * size, 0.76 * size, 10), 0x2c2824);
-  b.prop('glow', rod(up(at, 1.28 * size), up(at, 1.62 * size), 0.62 * size, 0.1 * size, 8), tint, 5);
-  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 1.6, halo: 3.2 * size });
+  b.prop('glow', rod(up(at, 1.28 * size), up(at, 1.62 * size), 0.62 * size, 0.1 * size, 8), '#ff9c42', 5);
+  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 2.3, halo: 3.0 * size });
   b.nav.block(at, 0.8 * size, 2);
 }
 
