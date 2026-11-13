@@ -59,13 +59,13 @@ export function generate(b, params) {
   // --- Gate ---------------------------------------------------------------
   for (const sign of [-1, 1]) {
     const gx = sign * 5.2;
-    b.prop('masonry', stoneBlock(2.7, 1.1, 1.9, P(gx, 0, 3.4), { bevel: 0.08, batter: 0.16, irregular: 0.28 }));
+    b.prop('masonry', stoneBlock(2.7, 1.1, 1.9, P(gx, 0, 3.4), { bevel: 0.08, batter: 0.16, irregular: 0.14 }));
     b.prop('masonry', coursedWall(P(gx - 1.2, 1.1, 3.4), P(gx + 1.2, 1.1, 3.4), 7.2, 1.6, {
-      courseHeight: 0.72, stoneWidth: 1.05, irregular: 0.36, quoins: true, bevel: 0.06,
+      courseHeight: 0.72, stoneWidth: 1.05, irregular: 0.14, quoins: true, bevel: 0.06,
     }));
-    b.prop('masonry', stoneBlock(2.65, 0.7, 1.85, P(gx, 8.3, 3.4), { bevel: 0.07, batter: -0.08, irregular: 0.22 }));
+    b.prop('masonry', stoneBlock(2.65, 0.7, 1.85, P(gx, 8.3, 3.4), { bevel: 0.07, batter: -0.08, irregular: 0.12 }));
   }
-  b.prop('masonry', arch(P(-4, 7, 3.4), P(4, 7, 3.4), 3, 1.2, 1.6, 11));
+  b.prop('masonry', arch(P(-4, 7, 3.4), P(4, 7, 3.4), 3, 1.2, 1.6, 13, { pointed: 0.18, irregular: 0.14 }));
   for (const sign of [-1, 1]) {
     b.prop('bronze', stoneBox(3.9, 9.6, 0.44, P(sign * 2, 4.8, 3.9), { bevel: 0.04, irregular: 0.06 }), 0xffffff);
     // Recessed coffer framing stiles on each bronze gate leaf.
@@ -80,10 +80,11 @@ export function generate(b, params) {
   for (const sign of [-1, 1]) {
     pillar(b, P(sign * 5.2, 0, -6), 8, 1.1);
     pillar(b, P(sign * 5.2, 0, -15), 8, 1.1);
-    brazier(b, P(sign * 3.2, 0, -1.5), { intensity: 7, range: 16 });
+    brazier(b, P(sign * 3.2, 0, -1.5), { tint: '#ffb668', intensity: 9.5, range: 20 });
   }
-  b.prop('masonry', arch(P(-5.2, 8, -6), P(5.2, 8, -6), 3.2, 0.9, 1.3, 11));
-  b.prop('masonry', arch(P(-5.2, 8, -15), P(5.2, 8, -15), 3.2, 0.9, 1.3, 11));
+  b.prop('masonry', arch(P(-5.2, 7.7, -6), P(5.2, 7.7, -6), 3.3, 0.95, 1.35, 13, { pointed: 0.18, irregular: 0.14 }));
+  b.prop('masonry', arch(P(-5.2, 7.7, -15), P(5.2, 7.7, -15), 3.3, 0.95, 1.35, 13, { pointed: 0.18, irregular: 0.14 }));
+  b.light(P(0, 10.5, -10.5), '#8c99ad', 0.75, 24, { flat: true });
 
   // --- The avenue ---------------------------------------------------------
   const rowX = halfWidth * 0.57;
@@ -92,25 +93,39 @@ export function generate(b, params) {
   for (const sign of [-1, 1]) {
     bays.forEach((z, index) => {
       pillar(b, P(sign * rowX, 0, z), height, pillarRadius);
+      // Structural wall buttress aligned with each bay.
+      b.prop('masonry', stoneBlock(1.1, 1.0, 1.45, P(sign * (halfWidth - 0.2), 0, z), { bevel: 0.06, batter: 0.1, irregular: 0.1 }));
+      b.prop('masonry', stoneBlock(0.85, height - 1.0, 1.2, P(sign * (halfWidth - 0.18), 1.0, z), { bevel: 0.05, irregular: 0.1 }), 0xe8e4dc);
       // Aisle rib to the wall, and the arcade to the next pier.
-      b.prop('masonry', arch(P(sign * rowX, height, z), P(sign * (halfWidth + 0.3), height, z), 2.6, 0.8, 1.2, 7));
+      b.prop('masonry', arch(P(sign * rowX, height - 0.1, z), P(sign * (halfWidth + 0.25), height - 0.1, z), 2.7, 0.85, 1.25, 9, {
+        pointed: 0.16, irregular: 0.12,
+      }));
       if (index < bays.length - 1) {
         const next = bays[index + 1];
-        b.prop('masonry', arch(P(sign * rowX, height - 4, z - pillarRadius), P(sign * rowX, height - 4, next + pillarRadius), 3.3, 0.9, 1.5, 9));
+        b.prop('masonry', arch(P(sign * rowX, height - 4.1, z - pillarRadius), P(sign * rowX, height - 4.1, next + pillarRadius), 3.4, 0.95, 1.55, 11, {
+          pointed: 0.18, irregular: 0.12,
+        }));
       }
     });
-    b.prop('masonry', stoneBox(1.7, 1.1, halfLength * 2 - 2, P(sign * rowX, height + 0.25, avenueZ), { bevel: 0.08, irregular: 0.12 }));
+    b.prop('masonry', stoneBox(1.85, 1.15, halfLength * 2 - 2, P(sign * rowX, height + 0.25, avenueZ), { bevel: 0.08, irregular: 0.08 }));
     // Wall dressings: segmented coursed plinth, corbelled gallery sill, pilastered parapet, springing cornice.
     b.prop('masonry', coursedWall(P(sign * (halfWidth - 0.2), 0, avenueZ - halfLength), P(sign * (halfWidth - 0.2), 0, avenueZ + halfLength), 1.15, 0.72, {
-      courseHeight: 0.55, stoneWidth: 1.6, irregular: 0.28, bevel: 0.06,
+      courseHeight: 0.55, stoneWidth: 1.6, irregular: 0.14, bevel: 0.06,
     }));
     b.prop('masonry', coursedWall(P(sign * (halfWidth - 0.15), galleryY - 0.5, avenueZ - halfLength + 4), P(sign * (halfWidth - 0.15), galleryY - 0.5, avenueZ + halfLength - 4), 0.52, 0.9, {
-      courseHeight: 0.52, stoneWidth: 1.5, irregular: 0.22, bevel: 0.05,
+      courseHeight: 0.52, stoneWidth: 1.5, irregular: 0.12, bevel: 0.05,
     }));
     b.prop('masonry', coursedWall(P(sign * (halfWidth + 0.25), galleryY, avenueZ - halfLength + 4), P(sign * (halfWidth + 0.25), galleryY, avenueZ + halfLength - 4), 1.05, 0.46, {
-      courseHeight: 0.38, stoneWidth: 1.1, irregular: 0.32, bevel: 0.04,
+      courseHeight: 0.38, stoneWidth: 1.1, irregular: 0.14, bevel: 0.04,
     }));
-    b.prop('masonry', stoneBox(1, 0.8, halfLength * 2, P(sign * (halfWidth - 0.3), height + 0.2, avenueZ), { bevel: 0.07, irregular: 0.12 }));
+    b.prop('masonry', stoneBox(1.1, 0.85, halfLength * 2, P(sign * (halfWidth - 0.3), height + 0.2, avenueZ), { bevel: 0.07, irregular: 0.08 }));
+    // Flush central walkway stone-and-bronze border strip.
+    for (const [z0, z1] of [[-20, chasm.z + chasm.half + 0.8], [chasm.z - chasm.half - 0.8, farZ + 1]]) {
+      const len = Math.abs(z0 - z1);
+      const midZ = (z0 + z1) * 0.5;
+      b.prop('masonry', stoneBox(0.55, 0.04, len, P(sign * 3.1, 0.01, midZ), { bevel: 0.015, irregular: 0.06 }), 0xd8d2c8);
+      b.prop('bronze', stoneBox(0.12, 0.05, len, P(sign * 2.78, 0.01, midZ), { bevel: 0.01, irregular: 0.04 }), 0xd9b37c);
+    }
     b.nav.addRect(P(sign * (galleryX + 0.3), galleryY, avenueZ), 3.4, halfLength - 4.6);
 
     // Gallery dwellings: coursed stone bays with corner pilasters, framed doors, and stone-dressed mullioned windows.
@@ -145,14 +160,25 @@ export function generate(b, params) {
     b.nav.addRect(P(sign * (halfWidth - 0.4), galleryY, -38.4), 2.4, 1.3);
     b.nav.block(P(sign * (halfWidth - 1.9), 0, -38.6), 1.7, 6);
   }
-  // Great ribs across the nave on every pier pair.
+  // Great ribs across the nave on every pier pair, plus longitudinal vault ribs and indirect ceiling fill.
   for (const z of bays) {
-    b.prop('masonry', arch(P(-rowX, height + 0.6, z), P(rowX, height + 0.6, z), vaultRise - 1.4, 1, 1.5, 15));
+    b.prop('masonry', arch(P(-rowX, height + 0.1, z), P(rowX, height + 0.1, z), vaultRise - 0.9, 1.15, 1.65, 17, {
+      pointed: 0.22, irregular: 0.12,
+    }));
+  }
+  b.prop('masonry', stoneBox(0.95, 0.75, halfLength * 2 - 2, P(0, height + vaultRise - 0.65, avenueZ), { bevel: 0.06, irregular: 0.08 }), 0xe8e4dc);
+  for (const sign of [-1, 1]) {
+    b.prop('masonry', stoneBox(0.62, 0.52, halfLength * 2 - 2, P(sign * rowX * 0.56, height + vaultRise * 0.62, avenueZ), { bevel: 0.05, irregular: 0.08 }), 0xdcd7cf);
   }
   for (const z of [bays[1], bays[3], bays[5], bays[7]]) {
     if (z === undefined) continue;
-    for (const sign of [-1, 1]) brazier(b, P(sign * (rowX - 3.2), 0, z + 6), { tint: '#ff8f3f', intensity: 10, range: 22, size: 1.15 });
+    for (const sign of [-1, 1]) {
+      brazier(b, P(sign * (rowX - 3.2), 0, z + 6), { tint: '#ffb668', intensity: 13.5, range: 28, size: 1.15 });
+      b.light(P(sign * (halfWidth - 2.5), 4.5, z + 6), '#b89468', 2.4, 16, { flat: true });
+    }
+    b.light(P(0, height + vaultRise * 0.45, z + 6), '#d6a676', 1.45, 28, { flat: true });
   }
+  b.light(P(0, height + vaultRise * 0.5, -26), '#8c99ad', 0.65, 26, { flat: true });
 
   // --- The chasm and its bridge -------------------------------------------
   bridge(b, P(0, 0, chasm.z + chasm.half + 0.6), P(0, 0, chasm.z - chasm.half - 0.6), 6.4, { footY: -chasm.depth, spans: 1, parapet: 1.1 });
@@ -232,13 +258,17 @@ export function generate(b, params) {
     crate(b, P(x + 2.4, 0, forge.z - 5.5), 0.9, 0.3);
     b.nav.block(P(x + 2.4, 0, forge.z - 5.5), 0.7, 2);
   }
-  // Great lintel over the way into the forge, with coursed stone piers.
+  // Great lintel over the way into the forge, with coursed stone piers, bronze portal trim, and focal glow.
   for (const px of [-5.6, 5.6]) {
-    b.prop('masonry', stoneBlock(2.05, 1.1, 1.85, P(px, 0, farZ - 0.5), { bevel: 0.07, batter: 0.14, irregular: 0.25 }));
-    b.prop('masonry', stoneBlock(1.85, 8.3, 1.65, P(px, 1.1, farZ - 0.5), { bevel: 0.07, irregular: 0.22 }));
+    b.prop('masonry', stoneBlock(2.15, 1.1, 1.9, P(px, 0, farZ - 0.5), { bevel: 0.07, batter: 0.14, irregular: 0.12 }));
+    b.prop('masonry', stoneBlock(1.9, 8.3, 1.7, P(px, 1.1, farZ - 0.5), { bevel: 0.07, irregular: 0.12 }));
+    b.prop('bronze', stoneBlock(0.32, 7.6, 0.24, P(px - Math.sign(px) * 0.95, 1.2, farZ + 0.42), { bevel: 0.02, irregular: 0.06 }), 0xe0b878);
   }
-  b.prop('masonry', stoneBox(13.4, 1.5, 1.8, P(0, 9.9, farZ - 0.5), { bevel: 0.08, irregular: 0.16 }));
-  b.prop('bronze', stoneBox(7, 0.7, 0.22, P(0, 9.9, farZ + 0.45), { bevel: 0.03, irregular: 0.08 }), 0xffffff);
+  b.prop('masonry', stoneBox(13.4, 1.5, 1.8, P(0, 9.9, farZ - 0.5), { bevel: 0.08, irregular: 0.12 }));
+  b.prop('bronze', stoneBox(7.2, 0.72, 0.24, P(0, 9.9, farZ + 0.45), { bevel: 0.03, irregular: 0.06 }), 0xffffff);
+  b.prop('bronze', stoneBox(1.2, 1.75, 0.36, P(0, 9.9, farZ + 0.5), { bevel: 0.04, irregular: 0.06 }), 0xe8c98e);
+  b.light(P(0, 4.8, farZ + 1.5), '#ffa952', 11, 28, { radius: 2.2, halo: 3.5 });
+  b.light(P(0, 7.2, farZ - 2.5), '#ffb86e', 6.5, 22, { flat: true });
 
   // --- Ore lift ---------------------------------------------------------------
   for (const [dx, dz] of [[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]]) {

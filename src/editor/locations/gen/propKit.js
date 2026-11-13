@@ -87,9 +87,10 @@ function buildChamferedPrism(width, height, depth, {
   for (let i = 0; i < 8; i += 1) {
     const [sx, sy, sz] = signs[i];
     const [px, py, pz] = pts[i];
-    vX.push([px, py - sy * b, pz - sz * b]);
-    vY.push([px - sx * b, py, pz - sz * b]);
-    vZ.push([px - sx * b, py - sy * b, pz]);
+    const bi = Math.max(0.002, b * (1 + (irregular > 0 ? (rng() - 0.5) * 0.8 * irregular : 0)));
+    vX.push([px, py - sy * bi, pz - sz * bi]);
+    vY.push([px - sx * bi, py, pz - sz * bi]);
+    vZ.push([px - sx * bi, py - sy * bi, pz]);
   }
   const positions = [];
   const pushTri = (a, bPt, c) => {
@@ -221,7 +222,9 @@ export function rod(a, b, ra, rb = ra, sides = 10) {
  */
 export function arch(a, b, rise, thickness, depth, count = 9, {
   keystone = true,
-  irregular = 0.28,
+  pointed = 0,
+  extrados = 1.08,
+  irregular = 0.22,
   seed = hashCoords(a.x + b.x, a.y + b.y, a.z + b.z, 97),
 } = {}) {
   const parts = [];
@@ -230,20 +233,23 @@ export function arch(a, b, rise, thickness, depth, count = 9, {
   const point = (t) => {
     const angle = Math.PI * t;
     const along = 0.5 - Math.cos(angle) * 0.5;
+    const crownBoost = pointed > 0 ? Math.pow(Math.sin(angle), 2.4) * pointed * rise : 0;
     return {
       x: a.x + (b.x - a.x) * along, z: a.z + (b.z - a.z) * along,
-      y: a.y + (b.y - a.y) * along + Math.sin(angle) * rise,
+      y: a.y + (b.y - a.y) * along + Math.sin(angle) * rise + crownBoost,
     };
   };
   const midIdx = Math.floor(count / 2);
+  const pad = Math.max(0, (extrados - 1) * 0.5);
   for (let index = 0; index < count; index += 1) {
     const isKey = keystone && count >= 5 && index === midIdx;
-    const p0 = point(index / count);
-    const p1 = point((index + 1) / count);
-    const tThick = thickness * (isKey ? 1.24 : 0.94 + (rng() - 0.5) * 0.14);
-    const tDepth = depth * (isKey ? 1.12 : 0.97 + (rng() - 0.5) * 0.08);
+    const isSpringer = index === 0 || index === count - 1;
+    const p0 = point(Math.max(0, index / count - pad / count));
+    const p1 = point(Math.min(1, (index + 1) / count + pad / count));
+    const tThick = thickness * (isKey ? 1.32 : isSpringer ? 1.12 : 0.96 + (rng() - 0.5) * 0.08);
+    const tDepth = depth * (isKey ? 1.18 : isSpringer ? 1.06 : 0.98 + (rng() - 0.5) * 0.05);
     parts.push(hewnBeam(p0, p1, tDepth, tThick, {
-      bevel: Math.min(0.05, tThick * 0.14),
+      bevel: Math.min(0.055, tThick * 0.15),
       irregular,
       seed: seed + index * 31,
     }));

@@ -182,33 +182,52 @@ export function bridge(b, a, c, width, { footY, material = 'masonry', tint = 0xf
 }
 
 /**
- * A great pier: stepped battered plinth, stacked beveled stone drum courses,
- * and a corbelled capital. Blocks the walker.
+ * A monumental Dwarven column: stepped chamfered plinth and octagonal base,
+ * continuous octagonal shaft with engaged vertical ribs and horizontal bands,
+ * and a corbelled capital with a bronze necking band. Blocks the walker.
  */
 export function pillar(b, at, height, radius, { material = 'masonry', tint = 0xffffff, sides = 8 } = {}) {
-  b.prop(material, stoneBlock(radius * 2.8, 0.9, radius * 2.8, at, { bevel: 0.08, batter: 0.16, irregular: 0.22 }), tint);
-  b.prop(material, stoneBlock(radius * 2.4, 0.55, radius * 2.4, up(at, 0.9), { bevel: 0.06, batter: 0.1, irregular: 0.2 }), tint);
-  const shaftStart = 1.45;
-  const shaftEnd = height - 1.5;
-  const shaftH = Math.max(0.5, shaftEnd - shaftStart);
-  const drumCount = Math.max(2, Math.round(shaftH / 1.35));
-  const drumH = shaftH / drumCount;
-  for (let i = 0; i < drumCount; i += 1) {
-    const y0 = shaftStart + i * drumH;
-    const t = i / drumCount;
-    const drumW = radius * 2 * (1 - t * 0.07);
-    const yaw = (i % 2) * (Math.PI / sides) + b.range(-0.04, 0.04);
-    b.prop(material, stoneBlock(drumW, drumH * 0.96, drumW, up(at, y0), {
-      yaw, bevel: Math.min(0.14, radius * 0.26), irregular: 0.24, seed: 300 + i * 29 + Math.round(at.x * 7 + at.z * 11),
-    }), tint);
+  // Broad square plinth + stepped octagonal base + recessed transition collar.
+  b.prop(material, stoneBlock(radius * 2.85, 0.72, radius * 2.85, at, { bevel: 0.08, batter: 0.14, irregular: 0.1 }), tint);
+  b.prop(material, rod(up(at, 0.72), up(at, 1.32), radius * 1.32, radius * 1.16, sides), 0xe8e4dc);
+  b.prop(material, rod(up(at, 1.32), up(at, 1.62), radius * 1.06, radius * 0.96, sides), 0xdad5cd);
+
+  // Continuous octagonal shaft with engaged cardinal ribs (recessed panels) and horizontal bands.
+  const shaftStart = 1.62;
+  const shaftEnd = height - 1.95;
+  const shaftH = Math.max(0.8, shaftEnd - shaftStart);
+  b.prop(material, rod(up(at, shaftStart), up(at, shaftEnd), radius * 0.96, radius * 0.9, sides), tint);
+  const ribW = radius * 0.42;
+  const ribSpan = radius * 2.04;
+  b.prop(material, stoneBlock(ribW, shaftH, ribSpan, up(at, shaftStart), { bevel: 0.05, batter: 0.04, irregular: 0.06 }), 0xf2efe9);
+  b.prop(material, stoneBlock(ribSpan, shaftH, ribW, up(at, shaftStart), { bevel: 0.05, batter: 0.04, irregular: 0.06 }), 0xf2efe9);
+  for (const frac of [0.34, 0.68]) {
+    const bandY = shaftStart + shaftH * frac;
+    const bandR = radius * (1.03 - frac * 0.05);
+    b.prop(material, rod(up(at, bandY - 0.12), up(at, bandY + 0.12), bandR, bandR, sides), 0xd8d3cb);
   }
-  b.prop(material, stoneBlock(radius * 2.45, 0.6, radius * 2.45, up(at, height - 1.5), { bevel: 0.07, batter: -0.1, irregular: 0.2 }), tint);
-  b.prop(material, stoneBlock(radius * 2.95, 0.9, radius * 2.95, up(at, height - 0.9), { bevel: 0.08, batter: -0.08, irregular: 0.2 }), tint);
+
+  // Capital: necking ring, bronze geometric band, flared bell, stepped abacus, corbel brackets, impost.
+  b.prop(material, rod(up(at, shaftEnd), up(at, shaftEnd + 0.28), radius * 0.94, radius * 1.08, sides), 0xdad5cd);
+  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.05, radius * 1.05, sides), 0xe6c896);
+  b.prop(material, rod(up(at, shaftEnd + 0.28), up(at, height - 0.95), radius * 1.08, radius * 1.38, sides), 0xeae6de);
+  b.prop(material, stoneBlock(radius * 2.75, 0.52, radius * 2.75, up(at, height - 0.95), { bevel: 0.08, batter: -0.06, irregular: 0.08 }), tint);
+  b.prop(material, stoneBlock(radius * 3.05, 0.43, radius * 3.05, up(at, height - 0.43), { bevel: 0.07, irregular: 0.08 }), 0xf2efe9);
+  // Four cardinal corbel brackets supporting the abacus.
+  for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    b.prop(material, stoneBox(
+      dx !== 0 ? radius * 0.65 : radius * 0.55,
+      0.58,
+      dz !== 0 ? radius * 0.65 : radius * 0.55,
+      { x: at.x + dx * radius * 1.15, y: height - 1.18, z: at.z + dz * radius * 1.15 },
+      { bevel: 0.05, batter: -0.14, irregular: 0.08 },
+    ), 0xdcd7cf);
+  }
   b.nav.block(at, radius * 1.45, height);
 }
 
 /** A fire bowl on a stepped, chamfered plinth. */
-export function brazier(b, at, { tint = '#ff8a3c', intensity = 9, range = 20, size = 1 } = {}) {
+export function brazier(b, at, { tint = '#ffb668', intensity = 10, range = 22, size = 1 } = {}) {
   b.prop('masonry', stoneBlock(1.05 * size, 0.35 * size, 1.05 * size, at, { bevel: 0.04, batter: 0.15, irregular: 0.25 }));
   b.prop('masonry', stoneBlock(0.84 * size, 0.6 * size, 0.84 * size, up(at, 0.35 * size), { bevel: 0.04, batter: 0.08, irregular: 0.25 }));
   b.prop('iron', rod(up(at, 0.92 * size), up(at, 1.32 * size), 0.35 * size, 0.76 * size, 10), 0x2c2824);

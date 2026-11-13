@@ -1,282 +1,418 @@
-# PROPOSAL ONLY: no runtime loader consumes this file yet.
-# See docs/plans/instanced-underground-and-ice-locations-master-plan-2026-11-13.md.
-# All asset, texture, shader and artwork IDs below are logical planned identifiers,
-# not assertions that downloadable files already exist.
-schemaVersion: 1
-status: proposal-only
+# Instanced locations: mines, Umbra'kor cavern cities, Stonehold holds, Frostgard glacier sites.
+# Consumed by src/editor/locations/LocationCatalog.js. Every key that names another
+# entry (profile, surface, theme, generator) is validated at load; unknown names fail.
+# Design: docs/plans/instanced-underground-and-ice-locations-master-plan-2026-11-13.md
+schemaVersion: 2
 
 instancedLocations:
   transitionPolicy:
-    entryTrigger: interact
-    exitTrigger: interact
-    loadingScreen:
-      requiredOnEnter: true
-      requiredOnExit: true
-      renderBeforeHeavyWork: true
-      minimumDisplayMs: 0
-      showMeasuredProgressOnly: true
-      showTitle: true
-      showSafeLoreTips: true
-      fallbackTheme: neutral
-      phases:
-        - resolve-manifest
-        - load-assets
-        - decode-textures
-        - build-geometry
-        - prepare-shaders
-        - prepare-navigation-collision
-        - activate
-    sceneSwap: atomic-after-ready
-    sourceAnchor: preserve-exact
-    onFailure: restore-previous-scene
-    cancelStaleLoads: true
-    preventConcurrentTransitions: true
-    inactiveScenePolicy: release-heavy-resources
+    interactCode: KeyE
+    devMenuCode: F8
+    # Steps shown on the loading screen, in order. Ids are fixed by the runtime.
+    phases:
+      - { id: resolve-manifest, label: Reading the way in }
+      - { id: load-assets, label: Gathering materials }
+      - { id: build-geometry, label: Shaping the place }
+      - { id: bake-lighting, label: Lighting the lamps }
+      - { id: prepare-shaders, label: Preparing surfaces }
+      - { id: activate, label: Stepping through }
+    exitPhases:
+      - { id: release, label: Leaving }
+      - { id: return, label: Returning to the surface }
 
-  defaultBudgets:
-    workerMeshing: true
-    prefetchAdjacentChambers: 2
-    portalCulling: true
-    distantRoomLod: true
-    keepGlobalSimulationRunning: true
-    gpuResourceCleanup: explicit
-    dynamicLightPoolMax: 4
-    shaderWarmupBeforeActivation: true
+  # `?locationQuality=low|medium|high` overrides `default`.
+  quality:
+    default: high
+    tiers:
+      high: { iceLayers: 4, particleScale: 1, voxelScale: 1 }
+      medium: { iceLayers: 3, particleScale: 0.6, voxelScale: 1.2 }
+      low: { iceLayers: 2, particleScale: 0.3, voxelScale: 1.5 }
 
-  uniquenessPolicy:
-    stableIdComponents:
-      - world-id
-      - source-entity-id
-      - site-id
-    requireNamedUniqueLandmark: true
-    requireSiteSpecificLayoutSeed: true
-    rejectMatchingLayoutFingerprints: true
-    allowAuthoredOverrides: true
-    requireReviewedCapitalLayouts: true
-    identityPreservesAzgaarSource: true
-
-  # The engine uses registries/factories, not JS branches on realm names.
-  # Missing/unknown required references must fail validation before activation.
-  contentPacks:
-    shared_underground:
-      lifecycle: planned
-      sourceRegistry: config/asset-registry.yaml
-      plannedAssetIds:
-        - underground-cavern/deep-walkway-arch
-        - underground-cavern/cavern-drain-channel
-        - underground-cavern/shaft-air-damper
-        - underground-cavern/cavern-lift-platform
-    mine_industrial:
-      lifecycle: planned
-      sourceRegistry: config/asset-registry.yaml
-      plannedAssetIds:
-        - mine/tunnel-support-kit
-        - mine/ore-cart-kit
-        - mine/shaft-lift-kit
-        - mine/ore-vein-kit
-        - mine/industrial-clutter-kit
-    umbra_kori_city:
-      lifecycle: planned
-      sourceRegistry: config/asset-registry.yaml
-      plannedAssetIds:
-        - umbrakor/cliff-house-compound
-        - umbrakor/void-arch-bridge
-        - umbrakor/vertical-terrace-block
-        - umbrakor/fungus-cultivation-hall
-        - umbrakor/house-market-balcony
-        - umbrakor/depth-warden-gate
-    stonehold_mountain:
-      lifecycle: planned
-      sourceRegistry: config/asset-registry.yaml
-      plannedAssetIds:
-        - stonehold/fortress-mountain-gate
-        - stonehold/forgeheart-workshop
-        - stonehold/smelter-tower
-        - stonehold/ore-lift-headframe
-        - stonehold/ore-cart-track
-        - stonehold/vault-council-hall
-    frostgard_glacial:
-      lifecycle: planned
-      sourceRegistry: config/asset-registry.yaml
-      plannedAssetIds:
-        - frostgard/great-winter-longhall
-        - frostgard/heated-storehouse
-        - frostgard/palisade-watch-gate
-        - frostgard/communal-warming-hall
-        - glacier/ice-tunnel-kit
-        - glacier/ice-fracture-kit
-
+  # Files under the app's base URL. `rough` is read from the green channel, so an
+  # AO/roughness/metal map works as well as a plain roughness map.
   textureSets:
+    ice:
+      color: assets/textures/locations/ice-color.webp
+      normal: assets/textures/locations/ice-normal.webp
+      rough: assets/textures/locations/ice-rough.webp
+    snow:
+      color: assets/textures/snow/snow007c_color_1k.jpg
+      normal: assets/textures/snow/snow007c_normal_gl_1k.jpg
+      rough: assets/textures/snow/snow007c_ao_rough_height_1k.jpg
+    cave-rock:
+      color: assets/textures/locations/cave-rock-color.webp
+      normal: assets/textures/locations/cave-rock-normal.webp
+      rough: assets/textures/locations/cave-rock-rough.webp
+    basalt:
+      color: assets/textures/locations/basalt-color.webp
+      normal: assets/textures/locations/basalt-normal.webp
+      rough: assets/textures/locations/basalt-rough.webp
+    granite:
+      color: assets/textures/locations/granite-color.webp
+      normal: assets/textures/locations/granite-normal.webp
+      rough: assets/textures/locations/granite-rough.webp
+    dressed-stone:
+      color: assets/textures/locations/dressed-stone-color.webp
+      normal: assets/textures/locations/dressed-stone-normal.webp
+      rough: assets/textures/locations/dressed-stone-rough.webp
+    iron:
+      color: assets/textures/locations/iron-color.webp
+      normal: assets/textures/locations/iron-normal.webp
+      rough: assets/textures/locations/iron-rough.webp
+    timber:
+      color: assets/textures/settlement/timber-beam-color.webp
+      normal: assets/textures/settlement/timber-beam-normal.webp
+      rough: assets/textures/settlement/timber-beam-arm.webp
+    rubble:
+      color: assets/textures/settlement/stone-rubble-color.webp
+      normal: assets/textures/settlement/stone-rubble-normal.webp
+      rough: assets/textures/settlement/stone-rubble-arm.webp
+    flagstone:
+      color: assets/textures/settlement/flag-slate-color.webp
+      normal: assets/textures/settlement/flag-slate-normal.webp
+      rough: assets/textures/settlement/flag-slate-arm.webp
+
+  # Stone-family surfaces (rock, masonry, timber, metal). See materials/StoneSurface.js.
+  # scale: texture repeats per metre.  vein/strata/masonry are optional features.
+  materialProfiles:
     mine_rock:
-      lifecycle: planned
-      surfaces: [fractured-rock, tool-cut-rock, mineral-seams, muddy-floor, rusted-metal]
+      surface: cave-rock
+      scale: 0.26
+      tint: '#b3a595'
+      normalStrength: 1.1
+      roughness: 1
+      strata: { frequency: 1.5, warp: 4, dip: 0.22, dark: '#8f8272', light: '#d8cbb6', relief: 1.2 }
+      vein: { color: '#c98a3a', scale: 1.3, sharpness: 7, roughness: 0.28, f0: 0.6, glow: 0.02 }
+    ore_rubble:
+      surface: rubble
+      scale: 0.7
+      tint: '#b9997a'
+      f0: 0.12
+    still_water:
+      surface: iron
+      scale: 0.12
+      tint: '#06090a'
+      normalStrength: 0.06
+      roughness: 0.08
+      f0: 0.1
+    timber:
+      surface: timber
+      scale: 0.55
+      tint: '#ffffff'
+      normalStrength: 0.9
+    sod_roof:
+      surface: timber
+      scale: 0.5
+      tint: '#5d5a4c'
+      normalStrength: 1.1
+    iron:
+      surface: iron
+      scale: 0.9
+      tint: '#ffffff'
+      roughness: 0.75
+      f0: 0.45
+    rubble_masonry:
+      surface: rubble
+      scale: 0.42
+      tint: '#ffffff'
+      normalStrength: 1.1
+    glacier_bedrock:
+      surface: cave-rock
+      scale: 0.22
+      tint: '#8d9299'
+      normalStrength: 1.1
     umbra_basalt:
-      lifecycle: planned
-      surfaces: [basalt-cavern, polished-dark-ashlar, iron-linkwork, fungus, pale-crystal]
+      surface: basalt
+      scale: 0.16
+      tint: '#6a6d7c'
+      normalStrength: 1.2
+      roughness: 0.9
+      strata: { frequency: 0.55, warp: 5, dip: 0.05, dark: '#77777f', light: '#c5c7d2', relief: 0.8 }
+      vein: { color: '#9fe6ff', scale: 0.9, sharpness: 10, roughness: 0.2, f0: 0.3, glow: 0.5 }
+    umbra_ashlar:
+      surface: basalt
+      scale: 0.3
+      tint: '#6f7284'
+      roughness: 0.7
+      masonry: { courseHeight: 0.55, blockLength: 1.3, jointWidth: 0.035, relief: 1.6 }
     stonehold_granite:
-      lifecycle: planned
-      surfaces: [dressed-granite, basalt-vault, ashlar-trim, black-iron, heat-soot]
-    frostgard_ice:
-      lifecycle: planned
-      surfaces: [dense-glacier-ice, frosted-ice, fractured-ice, dirty-ice, snow-crust, winter-timber]
+      surface: granite
+      scale: 0.22
+      tint: '#a59f97'
+      normalStrength: 1
+      roughness: 0.95
+      dressedRoughness: 0.85
+      sootColor: '#141110'
+      masonry: { courseHeight: 0.8, blockLength: 1.9, jointWidth: 0.05, relief: 1.8 }
+    stonehold_ashlar:
+      surface: dressed-stone
+      scale: 0.3
+      tint: '#b3a898'
+      roughness: 0.9
+      masonry: { courseHeight: 0.6, blockLength: 1.4, jointWidth: 0.04, relief: 1.6 }
+    bronze:
+      surface: iron
+      scale: 0.7
+      tint: '#c08a4a'
+      roughness: 0.55
+      f0: 0.7
+    obsidian_seal:
+      surface: basalt
+      scale: 0.3
+      tint: '#30303a'
+      roughness: 0.35
+      f0: 0.08
 
-  # Shader profile keys must resolve to explicitly registered safe TSL factories.
-  # No arbitrary shader code or expressions are evaluated from YAML.
-  shaderProfiles:
-    mine_cavern:
-      lifecycle: planned
-      factoryKey: geological-pbr
-      features: [dominant-plane-uv, fracture-normals, vertex-crevice-ao, mineral-veins, dampness]
-      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
-    umbra_cavern:
-      lifecycle: planned
-      factoryKey: dark-basalt-pbr
-      features: [stone-roughness-variation, pale-emissive-pockets, fungal-light-mask, cave-depth-haze]
-      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
-    stonehold_vault:
-      lifecycle: planned
-      factoryKey: carved-stone-pbr
-      features: [masonry-courses, edge-bevel-light, vertex-crevice-ao, soot, forge-glow]
-      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
-    frostgard_glacier:
-      lifecycle: planned
-      factoryKey: glacial-ice-pbr
-      features: [thickness-tint, internal-veins, fresnel, roughness-frost, snow-caps]
-      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy, full-scene-refraction]
+  # Ice families: one shader (materials/GlacierIceMaterial.js), seven presets.
+  # absorption: per-metre rgb extinction. Amounts are 0..1 and add to the vertex masks.
+  iceProfiles:
+    deep_blue_glacier: &ice
+      deepColor: '#0b3f7d'
+      thinColor: '#8fd8ee'
+      milkColor: '#b9dcea'
+      scatterColor: '#bfeaff'
+      sedimentColor: '#3d3a33'
+      frostColor: '#e9f4fa'
+      snowColor: '#f4f8fb'
+      absorption: [0.55, 0.085, 0.03]
+      depthRate: 0.55
+      roughness: 0.16
+      microNormal: 0.35
+      crackGain: 0.55
+      fracture: 0.15
+      bubbles: 0.08
+      cloud: 0.35
+      sediment: 0
+      frost: 0
+      snow: 0
+      banding: { frequency: 2.6, dip: 0.28, strength: 0.55 }
+      scallop: { scale: 0.75, depth: 0.09 }
+    white_bubbly:
+      <<: *ice
+      deepColor: '#5f9fc4'
+      thinColor: '#d6eef6'
+      roughness: 0.3
+      bubbles: 0.9
+      cloud: 0.9
+      crackGain: 0.3
+      depthRate: 0.3
+    clear_polished:
+      <<: *ice
+      deepColor: '#0a4b86'
+      thinColor: '#a9e6f5'
+      roughness: 0.06
+      microNormal: 0.12
+      bubbles: 0.02
+      cloud: 0.05
+      crackGain: 0.35
+      banding: { frequency: 2.6, dip: 0.28, strength: 0.1 }
+      scallop: { scale: 0.75, depth: 0.02 }
+    fractured:
+      <<: *ice
+      fracture: 0.9
+      crackGain: 1.1
+      roughness: 0.22
+    dirty_sediment:
+      <<: *ice
+      deepColor: '#16405f'
+      sediment: 0.8
+      cloud: 0.5
+      roughness: 0.34
+    frost_covered:
+      <<: *ice
+      frost: 0.75
+      roughness: 0.4
+    snow_covered:
+      <<: *ice
+      snow: 0.9
+      frost: 0.3
 
+  # Colours are linear-light ambient for up- and down-facing surfaces, the walker's
+  # carried lamp, and fog. absorption: how the bake dims light crossing solid.
   lightingProfiles:
     mine_lanterns:
-      sky: none
-      ambientKey: low-warm-rock-bounce
-      virtualLights: [lanterns, ore-glints]
+      background: '#030201'
+      fog: { color: '#0d0a07', density: 0.02 }
+      ambientUp: '#1b1611'
+      ambientDown: '#0c0a08'
+      carried: { color: '#ffd7a6', intensity: 1.5, range: 10 }
+      exposure: 1.2
+      absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     umbra_pale:
-      sky: none
-      ambientKey: low-cool-basalt
-      virtualLights: [wayfinding-crystals, home-windows, fungus-pockets]
+      background: '#020308'
+      fog: { color: '#070a14', density: 0.0075 }
+      ambientUp: '#0f1320'
+      ambientDown: '#06070c'
+      carried: { color: '#cfe4ff', intensity: 0.9, range: 9 }
+      exposure: 1.35
+      absorption: { rock: [5, 5, 5], ice: [0.55, 0.085, 0.03] }
     stonehold_forge:
-      sky: none
-      ambientKey: granite-forge-bounce
-      virtualLights: [furnaces, workshops, windows]
+      background: '#080706'
+      fog: { color: '#161311', density: 0.0068 }
+      ambientUp: '#2c2c34'
+      ambientDown: '#1c1815'
+      carried: { color: '#ffe0b8', intensity: 1.45, range: 13 }
+      exposure: 1.28
+      absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     frostgard_ice:
-      sky: entrance-only
-      ambientKey: blue-ice-bounce
-      virtualLights: [hearths, isolated-windows, ice-glints]
+      background: '#061423'
+      fog: { color: '#0d2740', density: 0.011 }
+      ambientUp: '#16303f'
+      ambientDown: '#081a2b'
+      carried: { color: '#e4f1ff', intensity: 0.7, range: 9 }
+      exposure: 1.15
+      absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
 
+  # One instanced sprite field per entry, in a box that follows the camera.
+  # velocity m/s; size metres [min, max]; anchor: a generator point the field gathers around.
   atmosphereProfiles:
     mine_dust:
-      effectKeys: [dust-motes, mineral-haze, damp-local]
-      audioKey: mine-industry
+      particles:
+        - { count: 700, box: 16, velocity: [0.02, -0.015, 0.03], sway: 0.012, size: [0.012, 0.035], color: '#e8d2b0', opacity: 0.55, additive: true, ambientGain: 2, lampGain: 0.5 }
     umbra_depth:
-      effectKeys: [cavern-depth-haze, humidity, sparse-fungal-motes]
-      audioKey: deep-cavern-city
+      particles:
+        - { count: 500, box: 30, velocity: [0.03, 0.02, 0.01], sway: 0.02, size: [0.02, 0.06], color: '#a9dcff', opacity: 0.5, additive: true, ambientGain: 3, lampGain: 0.3, glow: 0.05, twinkle: 2 }
     stonehold_industry:
-      effectKeys: [forge-smoke-local, ash-particles, workshop-dust]
-      audioKey: stonehold-forges
+      particles:
+        - { count: 450, box: 24, velocity: [0.05, 0.5, 0.03], sway: 0.03, size: [0.015, 0.045], color: '#ff9a4a', opacity: 0.7, additive: true, ambientGain: 0, lampGain: 0.1, glow: 0.8, twinkle: 3 }
+        - { count: 400, box: 18, velocity: [0.03, 0.01, 0.02], sway: 0.012, size: [0.012, 0.03], color: '#e6d6c0', opacity: 0.4, additive: true, ambientGain: 2, lampGain: 0.5 }
     frostgard_cold:
-      effectKeys: [frost-mist, entrance-spindrift, ice-dust]
-      audioKey: glacial-refuge
+      particles:
+        - { count: 600, box: 18, velocity: [0.02, -0.03, 0.02], sway: 0.012, size: [0.012, 0.03], color: '#eaf6ff', opacity: 0.8, additive: true, ambientGain: 2.5, lampGain: 0.6, twinkle: 5 }
+        - { count: 900, box: 26, velocity: [0.6, -0.5, -2.6], sway: 0.05, size: [0.03, 0.08], color: '#f2f8ff', opacity: 0.7, additive: false, ambientGain: 9, lampGain: 0.4, anchor: mouth, anchorRadius: 22 }
 
-  # backgroundAssetKey is a future art-registry ID. Fallback tint works without art.
   loadingThemes:
-    neutral:
-      title: "Entering a location"
-      fallbackColor: "#1a1e26"
-      backgroundAssetKey: null
+    neutral: { title: Entering a location, color: '#1a1e26', accent: '#cfd6e0' }
     mine_workings:
-      title: "The Deep Workings"
-      fallbackColor: "#27221c"
-      backgroundAssetKey: loading/mine-workings
+      title: The Deep Workings
+      color: '#27221c'
+      accent: '#ffb469'
+      tips:
+        - Timber sets mark ground the miners trusted. Where they stop, so did the trust.
+        - Ore shows first as a stain in the rock, then as a seam.
     umbra_depth:
-      title: "Umbra'kor — The Deep Dominion"
-      fallbackColor: "#12141f"
-      backgroundAssetKey: loading/umbra-depth
+      title: Umbra'kor — The Deep Dominion
+      color: '#12141f'
+      accent: '#a9dcff'
+      tips:
+        - There is no sky here. The pale lights are roads.
+        - Every bridge in the Dominion belongs to a house.
     stonehold_forge:
-      title: "Stonehold — Mountain Halls"
-      fallbackColor: "#25201d"
-      backgroundAssetKey: loading/stonehold-forge
+      title: Stonehold — Mountain Halls
+      color: '#25201d'
+      accent: '#ff9a4a'
+      tips:
+        - The pillars were not raised. They are what the masons left standing.
+        - Follow the warm air and you will find the forges.
     frostgard_ice:
-      title: "Frostgard — Beneath the Ice"
-      fallbackColor: "#162737"
-      backgroundAssetKey: loading/frostgard-glacier
+      title: Frostgard — Beneath the Ice
+      color: '#162737'
+      accent: '#8fd3ff'
+      tips:
+        - Thin ice glows. Deep ice is dark. Trust the dark.
+        - The Norths build on bedrock; a hearth and a glacier do not share a floor.
+    surface_return: { title: Returning to the surface, color: '#1a1e26', accent: '#cfd6e0' }
 
+  # generatorKey must be registered in src/editor/locations/generators/index.js.
+  # materials: the keys the generator writes props under; `terrain` is the carved volume.
+  #   kind stone → materialProfiles, kind ice → iceProfiles, kind glow → emissive.
   archetypes:
     working_mine:
-      sceneKind: isolated-interior
       generatorKey: mine-network
-      contentPacks: [shared_underground, mine_industrial]
-      textureSet: mine_rock
-      shaderProfile: mine_cavern
       lightingProfile: mine_lanterns
       atmosphereProfile: mine_dust
       loadingTheme: mine_workings
-      navigationKey: multi-level-passages
-      collisionKey: closed-cavern
-      simulationDomain: resource-extraction
-      physicalRequirements: [resource-deposit, viable-access]
+      voxel: 0.4
+      materials:
+        terrain: { kind: stone, profile: mine_rock }
+        timber: { kind: stone, profile: timber, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        ore: { kind: stone, profile: ore_rubble, masked: false }
+        water: { kind: stone, profile: still_water, masked: false }
+        glow: { kind: glow }
+      params:
+        drift: { width: 3.6, height: 3.2, setSpacing: 3.6 }
     drow_cavern_city:
-      sceneKind: isolated-interior
       generatorKey: vertical-cavern-city
-      contentPacks: [shared_underground, umbra_kori_city]
-      textureSet: umbra_basalt
-      shaderProfile: umbra_cavern
       lightingProfile: umbra_pale
       atmosphereProfile: umbra_depth
       loadingTheme: umbra_depth
-      navigationKey: vertical-district-city
-      collisionKey: cavern-bridges
-      simulationDomain: house-districts
-      physicalRequirements: [geological-cavern, stable-terraces, water-access]
       loreRealmKey: umbrakor
+      voxel: 0.9
+      materials:
+        terrain: { kind: stone, profile: umbra_basalt }
+        masonry: { kind: stone, profile: umbra_ashlar, masked: false }
+        timber: { kind: stone, profile: timber, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        water: { kind: stone, profile: still_water, masked: false }
+        glow: { kind: glow }
+      params:
+        stalactites: 70
+        houseTint: '#ffffff'
+        windowTint: '#ffb872'
+        crystalTint: '#bfe6ff'
     dwarven_mountain_hold:
-      sceneKind: isolated-interior
       generatorKey: mountain-hold
-      contentPacks: [shared_underground, stonehold_mountain]
-      textureSet: stonehold_granite
-      shaderProfile: stonehold_vault
       lightingProfile: stonehold_forge
       atmosphereProfile: stonehold_industry
       loadingTheme: stonehold_forge
-      navigationKey: fortress-city
-      collisionKey: vaulted-stone-structure
-      simulationDomain: forge-economy
-      physicalRequirements: [mountain-volume, secure-gate, ventilation]
       loreRealmKey: stonehold
+      voxel: 0.6
+      materials:
+        terrain: { kind: stone, profile: stonehold_granite }
+        masonry: { kind: stone, profile: stonehold_ashlar, masked: false }
+        timber: { kind: stone, profile: timber, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        bronze: { kind: stone, profile: bronze, masked: false }
+        ore: { kind: stone, profile: ore_rubble, masked: false }
+        glow: { kind: glow }
+      params:
+        avenue: { halfLength: 48, halfWidth: 15, height: 13, vaultRise: 9, pillarSpacing: 12, pillarRadius: 1.9 }
+        forgeTint: '#ff7a2a'
     frostgard_glacier:
-      sceneKind: isolated-interior
       generatorKey: glacial-cavern
-      contentPacks: [frostgard_glacial]
-      textureSet: frostgard_ice
-      shaderProfile: frostgard_glacier
       lightingProfile: frostgard_ice
       atmosphereProfile: frostgard_cold
       loadingTheme: frostgard_ice
-      navigationKey: multi-level-passages
-      collisionKey: ice-and-masonry
-      simulationDomain: winter-shelter
-      physicalRequirements: [glacier-or-ice-cave, safe-shelter, drainage]
       loreRealmKey: frostgard
+      voxel: 0.5
+      materials:
+        terrain: { kind: ice, profile: deep_blue_glacier, bedrock: glacier_bedrock }
+        clearIce: { kind: ice, profile: clear_polished, masked: false }
+        timber: { kind: stone, profile: timber, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        masonry: { kind: stone, profile: rubble_masonry, masked: false }
+        roof: { kind: stone, profile: sod_roof, masked: false }
+        seal: { kind: stone, profile: obsidian_seal, masked: false }
+        glow: { kind: glow }
+      params:
+        icicles: 260
+        longhall: { length: 13, width: 6, wallHeight: 2.6, roofRise: 3.4 }
 
-  # No fictional Eldara coordinates or burg IDs are inserted as placeholders.
-  # A future importer, editor or world generator populates validated manifests.
-  sites: {}
-
-  extensionContract:
-    requiredArchetypeKeys:
-      - sceneKind
-      - generatorKey
-      - contentPacks
-      - textureSet
-      - shaderProfile
-      - lightingProfile
-      - atmosphereProfile
-      - loadingTheme
-      - navigationKey
-      - collisionKey
-      - simulationDomain
-    requireRegisteredGenerator: true
-    requireRegisteredShaderFactory: true
-    requireReadyRequiredAssets: true
-    requireReciprocalPortalsUnlessExplicitOneWay: true
-    rejectUnknownKeys: true
-    requireDeterministicSiteIdentity: true
-    requireTransitionRoundTripTests: true
+  # Showcase sites are development access only: they have no Azgaar source and are
+  # not lore locations. World-anchored sites add `source` and `entrances` here.
+  sites:
+    showcase-deep-workings:
+      archetype: working_mine
+      title: The Deep Workings
+      subtitle: Working mine — showcase
+      seed: 4107
+      showcase: true
+    showcase-umbrakor-cavern:
+      archetype: drow_cavern_city
+      title: Umbra'kor Cavern City
+      subtitle: Drow cavern settlement — showcase
+      seed: 7719
+      showcase: true
+    showcase-stonehold-hall:
+      archetype: dwarven_mountain_hold
+      title: Stonehold Mountain Hall
+      subtitle: Dwarven hold — showcase
+      seed: 2231
+      showcase: true
+    showcase-frostgard-refuge:
+      archetype: frostgard_glacier
+      title: Frostgard Glacier Refuge
+      subtitle: Glacier cave and Norths refuge — showcase
+      seed: 9053
+      showcase: true
