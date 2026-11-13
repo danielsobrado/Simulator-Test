@@ -9,6 +9,8 @@ import {
 import { arcWallPath, sampleShapePath, placeShapePoint, shapeBounds } from './ShapePaths.js';
 import { normalizeShapeOpenings, resolveShapeOpenings, shapeOpeningPortal } from './ShapeOpenings.js';
 import { normalizeShapeStyle } from './ShapeStyles.js';
+import { normalizeShapeProfile } from './ShapeProfile.js';
+import { normalizeShapeCrown, resolveShapeCrown } from './ShapeCrown.js';
 
 export function normalizeShapeWall(source) {
   const height = shapeNumber(source.height, 'Wall height', 2.4, 0.5, 16);
@@ -22,6 +24,9 @@ export function normalizeShapeWall(source) {
     height,
     thickness: shapeNumber(source.thickness, 'Wall thickness', 0.4, 0.15, 2),
     taper: shapeNumber(source.taper, 'Wall taper', 1, 0.7, 1.2),
+    stonework: normalizeShapeProfile(source, height).stonework,
+    base: normalizeShapeProfile({ base: source.base }, height).base,
+    crown: normalizeShapeCrown(source.crown),
     surface: shapeChoice(source.surface, 'wall surface', 'masonry', [
       'masonry',
       'planks',
@@ -50,7 +55,7 @@ export function planShapeWall(primitive) {
     topThickness: primitive.thickness * primitive.taper,
     gaps: openings,
   }));
-  return {
+  return resolveShapeCrown({
     id: primitive.id,
     primitive,
     curve,
@@ -77,7 +82,7 @@ export function planShapeWall(primitive) {
       walkableFloors: [],
       roomBoundaries: [],
       portals: openings
-        .filter((o) => o.role !== 'window')
+        .filter((o) => !['window', 'slit'].includes(o.role))
         .map((o) => shapeOpeningPortal({ id: primitive.id, primitive }, o)),
       stairSockets: [],
       foundationContacts: slabs.map((slab) => ({
@@ -86,5 +91,5 @@ export function planShapeWall(primitive) {
       })),
       coverSurfaces: slabs.map((slab) => ({ ...slab, id: `${slab.id}:cover` })),
     },
-  };
+  });
 }

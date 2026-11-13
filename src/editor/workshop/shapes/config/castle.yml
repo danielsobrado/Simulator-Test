@@ -1,0 +1,29 @@
+# Fortification defaults for workshop shapes. Regenerate with `npm run generate:workshop-castle`.
+version: 1
+crown:
+  projection: 0.45        # metres the corbelled crown stands proud of the shaft face
+  height: 0.9             # parapet wall below the merlons, or the roofed gallery band
+  parapetThickness: 0.32
+  corbelSpacing: 0.75     # centre to centre, measured along the crown face
+  corbelWidth: 0.3
+  corbelDrop: 0.95        # height of the corbel table under the deck
+  corbelSteps: 3
+  arcadeLintel: 0.14      # solid stone left above the arch crown
+  arcadeDepth: 0.22
+  merlonWidth: 0.95
+  merlonGap: 0.6
+  merlonHeight: 0.85
+  copingHeight: 0.09
+  copingOverhang: 0.035
+turret:
+  width: 2.2
+  height: 4.2
+  projection: 0.62        # share of the turret diameter standing clear of the host face
+  thickness: 0.2
+  roofRise: 1.35          # roof rise as a multiple of the turret diameter
+  roofOverhang: 0.16
+  corbelSteps: 5
+  corbelDrop: 0.85        # underside cone height as a multiple of the diameter
+masonry:
+  ashlarCourse: 0.34
+  ashlarLength: 0.62

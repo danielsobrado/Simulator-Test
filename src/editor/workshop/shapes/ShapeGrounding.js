@@ -49,7 +49,7 @@ export function resolveShapeGrounding(plan) {
       { kind: 'path', points: plan.boundary, width: p.thickness + 0.3 });
     const surface = createShapeWallSurface(plan);
     for (const o of plan.openings) {
-      if (o.role === 'window' || p.elevation + o.bottom > 0.2) continue;
+      if (['window', 'slit'].includes(o.role) || p.elevation + o.bottom > 0.2) continue;
       const u = o.at * surface.length, width = o.width + 0.6;
       const points = [surface.point(u - width / 2, 0, p.thickness / 2 + 0.04),
         surface.point(u + width / 2, 0, p.thickness / 2 + 0.04),

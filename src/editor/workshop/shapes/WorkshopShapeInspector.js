@@ -2,9 +2,9 @@ import { createShapeWallSurface } from './ShapeWallSurface.js';
 import { shapeShutterLeafFits } from './ShapeShutterBuilder.js';
 
 const CONTEXTS = [['building', 'Shape'], ['roof', 'Roof'], ['opening', 'Openings'], ['feature', 'Features'], ['details', 'Dressing'], ['all', 'Advanced']];
-const SECTION_CONTEXT = { common: 'building', wall: 'building', curve: 'building', traversal: 'building',
+const SECTION_CONTEXT = { common: 'building', wall: 'building', curve: 'building', traversal: 'building', fortification: 'building',
   openings: 'opening', features: 'feature', details: 'details', style: 'details' };
-const unit = field => field === 'rotation' ? '°' : ['at', 'opening-at', 'age', 'ivyDensity', 'taper'].includes(field)
+const unit = field => field === 'rotation' ? '°' : ['at', 'opening-at', 'age', 'ivyDensity', 'taper', 'crown-ruin'].includes(field)
   ? 'ratio' : field === 'levels' ? 'floors' : 'm';
 
 /** Context affects presentation only; authored edits still go through the semantic session. */

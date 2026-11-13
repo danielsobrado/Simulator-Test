@@ -9,6 +9,11 @@ import { shapeFeatureSemantics } from './ShapeFeatureSemantics.js';
 import { resolveShapeBalcony } from './ShapeBalcony.js';
 import { resolveShapeButtress } from './ShapeButtress.js';
 import { shapeFeatureBounds } from './ShapeFeatureBounds.js';
+import { SHAPE_CROWN_NONE, normalizeShapeCrown } from './ShapeCrown.js';
+import { SHAPE_CASTLE_CONFIG } from './config/ShapeCastleConfig.generated.js';
+
+const TURRET = SHAPE_CASTLE_CONFIG.turret;
+const NO_BASE = Object.freeze({ style: 'none', height: 1, out: 0 });
 
 const distanceAt = (a, b) => Math.min(Math.abs(a - b), 1 - Math.abs(a - b));
 
@@ -19,7 +24,7 @@ function childVolume(host, f, frame, fields) {
     rotation: frame.rotation, height: f.height, elevation: frame.origin[1], taper: 1, levels: 1, thickness: 0.16,
     footprint: { family: 'rounded', width: f.width, depth: f.depth, cornerRadius: Math.min(0.18, f.depth * 0.2, f.width * 0.2) },
     roof: { ...p.roof, family: 'gable', axis: 'depth', rise: Math.min(0.85, f.width * 0.32), sweep: 0.25, sag: 0.03, overhang: 0.16 },
-    openings: [], features: [], craft: false, chimney: false, windowBoxes: false, interior: 'none', ivyDensity: 0, suppressed: [],
+    openings: [], features: [], base: NO_BASE, stages: [], crown: SHAPE_CROWN_NONE, craft: false, chimney: false, windowBoxes: false, interior: 'none', ivyDensity: 0, suppressed: [],
     // A volume carried by its host (jetty, dormer, oriel) has no footing course of its own.
     grounded: frame.origin[1] <= p.elevation + 0.05, ...fields };
   const plan = planShapeVolume(primitive);
@@ -104,6 +109,23 @@ const registry = new Map([
     }), openSides: true };
   }],
   ['buttress', resolveShapeButtress],
+  ['turret', (host, f, frame) => {
+    // A turret straddles the host face; on a corbelled crown it rides the crown's outer face.
+    const p = host.primitive, crown = host.crown, flat = f.roof === 'flat';
+    const onCrown = crown && f.bottom >= crown.base - crown.drop - 0.01;
+    const clear = f.width * (TURRET.projection - 0.5) + (onCrown ? crown.projection : 0);
+    return { turret: { drop: Math.min(f.bottom, f.width * TURRET.corbelDrop) },
+      child: childVolume(host, f, { ...frame, origin: offset(frame, clear, p.elevation + f.bottom) }, {
+        footprint: { family: 'oval', width: f.width, depth: f.width }, height: f.height,
+        thickness: Math.min(TURRET.thickness, f.width / 5.01), surface: 'masonry', facade: 'plain', shutters: false,
+        roof: { family: f.roof, axis: 'width', overhang: TURRET.roofOverhang, sweep: 0.5, sag: 0,
+          rise: flat ? 0.2 : Math.min(12, f.width * TURRET.roofRise * (f.roof === 'spire' ? 1.5 : 1)) },
+        crown: flat ? normalizeShapeCrown({ style: 'parapet', height: 0.5, merlonWidth: 0.5, merlonGap: 0.34, merlonHeight: 0.5 }) : SHAPE_CROWN_NONE,
+        // The oval footprint starts on the local +x side; its outward face is three quarters round.
+        openings: [{ id: 'turret-loop', role: 'slit', profile: 'square', at: 0.75, width: 0.12,
+          bottom: f.height * 0.38, height: Math.min(1.1, f.height * 0.36) }],
+      }) };
+  }],
 ]);
 
 /** Features are semantic modifiers expanded through shared volume/roof builders. */
@@ -113,7 +135,7 @@ export function resolveShapeFeatures(plan) {
     const key = `feature:${plan.id}:${f.id}`;
     if (plan.primitive.suppressed.includes(key)) return [];
     const anchor = supportAnchor(plan, f), frame = frameAt(plan, anchor), feature = registry.get(f.kind)(plan, f, frame);
-    const child = feature.child ? resolveShapeCraftDetails({ ...feature.child, neighbors: [{ ...plan, roofReplaced: Boolean(feature.replacesRoof) }, ...(plan.neighbors ?? [])] }) : null;
+    const child = feature.child ? resolveShapeCraftDetails({ ...feature.child, neighbors: [{ ...plan, roofReplaced: Boolean(feature.replacesRoof || feature.turret) }, ...(plan.neighbors ?? [])] }) : null;
     return [{ ...feature, child, frame: feature.frame ?? frame, intent: f, id: key, derivationKey: key,
       provenance: { source: 'authored', ruleId: 'architectural-feature', generatorVersion: 1, sourceEntityIds: [plan.id], derivationKey: key } }];
   });

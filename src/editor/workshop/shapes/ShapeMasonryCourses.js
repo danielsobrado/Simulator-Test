@@ -3,13 +3,34 @@ import { createShapeRoofSurface } from './ShapeRoofSurface.js';
 import { shapeRandom } from './ShapeMesh.js';
 import { shapeCellWear } from './ShapeWeathering.js';
 import { WORKSHOP_GEOMETRY_TOLERANCE as tolerance } from '../curves/GeometryTolerancePolicy.js';
+import { SHAPE_COURSE_HEIGHT } from './ShapeProfile.js';
+import { SHAPE_CASTLE_CONFIG } from './config/ShapeCastleConfig.generated.js';
 
 const CELL_RELIEF = 0.1;
 const ROOF_UNDERSIDE = 0.07;
 
-function shade(recipe, plan, domain, key) {
-  const v = 0.8 + shapeRandom(recipe.seed, plan.id, domain, key) * 0.2;
+// Cool grey ashlar is a vertex tint over the shared stone slot, so it never recolours other buildings.
+// The multipliers are linear and sized against the slot's base colour for each recipe stone.
+const ASHLAR_TINT = Object.freeze({ granite: [1.0, 1.08, 1.35], default: [0.54, 0.67, 1.06] });
+const PLAIN = Object.freeze([1, 1, 1]);
+
+/** Multiplier every dressed-stone tone of a shape shares, so trim never drifts from its wall. */
+export function shapeStoneTint(recipe, plan) {
+  return plan.primitive.stonework === 'ashlar' ? ASHLAR_TINT[recipe.style] ?? ASHLAR_TINT.default : PLAIN;
+}
+/** Mortar seen between ashlar stones: a dark recessed joint rather than a plaster-coloured gap. */
+export const SHAPE_ASHLAR_JOINT_TONE = Object.freeze([0.17, 0.25, 0.5]);
+
+export function shapeStoneTone(recipe, plan, domain, key) {
+  const random = shapeRandom(recipe.seed, plan.id, domain, key);
   const warm = shapeRandom(recipe.seed, plan.id, `${domain}-warmth`, key) - 0.5;
+  if (plan.primitive.stonework === 'ashlar') {
+    // Mostly even stones with the occasional darker or paler block, as in weathered ashlar.
+    const v = 0.74 + random * 0.16 + (random > 0.9 ? 0.07 : random < 0.08 ? -0.1 : 0);
+    const tint = shapeStoneTint(recipe, plan);
+    return [tint[0] * (v + warm * 0.035), tint[1] * v, tint[2] * (v - warm * 0.035)];
+  }
+  const v = 0.8 + random * 0.2;
   return [v + warm * 0.04, v, v - warm * 0.04];
 }
 
@@ -34,49 +55,75 @@ export function shapeMasonryCeiling(plan, surface) {
   };
 }
 
-export function buildShapeMasonryCourses(plan, meshes, recipe, surface, distances, openingEdges) {
-  const p = plan.primitive;
-  const ceiling = p.surface === 'masonry' ? shapeMasonryCeiling(plan, surface) : () => p.height;
-  const course = p.surface === 'planks' ? p.height : 0.34;
-  const cellWidth = p.surface === 'planks' ? 0.24 : 0.62;
-  const detail = recipe.detail >= 2;
-  const peak = Math.max(p.height, ...distances.map(ceiling));
-  const courseCount = Math.ceil(peak / course - tolerance.length);
-  for (let row = 0; row < courseCount; row++) {
-    if (!detail && row > 0) continue;
-    if (p.surface === 'plaster' && (row > 1 || p.grounded === false)) continue;
-    const y0 = row * course + 0.012,
-      y1 = Math.min(peak - 0.012, (row + 1) * course - 0.012);
-    const shift = p.surface === 'planks' ? 0 : ((row % 2) * cellWidth) / 2;
-    for (let cell = -1; cell < Math.ceil(surface.length / cellWidth); cell++) {
-      const u0 = Math.max(0, cell * cellWidth + shift + 0.012),
-        u1 = Math.min(surface.length, (cell + 1) * cellWidth + shift - 0.012);
-      if (u1 - u0 < 0.08) continue;
-      const mesh = p.surface === 'planks' ? meshes.inserts : meshes.trim;
-      const count = Math.max(1, Math.ceil((u1 - u0) / 0.18));
-      const color = shade(recipe, plan, p.surface, `${row}:${cell}`);
-      const cuts = [u0, ...distances.filter((d) => d > u0 && d < u1), u1];
-      for (let k = 1; k < count; k++) cuts.push(u0 + ((u1 - u0) * k) / count);
-      cuts.sort((a, b) => a - b);
-      for (let k = 0; k < cuts.length - 1; k++) {
-        // Courses stop under the eave and climb a gable, following the roof underside.
-        const roofed = [ceiling(cuts[k]) - 0.012, ceiling(cuts[k + 1]) - 0.012];
-        for (const band of wallSolidBands(surface, cuts[k], cuts[k + 1], y0, y1, false)) {
-          const top = band.top.map((value, i) => Math.min(value, roofed[i]));
-          const bottom = band.bottom.map((value, i) => Math.min(value, top[i]));
-          if (Math.max(top[0] - bottom[0], top[1] - bottom[1]) < 0.04) continue;
-          for (const side of p.kind === 'curved-wall' ? [-1, 1] : [1]) {
-            addWallPatch(mesh, surface, cuts[k], cuts[k + 1], bottom, top,
-              side * (p.thickness / 2 + 0.045), side * 0.055, color, {
+/**
+ * Lay staggered course cells over one band of a wall-like surface. Closed loops get a whole
+ * number of stones per course, so the bond runs around a tower without a seam.
+ */
+export function buildShapeCourseBand(plan, mesh, recipe, surface, {
+  bottom = 0, top, faces, spans = null, ceiling = null, distances = [], openingEdges = new Set(),
+  course = SHAPE_COURSE_HEIGHT, cellWidth = SHAPE_CASTLE_CONFIG.masonry.ashlarLength, stagger = true,
+  domain = 'masonry', key = '', rows = null,
+}) {
+  const detail = recipe.detail >= 2, length = surface.length, closed = surface.closed;
+  const cells = closed ? Math.max(2, Math.round(length / cellWidth)) : Math.ceil(length / cellWidth);
+  const width = closed ? length / cells : cellWidth;
+  const marks = closed ? [...distances, ...distances.map((d) => d + length)] : distances;
+  const wrap = (d) => (closed ? ((d % length) + length) % length : d);
+  const windows = !spans ? [[-Infinity, Infinity]]
+    : closed ? spans.flatMap(([a, b]) => [[a - length, b - length], [a, b], [a + length, b + length]]) : spans;
+  const count = Math.ceil((top - bottom) / course - tolerance.length);
+  for (let row = 0; row < count; row++) {
+    if (rows && !rows(row)) continue;
+    const y0 = bottom + row * course + 0.012,
+      y1 = Math.min(top - 0.012, bottom + (row + 1) * course - 0.012);
+    const shift = stagger ? ((row % 2) * width) / 2 : 0;
+    for (let cell = closed ? 0 : -1; cell < cells; cell++) {
+      const left = cell * width + shift + 0.012, right = (cell + 1) * width + shift - 0.012;
+      const color = shapeStoneTone(recipe, plan, domain, `${key}${row}:${cell}`);
+      for (const [from, to] of windows) {
+        const u0 = Math.max(closed ? left : Math.max(0, left), from),
+          u1 = Math.min(closed ? right : Math.min(length, right), to);
+        if (u1 - u0 < 0.08) continue;
+        const pieces = Math.max(1, Math.ceil((u1 - u0) / 0.18));
+        const cuts = [u0, ...marks.filter((d) => d > u0 && d < u1), u1];
+        for (let k = 1; k < pieces; k++) cuts.push(u0 + ((u1 - u0) * k) / pieces);
+        cuts.sort((a, b) => a - b);
+        const wear = shapeCellWear(plan, recipe.seed, `${key}${row}:${cell}`);
+        for (let k = 0; k < cuts.length - 1; k++) {
+          // A stone is chipped at its own corners only, never along the cuts that bend it round a curve.
+          const first = k === 0, last = k === cuts.length - 2;
+          const chips = [first ? wear[0] : 0, last ? wear[1] : 0, last ? wear[2] : 0, first ? wear[3] : 0];
+          // Courses stop under the eave and climb a gable, following the roof underside.
+          const roofed = ceiling ? [ceiling(cuts[k]) - 0.012, ceiling(cuts[k + 1]) - 0.012] : [y1, y1];
+          for (const band of wallSolidBands(surface, cuts[k], cuts[k + 1], y0, y1, false)) {
+            const high = band.top.map((value, i) => Math.min(value, roofed[i]));
+            const low = band.bottom.map((value, i) => Math.min(value, high[i]));
+            if (Math.max(high[0] - low[0], high[1] - low[1]) < 0.04) continue;
+            for (const face of faces) {
+              addWallPatch(mesh, surface, cuts[k], cuts[k + 1], low, high, face.offset, face.thickness, color, {
                 back: false,
                 bevel: detail,
-                wear: shapeCellWear(plan, recipe.seed, `${row}:${cell}`),
-                start: k === 0 || openingEdges.has(cuts[k]),
-                end: k === cuts.length - 2 || openingEdges.has(cuts[k + 1]),
+                wear: chips,
+                start: k === 0 || openingEdges.has(wrap(cuts[k])),
+                end: k === cuts.length - 2 || openingEdges.has(wrap(cuts[k + 1])),
               });
+            }
           }
         }
       }
     }
   }
+}
+
+export function buildShapeMasonryCourses(plan, meshes, recipe, surface, distances, openingEdges) {
+  const p = plan.primitive, planks = p.surface === 'planks';
+  const ceiling = p.surface === 'masonry' ? shapeMasonryCeiling(plan, surface) : () => p.height;
+  const detail = recipe.detail >= 2;
+  buildShapeCourseBand(plan, planks ? meshes.inserts : meshes.trim, recipe, surface, {
+    top: Math.max(p.height, ...distances.map(ceiling)),
+    faces: (p.kind === 'curved-wall' ? [-1, 1] : [1]).map((side) => ({ offset: side * (p.thickness / 2 + 0.045), thickness: side * 0.055 })),
+    ceiling, distances, openingEdges, domain: p.surface,
+    course: planks ? p.height : SHAPE_COURSE_HEIGHT, cellWidth: planks ? 0.24 : undefined, stagger: !planks,
+    rows: (row) => (detail || row === 0) && !(p.surface === 'plaster' && (row > 1 || p.grounded === false)),
+  });
 }

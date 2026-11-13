@@ -6,6 +6,7 @@ import { buildShapeRoofJunctions } from './ShapeRoofJunctionBuilder.js';
 import { WORKSHOP_GEOMETRY_TOLERANCE as tolerance } from '../curves/GeometryTolerancePolicy.js';
 import { shapeWallCoreMesh, SHAPE_MASONRY_CORE_TONE } from './ShapeMasonryCourses.js';
 import { buildShapeProfileRail } from './ShapeProfileRail.js';
+import { shapeStoneTint } from './ShapeMasonryCourses.js';
 
 // Overhangs show boarded sarking from below; bare slate there reads as a hole in the roof.
 const SOFFIT_TONE = Object.freeze([0.78, 0.74, 0.7]);
@@ -20,6 +21,8 @@ export function buildShapeRoof(plan, sourceMeshes, recipe) {
   meshes.trim = clipShapeRoofMesh(sourceMeshes.trim, createShapeRoofOcclusion(plan, { roofMargin: 0.12 }));
   const rings = p.roof.family === 'flat' ? 1 : recipe.detail >= 2 ? 20 : 10;
   const samples = plan.curve.samples.length;
+  const paved = p.roof.family === 'flat' && plan.crown && meshes.deck;
+  const deckTone = shapeStoneTint(recipe, plan).map((v) => v * 0.78);
   const roofQuad = (quad, color, solid = false) => {
     const area = quad.reduce((sum, a, i) => {
       const b = quad[(i + 1) % quad.length];
@@ -27,7 +30,7 @@ export function buildShapeRoof(plan, sourceMeshes, recipe) {
     }, 0);
     if (Math.abs(area) < tolerance.length * tolerance.length) return false;
     const top = surface.wall.clockwise ? quad : quad.toReversed();
-    meshes.roof.quad(...top, color, top.map((v) => surface.uvAt(v[0], v[2])), top.map((v) => surface.normalAt(v[0], v[2])));
+    (paved || meshes.roof).quad(...top, paved ? deckTone : color, top.map((v) => surface.uvAt(v[0], v[2])), top.map((v) => surface.normalAt(v[0], v[2])));
     if (solid) {
       const underside = quad.map(([x, y, z]) => [x, y - 0.06, z]);
       if (surface.wall.clockwise) meshes.inserts.quad(...underside.toReversed(), SOFFIT_TONE);
@@ -66,7 +69,7 @@ export function buildShapeRoof(plan, sourceMeshes, recipe) {
     }
   }
   buildShapeProfileRail(meshes.trim, t => surface.point(t * length, 1), length, 0.1, 0.12,
-    recipe.detail, [0.8, 0.8, 0.8], { closed: true, step: recipe.detail >= 2 ? 0.32 : 0.55 });
+    recipe.detail, shapeStoneTint(recipe, plan).map((v) => v * 0.8), { closed: true, step: recipe.detail >= 2 ? 0.32 : 0.55 });
   buildShapeRoofCraft(plan, meshes, recipe, surface, hidden);
   if (recipe.detail >= 2 && p.roof.family !== 'flat') buildShapeRoofTiles(plan, meshes.roof, surface, recipe, () => false);
   buildShapeRoofJunctions(plan, meshes.flashing, surface);

@@ -731,6 +731,11 @@ export class ProceduralWorkshopUi {
     this.camera.position.copy(center).addScaledVector(direction, Math.max(6, distance));
     this.camera.near = Math.max(0.05, distance / 100);
     this.camera.far = Math.max(100, distance * 8);
+    // Garden haze is tuned for cottages; a castle framed from further away must not sit inside it.
+    if (this.scene.fog?.isFog) {
+      this.scene.fog.near = Math.max(30, distance * 1.3);
+      this.scene.fog.far = Math.max(72, distance * 3.2);
+    }
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }

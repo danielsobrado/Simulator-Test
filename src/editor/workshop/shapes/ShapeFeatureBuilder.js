@@ -6,12 +6,15 @@ import { createShapeRoofOcclusion, clipShapeRoofMesh, clipShapeMeshSet } from '.
 import { createShapeWallSurface } from './ShapeWallSurface.js';
 import { buildShapeBalcony } from './ShapeBalconyBuilder.js';
 import { buildShapeButtress } from './ShapeButtress.js';
+import { buildShapeCrown } from './ShapeCrownBuilder.js';
+import { buildShapeTurretSupport } from './ShapeTurret.js';
+import { shapeStoneTint } from './ShapeMasonryCourses.js';
 
 const tint = [0.9, 0.9, 0.9];
 export function buildShapeFeatures(plan, meshes, recipe) {
   for (const feature of plan.features ?? []) {
     if (feature.balcony) { buildShapeBalcony(plan, feature, meshes, recipe); continue; }
-    if (feature.solidSupport) { buildShapeButtress(feature, clipShapeMeshSet(meshes, plan).trim); continue; }
+    if (feature.solidSupport) { buildShapeButtress(feature, clipShapeMeshSet(meshes, plan).trim, shapeStoneTint(recipe, plan).map((v) => v * 0.9)); continue; }
     const child = feature.child, occlusion = createShapeRoofOcclusion(child);
     const clipped = Object.fromEntries(Object.entries(meshes).map(([key, mesh]) => [key, clipShapeRoofMesh(mesh, occlusion)]));
     if (!feature.openSides) {
@@ -30,6 +33,8 @@ export function buildShapeFeatures(plan, meshes, recipe) {
       buildShapeFloors(child, clipped);
     }
     buildShapeRoof(child, meshes, recipe);
+    buildShapeCrown(child, meshes, recipe);
+    if (feature.turret) buildShapeTurretSupport(feature, clipped.trim, recipe);
     if (feature.intent.kind === 'jetty') {
       const surface = createShapeWallSurface(child), count = Math.ceil(child.curve.length / 0.8);
       for (let i = 0; i < count; i++) {

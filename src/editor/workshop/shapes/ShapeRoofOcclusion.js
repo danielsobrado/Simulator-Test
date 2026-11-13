@@ -1,4 +1,5 @@
 import { createShapeRoofSurface } from './ShapeRoofSurface.js';
+import { shapeBaseTop } from './ShapeProfile.js';
 import { clipShapePolygon, convexShapePlanes, convexShapeWallPlanes, interpolateShapeVertex, splitShapeFootprint } from './ShapePolygonClip.js';
 
 const triangles = (polygon) => Array.from({ length: Math.max(0, polygon.length - 2) }, (_, i) => [polygon[0], polygon[i + 1], polygon[i + 2]]);
@@ -35,8 +36,8 @@ export function createShapeRoofOcclusion(plan, { roofMargin = 0.001, roofs = tru
     // Identical overlapping surfaces have one deterministic owner, without double removal.
     if (positionKey(plan.primitive, roofs) === positionKey(n.primitive, roofs) && plan.id < n.id) return [];
     const surface = createShapeRoofSurface(n), outline = surface.outline;
-    const bottom = n.curve.samples.map((s) => surface.wall.point(s.distance, 0, n.primitive.thickness / 2));
-    const top = n.curve.samples.map((s) => surface.wall.point(s.distance, n.primitive.height, n.primitive.thickness / 2));
+    const bottom = n.curve.samples.map((s) => surface.wall.point(s.distance, shapeBaseTop(n.primitive), n.primitive.thickness / 2));
+    const top = n.curve.samples.map((s) => surface.wall.point(s.distance, n.primitive.height - 1e-4, n.primitive.thickness / 2));
     const bounds = [...bottom, ...outline];
     return [{ ...n, surface, planes: convexShapePlanes(outline), wallPlanes: convexShapeWallPlanes(bottom, top),
       coplanar: positionKey(plan.primitive, roofs) === positionKey(n.primitive, roofs),

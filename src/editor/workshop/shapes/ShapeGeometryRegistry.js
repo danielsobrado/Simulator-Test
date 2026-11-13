@@ -11,6 +11,7 @@ import { shapeStyleSlot, shapeStyleSourceRegion, shapeStyleFallbackRegion } from
 import { buildShapeFeatures } from './ShapeFeatureBuilder.js';
 import { buildShapeGrounding } from './ShapeGrounding.js';
 import { clipShapeMeshSet } from './ShapeRoofOcclusion.js';
+import { buildShapeCrown } from './ShapeCrownBuilder.js';
 
 const builders = new Map([
   [
@@ -21,6 +22,7 @@ const builders = new Map([
     },
   ],
   ['roof', buildShapeRoof],
+  ['crown', buildShapeCrown],
   ['facade', (plan, meshes, recipe) => buildShapeFacade(plan, clipShapeMeshSet(meshes, plan, { roofs: false }), recipe)],
   ['ivy', buildShapeIvy],
   ['supports', (plan, meshes) => buildShapeSupports(plan, meshes.supports)],

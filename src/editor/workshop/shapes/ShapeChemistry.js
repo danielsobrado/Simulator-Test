@@ -1,7 +1,7 @@
 import { WorkshopSpatialIndex } from '../spatial/WorkshopSpatialIndex.js';
 import polygonClipping from 'polygon-clipping';
 import { WORKSHOP_GEOMETRY_TOLERANCE as tolerance } from '../curves/GeometryTolerancePolicy.js';
-import { shapeEnvelopeAtHeight } from './ShapeEnvelope.js';
+import { shapeEnvelopeAtHeight, pointInShape, offsetShapePolygon } from './ShapeEnvelope.js';
 import { resolvePathGates } from './ShapePathGateReaction.js';
 import { resolveShapeCraftDetails } from './ShapeCraftDetails.js';
 import { resolveShapeRoofJunctions } from './ShapeRoofJunctions.js';
@@ -83,6 +83,19 @@ export function resolveShapeChemistry(plans) {
             height: plan.primitive.elevation,
           });
         }
+      }
+    }
+    if (plan.primitive.kind === 'curved-wall') {
+      for (const id of index.queryBounds(plan.bounds, { excludeIds: [plan.id] })) {
+        const other = byId.get(id), a = plan.primitive, b = other.primitive;
+        if (b.kind !== 'curved-volume' || a.elevation + a.height <= b.elevation || b.elevation + b.height <= a.elevation) continue;
+        const shell = shapeEnvelopeAtHeight(other, Math.max(a.elevation, b.elevation) + 0.5);
+        const reach = a.thickness / 2 + b.thickness / 2;
+        if (!plan.boundary.some((point) => pointInShape(point, offsetShapePolygon(shell, reach)))) continue;
+        plan.neighbors.push({ id: other.id, boundary: other.boundary, topBoundary: other.topBoundary, curve: other.curve, primitive: other.primitive });
+        const key = `join:${plan.id}:${other.id}`;
+        contacts.push({ id: key, source: 'auto', ruleId: 'wall-tower-join', generatorVersion: 1,
+          sourceEntityIds: [plan.id, other.id], derivationKey: key });
       }
     }
     supports.push(...(plan.supports ?? []));

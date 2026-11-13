@@ -3,6 +3,7 @@ import { createShapeWallSurface } from './ShapeWallSurface.js';
 import { placeShapePoint } from './ShapePaths.js';
 import { pointInShape } from './ShapeEnvelope.js';
 import { WORKSHOP_GEOMETRY_TOLERANCE as tolerance } from '../curves/GeometryTolerancePolicy.js';
+import { shapeRoofReach } from './ShapeCrown.js';
 
 const profiles = Object.freeze({
   cone: (t, p) => p.rise * (1 - t),
@@ -35,7 +36,7 @@ export function createShapeRoofSurface(plan) {
     : null;
   const angle = (p.rotation * Math.PI) / 180;
   const outline = plan.curve.samples.map((sample) =>
-    wall.point(sample.distance, p.height, p.thickness / 2 + roof.overhang),
+    wall.point(sample.distance, p.height - 1e-4, shapeRoofReach(p)),
   );
   function local(x, z) {
     const dx = x - p.position[0],
@@ -72,7 +73,7 @@ export function createShapeRoofSurface(plan) {
     return p.elevation + p.height + 0.08 + profiles[roof.family](t, roof);
   }
   function point(distance, t, lift = 0) {
-    const outer = wall.point(distance, p.height, p.thickness / 2 + roof.overhang);
+    const outer = wall.point(distance, p.height - 1e-4, shapeRoofReach(p));
     let x = p.position[0] + (outer[0] - p.position[0]) * t;
     let z = p.position[1] + (outer[2] - p.position[1]) * t;
     if (roof.family === 'gable') {

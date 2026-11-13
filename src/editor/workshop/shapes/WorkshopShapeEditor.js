@@ -149,9 +149,10 @@ export class WorkshopShapeEditor {
               id: this.openingId,
               role,
               at: 0.6,
-              bottom: role === 'window' ? Math.min(1, p.height - 0.5) : 0,
-              width: 1,
-              height: Math.min(role === 'window' ? 1.2 : 2.1, p.height),
+              ...(role === 'slit' ? { profile: 'square' } : {}),
+              bottom: role === 'slit' ? Math.min(1.2, p.height - 1) : role === 'window' ? Math.min(1, p.height - 0.5) : 0,
+              width: role === 'slit' ? 0.14 : 1,
+              height: Math.min(role === 'window' ? 1.2 : role === 'slit' ? 1.3 : 2.1, p.height),
             },
           ],
         });
@@ -187,6 +188,7 @@ export class WorkshopShapeEditor {
       curve: !volume,
       traversal,
       openings: !traversal,
+      fortification: !traversal,
     })) {
       this.root.querySelector(`[data-shape-section="${section}"]`).hidden = !visible;
     }
@@ -206,7 +208,15 @@ export class WorkshopShapeEditor {
     this.root.querySelector('[data-shape-field="opening-shutterPose"]').closest('label').hidden = opening?.role !== 'window' || !p.shutters;
     for (const element of this.root.querySelectorAll('[data-shape-field], [data-shape-number]')) {
       const field = element.dataset.shapeField ?? element.dataset.shapeNumber,
-        value = shapeFieldValue(p, field, opening);
+        value = shapeFieldValue(p, field, opening),
+        [group, key] = field.split('-'),
+        crown = p.crown?.style;
+      // Before the undefined skip: walls have no stages, so their setback labels must still be hidden.
+      if (['base', 'crown', 'stage'].includes(group))
+        element.closest('label').hidden = group === 'stage' ? !volume : key !== 'style' && (group === 'base'
+          ? p.base?.style === 'none'
+          : crown === 'none' || (key === 'sides' && volume) ||
+            (['projection', 'corbelSpacing', 'corbelDrop', 'arcade', 'machicolation'].includes(key) && crown !== 'corbelled'));
       if (value === undefined) continue;
       if (field === 'radius') {
         element.max = Math.min(p.footprint.width, p.footprint.depth) / 2;

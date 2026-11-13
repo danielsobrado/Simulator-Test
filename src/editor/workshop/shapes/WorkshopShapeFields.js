@@ -34,6 +34,7 @@ export function workshopShapeMarkup() {
         ['masonry', 'Chunky masonry'],
         ['planks', 'Timber planks'],
       ])}
+      ${select('stonework', 'Stonework', [['fieldstone', 'Warm chunky stone'], ['ashlar', 'Grey ashlar, dark joints']])}
     </div>
     <div class="workshop-shape-fields" data-shape-section="volume">
       ${select('facade', 'Facade', [
@@ -77,6 +78,20 @@ export function workshopShapeMarkup() {
     <div class="workshop-shape-fields" data-shape-section="curve">
       ${range('length', 'Length', 2, 16, 0.1)}${range('bend', 'Curve bend', -10, 10, 0.1)}
     </div>
+    <div class="workshop-shape-fields" data-shape-section="fortification">
+      ${select('base-style', 'Wall footing', [['none', 'Plain'], ['batter', 'Battered (flared)'], ['plinth', 'Stepped plinth']])}
+      ${range('base-height', 'Footing height', 0.2, 6, 0.1)}${range('base-out', 'Footing spread', 0, 2, 0.05)}
+      ${range('stage-at', 'Setback height', 0.3, 24, 0.1)}${range('stage-out', 'Setback amount', -1, 1, 0.02)}
+      ${select('crown-style', 'Crown', [['none', 'No crown'], ['parapet', 'Flush battlement'], ['corbelled', 'Projecting corbelled crown']])}
+      ${range('crown-projection', 'Crown projection', 0.1, 1.5, 0.05)}${range('crown-height', 'Parapet height', 0.2, 3, 0.05)}
+      ${range('crown-corbelSpacing', 'Corbel spacing', 0.35, 3, 0.05)}${range('crown-corbelDrop', 'Corbel height', 0.3, 2.5, 0.05)}
+      ${select('crown-arcade', 'Corbel arcade', [['round', 'Round arches'], ['pointed', 'Pointed arches'], ['none', 'Flat lintels']])}
+      ${select('crown-machicolation', 'Machicolations', [['decorative', 'Decorative (closed floor)'], ['open', 'Open murder holes'], ['none', 'Blind arcade']])}
+      ${select('crown-merlons', 'Battlements', [['square', 'Square merlons'], ['pierced', 'Pierced merlons'], ['stepped', 'Stepped merlons'], ['none', 'Plain parapet']])}
+      ${range('crown-merlonWidth', 'Merlon width', 0.3, 3, 0.05)}${range('crown-merlonGap', 'Embrasure width', 0.2, 3, 0.05)}
+      ${range('crown-merlonHeight', 'Merlon height', 0.3, 2.5, 0.05)}${range('crown-ruin', 'Ruined battlements', 0, 1, 0.05)}
+      ${select('crown-sides', 'Battlement sides', [['outer', 'Outer face'], ['both', 'Both faces']])}
+    </div>
     <div class="workshop-shape-fields" data-shape-section="traversal">
       ${range('path-width', 'Path width', 0.6, 4, 0.1)}${range('rise', 'End height difference', 0, 6, 0.1)}
       ${select('mode', 'Path treatment', [
@@ -95,14 +110,15 @@ export function workshopShapeMarkup() {
     </div>
     <div data-shape-section="openings">
       <label>Opening<select data-shape-action="opening"></select></label>
-      <div class="workshop-shape-actions"><button type="button" data-shape-action="add-door">+ Door</button><button type="button" data-shape-action="add-window">+ Window</button><button type="button" data-shape-action="add-arch">+ Arch</button><button type="button" data-shape-action="remove-opening">Remove opening</button></div>
+      <div class="workshop-shape-actions"><button type="button" data-shape-action="add-door">+ Door</button><button type="button" data-shape-action="add-window">+ Window</button><button type="button" data-shape-action="add-arch">+ Arch</button><button type="button" data-shape-action="add-slit">+ Arrow slit</button><button type="button" data-shape-action="remove-opening">Remove opening</button></div>
       <div class="workshop-shape-fields" data-shape-section="opening-fields">
         ${select('opening-profile', 'Opening shape', [
           ['arched', 'Round arch'],
           ['square', 'Square lintel'],
+          ['pointed', 'Pointed (Gothic) arch'],
         ])}
         ${range('opening-at', 'Along wall', 0, 0.99, 0.01)}${range('opening-bottom', 'Opening bottom', 0, 5, 0.05)}
-        ${range('opening-width', 'Opening width', 0.3, 3, 0.05)}${range('opening-height', 'Opening height', 0.3, 4, 0.05)}
+        ${range('opening-width', 'Opening width', 0.1, 3, 0.05)}${range('opening-height', 'Opening height', 0.3, 4, 0.05)}
         ${select('opening-shutterPose', 'Shutter pose', [['auto', 'Natural variation'], ['open', 'Open'], ['ajar', 'Ajar'], ['closed', 'Closed']])}
       </div>
     </div>
@@ -117,6 +133,9 @@ export function workshopShapeMarkup() {
 export function shapeFieldValue(p, field, opening) {
   if (['chimney', 'windowBoxes'].includes(field)) return p.craft && p[field];
   if (field.startsWith('style-')) return p.style[field.slice(6)] ?? 'auto';
+  if (field.startsWith('base-') || field.startsWith('crown-')) return p[field.split('-')[0]]?.[field.split('-')[1]];
+  // Undefined on walls and paths, which have no setbacks; volumes show stage 0 or its would-be defaults.
+  if (field.startsWith('stage-')) return p.stages && (field === 'stage-at' ? p.stages[0]?.at ?? p.height * 0.6 : p.stages[0]?.out ?? 0);
   const fields = {
     x: p.position[0],
     z: p.position[1],
@@ -175,6 +194,17 @@ export function shapeFieldChanges(p, field, value, openingId) {
         [field.slice(5) === 'family' ? 'family' : field.slice(5)]: value,
       },
     };
+  if (field.startsWith('base-') || field.startsWith('crown-')) {
+    const [group, key] = field.split('-');
+    return { [group]: { ...p[group], [key]: value } };
+  }
+  if (field.startsWith('stage-')) {
+    const stages = [...p.stages];
+    // A zero setback is no setback: drop stage 0 rather than keep an empty profile break.
+    if (field === 'stage-out' && Math.abs(value) < 1e-6) stages.shift();
+    else stages[0] = { at: p.height * 0.6, out: 0, ...stages[0], [field.slice(6)]: value };
+    return { stages };
+  }
   if (field.startsWith('opening-'))
     return {
       openings: p.openings.map((o) => (o.id === openingId ? { ...o, [field.slice(8)]: value } : o)),

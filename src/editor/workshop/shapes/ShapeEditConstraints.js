@@ -12,7 +12,11 @@ export function shapeFieldLimits(p, field) {
     'roof-rise': [0.2, 12], 'roof-overhang': [0.05, 1.5],
     'roof-sweep': [0, 1], 'roof-sag': [0, 0.5],
     'opening-at': [0, 1], 'opening-bottom': [0, p.height - 0.3],
-    'opening-width': [0.3, 5], 'opening-height': [0.3, p.height],
+    'opening-width': [0.1, 5], 'opening-height': [0.3, p.height],
+    'base-height': [0.2, Math.max(0.2, p.height)], 'base-out': [0, 2],
+    'stage-at': [0.3, Math.max(0.3, p.height - 0.3)], 'stage-out': [-1, 1],
+    'crown-projection': [0.1, 1.5], 'crown-height': [0.2, 3], 'crown-corbelSpacing': [0.35, 3], 'crown-corbelDrop': [0.3, 2.5],
+    'crown-merlonWidth': [0.3, 3], 'crown-merlonGap': [0.2, 3], 'crown-merlonHeight': [0.3, 2.5], 'crown-ruin': [0, 1],
   };
   if (field === 'elevation' && p.kind === 'traversal') limits.elevation[0] = Math.max(0, -p.rise);
   return limits[field] ?? null;
@@ -32,6 +36,8 @@ export function clampShapeField(p, field, value) {
 export function adaptShapeHeight(p, height) {
   return {
     height,
+    // The footing may not outgrow the wall it stands under.
+    ...(p.base ? { base: { ...p.base, height: Math.min(p.base.height, Math.max(0.2, height)) } } : {}),
     openings: p.openings.map((o) => {
       const openingHeight = Math.min(o.height, height);
       return { ...o, height: openingHeight, bottom: Math.min(o.bottom, height - openingHeight) };

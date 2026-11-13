@@ -1,3 +1,5 @@
+import { SHAPE_CASTLE_PRESETS } from './config/ShapeCastleConfig.generated.js';
+
 const opening = (id, at, role = 'window', bottom = 1) => ({
   id,
   at,
@@ -46,6 +48,8 @@ const traversal = (id, label, extra = {}) => ({
 
 export const SHAPE_PRESETS = Object.freeze(
   [
+    // Fortification designs are data (config/castle-presets.yml) over the same shape capabilities.
+    ...SHAPE_CASTLE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label, create: () => structuredClone(preset.primitives) })),
     {
       id: 'rounded-cottage',
       label: 'Rounded cottage',

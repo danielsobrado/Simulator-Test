@@ -1,5 +1,25 @@
 import { shapeChoice, shapeId, shapeNumber, shapeRecord } from './ShapeValidation.js';
 
+export const SHAPE_OPENING_ROLES = Object.freeze(['door', 'window', 'arch', 'slit']);
+export const SHAPE_OPENING_PROFILES = Object.freeze(['arched', 'square', 'pointed']);
+
+/** Height of the arched head above its springing line. */
+export function shapeOpeningRise(o) {
+  if (o.profile === 'square') return 0;
+  if (o.profile === 'pointed') return Math.min(o.width * 0.866, o.height * 0.55);
+  return Math.min(o.width / 2, o.height * 0.4);
+}
+
+/** Top of the opening at a signed distance from its centre line; masonry, trim and collision share it. */
+export function shapeOpeningTop(o, dx) {
+  const rise = shapeOpeningRise(o), x = Math.min(1, Math.abs(dx) / (o.width / 2));
+  // A pointed head is two arcs struck from the opposite springing points.
+  const head = o.profile === 'pointed'
+    ? (Math.sqrt(Math.max(0, 1 - ((x + 1) / 2) ** 2)) / 0.866)
+    : Math.sqrt(Math.max(0, 1 - x * x));
+  return o.bottom + o.height - rise + rise * Math.min(1, head);
+}
+
 /** Authored host-local opening intent, shared by closed volumes and freeform walls. */
 export function normalizeShapeOpenings(input, height) {
   const openings = input === undefined ? [] : input;
@@ -15,12 +35,12 @@ export function normalizeShapeOpenings(input, height) {
         throw new Error('Opening promotion requires a bounded derivation key.');
       return Object.freeze({
         id: shapeId(opening.id, 'Opening id'),
-        role: shapeChoice(opening.role, 'opening role', 'window', ['door', 'window', 'arch']),
-        profile: shapeChoice(opening.profile, 'opening profile', 'arched', ['arched', 'square']),
+        role: shapeChoice(opening.role, 'opening role', 'window', SHAPE_OPENING_ROLES),
+        profile: shapeChoice(opening.profile, 'opening profile', 'arched', SHAPE_OPENING_PROFILES),
         shutterPose: shapeChoice(opening.shutterPose, 'shutter pose', 'auto', ['auto', 'open', 'ajar', 'closed']),
         at: shapeNumber(opening.at, 'Opening position', 0.5, 0, 1),
         bottom: shapeNumber(opening.bottom, 'Opening bottom', 0, 0, height - 0.3),
-        width: shapeNumber(opening.width, 'Opening width', 1, 0.3, 5),
+        width: shapeNumber(opening.width, 'Opening width', 1, 0.1, 5),
         height: shapeNumber(opening.height, 'Opening height', 1.5, 0.3, height),
         ...(opening.promotedFrom !== undefined ? { promotedFrom: opening.promotedFrom } : {}),
       });

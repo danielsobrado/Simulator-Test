@@ -19,8 +19,8 @@ export function resolveShapeButtress(host, intent, frame) {
     solidSupport: { width, height, sides, footprint, bounds: shapeBounds(sides.flat().map(([x, , z]) => [x, z])) } };
 }
 
-export function buildShapeButtress(feature, mesh) {
-  const sides = feature.solidSupport.sides, count = sides[0].length, tint = [0.9, 0.9, 0.9];
+export function buildShapeButtress(feature, mesh, tint = [0.9, 0.9, 0.9]) {
+  const sides = feature.solidSupport.sides, count = sides[0].length;
   for (let i = 1; i < count - 1; i++) {
     mesh.triangle(sides[0][0], sides[0][i + 1], sides[0][i], tint);
     mesh.triangle(sides[1][0], sides[1][i], sides[1][i + 1], tint);

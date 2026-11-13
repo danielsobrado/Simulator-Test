@@ -1,10 +1,11 @@
 import { WorkshopSpatialIndex } from '../spatial/WorkshopSpatialIndex.js';
 import { resolveShapeRoofJunctions } from './ShapeRoofJunctions.js';
 
-function neighbor(plan, roofOnly = false) {
+// A contact already resolved as "walls only" (a turret through its host's eave) stays that way.
+function neighbor(plan, roofOnly = false, prior = null) {
   return { id: plan.id, primitive: plan.primitive, curve: plan.curve,
     boundary: plan.boundary, topBoundary: plan.topBoundary,
-    roofReplaced: Boolean(plan.roofReplaced), roofOnly };
+    roofReplaced: Boolean(plan.roofReplaced || prior?.roofReplaced), roofOnly };
 }
 
 const hasProjection = (plan) => plan.features?.some((f) => f.balcony || f.solidSupport);
@@ -29,13 +30,13 @@ export function resolveShapeFeatureContacts(plans) {
     // Retain existing exact body contacts, refreshing their resolved roof ownership.
     const neighbors = new Map((plan.neighbors ?? []).map((n) => {
       const entry = entries.get(n.id);
-      return [n.id, entry ? neighbor(entry.plan, entry.roofOnly) : n];
+      return [n.id, entry ? neighbor(entry.plan, entry.roofOnly, n) : n];
     }));
     for (const id of index.queryBounds(plan.bounds, { excludeIds: [plan.id] })) {
       const entry = entries.get(id);
       // Root/root contacts already have exact envelope tests in the base chemistry.
       if (!child && entry.ownerId === id && entry.ownerId !== ownerId && !hasProjection(plan)) continue;
-      neighbors.set(id, neighbor(entry.plan, entry.roofOnly));
+      neighbors.set(id, neighbor(entry.plan, entry.roofOnly, neighbors.get(id)));
       if (entry.ownerId !== ownerId && (child || entry.ownerId !== id || hasProjection(plan))) {
         const pair = [plan.id, id].sort(), key = `feature-join:${pair.join(':')}`;
         contacts.set(key, { id: key, derivationKey: key, source: 'auto',

@@ -1,3 +1,4 @@
+import { shapeOpeningRise, shapeOpeningTop } from './ShapeOpenings.js';
 import { shapeRandom } from './ShapeMesh.js';
 import { addWallPatch } from './ShapeWallSurface.js';
 
@@ -29,7 +30,7 @@ function closedPanel(plan, opening, side, meshes, recipe, surface) {
     addWallPatch(meshes.inserts, surface, a, b, opening.bottom + 0.045, top, offset + 0.027, 0.054, [v, v, v]);
   }
   if (recipe.detail < 2) return;
-  const top = opening.bottom + opening.height - (opening.profile === 'arched' ? Math.min(half, opening.height * 0.4) : 0);
+  const top = opening.bottom + opening.height - shapeOpeningRise(opening);
   for (const y of [opening.bottom + 0.19, Math.max(opening.bottom + 0.25, top - 0.14)]) {
     addWallPatch(meshes.inserts, surface, from, to, y - 0.025, y + 0.025, offset + 0.052, 0.028, [0.51, 0.51, 0.51]);
     const hinge = side < 0 ? from : to, end = hinge - side * Math.min(0.12, half);
@@ -71,9 +72,7 @@ export function buildShapeShutters(plan, meshes, recipe, surface) {
   for (const opening of plan.openings ?? p.openings) {
     if (opening.role !== 'window') continue;
     const center = opening.at * surface.length, width = Math.max(0.08, opening.width / 2 - 0.015);
-    const radius = opening.profile === 'square' ? 0 : Math.min(opening.width / 2, opening.height * 0.4);
-    const top = (distance) => Math.min(p.height - 0.02, opening.bottom + opening.height - radius +
-      radius * Math.sqrt(Math.max(0, 1 - (distance / (opening.width / 2)) ** 2))) - 0.045;
+    const top = (distance) => Math.min(p.height - 0.02, shapeOpeningTop(opening, distance)) - 0.045;
     // Leaves that would swing onto a corner or another window are omitted as a pair.
     if (opening.shutterPose !== 'closed' &&
       [-1, 1].some((side) => shapeShutterAngle(recipe.seed, plan.id, opening, side) > Math.PI / 2 &&

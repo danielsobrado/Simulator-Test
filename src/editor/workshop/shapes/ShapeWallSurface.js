@@ -3,6 +3,8 @@ import { placeShapePoint } from './ShapePaths.js';
 import { pointInShape, shapeEnvelopeAtHeight } from './ShapeEnvelope.js';
 import { WORKSHOP_GEOMETRY_TOLERANCE as tolerance } from '../curves/GeometryTolerancePolicy.js';
 import { addShapeWallBevel } from './ShapeWallBevel.js';
+import { shapeProfileOut } from './ShapeProfile.js';
+import { shapeOpeningTop } from './ShapeOpenings.js';
 
 export function createShapeWallSurface(plan) {
   const p = plan.primitive,
@@ -28,6 +30,9 @@ export function createShapeWallSurface(plan) {
     const s = sample(distance),
       scale = p.kind === 'curved-volume' ? 1 + ((p.taper - 1) * y) / p.height : 1;
     if (p.kind === 'curved-wall') offset *= 1 + ((p.taper - 1) * y) / p.height;
+    // The vertical profile moves both faces of a shell, and each face of a freestanding wall.
+    const out = shapeProfileOut(p, y);
+    if (out) offset += p.kind === 'curved-wall' ? Math.sign(offset) * out : out;
     const sign = clockwise ? -1 : 1;
     const local = [
       s.point[0] * scale + s.tangent[1] * offset * sign,
@@ -41,12 +46,7 @@ export function createShapeWallSurface(plan) {
       let dx = distance - o.at * length;
       if (plan.curve.closed) dx = ((((dx + length / 2) % length) + length) % length) - length / 2;
       if (Math.abs(dx) > o.width / 2 + tolerance.length) return [];
-      const radius = o.profile === 'square' ? 0 : Math.min(o.width / 2, o.height * 0.4);
-      const top =
-        o.bottom +
-        o.height -
-        radius +
-        radius * Math.sqrt(Math.max(0, 1 - (dx / (o.width / 2)) ** 2));
+      const top = shapeOpeningTop(o, dx);
       return [{ bottom: o.bottom, top: Math.min(p.height, top), opening: o }];
     });
   }

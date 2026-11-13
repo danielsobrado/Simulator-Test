@@ -129,7 +129,7 @@ export function resolvePathGates(plans, index, byId) {
           gaps: openings,
         })),
         portals: openings
-          .filter((o) => o.role !== 'window')
+          .filter((o) => !['window', 'slit'].includes(o.role))
           .map((o) => shapeOpeningPortal(plan, o)),
       },
     };

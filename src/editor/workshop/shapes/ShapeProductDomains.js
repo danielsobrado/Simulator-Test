@@ -5,6 +5,7 @@ export function shapeProductDomains(plan, recipe) {
     'ground',
     ...(plan.features?.length ? ['features'] : []),
     ...(plan.primitive.roof ? ['roof'] : []),
+    ...(plan.crown ? ['crown'] : []),
     ...(plan.primitive.facade === 'timber' || plan.primitive.shutters || plan.decorations?.some((d) => d.role === 'window-box') ? ['facade'] : []),
     ...(plan.supports?.length ? ['supports'] : []),
     ...(recipe.ivy ? ['ivy'] : []),
@@ -55,6 +56,9 @@ export function shapeProductKey(recipe, plan, domain) {
       : domain === 'features'
         ? { features: featureProducts(plan), style: plan.resolvedStyle,
             neighbors: plan.features.some((f) => f.solidSupport) ? roofNeighbors(plan) : neighbors }
+      : domain === 'crown'
+        ? { primitive: body(p, false), neighbors,
+            turrets: (plan.features ?? []).filter((f) => f.intent.kind === 'turret').map((f) => [f.frame.u, f.child.primitive.elevation, f.child.primitive.height, f.child.primitive.footprint.width]) }
       : domain === 'roof'
         ? {
             id: p.id,
@@ -65,6 +69,7 @@ export function shapeProductKey(recipe, plan, domain) {
             height: p.height,
             thickness: p.thickness,
             taper: p.taper,
+            base: p.base, stages: p.stages, crown: p.crown,
             footprint: p.footprint,
             surface: p.surface,
             roof: p.roof,
@@ -97,15 +102,16 @@ export function shapeProductKey(recipe, plan, domain) {
               };
   const regions = {
     walls: ['walls', 'trim', 'deck', 'inserts', 'glazing', 'metal'],
-    roof: ['roof', 'walls', 'trim', 'inserts', 'metal', 'flashing'],
+    roof: ['roof', 'walls', 'trim', 'deck', 'inserts', 'metal', 'flashing'],
     supports: ['supports'],
+    crown: ['walls', 'trim', 'deck'],
     ivy: ['foliage'],
     traversal: ['deck', 'trim', 'supports', 'rails'],
     facade: ['inserts', 'foliage', 'metal'],
     features: ['walls', 'roof', 'trim', 'deck', 'inserts', 'glazing', 'metal', 'flashing'],
     ground: ['trim', 'foliage'],
   }[domain];
-  const styleProperties = { walls: ['floor', 'trim'], roof: ['trim'], ground: ['trim'],
+  const styleProperties = { walls: ['floor', 'trim'], roof: ['floor', 'trim'], ground: ['trim'], crown: ['floor', 'trim'],
     supports: ['supports'], traversal: ['floor', 'trim', 'supports', 'railing'], features: ['floor', 'trim'] }[domain] ?? [];
   const style = Object.fromEntries(styleProperties.map((key) => [key, [plan.resolvedStyle?.values[key], plan.resolvedStyle?.sources[key]]]));
   const overrides = Object.fromEntries(
@@ -120,7 +126,7 @@ export function shapeProductKey(recipe, plan, domain) {
   return JSON.stringify([
     domain,
     shape,
-    ['walls', 'facade', 'ground', 'features'].includes(domain) ? p.age : null,
+    ['walls', 'facade', 'ground', 'features', 'crown'].includes(domain) ? p.age : null,
     style,
     recipe.seed,
     recipe.detail,
