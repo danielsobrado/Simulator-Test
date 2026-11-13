@@ -56,8 +56,10 @@ there:
    `writeBuffer` at about +3.4 ms per spike render there. Uploads do not move
    the *average* frame (§2 finding 5) but a large one landing in a single draw
    is a spike. Fix: no meadow publication may upload more than the sliced
-   initial-upload path allows per frame (`meadowInitialGpuUploadMaxFrameBytes`
-   is the existing bound; publications and repacks do not honour it). §9
+   initial-upload path in `StreamedDrawPreparation` allows per frame (the
+   `meadowInitialGpuUploadMaxFrameBytes` counter records its peak; whether
+   publications and repacks go through that path is the first thing to
+   check). §9
    item 1 removes the cause; this bounds it meanwhile.
 2. **The same draws costing several times more (town).** In the same rough
    slice every per-draw function grows together, with no upload or creation
