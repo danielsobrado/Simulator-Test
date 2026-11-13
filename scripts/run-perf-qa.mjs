@@ -71,6 +71,9 @@ const cpuProfilePath = cpuProfileArg === null ? null : path.resolve(cpuProfileAr
 const cpuProfileReportPath = cpuProfilePath === null
   ? null
   : path.relative(root, cpuProfilePath).replaceAll('\\', '/');
+// Diagnostic only: allocation sampling perturbs frame times, so never quote pacing from such a run.
+const heapProfileArg = readArg('heap-profile');
+const heapProfilePath = heapProfileArg === null ? null : path.resolve(heapProfileArg).replaceAll('\\', '/');
 const drainSeconds = readArg('drain-seconds') === null
   ? 0 : positiveNumber('drain-seconds', 15);
 const runnerPath = path.join(
@@ -273,6 +276,12 @@ const fs = require('fs');
     // development reloads cannot silently change the measured runtime.
     await page.waitForFunction(() => window.__perfQa?.recording
       || window.__perfQa?.status === 'done', null, { timeout: ${timeoutMs} });
+    // Sampled over the recorded window only, keeping what the collector already freed:
+    // per-frame garbage is exactly the part a live-heap snapshot would miss.
+    const heapCdp = ${JSON.stringify(heapProfilePath)} === null ? null
+      : cdp ?? await page.context().newCDPSession(page);
+    await heapCdp?.send('HeapProfiler.startSampling', { samplingInterval: 16384,
+      includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
     const preparationQueuesAtStart = await page.evaluate(() => {
       const surface = window.__editor.stylizedSurface;
       const describe = queue => ({ size: queue?.size ?? 0,
@@ -289,6 +298,8 @@ const fs = require('fs');
     await page.waitForFunction(() => window.__perfQa?.status === 'done', null, {
       timeout: ${timeoutMs},
     });
+    if (heapCdp) fs.writeFileSync(${JSON.stringify(heapProfilePath)},
+      JSON.stringify((await heapCdp.send('HeapProfiler.stopSampling')).profile));
     const detailVisibilityAtStop = await page.evaluate(() => window.__editor.stylizedSurface.detailViews
       .filter(view => view.visibility).map(view => {
         const visibility = view.visibility;
@@ -424,6 +435,7 @@ const fs = require('fs');
       rendererBackend,
       screenshot: ${JSON.stringify(screenshotReportPath)},
       cpuProfile: ${JSON.stringify(cpuProfileReportPath)},
+      heapProfile: ${JSON.stringify(heapProfilePath === null ? null : path.relative(root, heapProfilePath).replaceAll('\\', '/'))},
     };
     report.capture.assetIntegrity = await page.evaluate(async () => {
       const { treeImpostorIntegrity } = await import('/src/editor/stylized/impostor/TreeImpostorIntegrity.js');

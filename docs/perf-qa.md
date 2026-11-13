@@ -335,7 +335,9 @@ records native samples and exits non-zero if either check fails.
 The runner rejects software/fallback adapters. Headless Chromium commonly fails
 that gate on Windows, so use `--headed` for comparisons. `--cpu-profile` writes
 a Chrome sampled CPU profile alongside the JSON without making profiling the
-default measurement path.
+default measurement path. `--heap-profile <file>` writes a sampled allocation
+profile of the recorded window, including objects the collector already freed.
+Allocation sampling slows the frame, so never quote pacing from such a run.
 
 ## Code map
 

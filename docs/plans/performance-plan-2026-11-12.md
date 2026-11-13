@@ -103,6 +103,54 @@ the draw count itself is flat. It also explains the steady cost: three's cheap
 updates are about 28% of main-thread time. Making static draws eligible for
 them is a possible later phase, not something to try inside phase 2.
 
+**Town allocation profile, 2026-11-13.** `settlement-approach` with the new
+`--heap-profile` option (native focus held, settled, zero errors; pacing from
+this run is void because sampling slows the frame). Files:
+`tmp/perf-town-alloc-2026-11-13/`.
+
+- **The draw count is flat on spike frames:** 342–358 draws against a median
+  of 354, all full refreshes, on all 22 render spikes. The spikes are the same
+  work running slower.
+- **The main thread allocates 162 MB/s — 2.4 MB per frame.** That is enough
+  garbage to keep the collector running continuously. It fits the runs of
+  consecutive slow frames and the collector time seen in spike renders, but
+  the profile shows the allocation rate, not how much of each spike it
+  causes. Phase 2's test is direct: cut the rate and count the spikes again.
+
+Where it comes from, over the 12 s window:
+
+| Source | MB | Runs | Note |
+| --- | --- | --- | --- |
+| Scatter manifests (`StableScatterManifest.step`) | 468 | budgeted | candidate objects per placement |
+| Tree manifest build, mostly `ForestHabitatField.js:351` closures | 306 | budgeted | |
+| Draw submission inside three | 270 | every frame | attribute `update` 36, draw-list sort 22, matrix walk 26 |
+| `MeadowTileLayer.update` (`meadowPageUpdatePlan` 51, `MeadowBandBatch.update` 26) | 251 | every frame | |
+| Perf QA itself (`PerfCounters.snapshot` 103, `delta` 25) | 130 | every frame | not in production, but in every measurement |
+| `settlementSelectionJob` via `SettlementView.update` | 97 | every frame | generator rebuilt per frame |
+| `buildChunkLodPlan` (trees 43, rocks 18, bushes 13) | 73 | every frame | |
+| String keys built with `join` (`TreeManifestStore.context`, `RockManifestStore.blockerSnapshot`, `manifestKey`) | 40 | every frame | |
+| `MinimapRaster.build` | 32 | budgeted | |
+
+**Phase 2, concretely.** One commit per row, each checked with the same
+`--heap-profile` town run; none may change output.
+
+1. Perf QA first, so the instrument stops distorting what it measures:
+   `PerfCounters.snapshot`/`delta` write into reused objects.
+2. The every-frame rows that are ours: settlement selection, chunk LOD plans,
+   the meadow page plan and the joined string keys. Each should allocate
+   nothing on a frame where its inputs did not change — keep the previous
+   result and its key, rebuild only on a revision change.
+3. Scatter and tree manifests: reuse one candidate record per builder instead
+   of an object per placement (this is also phase 4a's ground; do them
+   together).
+4. Three's own share is last and only where a setting does it: the draw-list
+   sort allocates because of its comparator path, and static subtrees need no
+   matrix walk (phase 5 item 1).
+
+**Gate.** Town allocation rate at most 60 MB/s with rows 1–3 done. Then the
+phase 2 gate in §5 on a clean timed A/B/A/B. If the spike count does not
+fall with the allocation rate, the garbage was not the cause: say so and stop.
+
 ### 0.3 Two cascades are closed
 
 The valid-focus repeat measured 8.98 ms render CPU against the 5.67 ms
