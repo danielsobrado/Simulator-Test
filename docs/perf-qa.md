@@ -1836,3 +1836,14 @@ include exact runtime hashes, callback/RAF indexing, tests and skipped gates.
 Only phase 0 remains. Retained water acceptance passes every gate on NVIDIA
 WebGPU with native focus, zero GPU errors and 7.9 ms frame p95. Existing long
 frames remain; this is not a 60 FPS tail fix.
+
+## Preparation-only corrected-gate retest — 2026-11-13
+
+The [phase 1b retest](performance-phase1b-2026-11-13.md) restores the exact
+earlier preparation-only source and uses the corrected gates. The full
+candidate suite passes 4326 tests. Grassland A/B/A/B is focus-valid, but B2
+fails with a 12.2 ms capture and 25.1 ms callback despite better p95 and mean
+render CPU. Forest B1 also fails (9.3 / 22.1 ms). No runtime change is promoted.
+Two forest A2 attempts lost native focus and are excluded; the remaining
+forest pair and candidate water check await an uninterrupted foreground window.
+The report preserves the accepted rows, rejected attempts and clean patch.
