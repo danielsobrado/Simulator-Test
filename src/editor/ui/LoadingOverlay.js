@@ -37,6 +37,7 @@ const MARKUP = `
   </div>
   <section class="loading-card">
     <h2 class="loading-card__eyebrow" data-role="title"></h2>
+    <p class="loading-card__subtitle" data-role="subtitle" hidden></p>
     <div class="loading-card__body">
       <span class="loading-card__icon">${TRAVELLER_ICON}</span>
       <span class="loading-card__who"><strong>${TRAVELLER.name}</strong><span>${TRAVELLER.title}</span></span>
@@ -51,6 +52,7 @@ const MARKUP = `
     <ol class="loading-ticker" data-role="ticker" aria-hidden="true"></ol>
     <p class="loading-error" data-role="error" hidden></p>
   </section>
+  <p class="loading-tip" data-role="tip" hidden></p>
 `;
 
 /**
@@ -65,6 +67,9 @@ const MARKUP = `
  *    the donor's iris when the load finishes.
  *  - `compact` (walk-mode streaming): the card alone over the live world, which
  *    the player is already standing in.
+ *
+ * A session's optional `theme` (entering or leaving a location) swaps the key art
+ * and wordmark for that location's gradient backdrop, accent and lines.
  *
  * Input is never captured: boot keeps the editor usable and walk-mode streaming
  * must never trap the player behind a modal.
@@ -91,6 +96,8 @@ export class LoadingOverlay {
       ringPercent: role('ring-percent'),
       ticker: role('ticker'),
       error: role('error'),
+      subtitle: role('subtitle'),
+      tip: role('tip'),
     };
     const art = this.element.querySelector('.loading-art-image');
     art.addEventListener('load', () => this.element.classList.add('is-art-loaded'), { once: true });
@@ -121,6 +128,25 @@ export class LoadingOverlay {
     target[property] = value;
   }
 
+  /** `#set` for a custom property, which is removed rather than left empty when absent. */
+  #setVar(name, value) {
+    if (this.rendered[name] === value) return;
+    this.rendered[name] = value;
+    if (value) this.element.style.setProperty(name, value);
+    else this.element.style.removeProperty(name);
+  }
+
+  /** A location's backdrop and lines; written every session so none outlives its own. */
+  #renderTheme(theme) {
+    this.#set('theme', this.element.dataset, 'theme', theme?.key ?? '');
+    this.#setVar('--loading-theme-color', theme?.color ?? '');
+    this.#setVar('--loading-theme-accent', theme?.accent ?? '');
+    this.#set('subtitle', this.nodes.subtitle, 'textContent', theme?.subtitle ?? '');
+    this.#set('subtitleHidden', this.nodes.subtitle, 'hidden', !theme?.subtitle);
+    this.#set('tip', this.nodes.tip, 'textContent', theme?.tip ?? '');
+    this.#set('tipHidden', this.nodes.tip, 'hidden', !theme?.tip);
+  }
+
   render(state) {
     if (!state.open) {
       if (this.wasOpen) this.#leave();
@@ -132,6 +158,7 @@ export class LoadingOverlay {
     this.lastState = state;
     this.element.hidden = false;
     this.#set('presentation', this.element.dataset, 'presentation', state.presentation ?? 'cinematic');
+    this.#renderTheme(state.theme);
     this.#set('title', this.nodes.title, 'textContent', state.title ?? '');
     this.#setPercent(Math.round((state.ratio ?? 0) * 100));
     this.#set('status', this.nodes.status, 'textContent', state.activeLabel || state.title || '');

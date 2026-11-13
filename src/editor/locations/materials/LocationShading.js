@@ -96,10 +96,10 @@ export function shadeSurface({ albedo, normal, roughness, f0 = 0.04, metalness =
   const fresnel = fresnelBase.add(vec3(1).sub(fresnelBase).mul(pow(float(1).sub(clamp(dot(normal, viewDirection), 0, 1)), 5)));
   const gloss = float(1).sub(roughness);
   const specTint = mix(vec3(1), albedo, metallic);
-  const diffuseAlbedo = albedo.mul(float(1).sub(metallic.mul(0.62)));
+  const diffuseAlbedo = albedo.mul(float(1).sub(metallic.mul(0.54)));
   const mirrored = reflect(viewDirection.negate(), normal);
   const reflection = mix(locationLight.ambientDown, locationLight.ambientUp, mirrored.y.mul(0.5).add(0.5))
-    .mul(fresnel).mul(specTint).mul(gloss.mul(gloss)).mul(occlusion).mul(mix(float(2.4), float(5.2), metallic));
+    .mul(fresnel).mul(specTint).mul(gloss.mul(gloss)).mul(occlusion).mul(mix(float(2.4), float(6.0), metallic));
   const specular = bakedLight.mul(directionality).mul(highlight(normal, toLight, roughness))
     .add(carried.mul(highlight(normal, carriedDirection, roughness)))
     .mul(fresnel.mul(3.5).min(1)).mul(specTint).mul(gloss);

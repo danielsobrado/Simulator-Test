@@ -121,6 +121,15 @@ test('subscribers receive the current state immediately and on change', () => {
   assert.deepEqual(seen, [false, true, false]);
 });
 
+test('a session carries its optional theme, null when it has none', () => {
+  const { instance } = tracker();
+  instance.begin({ title: 'Boot', steps: ['A'] });
+  assert.equal(instance.getState().theme, null);
+  const theme = { key: 'frostgard_ice', subtitle: 'Glacier refuge', accent: '#8fd3ff' };
+  instance.begin({ title: 'Frostgard', steps: ['A'], theme });
+  assert.deepEqual(instance.getState().theme, theme);
+});
+
 test('unknown step ids fail loudly instead of silently doing nothing', () => {
   const { instance } = tracker();
   const session = instance.begin({ title: 'Boot', steps: ['A'] });

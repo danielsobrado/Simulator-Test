@@ -305,17 +305,17 @@ export function brazier(b, at, {
   b.prop(trimMaterial, stoneBlock(1.12 * size, 0.34 * size, 1.12 * size, at, { bevel: 0.05, batter: 0.14, irregular: 0.08 }));
   b.prop(trimMaterial, stoneBlock(0.84 * size, 0.58 * size, 0.84 * size, up(at, 0.34 * size), { bevel: 0.045, batter: 0.08, irregular: 0.08 }));
   // Riveted wrought-iron fire basin + wide flared lip + optional aged bronze collar rim.
-  b.prop('iron', rod(up(at, 0.9 * size), up(at, 1.24 * size), 0.34 * size, 0.68 * size, 8), 0x2a2623);
-  b.prop('iron', rod(up(at, 1.24 * size), up(at, 1.38 * size), 0.72 * size, 0.78 * size, 8), 0x35302c);
+  b.prop('iron', rod(up(at, 0.9 * size), up(at, 1.24 * size), 0.34 * size, 0.68 * size, 8), 0x6a6e78);
+  b.prop('iron', rod(up(at, 1.24 * size), up(at, 1.38 * size), 0.72 * size, 0.78 * size, 8), 0x7a7f8a);
   if (bronzeRim) {
     b.prop('bronze', rod(up(at, 1.26 * size), up(at, 1.36 * size), 0.75 * size, 0.75 * size, 8), 0xd8b478);
   }
-  b.prop('iron', rod(up(at, 1.54 * size), up(at, 1.6 * size), 0.66 * size, 0.66 * size, 8), 0x2b2622);
+  b.prop('iron', rod(up(at, 1.54 * size), up(at, 1.6 * size), 0.66 * size, 0.66 * size, 8), 0x707580);
   for (let i = 0; i < 6; i += 1) {
     const a = (i / 6) * Math.PI * 2;
     const bx = at.x + Math.cos(a) * 0.62 * size;
     const bz = at.z + Math.sin(a) * 0.62 * size;
-    b.prop('iron', rod({ x: bx, y: at.y + 1.3 * size, z: bz }, { x: bx, y: at.y + 1.58 * size, z: bz }, 0.032 * size, 0.028 * size, 5), 0x2a2521);
+    b.prop('iron', rod({ x: bx, y: at.y + 1.3 * size, z: bz }, { x: bx, y: at.y + 1.58 * size, z: bz }, 0.032 * size, 0.028 * size, 5), 0x6c717a);
   }
   // Sculpted dark charcoal bed with glowing ember fissures underneath animated flame tongues.
   b.prop('glow', rod(up(at, 1.22 * size), up(at, 1.36 * size), 0.58 * size, 0.42 * size, 8), '#c83e0e', 1.65);
@@ -328,8 +328,8 @@ export function brazier(b, at, {
       x: at.x + ox * size, y: at.y + 1.36 * size, z: at.z + oz * size,
     }, { yaw: ang, bevel: 0.025 * size, irregular: 0.45 }), 0x221c18);
   }
-  b.flame(up(at, 1.36 * size), { width: 0.78 * size, height: 1.08 * size, core: '#ffefb4', outer: '#ff5c14', speed: 1.05 });
-  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 2.3, halo: 1.15 * size });
+  b.flame(up(at, 1.36 * size), { width: 0.74 * size, height: 1.05 * size, core: '#fff2bc', outer: '#ff520e', speed: 1.08 });
+  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 2.3, halo: 0.48 * size });
   b.nav.block(at, 0.82 * size, 2);
 }
 

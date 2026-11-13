@@ -405,3 +405,13 @@ reed_roof_04, painted_plaster_wall, old_planks_02, dark_planks,
 cobblestone_floor_01, rock_face_03 (crags), and for Stonehold dark_rock_02 and
 stone_tiles_02 (https://polyhaven.com). They are released under CC0 1.0,
 so no attribution is required.
+
+## Location surface textures (ice, cave rock)
+
+Ice004 and Rock035 by ambientCG (Lennart Demes), CC0 1.0 Universal.
+Sources: https://ambientcg.com/view?id=Ice004 and https://ambientcg.com/view?id=Rock035
+
+1K JPG Color, NormalGL and Roughness maps converted to 1024 px WebP into
+`public/assets/textures/locations/` as `ice-{color,normal,rough}.webp` and
+`cave-rock-{color,normal,rough}.webp`. Provenance in
+`public/assets/textures/locations/manifest.json`.

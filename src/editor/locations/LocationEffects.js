@@ -95,14 +95,14 @@ export function createFlames(flames) {
   const shiftedU = u.add(turb.mul(0.36).mul(v.mul(0.85).add(0.15)));
   const dx = abs(shiftedU);
 
-  const tongues = clamp(envelope.mul(1.05).add(n2.mul(0.14).mul(v)), 0.01, 1);
-  const bodyMask = smoothstep(tongues, tongues.mul(0.24), dx)
-    .mul(smoothstep(float(0.02), float(0.16), v))
-    .mul(smoothstep(float(1.0), float(0.62), v.add(n2.mul(0.24))))
+  const tongues = clamp(envelope.mul(1.0).add(n2.mul(0.2).mul(v)), 0.01, 1);
+  const bodyMask = smoothstep(tongues.mul(0.95), tongues.mul(0.18), dx)
+    .mul(smoothstep(float(0.02), float(0.15), v))
+    .mul(smoothstep(float(0.98), float(0.56), v.add(n2.mul(0.26))))
     .mul(smoothstep(float(0.99), float(0.84), v));
-  const coreMask = pow(smoothstep(tongues.mul(0.6), float(0), dx).mul(smoothstep(float(0.72), float(0.08), v)), 1.45);
-  const shimmer = flicker(instanceIndex.toFloat().add(5.1), 0.08);
-  material.colorNode = mix(outerAttr, coreAttr, coreMask).mul(bodyMask).mul(shimmer).mul(1.38);
+  const coreMask = pow(smoothstep(tongues.mul(0.56), float(0), dx).mul(smoothstep(float(0.68), float(0.06), v)), 1.5);
+  const shimmer = flicker(instanceIndex.toFloat().add(5.1), 0.1);
+  material.colorNode = mix(outerAttr, coreAttr, coreMask).mul(bodyMask).mul(shimmer).mul(1.55);
 
   const sprite = new THREE.Sprite(material);
   sprite.count = count;

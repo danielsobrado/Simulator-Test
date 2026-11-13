@@ -1,0 +1,77 @@
+/*
+ * Development menu for travelling to showcase locations (LocationDevMenu.js).
+ * Keyboard only, so it never takes the pointer. No `backdrop-filter`: over the
+ * live WebGPU canvas the compositor would re-blur the framebuffer every frame.
+ */
+.location-dev-menu {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  /* Above the canvas and the town prompt (40), below .loading-overlay (60, 1000). */
+  z-index: 50;
+  width: max-content;
+  min-width: min(340px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 8px;
+  border: 1px solid rgb(233 224 203 / 22%);
+  border-radius: 8px;
+  background: rgb(9 13 15 / 88%);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 40%);
+  color: #eef4e8;
+  font: 500 13px/1.35 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.location-dev-menu[hidden] {
+  display: none;
+}
+
+.location-dev-menu ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.location-dev-menu li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.location-dev-menu li[aria-current] {
+  background: rgb(182 238 67 / 12%);
+  color: #d9f59a;
+}
+
+.location-dev-menu li[aria-current]::after {
+  margin-left: auto;
+  padding-left: 12px;
+  content: 'here';
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+
+.location-dev-menu kbd {
+  flex: none;
+  min-width: 1.7em;
+  padding: 1px 5px;
+  border: 1px solid rgb(238 244 232 / 42%);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 7%);
+  font: 600 12px/1.4 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  text-align: center;
+}
+
+.location-dev-menu__hint {
+  margin: 8px 0 0;
+  color: rgb(238 244 232 / 55%);
+  font-size: 11px;
+  text-align: center;
+}

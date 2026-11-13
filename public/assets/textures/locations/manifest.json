@@ -1,0 +1,16 @@
+{
+  "sets": {
+    "ice": {
+      "source": "https://ambientcg.com/view?id=Ice004",
+      "assetId": "Ice004",
+      "license": "CC0-1.0",
+      "files": ["ice-color.webp", "ice-normal.webp", "ice-rough.webp"]
+    },
+    "cave-rock": {
+      "source": "https://ambientcg.com/view?id=Rock035",
+      "assetId": "Rock035",
+      "license": "CC0-1.0",
+      "files": ["cave-rock-color.webp", "cave-rock-normal.webp", "cave-rock-rough.webp"]
+    }
+  }
+}

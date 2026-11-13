@@ -45,11 +45,14 @@ export class LoadingSession {
    * @param {string} [options.detail]
    * @param {'cinematic' | 'compact'} [options.presentation] full-screen key art (boot,
    *   import) or a card alone over the live world (walk-mode streaming)
+   * @param {{key: string, subtitle?: string, tip?: string, color?: string, accent?: string} | null} [options.theme]
+   *   a location's own backdrop (entering a mine, a hold) instead of the key art
    */
-  constructor(tracker, { title, steps = [], detail = '', presentation = 'cinematic' }) {
+  constructor(tracker, { title, steps = [], detail = '', presentation = 'cinematic', theme = null }) {
     this.tracker = tracker;
     this.title = title;
     this.presentation = presentation;
+    this.theme = theme;
     this.steps = normalizeSteps(steps);
     this.detailText = detail;
     this.error = null;
@@ -151,6 +154,7 @@ export class LoadingSession {
     return {
       title: this.title,
       presentation: this.presentation,
+      theme: this.theme,
       steps: this.steps.map((step) => ({ ...step, units: step.units ? { ...step.units } : null })),
       activeLabel: active?.label ?? '',
       detail: this.detailText,
