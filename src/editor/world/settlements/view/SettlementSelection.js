@@ -59,7 +59,7 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
     const coverage = { epoch, complete: Boolean(site.placements) && !site.job, required: new Map() };
     const source = { style: site.plan.profile.style, kind: '', variant: 0, surfaces: site.surfaces };
     for (const [index, placement] of (site.placements ?? []).entries()) {
-      const id = `${site.id}:${index}`, distance = Math.hypot(placement.x - focus.x, placement.z - focus.z);
+      const id = placement.objectId ??= `${site.id}:${index}`, distance = Math.hypot(placement.x - focus.x, placement.z - focus.z);
       const range = placement.small ? settings.smallRange : settings.farRange;
       const inView = !view.culls || view.inView(placement);
       const needsCoverage = index < site.plan.buildings.length && distance < range && inView;
@@ -89,22 +89,32 @@ export function* settlementSelectionJob(view, focus, timestamp, settings) {
         rows.entry = entry;
         if (!seen.has(placement.key)) seen.set(placement.key, new Set());
         seen.get(placement.key).add(id);
-        const representations = [];
-        if (visible > 0 && inView) {
-          for (const [band, fade, direction] of [['near', visible * blend, 1], ['far', visible * (1 - blend), -1]]) {
-            if (fade <= 0 || band === 'far' && !entry.far) continue;
-            representations.push({ ...placement[band], band, fade, objectId: id, biomeLook: site.biomeLook,
-              quantizedFade: Math.fround(fade), ditherDirection: direction });
-            if (needsCoverage) {
-              if (!coverage.required.has(placement.key)) coverage.required.set(placement.key, new Set());
-              coverage.required.get(placement.key).add(band);
-            }
+        const drawn = visible > 0 && inView;
+        const nearFade = drawn ? visible * blend : 0, farFade = drawn && entry.far ? visible * (1 - blend) : 0;
+        if (drawn) {
+          if (needsCoverage && (nearFade > 0 || farFade > 0)) {
+            if (!coverage.required.has(placement.key)) coverage.required.set(placement.key, new Set());
+            if (nearFade > 0) coverage.required.get(placement.key).add('near');
+            if (farFade > 0) coverage.required.get(placement.key).add('far');
           }
           shown++; if (index < site.plan.buildings.length) buildings++; else props++;
         }
+        // Every ready key is still published each pass (its anchor follows the origin there),
+        // but a placement whose rows would compare equal sends no change and allocates nothing.
         if (!pending.has(placement.key)) pending.set(placement.key, new Map());
-        pending.get(placement.key).set(id, representations);
-      }
+        const sent = placement.sent ??= { rows: null, near: 0, far: 0, nearMatrix: null, farMatrix: null };
+        if (sent.rows !== rows || sent.near !== nearFade || sent.far !== farFade
+            || sent.nearMatrix !== placement.near?.matrix || sent.farMatrix !== placement.far?.matrix) {
+          const representations = [];
+          if (nearFade > 0) representations.push({ ...placement.near, band: 'near', fade: nearFade, objectId: id,
+            biomeLook: site.biomeLook, quantizedFade: Math.fround(nearFade), ditherDirection: 1 });
+          if (farFade > 0) representations.push({ ...placement.far, band: 'far', fade: farFade, objectId: id,
+            biomeLook: site.biomeLook, quantizedFade: Math.fround(farFade), ditherDirection: -1 });
+          pending.get(placement.key).set(id, representations);
+          sent.rows = rows; sent.near = nearFade; sent.far = farFade;
+          sent.nearMatrix = placement.near?.matrix; sent.farMatrix = placement.far?.matrix;
+        }
+      } else if (placement.sent) placement.sent.rows = null;
       if (needsCoverage && (entry?.state !== 'ready' || placement.shown < 1)) coverage.complete = false;
       PerfCounters.inc('settlementPlacementsEvaluated');
       if (++units % SLICE === 0) { yield* flush(); yield; }

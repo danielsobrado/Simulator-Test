@@ -112,3 +112,18 @@ test('skyline handover waits for this site buildings, fades and published tiers'
   assert.equal(settlementSiteDrawn(f.view, site), false, 'failed required buildings retain massing');
   f.entries.delete('unrelated-town');
 });
+
+test('a settled pass sends no row changes, and a tier that left and returned is published again', t => {
+  const f = fixture(t); for (const time of [0, 400, 800]) run(f.view, time);
+  const count = key => f.view.rows.get(key).storage.buckets.near.length;
+  const rows = f.view.rows.get('house-0'), row = rows.storage.buckets.near[0], total = count('house-0');
+  run(f.view, 1200);
+  assert.equal(rows.storage.buckets.near[0], row, 'unchanged placements keep their published row object');
+  assert.equal(count('house-0'), total);
+  const entry = f.entries.get('house-0');
+  entry.state = 'loading'; run(f.view, 1600);
+  assert.equal(f.view.rows.has('house-0'), false);
+  entry.state = 'ready'; for (const time of [2000, 2400, 2800]) run(f.view, time);
+  assert.notEqual(f.view.rows.get('house-0'), rows);
+  assert.equal(count('house-0'), total, 'every placement is sent to the new rows');
+});
