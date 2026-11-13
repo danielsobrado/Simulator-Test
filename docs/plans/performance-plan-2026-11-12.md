@@ -151,6 +151,47 @@ Where it comes from, over the 12 s window:
 phase 2 gate in §5 on a clean timed A/B/A/B. If the spike count does not
 fall with the allocation rate, the garbage was not the cause: say so and stop.
 
+**First round of cuts, 2026-11-13.** Seven commits, `8b172826` to `83c7aa50`:
+perf QA counters, settlement selection (twice), scatter and forest
+candidates, manifest string keys, chunk LOD plans and the meadow page plan.
+Outputs are unchanged by recorded-value tests; the full suite passes (4333).
+
+Allocation, same route and option, frozen snapshots of `2ee06154` and
+`5498ea47` (both with focus held, settled, zero errors):
+
+| | Before | After |
+| --- | --- | --- |
+| Total | 127.8 MB/s | 96.0 MB/s |
+| Per frame | 2.54 MB | 1.99 MB |
+| Scatter manifests | 37.1 | 25.0 |
+| Tree manifest build | 23.7 | 13.6 |
+| Tree view update (LOD plan, keys) | 11.4 | 4.8 |
+| Perf QA harness | 9.0 | 1.2 |
+| Chunk LOD plan | 7.1 | 2.0 |
+| Manifest string keys | 8.1 | 1.1 |
+| Meadow tile update | 15.2 | 11.3 |
+| Draw submission inside three | 17.0 | 16.1 |
+| Settlement view update | 1.7 | 4.5 |
+
+**The 60 MB/s gate is not met**: 25% down, not 53%. Settlement rose because
+the selection job fills its time budget: each placement cost half the garbage,
+so it ran five times as many passes (137 k placements evaluated against 26 k).
+`83c7aa50` removes its per-pass id sets too, but is not in the "after"
+snapshot above and is unmeasured.
+
+**The spike question is still open.** A timed A/B/A/B on the same snapshots,
+without sampling, was too noisy to read: frames over 16.7 ms were 34.0% and
+15.8% on the baseline arm and 5.1% and 19.3% on the change arm, all four far
+worse than phase 0's 2.1% for this route. The two repeats of each arm differ
+by more than the arms do, so nothing is claimed either way. Other applications
+were using two to three CPU cores and the GPU during the runs. Reports:
+`tmp/perf-town-alloc-2026-11-13/timed-{a1,b1,a2,b2}.json`.
+
+Next, in order: repeat that A/B/A/B on a quiet machine, with `83c7aa50` as
+the change arm; then the remaining large sources — scatter candidates
+(regional field sampling and the per-placement records), three's attribute
+update and draw-list sort, and tree species selection.
+
 ### 0.3 Two cascades are closed
 
 The valid-focus repeat measured 8.98 ms render CPU against the 5.67 ms
