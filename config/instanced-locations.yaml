@@ -1,0 +1,282 @@
+# PROPOSAL ONLY: no runtime loader consumes this file yet.
+# See docs/plans/instanced-underground-and-ice-locations-master-plan-2026-11-13.md.
+# All asset, texture, shader and artwork IDs below are logical planned identifiers,
+# not assertions that downloadable files already exist.
+schemaVersion: 1
+status: proposal-only
+
+instancedLocations:
+  transitionPolicy:
+    entryTrigger: interact
+    exitTrigger: interact
+    loadingScreen:
+      requiredOnEnter: true
+      requiredOnExit: true
+      renderBeforeHeavyWork: true
+      minimumDisplayMs: 0
+      showMeasuredProgressOnly: true
+      showTitle: true
+      showSafeLoreTips: true
+      fallbackTheme: neutral
+      phases:
+        - resolve-manifest
+        - load-assets
+        - decode-textures
+        - build-geometry
+        - prepare-shaders
+        - prepare-navigation-collision
+        - activate
+    sceneSwap: atomic-after-ready
+    sourceAnchor: preserve-exact
+    onFailure: restore-previous-scene
+    cancelStaleLoads: true
+    preventConcurrentTransitions: true
+    inactiveScenePolicy: release-heavy-resources
+
+  defaultBudgets:
+    workerMeshing: true
+    prefetchAdjacentChambers: 2
+    portalCulling: true
+    distantRoomLod: true
+    keepGlobalSimulationRunning: true
+    gpuResourceCleanup: explicit
+    dynamicLightPoolMax: 4
+    shaderWarmupBeforeActivation: true
+
+  uniquenessPolicy:
+    stableIdComponents:
+      - world-id
+      - source-entity-id
+      - site-id
+    requireNamedUniqueLandmark: true
+    requireSiteSpecificLayoutSeed: true
+    rejectMatchingLayoutFingerprints: true
+    allowAuthoredOverrides: true
+    requireReviewedCapitalLayouts: true
+    identityPreservesAzgaarSource: true
+
+  # The engine uses registries/factories, not JS branches on realm names.
+  # Missing/unknown required references must fail validation before activation.
+  contentPacks:
+    shared_underground:
+      lifecycle: planned
+      sourceRegistry: config/asset-registry.yaml
+      plannedAssetIds:
+        - underground-cavern/deep-walkway-arch
+        - underground-cavern/cavern-drain-channel
+        - underground-cavern/shaft-air-damper
+        - underground-cavern/cavern-lift-platform
+    mine_industrial:
+      lifecycle: planned
+      sourceRegistry: config/asset-registry.yaml
+      plannedAssetIds:
+        - mine/tunnel-support-kit
+        - mine/ore-cart-kit
+        - mine/shaft-lift-kit
+        - mine/ore-vein-kit
+        - mine/industrial-clutter-kit
+    umbra_kori_city:
+      lifecycle: planned
+      sourceRegistry: config/asset-registry.yaml
+      plannedAssetIds:
+        - umbrakor/cliff-house-compound
+        - umbrakor/void-arch-bridge
+        - umbrakor/vertical-terrace-block
+        - umbrakor/fungus-cultivation-hall
+        - umbrakor/house-market-balcony
+        - umbrakor/depth-warden-gate
+    stonehold_mountain:
+      lifecycle: planned
+      sourceRegistry: config/asset-registry.yaml
+      plannedAssetIds:
+        - stonehold/fortress-mountain-gate
+        - stonehold/forgeheart-workshop
+        - stonehold/smelter-tower
+        - stonehold/ore-lift-headframe
+        - stonehold/ore-cart-track
+        - stonehold/vault-council-hall
+    frostgard_glacial:
+      lifecycle: planned
+      sourceRegistry: config/asset-registry.yaml
+      plannedAssetIds:
+        - frostgard/great-winter-longhall
+        - frostgard/heated-storehouse
+        - frostgard/palisade-watch-gate
+        - frostgard/communal-warming-hall
+        - glacier/ice-tunnel-kit
+        - glacier/ice-fracture-kit
+
+  textureSets:
+    mine_rock:
+      lifecycle: planned
+      surfaces: [fractured-rock, tool-cut-rock, mineral-seams, muddy-floor, rusted-metal]
+    umbra_basalt:
+      lifecycle: planned
+      surfaces: [basalt-cavern, polished-dark-ashlar, iron-linkwork, fungus, pale-crystal]
+    stonehold_granite:
+      lifecycle: planned
+      surfaces: [dressed-granite, basalt-vault, ashlar-trim, black-iron, heat-soot]
+    frostgard_ice:
+      lifecycle: planned
+      surfaces: [dense-glacier-ice, frosted-ice, fractured-ice, dirty-ice, snow-crust, winter-timber]
+
+  # Shader profile keys must resolve to explicitly registered safe TSL factories.
+  # No arbitrary shader code or expressions are evaluated from YAML.
+  shaderProfiles:
+    mine_cavern:
+      lifecycle: planned
+      factoryKey: geological-pbr
+      features: [dominant-plane-uv, fracture-normals, vertex-crevice-ao, mineral-veins, dampness]
+      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
+    umbra_cavern:
+      lifecycle: planned
+      factoryKey: dark-basalt-pbr
+      features: [stone-roughness-variation, pale-emissive-pockets, fungal-light-mask, cave-depth-haze]
+      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
+    stonehold_vault:
+      lifecycle: planned
+      factoryKey: carved-stone-pbr
+      features: [masonry-courses, edge-bevel-light, vertex-crevice-ao, soot, forge-glow]
+      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy]
+    frostgard_glacier:
+      lifecycle: planned
+      factoryKey: glacial-ice-pbr
+      features: [thickness-tint, internal-veins, fresnel, roughness-frost, snow-caps]
+      forbiddenFeatures: [viewport-depth-copy, viewport-color-copy, full-scene-refraction]
+
+  lightingProfiles:
+    mine_lanterns:
+      sky: none
+      ambientKey: low-warm-rock-bounce
+      virtualLights: [lanterns, ore-glints]
+    umbra_pale:
+      sky: none
+      ambientKey: low-cool-basalt
+      virtualLights: [wayfinding-crystals, home-windows, fungus-pockets]
+    stonehold_forge:
+      sky: none
+      ambientKey: granite-forge-bounce
+      virtualLights: [furnaces, workshops, windows]
+    frostgard_ice:
+      sky: entrance-only
+      ambientKey: blue-ice-bounce
+      virtualLights: [hearths, isolated-windows, ice-glints]
+
+  atmosphereProfiles:
+    mine_dust:
+      effectKeys: [dust-motes, mineral-haze, damp-local]
+      audioKey: mine-industry
+    umbra_depth:
+      effectKeys: [cavern-depth-haze, humidity, sparse-fungal-motes]
+      audioKey: deep-cavern-city
+    stonehold_industry:
+      effectKeys: [forge-smoke-local, ash-particles, workshop-dust]
+      audioKey: stonehold-forges
+    frostgard_cold:
+      effectKeys: [frost-mist, entrance-spindrift, ice-dust]
+      audioKey: glacial-refuge
+
+  # backgroundAssetKey is a future art-registry ID. Fallback tint works without art.
+  loadingThemes:
+    neutral:
+      title: "Entering a location"
+      fallbackColor: "#1a1e26"
+      backgroundAssetKey: null
+    mine_workings:
+      title: "The Deep Workings"
+      fallbackColor: "#27221c"
+      backgroundAssetKey: loading/mine-workings
+    umbra_depth:
+      title: "Umbra'kor — The Deep Dominion"
+      fallbackColor: "#12141f"
+      backgroundAssetKey: loading/umbra-depth
+    stonehold_forge:
+      title: "Stonehold — Mountain Halls"
+      fallbackColor: "#25201d"
+      backgroundAssetKey: loading/stonehold-forge
+    frostgard_ice:
+      title: "Frostgard — Beneath the Ice"
+      fallbackColor: "#162737"
+      backgroundAssetKey: loading/frostgard-glacier
+
+  archetypes:
+    working_mine:
+      sceneKind: isolated-interior
+      generatorKey: mine-network
+      contentPacks: [shared_underground, mine_industrial]
+      textureSet: mine_rock
+      shaderProfile: mine_cavern
+      lightingProfile: mine_lanterns
+      atmosphereProfile: mine_dust
+      loadingTheme: mine_workings
+      navigationKey: multi-level-passages
+      collisionKey: closed-cavern
+      simulationDomain: resource-extraction
+      physicalRequirements: [resource-deposit, viable-access]
+    drow_cavern_city:
+      sceneKind: isolated-interior
+      generatorKey: vertical-cavern-city
+      contentPacks: [shared_underground, umbra_kori_city]
+      textureSet: umbra_basalt
+      shaderProfile: umbra_cavern
+      lightingProfile: umbra_pale
+      atmosphereProfile: umbra_depth
+      loadingTheme: umbra_depth
+      navigationKey: vertical-district-city
+      collisionKey: cavern-bridges
+      simulationDomain: house-districts
+      physicalRequirements: [geological-cavern, stable-terraces, water-access]
+      loreRealmKey: umbrakor
+    dwarven_mountain_hold:
+      sceneKind: isolated-interior
+      generatorKey: mountain-hold
+      contentPacks: [shared_underground, stonehold_mountain]
+      textureSet: stonehold_granite
+      shaderProfile: stonehold_vault
+      lightingProfile: stonehold_forge
+      atmosphereProfile: stonehold_industry
+      loadingTheme: stonehold_forge
+      navigationKey: fortress-city
+      collisionKey: vaulted-stone-structure
+      simulationDomain: forge-economy
+      physicalRequirements: [mountain-volume, secure-gate, ventilation]
+      loreRealmKey: stonehold
+    frostgard_glacier:
+      sceneKind: isolated-interior
+      generatorKey: glacial-cavern
+      contentPacks: [frostgard_glacial]
+      textureSet: frostgard_ice
+      shaderProfile: frostgard_glacier
+      lightingProfile: frostgard_ice
+      atmosphereProfile: frostgard_cold
+      loadingTheme: frostgard_ice
+      navigationKey: multi-level-passages
+      collisionKey: ice-and-masonry
+      simulationDomain: winter-shelter
+      physicalRequirements: [glacier-or-ice-cave, safe-shelter, drainage]
+      loreRealmKey: frostgard
+
+  # No fictional Eldara coordinates or burg IDs are inserted as placeholders.
+  # A future importer, editor or world generator populates validated manifests.
+  sites: {}
+
+  extensionContract:
+    requiredArchetypeKeys:
+      - sceneKind
+      - generatorKey
+      - contentPacks
+      - textureSet
+      - shaderProfile
+      - lightingProfile
+      - atmosphereProfile
+      - loadingTheme
+      - navigationKey
+      - collisionKey
+      - simulationDomain
+    requireRegisteredGenerator: true
+    requireRegisteredShaderFactory: true
+    requireReadyRequiredAssets: true
+    requireReciprocalPortalsUnlessExplicitOneWay: true
+    rejectUnknownKeys: true
+    requireDeterministicSiteIdentity: true
+    requireTransitionRoundTripTests: true
