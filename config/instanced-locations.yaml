@@ -142,7 +142,7 @@ instancedLocations:
       floorSurface: flagstone
       floorScale: 0.36
       floorTint: '#9da3ad'
-      floorRoughness: 0.8
+      floorRoughness: 0.92
       walkwayWear: true
       scale: 0.26
       tint: '#999fa9'
@@ -198,14 +198,14 @@ instancedLocations:
       depthRate: 0.55
       roughness: 0.16
       microNormal: 0.35
-      crackGain: 0.55
-      fracture: 0.15
+      crackGain: 0.45
+      fracture: 0.12
       bubbles: 0.08
       cloud: 0.35
       sediment: 0
       frost: 0
       snow: 0
-      banding: { frequency: 2.6, dip: 0.28, strength: 0.55 }
+      banding: { frequency: 1.7, dip: 0.28, strength: 0.4 }
       scallop: { scale: 0.75, depth: 0.09 }
     white_bubbly:
       <<: *ice
@@ -277,8 +277,8 @@ instancedLocations:
     frostgard_ice:
       background: '#061423'
       fog: { color: '#0d2740', density: 0.011 }
-      ambientUp: '#16303f'
-      ambientDown: '#081a2b'
+      ambientUp: '#2a5068'
+      ambientDown: '#123049'
       carried: { color: '#e4f1ff', intensity: 0.7, range: 9 }
       exposure: 1.15
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }

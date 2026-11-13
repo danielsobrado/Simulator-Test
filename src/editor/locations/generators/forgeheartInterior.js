@@ -58,35 +58,45 @@ export function buildForgeheartInterior(b, { forge, lift, farZ, forgeTint, warmT
   const hearthZ = forge.z - 9.6;
 
   // --- 1. Monumental Central Blast Crucible (the visual anchor beyond Hero Gateway) ---
-  b.prop('carved', stoneBlock(7.2, 1.05, 4.4, P(0, 0, hearthZ), { bevel: 0.09, batter: 0.12, irregular: 0.06 }));
-  b.prop('masonry', stoneBlock(6.2, 4.4, 3.8, P(0, 1.05, hearthZ), { bevel: 0.08, batter: 0.05, irregular: 0.06 }));
+  b.prop('carved', stoneBlock(7.2, 1.05, 4.4, P(0, 0, hearthZ), { bevel: 0.09, batter: 0.12, irregular: 0.06 }), 0xcbc7c0);
+  b.prop('masonry', stoneBlock(6.2, 4.4, 3.8, P(0, 1.05, hearthZ), { bevel: 0.08, batter: 0.05, irregular: 0.06 }), 0xd4d0c8);
   coursedMasonryWall(b, P(-3.0, 0.9, hearthZ + 1.92), P(3.0, 0.9, hearthZ + 1.92), 4.6, 0.42, {
     courseHeight: 0.68,
     openings: [{ s: 3.0, sill: 0, width: 2.8, height: 2.65, profile: 'round', dressed: true }],
     baseTint: 0xd0cec9,
     trimTint: 0xe6e3dc,
   });
-  b.prop('carved', stoneBlock(5.0, 2.2, 3.2, P(0, 5.45, hearthZ), { bevel: 0.08, batter: 0.18, irregular: 0.05 }));
-  b.prop('masonry', stoneBlock(3.2, 6.8, 2.6, P(0, 7.65, hearthZ - 0.1), { bevel: 0.08, batter: 0.12, irregular: 0.05 }));
-  // Forged iron furnace braces, tension bands & keystone bronze crest.
+  b.prop('carved', stoneBlock(5.0, 2.2, 3.2, P(0, 5.45, hearthZ), { bevel: 0.08, batter: 0.18, irregular: 0.05 }), 0xc6c3bd);
+  b.prop('carved', stoneBox(6.6, 0.34, 4.1, P(0, 5.45, hearthZ), { bevel: 0.05, irregular: 0.04 }), 0xd6d3cd);
+  b.prop('masonry', stoneBlock(3.2, 6.8, 2.6, P(0, 7.65, hearthZ - 0.1), { bevel: 0.08, batter: 0.12, irregular: 0.05 }), 0xc4c0b9);
+  // Forged iron furnace braces, tension bands & bronze keystone crest on upper mantel.
   for (const sx of [-2.45, 2.45]) {
-    b.prop('iron', stoneBlock(0.34, 5.6, 0.4, P(sx, 0.6, hearthZ + 1.98), { bevel: 0.025 }), 0x35312c);
+    b.prop('iron', stoneBlock(0.34, 5.6, 0.4, P(sx, 0.6, hearthZ + 1.98), { bevel: 0.025 }), 0x6c717a);
   }
   for (const bandY of [3.9, 5.5, 7.4, 10.2]) {
     const bw = bandY < 6 ? 6.4 : 4.2;
-    b.prop('iron', stoneBox(bw, 0.24, 3.95, P(0, bandY, hearthZ), { bevel: 0.02 }), 0x2f2b27);
+    b.prop('iron', stoneBox(bw, 0.24, 3.95, P(0, bandY, hearthZ), { bevel: 0.02 }), 0x686c76);
   }
+  b.prop('bronze', stoneBox(1.1, 1.1, 0.2, P(0, 4.75, hearthZ + 2.02), { bevel: 0.03 }), 0xcba66d);
   emitRadialArch(b, 'carved', P(-1.65, 0.7, hearthZ + 2.02), P(1.65, 0.7, hearthZ + 2.02), 1.95, 0.62, 0.65, 11, {
     pointed: 0.16, tint: 0xe2dfd8, keystoneTint: 0xf0ede6, irregular: 0.05,
   });
-  // Vertical iron furnace grate bars, deep coal glow bed & live flames inside blast firebox.
-  b.prop('glow', box(2.55, 1.95, 0.35, P(0, 1.25, hearthZ + 1.65)), forgeTint, 3.8);
-  b.prop('glow', box(1.85, 0.75, 0.65, P(0, 0.7, hearthZ + 1.95)), '#ffaa38', 3.4);
-  for (const bx of [-0.95, -0.48, 0, 0.48, 0.95]) {
-    b.prop('iron', rod(P(bx, 0.65, hearthZ + 1.95), P(bx, 2.15, hearthZ + 1.95), 0.042, 0.042, 6), 0x24201c);
+  // Recessed dark iron fireback, sculpted glowing coal bed, clinker chunks, iron grate & layered live flames.
+  b.prop('iron', box(2.6, 2.1, 0.3, P(0, 1.3, hearthZ + 1.55)), 0x2a2725);
+  b.prop('glow', stoneBox(2.1, 0.42, 0.75, P(0, 0.85, hearthZ + 1.85), { bevel: 0.06, irregular: 0.3 }), '#dc460c', 1.65);
+  for (const [cx, cy, cz, cs] of [[-0.65, 1.05, 1.88, 0.42], [0.0, 1.1, 1.86, 0.48], [0.62, 1.02, 1.9, 0.4], [-0.3, 0.92, 2.0, 0.34], [0.35, 0.94, 1.98, 0.36]]) {
+    b.prop('glow', stoneBox(cs, cs * 0.65, cs, P(cx, cy, hearthZ + cz), { yaw: cx * 2, bevel: 0.05, irregular: 0.45 }), '#ff6a18', 1.55);
   }
-  b.flame(P(0, 1.15, hearthZ + 1.92), { width: 1.75, height: 2.15, core: '#fff5c2', outer: '#ff5c12', speed: 1.2 });
-  b.light(P(0, 1.95, hearthZ + 3.4), forgeTint, 15.5, 29, { radius: 2.6, halo: 1.9 });
+  for (const [cx, cz, ang] of [[-0.48, 2.04, 0.4], [0.15, 2.06, 1.1], [0.58, 2.02, 2.0]]) {
+    b.prop('iron', stoneBox(0.32, 0.2, 0.28, P(cx, 0.96, hearthZ + cz), { yaw: ang, bevel: 0.03, irregular: 0.45 }), 0x26211e);
+  }
+  for (const bx of [-0.95, -0.48, 0, 0.48, 0.95]) {
+    b.prop('iron', rod(P(bx, 0.65, hearthZ + 2.08), P(bx, 2.18, hearthZ + 2.08), 0.042, 0.042, 6), 0x626670);
+  }
+  b.flame(P(-0.48, 1.15, hearthZ + 1.92), { width: 0.95, height: 1.55, core: '#fff4c4', outer: '#ff520e', speed: 1.15 });
+  b.flame(P(0, 1.22, hearthZ + 1.96), { width: 1.18, height: 1.95, core: '#fff5c8', outer: '#ff5610', speed: 1.25 });
+  b.flame(P(0.48, 1.12, hearthZ + 1.92), { width: 0.9, height: 1.48, core: '#fff4c4', outer: '#ff520e', speed: 1.08 });
+  b.light(P(0, 1.95, hearthZ + 3.4), forgeTint, 15.0, 29, { radius: 2.6, halo: 1.35 });
   b.nav.block(P(0, 0, hearthZ), 4.0, 6);
 
   // Twin great bellows flanking the central blast furnace.
@@ -94,12 +104,12 @@ export function buildForgeheartInterior(b, { forge, lift, farZ, forgeTint, warmT
   buildForgeBellows(b, P(4.7, 0, hearthZ + 0.5), -1);
 
   // Molten runoff casting channel & floor ingot mold pit directly in front of the furnace lip.
-  b.prop('iron', stoneBox(3.4, 0.12, 2.2, P(0, 0.06, hearthZ + 3.1), { bevel: 0.03 }), 0x5c6068);
-  b.prop('iron', stoneBox(0.24, 0.2, 2.2, P(-1.58, 0.1, hearthZ + 3.1), { bevel: 0.02 }), 0x6c7078);
-  b.prop('iron', stoneBox(0.24, 0.2, 2.2, P(1.58, 0.1, hearthZ + 3.1), { bevel: 0.02 }), 0x6c7078);
-  b.prop('iron', stoneBox(3.4, 0.2, 0.24, P(0, 0.1, hearthZ + 4.18), { bevel: 0.02 }), 0x6c7078);
-  b.prop('glow', box(0.4, 0.08, 1.9, P(0, 0.12, hearthZ + 3.0)), '#ff6818', 1.8);
-  b.prop('glow', box(2.0, 0.08, 0.56, P(0, 0.12, hearthZ + 3.8)), '#ff7820', 1.7);
+  b.prop('iron', stoneBox(3.4, 0.12, 2.2, P(0, 0.06, hearthZ + 3.1), { bevel: 0.03 }), 0x6c717a);
+  b.prop('iron', stoneBox(0.24, 0.2, 2.2, P(-1.58, 0.1, hearthZ + 3.1), { bevel: 0.02 }), 0x767b84);
+  b.prop('iron', stoneBox(0.24, 0.2, 2.2, P(1.58, 0.1, hearthZ + 3.1), { bevel: 0.02 }), 0x767b84);
+  b.prop('iron', stoneBox(3.4, 0.2, 0.24, P(0, 0.1, hearthZ + 4.18), { bevel: 0.02 }), 0x767b84);
+  b.prop('glow', box(0.38, 0.08, 1.9, P(0, 0.12, hearthZ + 3.0)), '#ff6014', 1.45);
+  b.prop('glow', box(1.95, 0.08, 0.52, P(0, 0.12, hearthZ + 3.8)), '#ff6c1a', 1.4);
   b.nav.block(P(0, 0, hearthZ + 3.1), 1.9, 1.5);
 
   // --- 2. Central Forging Dais & Master Anvil Station (silhouetted inside Hero Gateway vista) ---
@@ -142,16 +152,20 @@ export function buildForgeheartInterior(b, { forge, lift, farZ, forgeTint, warmT
     emitRadialArch(b, 'masonry', P(at.x - 1.4, 0.4, at.z + 1.85), P(at.x + 1.4, 0.4, at.z + 1.85), 1.7, 0.52, 0.52, 9, {
       pointed: 0.15, irregular: 0.06,
     });
-    b.prop('glow', box(2.3, 1.7, 0.2, P(at.x, 1.1, at.z + 1.75)), forgeTint, 3.6);
-    b.flame(P(at.x, 1.0, at.z + 1.85), { width: 1.2, height: 1.5, core: '#fff2b0', outer: '#ff5e14', speed: 1.0 });
-    b.prop('iron', stoneBox(5.7, 0.26, 3.9, P(at.x, 3.2, at.z), { bevel: 0.03 }), 0x2b2724);
-    b.light(P(at.x, 1.7, at.z + 3.2), forgeTint, 12.5, 26, { radius: 2.2, halo: 1.8 });
+    b.prop('iron', box(2.35, 1.85, 0.22, P(at.x, 1.1, at.z + 1.62)), 0x262220);
+    b.prop('glow', stoneBox(1.8, 0.36, 0.55, P(at.x, 0.72, at.z + 1.84), { bevel: 0.05, irregular: 0.3 }), '#dc460c', 1.65);
+    for (const cx of [-0.45, 0, 0.45]) {
+      b.prop('iron', rod(P(at.x + cx, 0.52, at.z + 1.94), P(at.x + cx, 1.78, at.z + 1.94), 0.036, 0.036, 6), 0x646872);
+    }
+    b.flame(P(at.x, 1.0, at.z + 1.86), { width: 1.25, height: 1.65, core: '#fff4c4', outer: '#ff520e', speed: 1.05 });
+    b.prop('iron', stoneBox(5.7, 0.26, 3.9, P(at.x, 3.2, at.z), { bevel: 0.03 }), 0x6c717a);
+    b.light(P(at.x, 1.7, at.z + 3.2), forgeTint, 12.0, 26, { radius: 2.2, halo: 1.1 });
     b.nav.block(at, 3.4, 6);
 
     const work = P(at.x + 1.2, 0, at.z + 5.8);
     b.prop('timber', rod(work, P(work.x, 0.6, work.z), 0.44, 0.4, 9), 0x6a5038);
-    b.prop('iron', stoneBlock(0.92, 0.3, 0.42, P(work.x, 0.6, work.z), { bevel: 0.03, batter: 0.08 }), 0x45403b);
-    b.prop('iron', rod(P(work.x + 0.45, 0.78, work.z), P(work.x + 0.85, 0.82, work.z), 0.14, 0.03, 6), 0x45403b);
+    b.prop('iron', stoneBlock(0.92, 0.3, 0.42, P(work.x, 0.6, work.z), { bevel: 0.03, batter: 0.08 }), 0x6c717a);
+    b.prop('iron', rod(P(work.x + 0.45, 0.78, work.z), P(work.x + 0.85, 0.82, work.z), 0.14, 0.03, 6), 0x6c717a);
     b.nav.block(work, 0.75, 2);
     b.prop('masonry', stoneBlock(2.25, 0.72, 0.95, P(at.x - 2.6, 0, at.z + 5.2), { bevel: 0.05, batter: 0.08 }));
     b.prop('iron', stoneBox(1.9, 0.06, 0.6, P(at.x - 2.6, 0.66, at.z + 5.2), { bevel: 0.015 }), 0x10161a);
@@ -160,38 +174,49 @@ export function buildForgeheartInterior(b, { forge, lift, farZ, forgeTint, warmT
 
   // --- 4. Overhead Riveted Iron Gantry & Exhaust Ducts ---
   for (const gz of [forge.z - 4.2, forge.z + 4.4]) {
-    b.prop('iron', hewnBeam(P(-19, 8.3, gz), P(19, 8.3, gz), 0.42, 0.56, { bevel: 0.03 }), 0x62666e);
+    b.prop('iron', hewnBeam(P(-19, 8.3, gz), P(19, 8.3, gz), 0.42, 0.56, { bevel: 0.03 }), 0x70747d);
     for (const cx of [-14, -7, 7, 14]) {
-      b.prop('iron', rod(P(cx, 8.0, gz), P(cx, 5.2, gz), 0.035, 0.035, 6), 0x52565e);
+      b.prop('iron', rod(P(cx, 8.0, gz), P(cx, 5.2, gz), 0.035, 0.035, 6), 0x686c74);
     }
   }
   for (const gx of [-14, 14]) {
-    b.prop('iron', hewnBeam(P(gx, 8.4, hearthZ + 1.0), P(0, 9.6, hearthZ), 0.48, 0.52, { bevel: 0.03 }), 0x666a72);
-    b.light(P(gx * 0.72, 9.6, hearthZ + 5.8), '#ffa860', 2.8, 22, { flat: true });
+    b.prop('iron', hewnBeam(P(gx, 8.4, hearthZ + 1.0), P(0, 9.6, hearthZ), 0.48, 0.52, { bevel: 0.03 }), 0x70747d);
+    b.light(P(gx * 0.72, 9.6, hearthZ + 5.8), '#ffa860', 3.1, 22, { flat: true });
   }
   b.light(P(0, 8.2, forge.z - 2.5), '#ffad64', 4.2, 26, { flat: true });
+  b.light(P(0, 3.2, forge.z + 6.5), '#ffb874', 3.4, 17, { flat: true });
 
   // Organized ingot stacks, coal bunkers & ore crates between furnaces.
   for (const x of [-8.6, 8.6]) {
     for (const [ox, oy, oz, s] of [[0, 0.55, 0, 1.15], [-0.55, 0.35, 0.45, 0.72], [0.5, 0.32, -0.4, 0.68], [0.2, 0.85, 0.15, 0.6]]) {
       b.prop('masonry', stoneBox(s * 1.1, s * 0.75, s, P(x + ox, oy, forge.z - 9 + oz), {
         yaw: ox * 2 + oz, bevel: s * 0.2, irregular: 0.55,
-      }), 0x1b1917);
+      }), 0x2e2a26);
     }
     b.nav.block(P(x, 0, forge.z - 9), 2, 2);
     buildIngotRack(b, P(x, 0, forge.z - 5.2), x < 0 ? 0.2 : -0.2);
   }
 
+  // West-wall Crushed Ore Hopper, Slag Wheelbarrow & Supply Lantern balancing East Ore Lift.
+  b.prop('masonry', stoneBlock(2.8, 1.5, 3.2, P(-18.5, 0, forge.z + 1.2), { bevel: 0.06, batter: 0.08 }), 0xb4b8c2);
+  b.prop('timber', stoneBox(2.4, 1.1, 2.7, P(-18.3, 2.0, forge.z + 1.2), { bevel: 0.04 }), 0x6a5038);
+  for (const [ox, oy, oz, s] of [[0, 2.7, 0, 0.9], [-0.45, 2.65, 0.5, 0.65], [0.4, 2.65, -0.4, 0.6]]) {
+    b.prop('ore', stoneBox(s * 1.1, s * 0.75, s, P(-18.3 + ox, oy, forge.z + 1.2 + oz), { yaw: ox + oz, bevel: s * 0.2, irregular: 0.5 }), 0xb49a7c);
+  }
+  crate(b, P(-16.2, 0, forge.z + 4.4), 0.92, 0.25);
+  b.light(P(-16.5, 4.4, forge.z + 1.2), '#ffb86e', 4.0, 18, { radius: 1.4, halo: 0.8 });
+  b.nav.block(P(-18.0, 0, forge.z + 1.2), 2.2, 3.8);
+
   // --- 5. Ore Lift Integration & Rail Spur (`lift = P(19, 0, forge.z)`) ---
   for (const [dx, dz] of [[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]]) {
     b.prop('masonry', stoneBlock(0.95, 0.5, 0.95, P(lift.x + dx, 0, lift.z + dz), { bevel: 0.05, batter: 0.16, irregular: 0.22 }));
-    b.prop('iron', hewnBeam(P(lift.x + dx, 0.4, lift.z + dz), P(lift.x + dx * 0.6, 8.6, lift.z + dz * 0.6), 0.32, 0.32, { bevel: 0.03 }), 0x2f2a26);
+    b.prop('iron', hewnBeam(P(lift.x + dx, 0.4, lift.z + dz), P(lift.x + dx * 0.6, 8.6, lift.z + dz * 0.6), 0.32, 0.32, { bevel: 0.03 }), 0x686c74);
   }
   for (const [x0, z0, x1, z1] of [[-2, -2, 2, -2], [-2, 2, 2, 2], [-2, -2, -2, 2], [2, -2, 2, 2]]) {
-    b.prop('iron', hewnBeam(P(lift.x + x0, 8.6, lift.z + z0), P(lift.x + x1, 8.6, lift.z + z1), 0.3, 0.3, { bevel: 0.03 }), 0x2f2a26);
+    b.prop('iron', hewnBeam(P(lift.x + x0, 8.6, lift.z + z0), P(lift.x + x1, 8.6, lift.z + z1), 0.3, 0.3, { bevel: 0.03 }), 0x686c74);
   }
-  b.prop('iron', rod(P(lift.x - 1.2, 9.2, lift.z), P(lift.x + 1.2, 9.2, lift.z), 0.9, 0.9, 14), 0x39332e);
-  for (const dz of [-0.7, 0.7]) b.prop('iron', rod(P(lift.x, 9, lift.z + dz), P(lift.x, -1.2, lift.z + dz), 0.04, 0.04, 5), 0x1f1c1a);
+  b.prop('iron', rod(P(lift.x - 1.2, 9.2, lift.z), P(lift.x + 1.2, 9.2, lift.z), 0.9, 0.9, 14), 0x70747d);
+  for (const dz of [-0.7, 0.7]) b.prop('iron', rod(P(lift.x, 9, lift.z + dz), P(lift.x, -1.2, lift.z + dz), 0.04, 0.04, 5), 0x5c6068);
   b.prop('timber', stoneBox(4, 0.25, 4, P(lift.x, -1.3, lift.z), { bevel: 0.03, irregular: 0.12 }), 0x6a5038);
   for (const [ox, oy, oz, s] of [[0, -0.75, 0, 1.0], [-0.6, -0.9, 0.5, 0.65], [0.55, -0.92, -0.45, 0.7], [-0.4, -0.95, -0.55, 0.55]]) {
     b.prop('ore', stoneBox(s * 1.15, s * 0.78, s, P(lift.x + ox, oy, lift.z + oz), {

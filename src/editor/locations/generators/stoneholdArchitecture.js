@@ -55,13 +55,13 @@ function chevronHood(width, height, overhang, depth, at, yaw = 0) {
 }
 
 function lanternCage(b, at, lightColor = '#ffd29e', intensity = 3.4, range = 14) {
-  b.prop('iron', stoneBox(0.46, 0.08, 0.56, P(at.x, at.y + 0.22, at.z), { bevel: 0.02 }), 0x2c2824);
+  b.prop('iron', stoneBox(0.46, 0.08, 0.56, P(at.x, at.y + 0.22, at.z), { bevel: 0.02 }), 0x6c717a);
   for (const [lx, lz] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]]) {
-    b.prop('iron', rod(P(at.x + lx, at.y - 0.2, at.z + lz), P(at.x + lx, at.y + 0.2, at.z + lz), 0.018, 0.018, 4), 0x2a2623);
+    b.prop('iron', rod(P(at.x + lx, at.y - 0.2, at.z + lz), P(at.x + lx, at.y + 0.2, at.z + lz), 0.018, 0.018, 4), 0x646872);
   }
   b.prop('glow', rod(P(at.x, at.y - 0.16, at.z), P(at.x, at.y - 0.04, at.z), 0.12, 0.08, 6), '#d94810', 1.5);
-  b.flame(P(at.x, at.y - 0.1, at.z), { width: 0.24, height: 0.36, core: '#fff1b4', outer: '#ff5e14', speed: 1.15 });
-  b.light(at, lightColor, intensity, range, { radius: 1.5, halo: 0.78 });
+  b.flame(P(at.x, at.y - 0.1, at.z), { width: 0.24, height: 0.36, core: '#fff1b4', outer: '#ff520e', speed: 1.15 });
+  b.light(at, lightColor, intensity, range, { radius: 1.5, halo: 0.58 });
 }
 
 /**
@@ -261,17 +261,17 @@ export function buildWallBay(b, sign, halfWidth, height, galleryY, z0, z1, varia
     // Stepped stone capstan base + horizontal oak/iron drum + spokes + tensioned twin hoist chains.
     b.prop('carved', stoneBlock(1.4, 0.55, 2.5, P(xWall + inDir * 0.3, 0, midZ), { bevel: 0.04, batter: 0.08 }), 0xc8cace);
     for (const dz of [-0.95, 0.95]) {
-      b.prop('iron', stoneBlock(0.55, 1.35, 0.24, P(xWall + inDir * 0.3, 0.55, midZ + dz), { bevel: 0.025 }), 0x35312c);
+      b.prop('iron', stoneBlock(0.55, 1.35, 0.24, P(xWall + inDir * 0.3, 0.55, midZ + dz), { bevel: 0.025 }), 0x6a6e78);
     }
     b.prop('timber', rod(P(xWall + inDir * 0.3, 1.45, midZ - 0.9), P(xWall + inDir * 0.3, 1.45, midZ + 0.9), 0.32, 0.32, 10), 0x6a5038);
-    b.prop('iron', rod(P(xWall + inDir * 0.3, 1.45, midZ - 1.15), P(xWall + inDir * 0.3, 1.45, midZ + 1.15), 0.14, 0.14, 8), 0x454950);
+    b.prop('iron', rod(P(xWall + inDir * 0.3, 1.45, midZ - 1.15), P(xWall + inDir * 0.3, 1.45, midZ + 1.15), 0.14, 0.14, 8), 0x767b84);
     for (const dz of [-0.55, 0.55]) {
-      b.prop('iron', rod(P(xWall + inDir * 0.3, 1.65, midZ + dz), P(xWall + inDir * 0.3, 4.95, midZ + dz), 0.032, 0.032, 6), 0x2c2824);
+      b.prop('iron', rod(P(xWall + inDir * 0.3, 1.65, midZ + dz), P(xWall + inDir * 0.3, 4.95, midZ + dz), 0.032, 0.032, 6), 0x646872);
     }
     // Overhead iron pulley beam & heavy stone counterweight block.
-    b.prop('iron', stoneBox(0.95, 0.35, 1.9, P(xWall + inDir * 0.32, 5.0, midZ), { bevel: 0.025 }), 0x36322d);
+    b.prop('iron', stoneBox(0.95, 0.35, 1.9, P(xWall + inDir * 0.32, 5.0, midZ), { bevel: 0.025 }), 0x6c717a);
     b.prop('carved', stoneBlock(0.68, 0.9, 0.68, P(xWall + inDir * 0.35, 2.35, midZ + 1.45), { bevel: 0.04 }), 0x9ca1ab);
-    b.prop('iron', rod(P(xWall + inDir * 0.35, 3.25, midZ + 1.45), P(xWall + inDir * 0.32, 4.95, midZ + 1.1), 0.026, 0.026, 6), 0x2c2824);
+    b.prop('iron', rod(P(xWall + inDir * 0.35, 3.25, midZ + 1.45), P(xWall + inDir * 0.32, 4.95, midZ + 1.1), 0.026, 0.026, 6), 0x646872);
     lanternCage(b, P(xWall + inDir * 0.55, 3.5, midZ - 2.15), '#ffcf94', 3.4, 15);
     return;
   }
@@ -373,7 +373,7 @@ export function buildHeroGateway(b, farZ, height) {
     }
 
     // Artisan riveted iron & bronze fortress gate leaves with diagonal X-truss bracing and central roundel.
-    b.prop('iron', stoneBlock(0.36, 8.6, 3.4, P(sign * 4.15, 0, farZ - 2.3), { bevel: 0.03, irregular: 0.04 }), 0x2c2824);
+    b.prop('iron', stoneBlock(0.36, 8.6, 3.4, P(sign * 4.15, 0, farZ - 2.3), { bevel: 0.03, irregular: 0.04 }), 0x626670);
     b.prop('bronze', stoneBlock(0.42, 8.6, 0.26, P(sign * 4.14, 0, farZ - 0.72), { bevel: 0.02 }), 0xcba66d);
     b.prop('bronze', stoneBlock(0.42, 8.6, 0.26, P(sign * 4.14, 0, farZ - 3.88), { bevel: 0.02 }), 0xcba66d);
     for (const y of [1.4, 4.2, 7.0]) {

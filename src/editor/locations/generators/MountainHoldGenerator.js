@@ -191,6 +191,7 @@ export function generate(b, params) {
 
   // Compound vaulted nave ceiling ribs, diagonal groin ribs, bosses, and intentional lighting rhythm.
   buildVaultedCeiling(b, bays, { rowX, height, vaultRise, avenueZ, halfLength });
+  b.light(P(0, 7.6, -12), '#cbbba8', 1.25, 20, { flat: true });
   for (let i = 0; i < bays.length; i += 1) {
     const z = bays[i];
     b.light(P(0, height + vaultRise * 0.56, z), i % 2 === 0 ? '#cfc0ad' : '#b2bbca', 1.48, 26, { flat: true });
@@ -226,10 +227,10 @@ export function generate(b, params) {
   b.prop('masonry', stoneBlock(8.6, 0.45, 8.6, P(dais.x, 0.45, dais.z), { bevel: 0.06, batter: 0.08, irregular: 0.18 }));
   b.prop('masonry', stoneBlock(6.2, 0.45, 6.2, P(dais.x, 0.9, dais.z), { bevel: 0.06, batter: 0.08, irregular: 0.18 }));
   b.prop('masonry', stoneBlock(2.7, 1.3, 1.9, P(dais.x, 1.35, dais.z), { bevel: 0.07, batter: 0.12, irregular: 0.22 }));
-  b.prop('iron', stoneBlock(2.25, 0.5, 1.25, P(dais.x, 2.65, dais.z), { bevel: 0.05, batter: 0.1, irregular: 0.1 }), 0x3a3531);
-  b.prop('iron', stoneBlock(1.25, 0.55, 0.95, P(dais.x, 3.15, dais.z), { bevel: 0.05, irregular: 0.08 }), 0x3a3531);
-  b.prop('iron', stoneBlock(3.8, 0.75, 1.3, P(dais.x, 3.7, dais.z), { bevel: 0.06, batter: -0.06, irregular: 0.08 }), 0x45403b);
-  b.prop('iron', rod(P(dais.x + 1.9, 4.08, dais.z), P(dais.x + 3.4, 4.2, dais.z), 0.5, 0.08, 8), 0x45403b);
+  b.prop('iron', stoneBlock(2.25, 0.5, 1.25, P(dais.x, 2.65, dais.z), { bevel: 0.05, batter: 0.1, irregular: 0.1 }), 0x686c76);
+  b.prop('iron', stoneBlock(1.25, 0.55, 0.95, P(dais.x, 3.15, dais.z), { bevel: 0.05, irregular: 0.08 }), 0x6c717a);
+  b.prop('iron', stoneBlock(3.8, 0.75, 1.3, P(dais.x, 3.7, dais.z), { bevel: 0.06, batter: -0.06, irregular: 0.08 }), 0x767b84);
+  b.prop('iron', rod(P(dais.x + 1.9, 4.08, dais.z), P(dais.x + 3.4, 4.2, dais.z), 0.5, 0.08, 8), 0x767b84);
   for (const [dx, dz] of [[-4.2, -4.2], [4.2, -4.2], [-4.2, 4.2], [4.2, 4.2]]) {
     b.prop('masonry', stoneBlock(0.95, 1.2, 0.95, P(dais.x + dx, 0.45, dais.z + dz), { bevel: 0.06, batter: 0.12, irregular: 0.2 }));
     b.prop('masonry', rod(P(dais.x + dx, 1.65, dais.z + dz), P(dais.x + dx, 7.5, dais.z + dz), 0.65, 0.38, 4));
@@ -240,12 +241,12 @@ export function generate(b, params) {
   for (let index = 0; index < 12; index += 1) {
     const a0 = index / 12 * Math.PI * 2, a1 = (index + 1) / 12 * Math.PI * 2;
     const on = (a, y) => P(dais.x + Math.cos(a) * ringRadius, y, dais.z + Math.sin(a) * ringRadius);
-    b.prop('iron', hewnBeam(on(a0, ringY), on(a1, ringY), 0.3, 0.45, { bevel: 0.03, irregular: 0.08 }), 0x2b2724);
-    b.prop('iron', rod(on(a0, ringY + 0.2), on(a0, ringY + 0.55), 0.3, 0.5, 8), 0x2b2724);
+    b.prop('iron', hewnBeam(on(a0, ringY), on(a1, ringY), 0.3, 0.45, { bevel: 0.03, irregular: 0.08 }), 0x626670);
+    b.prop('iron', rod(on(a0, ringY + 0.2), on(a0, ringY + 0.55), 0.3, 0.5, 8), 0x666a74);
     b.prop('glow', rod(on(a0, ringY + 0.48), on(a0, ringY + 0.58), 0.34, 0.22, 7), '#c8420e', 1.6);
-    b.flame(on(a0, ringY + 0.55), { width: 0.44, height: 0.62, core: '#fff1b4', outer: '#ff5e14', speed: 1.1 });
-    b.light(on(a0, ringY + 1), '#ff8f3f', 3.4, 20, { halo: 0.95 });
-    if (index % 3 === 0) b.prop('iron', rod(on(a0, ringY), P(dais.x + Math.cos(a0) * 1.5, height + vaultRise - 0.4, dais.z + Math.sin(a0) * 1.5), 0.04, 0.04, 5), 0x1f1c1a);
+    b.flame(on(a0, ringY + 0.55), { width: 0.44, height: 0.62, core: '#fff1b4', outer: '#ff520e', speed: 1.1 });
+    b.light(on(a0, ringY + 1), '#ff8f3f', 3.4, 20, { halo: 0.6 });
+    if (index % 3 === 0) b.prop('iron', rod(on(a0, ringY), P(dais.x + Math.cos(a0) * 1.5, height + vaultRise - 0.4, dais.z + Math.sin(a0) * 1.5), 0.04, 0.04, 5), 0x5c6068);
   }
 
   // --- Forgeheart Interior & Ore Lift -------------------------------------

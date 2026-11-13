@@ -121,8 +121,9 @@ export function createFlames(flames) {
 export function createParticles(profile) {
   const size = profile.box;
   const index = instanceIndex.toFloat();
-  const seed = vec3(hash(index), hash(index.add(0.37)), hash(index.add(0.71)));
-  const drift = vec3(...profile.velocity).mul(mix(float(0.5), float(1.5), hash(index.add(0.19))));
+  // Integer-spaced seeds: fractional offsets of one index hash to correlated values and draw the field as a line.
+  const seed = vec3(hash(index.mul(3)), hash(index.mul(3).add(1)), hash(index.mul(3).add(2)));
+  const drift = vec3(...profile.velocity).mul(mix(float(0.5), float(1.5), hash(index.add(7919))));
   const sway = vec3(sin(time.mul(0.7).add(seed.x.mul(40))), sin(time.mul(0.9).add(seed.y.mul(40))),
     sin(time.mul(0.6).add(seed.z.mul(40)))).mul(profile.sway);
   // Wrapped relative to the camera so the box travels with it and no particle pops.
@@ -133,7 +134,7 @@ export function createParticles(profile) {
     blending: profile.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
   });
   material.positionNode = world;
-  material.scaleNode = vec2(mix(float(profile.size[0]), float(profile.size[1]), hash(index.add(0.53))));
+  material.scaleNode = vec2(mix(float(profile.size[0]), float(profile.size[1]), hash(index.add(15485))));
   const lamp = locationLight.carriedColor
     .mul(pow(smoothstep(0, locationLight.carriedRange, length(world.sub(locationLight.carriedPosition))).oneMinus(), 2));
   const edge = smoothstep(0.35, 0.5, length(local.div(size))).oneMinus();
