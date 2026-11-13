@@ -85,6 +85,33 @@ function faceTowardNormals({ positions: p, normals: n, indices }) {
 }
 
 /**
+ * Averages a per-vertex attribute with its mesh neighbours, in place. One
+ * vertex on a flake of noise can catch a light its neighbours cannot; without
+ * this it shows as a single bright triangle fan.
+ */
+export function smoothAttribute(indices, array, size, passes = 1) {
+  const count = array.length / size;
+  const sum = new Float32Array(array.length), weight = new Float32Array(count);
+  for (let pass = 0; pass < passes; pass += 1) {
+    sum.set(array);
+    weight.fill(1);
+    for (let t = 0; t < indices.length; t += 3) {
+      for (let corner = 0; corner < 3; corner += 1) {
+        const a = indices[t + corner], b = indices[t + (corner + 1) % 3];
+        for (let c = 0; c < size; c += 1) {
+          sum[a * size + c] += array[b * size + c];
+          sum[b * size + c] += array[a * size + c];
+        }
+        weight[a] += 1; weight[b] += 1;
+      }
+    }
+    for (let v = 0; v < count; v += 1) {
+      for (let c = 0; c < size; c += 1) array[v * size + c] = sum[v * size + c] / weight[v];
+    }
+  }
+}
+
+/**
  * Splits an indexed mesh into one mesh per `cell`-metre column, so the renderer
  * can cull the parts of a large cave that are behind the camera.
  *

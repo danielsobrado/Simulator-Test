@@ -75,3 +75,9 @@
   font-size: 11px;
   text-align: center;
 }
+
+/* Inside a location the world is paused: its streaming notice would never clear. */
+body[data-location] .hud-status,
+body[data-location] .scenic-tour-button {
+  display: none;
+}

@@ -4,7 +4,7 @@ import { DensityGrid } from './gen/DensityGrid.js';
 import { bakeLighting } from './gen/LightBake.js';
 import { createRng } from './gen/noise.js';
 import { chamber, tunnel } from './gen/shapes.js';
-import { extractSurface, splitByColumns } from './gen/SurfaceNets.js';
+import { extractSurface, smoothAttribute, splitByColumns } from './gen/SurfaceNets.js';
 import { LocationNav } from './LocationNav.js';
 
 const CULL_COLUMN_METRES = 28;
@@ -170,6 +170,8 @@ export class LocationBuilder {
       grid: this.grid, positions: surface.positions, normals: surface.normals, lights: this.lights,
       iceAt: (v) => ice[v], absorption,
     });
+    smoothAttribute(surface.indices, baked.light, 3, 1);
+    smoothAttribute(surface.indices, baked.shade, 2, 2);
     const chunks = splitByColumns({
       indices: surface.indices,
       attributes: {

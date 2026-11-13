@@ -33,7 +33,7 @@ export function generate(b, params) {
   b.room(P(hallAt.x + 12, 6, hallAt.z - 8), { rx: 12, ry: 10, rz: 11, floorY: hallAt.y, smooth: 2, walkRadius: 0 });
   const crevasseYaw = 0.5;
   b.grid.carve(hall(P(hallAt.x + 3, hallAt.y - 12, hallAt.z - 4),
-    { halfLength: 19, halfWidth: 1.5, height: 46, yaw: crevasseYaw }), 0.8);
+    { halfLength: 19, halfWidth: 2, height: 46, yaw: crevasseYaw }), 0.8);
   // Walkable hall floor on both sides of the crevasse, joined by the plank bridge.
   const cs = Math.sin(crevasseYaw), cc = Math.cos(crevasseYaw);
   const across = (along, offset) => P(hallAt.x + 3 + cc * along - cs * offset, hallAt.y, hallAt.z - 4 + cs * along + cc * offset);
@@ -72,11 +72,13 @@ export function generate(b, params) {
     const at = across(b.range(-13, 13), b.range(-0.5, 0.5));
     drifts.push([P(at.x, hallAt.y - 13.4, at.z), 2.6, 1.6, 2.6]);
   }
-  drifts.push([across(-5, 3.6), 2.6, 0.8, 2], [across(7, -3.4), 2.2, 0.7, 2.4]);
+  for (const at of [across(-5, 4.2), across(7, -4)]) drifts.push([P(at.x, at.y - 0.6, at.z), 3.2, 1.7, 2.8]);
   for (const [at, rx, ry, rz] of drifts) b.grid.fill(mound(at, rx, ry, rz), 0.8);
 
-  b.grid.roughen({ amp: 0.55, scale: 0.17, seed: b.seed, octaves: 2, floorAmp: 0.1 });
-  b.grid.roughen({ amp: 0.16, scale: 0.7, seed: b.seed + 5, octaves: 2, floorAmp: 0.15 });
+  // The crevasse is a clean break: noise on its narrow walls would shred them into flakes.
+  const calm = (x, y, z) => (Math.abs((z - hallAt.z + 4) * cc - (x - hallAt.x - 3) * cs) < 4.5 ? 0.3 : 1);
+  b.grid.roughen({ amp: 0.55, scale: 0.17, seed: b.seed, octaves: 2, floorAmp: 0.1, ampAt: calm });
+  b.grid.roughen({ amp: 0.16, scale: 0.7, seed: b.seed + 5, octaves: 2, floorAmp: 0.15, ampAt: calm });
 
   const near = (p, q, radius) => Math.max(0, 1 - Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) / radius);
   b.classify = (p, n, mask, mask2) => {
@@ -85,15 +87,16 @@ export function generate(b, params) {
     const bed = Math.max(0, 1 - Math.hypot(p.x - refuge.x, p.z - refuge.z) / 17) * 1.5;
     const moraine = Math.max(0, grain - 0.56) * 3 * Math.max(0, 1 - (p.y - hallAt.y) / 3);
     const rock = Math.min(1, Math.max(bed + (grain - 0.5) * 0.9, moraine * (n.y > 0.5 ? 1 : 0.4)));
-    const cold = Math.max(near(p, mouth, 30), near(p, P(hallAt.x + 3, 16, hallAt.z - 4), 22) * 0.8);
+    const cold = Math.max(near(p, mouth, 30), near(p, P(hallAt.x + 3, 16, hallAt.z - 4), 22) * 0.3);
     let snow = 0;
+    const facingUp = Math.min(1, Math.max(0, (n.y - 0.25) / 0.45));
     for (const [at, rx] of drifts) snow = Math.max(snow, near(p, at, rx * 1.9));
-    snow = Math.max(snow, cold * (n.y > 0.55 ? 0.75 : 0), near(p, refuge, 16) * (n.y > 0.7 ? 0.35 : 0));
+    snow = Math.max(snow, near(p, mouth, 30) * 0.9) * facingUp;
     const split = Math.abs((p.z - hallAt.z + 4) * cc - (p.x - hallAt.x - 3) * cs);
     mask[0] = rock;
     mask[1] = Math.min(1, snow);
     mask[2] = Math.min(1, cold * 0.9 + Math.max(0, grain - 0.6) * 1.2);
-    mask[3] = Math.min(1, Math.max(0, 1 - split / 5) * 0.8 + near(p, vault, 13) + near(p, fallAt, 7) * 0.3);
+    mask[3] = Math.min(1, Math.max(0, 1 - split / 5) * 0.55 + near(p, vault, 13) + near(p, fallAt, 7) * 0.3);
     mask2[0] = Math.min(1, Math.max(0, 1 - (p.y - hallAt.y) / 4.5) * (0.35 + grain) + rock * 0.5);
     mask2[1] = Math.min(1, near(p, fallAt, 8) * 1.4 + Math.max(0, (p.y - 12) / 16) + near(p, mouth, 16) * 0.5);
     return 1 - rock;
@@ -102,21 +105,21 @@ export function generate(b, params) {
   // --- Light -------------------------------------------------------------
   // Overcast daylight at the mouth; the opening itself is a white-out.
   b.prop('glow', box(15, 12, 0.3, P(mouth.x, mouth.y + 4, mouth.z + 4.6)), SKY, 3.2);
-  b.light(P(mouth.x, mouth.y + 3.4, mouth.z + 1.5), SKY, 2.6, 46, { flat: true });
-  b.light(P(mouth.x, mouth.y + 2, mouth.z - 9), SKY, 0.8, 30, { flat: true });
+  b.light(P(mouth.x, mouth.y + 3.4, mouth.z + 1.5), SKY, 1.3, 46, { flat: true });
+  b.light(P(mouth.x, mouth.y + 2, mouth.z - 9), SKY, 0.4, 30, { flat: true });
   b.shaft(P(mouth.x, mouth.y + 5, mouth.z + 3), P(0.5, 0.4, 4), 8, SKY, 0.07);
   b.anchor('mouth', P(mouth.x, mouth.y + 2, mouth.z - 4));
   // Daylight down the crevasse, strongest where it is widest.
   for (const along of [-12, -4, 4, 12]) {
     const top = across(along, 0);
-    b.light(P(top.x, 30, top.z), SKY, 1.7, 44, { flat: true });
+    b.light(P(top.x, 30, top.z), SKY, 0.55, 44, { flat: true });
   }
   b.prop('glow', box(36, 0.3, 3.6, P(hallAt.x + 3, 31.7, hallAt.z - 4), -crevasseYaw), SKY, 3.2);
   b.shaft(P(across(3, 0).x, 31, across(3, 0).z), P(across(1, 1.5).x, hallAt.y, across(1, 1.5).z), 5, SKY, 0.06);
   b.shaft(P(across(-8, 0).x, 31, across(-8, 0).z), P(across(-9, -1).x, hallAt.y, across(-9, -1).z), 4, SKY, 0.045);
   // The sun above the glacier, reaching the cave only through the ice.
-  for (const [x, z, power] of [[-16, -40, 3.2], [12, -56, 3], [-2, -22, 2.2], [3, -8, 2], [10, -86, 2.4], [-18, -62, 1.6]]) {
-    b.light(P(x, 33, z), '#f2f8ff', power, 40, { flat: true });
+  for (const [x, z, power] of [[-22, -52, 1.1], [14, -38, 1.1], [-4, -62, 1.1], [-16, -40, 1.5], [12, -56, 1.4], [-2, -22, 1.1], [3, -8, 1], [10, -86, 1.3], [-18, -62, 1], [-40, -74, 1.3], [-30, -90, 1]]) {
+    b.light(P(x, 33, z), '#f2f8ff', power, 58, { flat: true });
   }
 
   // --- The people's works --------------------------------------------------
@@ -152,6 +155,14 @@ export function generate(b, params) {
   b.prop('timber', beam(P(choke.x + 0.9, choke.y + 1.5, choke.z - 1.26), P(choke.x - 0.9, choke.y + 1.5, choke.z + 1.26), 0.14), DARK);
 
   longhall(b, P(refuge.x - 2, refuge.y, refuge.z - 3), params.longhall);
+  // Torches on stakes mark the yard, and the cold of the ice above still reaches it.
+  for (const [dx, dz] of [[9, 7], [-10, 9], [11, -3]]) {
+    const foot = P(refuge.x + dx, refuge.y, refuge.z + dz);
+    b.prop('timber', rod(foot, P(foot.x, foot.y + 1.9, foot.z), 0.06, 0.05, 6), DARK);
+    lantern(b, P(foot.x, foot.y + 2.1, foot.z), { tint: '#ffa257', intensity: 4, range: 14, halo: 1.4 });
+    b.nav.block(foot, 0.4, 2);
+  }
+  b.light(P(refuge.x, refuge.y + 8, refuge.z), '#7fb4e6', 0.5, 24, { flat: true });
   storehouse(b, P(refuge.x + 7, refuge.y, refuge.z - 8));
   // Woodpile, sled, stores by the door.
   for (let row = 0; row < 3; row += 1) {
@@ -170,9 +181,14 @@ export function generate(b, params) {
   b.prop('timber', box(0.8, 0.06, 1.6, P(refuge.x + 3, refuge.y + 0.3, refuge.z + 9)), TIMBER);
 
   // The sealed vault: something dark stands in the far wall, behind a pane of clear ice.
-  b.prop('seal', rod(P(vault.x, vault.y + 0.2, vault.z - 8.2), P(vault.x, vault.y + 6.4, vault.z - 8.6), 1.5, 0.5, 6), 0x1c1a20);
-  b.prop('clearIce', box(7.5, 7.5, 0.5, P(vault.x, vault.y + 3.6, vault.z - 7.2)), 0xffffff);
-  b.light(P(vault.x, vault.y + 2.6, vault.z - 3.5), '#8fd0ff', 1.3, 13, { halo: 0 });
+  // The sealed vault: black standing stones the ice has grown around but not over.
+  for (const [dx, dz, tall, lean] of [[0, -6.6, 6.2, 0.3], [-2.3, -6, 4.2, -0.5], [2.1, -6.2, 3.4, 0.6]]) {
+    const foot = P(vault.x + dx, vault.y - 0.3, vault.z + dz);
+    b.prop('seal', rod(foot, P(foot.x + lean, foot.y + tall, foot.z - 0.4), 1.1, 0.25, 5), 0xffffff);
+    b.prop('clearIce', rod(P(foot.x, foot.y, foot.z + 0.2), P(foot.x + lean * 0.3, foot.y + tall * 0.45, foot.z), 1.7, 0.9, 7), 0xffffff);
+    b.nav.block(foot, 1.6, 4);
+  }
+  b.light(P(vault.x, vault.y + 3, vault.z - 3), '#8fd0ff', 2.2, 15, { halo: 0 });
   for (const dx of [-3.4, 3.4]) {
     b.prop('masonry', block(0.7, 1.5, 0.7, P(vault.x + dx, vault.y, vault.z - 5.6)), 0xb9b4ad);
     b.prop('glow', box(0.3, 0.3, 0.3, P(vault.x + dx, vault.y + 1.7, vault.z - 5.6)), '#9fdcff', 2.5);

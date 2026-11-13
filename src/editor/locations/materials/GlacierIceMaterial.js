@@ -61,7 +61,7 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
   // Melt scallops: the cupped relief wind and meltwater leave on cave ice.
   const scallop = mx_worley_noise_float(point.mul(profile.scallop.scale));
   const cupped = bumpNormal(geometryNormal, scallop.mul(profile.scallop.depth), 1);
-  let normal = triplanarNormal(maps.ice.normal, point, cupped, weights, 0.42, profile.microNormal);
+  let normal = triplanarNormal(maps.ice.normal, point, cupped, weights, 0.21, profile.microNormal);
 
   const into = refract(viewDirection.negate(), normal, 1 / ICE_IOR);
   const absorption = vec3(...profile.absorption);
@@ -72,10 +72,15 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
     const inside = point.add(into.mul(depth));
     // In and back out again.
     const through = exp(absorption.mul(-2 * depth));
-    const plates = triplanarSample(maps.ice.color, inside, weights, 0.15 * (1 + index * 0.37)).g;
-    let glint = smoothstep(0.55, 0.95, plates).mul(profile.crackGain);
-    const sheet = pow(abs(mx_noise_float(inside.mul(0.7 + index * 0.35).add(index * 17.1))).oneMinus(), 14);
-    glint = glint.add(sheet.mul(fracture).mul(2.6));
+    // The crack network shows only in patches, strongest where the ice is fractured.
+    const plates = triplanarSample(maps.ice.color, inside, weights, 0.06 * (1 + index * 0.45)).g;
+    const patch = smoothstep(0.25, 0.7, mx_noise_float(inside.mul(0.16).add(index * 5.3))).mul(0.12).add(fracture.mul(fracture).mul(1.6));
+    let glint = smoothstep(0.62, 0.98, plates).mul(profile.crackGain).mul(patch);
+    // Fracture planes: the zero set of a slow noise is a few curved sheets, not a net —
+    // but only if most of them are culled, so a second field keeps one in several.
+    const sheet = pow(abs(mx_noise_float(inside.mul(0.22 + index * 0.09).add(index * 17.1))).oneMinus(), 48)
+      .mul(smoothstep(0.1, 0.5, mx_noise_float(inside.mul(0.11).add(31.7 + index * 3.1))));
+    glint = glint.add(sheet.mul(fracture).mul(1.8));
     if (index < 2) glint = glint.add(smoothstep(0.6, 0.9, mx_noise_float(inside.mul(27))).mul(bubbles).mul(1.3));
     interior = interior.add(through.mul(glint).mul(1 / count));
   }
@@ -86,7 +91,9 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
   // Annual layers: compressed firn alternates clear blue and white bubbly bands, tilted by glacier flow.
   const phase = deepPoint.y.mul(profile.banding.frequency).add(mx_noise_float(deepPoint.mul(0.17)).mul(5))
     .add(deepPoint.x.mul(profile.banding.dip));
-  const band = smoothstep(0.2, 0.9, sin(phase)).mul(profile.banding.strength);
+  // Two beat frequencies and a slow fade keep the layers from reading as stripes.
+  const band = smoothstep(-0.3, 1, sin(phase).mul(0.65).add(sin(phase.mul(0.43).add(2.1)).mul(0.35)))
+    .mul(smoothstep(-0.4, 0.5, mx_noise_float(deepPoint.mul(0.07)))).mul(profile.banding.strength);
   const dirt = smoothstep(0.84, 0.98, sin(phase.mul(0.37).add(1.7))).mul(sediment.mul(1.5).min(1))
     .add(smoothstep(0.55, 0.85, mx_noise_float(deepPoint.mul(8))).mul(sediment).mul(0.6));
 
@@ -96,8 +103,9 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
   albedo = mix(albedo, color(profile.milkColor), clamp(milk.mul(0.7).add(band.mul(0.45)).add(bubbles.mul(0.3)), 0, 1));
   albedo = mix(albedo, color(profile.sedimentColor), clamp(dirt, 0, 1));
   albedo = albedo.add(color(profile.scatterColor).mul(interior));
-  let roughness = float(profile.roughness).mul(triplanarSample(maps.ice.rough, point, weights, 0.42).g.mul(0.8).add(0.6))
-    .add(dirt.mul(0.3));
+  // The photographed roughness is a crack web; at full strength every highlight draws it.
+  let roughness = float(profile.roughness).mul(triplanarSample(maps.ice.rough, point, weights, 0.11).g.mul(0.3).add(0.85))
+    .add(mx_noise_float(point.mul(0.4)).mul(0.05)).add(milk.mul(0.2)).add(dirt.mul(0.3));
   let f0 = float(0.02);
   let wrap = float(0.9);
 
@@ -111,16 +119,15 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
     wrap = mix(wrap, float(0.15), amount);
   }
 
-  const frostGrain = mx_noise_float(point.mul(3.1)).mul(0.5).add(0.5);
-  const frost = smoothstep(0.35, 0.8, frostAmount.mul(1.3).add(frostGrain.mul(0.5)).sub(0.25))
+  const frostGrain = mx_fractal_noise_float(point.mul(0.9), 3, 2, 0.5).mul(0.5).add(0.5);
+  const frost = smoothstep(0.2, 0.95, frostAmount.mul(1.3).add(frostGrain.mul(0.5)).sub(0.25))
     .mul(clamp(frostAmount.mul(4), 0, 1));
   albedo = mix(albedo, color(profile.frostColor), frost.mul(0.85));
   roughness = mix(roughness, float(0.8), frost);
 
   // Snow settles on what faces up, and drifts decide where it is deep enough to hide the ice.
   const drift = mx_noise_float(point.mul(0.7)).mul(0.5).add(0.5);
-  const snow = smoothstep(0.45, 0.62, snowAmount.mul(1.2).add(normal.y.mul(0.35)).add(drift.mul(0.3)).sub(0.45))
-    .mul(clamp(snowAmount.mul(6), 0, 1));
+  const snow = smoothstep(0.42, 0.72, snowAmount.add(drift.sub(0.5).mul(0.5))).mul(smoothstep(0.25, 0.65, geometryNormal.y));
   const snowUv = point.xz.mul(0.4);
   const snowTilt = texture(maps.snow.normal, snowUv).xy.mul(2).sub(1);
   const sparkle = smoothstep(0.93, 1, mx_noise_float(point.mul(55).add(viewDirection.mul(6))));

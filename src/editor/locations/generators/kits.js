@@ -334,11 +334,11 @@ export function brazier(b, at, {
 }
 
 /** A cluster of pale crystal shards that light the way. */
-export function crystal(b, at, size, { tint = '#bfe6ff', intensity = 2.2, range = 11 } = {}) {
+export function crystal(b, at, size, { tint = '#bfe6ff', intensity = 2.2, range = 11, gain = 2.2 } = {}) {
   for (let index = 0; index < 4; index += 1) {
     const lean = { x: at.x + b.range(-0.5, 0.5) * size, y: at.y + b.range(0.7, 1.5) * size, z: at.z + b.range(-0.5, 0.5) * size };
     const foot = { x: at.x + b.range(-0.25, 0.25) * size, y: at.y - 0.1, z: at.z + b.range(-0.25, 0.25) * size };
-    b.prop('glow', rod(foot, lean, 0.16 * size, 0.02, 5), tint, 2.2);
+    b.prop('glow', rod(foot, lean, 0.16 * size, 0.02, 5), tint, gain);
   }
   b.light(up(at, size), tint, intensity, range, { radius: 1, halo: 1.6 * size });
 }

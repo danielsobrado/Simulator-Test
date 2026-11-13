@@ -22,7 +22,7 @@ export function generate(b, params) {
   const gate = P(0, 16, 7), ledge = P(0, 16, -23);
   const market = P(0, 8, -72);
   const west = P(-41, 14, -72), east = P(41, 2, -78), beds = P(0, -6, -113);
-  const lamp = (at, size = 1, power = 2.2) => crystal(b, at, size, { tint: crystalTint, intensity: power, range: 12 * size });
+  const lamp = (at, size = 1, power = 2.2) => crystal(b, at, size, { tint: crystalTint, intensity: power * 1.6, range: 16 * size, gain: 1.1 });
 
   // The void.
   b.grid.carve(chamber(P(0, 20, -72), { rx: 57, ry: 41, rz: 55, floorY: LAKE }));
@@ -74,7 +74,8 @@ export function generate(b, params) {
 
   b.classify = (p, n, mask) => {
     const seam = fbm3(p.x * 0.05, p.y * 0.05, p.z * 0.05, b.seed + 41, 3);
-    mask[0] = Math.max(0, seam - 0.58) * 4 * (p.y < 24 ? 1 : 0.4);
+    // Crystal seams run in the walls and roof, never across a floor.
+    mask[0] = Math.max(0, seam - 0.72) * 3 * (n.y > 0.4 ? 0 : 1);
     mask[1] = Math.min(1, Math.max(0, (LAKE + 7 - p.y) / 6));
     mask[2] = 0;
     // Where people walk, the floor is cut and flagged.
@@ -85,8 +86,8 @@ export function generate(b, params) {
 
   // --- Water and the light that shows the void ------------------------------
   b.prop('water', box(140, 0.05, 140, P(0, LAKE + 2.6, -72)));
-  for (const [x, y, z, power] of [[32, LAKE + 6, -40, 0.55], [-36, LAKE + 6, -102, 0.55], [0, 46, -40, 0.4], [-30, 40, -80, 0.35], [34, 40, -92, 0.35]]) {
-    b.light(P(x, y, z), '#4f78b8', power, 70, { flat: true });
+  for (const [x, y, z, power] of [[32, LAKE + 6, -40, 1.6], [-36, LAKE + 6, -102, 1.6], [0, 46, -40, 1.5], [-30, 40, -80, 1.3], [34, 40, -92, 1.3], [0, 30, -110, 1.2], [-44, 20, -40, 1], [44, 14, -100, 1]]) {
+    b.light(P(x, y, z), '#5b82c4', power, 80, { flat: true });
   }
 
   // --- Gate ledge -------------------------------------------------------------
@@ -99,7 +100,7 @@ export function generate(b, params) {
   lamp(P(3.6, 16, -29.5), 0.9);
 
   // --- Market island -----------------------------------------------------------
-  house(b, market, 0, 7.5, 12.5, 7.5, { windowTint, windows: 3, floors: 4, light: 1.6 });
+  house(b, market, 0, 7.5, 12.5, 7.5, { windowTint, windows: 3, floors: 4, light: 3.5 });
   b.prop('masonry', block(5, 4, 5, P(market.x, market.y + 13.4, market.z)));
   b.prop('masonry', rod(P(market.x, market.y + 17.4, market.z), P(market.x, market.y + 20.4, market.z), 1.6, 0.2, 4));
   for (let index = 0; index < 9; index += 1) {
@@ -117,7 +118,7 @@ export function generate(b, params) {
       b.light(P(at.x, at.y + 2.2, at.z), windowTint, 2.4, 9, { halo: 1.2 });
       b.nav.block(at, 2.1, 3);
     } else {
-      house(b, at, facing, b.range(4.6, 5.8), b.range(4.2, 7.5), 4.4, { windowTint, windows: 2, floors: 2 });
+      house(b, at, facing, b.range(4.6, 5.8), b.range(4.2, 7.5), 4.4, { windowTint, windows: 2, floors: 2, light: 3 });
     }
   }
   for (let index = 0; index < 6; index += 1) {
@@ -128,14 +129,14 @@ export function generate(b, params) {
   for (let index = 0; index < 9; index += 1) {
     const angle = index / 9 * Math.PI * 2;
     b.prop('glow', rod(P(spindleTip.x + Math.cos(angle) * 1.2, spindleTip.y + 2.5, spindleTip.z + Math.sin(angle) * 1.2),
-      P(spindleTip.x + Math.cos(angle) * b.range(0.3, 2.4), spindleTip.y - b.range(1.5, 5), spindleTip.z + Math.sin(angle) * b.range(0.3, 2.4)), 0.5, 0.03, 5), crystalTint, 2.6);
+      P(spindleTip.x + Math.cos(angle) * b.range(0.3, 2.4), spindleTip.y - b.range(1.5, 5), spindleTip.z + Math.sin(angle) * b.range(0.3, 2.4)), 0.5, 0.03, 5), crystalTint, 1.3);
   }
-  b.light(P(spindleTip.x, spindleTip.y - 3, spindleTip.z), crystalTint, 9, 46, { radius: 3, halo: 7 });
+  b.light(P(spindleTip.x, spindleTip.y - 3, spindleTip.z), crystalTint, 70, 70, { radius: 4, halo: 7 });
 
   // --- West terrace: houses cut back into the cliff -----------------------------
   for (let z = west.z - 22; z <= west.z + 22; z += 7.4) {
     const tall = b.range(5.5, 10);
-    house(b, P(west.x - 5.4, west.y, z), ALONG_Z, 5.8, tall, 5, { windowTint, windows: 2, floors: 3 });
+    house(b, P(west.x - 5.4, west.y, z), ALONG_Z, 5.8, tall, 5, { windowTint, windows: 2, floors: 3, light: 3 });
     if (Math.round(z) % 2) lamp(P(west.x + 7, west.y, z + 3.6), 0.8, 1.8);
   }
   // --- East tier: a house compound behind its own wall ----------------------------
@@ -146,7 +147,7 @@ export function generate(b, params) {
   for (let z = east.z - 20; z <= east.z + 7; z += 0.9) b.nav.block(P(east.x - 3.5, east.y, z), 0.7, 4);
   b.nav.block(P(east.x - 3.5, east.y, east.z + 11.6), 1.4, 4);
   for (const [dz, tall] of [[-15, 9], [-6, 12], [3, 7]]) {
-    house(b, P(east.x + 3.6, east.y, east.z + dz), -ALONG_Z, 7, tall, 5.4, { windowTint, windows: 3, floors: 4 });
+    house(b, P(east.x + 3.6, east.y, east.z + dz), -ALONG_Z, 7, tall, 5.4, { windowTint, windows: 3, floors: 4, light: 3 });
   }
   lamp(P(east.x - 5.6, east.y, east.z + 9), 1, 2.4);
   lamp(P(east.x - 5.6, east.y, east.z + 14.4), 1, 2.4);
@@ -155,7 +156,7 @@ export function generate(b, params) {
   // --- Perches: houses no bridge reaches, only seen ------------------------------
   for (const [at, half] of perches) {
     for (let offset = -half + 3.5; offset <= half - 3; offset += 6.2) {
-      house(b, P(at.x + Math.sign(at.x) * 1.5, at.y, at.z + offset), -Math.sign(at.x) * ALONG_Z, 4.8, b.range(4, 8), 4.2, { windowTint, windows: 2, floors: 3, light: 1.6 });
+      house(b, P(at.x + Math.sign(at.x) * 1.5, at.y, at.z + offset), -Math.sign(at.x) * ALONG_Z, 4.8, b.range(4, 8), 4.2, { windowTint, windows: 2, floors: 3, light: 3 });
     }
     lamp(P(at.x - Math.sign(at.x) * 4.5, at.y, at.z), 1, 2.2);
   }

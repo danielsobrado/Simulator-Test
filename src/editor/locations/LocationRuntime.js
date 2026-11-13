@@ -138,6 +138,8 @@ export class LocationRuntime {
       // The hero's body lives in the world scene; inside a location the view is first person.
       if (this.viewModeController.isThirdPerson) this.viewModeController.toggleCameraView();
       player.placeAt(spawn);
+      // World-only HUD pieces (streaming notice, scenic tour) hide while this is set.
+      document.body.dataset.location = site.id;
       previous?.dispose();
       const history = this.record.sites[site.id] ?? { visits: 0 };
       this.record.sites[site.id] = { ...history, visits: history.visits + 1, discovered: true };
@@ -177,6 +179,7 @@ export class LocationRuntime {
       this.current = null;
       this.anchor = null;
       player.groundOverride = null;
+      delete document.body.dataset.location;
       this.#returnRenderer();
       const render = this.floatingOrigin.toRender(anchor.x, anchor.z);
       player.placeAt({ x: render.x, z: render.z, y: player.getGroundHeight(render.x, render.z), yaw: anchor.yaw, pitch: anchor.pitch });
