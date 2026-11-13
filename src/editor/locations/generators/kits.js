@@ -1,4 +1,4 @@
-import { arch, beam, block, box, coursedWall, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
+import { arch, beam, block, box, coursedWall, extrudedProfile, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
 
 /**
  * Built assemblies shared by the generators. Each takes the builder first and
@@ -241,24 +241,55 @@ export function pillar(b, at, height, radius, {
     b.prop('bronze', rod(up(at, bandY - 0.04), up(at, bandY + 0.04), radius * 1.02, radius * 1.02, sides), 0xd8b478);
   }
 
-  // 3. Load-bearing capital: necking collar, bronze fillet, flared bell, abacus, stepped corbels, impost.
-  b.prop(trimMaterial, rod(up(at, shaftEnd), up(at, shaftEnd + 0.26), radius * 0.94, radius * 1.08, sides), 0xe4e2de);
-  b.prop('bronze', rod(up(at, shaftEnd + 0.06), up(at, shaftEnd + 0.2), radius * 1.06, radius * 1.06, sides), 0xe4c288);
-  b.prop(trimMaterial, rod(up(at, shaftEnd + 0.26), up(at, height - 0.96), radius * 1.08, radius * 1.38, sides), 0xebe9e6);
-  if (ceremonial || reinforced) {
-    // Stepped angular corbel brackets on cardinal faces under the abacus.
-    for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      b.prop(trimMaterial, stoneBox(
-        dx !== 0 ? radius * 0.54 : radius * 0.48,
-        0.48,
-        dz !== 0 ? radius * 0.54 : radius * 0.48,
-        { x: at.x + dx * radius * 1.08, y: height - 1.18, z: at.z + dz * radius * 1.08 },
-        { bevel: 0.045, batter: -0.16, irregular: 0.04 },
-      ), 0xe8e5e0);
+  // 3. Sculpted load-bearing Dwarven capital: astragal, dentil collar lugs, flared bell, flying knee corbels, bronze-bound impost.
+  b.prop(trimMaterial, rod(up(at, shaftEnd), up(at, shaftEnd + 0.24), radius * 0.94, radius * 1.12, sides), 0xe4e2de);
+  b.prop('bronze', rod(up(at, shaftEnd + 0.05), up(at, shaftEnd + 0.19), radius * 1.09, radius * 1.09, sides), 0xe4c288);
+  // Radial dentil lugs around the necking astragal catching firelight.
+  for (let i = 0; i < sides; i += 1) {
+    const a = (i / sides) * Math.PI * 2 + Math.PI / sides;
+    const lugR = radius * 1.07;
+    b.prop(trimMaterial, stoneBox(radius * 0.24, 0.2, radius * 0.24, {
+      x: at.x + Math.cos(a) * lugR, y: at.y + shaftEnd + 0.34, z: at.z + Math.sin(a) * lugR,
+    }, { yaw: -a, bevel: 0.03, irregular: 0.03 }), 0xedeae6);
+  }
+  b.prop(trimMaterial, rod(up(at, shaftEnd + 0.24), up(at, height - 0.92), radius * 1.08, radius * 1.44, sides), 0xebe9e6);
+
+  // Diagonal flying structural knee-corbel brackets springing outward to brace the cantilevered impost.
+  for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    b.prop(trimMaterial, hewnBeam(
+      { x: at.x + dx * radius * 0.96, y: at.y + shaftEnd + 0.18, z: at.z + dz * radius * 0.96 },
+      { x: at.x + dx * radius * 1.46, y: at.y + height - 0.56, z: at.z + dz * radius * 1.46 },
+      radius * 0.34, radius * 0.3, { bevel: 0.04, irregular: 0.03 },
+    ), 0xe8e5e0);
+    if (ceremonial || reinforced) {
+      // Faceted hexagonal Dwarf shield medallion + bronze central stud on the cardinal capital faces.
+      const shieldPts = [
+        [-0.24 * radius, -0.14 * radius], [0, -0.3 * radius], [0.24 * radius, -0.14 * radius],
+        [0.24 * radius, 0.14 * radius], [0, 0.3 * radius], [-0.24 * radius, 0.14 * radius],
+      ];
+      b.prop(trimMaterial, extrudedProfile(shieldPts, radius * 0.16, {
+        bevel: 0.025,
+        yaw: dx !== 0 ? Math.PI * 0.5 : 0,
+        at: { x: at.x + dx * radius * 1.24, y: at.y + height - 1.18, z: at.z + dz * radius * 1.24 },
+      }), 0xdedbd6);
+      b.prop('bronze', stoneBox(radius * 0.16, radius * 0.16, radius * 0.16, {
+        x: at.x + dx * radius * 1.31, y: at.y + height - 1.18, z: at.z + dz * radius * 1.31,
+      }, { yaw: Math.PI / 4, bevel: 0.02, irregular: 0.02 }), 0xe2c086);
     }
   }
-  b.prop(trimMaterial, stoneBlock(radius * 2.7, 0.48, radius * 2.7, up(at, height - 0.96), { bevel: 0.08, batter: -0.06, irregular: 0.05 }), 0xf2f0ed);
-  b.prop(material, stoneBlock(radius * 2.98, 0.48, radius * 2.98, up(at, height - 0.48), { bevel: 0.07, irregular: 0.05 }), tint);
+  if (ceremonial || reinforced) {
+    // Diagonal corner knee spurs for full 8-way monumental crown massing.
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      b.prop(trimMaterial, hewnBeam(
+        { x: at.x + sx * radius * 0.72, y: at.y + shaftEnd + 0.28, z: at.z + sz * radius * 0.72 },
+        { x: at.x + sx * radius * 1.14, y: at.y + height - 0.56, z: at.z + sz * radius * 1.14 },
+        radius * 0.28, radius * 0.24, { bevel: 0.035, irregular: 0.03 },
+      ), 0xe2dfda);
+    }
+  }
+  b.prop(trimMaterial, stoneBlock(radius * 2.74, 0.44, radius * 2.74, up(at, height - 0.92), { bevel: 0.08, batter: -0.08, irregular: 0.04 }), 0xf2f0ed);
+  b.prop(material, stoneBlock(radius * 3.06, 0.48, radius * 3.06, up(at, height - 0.48), { bevel: 0.07, irregular: 0.04 }), tint);
+  b.prop('bronze', stoneBlock(radius * 3.1, 0.1, radius * 3.1, up(at, height - 0.34), { bevel: 0.015, irregular: 0.02 }), 0xcfa96c);
   b.nav.block(at, radius * 1.45, height);
 }
 

@@ -319,3 +319,37 @@ export function coursedWall(a, b, height, thickness, {
   }
   return parts;
 }
+
+/**
+ * An extruded beveled 2D polygon profile centred along its extrusion axis.
+ * Useful for carved reliefs, Dwarf-chevron gables, anvil silhouettes, and corbels.
+ */
+export function extrudedProfile(points, depth, {
+  bevel = 0.04,
+  bevelSize = bevel,
+  yaw = 0,
+  rx = 0,
+  rz = 0,
+  at = { x: 0, y: 0, z: 0 },
+} = {}) {
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i += 1) shape.lineTo(points[i][0], points[i][1]);
+  shape.closePath();
+
+  const bThick = Math.max(0, Math.min(bevel, depth * 0.42));
+  const coreDepth = Math.max(0.01, depth - bThick * 2);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: coreDepth,
+    bevelEnabled: bThick > 0.004,
+    bevelThickness: bThick,
+    bevelSize: Math.max(0.004, bevelSize),
+    bevelSegments: 1,
+    curveSegments: 1,
+  });
+  geometry.translate(0, 0, -coreDepth * 0.5);
+  if (rx) geometry.rotateX(rx);
+  if (rz) geometry.rotateZ(rz);
+  if (yaw) geometry.rotateY(yaw);
+  return geometry.translate(at.x, at.y, at.z);
+}
