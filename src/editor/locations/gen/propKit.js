@@ -1,0 +1,315 @@
+import * as THREE from 'three/webgpu';
+import { createRng } from './noise.js';
+
+/**
+ * World-space primitives for built things. Faces are subdivided to about
+ * `GRAIN` metres because lighting is baked per vertex: a ten-metre wall with
+ * four corners could only ever hold one gradient.
+ */
+
+const GRAIN = 1.1;
+const X = new THREE.Vector3(1, 0, 0);
+const Y = new THREE.Vector3(0, 1, 0);
+const scratch = new THREE.Matrix4();
+const segments = (length) => Math.max(1, Math.min(24, Math.round(length / GRAIN)));
+
+function hashCoords(x, y, z, salt = 0) {
+  let h = (Math.round(x * 100) * 73856093) ^ (Math.round(y * 100) * 19349663) ^ (Math.round(z * 100) * 83492791) ^ salt;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+/**
+ * A chamfered, optionally tapered and subtly irregular 8-corner prism centred at
+ * local origin. Produces clean flat/chamfered facets that catch vertex-baked
+ * light along edges without inflating vertex count.
+ */
+function buildChamferedPrism(width, height, depth, {
+  bevel = 0.04,
+  batter = 0,
+  irregular = 0,
+  seed = 1,
+} = {}) {
+  const rng = createRng(seed);
+  const b = Math.min(bevel, width * 0.28, height * 0.28, depth * 0.28);
+  const hw = Math.max(0.01, width * 0.5);
+  const hh = Math.max(0.01, height * 0.5);
+  const hd = Math.max(0.01, depth * 0.5);
+  const topScale = Math.max(0.5, 1 - batter);
+  const botScale = 1 + batter * 0.35;
+
+  const jit = (amt) => (irregular > 0 ? (rng() - 0.5) * 2 * amt * irregular : 0);
+
+  // Inner core corners (before bevel expansion) for 8 corners: bottom 4, top 4.
+  const pts = [
+    [-hw * botScale + jit(hw * 0.14), -hh + jit(hh * 0.08), -hd * botScale + jit(hd * 0.14)],
+    [hw * botScale + jit(hw * 0.14), -hh + jit(hh * 0.08), -hd * botScale + jit(hd * 0.14)],
+    [hw * botScale + jit(hw * 0.14), -hh + jit(hh * 0.08), hd * botScale + jit(hd * 0.14)],
+    [-hw * botScale + jit(hw * 0.14), -hh + jit(hh * 0.08), hd * botScale + jit(hd * 0.14)],
+    [-hw * topScale + jit(hw * 0.14), hh + jit(hh * 0.08), -hd * topScale + jit(hd * 0.14)],
+    [hw * topScale + jit(hw * 0.14), hh + jit(hh * 0.08), -hd * topScale + jit(hd * 0.14)],
+    [hw * topScale + jit(hw * 0.14), hh + jit(hh * 0.08), hd * topScale + jit(hd * 0.14)],
+    [-hw * topScale + jit(hw * 0.14), hh + jit(hh * 0.08), hd * topScale + jit(hd * 0.14)],
+  ];
+
+  // If bevel is negligible, emit a subdivided box with perturbed corners.
+  if (b < 0.005) {
+    const geo = new THREE.BoxGeometry(width, height, depth, segments(width), segments(height), segments(depth));
+    if (batter > 0 || irregular > 0) {
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i += 1) {
+        const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+        const t = (py + hh) / Math.max(0.01, height);
+        const s = botScale * (1 - t) + topScale * t;
+        pos.setXYZ(i, px * s, py, pz * s);
+      }
+      geo.computeVertexNormals();
+    }
+    return geo;
+  }
+
+  // Build an 8-corner chamfered hexahedron by shrinking each face inward by `b`
+  // into 3 vertices per corner (24 vertices total), then emitting 6 faces + 12 edge bevels + 8 corner bevels.
+  // For each corner c in 0..7, its 3 split vertices sit along its 3 incident axes.
+  const inset = (p, sx, sy, sz) => [
+    p[0] - sx * b, p[1], p[2], // X-inset
+    p[0], p[1] - sy * b, p[2], // Y-inset
+    p[0], p[1], p[2] - sz * b, // Z-inset
+  ];
+  // Actually simpler & cleaner: each corner has 3 vertices:
+  // vX (shifted toward center in Y & Z by b), vY (shifted in X & Z by b), vZ (shifted in X & Y by b)
+  const signs = [
+    [-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1],
+    [-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1],
+  ];
+  const vX = [], vY = [], vZ = [];
+  for (let i = 0; i < 8; i += 1) {
+    const [sx, sy, sz] = signs[i];
+    const [px, py, pz] = pts[i];
+    vX.push([px, py - sy * b, pz - sz * b]);
+    vY.push([px - sx * b, py, pz - sz * b]);
+    vZ.push([px - sx * b, py - sy * b, pz]);
+  }
+  const positions = [];
+  const pushTri = (a, bPt, c) => {
+    positions.push(a[0], a[1], a[2], bPt[0], bPt[1], bPt[2], c[0], c[1], c[2]);
+  };
+  const pushQuad = (a, bPt, c, d) => {
+    pushTri(a, bPt, c);
+    pushTri(a, c, d);
+  };
+  // 6 main faces (outward CCW):
+  pushQuad(vY[0], vY[1], vY[2], vY[3]); // -Y bottom
+  pushQuad(vY[7], vY[6], vY[5], vY[4]); // +Y top
+  pushQuad(vZ[3], vZ[2], vZ[6], vZ[7]); // +Z front
+  pushQuad(vZ[1], vZ[0], vZ[4], vZ[5]); // -Z back
+  pushQuad(vX[2], vX[1], vX[5], vX[6]); // +X right
+  pushQuad(vX[0], vX[3], vX[7], vX[4]); // -X left
+
+  // 12 edge chamfers:
+  // Bottom 4 edges (Y=-1):
+  pushQuad(vY[3], vY[2], vZ[2], vZ[3]); // -Y/+Z
+  pushQuad(vY[1], vY[0], vZ[0], vZ[1]); // -Y/-Z
+  pushQuad(vY[2], vY[1], vX[1], vX[2]); // -Y/+X
+  pushQuad(vY[0], vY[3], vX[3], vX[0]); // -Y/-X
+  // Top 4 edges (Y=+1):
+  pushQuad(vZ[7], vZ[6], vY[6], vY[7]); // +Y/+Z
+  pushQuad(vZ[5], vZ[4], vY[4], vY[5]); // +Y/-Z
+  pushQuad(vX[6], vX[5], vY[5], vY[6]); // +Y/+X
+  pushQuad(vX[4], vX[7], vY[7], vY[4]); // +Y/-X
+  // Vertical 4 edges:
+  pushQuad(vZ[2], vX[2], vX[6], vZ[6]); // +X/+Z
+  pushQuad(vX[3], vZ[3], vZ[7], vX[7]); // -X/+Z
+  pushQuad(vX[1], vZ[1], vZ[5], vX[5]); // +X/-Z
+  pushQuad(vZ[0], vX[0], vX[4], vZ[4]); // -X/-Z
+
+  // 8 corner triangles:
+  pushTri(vY[0], vZ[0], vX[0]);
+  pushTri(vY[1], vX[1], vZ[1]);
+  pushTri(vY[2], vZ[2], vX[2]);
+  pushTri(vY[3], vX[3], vZ[3]);
+  pushTri(vY[4], vX[4], vZ[4]);
+  pushTri(vY[5], vZ[5], vX[5]);
+  pushTri(vY[6], vX[6], vZ[6]);
+  pushTri(vY[7], vZ[7], vX[7]);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** A box centred at `at`, turned `yaw` about Y. */
+export function box(width, height, depth, at, yaw = 0) {
+  const geometry = new THREE.BoxGeometry(width, height, depth, segments(width), segments(height), segments(depth));
+  if (yaw) geometry.rotateY(yaw);
+  return geometry.translate(at.x, at.y, at.z);
+}
+
+/** A box standing on the floor point `at`. */
+export function block(width, height, depth, at, yaw = 0) {
+  return box(width, height, depth, { x: at.x, y: at.y + height / 2, z: at.z }, yaw);
+}
+
+/** A chamfered, optionally battered & irregular stone block centred at `at`. */
+export function stoneBox(width, height, depth, at, {
+  yaw = 0,
+  bevel = Math.min(0.055, Math.min(width, height, depth) * 0.16),
+  batter = 0,
+  irregular = 0.35,
+  seed = hashCoords(at.x, at.y, at.z, 17),
+} = {}) {
+  const geometry = buildChamferedPrism(width, height, depth, { bevel, batter, irregular, seed });
+  if (yaw) geometry.rotateY(yaw);
+  return geometry.translate(at.x, at.y, at.z);
+}
+
+/** A chamfered stone block standing on the floor point `at`. */
+export function stoneBlock(width, height, depth, at, options = {}) {
+  return stoneBox(width, height, depth, { x: at.x, y: at.y + height / 2, z: at.z }, options);
+}
+
+/** A squared member from `a` to `b`: beams, braces, rails, planks. */
+export function beam(a, b, width, height = width) {
+  const from = new THREE.Vector3(a.x, a.y, a.z), to = new THREE.Vector3(b.x, b.y, b.z);
+  const axis = to.clone().sub(from);
+  const length = axis.length();
+  const geometry = new THREE.BoxGeometry(length, height, width, segments(length), 1, 1);
+  scratch.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(X, axis.normalize()));
+  scratch.setPosition(from.add(to).multiplyScalar(0.5));
+  return geometry.applyMatrix4(scratch);
+}
+
+/** A hand-hewn, chamfered timber or cut-stone beam from `a` to `b` with subtle taper/irregularity. */
+export function hewnBeam(a, b, width, height = width, {
+  bevel = Math.min(0.035, Math.min(width, height) * 0.16),
+  irregular = 0.25,
+  taper = 0,
+  seed = hashCoords(a.x + b.x, a.y + b.y, a.z + b.z, 53),
+} = {}) {
+  const from = new THREE.Vector3(a.x, a.y, a.z), to = new THREE.Vector3(b.x, b.y, b.z);
+  const axis = to.clone().sub(from);
+  const length = axis.length();
+  if (length < 1e-4) return box(0.01, 0.01, 0.01, a);
+  const geometry = buildChamferedPrism(length, height, width, {
+    bevel: Math.min(bevel, length * 0.2),
+    batter: taper,
+    irregular,
+    seed,
+  });
+  scratch.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(X, axis.normalize()));
+  scratch.setPosition(from.add(to).multiplyScalar(0.5));
+  return geometry.applyMatrix4(scratch);
+}
+
+/** A round member from `a` to `b`, `ra` at the start and `rb` at the end: logs, posts, drums, icicles. */
+export function rod(a, b, ra, rb = ra, sides = 10) {
+  const from = new THREE.Vector3(a.x, a.y, a.z), to = new THREE.Vector3(b.x, b.y, b.z);
+  const axis = to.clone().sub(from);
+  const length = axis.length();
+  const geometry = new THREE.CylinderGeometry(rb, ra, length, sides, segments(length));
+  scratch.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(Y, axis.normalize()));
+  scratch.setPosition(from.add(to).multiplyScalar(0.5));
+  return geometry.applyMatrix4(scratch);
+}
+
+/**
+ * A round arch in the vertical plane through `a` and `b` (its springing points),
+ * built of `count` tapered, beveled voussoir blocks with a proud keystone.
+ * `rise` is the crown height above the springing.
+ */
+export function arch(a, b, rise, thickness, depth, count = 9, {
+  keystone = true,
+  irregular = 0.28,
+  seed = hashCoords(a.x + b.x, a.y + b.y, a.z + b.z, 97),
+} = {}) {
+  const parts = [];
+  const rng = createRng(seed);
+  const span = Math.hypot(b.x - a.x, b.z - a.z);
+  const point = (t) => {
+    const angle = Math.PI * t;
+    const along = 0.5 - Math.cos(angle) * 0.5;
+    return {
+      x: a.x + (b.x - a.x) * along, z: a.z + (b.z - a.z) * along,
+      y: a.y + (b.y - a.y) * along + Math.sin(angle) * rise,
+    };
+  };
+  const midIdx = Math.floor(count / 2);
+  for (let index = 0; index < count; index += 1) {
+    const isKey = keystone && count >= 5 && index === midIdx;
+    const p0 = point(index / count);
+    const p1 = point((index + 1) / count);
+    const tThick = thickness * (isKey ? 1.24 : 0.94 + (rng() - 0.5) * 0.14);
+    const tDepth = depth * (isKey ? 1.12 : 0.97 + (rng() - 0.5) * 0.08);
+    parts.push(hewnBeam(p0, p1, tDepth, tThick, {
+      bevel: Math.min(0.05, tThick * 0.14),
+      irregular,
+      seed: seed + index * 31,
+    }));
+  }
+  parts.span = span;
+  return parts;
+}
+
+/**
+ * Lay a coursed, irregular stone wall face between floor points `a` and `b`
+ * of `height` and `thickness`, with varied course heights, varied stone widths,
+ * pillowed bevels, and subtle depth relief.
+ */
+export function coursedWall(a, b, height, thickness, {
+  courseHeight = 0.42,
+  stoneWidth = 0.72,
+  irregular = 0.42,
+  bevel = 0.045,
+  quoins = false,
+  seed = hashCoords(a.x + b.x, a.y, a.z + b.z, 131),
+} = {}) {
+  const parts = [];
+  const rng = createRng(seed);
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const span = Math.hypot(dx, dz);
+  if (span < 0.1 || height < 0.1) return parts;
+  const ux = dx / span, uz = dz / span;
+  const yaw = Math.atan2(-uz, ux);
+
+  const count = Math.max(1, Math.round(height / courseHeight));
+  const weights = Array.from({ length: count }, (_, row) => (
+    (row === 0 ? 1.25 : 0.8 + rng() * 0.42)
+  ));
+  const totalW = weights.reduce((s, w) => s + w, 0);
+  let yCursor = a.y;
+
+  for (let row = 0; row < count; row += 1) {
+    const ch = (weights[row] / totalW) * height;
+    const cy = yCursor + ch * 0.5;
+    yCursor += ch;
+    let uCursor = 0;
+    const rowEnd = span;
+    let col = 0;
+    while (uCursor < rowEnd - 0.08) {
+      const atLeftQuoin = quoins && col === 0;
+      const isRightEnd = rowEnd - uCursor <= stoneWidth * 1.35;
+      const targetW = atLeftQuoin
+        ? ((row % 2 === 0 ? 1.25 : 0.78) * stoneWidth)
+        : stoneWidth * (0.62 + rng() * 0.75);
+      const sw = isRightEnd ? rowEnd - uCursor : Math.min(rowEnd - uCursor, targetW);
+      const cu = uCursor + sw * 0.5;
+      uCursor += sw;
+
+      const isQuoin = quoins && (atLeftQuoin || isRightEnd);
+      const depthBump = (isQuoin ? 0.08 : (rng() - 0.5) * 0.06);
+      const sd = thickness + depthBump;
+      const pos = { x: a.x + ux * cu, y: cy, z: a.z + uz * cu };
+      parts.push(stoneBox(sw * 0.96, ch * 0.93, sd, pos, {
+        yaw,
+        bevel: Math.min(bevel, sw * 0.15, ch * 0.15),
+        batter: row === 0 ? 0.12 : 0,
+        irregular: isQuoin ? irregular * 0.65 : irregular,
+        seed: seed + row * 197 + col * 37,
+      }));
+      col += 1;
+    }
+  }
+  return parts;
+}
