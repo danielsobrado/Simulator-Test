@@ -187,10 +187,33 @@ by more than the arms do, so nothing is claimed either way. Other applications
 were using two to three CPU cores and the GPU during the runs. Reports:
 `tmp/perf-town-alloc-2026-11-13/timed-{a1,b1,a2,b2}.json`.
 
-Next, in order: repeat that A/B/A/B on a quiet machine, with `83c7aa50` as
-the change arm; then the remaining large sources — scatter candidates
-(regional field sampling and the per-placement records), three's attribute
-update and draw-list sort, and tree species selection.
+**Quiet-machine repeat, same day.** Three interleaved pairs, frozen
+`2ee06154` against frozen `83c7aa50`, no process above 0.1 of a core
+beforehand, all six focused, settled and error-free:
+
+| Run | Frames over 16.7 ms | Render avg / p95 | Avg FPS |
+| --- | --- | --- | --- |
+| Before 1, 2, 3 | 2.31%, 2.77%, 2.97% | 6.79–6.83 / 7.8–8.0 ms | 90.3, 90.4, 89.8 |
+| After 1, 2, 3 | 3.72%, 2.60%, 3.36% | 6.76–6.81 / 7.9–8.2 ms | 92.0, 93.1, 91.8 |
+
+The first round of cuts did **not** reduce spikes: the arms overlap, and
+the after arm is if anything slightly worse (mean 3.2% against 2.7%). It
+bought about 2% average FPS. So a quarter less allocation does not move the
+60 FPS floor, which weakens garbage collection in our own code as the main
+cause.
+
+What the hitch frames are made of, in all six runs: 35–50% carry a render
+phase more than 5 ms above its median, and another 30–45% have measured
+phases summing to at least 6 ms less than the frame interval — the time was
+lost outside the animation callback, where no phase clock or render counter
+can see it. That second group is as large as the first and the plan has not
+addressed it. Reports: `tmp/perf-town-alloc-2026-11-13/quiet-{a,b}{1,2,3}.json`.
+
+Next, in order: find out what the outside-callback gaps are (a trace with
+GC, compositor and GPU-process events over one town run) before cutting any
+more allocation; then, only if that trace blames GC, the remaining large
+sources — scatter candidates, three's attribute update and draw-list sort,
+and tree species selection.
 
 ### 0.3 Two cascades are closed
 
