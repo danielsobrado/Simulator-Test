@@ -23,8 +23,9 @@ import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from tree_kit import (Branch, assemble, card, card_uv, export, fbm, grow, jitter, material,  # noqa: E402
-                      oriented_card, perpendicular, remove, render_preview, save_image, setup_scene, tube_mesh)
+from tree_kit import (Branch, add_root_spurs, assemble, card, card_uv, export, fbm, grow, jitter, material,  # noqa: E402
+                      oriented_card, perpendicular, remove, render_preview, save_image, setup_scene,
+                      tube_mesh, weld_skeleton_junctions)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.join(ROOT, 'assets', 'runtime-sources', 'trees', 'swamp')
@@ -170,17 +171,19 @@ def build_skeleton(seed, kind, height, base_radius, forks, lean):
     bole_height = height * (0.48 if kind == 'giant' else 0.75)
     heading = rng.uniform(0, 6.28)
     lean_dir = Vector((math.cos(heading), math.sin(heading), 0))
-    # The bole: an S-bent, slowly twisting trunk.
-    steps = 14
+    # The bole: an S-bent, slowly twisting trunk with denser rings near the ground flare.
+    steps = 16
     points, radii = [], []
     bend_phase = rng.uniform(0, 6.28)
-    for i in range(steps + 1):
-        t = i / steps
+    ts = [-0.14 / max(bole_height, 1.0), 0.0, 0.03, 0.07, 0.13, 0.21] + [0.21 + 0.79 * i / (steps - 5) for i in range(1, steps - 4)]
+    for t in ts:
+        tc = max(0.0, t)
         z = t * bole_height
-        offset = lean_dir * (lean * z) + Vector((math.sin(bend_phase + t * 3.1), math.cos(bend_phase * 1.3 + t * 2.4), 0)) * 0.45 * t
+        offset = lean_dir * (lean * tc * bole_height) + Vector((math.sin(bend_phase + tc * 3.1), math.cos(bend_phase * 1.3 + tc * 2.4), 0)) * 0.45 * tc
         points.append(Vector((offset.x, offset.y, z)))
-        radii.append(base_radius * (1 - 0.45 * t))
-    branches.append(Branch(points, radii, 0))
+        radii.append(base_radius * (1 - 0.45 * tc))
+    trunk = Branch(points, radii, 0, kind='trunk')
+    branches.append(trunk)
     top = points[-1]
     top_dir = (points[-1] - points[-2]).normalized()
     if kind == 'snag':
@@ -188,44 +191,44 @@ def build_skeleton(seed, kind, height, base_radius, forks, lean):
         for k in range(forks):
             ang = heading + k * math.pi + rng.uniform(-0.6, 0.6)
             d = (top_dir * 0.6 + Vector((math.cos(ang), math.sin(ang), 0)) * 0.8).normalized()
-            grow(rng, points[int(steps * rng.uniform(0.55, 0.9))], d, height * rng.uniform(0.3, 0.45), radii[-1] * 0.5, 1, spec, branches)
+            idx = int(len(points) * rng.uniform(0.58, 0.90))
+            grow(rng, points[idx], d, height * rng.uniform(0.3, 0.45), radii[idx] * 0.52, 1, spec, branches, parent=trunk)
     else:
         for k in range(forks):
             ang = heading + k * 6.28 / forks + rng.uniform(-0.4, 0.4)
             d = (top_dir * 1.0 + Vector((math.cos(ang), math.sin(ang), 0)) * rng.uniform(0.45, 0.8)).normalized()
-            grow(rng, top, d, (height - bole_height) * rng.uniform(0.75, 0.95), radii[-1] * rng.uniform(0.62, 0.78), 1, spec, branches)
+            grow(rng, top, d, (height - bole_height) * rng.uniform(0.75, 0.95), radii[-1] * rng.uniform(0.65, 0.78), 1, spec, branches, parent=trunk)
         # Low side limbs and dead stubs along the bole.
         for k in range(rng.randint(2, 4)):
-            t = rng.uniform(0.45, 0.9)
-            i = int(t * steps)
+            t = rng.uniform(0.45, 0.88)
+            i = max(2, min(len(points) - 2, int(t * len(points))))
             ang = rng.uniform(0, 6.28)
-            d = Vector((math.cos(ang), math.sin(ang), rng.uniform(0.1, 0.5))).normalized()
-            grow(rng, points[i], d, height * rng.uniform(0.18, 0.32), radii[i] * rng.uniform(0.25, 0.4), 2, spec, branches)
-    # Buttress roots: from the bole's foot outward and down into the mud.
-    roots = []
-    for k in range(rng.randint(5, 7)):
-        ang = heading + k * 6.28 / 6 + rng.uniform(-0.3, 0.3)
-        out_dir = Vector((math.cos(ang), math.sin(ang), 0))
-        # Low, thick flanges that start inside the bole and sink into the mud:
-        # a flared foot, not legs.
-        reach = base_radius * rng.uniform(2.0, 2.9)
-        start_h = base_radius * rng.uniform(1.0, 1.5)
-        pts, rr = [], []
-        for i in range(9):
-            t = i / 8
-            r_out = base_radius * 0.25 + reach * t
-            z = start_h * (1 - t) ** 1.4 - 0.3 * t
-            p = out_dir * r_out + Vector((0, 0, z)) + jitter(rng, 0.04) * t
-            pts.append(p)
-            rr.append(base_radius * 0.52 * (1 - 0.72 * t))
-        roots.append(Branch(pts, rr, 0))
-    return branches, roots
+            d = Vector((math.cos(ang), math.sin(ang), rng.uniform(0.12, 0.48))).normalized()
+            grow(rng, points[i], d, height * rng.uniform(0.18, 0.32), radii[i] * rng.uniform(0.26, 0.40), 1, spec, branches, parent=trunk)
+    # Buttress roots: smooth arched cypress flanges emerging tangentially from the fluted bole.
+    root_count = rng.randint(5, 7)
+    spurs = []
+    for k in range(root_count):
+        ang = heading + k * 6.28318 / root_count + rng.uniform(-0.22, 0.22)
+        spurs.append({
+            'angle': ang,
+            'up': base_radius * rng.uniform(1.55, 2.15),
+            'out': base_radius * rng.uniform(1.35, 1.95),
+            'crest_width': base_radius * rng.uniform(0.14, 0.19),
+            'foot_width': base_radius * rng.uniform(0.38, 0.48),
+            'curve': rng.uniform(-0.15, 0.15),
+            'steps': 5,
+        })
+    weld_skeleton_junctions(branches, add_collars=True, snag=(kind == 'snag'))
+    return branches, spurs
 
 
-def fluted_radius(base_radius, z, theta, phase):
-    """Wider at the foot (flare) and fluted into lobes low down."""
-    flare = 1 + 0.75 * math.exp(-max(z, 0) / (0.9 * base_radius + 0.3))
-    flute = 1 + 0.16 * math.exp(-max(z, 0) / 4.0) * math.sin(5 * theta + phase)
+def fluted_radius(base_radius, z, theta, phase, spur_angles=()):
+    """Wider at the foot (flare) and fluted into lobes aligned with the buttress roots."""
+    zc = max(z, 0.0)
+    flare = 1 + 0.58 * math.exp(-zc / (0.95 * base_radius + 0.35))
+    lobe_sum = sum(math.exp(-((math.atan2(math.sin(theta - a), math.cos(theta - a)) / 0.44) ** 2)) for a in spur_angles)
+    flute = 1 + 0.16 * math.exp(-zc / 3.8) * lobe_sum + 0.08 * math.exp(-zc / 4.2) * math.sin(5 * theta + phase)
     return flare * flute
 
 
@@ -269,14 +272,15 @@ def foliage(bm, uv_layer, branches, seed, kind):
 
 
 def build_tree(name, seed, kind, height, base_radius, forks, lean, bark_mat, leaf_mat):
-    branches, roots = build_skeleton(seed, kind, height, base_radius, forks, lean)
+    branches, spurs = build_skeleton(seed, kind, height, base_radius, forks, lean)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
     phase = random.Random(seed).uniform(0, 6.28)
+    spur_angles = [s['angle'] for s in spurs]
+    trunk_scale = lambda z, theta: fluted_radius(base_radius, z, theta, phase, spur_angles)  # noqa: E731
     for b in branches:
-        tube_mesh(bm, uv, b, (lambda z, theta: fluted_radius(base_radius, z, theta, phase)) if b.depth == 0 else None)
-    for r in roots:
-        tube_mesh(bm, uv, r)
+        tube_mesh(bm, uv, b, trunk_scale if b.depth == 0 else None)
+    add_root_spurs(bm, uv, branches[0], spurs, trunk_scale=trunk_scale, steps=5)
     trunk_mesh = bpy.data.meshes.new(f'{name}-bark')
     bm.to_mesh(trunk_mesh)
     bm.free()

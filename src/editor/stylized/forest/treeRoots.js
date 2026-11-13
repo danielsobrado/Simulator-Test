@@ -8,8 +8,8 @@ import { unitRandom } from './proceduralGeometry.js';
  * Each root is a fin, 72 triangles: tall and thin where it leaves the bole, flat
  * where it creeps into the soil. Built once per prototype, never during a chunk build.
  */
-const ROOT_RINGS = 7;
-const ROOT_SIDES = 6;
+const ROOT_RINGS = 8;
+const ROOT_SIDES = 8;
 const MIN_STEM_RADIUS = 0.06;
 
 /**
@@ -68,6 +68,40 @@ function sectionRing(points) {
   return { x, z, radius: median(stem, [x, z]) };
 }
 
+function detectAuthoredRoots(geometry, position, best, footX, footZ, minY, height) {
+  if (position.count < 80) return false;
+  const footBand = minY + Math.min(1.5, height * 0.10);
+  const sectorMax = new Float64Array(8);
+  let maxFootR = 0;
+  for (let i = 0; i < position.count; i += 1) {
+    const y = position.getY(i);
+    if (y > footBand) continue;
+    const dx = position.getX(i) - footX;
+    const dz = position.getZ(i) - footZ;
+    const r = Math.hypot(dx, dz);
+    if (r > best.radius * 8) continue;
+    if (r > maxFootR) maxFootR = r;
+    const angle = Math.atan2(dz, dx);
+    const bucket = ((Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 8) % 8) + 8) % 8;
+    if (r > sectorMax[bucket]) sectorMax[bucket] = r;
+  }
+  const activeSectors = [...sectorMax].filter((r) => r > 1e-4);
+  if (activeSectors.length >= 4) {
+    const minSectorR = Math.min(...activeSectors);
+    if (maxFootR > best.radius * 1.25 && maxFootR > minSectorR * 1.14) {
+      return true;
+    }
+  }
+  if (maxFootR > best.radius * 1.18) {
+    const ring16 = sectionRing(sliceAt(geometry, minY + height * 0.16));
+    const ring45 = sectionRing(sliceAt(geometry, minY + height * 0.45));
+    if (ring16 && ring45 && ring45.radius > 1e-4 && ring16.radius / ring45.radius < 1.25) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Axis and radius of the stem, or null if it has none. Measured on cross-sections
  * of the surface, not its vertices: decimated authored stems carry only a handful
@@ -89,12 +123,16 @@ export function measureStem(geometry) {
     const ring = sectionRing(sliceAt(geometry, low + span * share));
     if (ring && ring.radius >= MIN_STEM_RADIUS && (!best || ring.radius < best.radius)) best = ring;
   }
+  const foot = sectionRing(sliceAt(geometry, minY + Math.min(0.25, height * 0.015)));
   // A sapling's bole can taper under the minimum by then: take it at its foot.
   if (!best) {
-    const foot = sectionRing(sliceAt(geometry, minY + height * 0.01));
     if (foot && foot.radius >= MIN_STEM_RADIUS) best = foot;
   }
-  return best ? { ...best, minY, height } : null;
+  if (!best) return null;
+  const footX = foot ? foot.x : best.x;
+  const footZ = foot ? foot.z : best.z;
+  const hasAuthoredRoots = detectAuthoredRoots(geometry, position, best, footX, footZ, minY, height);
+  return { ...best, footX, footZ, minY, height, hasAuthoredRoots };
 }
 
 function uvRange(geometry) {
@@ -142,6 +180,8 @@ export function createTreeRootGeometry(trunk, seed, {
   const normals = [];
   const uvs = [];
   const indices = [];
+  const footX = stem.footX ?? stem.x;
+  const footZ = stem.footZ ?? stem.z;
   rootHeadings(seed, profile).forEach((angle, root) => {
     const channel = 300 + root * 7;
     const reach = Math.min(stem.radius * lerp(profile.reach, unitRandom(seed, channel + 1)), maxReach);
@@ -155,21 +195,25 @@ export function createTreeRootGeometry(trunk, seed, {
     for (let ring = 0; ring < ROOT_RINGS; ring += 1) {
       const t = ring / (ROOT_RINGS - 1);
       const heading = angle + wander * t * t;
-      const out = stem.radius * 0.55 + reach * t;
-      const cx = stem.x + Math.cos(heading) * out;
-      const cz = stem.z + Math.sin(heading) * out;
+      const out = stem.radius * 0.42 + reach * (t ** 1.12);
+      const originX = footX + (stem.x - footX) * ((1 - t) ** 1.6);
+      const originZ = footZ + (stem.z - footZ) * ((1 - t) ** 1.6);
+      const cx = originX + Math.cos(heading) * out;
+      const cz = originZ + Math.sin(heading) * out;
       // A fin from below the soil up to a crest that falls fast off the bole and
       // then creeps along the ground, so the root reads as rising out of the earth.
-      const halfWidth = thickness * (1 - t * 0.7);
+      const halfWidth = thickness * (1 - t * 0.72);
       // The tip dives into the soil, so a dip under it never shows it hanging.
       const dive = stem.radius * 0.6 * t * t;
-      const crest = stem.minY + rise * (1 - t) ** 1.4 + halfWidth - dive;
+      const crest = stem.minY + rise * ((1 - t) ** 1.75) + halfWidth * (1 - 0.5 * t) - dive;
       const floor = stem.minY - sink - dive;
       const cy = (crest + floor) / 2;
-      const halfHeight = (crest - floor) / 2;
+      const halfHeight = Math.max(0.005, (crest - floor) / 2);
       if (previous) travelled += Math.hypot(cx - previous[0], cy - previous[1], cz - previous[2]);
       previous = [cx, cy, cz];
       const perimeter = Math.PI * 2 * Math.sqrt((halfWidth ** 2 + halfHeight ** 2) / 2);
+      const radialX = Math.cos(heading);
+      const radialZ = Math.sin(heading);
       for (let side = 0; side < ROOT_SIDES; side += 1) {
         const around = (side / ROOT_SIDES) * Math.PI * 2;
         const across = Math.cos(around);
@@ -177,11 +221,16 @@ export function createTreeRootGeometry(trunk, seed, {
         const sideX = -Math.sin(heading);
         const sideZ = Math.cos(heading);
         positions.push(cx + sideX * across * halfWidth, cy + up * halfHeight, cz + sideZ * across * halfWidth);
-        // Ellipse normal: a flat fin faces sideways, its crest faces the sky.
-        const nAcross = across / halfWidth;
-        const nUp = up / halfHeight;
-        const length = Math.hypot(nAcross, nUp) || 1;
-        normals.push(sideX * nAcross / length, nUp / length, sideZ * nAcross / length);
+        // Blend cross-section ellipse normal with outward trunk radial normal so root shoulders
+        // shade continuously with the trunk bark instead of catching flat sky-facing moss wedges.
+        const nAcross = across / Math.max(halfWidth, 0.005);
+        const nUp = (up * 0.48) / halfHeight;
+        const nOut = (0.35 + 0.45 * (1 - t)) / Math.max(halfWidth, 0.005);
+        const nx = sideX * nAcross + radialX * nOut;
+        const ny = nUp;
+        const nz = sideZ * nAcross + radialZ * nOut;
+        const length = Math.hypot(nx, ny, nz) || 1;
+        normals.push(nx / length, ny / length, nz / length);
         uvs.push(
           range ? range.minU + (side / ROOT_SIDES) * perimeter * uPerMetre : 0,
           range ? range.minV + travelled * vPerMetre : t,
@@ -216,20 +265,25 @@ export function swellTrunkBase(trunk, stem, headings, profile = ROOT_PROFILES.br
   const position = trunk.getAttribute('position');
   if (!position || headings.length === 0) return;
   const reachHeight = stem.radius * lerp(profile.rise, 0.5) * 1.2;
+  const footX = stem.footX ?? stem.x;
+  const footZ = stem.footZ ?? stem.z;
   for (let index = 0; index < position.count; index += 1) {
     const y = position.getY(index);
     const h = (y - stem.minY) / reachHeight;
     if (h >= 1) continue;
-    const dx = position.getX(index) - stem.x;
-    const dz = position.getZ(index) - stem.z;
+    const hClamped = Math.max(0, h);
+    const axisX = footX + (stem.x - footX) * hClamped;
+    const axisZ = footZ + (stem.z - footZ) * hClamped;
+    const dx = position.getX(index) - axisX;
+    const dz = position.getZ(index) - axisZ;
     const distance = Math.hypot(dx, dz);
     if (distance < 1e-5 || distance > stem.radius * 2.5) continue;
     const theta = Math.atan2(dz, dx);
     let lobe = 0;
-    for (const heading of headings) lobe = Math.max(lobe, Math.max(0, Math.cos(theta - heading)) ** 6);
-    const scale = 1 + profile.swell * (1 - Math.max(0, h)) ** 3 * (0.45 + 0.55 * lobe);
-    position.setX(index, stem.x + dx * scale);
-    position.setZ(index, stem.z + dz * scale);
+    for (const heading of headings) lobe = Math.max(lobe, Math.max(0, Math.cos(theta - heading)) ** 4);
+    const scale = 1 + profile.swell * ((1 - hClamped) ** 2.6) * (0.45 + 0.55 * lobe);
+    position.setX(index, axisX + dx * scale);
+    position.setZ(index, axisZ + dz * scale);
   }
   position.needsUpdate = true;
   trunk.computeBoundingBox();

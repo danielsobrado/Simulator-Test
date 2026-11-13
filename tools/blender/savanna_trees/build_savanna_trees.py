@@ -23,8 +23,8 @@ import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from tree_kit import (Branch, assemble, card, export, fbm, grow, jitter, material,  # noqa: E402
-                      perpendicular, remove, save_image, setup_scene, tube_mesh)
+from tree_kit import (Branch, add_root_spurs, assemble, card, export, fbm, grow, jitter, material,  # noqa: E402
+                      perpendicular, remove, save_image, setup_scene, tube_mesh, weld_skeleton_junctions)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.join(ROOT, 'assets', 'runtime-sources', 'trees', 'savanna')
@@ -108,7 +108,7 @@ FAN = {
 }
 
 
-def limb(rng, start, end, radius, end_radius, steps=10, wander=0.18):
+def limb(rng, start, end, radius, end_radius, steps=10, wander=0.18, parent=None):
     """A zig-zag limb from `start` to `end`: acacia wood bends at every node."""
     points, radii = [], []
     side = perpendicular((end - start).normalized())
@@ -118,7 +118,7 @@ def limb(rng, start, end, radius, end_radius, steps=10, wander=0.18):
         p = start.lerp(end, t) + side * bend * rng.uniform(-1, 1) + jitter(rng, 0.05) * (0 < i < steps)
         points.append(p)
         radii.append(radius + (end_radius - radius) * t ** 0.9)
-    return Branch(points, radii, 1)
+    return Branch(points, radii, 1, parent=parent)
 
 
 def build_skeleton(seed, height, crown, base_radius, limbs, bole_share, lean):
@@ -128,13 +128,15 @@ def build_skeleton(seed, height, crown, base_radius, limbs, bole_share, lean):
     bole_h = height * bole_share
     plane = height * 0.86
     branches = []
-    # The bole: short and leaning, slightly flared at the foot.
+    # The bole: short and leaning, with denser lower stations for a smooth foot flare.
     pts, rr = [], []
-    for i in range(7):
-        t = i / 6
-        pts.append(lean_dir * lean * bole_h * t + Vector((0, 0, bole_h * t)) + jitter(rng, 0.03) * (0 < i < 6))
-        rr.append(base_radius * (1 - 0.25 * t))
-    branches.append(Branch(pts, rr, 0))
+    ts = [-0.14 / max(bole_h, 1.0), 0.0, 0.06, 0.14, 0.26, 0.44, 0.65, 0.84, 1.0]
+    for idx, t in enumerate(ts):
+        tc = max(0.0, t)
+        pts.append(lean_dir * lean * bole_h * tc + Vector((0, 0, bole_h * t)) + jitter(rng, 0.025) * (1 < idx < len(ts) - 1))
+        rr.append(base_radius * (1 - 0.25 * tc))
+    trunk = Branch(pts, rr, 0, kind='trunk')
+    branches.append(trunk)
     top = pts[-1]
     # Primary limbs climb at an angle to the crown plane, spread round the bole.
     tips = []
@@ -142,32 +144,40 @@ def build_skeleton(seed, height, crown, base_radius, limbs, bole_share, lean):
         ang = heading + k * 6.28 / limbs + rng.uniform(-0.5, 0.5)
         reach = crown * rng.uniform(0.5, 0.75)
         end = Vector((math.cos(ang) * reach, math.sin(ang) * reach, plane - rng.uniform(0.3, 0.9))) + lean_dir * lean * bole_h
-        r0 = rr[-1] * rng.uniform(0.62, 0.78)
-        branches.append(limb(rng, top, end, r0, r0 * 0.45))
-        tips.append((end, ang, r0 * 0.45))
+        r0 = rr[-1] * rng.uniform(0.66, 0.78)
+        primary = limb(rng, top, end, r0, r0 * 0.45, parent=trunk)
+        branches.append(primary)
+        tips.append((end, ang, r0 * 0.45, primary))
     # From each limb head a fan of boughs out to the crown's rim, mostly outward
     # but some back over the bole so the plate closes over the trunk.
-    for end, ang, r in tips:
+    for end, ang, r, primary in tips:
         fan = []
         for j in range(rng.randint(5, 7)):
             a = ang + rng.uniform(-2.0, 2.0)
             d = Vector((math.cos(a), math.sin(a), rng.uniform(0.0, 0.18))).normalized()
             length = crown * rng.uniform(0.3, 0.6)
-            grow(rng, end, d, length, r * rng.uniform(0.5, 0.75), 2, FAN, fan)
+            grow(rng, end, d, length, r * rng.uniform(0.5, 0.75), 2, FAN, fan, parent=primary)
         # Squash the fan about its head: twigs that climbed or drooped out of the
         # plate read as sticks above it and as pads hanging under it. One mapping
         # for the whole fan keeps every child joined to its parent.
         for b in fan:
             b.points = [Vector((p.x, p.y, end.z + (p.z - end.z) * 0.25)) for p in b.points]
         branches.extend(fan)
-    # Roots: a short flare into the ground.
+    # Roots: smooth surface root spurs emerging tangentially from the fluted acacia foot.
+    spurs = []
     for k in range(4):
-        ang = heading + k * 1.57 + rng.uniform(-0.3, 0.3)
-        out = Vector((math.cos(ang), math.sin(ang), 0))
-        # Starts inside the bole and sinks below grade: a flared foot, not legs.
-        rp = [out * base_radius * (0.2 + 1.3 * t) + Vector((0, 0, base_radius * 0.7 * (1 - t) - 0.25 * t)) for t in (0, 0.5, 1)]
-        branches.append(Branch(rp, [base_radius * 0.75, base_radius * 0.45, base_radius * 0.15], 0))
-    return branches, plane
+        ang = heading + k * 1.57 + rng.uniform(-0.25, 0.25)
+        spurs.append({
+            'angle': ang,
+            'up': base_radius * rng.uniform(1.4, 2.0),
+            'out': base_radius * rng.uniform(1.4, 1.9),
+            'crest_width': base_radius * 0.26,
+            'foot_width': base_radius * 0.48,
+            'curve': rng.uniform(-0.14, 0.14),
+            'steps': 4,
+        })
+    weld_skeleton_junctions(branches, add_collars=True)
+    return branches, spurs, plane
 
 
 def pads(bm, uv_layer, branches, seed, plane):
@@ -211,11 +221,20 @@ def preview(root, path, crown, height):
 
 
 def build_tree(name, seed, height, crown, base_radius, limbs, bole_share, lean, bark_mat, leaf_mat):
-    branches, plane = build_skeleton(seed, height, crown, base_radius, limbs, bole_share, lean)
+    branches, spurs, plane = build_skeleton(seed, height, crown, base_radius, limbs, bole_share, lean)
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
+    spur_angles = [s['angle'] for s in spurs]
+
+    def acacia_bole(z, theta):
+        zc = max(z, 0.0)
+        flare = 1.0 + 0.38 * math.exp(-zc / (1.3 * base_radius + 0.2))
+        lobe_sum = sum(math.exp(-((math.atan2(math.sin(theta - a), math.cos(theta - a)) / 0.48) ** 2)) for a in spur_angles)
+        return flare * (1.0 + 0.14 * math.exp(-zc / 1.2) * lobe_sum)
+
     for b in branches:
-        tube_mesh(bm, uv, b)
+        tube_mesh(bm, uv, b, acacia_bole if b.depth == 0 else None)
+    add_root_spurs(bm, uv, branches[0], spurs, trunk_scale=acacia_bole, steps=4)
     trunk_mesh = bpy.data.meshes.new(f'{name}-bark')
     bm.to_mesh(trunk_mesh)
     bm.free()

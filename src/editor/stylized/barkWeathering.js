@@ -138,7 +138,7 @@ export function applyBarkWeathering(material, { settings }) {
   // and along the tops of its roots, which is where it stays damp.
   const facing = dot(normalWorld, vec3(SHADED_SIDE[0], SHADED_SIDE[1], SHADED_SIDE[2]))
     .max(0).mul(0.7)
-    .add(normalWorld.y.max(0).mul(0.8));
+    .add(smoothstep(0.55, 0.92, normalWorld.y).mul(0.45));
   const low = smoothstep(0, MOSS_REACH, local.y).oneMinus().mul(0.6).add(0.4);
   // The snow band is an altitude, so it reads the world height — the instance
   // anchor shifts only x and z, so y is canonical metres. Against `local.y`,

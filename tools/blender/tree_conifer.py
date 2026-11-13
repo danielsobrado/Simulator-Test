@@ -15,9 +15,11 @@ GOLDEN = 2.39996
 
 def trunk_sampler(points, radii, height):
     def at(z):
-        f = min(max(z / height, 0), 1) * (len(points) - 1)
-        i = min(int(f), len(points) - 2)
-        return points[i].lerp(points[i + 1], f - i), radii[i] + (radii[i + 1] - radii[i]) * (f - i)
+        pts_pos = [p for p in points if p.z >= 0.0]
+        rads_pos = [r for p, r in zip(points, radii) if p.z >= 0.0]
+        f = min(max(z / height, 0), 1) * (len(pts_pos) - 1)
+        i = min(int(f), len(pts_pos) - 2)
+        return pts_pos[i].lerp(pts_pos[i + 1], f - i), rads_pos[i] + (rads_pos[i + 1] - rads_pos[i]) * (f - i)
     return at
 
 
@@ -33,14 +35,18 @@ def whorled_conifer(rng, spec):
     heading, phase = rng.uniform(0, 6.28), rng.uniform(0, 6.28)
     lean_dir = Vector((math.cos(heading), math.sin(heading), 0))
     points, radii = [], []
-    for i in range(15):
-        t = i / 14
+    # Cluster lower trunk stations near z=0 (and slightly below grade) for a smooth root flare
+    ts = [-0.14 / max(height, 1.0), 0.0, 0.025, 0.06, 0.11] + [0.11 + 0.89 * i / 12 for i in range(1, 13)]
+    for t in ts:
+        tc = max(0.0, t)
         z = t * height
-        wobble = Vector((math.sin(phase + t * 5.1), math.cos(phase * 1.7 + t * 4.3), 0)) * 0.15 * math.sin(math.pi * t)
-        points.append(lean_dir * spec['lean'] * z + wobble + Vector((0, 0, z)))
-        radii.append(base_radius * (1 - 0.2 * z / bole) if z < bole
-                     else base_radius * 0.8 + (tip_radius - base_radius * 0.8) * (z - bole) / (height - bole))
-    branches, cards = [Branch(points, radii, 0)], []
+        zc = tc * height
+        wobble = Vector((math.sin(phase + tc * 5.1), math.cos(phase * 1.7 + tc * 4.3), 0)) * 0.15 * math.sin(math.pi * tc)
+        points.append(lean_dir * spec['lean'] * zc + wobble + Vector((0, 0, z)))
+        radii.append(base_radius * (1 - 0.2 * zc / bole) if zc < bole
+                     else base_radius * 0.8 + (tip_radius - base_radius * 0.8) * (zc - bole) / (height - bole))
+    trunk = Branch(points, radii, 0, kind='trunk')
+    branches, cards = [trunk], []
     trunk_at = trunk_sampler(points, radii, height)
 
     def pick(t):
@@ -68,8 +74,8 @@ def whorled_conifer(rng, spec):
                 pos = pos + d * length / segments
                 pts.append(pos.copy())
                 dirs.append(d)
-            r0 = max(0.02, min(0.07, trunk_radius * 0.35))
-            branches.append(Branch(pts, [r0 + (0.012 - r0) * j / segments for j in range(segments + 1)], 1))
+            r0 = max(0.024, min(0.08, trunk_radius * 0.38))
+            branches.append(Branch(pts, [r0 + (0.012 - r0) * j / segments for j in range(segments + 1)], 1, parent=trunk))
             for s in range(stations):
                 f = near if stations == 1 else near + (far - near) * s / (stations - 1)
                 at = min(int(f * segments), segments - 1)
@@ -94,10 +100,10 @@ def whorled_conifer(rng, spec):
                           'roll': roll + twist, 'whorl': whorl, 'branch': 0})
     for _ in range(rng.randint(3, 5) if spec.get('stubs') else 0):
         # Bare, broken stubs where the lower crown has died back.
-        start, _ = trunk_at(bole * rng.uniform(0.35, 0.95))
+        start, tr_r = trunk_at(bole * rng.uniform(0.35, 0.95))
         angle = rng.uniform(0, 6.28)
         d = Vector((math.cos(angle), math.sin(angle), rng.uniform(-0.25, 0.1))).normalized()
-        branches.append(Branch([start, start + d * rng.uniform(0.3, 0.9)], [0.03, 0.02], 1))
+        branches.append(Branch([start, start + d * rng.uniform(0.3, 0.9)], [max(0.03, tr_r * 0.26), 0.02], 1, parent=trunk))
     return branches, cards
 
 

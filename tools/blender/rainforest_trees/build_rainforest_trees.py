@@ -25,7 +25,8 @@ import bmesh
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from tree_kit import Branch, assemble, card, grow, material, remove, render_preview, setup_scene, tube_mesh  # noqa: E402
+from tree_kit import (Branch, add_root_spurs, assemble, card, grow, material,  # noqa: E402
+                      remove, render_preview, setup_scene, tube_mesh, weld_skeleton_junctions)
 from tree_kit_scans import (contact_sheet, export_group, join_atlases, leaf_atlas_from_scan,  # noqa: E402
                             region_card, source_path, triangles)
 from tree_sprays import bake_sprays, broadleaf_spray, palm_frond, upright  # noqa: E402
@@ -93,12 +94,13 @@ def palm_atlas():
 
 # ---------------------------------------------------------------- skeleton
 
-def tube_sides(radius):
-    return 14 if radius > 0.5 else 8 if radius > 0.2 else 5 if radius > 0.08 else 3
+def tube_sides(radius, depth=0):
+    return 14 if radius > 0.5 else 8 if (radius > 0.2 or (depth == 1 and radius > 0.12)) else 5 if radius > 0.08 else 3
 
 
 def tube_triangles(branch):
-    sides = tube_sides(branch.radii[0])
+    r0 = getattr(branch, 'nominal_radius', branch.radii[0])
+    sides = getattr(branch, 'forced_sides', None) or tube_sides(r0, branch.depth)
     return sides * (len(branch.points) - 1) * 2 + sides
 
 
@@ -106,16 +108,28 @@ def thinned(branch, step):
     if step <= 1 or len(branch.points) <= 3:
         return branch
     keep = sorted(set(range(0, len(branch.points), step)) | {len(branch.points) - 1})
-    return Branch([branch.points[i] for i in keep], [branch.radii[i] for i in keep], branch.depth)
+    return Branch([branch.points[i].copy() for i in keep], [branch.radii[i] for i in keep],
+                  branch.depth, kind=branch.kind, parent=branch.parent)
 
 
-def fit_trunk(branches, limit):
-    """Thin the fine branches' rings until the bark fits its triangle limit."""
+def fit_trunk(trunk, branches, limit):
+    """Thin the fine branches' rings and weld junctions until the bark fits its triangle limit."""
     for step in (1, 2, 3, 4, 6):
-        fitted = [thinned(b, step) if b.depth >= 2 else b for b in branches]
-        if sum(tube_triangles(b) for b in fitted) <= limit:
-            return fitted
-    return fitted
+        for add_collars in (True, False):
+            # Clone branch points/radii so each candidate pass starts clean
+            cloned = [Branch([p.copy() for p in trunk.points], list(trunk.radii), 0, kind='trunk')]
+            id_map = {id(trunk): cloned[0]}
+            for b in branches:
+                cb = thinned(b, step) if b.depth >= 2 else Branch([p.copy() for p in b.points], list(b.radii), b.depth, kind=b.kind, parent=b.parent)
+                id_map[id(b)] = cb
+                cloned.append(cb)
+            for cb in cloned[1:]:
+                if cb.parent is not None and id(cb.parent) in id_map:
+                    cb.parent = id_map[id(cb.parent)]
+            weld_skeleton_junctions(cloned, add_collars=add_collars)
+            if sum(tube_triangles(b) for b in cloned) <= limit:
+                return cloned[0], cloned[1:]
+    return cloned[0], cloned[1:]
 
 
 def fit_crown(crown, origin, radius, top):
@@ -128,16 +142,18 @@ def fit_crown(crown, origin, radius, top):
                             origin.z + (p.z - origin.z) * sz)) for p in b.points]
 
 
-def bole(rng, height, base_radius, lean, top_share, steps=10):
+def bole(rng, height, base_radius, lean, top_share, steps=12):
     heading, phase = rng.uniform(0, 6.28), rng.uniform(0, 6.28)
     lean_dir = Vector((math.cos(heading), math.sin(heading), 0))
     points, radii = [], []
-    for i in range(steps + 1):
-        t = i / steps
-        wobble = Vector((math.sin(phase + t * 2.6), math.cos(phase * 1.3 + t * 2.1), 0)) * 0.12 * t
-        points.append(lean_dir * lean * height * t + wobble + Vector((0, 0, height * t)))
-        radii.append(base_radius * (1 - (1 - top_share) * t))
-    return Branch(points, radii, 0), heading
+    # Cluster lower stations near the ground (starting slightly below grade) so the root flare curves smoothly
+    ts = [-0.14 / max(height, 1.0), 0.0, 0.035, 0.08, 0.15] + [0.15 + 0.85 * i / (steps - 4) for i in range(1, steps - 3)]
+    for t in ts:
+        tc = max(0.0, t)
+        wobble = Vector((math.sin(phase + tc * 2.6), math.cos(phase * 1.3 + tc * 2.1), 0)) * 0.12 * tc
+        points.append(lean_dir * lean * height * tc + wobble + Vector((0, 0, height * t)))
+        radii.append(base_radius * (1 - (1 - top_share) * tc))
+    return Branch(points, radii, 0, kind='trunk'), heading
 
 
 def limbs(rng, trunk, heading, count, elevation, length, radius_share):
@@ -147,31 +163,8 @@ def limbs(rng, trunk, heading, count, elevation, length, radius_share):
         angle = heading + k * 6.28318 / count + rng.uniform(-0.35, 0.35)
         e = math.radians(rng.uniform(*elevation))
         d = Vector((math.cos(angle) * math.cos(e), math.sin(angle) * math.cos(e), math.sin(e)))
-        grow(rng, top, d, length * rng.uniform(0.85, 1.1), trunk.radii[-1] * radius_share, 1, CROWN, crown)
+        grow(rng, top, d, length * rng.uniform(0.85, 1.1), trunk.radii[-1] * radius_share, 1, CROWN, crown, parent=trunk)
     return crown
-
-
-def buttress(bm, uv_layer, angle, base_radius, up, out):
-    """A plank buttress: a thin fin from `up` metres on the bole to `out` metres
-    from its axis, sunk a little below grade."""
-    direction = Vector((math.cos(angle), math.sin(angle), 0))
-    side = Vector((-math.sin(angle), math.cos(angle), 0))
-    ridge, foot = [], []
-    for i in range(5):
-        t = i / 4
-        r = base_radius * 0.5 + (out - base_radius * 0.5) * t
-        ridge.append(direction * r + Vector((0, 0, up * (1 - t) ** 1.8 - 0.3 * t)))
-        foot.append(direction * r + Vector((0, 0, -0.35)))
-    for i in range(4):
-        thick = [0.09 * (1 - 0.6 * j / 4) for j in (i, i + 1)]
-        for sign in (-1, 1):
-            a, b = foot[i] + side * sign * thick[0] * 1.6, foot[i + 1] + side * sign * thick[1] * 1.6
-            c, d = ridge[i + 1] + side * sign * thick[1] * 0.4, ridge[i] + side * sign * thick[0] * 0.4
-            corners = [a, b, c, d] if sign > 0 else [d, c, b, a]
-            card(bm, uv_layer, corners, [(p.length / 3, p.z / 3) for p in corners])
-        top = [ridge[i] - side * thick[0] * 0.4, ridge[i] + side * thick[0] * 0.4,
-               ridge[i + 1] + side * thick[1] * 0.4, ridge[i + 1] - side * thick[1] * 0.4]
-        card(bm, uv_layer, top, [(p.length / 3, p.z / 3) for p in top])
 
 
 def liana(rng, limb, bole_axis):
@@ -183,7 +176,7 @@ def liana(rng, limb, bole_axis):
     sideways = Vector((-math.sin(angle), math.cos(angle), 0)) * sag * rng.uniform(-0.6, 0.6)
     radius = rng.uniform(0.03, 0.05)
     points = [start.lerp(end, i / 12) + (Vector((0, 0, -sag)) + sideways) * 4 * (i / 12) * (1 - i / 12) for i in range(13)]
-    return Branch(points, [radius] * 13, 1)
+    return Branch(points, [radius] * 13, 1, kind='vine')
 
 
 # ---------------------------------------------------------------- trees
@@ -225,28 +218,44 @@ def emit(bm, uv_layer, regions, cards):
 
 def build_emergent(rng, height, crown_radius, base_radius, trunk_limit, card_limit, extra, regions, bark_bm, leaf_bm, uvs):
     trunk, heading = bole(rng, height * 0.55, base_radius, 0.02, 0.62)
-    crown = limbs(rng, trunk, heading, extra['buttresses'], (35, 50), crown_radius * 0.6, 0.5)
+    crown = limbs(rng, trunk, heading, extra['buttresses'], (35, 50), crown_radius * 0.6, 0.54)
     # Sprays reach about 1.6 m past the twigs, so the skeleton stops short of the crown radius.
     fit_crown(crown, trunk.points[-1], crown_radius - 1.6, height - 1.0)
     primaries = [b for b in crown if b.depth == 1]
     vines = [liana(rng, rng.choice(primaries), trunk.points[0]) for _ in range(extra['lianas'])]
     phase, lobes = rng.uniform(0, 6.28), extra['buttresses']
-    fixed = tube_triangles(trunk) + sum(tube_triangles(v) for v in vines) + lobes * 24
+    spur_steps = 4
+    spur_tris = lobes * (spur_steps * 6 * 2 + 6) + 40
+    vine_tris = sum(tube_triangles(v) for v in vines)
+
+    spur_angles = [heading + k * 6.28318 / lobes + rng.uniform(-0.16, 0.16) for k in range(lobes)]
 
     def fluted(z, theta):
-        flare = 1 + 0.5 * math.exp(-max(z, 0) / (0.9 * base_radius + 0.3))
-        return flare * (1 + 0.12 * math.exp(-max(z, 0) / 4.0) * math.sin(lobes * theta + phase))
+        flare = 1 + 0.45 * math.exp(-max(z, 0) / (1.05 * base_radius + 0.35))
+        lobe_sum = sum(math.exp(-((math.atan2(math.sin(theta - a), math.cos(theta - a)) / 0.42) ** 2)) for a in spur_angles)
+        flute = 1 + 0.18 * math.exp(-max(z, 0) / 4.2) * lobe_sum + 0.05 * math.exp(-max(z, 0) / 5.0) * math.sin(lobes * theta + phase)
+        return flare * flute
 
-    tube_mesh(bark_bm, uvs[0], trunk, fluted)
-    for b in fit_trunk(crown, trunk_limit - fixed) + vines:
+    fitted_trunk, fitted_crown = fit_trunk(trunk, crown, trunk_limit - vine_tris - spur_tris)
+    tube_mesh(bark_bm, uvs[0], fitted_trunk, fluted)
+    for b in fitted_crown + vines:
         tube_mesh(bark_bm, uvs[0], b)
-    for k in range(lobes):
-        buttress(bark_bm, uvs[0], heading + k * 6.28318 / lobes + rng.uniform(-0.2, 0.2), base_radius, extra['up'], extra['out'])
-    cards = tip_cards(rng, crown, ['B1', 'B2', 'B3', 'B4'], 3, 60, (20, 40), (2.2, 3.0), along=(0.45, 0.75, 1.0))
+    spurs = [{
+        'angle': ang,
+        'up': extra['up'] * rng.uniform(1.15, 1.38),
+        'out': extra['out'] * rng.uniform(0.92, 1.08),
+        'crest_width': base_radius * rng.uniform(0.11, 0.15),
+        'foot_width': base_radius * rng.uniform(0.38, 0.48),
+        'curve': rng.uniform(-0.14, 0.14),
+        'steps': spur_steps,
+    } for ang in spur_angles]
+    add_root_spurs(bark_bm, uvs[0], fitted_trunk, spurs, trunk_scale=fluted, steps=spur_steps)
+    cards = tip_cards(rng, fitted_crown, ['B1', 'B2', 'B3', 'B4'], 3, 60, (20, 40), (2.2, 3.0), along=(0.45, 0.75, 1.0))
     epiphytes = []
+    fitted_primaries = [b for b in fitted_crown if b.depth == 1]
     for _ in range(6):
         # A rosette seated on the upper side of a primary limb.
-        limb = rng.choice(primaries)
+        limb = rng.choice(fitted_primaries)
         index = rng.randint(1, len(limb.points) - 1)
         seat, turn = limb.points[index] + Vector((0, 0, limb.radii[index])), rng.uniform(0, 6.28)
         for k in range(5):
@@ -259,13 +268,34 @@ def build_emergent(rng, height, crown_radius, base_radius, trunk_limit, card_lim
 
 
 def build_midstorey(rng, height, crown_radius, base_radius, trunk_limit, card_limit, extra, regions, bark_bm, leaf_bm, uvs):
-    trunk, heading = bole(rng, height * 0.4, base_radius, 0.1, 0.7, steps=6)
-    crown = limbs(rng, trunk, heading, 3, (40, 60), crown_radius * 0.7, 0.62)
+    trunk, heading = bole(rng, height * 0.4, base_radius, 0.1, 0.7, steps=8)
+    crown = limbs(rng, trunk, heading, 3, (40, 60), crown_radius * 0.7, 0.65)
     fit_crown(crown, trunk.points[-1], crown_radius - 1.2, height - 0.6)
-    tube_mesh(bark_bm, uvs[0], trunk)
-    for b in fit_trunk(crown, trunk_limit - tube_triangles(trunk)):
+    root_lobes = 4
+    spur_steps = 3
+    spur_tris = root_lobes * (spur_steps * 6 * 2 + 6)
+    spur_angles = [heading + k * 6.28318 / root_lobes + rng.uniform(-0.2, 0.2) for k in range(root_lobes)]
+
+    def mid_fluted(z, theta):
+        flare = 1 + 0.35 * math.exp(-max(z, 0) / (1.4 * base_radius + 0.25))
+        lobe_sum = sum(math.exp(-((math.atan2(math.sin(theta - a), math.cos(theta - a)) / 0.5) ** 2)) for a in spur_angles)
+        return flare * (1 + 0.12 * math.exp(-max(z, 0) / 1.4) * lobe_sum)
+
+    fitted_trunk, fitted_crown = fit_trunk(trunk, crown, trunk_limit - spur_tris)
+    tube_mesh(bark_bm, uvs[0], fitted_trunk, mid_fluted)
+    for b in fitted_crown:
         tube_mesh(bark_bm, uvs[0], b)
-    cards = sorted(tip_cards(rng, crown, ['J1', 'J2'], 2, 70, (15, 35), (1.6, 2.2), along=(0.5, 1.0)), key=lambda c: c['inner'])
+    spurs = [{
+        'angle': ang,
+        'up': base_radius * rng.uniform(1.8, 2.5),
+        'out': base_radius * rng.uniform(1.6, 2.2),
+        'crest_width': base_radius * 0.24,
+        'foot_width': base_radius * 0.46,
+        'curve': rng.uniform(-0.12, 0.12),
+        'steps': spur_steps,
+    } for ang in spur_angles]
+    add_root_spurs(bark_bm, uvs[0], fitted_trunk, spurs, trunk_scale=mid_fluted, steps=spur_steps)
+    cards = sorted(tip_cards(rng, fitted_crown, ['J1', 'J2'], 2, 70, (15, 35), (1.6, 2.2), along=(0.5, 1.0)), key=lambda c: c['inner'])
     emit(leaf_bm, uvs[1], regions, cards[max(0, len(cards) - card_limit // 2):])
 
 
@@ -291,14 +321,21 @@ def build_palm(rng, height, crown_radius, base_radius, trunk_limit, card_limit, 
     lean_dir = Vector((math.cos(heading), math.sin(heading), 0))
     bow_dir = Vector((math.cos(bow), math.sin(bow), 0))
     stem = height - 1.2  # the fronds arch above the top of the trunk
-    # The two palms differ in ring count on purpose: with identical topology the
-    # exporter shares one index buffer between them, gltfpack splits it, and the
-    # asset optimizer then reports the geometry as having grown.
+    # Cluster stations near the base so the palm's bulbous fibrous root boss curves smoothly
     last = extra['rings'] - 1
-    points = [lean_dir * extra['lean'] * stem * (i / last) ** 1.6 + bow_dir * 0.25 * math.sin(math.pi * i / last)
-              + Vector((0, 0, stem * i / last)) for i in range(last + 1)]
-    trunk = Branch(points, [base_radius * (1 - 0.3 * i / last) for i in range(last + 1)], 0)
-    tube_mesh(bark_bm, uvs[0], trunk, lambda z, theta: 1 + 0.25 * math.exp(-max(z, 0) / 0.5))
+    ts = [-0.008, 0.0, 0.025, 0.06, 0.11] + [0.11 + 0.89 * i / (last - 2) for i in range(1, last - 1)]
+    points = [lean_dir * extra['lean'] * stem * (max(0.0, t) ** 1.6) + bow_dir * 0.25 * math.sin(math.pi * max(0.0, t))
+              + Vector((0, 0, stem * t)) for t in ts]
+    radii = [base_radius * (1 - 0.3 * max(0.0, t)) for t in ts]
+    trunk = Branch(points, radii, 0, kind='trunk')
+
+    def palm_bole(z, theta):
+        zc = max(z, 0.0)
+        bulb = 1.0 + 0.44 * math.exp(-((zc / 0.52) ** 1.4))
+        flute = 1.0 + 0.06 * math.exp(-zc / 0.9) * math.cos(7 * theta + heading)
+        return bulb * flute
+
+    tube_mesh(bark_bm, uvs[0], trunk, palm_bole)
     top = points[-1]
     for k in range(extra['fronds']):
         young = k < 5

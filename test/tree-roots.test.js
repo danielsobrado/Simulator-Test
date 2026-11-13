@@ -73,6 +73,25 @@ test('the foot swells into the roots and the bole above it does not', () => {
   assert.ok(Math.abs(bole - 0.3) < 0.01, `bole radius ${bole}`);
 });
 
+test('a trunk that already has authored root spurs keeps them without adding duplicate procedural root fins', () => {
+  const geometry = trunk(0.35).toNonIndexed();
+  const spurs = createTreeRootGeometry(geometry, 'authored-buttress');
+  const posA = geometry.getAttribute('position');
+  const posB = spurs.toNonIndexed().getAttribute('position');
+  const merged = new Float32Array(posA.array.length + posB.array.length);
+  merged.set(posA.array, 0);
+  merged.set(posB.array, posA.array.length);
+  const authored = new THREE.BufferGeometry();
+  authored.setAttribute('position', new THREE.Float32BufferAttribute(merged, 3));
+  const vertexCountBefore = authored.getAttribute('position').count;
+  const stem = measureStem(authored);
+  assert.equal(stem.hasAuthoredRoots, true);
+  const parts = [{ kind: 'trunk', geometry: authored }, { kind: 'leaf', geometry: new THREE.SphereGeometry(3) }];
+  assert.equal(attachTreeRoots(parts, 'authored-buttress'), true);
+  assert.equal(parts[0].geometry.getAttribute('position').count, vertexCountBefore);
+  assert.ok(parts[0].bole.radius > 0.25 && parts[0].bole.radius < 0.45);
+});
+
 test('species pick their root profile', () => {
   assert.equal(rootProfileForSpecies(['conifer_narrow', 'conifer_wide']), 'conifer');
   assert.equal(rootProfileForSpecies('wetland_sparse'), 'buttress');

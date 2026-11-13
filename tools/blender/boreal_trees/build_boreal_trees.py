@@ -14,6 +14,7 @@ docs/plans/trees-aaa-plan-2026-11-10.md §5: a straight leader with whorls of
 drooping (spruce, fir) or rising (pine) branches, each carrying crossed cards of
 scanned needle sprays.
 """
+import math
 import os
 import random
 import sys
@@ -23,7 +24,7 @@ import bmesh
 from mathutils import Vector
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from tree_kit import assemble, material, remove, render_preview, setup_scene, tube_mesh  # noqa: E402
+from tree_kit import add_root_spurs, assemble, material, remove, render_preview, setup_scene, tube_mesh, weld_skeleton_junctions  # noqa: E402
 from tree_conifer import drop_to_limit, whorled_conifer  # noqa: E402
 from tree_kit_scans import (contact_sheet, export_group, leaf_atlas_from_scan, region_card,  # noqa: E402
                             source_path, triangles)
@@ -89,10 +90,31 @@ def build_tree(name, regions, bark_mat, leaf_mat):
                 cards.append({'base': branch.points[-1] - direction * 0.1, 'dir': direction, 'width': spec['card_width'],
                               'key': 'FT', 'roll': rng.uniform(0, 3.14), 'whorl': 0, 'branch': 0})
     cards = drop_to_limit(cards, card_limit)
+    weld_skeleton_junctions(branches, add_collars=False, snag=(spec['stations'] == 0))
+    base_radius = spec['base_radius']
+    root_count = 4
+    spur_angles = [rng.uniform(0, 1.57) + k * 6.28318 / root_count + rng.uniform(-0.22, 0.22) for k in range(root_count)]
+
+    def conifer_bole(z, theta):
+        zc = max(z, 0.0)
+        flare = 1.0 + 0.36 * math.exp(-zc / (1.4 * base_radius + 0.22))
+        lobe_sum = sum(math.exp(-((math.atan2(math.sin(theta - a), math.cos(theta - a)) / 0.48) ** 2)) for a in spur_angles)
+        return flare * (1.0 + 0.12 * math.exp(-zc / 1.4) * lobe_sum)
+
+    spurs = [{
+        'angle': ang,
+        'up': base_radius * rng.uniform(1.4, 2.0),
+        'out': base_radius * rng.uniform(1.4, 1.9),
+        'crest_width': base_radius * 0.25,
+        'foot_width': base_radius * 0.46,
+        'curve': rng.uniform(-0.12, 0.12),
+        'steps': 3,
+    } for ang in spur_angles]
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
     for branch in branches:
-        tube_mesh(bm, uv, branch)
+        tube_mesh(bm, uv, branch, conifer_bole if branch.depth == 0 else None)
+    add_root_spurs(bm, uv, branches[0], spurs, trunk_scale=conifer_bole, steps=3)
     trunk_mesh = bpy.data.meshes.new(f'{name}-bark')
     bm.to_mesh(trunk_mesh)
     bm.free()

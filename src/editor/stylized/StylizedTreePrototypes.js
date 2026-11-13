@@ -292,12 +292,26 @@ export function attachTreeRoots(parts, seed, profileName = 'broadleaf') {
     ...measured,
     radius: Math.min(measured.radius, measured.height * 0.05, crownRadius > 0 ? crownRadius * 0.15 : Infinity),
   };
+  if (measured.hasAuthoredRoots) {
+    trunkPart.geometry.computeBoundingBox();
+    const minY = trunkPart.geometry.boundingBox?.min.y ?? 0;
+    const sink = Math.min(0.14, measured.height * 0.01, stem.radius * 0.35);
+    if (minY >= -1e-3 && sink > 0) {
+      for (const part of parts) {
+        part.geometry.translate(0, -sink, 0);
+        part.geometry.computeBoundingBox();
+        part.geometry.computeBoundingSphere();
+      }
+    }
+    trunkPart.bole = { x: measured.footX ?? stem.x, z: measured.footZ ?? stem.z, radius: stem.radius };
+    return true;
+  }
   const maxReach = Math.min(stem.height * 0.12, crownRadius > 0 ? crownRadius * 0.45 : Infinity);
   const roots = createTreeRootGeometry(trunkPart.geometry, seed, { profile, maxReach, stem });
   swellTrunkBase(trunkPart.geometry, stem, rootHeadings(seed, profile), profile);
   if (!mergeIntoTrunk(parts, roots)) return false;
   // What collision stands the trunk on, since the bark now includes its roots.
-  trunkPart.bole = { x: stem.x, z: stem.z, radius: stem.radius };
+  trunkPart.bole = { x: measured.footX ?? stem.x, z: measured.footZ ?? stem.z, radius: stem.radius };
   return true;
 }
 
