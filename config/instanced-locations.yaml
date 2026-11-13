@@ -108,9 +108,11 @@ instancedLocations:
     iron:
       surface: iron
       scale: 0.9
-      tint: '#ffffff'
-      roughness: 0.75
-      f0: 0.45
+      tint: '#9a9ea8'
+      normalStrength: 1.1
+      roughness: 0.48
+      metalness: 0.82
+      f0: 0.56
     rubble_masonry:
       surface: rubble
       scale: 0.42
@@ -137,33 +139,43 @@ instancedLocations:
       masonry: { courseHeight: 0.55, blockLength: 1.3, jointWidth: 0.035, relief: 1.6 }
     stonehold_granite:
       surface: granite
-      scale: 0.25
-      tint: '#9ca2ac'
-      normalStrength: 1.18
-      roughness: 0.92
+      floorSurface: flagstone
+      floorScale: 0.36
+      floorTint: '#9da3ad'
+      floorRoughness: 0.8
+      walkwayWear: true
+      scale: 0.26
+      tint: '#999fa9'
+      normalStrength: 1.24
+      roughness: 0.9
       dressedRoughness: 0.82
-      sootColor: '#141314'
-      masonry: { courseHeight: 0.82, blockLength: 1.95, jointWidth: 0.036, relief: 1.9 }
+      cavityShade: 0.85
+      sootColor: '#121112'
+      masonry: { courseHeight: 0.82, blockLength: 1.95, jointWidth: 0.036, relief: 1.95 }
     stonehold_ashlar:
       surface: dressed-stone
-      scale: 0.3
+      scale: 0.32
       tint: '#aab0ba'
-      normalStrength: 1.14
-      roughness: 0.86
-      masonry: { courseHeight: 0.82, blockLength: 1.95, jointWidth: 0.032, relief: 1.6 }
+      normalStrength: 1.2
+      roughness: 0.84
+      chiselGrain: 0.62
+      cavityShade: 0.8
     stonehold_carved:
       surface: dressed-stone
-      scale: 0.36
-      tint: '#9298a3'
-      normalStrength: 1.2
-      roughness: 0.8
-      masonry: { courseHeight: 0.65, blockLength: 1.5, jointWidth: 0.024, relief: 1.45 }
+      scale: 0.42
+      tint: '#949aa4'
+      normalStrength: 1.24
+      roughness: 0.76
+      chiselGrain: 0.7
+      cavityShade: 0.95
     bronze:
       surface: iron
-      scale: 0.7
-      tint: '#c08a4a'
-      roughness: 0.55
-      f0: 0.7
+      scale: 0.75
+      tint: '#c89250'
+      normalStrength: 1.1
+      roughness: 0.42
+      metalness: 0.88
+      f0: 0.74
     obsidian_seal:
       surface: basalt
       scale: 0.3

@@ -293,7 +293,7 @@ export function pillar(b, at, height, radius, {
   b.nav.block(at, radius * 1.45, height);
 }
 
-/** A heavy forged brazier on a chamfered pedestal, with a glowing coal bed and layered flame tongues. */
+/** A heavy forged brazier on a chamfered pedestal, with a real charcoal ember bed and animated flame tongues. */
 export function brazier(b, at, {
   tint = '#ffd29e',
   intensity = 6.5,
@@ -304,13 +304,12 @@ export function brazier(b, at, {
 } = {}) {
   b.prop(trimMaterial, stoneBlock(1.12 * size, 0.34 * size, 1.12 * size, at, { bevel: 0.05, batter: 0.14, irregular: 0.08 }));
   b.prop(trimMaterial, stoneBlock(0.84 * size, 0.58 * size, 0.84 * size, up(at, 0.34 * size), { bevel: 0.045, batter: 0.08, irregular: 0.08 }));
-  // Fluted iron fire basin + wide flared lip + optional bronze collar rim.
+  // Riveted wrought-iron fire basin + wide flared lip + optional aged bronze collar rim.
   b.prop('iron', rod(up(at, 0.9 * size), up(at, 1.24 * size), 0.34 * size, 0.68 * size, 8), 0x2a2623);
   b.prop('iron', rod(up(at, 1.24 * size), up(at, 1.38 * size), 0.72 * size, 0.78 * size, 8), 0x35302c);
   if (bronzeRim) {
     b.prop('bronze', rod(up(at, 1.26 * size), up(at, 1.36 * size), 0.75 * size, 0.75 * size, 8), 0xd8b478);
   }
-  // Glowing ember mound cupped inside an iron grate basket (replaces jagged low-poly flame cones).
   b.prop('iron', rod(up(at, 1.54 * size), up(at, 1.6 * size), 0.66 * size, 0.66 * size, 8), 0x2b2622);
   for (let i = 0; i < 6; i += 1) {
     const a = (i / 6) * Math.PI * 2;
@@ -318,22 +317,19 @@ export function brazier(b, at, {
     const bz = at.z + Math.sin(a) * 0.62 * size;
     b.prop('iron', rod({ x: bx, y: at.y + 1.3 * size, z: bz }, { x: bx, y: at.y + 1.58 * size, z: bz }, 0.032 * size, 0.028 * size, 5), 0x2a2521);
   }
-  b.prop('glow', rod(up(at, 1.24 * size), up(at, 1.44 * size), 0.56 * size, 0.36 * size, 8), '#c9400e', 2.2);
-  b.prop('glow', rod(up(at, 1.3 * size), up(at, 1.5 * size), 0.34 * size, 0.16 * size, 8), '#ff922e', 2.5);
-  const coals = [
-    [0.18, 0.12, 0.14],
-    [-0.19, 0.09, 0.13],
-    [0.05, -0.2, 0.13],
-    [-0.14, -0.15, 0.12],
+  // Sculpted dark charcoal bed with glowing ember fissures underneath animated flame tongues.
+  b.prop('glow', rod(up(at, 1.22 * size), up(at, 1.36 * size), 0.58 * size, 0.42 * size, 8), '#c83e0e', 1.65);
+  const clinkers = [
+    [0.24, 0.14, 0.17, 0.35], [-0.22, 0.18, 0.15, 0.9], [0.16, -0.22, 0.16, 1.7],
+    [-0.18, -0.18, 0.15, 2.2], [0.02, 0.04, 0.18, 0.6],
   ];
-  for (const [ox, oz, r] of coals) {
-    b.prop('glow', rod(
-      { x: at.x + ox * size, y: at.y + 1.28 * size, z: at.z + oz * size },
-      { x: at.x + ox * 0.6 * size, y: at.y + 1.46 * size, z: at.z + oz * 0.6 * size },
-      r * size, r * 0.45 * size, 6,
-    ), '#ff7b1c', 1.8);
+  for (const [ox, oz, s, ang] of clinkers) {
+    b.prop('iron', stoneBox(s * 1.15 * size, s * 0.75 * size, s * size, {
+      x: at.x + ox * size, y: at.y + 1.36 * size, z: at.z + oz * size,
+    }, { yaw: ang, bevel: 0.025 * size, irregular: 0.45 }), 0x221c18);
   }
-  b.light(up(at, 1.85 * size), tint, intensity, range, { radius: 2.3, halo: 2.15 * size });
+  b.flame(up(at, 1.36 * size), { width: 0.78 * size, height: 1.08 * size, core: '#ffefb4', outer: '#ff5c14', speed: 1.05 });
+  b.light(up(at, 1.9 * size), tint, intensity, range, { radius: 2.3, halo: 1.15 * size });
   b.nav.block(at, 0.82 * size, 2);
 }
 

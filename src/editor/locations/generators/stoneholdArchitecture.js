@@ -1,6 +1,6 @@
 import { emitRadialArch, coursedMasonryWall } from '../gen/dwarvenMasonry.js';
 import { box, extrudedProfile, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
-import { brazier } from './kits.js';
+import { brazier, crate } from './kits.js';
 
 const P = (x, y, z) => ({ x, y, z });
 const WALL_COURSE_HEIGHT = 0.82;
@@ -24,9 +24,9 @@ function forgeAnvilCrest(b, at, scale = 1, yaw = 0) {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     octPts.push([Math.cos(a) * 1.15 * s, Math.sin(a) * 1.15 * s]);
   }
-  b.prop('carved', extrudedProfile(octPts, 0.22 * s, { bevel: 0.05 * s, yaw, at: offset(0, 0, 0.04 * s) }), 0x8a8f9a);
+  b.prop('carved', extrudedProfile(octPts, 0.2 * s, { bevel: 0.045 * s, yaw, at: offset(0, 0, 0.1 * s) }), 0x8a8f9a);
   const innerOct = octPts.map(([px, py]) => [px * 0.82, py * 0.82]);
-  b.prop('bronze', extrudedProfile(innerOct, 0.14 * s, { bevel: 0.025 * s, yaw, at: offset(0, 0, 0.14 * s) }), 0xd6af6c);
+  b.prop('bronze', extrudedProfile(innerOct, 0.14 * s, { bevel: 0.025 * s, yaw, at: offset(0, 0, 0.24 * s) }), 0xd6af6c);
 
   // Genuine 3D sculpted Dwarven anvil silhouette (horn, face table, waist, stepped foot).
   const anvilPts = [
@@ -36,9 +36,9 @@ function forgeAnvilCrest(b, at, scale = 1, yaw = 0) {
     [-0.64 * s, 0.2 * s], [-0.24 * s, 0.1 * s], [-0.26 * s, -0.18 * s],
     [-0.38 * s, -0.22 * s],
   ];
-  b.prop('iron', extrudedProfile(anvilPts, 0.2 * s, { bevel: 0.03 * s, yaw, at: offset(0, -0.02 * s, 0.22 * s) }), 0x2c2824);
+  b.prop('iron', extrudedProfile(anvilPts, 0.2 * s, { bevel: 0.03 * s, yaw, at: offset(0, -0.02 * s, 0.34 * s) }), 0x62666e);
   const peakPts = [[-0.68 * s, -0.45 * s], [0, 0.12 * s], [0.68 * s, -0.45 * s], [0.46 * s, -0.45 * s], [0, -0.08 * s], [-0.46 * s, -0.45 * s]];
-  b.prop('bronze', extrudedProfile(peakPts, 0.12 * s, { bevel: 0.02 * s, yaw, at: offset(0, 0.36 * s, 0.2 * s) }), 0xe0bf84);
+  b.prop('bronze', extrudedProfile(peakPts, 0.12 * s, { bevel: 0.02 * s, yaw, at: offset(0, 0.36 * s, 0.34 * s) }), 0xe0bf84);
 }
 
 function chevronHood(width, height, overhang, depth, at, yaw = 0) {
@@ -59,8 +59,9 @@ function lanternCage(b, at, lightColor = '#ffd29e', intensity = 3.4, range = 14)
   for (const [lx, lz] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]]) {
     b.prop('iron', rod(P(at.x + lx, at.y - 0.2, at.z + lz), P(at.x + lx, at.y + 0.2, at.z + lz), 0.018, 0.018, 4), 0x2a2623);
   }
-  b.prop('glow', box(0.2, 0.28, 0.2, at), '#ff9e38', 2.2);
-  b.light(at, lightColor, intensity, range, { radius: 1.5, halo: 1.2 });
+  b.prop('glow', rod(P(at.x, at.y - 0.16, at.z), P(at.x, at.y - 0.04, at.z), 0.12, 0.08, 6), '#d94810', 1.5);
+  b.flame(P(at.x, at.y - 0.1, at.z), { width: 0.24, height: 0.36, core: '#fff1b4', outer: '#ff5e14', speed: 1.15 });
+  b.light(at, lightColor, intensity, range, { radius: 1.5, halo: 0.78 });
 }
 
 /**
@@ -120,14 +121,14 @@ export function buildVaultedCeiling(b, bays, { rowX, height, vaultRise, avenueZ,
       const midZ = (z + bays[i + 1]) * 0.5;
       b.prop('carved', stoneBox(1.75, 1.08, 1.75, P(0, crownY - 0.15, midZ), { yaw: Math.PI / 4, bevel: 0.1, irregular: 0.04 }), 0xe2dfd9);
       b.prop('bronze', stoneBox(0.86, 0.22, 0.86, P(0, crownY - 0.68, midZ), { yaw: Math.PI / 4, bevel: 0.025, irregular: 0.03 }), 0xd8b478);
-      // Tier 2 — Clean quadripartite diagonal groin ribs seating cleanly from pier imposts into the bay boss.
+      // Tier 2 — Clean darker diagonal groin ribs seating from pier imposts into the bay boss to preserve contrast.
       for (const sign of [-1, 1]) {
         for (const endZ of [z, bays[i + 1]]) {
           b.prop('carved', hewnBeam(
             P(sign * (rowX - 0.35), height + 0.15, endZ),
             P(0, crownY - 0.15, midZ),
             0.54, 0.62, { bevel: 0.05, irregular: 0.04 },
-          ), 0xcfd2d8);
+          ), 0xb2b6c0);
         }
       }
     }
@@ -178,9 +179,9 @@ export function buildWallBay(b, sign, halfWidth, height, galleryY, z0, z1, varia
     });
   } else {
     const openings = [];
-    if (variant === 'alcove') {
+    if (variant === 'alcove' || variant === 'engineering') {
       openings.push({ s: baySpan * 0.5, sill: 0, width: 4.8, height: 5.45, profile: 'pointed', dressed: true });
-    } else if (variant === 'heritage') {
+    } else if (variant === 'heritage' || variant === 'storage') {
       openings.push({ s: baySpan * 0.5, sill: 0.78, width: 5.2, height: 4.15, profile: 'segmental', dressed: true });
     }
     coursedMasonryWall(b, P(xWall, 0, zHigh), P(xWall, 0, zLow), galleryY - 0.1, 0.68, {
@@ -227,7 +228,7 @@ export function buildWallBay(b, sign, halfWidth, height, galleryY, z0, z1, varia
 
     // Recessed dark backing stele behind the arched opening + 3D extruded Forgeheart Anvil Crest.
     b.prop('carved', stoneBlock(0.28, 3.9, 5.1, P(sign * (halfWidth - 0.08), baseY + 0.25, shrineZ), { bevel: 0.04, irregular: 0.04 }), 0x7c818c);
-    forgeAnvilCrest(b, P(xWall + inDir * 0.18, baseY + 2.35, shrineZ), isChasm ? 1.05 : 1.18, faceYaw);
+    forgeAnvilCrest(b, P(xWall + inDir * 0.24, baseY + 2.35, shrineZ), isChasm ? 1.05 : 1.18, faceYaw);
 
     if (isChasm) {
       for (const dz of [-2.35, 2.35]) {
@@ -251,6 +252,47 @@ export function buildWallBay(b, sign, halfWidth, height, galleryY, z0, z1, varia
     return;
   }
 
+  if (variant === 'engineering') {
+    // Engineering Winch & Chain Conduit Bay: recessed rock pocket, cast-iron capstan winch, pulley & counterweight.
+    b.prop('carved', stoneBlock(0.28, 5.4, 5.0, P(sign * (halfWidth + 0.45), 0, midZ), { bevel: 0.04, irregular: 0.04 }), 0x6c717d);
+    for (const dz of [-2.4, 2.4]) {
+      b.prop('carved', stoneBlock(0.95, 3.6, 0.38, P(sign * (halfWidth + 0.02), 0, midZ + dz), { bevel: 0.03 }), 0x808590);
+    }
+    // Stepped stone capstan base + horizontal oak/iron drum + spokes + tensioned twin hoist chains.
+    b.prop('carved', stoneBlock(1.4, 0.55, 2.5, P(xWall + inDir * 0.3, 0, midZ), { bevel: 0.04, batter: 0.08 }), 0xc8cace);
+    for (const dz of [-0.95, 0.95]) {
+      b.prop('iron', stoneBlock(0.55, 1.35, 0.24, P(xWall + inDir * 0.3, 0.55, midZ + dz), { bevel: 0.025 }), 0x35312c);
+    }
+    b.prop('timber', rod(P(xWall + inDir * 0.3, 1.45, midZ - 0.9), P(xWall + inDir * 0.3, 1.45, midZ + 0.9), 0.32, 0.32, 10), 0x6a5038);
+    b.prop('iron', rod(P(xWall + inDir * 0.3, 1.45, midZ - 1.15), P(xWall + inDir * 0.3, 1.45, midZ + 1.15), 0.14, 0.14, 8), 0x454950);
+    for (const dz of [-0.55, 0.55]) {
+      b.prop('iron', rod(P(xWall + inDir * 0.3, 1.65, midZ + dz), P(xWall + inDir * 0.3, 4.95, midZ + dz), 0.032, 0.032, 6), 0x2c2824);
+    }
+    // Overhead iron pulley beam & heavy stone counterweight block.
+    b.prop('iron', stoneBox(0.95, 0.35, 1.9, P(xWall + inDir * 0.32, 5.0, midZ), { bevel: 0.025 }), 0x36322d);
+    b.prop('carved', stoneBlock(0.68, 0.9, 0.68, P(xWall + inDir * 0.35, 2.35, midZ + 1.45), { bevel: 0.04 }), 0x9ca1ab);
+    b.prop('iron', rod(P(xWall + inDir * 0.35, 3.25, midZ + 1.45), P(xWall + inDir * 0.32, 4.95, midZ + 1.1), 0.026, 0.026, 6), 0x2c2824);
+    lanternCage(b, P(xWall + inDir * 0.55, 3.5, midZ - 2.15), '#ffcf94', 3.4, 15);
+    return;
+  }
+
+  if (variant === 'storage') {
+    // Guild Supply & Assay Storage Bay: segmental stone shelves, orderly ingot bars & sealed crates.
+    b.prop('carved', stoneBlock(0.28, 4.2, 5.1, P(sign * (halfWidth - 0.04), 0.78, midZ), { bevel: 0.04 }), 0x767b86);
+    b.prop('carved', stoneBlock(0.82, 0.78, 5.2, P(xWall + inDir * 0.25, 0, midZ), { bevel: 0.04 }), 0xc6c8cc);
+    b.prop('carved', stoneBox(0.75, 0.16, 4.8, P(xWall + inDir * 0.22, 2.25, midZ), { bevel: 0.025 }), 0xd8d6d2);
+    for (const dz of [-1.7, 0.0, 1.7]) {
+      b.prop('carved', stoneBlock(0.68, 1.45, 0.28, P(xWall + inDir * 0.22, 0.78, midZ + dz), { bevel: 0.025 }), 0xbec1c7);
+    }
+    crate(b, P(xWall + inDir * 0.24, 0.78, midZ - 0.85), 0.68, 0.08);
+    crate(b, P(xWall + inDir * 0.24, 0.78, midZ + 0.85), 0.68, -0.05);
+    for (let i = 0; i < 4; i += 1) {
+      b.prop('bronze', stoneBox(0.42, 0.14, 0.24, P(xWall + inDir * 0.22, 2.4, midZ - 1.2 + i * 0.78), { bevel: 0.02 }), 0xd9b06e);
+    }
+    lanternCage(b, P(xWall + inDir * 0.45, 3.65, midZ), '#ffd29a', 3.0, 14);
+    return;
+  }
+
   // 'alcove': Real split-course pointed arch recess revealing dark inner back wall, hearth apron & flue cowl.
   b.prop('carved', stoneBlock(0.28, 5.4, 5.0, P(sign * (halfWidth + 0.52), 0, midZ), { bevel: 0.04, irregular: 0.04 }), 0x6f7480);
   // Inner flanking return jamb blocks tying the carved pocket cleanly into the outer rock wall.
@@ -266,13 +308,18 @@ export function buildWallBay(b, sign, halfWidth, height, galleryY, z0, z1, varia
   });
 
   if (index === 5) {
+    // Craftsmen's Alcove: stone smithing workbench, bronze ingot stock, iron quench box, and sledge rack.
     const bz = midZ + 4.35;
-    b.prop('timber', stoneBlock(0.78, 0.68, 1.65, P(xWall + inDir * 0.9, 0, bz), { bevel: 0.03, irregular: 0.08 }), 0x6a5038);
-    for (const [dy, dz] of [[0.72, -0.35], [0.72, 0.35], [0.84, 0]]) {
-      b.prop('bronze', stoneBox(0.44, 0.12, 0.22, P(xWall + inDir * 0.9, dy, bz + dz), { bevel: 0.02, irregular: 0.04 }), 0xd9b06e);
+    b.prop('timber', stoneBlock(0.84, 0.72, 1.8, P(xWall + inDir * 0.88, 0, bz), { bevel: 0.03, irregular: 0.08 }), 0x6a5038);
+    b.prop('iron', stoneBox(0.88, 0.08, 1.84, P(xWall + inDir * 0.88, 0.72, bz), { bevel: 0.02 }), 0x35312c);
+    for (const [dy, dz] of [[0.82, -0.45], [0.82, 0.45], [0.95, 0]]) {
+      b.prop('bronze', stoneBox(0.44, 0.12, 0.24, P(xWall + inDir * 0.88, dy, bz + dz), { bevel: 0.02 }), 0xd9b06e);
     }
-    b.prop('timber', hewnBeam(P(xWall + inDir * 0.72, 0.05, bz + 0.95), P(xWall + inDir * 0.42, 1.45, bz + 0.95), 0.08, 0.08), 0x5c422c);
-    b.prop('iron', stoneBox(0.32, 0.24, 0.44, P(xWall + inDir * 0.43, 1.42, bz + 0.95), { bevel: 0.03 }), 0x35312c);
+    b.prop('timber', hewnBeam(P(xWall + inDir * 0.72, 0.05, bz + 1.08), P(xWall + inDir * 0.42, 1.48, bz + 1.08), 0.08, 0.08), 0x5c422c);
+    b.prop('iron', stoneBox(0.32, 0.24, 0.44, P(xWall + inDir * 0.43, 1.45, bz + 1.08), { bevel: 0.03 }), 0x454950);
+    // Stone quench trough beside the hearth.
+    b.prop('carved', stoneBlock(0.75, 0.54, 1.15, P(xWall + inDir * 0.88, 0, midZ - 2.1), { bevel: 0.03 }), 0x9ea2ac);
+    b.prop('iron', stoneBox(0.54, 0.06, 0.92, P(xWall + inDir * 0.88, 0.5, midZ - 2.1), { bevel: 0.015 }), 0x161b20);
   }
 }
 
@@ -313,8 +360,9 @@ export function buildHeroGateway(b, farZ, height) {
     b.prop('carved', stoneBlock(1.4, 3.0, 1.4, P(sign * 9.2, 7.4, farZ + 0.18), { bevel: 0.07, batter: 0.24, irregular: 0.04 }));
     b.prop('bronze', stoneBox(1.1, 0.16, 1.1, P(sign * 9.2, 10.45, farZ + 0.18), { bevel: 0.025 }), 0xd8b478);
     b.prop('iron', rod(P(sign * 9.2, 10.55, farZ + 0.18), P(sign * 9.2, 10.95, farZ + 0.18), 0.36, 0.5, 8), 0x2c2824);
-    b.prop('glow', rod(P(sign * 9.2, 10.9, farZ + 0.18), P(sign * 9.2, 11.25, farZ + 0.18), 0.34, 0.12, 8), '#ff8c2c', 2.2);
-    b.light(P(sign * 9.2, 11.4, farZ + 0.38), '#ffc682', 3.0, 17, { radius: 1.5, halo: 1.2 });
+    b.prop('glow', rod(P(sign * 9.2, 10.82, farZ + 0.18), P(sign * 9.2, 10.96, farZ + 0.18), 0.34, 0.24, 8), '#c8420e', 1.7);
+    b.flame(P(sign * 9.2, 10.95, farZ + 0.18), { width: 0.58, height: 0.85, core: '#fff1b4', outer: '#ff5e14', speed: 1.1 });
+    b.light(P(sign * 9.2, 11.4, farZ + 0.38), '#ffc682', 3.0, 17, { radius: 1.5, halo: 0.9 });
 
     // Inner stepped portal jambs & bronze-clamped flanking pilasters.
     b.prop('carved', stoneBlock(1.4, 8.4, 2.35, P(sign * 4.85, 0, farZ - 0.45), { bevel: 0.07, irregular: 0.05 }));
@@ -358,8 +406,9 @@ export function buildHeroGateway(b, farZ, height) {
   b.prop('iron', rod(P(0, 11.7, farZ - 1.1), P(0, 9.6, farZ - 1.1), 0.04, 0.04, 6), 0x2a2521);
   b.prop('iron', rod(P(0, 9.2, farZ - 1.1), P(0, 9.65, farZ - 1.1), 0.55, 0.35, 8), 0x2c2824);
   b.prop('bronze', rod(P(0, 9.3, farZ - 1.1), P(0, 9.48, farZ - 1.1), 0.58, 0.58, 8), 0xd8b478);
-  b.prop('glow', rod(P(0, 9.1, farZ - 1.1), P(0, 9.32, farZ - 1.1), 0.36, 0.16, 8), '#ff9c34', 2.2);
-  b.light(P(0, 9.0, farZ - 1.1), '#ffc884', 3.6, 17, { radius: 1.5, halo: 1.2 });
+  b.prop('glow', rod(P(0, 9.05, farZ - 1.1), P(0, 9.22, farZ - 1.1), 0.34, 0.24, 8), '#d44810', 1.6);
+  b.flame(P(0, 8.95, farZ - 1.1), { width: 0.45, height: 0.6, core: '#fff1b4', outer: '#ff5e14', speed: 1.15 });
+  b.light(P(0, 9.0, farZ - 1.1), '#ffc884', 3.6, 17, { radius: 1.5, halo: 0.9 });
 
   // Stepped bronze-trimmed threshold sill across the portal floor (flush/walkable).
   b.prop('carved', stoneBox(10.6, 0.05, 2.4, P(0, 0.015, farZ + 0.6), { bevel: 0.02, irregular: 0.03 }));

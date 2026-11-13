@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import {
-  attribute, cameraPosition, color, float, fract, hash, instancedBufferAttribute, instanceIndex, length, mix, positionWorld, pow, sin, smoothstep,
-  time, uniform, uv, vec2, vec3,
+  abs, attribute, cameraPosition, clamp, color, float, fract, hash, instancedBufferAttribute, instanceIndex, length,
+  mix, mx_noise_float, positionWorld, pow, sin, smoothstep, time, uniform, uv, vec2, vec3,
 } from 'three/tsl';
 import { locationLight } from './materials/LocationShading.js';
 
@@ -44,6 +44,66 @@ export function createHalos(halos) {
   material.positionNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(position, 3));
   material.scaleNode = vec2(haloTint.w);
   material.colorNode = haloTint.rgb.mul(softDisc(2.2)).mul(flicker(instanceIndex.toFloat(), 0.1));
+  const sprite = new THREE.Sprite(material);
+  sprite.count = count;
+  sprite.frustumCulled = false;
+  sprite.renderOrder = 2;
+  return sprite;
+}
+
+/**
+ * Animated procedural flame tongues rendered in one instanced draw call:
+ * multi-octave upward turbulence, teardrop envelope, amber-gold core to orange tips.
+ *
+ * @param {Array<{ x: number, y: number, z: number, width: number, height: number, speed: number, core: number[], outer: number[] }>} flames
+ */
+export function createFlames(flames) {
+  const count = flames.length;
+  const position = new Float32Array(count * 3);
+  const scaleSpeed = new Float32Array(count * 3);
+  const coreArr = new Float32Array(count * 3);
+  const outerArr = new Float32Array(count * 3);
+  flames.forEach((flame, index) => {
+    position.set([flame.x, flame.y, flame.z], index * 3);
+    scaleSpeed.set([flame.width, flame.height, flame.speed ?? 1], index * 3);
+    coreArr.set(flame.core, index * 3);
+    outerArr.set(flame.outer, index * 3);
+  });
+
+  const material = new THREE.SpriteNodeMaterial({
+    name: 'location-flames',
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: true,
+  });
+  const sAttr = instancedBufferAttribute(new THREE.InstancedBufferAttribute(scaleSpeed, 3));
+  const coreAttr = instancedBufferAttribute(new THREE.InstancedBufferAttribute(coreArr, 3));
+  const outerAttr = instancedBufferAttribute(new THREE.InstancedBufferAttribute(outerArr, 3));
+  material.positionNode = instancedBufferAttribute(new THREE.InstancedBufferAttribute(position, 3));
+  material.scaleNode = vec2(sAttr.x, sAttr.y);
+
+  const seed = hash(instanceIndex.toFloat().add(1.37));
+  const u = uv().x.sub(0.5).mul(2);
+  const v = uv().y;
+  const scrollT = time.mul(sAttr.z);
+
+  const n1 = mx_noise_float(vec3(u.mul(2.1), v.mul(2.8).sub(scrollT.mul(3.1)), seed.mul(19.3)));
+  const n2 = mx_noise_float(vec3(u.mul(4.8).add(n1.mul(0.85)), v.mul(5.8).sub(scrollT.mul(5.7)), seed.mul(37.1)));
+  const turb = n1.mul(0.65).add(n2.mul(0.35));
+
+  const envelope = pow(clamp(v.mul(3.6), 0, 1), 0.45).mul(pow(clamp(v.oneMinus(), 0, 1), 0.78));
+  const shiftedU = u.add(turb.mul(0.36).mul(v.mul(0.85).add(0.15)));
+  const dx = abs(shiftedU);
+
+  const tongues = clamp(envelope.mul(1.05).add(n2.mul(0.14).mul(v)), 0.01, 1);
+  const bodyMask = smoothstep(tongues, tongues.mul(0.24), dx)
+    .mul(smoothstep(float(0.02), float(0.16), v))
+    .mul(smoothstep(float(1.0), float(0.62), v.add(n2.mul(0.24))))
+    .mul(smoothstep(float(0.99), float(0.84), v));
+  const coreMask = pow(smoothstep(tongues.mul(0.6), float(0), dx).mul(smoothstep(float(0.72), float(0.08), v)), 1.45);
+  const shimmer = flicker(instanceIndex.toFloat().add(5.1), 0.08);
+  material.colorNode = mix(outerAttr, coreAttr, coreMask).mul(bodyMask).mul(shimmer).mul(1.38);
+
   const sprite = new THREE.Sprite(material);
   sprite.count = count;
   sprite.frustumCulled = false;

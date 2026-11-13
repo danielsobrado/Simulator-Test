@@ -1,6 +1,7 @@
 import { coursedMasonryWall, emitRadialArch } from '../gen/dwarvenMasonry.js';
 import { beam, block, box, coursedWall, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
 import { hall, shaft } from '../gen/shapes.js';
+import { buildForgeheartInterior } from './forgeheartInterior.js';
 import { brazier, bridge, crate, pillar, stairs } from './kits.js';
 import { buildEntranceHall, buildFloorInlay, buildHeroGateway, buildVaultedCeiling, buildWallBay } from './stoneholdArchitecture.js';
 
@@ -100,8 +101,10 @@ export function generate(b, params) {
   const rowX = halfWidth * 0.57;
   const bays = [];
   for (let z = -20 - pillarSpacing / 2; z > farZ + 2; z -= pillarSpacing) bays.push(z);
-  const bayVariants = ['structural', 'alcove', 'heritage', 'chasm-heritage', 'heritage', 'alcove', 'structural'];
+  const leftVariants = ['structural', 'alcove', 'heritage', 'chasm-heritage', 'engineering', 'alcove', 'storage'];
+  const rightVariants = ['structural', 'storage', 'heritage', 'chasm-heritage', 'heritage', 'alcove', 'engineering'];
   for (const sign of [-1, 1]) {
+    const bayVariants = sign < 0 ? leftVariants : rightVariants;
     bays.forEach((z, index) => {
       const pVariant = index === bays.length - 1
         ? 'reinforced'
@@ -157,6 +160,24 @@ export function generate(b, params) {
         b.prop('iron', box(0.06, 0.06, 0.72, P(wall - sign * 0.14, galleryY + 1.85, z)), 0x2b2724);
         b.light(P(wall - sign * 0.9, galleryY + 1.9, z), WARM, 2.2, 10, { halo: 1.1 });
       }
+      // Alternating gallery parapet lanterns so upper dwarf dwellings & walkways stay readable rather than black void.
+      if (Math.round(z / 6) % 2 === 0) {
+        const lx = sign * (halfWidth + 0.55);
+        b.prop('iron', stoneBox(0.24, 0.24, 0.24, P(lx, galleryY + 2.45, z), { bevel: 0.02 }), 0x2c2824);
+        b.flame(P(lx, galleryY + 2.22, z), { width: 0.2, height: 0.3, core: '#fff1b4', outer: '#ff5e14', speed: 1.0 });
+        b.light(P(lx - sign * 0.4, galleryY + 2.35, z), '#ffcc8e', 4.0, 16, { radius: 1.2, halo: 0.65 });
+      }
+    }
+    // Purposeful upper gallery installations (chasm windlass on West, alloy supply tally on East).
+    if (sign < 0) {
+      const gx = -halfWidth - 1.2;
+      b.prop('timber', stoneBlock(1.4, 0.3, 1.4, P(gx, galleryY, chasm.z), { bevel: 0.03 }), 0x6a5038);
+      b.prop('timber', rod(P(gx, galleryY + 0.9, chasm.z - 0.55), P(gx, galleryY + 0.9, chasm.z + 0.55), 0.28, 0.28, 8), 0x6a5038);
+      b.prop('iron', rod(P(gx + 0.55, galleryY + 0.9, chasm.z), P(gx + 0.55, galleryY - 3.6, chasm.z), 0.035, 0.035, 6), 0x2c2824);
+    } else {
+      const sx = halfWidth + 2.6;
+      crate(b, P(sx, galleryY, chasm.z - 12), 0.82, 0.15);
+      b.prop('bronze', stoneBox(0.75, 0.16, 0.42, P(sx, galleryY + 0.72, chasm.z - 12), { bevel: 0.02 }), 0xd9b06e);
     }
     // Stair from the aisle to the gallery, with its coursed stone landing pier.
     const foot = P(sign * (halfWidth - 1.9), 0, -23), head = P(sign * (halfWidth - 1.9), galleryY, -37);
@@ -221,68 +242,15 @@ export function generate(b, params) {
     const on = (a, y) => P(dais.x + Math.cos(a) * ringRadius, y, dais.z + Math.sin(a) * ringRadius);
     b.prop('iron', hewnBeam(on(a0, ringY), on(a1, ringY), 0.3, 0.45, { bevel: 0.03, irregular: 0.08 }), 0x2b2724);
     b.prop('iron', rod(on(a0, ringY + 0.2), on(a0, ringY + 0.55), 0.3, 0.5, 8), 0x2b2724);
-    b.prop('glow', rod(on(a0, ringY + 0.5), on(a0, ringY + 0.85), 0.42, 0.06, 7), '#ff8f3f', 5);
-    b.light(on(a0, ringY + 1), '#ff8f3f', 3.4, 20, { halo: 1.8 });
+    b.prop('glow', rod(on(a0, ringY + 0.48), on(a0, ringY + 0.58), 0.34, 0.22, 7), '#c8420e', 1.6);
+    b.flame(on(a0, ringY + 0.55), { width: 0.44, height: 0.62, core: '#fff1b4', outer: '#ff5e14', speed: 1.1 });
+    b.light(on(a0, ringY + 1), '#ff8f3f', 3.4, 20, { halo: 0.95 });
     if (index % 3 === 0) b.prop('iron', rod(on(a0, ringY), P(dais.x + Math.cos(a0) * 1.5, height + vaultRise - 0.4, dais.z + Math.sin(a0) * 1.5), 0.04, 0.04, 5), 0x1f1c1a);
   }
 
-  // --- The forges -----------------------------------------------------------
-  for (const at of furnaces) {
-    b.prop('masonry', stoneBlock(5.5, 4.6, 3.6, at, { bevel: 0.08, batter: 0.06, irregular: 0.28 }));
-    b.prop('masonry', coursedWall(P(at.x - 2.65, 0, at.z + 1.82), P(at.x + 2.65, 0, at.z + 1.82), 4.5, 0.32, {
-      courseHeight: 0.52, stoneWidth: 0.85, irregular: 0.42, quoins: true, bevel: 0.05,
-    }));
-    b.prop('masonry', stoneBlock(4.1, 1.6, 2.9, P(at.x, 4.6, at.z), { bevel: 0.08, batter: 0.12, irregular: 0.26 }));
-    b.prop('masonry', stoneBlock(2.3, 9, 2.3, P(at.x, 6.2, at.z - 0.2), { bevel: 0.08, batter: 0.08, irregular: 0.26 }));
-    emitRadialArch(b, 'masonry', P(at.x - 1.4, 0.4, at.z + 1.85), P(at.x + 1.4, 0.4, at.z + 1.85), 1.7, 0.52, 0.52, 9, {
-      pointed: 0.15, irregular: 0.08,
-    });
-    b.prop('glow', box(2.3, 1.7, 0.2, P(at.x, 1.1, at.z + 1.75)), forgeTint, 4.5);
-    b.prop('iron', stoneBox(5.7, 0.26, 3.9, P(at.x, 3.2, at.z), { bevel: 0.03, irregular: 0.06 }), 0x2b2724);
-    b.light(P(at.x, 1.6, at.z + 3.2), forgeTint, 15, 28, { radius: 2, halo: 4.5 });
-    b.nav.block(at, 3.4, 6);
-    // Anvil on its chamfered timber block, beveled stone quench trough beside it.
-    const work = P(at.x + 1.2, 0, at.z + 6);
-    b.prop('timber', rod(work, P(work.x, 0.6, work.z), 0.44, 0.4, 9), 0x6a5038);
-    b.prop('iron', stoneBlock(0.92, 0.3, 0.42, P(work.x, 0.6, work.z), { bevel: 0.03, batter: 0.08, irregular: 0.08 }), 0x45403b);
-    b.prop('iron', rod(P(work.x + 0.45, 0.78, work.z), P(work.x + 0.85, 0.82, work.z), 0.14, 0.03, 6), 0x45403b);
-    b.nav.block(work, 0.75, 2);
-    b.prop('masonry', stoneBlock(2.25, 0.72, 0.95, P(at.x - 2.6, 0, at.z + 5.4), { bevel: 0.05, batter: 0.08, irregular: 0.24 }));
-    b.prop('iron', stoneBox(1.9, 0.06, 0.6, P(at.x - 2.6, 0.66, at.z + 5.4), { bevel: 0.015, irregular: 0.05 }), 0x10161a);
-    b.nav.block(P(at.x - 2.6, 0, at.z + 5.4), 1.2, 2);
-  }
-  // Coal and irregular ore/slag heaps between the furnaces.
-  for (const x of [-7, 7]) {
-    for (const [ox, oy, oz, s] of [[0, 0.55, 0, 1.15], [-0.55, 0.35, 0.45, 0.72], [0.5, 0.32, -0.4, 0.68], [0.2, 0.85, 0.15, 0.6]]) {
-      b.prop('masonry', stoneBox(s * 1.1, s * 0.75, s, P(x + ox, oy, forge.z - 9 + oz), {
-        yaw: ox * 2 + oz, bevel: s * 0.2, irregular: 0.65,
-      }), 0x1b1917);
-    }
-    b.nav.block(P(x, 0, forge.z - 9), 2, 2);
-    crate(b, P(x + 2.4, 0, forge.z - 5.5), 0.9, 0.3);
-    b.nav.block(P(x + 2.4, 0, forge.z - 5.5), 0.7, 2);
-  }
+  // --- Forgeheart Interior & Ore Lift -------------------------------------
   buildHeroGateway(b, farZ, height);
-
-  // --- Ore lift ---------------------------------------------------------------
-  for (const [dx, dz] of [[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]]) {
-    b.prop('masonry', stoneBlock(0.95, 0.5, 0.95, P(lift.x + dx, 0, lift.z + dz), { bevel: 0.05, batter: 0.16, irregular: 0.28 }));
-    b.prop('iron', hewnBeam(P(lift.x + dx, 0.4, lift.z + dz), P(lift.x + dx * 0.6, 8.6, lift.z + dz * 0.6), 0.32, 0.32, { bevel: 0.03, irregular: 0.1 }), 0x2f2a26);
-  }
-  for (const [x0, z0, x1, z1] of [[-2, -2, 2, -2], [-2, 2, 2, 2], [-2, -2, -2, 2], [2, -2, 2, 2]]) {
-    b.prop('iron', hewnBeam(P(lift.x + x0, 8.6, lift.z + z0), P(lift.x + x1, 8.6, lift.z + z1), 0.3, 0.3, { bevel: 0.03, irregular: 0.08 }), 0x2f2a26);
-  }
-  b.prop('iron', rod(P(lift.x - 1.2, 9.2, lift.z), P(lift.x + 1.2, 9.2, lift.z), 0.9, 0.9, 14), 0x39332e);
-  for (const dz of [-0.7, 0.7]) b.prop('iron', rod(P(lift.x, 9, lift.z + dz), P(lift.x, -1.2, lift.z + dz), 0.04, 0.04, 5), 0x1f1c1a);
-  b.prop('timber', stoneBox(4, 0.25, 4, P(lift.x, -1.3, lift.z), { bevel: 0.03, irregular: 0.14 }), 0x6a5038);
-  for (const [ox, oy, oz, s] of [[0, -0.75, 0, 1.0], [-0.6, -0.9, 0.5, 0.65], [0.55, -0.92, -0.45, 0.7], [-0.4, -0.95, -0.55, 0.55]]) {
-    b.prop('ore', stoneBox(s * 1.15, s * 0.78, s, P(lift.x + ox, oy, lift.z + oz), {
-      yaw: ox * 2 + oz, bevel: s * 0.2, irregular: 0.65,
-    }), 0xb49a7c);
-  }
-  b.light(P(lift.x, -12, lift.z), forgeTint, 2.2, 16, { halo: 0 });
-  b.light(P(lift.x - 2, 6.5, lift.z), WARM, 4, 15, { halo: 1.4 });
-  b.prop('glow', box(0.2, 0.36, 0.2, P(lift.x - 2, 6.5, lift.z)), WARM, 4);
+  buildForgeheartInterior(b, { forge, lift, farZ, forgeTint, warmTint: WARM });
 
   b.spawn('entry', P(0, 0, 0), 0);
   b.exit('gate', P(0, 0, 2.2), { radius: 2.6, label: 'Leave by the mountain gate' });
