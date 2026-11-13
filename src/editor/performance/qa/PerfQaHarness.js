@@ -240,12 +240,9 @@ export class PerfQaHarness {
       return null;
     }
 
-    const counters = PerfCounters.snapshot();
-    const countersDelta = PerfCounters.delta(this.lastCounters, counters);
-    this.lastCounters = counters;
+    const countersDelta = PerfCounters.advance(this.lastCounters);
     const playerStatus = this.playerController.getStatus();
     const frame = this.profiler.endFrame({
-      counters,
       countersDelta,
       streaming,
       voxel,

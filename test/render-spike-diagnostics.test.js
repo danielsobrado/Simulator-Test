@@ -138,3 +138,15 @@ test('stage attribution requires complete samples and accounts for excess above 
   report.summary.frameCount = 10;
   assert.equal(renderSpikeReport(report).attributedShare, 0, 'downsampled data cannot establish a stage median');
 });
+
+test('advance reports the same changes as delta and updates the previous snapshot in place', () => {
+  PerfCounters.reset();
+  PerfCounters.inc('a', 2); PerfCounters.set('b', 5);
+  const previous = PerfCounters.snapshot();
+  PerfCounters.inc('a'); PerfCounters.set('b', 3); PerfCounters.inc('c', 4); PerfCounters.inc('d', 0);
+  const expected = PerfCounters.delta(previous);
+  assert.deepEqual(PerfCounters.advance(previous), expected);
+  assert.deepEqual(expected, { a: 1, b: -2, c: 4 });
+  assert.deepEqual(PerfCounters.advance(previous), {}, 'nothing changed since');
+  PerfCounters.reset();
+});

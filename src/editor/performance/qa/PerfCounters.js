@@ -51,6 +51,21 @@ export const PerfCounters = {
     }
   },
 
+  // Per-frame form of `delta`: what changed since `previous`, which is brought up to
+  // date in place. No full copy and no key set, so measuring a frame adds little garbage to it.
+  advance(previous) {
+    const result = {};
+    for (const key in counts) {
+      const value = counts[key];
+      const change = value - (previous[key] ?? 0);
+      if (change !== 0) {
+        result[key] = change;
+        previous[key] = value;
+      }
+    }
+    return result;
+  },
+
   delta(previous, next = counts) {
     const result = {};
     const keys = new Set([...Object.keys(previous ?? {}), ...Object.keys(next)]);
