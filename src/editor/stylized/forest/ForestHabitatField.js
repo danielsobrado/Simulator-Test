@@ -349,6 +349,7 @@ export function createForestPlacementEvaluator(field, counters = null, {
   exclusionAt = null,
 } = {}) {
   if (!field) return null;
+  const editQuery = { stableId: null, priority: 0, patchId: null, forestSuitability: 0 };
   return (candidate) => {
     counters && (counters.evaluated += 1);
     const habitat = field.sample(candidate.x, candidate.z);
@@ -369,7 +370,13 @@ export function createForestPlacementEvaluator(field, counters = null, {
       forestWaterWeight: habitat.waterWeight,
       ...ecological,
     };
-    if (editStore && !editStore.allows({ ...candidate, ...record })) {
+    // The edit check reads four fields; merging candidate and record per tree only to ask was garbage.
+    // Record fields win, as they did in the merged object.
+    editQuery.stableId = 'stableId' in record ? record.stableId : candidate.stableId;
+    editQuery.priority = 'priority' in record ? record.priority : candidate.priority;
+    editQuery.patchId = record.patchId;
+    editQuery.forestSuitability = record.forestSuitability;
+    if (editStore && !editStore.allows(editQuery)) {
       counters && (counters.rejectedEdits = (counters.rejectedEdits ?? 0) + 1);
       return null;
     }

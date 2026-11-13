@@ -210,20 +210,17 @@ function createCandidate({
   candidateEvaluator,
   shouldYield = null,
 }) {
-  const random01 = (channel) => (
-    scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + channel)
-  );
   const cellX = chunkX * chunkSize
-    + Math.floor(random01(0) * chunkSize);
+    + Math.floor(scatterRandom01(chunkX, chunkZ, index, randomChannelOffset) * chunkSize);
   const cellZ = chunkZ * chunkSize
-    + Math.floor(random01(1) * chunkSize);
+    + Math.floor(scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 1) * chunkSize);
   const tileId = tileAt(cellX, cellZ);
   if (!tileIds.has(tileId)) return null;
 
   const center = cellCenterToWorld(cellX, cellZ, tileSize);
-  const x = center.x + (random01(2) - 0.5) * tileSize;
-  const z = center.z + (random01(3) - 0.5) * tileSize;
-  const prototypeRoll = random01(4);
+  const x = center.x + (scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 2) - 0.5) * tileSize;
+  const z = center.z + (scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 3) - 0.5) * tileSize;
+  const prototypeRoll = scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 4);
   const prototypeIndex = prototypeIndexForRoll
     ? prototypeIndexForRoll(prototypeRoll, tileId, x, z)
     : Math.floor(prototypeRoll * prototypeCount) % prototypeCount;
@@ -233,8 +230,8 @@ function createCandidate({
     throw new Error('prototypeIndexForRoll must return an available prototype index.');
   }
   const scale = minScale
-    + random01(5) * (maxScale - minScale);
-  const rotationY = random01(6) * Math.PI * 2;
+    + scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 5) * (maxScale - minScale);
+  const rotationY = scatterRandom01(chunkX, chunkZ, index, randomChannelOffset + 6) * Math.PI * 2;
   const id = stableId(kind, chunkX, chunkZ, index);
   const candidate = Object.freeze({
     stableId: id,
@@ -316,6 +313,10 @@ export function createStableChunkManifestBuilder({
   let authoritativeCandidates = null;
   let spacingIndex = null;
   const neighbours = [];
+  // One argument record per builder: a fresh one per candidate was garbage on every placement tried.
+  const candidateArgs = { kind, chunkX: 0, chunkZ: 0, index: 0, chunkSize, tileSize, tileIds: eligibleTileIds,
+    tileAt, heightAt, prototypeCount, prototypeIndexForRoll, minScale, maxScale, radiusForScale,
+    randomChannelOffset, priorityChannel, candidateEvaluator, shouldYield: null };
   let acceptanceIndex = 0;
   const owned = [];
   let result = null;
@@ -357,26 +358,11 @@ export function createStableChunkManifestBuilder({
           advanceCandidate();
           continue;
         }
-        const candidate = createCandidate({
-          kind,
-          chunkX: candidateChunkX,
-          chunkZ: candidateChunkZ,
-          index: candidateIndex,
-          chunkSize,
-          tileSize,
-          tileIds: eligibleTileIds,
-          tileAt,
-          heightAt,
-          prototypeCount,
-          prototypeIndexForRoll,
-          minScale,
-          maxScale,
-          radiusForScale,
-          randomChannelOffset,
-          priorityChannel,
-          candidateEvaluator,
-          shouldYield: yieldRequested,
-        });
+        candidateArgs.chunkX = candidateChunkX;
+        candidateArgs.chunkZ = candidateChunkZ;
+        candidateArgs.index = candidateIndex;
+        candidateArgs.shouldYield = yieldRequested;
+        const candidate = createCandidate(candidateArgs);
         if (candidate === CANDIDATE_PENDING) return null;
         if (candidate) candidates.push(candidate);
         advanceCandidate();
