@@ -25,6 +25,7 @@ export class RockManifestStore {
     this.cache = new Map();
     this.pending = new Map();
     this.halos = new Map();
+    this.haloSignatures = new Map();
     this.clock = 0;
     this.version = 0;
     this.queue = new StylizedBuildQueue({ buildsPerFrame: 16, budgetMs: view.manifestBuildBudgetMs });
@@ -76,7 +77,16 @@ export class RockManifestStore {
       else entries.push(this.cache.get(`${x + dx}:${z + dz}`));
     }
     if (!ready) return null;
-    const signature = entries.map(entry => entry.signature).join('|');
+    // Cache entries are immutable and replaced on rebuild, so identical entry
+    // references mean an identical signature; skip the per-frame join then.
+    const memo = this.haloSignatures.get(key);
+    const same = memo !== undefined && memo.entries.length === entries.length
+      && memo.entries.every((entry, i) => entry === entries[i]);
+    const signature = same ? memo.signature : entries.map(entry => entry.signature).join('|');
+    if (!same) {
+      this.haloSignatures.set(key, { entries, signature });
+      if (this.haloSignatures.size > 625) this.haloSignatures.delete(this.haloSignatures.keys().next().value);
+    }
     const cached = this.halos.get(key);
     if (cached?.signature === signature) { cached.token = token; return cached; }
     const snapshot = { token, signature, placements: Object.freeze(entries.flatMap(e => e.placements)) };
@@ -165,5 +175,5 @@ export class RockManifestStore {
     return result;
   }
 
-  dispose() { this.queue.clear(); this.pending.clear(); this.cache.clear(); this.halos.clear(); }
+  dispose() { this.queue.clear(); this.pending.clear(); this.cache.clear(); this.halos.clear(); this.haloSignatures.clear(); }
 }

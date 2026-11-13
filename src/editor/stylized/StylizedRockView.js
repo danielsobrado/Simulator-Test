@@ -431,16 +431,33 @@ export class StylizedRockView {
   }
 
   manifestKey(chunkX, chunkZ) {
-    return [
-      this.revisionTracker.signature(chunkX, chunkZ, 1),
-      this.prototypes.length,
-      this.clusterField?.signature ?? 'uniform',
-      this.regionalCharacterField?.signature ?? 'uniform-regions',
-      this.prototypeBiomeRulesSignature,
-      this.pathClearance?.signature ?? 'nopath',
-      this.biomeAssetPalette?.revision ?? 0,
-      this.riverRocks.signature,
-    ].join('|');
+    // Called per chunk per frame: rebuild the joined key only when an input moved
+    // (the tracker's revision bumps on every change to its signatures).
+    const tracker = this.revisionTracker;
+    const prototypeCount = this.prototypes.length;
+    const cluster = this.clusterField?.signature ?? 'uniform';
+    const regional = this.regionalCharacterField?.signature ?? 'uniform-regions';
+    const rules = this.prototypeBiomeRulesSignature;
+    const path = this.pathClearance?.signature ?? 'nopath';
+    const palette = this.biomeAssetPalette?.revision ?? 0;
+    const rivers = this.riverRocks.signature;
+    const memos = this.manifestKeyMemos ??= new Map();
+    const memoKey = chunkX * 4294967296 + chunkZ;
+    const memo = memos.get(memoKey);
+    const trackable = typeof tracker.revision === 'number';
+    if (trackable && memo !== undefined && memo.tracker === tracker && memo.revision === tracker.revision
+        && memo.prototypeCount === prototypeCount && memo.cluster === cluster && memo.regional === regional
+        && memo.rules === rules && memo.path === path && memo.palette === palette && memo.rivers === rivers) {
+      return memo.key;
+    }
+    const key = [tracker.signature(chunkX, chunkZ, 1), prototypeCount, cluster, regional, rules, path, palette, rivers]
+      .join('|');
+    if (trackable) {
+      if (memos.size >= 2048) memos.clear();
+      memos.set(memoKey, { tracker, revision: tracker.revision, prototypeCount, cluster, regional, rules, path, palette,
+        rivers, key });
+    }
+    return key;
   }
 
   cachedManifestForChunk(chunkX, chunkZ) {

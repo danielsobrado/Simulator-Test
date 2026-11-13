@@ -224,19 +224,47 @@ export class TreeManifestStore {
       ?? this.objectMap?.revision
       ?? 0;
     const key = `${chunkX}:${chunkZ}`;
-    const inputSignature = [
-      this.revisionTracker.signature(chunkX, chunkZ, 1),
-      rockSnapshot?.signature ?? placementSignature(rocks),
+    // Rebuild the joined strings only when their inputs changed: this path can run
+    // every frame, and each join is per-frame string garbage. The tracker's
+    // revision and the edit (epoch, clock) pair bump on every change to the
+    // signatures they feed; without those counters we recompute.
+    const cached = this.contextCache.get(key);
+    const tracker = this.revisionTracker;
+    const edits = this.editRevisions;
+    const old = cached?.inputs;
+    const worldSignature = typeof tracker.revision === 'number' && old?.tracker === tracker
+      && old.worldRevision === tracker.revision
+      ? old.worldSignature : tracker.signature(chunkX, chunkZ, 1);
+    const editSignature = typeof edits.epoch === 'number' && typeof edits.clock === 'number' && old?.edits === edits
+      && old.editEpoch === edits.epoch && old.editClock === edits.clock
+      ? old.editSignature : edits.signature(chunkX, chunkZ);
+    const inputs = {
+      tracker, worldRevision: tracker.revision, worldSignature,
+      edits, editEpoch: edits.epoch, editClock: edits.clock, editSignature,
+      rockSignature: rockSnapshot?.signature ?? placementSignature(rocks),
+      constructionRevision,
+      prototypeCount: this.prototypeCount,
+      forestSignature: this.forestField?.signature ?? 'uniform',
+      speciesSignature: this.speciesRegistry.signature,
+      pathSignature: this.pathClearance.signature,
+    };
+    const unchanged = old !== undefined && old.worldSignature === worldSignature
+      && old.editSignature === editSignature && old.rockSignature === inputs.rockSignature
+      && old.constructionRevision === constructionRevision && old.prototypeCount === inputs.prototypeCount
+      && old.forestSignature === inputs.forestSignature && old.speciesSignature === inputs.speciesSignature
+      && old.pathSignature === inputs.pathSignature;
+    const inputSignature = unchanged ? cached.inputSignature : [
+      worldSignature,
+      inputs.rockSignature,
       constructionRevision,
       this.prototypeCount,
-      this.forestField?.signature ?? 'uniform',
-      this.speciesRegistry.signature,
-      this.pathClearance.signature,
-      this.editRevisions.signature(chunkX, chunkZ),
+      inputs.forestSignature,
+      inputs.speciesSignature,
+      inputs.pathSignature,
+      editSignature,
     ].join('|');
-    const cached = this.contextCache.get(key);
     if (cached?.inputSignature === inputSignature) {
-      Object.assign(cached, { version, rockStore, sourceWindow, worldRevision, objectRevision, prototypeRevision,
+      Object.assign(cached, { inputs, version, rockStore, sourceWindow, worldRevision, objectRevision, prototypeRevision,
         paletteRevision, editRevision: this.editStore.revision, prototypeCount: this.prototypeCount });
       return cached.context;
     }
@@ -254,7 +282,7 @@ export class TreeManifestStore {
       blockers,
       signature: `${inputSignature}|${placementSignature(blockers)}`,
     });
-    this.contextCache.set(key, { inputSignature, context, version, rockStore, sourceWindow, worldRevision, objectRevision,
+    this.contextCache.set(key, { inputSignature, inputs, context, version, rockStore, sourceWindow, worldRevision, objectRevision,
       prototypeRevision, paletteRevision, editRevision: this.editStore.revision, prototypeCount: this.prototypeCount });
     return context;
   }

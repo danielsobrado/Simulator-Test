@@ -37,6 +37,31 @@ test('waiting contexts are cheap until completion, edits, assets or the dependen
   assert.equal(calls(),10);
 });
 
+test('context input signature is unchanged in format, reused while inputs hold, and tracks each input', () => {
+  const { store, rocks, ready } = fixture();
+  let worldJoins = 0, editJoins = 0;
+  store.revisionTracker.signature = () => { worldJoins++; return `world${store.revisionTracker.revision}`; };
+  Object.assign(store.editRevisions, { epoch: 0, clock: 0,
+    signature: () => { editJoins++; return `edits${store.editRevisions.clock}`; } });
+  ready();
+  const first = store.context(0, 0, rocks);
+  assert.equal(store.contextCache.get('0:0').inputSignature, 'world0|rocks|0|29|forest|species|paths|edits0');
+  // Changing only the rock manifest version misses the fast path but no input moved.
+  for (let i = 0; i < 20; i++) { rocks.manifestStore.version++; assert.equal(store.context(0, 0, rocks), first); }
+  assert.equal(worldJoins, 1);
+  assert.equal(editJoins, 1);
+  store.revisionTracker.revision++; rocks.manifestStore.version++;
+  assert.notEqual(store.context(0, 0, rocks).signature, first.signature);
+  assert.equal(worldJoins, 2);
+  store.editRevisions.clock++; rocks.manifestStore.version++;
+  store.context(0, 0, rocks);
+  assert.equal(editJoins, 2);
+  assert.equal(store.contextCache.get('0:0').inputSignature, 'world1|rocks|0|29|forest|species|paths|edits1');
+  store.forestField = { signature: 'forest2' }; rocks.manifestStore.version++;
+  store.context(0, 0, rocks);
+  assert.equal(store.contextCache.get('0:0').inputSignature, 'world1|rocks|0|29|forest2|species|paths|edits1');
+});
+
 test('blocked rock contexts do not repeatedly request a prepared halo; ready contexts still require it', () => {
   const { store, rocks, ready } = fixture();
   let requests = 0;
