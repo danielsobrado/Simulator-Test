@@ -18,3 +18,4 @@ assets-src/medieval-town-kit/previews/**/_warm.png
 .playwright-mcp/
 # Downloaded scan textures (npm run fetch:tree-sources); the lock file is committed
 assets/source-cache/
+docs/reference/*.zip

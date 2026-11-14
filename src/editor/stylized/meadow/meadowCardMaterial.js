@@ -7,6 +7,7 @@ import {
   cameraViewMatrix,
   cos,
   dot,
+  float,
   floor,
   mix,
   normalize,
@@ -33,6 +34,7 @@ import { meadowInstance } from './meadowBladeShape.js';
 import { applyHandoff, applyPublicationFade } from './meadowFade.js';
 import { meadowGrowthNodes } from './meadowGrowthNodes.js';
 import { meadowPigment } from './meadowPigment.js';
+import { meadowPlantNodes } from './meadowPlantNodes.js';
 
 /** The card atlas: three silhouettes side by side, each a 2 × 2 block of clumps. */
 const ATLAS_COLUMNS = 6;
@@ -69,7 +71,8 @@ export function createMeadowCardMaterial({ uniforms, tuning, config, sunDirectio
       const toward = cameraPosition.xz.sub(card.base.xz).normalize();
       // Clumps stand patchier than single blades (the donor's 0.5..1.25).
       const profile = meadowGrowthNodes(uniforms,card,true);
-      const height = profile.height.mul(card.strength);
+      // The clump is whichever plant grows at its foot (the blades' accents).
+      const height = profile.height.mul(card.strength).mul(meadowPlantNodes(uniforms, card).height);
       const width = uniforms.cardWidth.mul(sqrt(card.strength));
       local.x.assign(positionLocal.x.mul(toward.y).mul(width));
       local.z.assign(positionLocal.x.mul(toward.x.negate()).mul(width));
@@ -92,8 +95,12 @@ export function createMeadowCardMaterial({ uniforms, tuning, config, sunDirectio
   material.receivedShadowPositionNode = position;
 
   const card = meadowInstance(uniforms.origin, { cards: true });
-  const shape = floor(card.cell.div(4));
-  const variant = card.cell.sub(shape.mul(4));
+  const variant = card.cell.sub(floor(card.cell.div(4)).mul(4));
+  // The atlas has art for the three stand silhouettes only: a strap clump
+  // borrows the reed's, a lance clump the broadleaf's. Chosen per card in the
+  // vertex stage, so the fragment stage reads no growth tables.
+  const plantShape = meadowPlantNodes(uniforms, card).shape;
+  const shape = plantShape.greaterThan(3.5).select(float(1), plantShape.min(2)).toVarying('meadowCardPlant').round();
   const column = shape.mul(2).add(variant.mod(2));
   const row = floor(variant.div(2));
   const cell = vec2(1 / ATLAS_COLUMNS, 1 / ATLAS_ROWS);

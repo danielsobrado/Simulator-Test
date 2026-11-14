@@ -87,6 +87,26 @@
         "--strictPort"
       ],
       "port": 5182
+    },
+    {
+      "name": "alloc-before",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "2ee06154",
+        "5196"
+      ],
+      "port": 5196
+    },
+    {
+      "name": "alloc-after",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/serve-world-visual-snapshot.mjs",
+        "83c7aa50",
+        "5197"
+      ],
+      "port": 5197
     }
   ]
 }
