@@ -1,4 +1,4 @@
-import { arch, beam, block, box, coursedWall, extrudedProfile, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
+import { arch, beam, block, box, coursedWall, extrudedProfile, hewnBeam, rod, roughTimber, stoneBlock, stoneBox } from '../gen/propKit.js';
 
 /**
  * Built assemblies shared by the generators. Each takes the builder first and
@@ -20,18 +20,19 @@ const side = (p, f, offset) => ({ x: p.x + f.nx * offset, y: p.y, z: p.z + f.nz 
 export function lantern(b, at, { tint = '#ffb061', intensity = 5, range = 13, halo = 1.5, hung = 0 } = {}) {
   b.prop('iron', rod(up(at, 0.16), up(at, 0.27), 0.2, 0.05, 8), 0x6c717a);
   b.prop('iron', rod(up(at, -0.22), up(at, -0.14), 0.16, 0.19, 8), 0x6c717a);
+  b.prop('iron', rod(up(at, -0.15), up(at, -0.07), 0.068, 0.058, 8), 0x705d44);
   for (const [dx, dz] of [[-0.1, -0.1], [0.1, -0.1], [-0.1, 0.1], [0.1, 0.1]]) {
-    b.prop('iron', rod({ x: at.x + dx, y: at.y - 0.15, z: at.z + dz }, { x: at.x + dx, y: at.y + 0.17, z: at.z + dz }, 0.014, 0.014, 4), 0x666b74);
+    b.prop('iron', rod({ x: at.x + dx, y: at.y - 0.15, z: at.z + dz }, { x: at.x + dx, y: at.y + 0.17, z: at.z + dz }, 0.015, 0.015, 5), 0x666b74);
   }
   if (hung > 0) b.prop('iron', rod(up(at, 0.26), up(at, 0.26 + hung), 0.016, 0.016, 5), 0x626670);
-  b.prop('glow', rod(up(at, -0.13), up(at, 0.06), 0.075, 0.065, 8), '#e67822', 1.25);
-  b.flame(up(at, -0.07), { width: 0.18, height: 0.26, core: '#fff3c4', outer: '#ff5c10', speed: 1.15 });
+  b.prop('glow', rod(up(at, -0.08), up(at, 0.02), 0.036, 0.024, 8), '#e67822', 0.92);
+  b.flame(up(at, -0.05), { width: 0.19, height: 0.27, core: '#fff3c4', outer: '#ff5c10', speed: 1.15 });
   b.light(at, tint, intensity, range, { radius: 1.2, halo: halo * 0.55 });
 }
 
 /**
- * A hand-hewn mine timber set across a drift: tapered chamfered posts on
- * sill foot blocks, an overhanging eared cap beam, knee braces, and lagging.
+ * A hand-hewn mine timber set across a drift: tapered organic octagonal posts,
+ * slightly bowed eared cap beam, adze-split knee braces, and roof lagging poles.
  */
 export function timberSet(b, at, yaw, width, height, tint = 0x7d6044) {
   const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -43,34 +44,34 @@ export function timberSet(b, at, yaw, width, height, tint = 0x7d6044) {
   const rightTop = { x: right.x - c * 0.08 + leanR, y: at.y + height, z: right.z + s * 0.08 };
 
   // Flared sill foot blocks under each post.
-  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, left, { yaw, bevel: 0.03, batter: 0.16, irregular: 0.3 }), tint);
-  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, right, { yaw, bevel: 0.03, batter: 0.16, irregular: 0.3 }), tint);
+  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, left, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
+  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, right, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
 
-  // Hand-hewn chamfered posts.
-  b.prop('timber', hewnBeam(left, leftTop, 0.27, 0.27, { taper: 0.08, irregular: 0.32 }), tint);
-  b.prop('timber', hewnBeam(right, rightTop, 0.27, 0.27, { taper: 0.08, irregular: 0.32 }), tint);
+  // Hand-hewn organic octagonal posts with natural slight bow.
+  b.prop('timber', roughTimber(left, leftTop, 0.27, 0.27, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
+  b.prop('timber', roughTimber(right, rightTop, 0.27, 0.27, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
 
-  // Overhanging eared cap beam.
+  // Overhanging eared cap beam with natural rock-load bow.
   const capLeft = { x: leftTop.x - c * 0.24, y: leftTop.y + 0.13, z: leftTop.z + s * 0.24 };
   const capRight = { x: rightTop.x + c * 0.24, y: rightTop.y + 0.13, z: rightTop.z - s * 0.24 };
-  b.prop('timber', hewnBeam(capLeft, capRight, 0.31, 0.27, { irregular: 0.28 }), tint);
+  b.prop('timber', roughTimber(capLeft, capRight, 0.3, 0.26, { taper: 0.05, bow: 0.028, irregular: 0.38 }), tint);
 
-  // Knee braces on one or both sides, with joinery peg blocks.
+  // Adze-hewn knee braces on one or both sides.
   for (const [post, top, otherTop, chance] of [[left, leftTop, rightTop, 0.75], [right, rightTop, leftTop, 0.55]]) {
     if (b.random() < chance) {
       const braceBot = lerp(post, top, 0.62);
       const braceTop = lerp(top, otherTop, 0.26);
-      b.prop('timber', hewnBeam(braceBot, up(braceTop, 0.08), 0.15, 0.15, { irregular: 0.22 }), tint);
+      b.prop('timber', roughTimber(braceBot, up(braceTop, 0.08), 0.15, 0.15, { taper: 0.06, bow: 0.024, irregular: 0.4 }), tint);
     }
   }
   // Overhead lagging poles on ~50% of sets to break up the flat cap silhouette.
   if (b.random() < 0.5) {
     for (const t of [0.22, 0.5, 0.78]) {
       const p = lerp(leftTop, rightTop, t);
-      b.prop('timber', hewnBeam(
+      b.prop('timber', roughTimber(
         { x: p.x - s * 0.6, y: p.y + 0.28, z: p.z - c * 0.6 },
         { x: p.x + s * 0.6, y: p.y + 0.28, z: p.z + c * 0.6 },
-        0.11, 0.09, { irregular: 0.35 },
+        0.11, 0.09, { taper: 0.08, bow: 0.02, irregular: 0.45 },
       ), tint);
     }
   }
@@ -86,11 +87,11 @@ export function rails(b, a, c, gauge = 0.9) {
     const jitterD = d + b.range(-0.07, 0.07);
     const p = lerp(a, c, Math.max(0, Math.min(1, jitterD / f.length)));
     const halfSpan = gauge * b.range(0.74, 0.88);
-    const skew = b.range(-0.04, 0.04);
-    b.prop('timber', hewnBeam(
+    const skew = b.range(-0.05, 0.05);
+    b.prop('timber', roughTimber(
       up(side(p, f, -halfSpan), 0.04),
       { x: side(p, f, halfSpan).x + f.ux * skew, y: p.y + 0.04, z: side(p, f, halfSpan).z + f.uz * skew },
-      0.21, 0.095, { bevel: 0.025, irregular: 0.35 },
+      0.2, 0.1, { taper: 0.06, bow: 0.018, irregular: 0.42 },
     ), 0x5d4733);
   }
 }

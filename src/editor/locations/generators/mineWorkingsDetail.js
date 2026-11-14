@@ -1,4 +1,4 @@
-import { box, hewnBeam, rod, stoneBlock, stoneBox } from '../gen/propKit.js';
+import { box, hewnBeam, rod, roughTimber, stoneBlock, stoneBox } from '../gen/propKit.js';
 import { barrel, crate, lantern, rails, timberSet } from './kits.js';
 
 const P = (x, y, z) => ({ x, y, z });
@@ -7,7 +7,7 @@ const lerpP = (a, c, t) => P(a.x + (c.x - a.x) * t, a.y + (c.y - a.y) * t, a.z +
 
 /** Builds a miner's pickaxe or heavy sledge leaning against a support or rock wall. */
 function buildMiningTool(b, foot, tip, { head = 'pick', yaw = 0 } = {}) {
-  b.prop('timber', hewnBeam(foot, tip, 0.055, 0.055, { irregular: 0.15 }), 0x72563c);
+  b.prop('timber', roughTimber(foot, tip, 0.055, 0.055, { bow: 0.015, irregular: 0.25 }), 0x72563c);
   if (head === 'pick') {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     b.prop('iron', hewnBeam(
@@ -32,11 +32,11 @@ export function buildAditPortal(b, drift) {
   }
   for (const side of [-1, 1]) {
     const jx = side * (drift.width / 2 + 0.12);
-    b.prop('timber', stoneBlock(0.36, 0.22, 0.42, P(jx, 0, 7.05), { bevel: 0.03, batter: 0.14, irregular: 0.25 }), 0x6a5038);
-    b.prop('timber', hewnBeam(P(jx, 0.22, 7.05), P(jx, drift.height + 0.22, 7.05), 0.3, 0.28, { taper: 0.06, irregular: 0.25 }), 0x6a5038);
-    b.prop('timber', hewnBeam(P(jx, drift.height - 0.55, 7.05), P(jx - side * 0.6, drift.height + 0.15, 7.05), 0.16, 0.16, { irregular: 0.2 }), 0x6a5038);
+    b.prop('timber', stoneBlock(0.36, 0.22, 0.42, P(jx, 0, 7.05), { bevel: 0.04, batter: 0.16, irregular: 0.4 }), 0x6a5038);
+    b.prop('timber', roughTimber(P(jx, 0.22, 7.05), P(jx, drift.height + 0.22, 7.05), 0.3, 0.28, { taper: 0.08, bow: 0.02, irregular: 0.36 }), 0x6a5038);
+    b.prop('timber', roughTimber(P(jx, drift.height - 0.55, 7.05), P(jx - side * 0.6, drift.height + 0.15, 7.05), 0.16, 0.16, { bow: 0.02, irregular: 0.38 }), 0x6a5038);
   }
-  b.prop('timber', hewnBeam(P(-drift.width / 2 - 0.4, drift.height + 0.25, 7.05), P(drift.width / 2 + 0.4, drift.height + 0.25, 7.05), 0.34, 0.3, { irregular: 0.25 }), 0x6a5038);
+  b.prop('timber', roughTimber(P(-drift.width / 2 - 0.4, drift.height + 0.25, 7.05), P(drift.width / 2 + 0.4, drift.height + 0.25, 7.05), 0.34, 0.3, { bow: 0.025, irregular: 0.36 }), 0x6a5038);
   for (const x of [-0.9, 0, 0.9]) {
     b.prop('glow', box(0.05, drift.height * 0.72, 0.05, P(x, drift.height * 0.5, 7.02)), '#cfe2ff', 2.4);
   }
@@ -82,13 +82,13 @@ export function buildSortingStation(b, shaftAt, hub) {
   const frameTop = 6.2;
   for (const [dx, dz] of [[-2.7, -2.7], [2.7, -2.7], [-2.7, 2.7], [2.7, 2.7]]) {
     b.prop('iron', stoneBlock(0.65, 0.35, 0.65, P(shaftAt.x + dx, -1.05, shaftAt.z + dz), { bevel: 0.04, batter: 0.15, irregular: 0.25 }), 0x6e737c);
-    b.prop('timber', hewnBeam(P(shaftAt.x + dx, -0.8, shaftAt.z + dz), P(shaftAt.x + dx * 0.55, frameTop, shaftAt.z + dz * 0.55), 0.34, 0.34, { taper: 0.1, irregular: 0.25 }), 0x7d6044);
+    b.prop('timber', roughTimber(P(shaftAt.x + dx, -0.8, shaftAt.z + dz), P(shaftAt.x + dx * 0.55, frameTop, shaftAt.z + dz * 0.55), 0.34, 0.34, { taper: 0.12, bow: 0.022, irregular: 0.38 }), 0x7d6044);
   }
   for (const [dx, dz] of [[-2.7, -2.7], [2.7, -2.7], [-2.7, 2.7], [2.7, 2.7]]) {
-    b.prop('timber', hewnBeam(P(shaftAt.x + dx * 0.8, 2.4, shaftAt.z + dz * 0.8), P(shaftAt.x - dx * 0.8, 2.4, shaftAt.z + dz * 0.8), 0.18, 0.18, { irregular: 0.2 }), 0x6a5038);
+    b.prop('timber', roughTimber(P(shaftAt.x + dx * 0.8, 2.4, shaftAt.z + dz * 0.8), P(shaftAt.x - dx * 0.8, 2.4, shaftAt.z + dz * 0.8), 0.18, 0.18, { bow: 0.02, irregular: 0.35 }), 0x6a5038);
   }
-  b.prop('timber', hewnBeam(P(shaftAt.x - 1.9, frameTop, shaftAt.z), P(shaftAt.x + 1.9, frameTop, shaftAt.z), 0.36, 0.34, { irregular: 0.2 }), 0x7d6044);
-  b.prop('timber', hewnBeam(P(shaftAt.x, frameTop, shaftAt.z - 1.9), P(shaftAt.x, frameTop, shaftAt.z + 1.9), 0.36, 0.34, { irregular: 0.2 }), 0x7d6044);
+  b.prop('timber', roughTimber(P(shaftAt.x - 1.9, frameTop, shaftAt.z), P(shaftAt.x + 1.9, frameTop, shaftAt.z), 0.36, 0.34, { bow: 0.025, irregular: 0.34 }), 0x7d6044);
+  b.prop('timber', roughTimber(P(shaftAt.x, frameTop, shaftAt.z - 1.9), P(shaftAt.x, frameTop, shaftAt.z + 1.9), 0.36, 0.34, { bow: 0.025, irregular: 0.34 }), 0x7d6044);
   b.prop('iron', rod(P(shaftAt.x - 0.5, frameTop + 0.45, shaftAt.z), P(shaftAt.x + 0.5, frameTop + 0.45, shaftAt.z), 0.5, 0.5, 14), 0x767b86);
   b.prop('iron', rod(P(shaftAt.x, frameTop, shaftAt.z + 0.45), P(shaftAt.x, -12, shaftAt.z + 0.45), 0.032, 0.032, 5), 0x5c6068);
   // Suspended iron-strapped ore skip hovering near collar + manual hoist windlass drum beside shaft.
@@ -110,8 +110,8 @@ export function buildSortingStation(b, shaftAt, hub) {
   for (let index = 0; index < 10; index += 1) {
     const angle = index / 10 * Math.PI * 2, next = (index + 1) / 10 * Math.PI * 2;
     const at = (a, y) => P(shaftAt.x + Math.cos(a) * 2.75, y, shaftAt.z + Math.sin(a) * 2.75);
-    b.prop('timber', hewnBeam(at(angle, -0.1), at(next, -0.1), 0.12, 0.1, { irregular: 0.2 }), 0x6a5038);
-    b.prop('timber', hewnBeam(at(angle, -1), at(angle, 0.05), 0.12, 0.12, { irregular: 0.2 }), 0x6a5038);
+    b.prop('timber', roughTimber(at(angle, -0.1), at(next, -0.1), 0.12, 0.1, { bow: 0.015, irregular: 0.36 }), 0x6a5038);
+    b.prop('timber', roughTimber(at(angle, -1), at(angle, 0.05), 0.12, 0.12, { irregular: 0.36 }), 0x6a5038);
   }
   lantern(b, P(shaftAt.x, frameTop - 0.9, shaftAt.z - 1.2), { intensity: 7, range: 19, hung: 0.6 });
   b.light(P(shaftAt.x, -15, shaftAt.z), '#ff9a4d', 3, 12, { halo: 1.5 });
@@ -131,7 +131,7 @@ export function buildSortingStation(b, shaftAt, hub) {
   // Sorting bench with planked top, braced legs, ore specimens & tool rack.
   b.prop('timber', stoneBox(3.2, 0.13, 1.3, P(-6, -0.1, -44.5), { yaw: 0.3, bevel: 0.025, irregular: 0.18 }), 0x7d6044);
   for (const [dx, dz] of [[-1.3, -0.4], [1.3, -0.4], [-1.3, 0.4], [1.3, 0.4]]) {
-    b.prop('timber', hewnBeam(P(-6 + dx, -1, -44.5 + dz), P(-6 + dx, -0.12, -44.5 + dz), 0.14, 0.14, { irregular: 0.2 }), 0x7d6044);
+    b.prop('timber', roughTimber(P(-6 + dx, -1, -44.5 + dz), P(-6 + dx, -0.12, -44.5 + dz), 0.14, 0.14, { bow: 0.015, irregular: 0.32 }), 0x7d6044);
   }
   for (const [ox, oz, sc] of [[-0.7, 0.1, 0.26], [0.2, -0.15, 0.3], [0.9, 0.2, 0.22]]) {
     b.prop('ore', stoneBox(sc, sc * 0.75, sc, P(-6 + ox, 0.05, -44.5 + oz), { yaw: ox * 2, bevel: sc * 0.2, irregular: 0.6 }), 0xc4aa8a);
@@ -163,7 +163,7 @@ export function buildStopeWorkings(b, stope) {
     const top = b.probe(x, stope.y + 1, z, 1, 9) ?? stope.y + 3;
     const tx = x + b.range(-0.3, 0.3);
     b.prop('timber', stoneBlock(0.45, 0.14, 0.45, P(x, stope.y, z), { bevel: 0.03, batter: 0.15, irregular: 0.3 }), 0x6a5038);
-    b.prop('timber', hewnBeam(P(x, stope.y + 0.1, z), P(tx, top + 0.15, z), 0.32, 0.32, { taper: 0.08, irregular: 0.32 }), 0x7d6044);
+    b.prop('timber', roughTimber(P(x, stope.y + 0.1, z), P(tx, top + 0.15, z), 0.32, 0.32, { taper: 0.1, bow: 0.025, irregular: 0.42 }), 0x7d6044);
     b.prop('timber', stoneBox(0.55, 0.12, 0.45, P(tx, top + 0.1, z), { bevel: 0.025, irregular: 0.25 }), 0x6a5038);
     b.nav.block(P(x, stope.y, z), 0.35, 3);
   }
@@ -193,18 +193,18 @@ export function buildCollapsedHeading(b, eastTurn, fall) {
   // Diagonal timber X-barricade slats nailed across the drift frame.
   const rx = -Math.sin(yawToFall), rz = Math.cos(yawToFall);
   for (const [y0, y1] of [[0.55, 1.65], [1.65, 0.55], [1.1, 1.1]]) {
-    b.prop('timber', hewnBeam(
+    b.prop('timber', roughTimber(
       P(barrier.x - rx * 0.95, barrier.y + y0, barrier.z - rz * 0.95),
       P(barrier.x + rx * 0.95, barrier.y + y1, barrier.z + rz * 0.95),
-      0.16, 0.08, { irregular: 0.25 },
+      0.16, 0.09, { bow: 0.02, irregular: 0.42 },
     ), 0x6a5038);
   }
   // Snapped beam protruding from jagged fallen slate boulders past the barricade.
   const spill = lerpP(eastTurn, fall, 0.8);
-  b.prop('timber', hewnBeam(
+  b.prop('timber', roughTimber(
     P(spill.x - 0.6, spill.y + 1.4, spill.z - 0.4),
     P(spill.x + 1.3, spill.y + 0.2, spill.z + 0.8),
-    0.26, 0.24, { irregular: 0.32 },
+    0.26, 0.24, { bow: 0.03, irregular: 0.48 },
   ), 0x5c442f);
   for (const [dx, dy, dz, sx, sy, sz] of [
     [-0.4, 0.35, -0.2, 0.95, 0.7, 0.85], [0.35, 0.3, 0.25, 0.8, 0.55, 0.9], [-0.1, 0.75, 0.4, 0.75, 0.55, 0.7],
@@ -237,8 +237,8 @@ export function buildFloodedLevel(b, inclineTop, flooded, waterY) {
   b.prop('water', box(26, 0.05, 22, P(flooded.x, waterY, flooded.z)), 0xffffff);
   lantern(b, P(-1.2, -7.4, -81), { intensity: 4.5, range: 15 });
   b.prop('timber', stoneBlock(0.34, 1.5, 0.34, P(-1.2, -9, -81), { bevel: 0.03, batter: 0.08, irregular: 0.25 }), 0x5a442f);
-  b.prop('timber', hewnBeam(P(-3, waterY + 0.1, -84), P(-3.6, waterY + 0.4, -88), 0.3, 0.3, { irregular: 0.3 }), 0x4a3828);
-  b.prop('timber', hewnBeam(P(1.8, waterY + 0.05, -86.5), P(3.4, waterY + 0.08, -85.2), 0.24, 0.22, { irregular: 0.25 }), 0x523c28);
+  b.prop('timber', roughTimber(P(-3, waterY + 0.1, -84), P(-3.6, waterY + 0.4, -88), 0.3, 0.3, { taper: 0.1, bow: 0.025, irregular: 0.45 }), 0x4a3828);
+  b.prop('timber', roughTimber(P(1.8, waterY + 0.05, -86.5), P(3.4, waterY + 0.08, -85.2), 0.24, 0.22, { bow: 0.02, irregular: 0.4 }), 0x523c28);
 
   // Far-side & rocky left-bank lamps plus cavern vault bounce across the drowned pool.
   lantern(b, P(4.5, -7.6, -90), { intensity: 4.2, range: 17, halo: 1.0 });

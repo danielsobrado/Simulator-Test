@@ -10,6 +10,7 @@ import { createRng } from './noise.js';
 const GRAIN = 1.1;
 const X = new THREE.Vector3(1, 0, 0);
 const Y = new THREE.Vector3(0, 1, 0);
+const Z = new THREE.Vector3(0, 0, 1);
 const scratch = new THREE.Matrix4();
 const segments = (length) => Math.max(1, Math.min(24, Math.round(length / GRAIN)));
 
@@ -182,6 +183,23 @@ export function beam(a, b, width, height = width) {
   return geometry.applyMatrix4(scratch);
 }
 
+/**
+ * A flat slab running `a` to `b`, `width` wide along `across` (any vector not parallel
+ * to the run) and `thickness` thick: roof pitches, doors, shutters, decking.
+ */
+export function panel(a, b, across, width, thickness) {
+  const from = new THREE.Vector3(a.x, a.y, a.z), to = new THREE.Vector3(b.x, b.y, b.z);
+  const run = to.clone().sub(from);
+  const length = run.length();
+  run.normalize();
+  const side = new THREE.Vector3(across.x, across.y, across.z);
+  side.addScaledVector(run, -side.dot(run)).normalize();
+  const geometry = new THREE.BoxGeometry(length, thickness, width, segments(length), 1, segments(width));
+  scratch.makeBasis(run, new THREE.Vector3().crossVectors(side, run), side);
+  scratch.setPosition(from.add(to).multiplyScalar(0.5));
+  return geometry.applyMatrix4(scratch);
+}
+
 /** A hand-hewn, chamfered timber or cut-stone beam from `a` to `b` with subtle taper/irregularity. */
 export function hewnBeam(a, b, width, height = width, {
   bevel = Math.min(0.035, Math.min(width, height) * 0.16),
@@ -213,6 +231,89 @@ export function rod(a, b, ra, rb = ra, sides = 10) {
   scratch.makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(Y, axis.normalize()));
   scratch.setPosition(from.add(to).multiplyScalar(0.5));
   return geometry.applyMatrix4(scratch);
+}
+
+/**
+ * An organic adze-hewn mine timber or peeled log from `a` to `b`: subdivided along
+ * its span with subtle structural bow, taper, and irregular octagonal cross-sections
+ * so heavy timberwork avoids ruler-straight extruded chamfer edges.
+ */
+export function roughTimber(a, b, width, height = width, {
+  sides = 8,
+  taper = 0.06,
+  bow = 0.025,
+  irregular = 0.35,
+  seed = hashCoords(a.x + b.x, a.y + b.y, a.z + b.z, 71),
+} = {}) {
+  const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+  const length = Math.hypot(dx, dy, dz);
+  if (length < 1e-4) return box(0.01, 0.01, 0.01, a);
+
+  const rng = createRng(seed);
+  const dir = new THREE.Vector3(dx / length, dy / length, dz / length);
+  const upRef = Math.abs(dir.y) > 0.9 ? Z : Y;
+  const right = new THREE.Vector3().crossVectors(upRef, dir).normalize();
+  const upVec = new THREE.Vector3().crossVectors(dir, right).normalize();
+
+  const steps = Math.max(4, Math.min(18, Math.ceil(length / 0.38)));
+  const sagMag = -Math.abs(bow) * length * 0.32;
+  const sideMag = (rng() - 0.5) * 2 * bow * length * 0.42;
+  const wPhaseA = rng() * Math.PI * 2;
+  const wPhaseB = rng() * Math.PI * 2;
+  const rx = width * 0.54;
+  const ry = height * 0.54;
+
+  const rings = [];
+  const centers = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const env = Math.sin(t * Math.PI);
+    const wiggleR = Math.sin(t * Math.PI * 2.5 + wPhaseA) * 0.018 * irregular * env;
+    const wiggleU = Math.sin(t * Math.PI * 3.1 + wPhaseB) * 0.014 * irregular * env;
+    const cx = a.x + dx * t + right.x * (env * sideMag + wiggleR) + upVec.x * (env * sagMag + wiggleU);
+    const cy = a.y + dy * t + right.y * (env * sideMag + wiggleR) + upVec.y * (env * sagMag + wiggleU);
+    const cz = a.z + dz * t + right.z * (env * sideMag + wiggleR) + upVec.z * (env * sagMag + wiggleU);
+    centers.push([cx, cy, cz]);
+
+    const scale = (1 + taper * 0.25) * (1 - t) + Math.max(0.58, 1 - taper * 0.72) * t;
+    const ring = [];
+    for (let k = 0; k < sides; k += 1) {
+      const ang = ((k + 0.5) / sides) * Math.PI * 2;
+      const knot = 1 + (rng() - 0.5) * 0.28 * irregular;
+      const ox = Math.cos(ang) * rx * scale * knot;
+      const oy = Math.sin(ang) * ry * scale * knot;
+      ring.push([
+        cx + right.x * ox + upVec.x * oy,
+        cy + right.y * ox + upVec.y * oy,
+        cz + right.z * ox + upVec.z * oy,
+      ]);
+    }
+    rings.push(ring);
+  }
+
+  const positions = [];
+  const pushTri = (p0, p1, p2) => {
+    positions.push(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
+  };
+  for (let i = 0; i < steps; i += 1) {
+    const r0 = rings[i], r1 = rings[i + 1];
+    for (let k = 0; k < sides; k += 1) {
+      const kn = (k + 1) % sides;
+      pushTri(r0[k], r0[kn], r1[kn]);
+      pushTri(r0[k], r1[kn], r1[k]);
+    }
+  }
+  const c0 = centers[0], cN = centers[steps];
+  for (let k = 0; k < sides; k += 1) {
+    const kn = (k + 1) % sides;
+    pushTri(c0, rings[0][kn], rings[0][k]);
+    pushTri(cN, rings[steps][k], rings[steps][kn]);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 /**
