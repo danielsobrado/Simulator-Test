@@ -1,3 +1,4 @@
+import { valueNoise } from '../../world/valueNoise2d.js';
 import {
   createForestBiomeProfiles,
   forestProfileSignature,
@@ -296,11 +297,19 @@ export class ForestHabitatField {
       profile.regionalForestFloor,
       this.regionalCharacterField?.sampleChannel(x, z, 'forest') ?? 1,
     );
-    const rawCoverage = Math.max(patch.patchCoverage, riparian) * regionalForest;
+    // Clearings are holes in the field itself, so trees, shrubs, grass, litter
+    // and the far canopy all open together; a gallery wood stays closed.
+    // Open country's woods are groves already: a glade would only erase them.
+    const glade = profile.structure === 'groves' ? NO_GLADE : forestGlade(x, z);
+    const rawCoverage = Math.max(patch.patchCoverage * glade.open, riparian) * regionalForest;
     const coverage = clamp01(rawCoverage ** this.coverageContrast);
+    const patchEdge = Math.max(patch.patchEdge, glade.rim * patch.patchCoverage);
+    // Young growth advances past the closed stand: a thin scatter of trees
+    // across the edge ring (ForestSpeciesRegistry keeps the outer ones young).
+    const succession = SUCCESSION_BELT * patchEdge * patchEdge * regionalForest;
     const suitability = clamp01(
       profile.density * this.coreDensityBoost
-      * coverage
+      * Math.max(coverage, succession)
       * elevationFactor
       * slopeFactor
       * waterFactor,
@@ -316,8 +325,8 @@ export class ForestHabitatField {
       // riparian belt too; the raw patch term stays available separately.
       patchCoverage: coverage,
       uplandPatchCoverage: clamp01(patch.patchCoverage ** this.coverageContrast),
-      rawPatchCoverage: patch.patchCoverage,
-      patchEdge: patch.patchEdge,
+      rawPatchCoverage: patch.patchCoverage * glade.open,
+      patchEdge,
       patchDistance: patch.patchDistance,
       elevation,
       slope,
@@ -341,6 +350,25 @@ export class ForestHabitatField {
     this.stats.builds += 1;
     return sample;
   }
+}
+
+/** Share of full tree density the edge ring keeps outside the closed stand. */
+const SUCCESSION_BELT = 0.1;
+const GLADE_SCALE = 90;
+const GLADE_SEED = 0x676c6164;
+/** Noise band a glade's rim spans: below it open ground, above it closed wood. */
+const GLADE_BAND = Object.freeze([-0.5, -0.35]);
+
+/**
+ * Clearings inside a wood: `open` is 0 in a glade and 1 in closed forest, `rim`
+ * peaks on the glade's edge so it grows an edge community like the wood's own.
+ * About one seventh of a wood's area, in glades some 30-60 m across.
+ */
+const NO_GLADE = Object.freeze({ open: 1, rim: 0 });
+export function forestGlade(x, z) {
+  const noise = valueNoise(x / GLADE_SCALE, z / GLADE_SCALE, GLADE_SEED);
+  const t = Math.min(1, Math.max(0, (noise - GLADE_BAND[0]) / (GLADE_BAND[1] - GLADE_BAND[0])));
+  return { open: t * t * (3 - 2 * t), rim: 1 - Math.abs(t - 0.5) * 2 };
 }
 
 export function createForestPlacementEvaluator(field, counters = null, {

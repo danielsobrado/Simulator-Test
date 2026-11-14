@@ -200,6 +200,7 @@ export class StylizedBushView {
     this.prototypeIndexForRoll = createBiomePrototypeSelector({
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
+      communities: true,
     });
     const newPrototypes = [];
     for (const [index, { geometry, source, motion }] of extracted.entries()) {
@@ -288,11 +289,15 @@ export class StylizedBushView {
         'scrub',
       ) ?? 1;
       // Scrub districts thin thickets, not the shrub layer of a wood.
-      const clusterDensity = understoryClusterDensity(
+      // The woodland edge is a shrub belt in its own right, out past the last
+      // trunks: without it shrubs peaked in the core and the meadow met the
+      // wood at a line of trees (`edgeBelt`, 0 disables).
+      const edge = habitat?.patchEdge ?? 0;
+      const clusterDensity = Math.max(understoryClusterDensity(
         cluster.density * regionalScrub,
         habitat,
         bushes.understoryDensity,
-      );
+      ), (bushes.edgeBelt ?? 0) * edge);
       if (clusterDensity <= 0) return null;
       const canopy = habitat
         ? forestFloorDensity(habitat, 'bush', forestFloorConfig)
@@ -305,6 +310,8 @@ export class StylizedBushView {
       const density = Math.min(1, clusterDensity * canopy * fringe * biome);
       if (candidate.priority >= density) return null;
       return {
+        // Edge shrubs stand taller: the step up from grass to crowns.
+        scale: candidate.scale * (1 + (bushes.edgeScale ?? 0) * edge),
         clusterId: cluster.clusterId,
         bushCoverage: cluster.coverage,
         bushEdge: cluster.edge,

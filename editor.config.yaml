@@ -2205,6 +2205,10 @@ stylizedSurface:
     colorFern: '#628e52'
     # Bushes thicken toward cluster and forest fringes.
     edgeAffinity: 0.5
+    # A shrub belt along every woodland edge, out past the last trunks, at this
+    # share of a thicket's density; and how much taller its shrubs stand.
+    edgeBelt: 0.85
+    edgeScale: 0.35
     # Cluster density a wood's interior keeps at full canopy, wherever the cluster
     # field has no thicket: a closed forest has a shrub layer throughout.
     understoryDensity: 1.0

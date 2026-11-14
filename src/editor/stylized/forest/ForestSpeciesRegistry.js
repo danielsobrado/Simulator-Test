@@ -97,8 +97,10 @@ function pickWeighted(weights, roll) {
   return weights.length - 1;
 }
 
-function weightedAge(edge, coverage, random) {
+function weightedAge(edge, coverage, random, outside = false) {
   const edgeBias = Math.min(1, Math.max(0, edge));
+  // Beyond the closed stand only young growth has arrived yet.
+  if (outside && edgeBias > 0) return random < 0.6 ? 'sapling' : 'young';
   const coreBias = Math.min(1, Math.max(0, coverage - edgeBias * 0.35));
   if (random < 0.025) return 'dead';
   if (random < 0.12 + edgeBias * 0.28) return 'sapling';
@@ -254,6 +256,7 @@ export class ForestSpeciesRegistry {
         habitat.patchEdge,
         habitat.patchCoverage,
         stableUnit(candidate.stableId, 43),
+        habitat.rawPatchCoverage < 0.5 && !(habitat.riparian > 0),
       );
     const age = AGE_CLASSES[ageClass];
     const individualVariation = 0.9 + stableUnit(candidate.stableId, 47) * 0.2;

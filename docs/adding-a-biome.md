@@ -105,6 +105,25 @@ What does not blend, and so limits what neighbours can look like:
 When adding a biome, capture one pose on each border it can have, not only its
 interior.
 
+## How vegetation is distributed
+
+Every layer reads one analytic field, `ForestHabitatField` (coverage and edge
+of the wood at a position), so the layers open and close together. A new biome
+gets all of this from its forest profile and its variants' `canopy` tags.
+
+| Rule | What it does | Where |
+| --- | --- | --- |
+| Woodland edge belt | Shrubs run along every wood's edge and out past the last trunks, up to 35% taller there (`bushes.edgeBelt`, `edgeScale`). | `StylizedBushView` evaluator |
+| Succession | A thin scatter of trees crosses the edge ring; those outside the closed stand are only saplings and young trees. | `ForestHabitatField.evaluate`, `weightedAge` |
+| Glades | Clearings 30-60 m across inside closed and fragmented woods, cut from the field itself: trees, shrubs, grass thinning, litter and the far canopy all open. Their rims grow the edge community. Grove biomes (savanna, grassland) get none. | `forestGlade` |
+| Communities | Each shrub and floor-plant species has its own slow field (16 m), so a stretch of ground favours two or three species, not all of them evenly. | `BiomePrototypeSelector` (`communities`) |
+| Variant `canopy` | `core`, `edge`, `open` weight which species grows where along the gradient. Tag every shrub and floor variant. | `assets.*Variants` |
+
+Open meadow -> shrub belt -> saplings -> closed wood is therefore the default
+shape of any wood. What is not modelled: moisture (only distance to water),
+and trees do not know their neighbours, so "young near parents" is the edge
+ring, not true seeding.
+
 ## Streaming
 
 The world is unbounded and runs in a browser tab, so a biome must cost nothing

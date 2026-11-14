@@ -23,6 +23,8 @@
  * is up to 144 per chunk for trees across a streaming window.
  */
 
+import { valueNoise } from '../world/valueNoise2d.js';
+
 export const CHARACTER_CHANNELS = Object.freeze(['meadow', 'forest', 'scrub', 'rocky']);
 export const CANOPY_PREFERENCES = Object.freeze(['any', 'core', 'edge', 'open']);
 
@@ -30,6 +32,21 @@ export const CANOPY_PREFERENCES = Object.freeze(['any', 'core', 'edge', 'open'])
 // merely disfavours must still be reachable, or a chunk whose candidates all
 // land in that district would have no eligible prototype at all.
 const DYNAMIC_FLOOR = 0.08;
+
+/** Metres across a drift of one species, and the seed of its field. */
+const COMMUNITY_METERS = 16;
+const COMMUNITY_SEED = 0x636f6d6d;
+
+/**
+ * Plants grow in communities: each prototype has its own slow field, so a
+ * stretch of floor favours two or three species and the next stretch others,
+ * instead of every species salted evenly everywhere. 0.15 where it is scarce to
+ * about 2 in its drifts.
+ */
+function communityFactor(index, x, z) {
+  const presence = valueNoise(x / COMMUNITY_METERS + index * 37.13, z / COMMUNITY_METERS - index * 17.71, COMMUNITY_SEED) * 0.5 + 0.5;
+  return 0.15 + 1.9 * presence * presence;
+}
 
 function clamp01(value) {
   return value > 1 ? 1 : (value > 0 ? value : 0);
@@ -77,7 +94,7 @@ export function normalizeBiomePrototypeRule(rule = {}) {
  * inert rather than failing, which keeps callers that have no forest field or no
  * regional field working unchanged.
  */
-export function createBiomePrototypeSelector({ rules, regionalCharacterField = null }) {
+export function createBiomePrototypeSelector({ rules, regionalCharacterField = null, communities = false }) {
   if (!Array.isArray(rules) || rules.length === 0) {
     throw new Error('A biome prototype selector needs at least one prototype rule.');
   }
@@ -126,7 +143,7 @@ export function createBiomePrototypeSelector({ rules, regionalCharacterField = n
         }
         if (rule.canopy !== 'any') weight *= canopyFactor(rule.canopy, habitat);
       }
-      weightScratch[slot] = weight;
+      weightScratch[slot] = communities ? weight * communityFactor(eligible[slot], x, z) : weight;
       total += weight;
     }
     if (!(total > 0)) return eligible[Math.min(eligible.length - 1, Math.floor(target * eligible.length))];

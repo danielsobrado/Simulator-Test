@@ -254,6 +254,7 @@ export class StylizedGroundDetailView {
     this.prototypeIndexForRoll = createBiomePrototypeSelector({
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
+      communities: true,
     });
     const capacity = instanceCapacity({
       residentRadius: this.layerConfig.residentRadius,
@@ -327,6 +328,7 @@ export class StylizedGroundDetailView {
     this.prototypeIndexForRoll = createBiomePrototypeSelector({
       rules: this.prototypeBiomeRules,
       regionalCharacterField: this.regionalCharacterField,
+      communities: true,
     });
     const capacity = instanceCapacity({
       residentRadius: this.layerConfig.residentRadius,
