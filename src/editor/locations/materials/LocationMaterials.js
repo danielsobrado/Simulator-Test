@@ -50,7 +50,10 @@ export class LocationMaterials {
       if (entry.kind === 'glow') {
         material = createGlowMaterial();
       } else if (entry.kind === 'ice') {
-        const maps = { ice: await this.#maps(entry.surfaces.ice), snow: await this.#maps(entry.surfaces.snow) };
+        const maps = {
+          ice: await this.#maps(entry.surfaces.ice), cracks: await this.#maps(entry.surfaces.cracks),
+          snow: await this.#maps(entry.surfaces.snow),
+        };
         if (entry.surfaces.rock) maps.rock = await this.#maps(entry.surfaces.rock);
         material = createGlacierIceMaterial(`location-${key}`, {
           profile: entry.profile, maps, stoneProfile: entry.bedrock, layers: quality.iceLayers, masked: entry.masked,
@@ -59,10 +62,15 @@ export class LocationMaterials {
         const profile = entry.masked ? entry.profile : { ...entry.profile, vertexTint: true };
         const maps = await this.#maps(entry.surfaces.stone);
         if (entry.surfaces.floor) maps.floor = await this.#maps(entry.surfaces.floor);
+        if (entry.surfaces.alt) maps.alt = await this.#maps(entry.surfaces.alt);
         material = createStoneMaterial(`location-${key}`, profile, maps, { masked: entry.masked });
       }
       this.materials.push(material);
-      set[key] = { material, ice: entry.kind === 'ice' ? 1 : 0 };
+      set[key] = {
+        material,
+        ice: entry.kind === 'ice' ? 1 : 0,
+        woodGrain: Boolean(entry.profile?.woodGrain),
+      };
     }
     return set;
   }

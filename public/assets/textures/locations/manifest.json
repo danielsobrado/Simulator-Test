@@ -4,13 +4,41 @@
       "source": "https://ambientcg.com/view?id=Ice004",
       "assetId": "Ice004",
       "license": "CC0-1.0",
-      "files": ["ice-color.webp", "ice-normal.webp", "ice-rough.webp"]
+      "files": [
+        "ice-color.webp",
+        "ice-normal.webp",
+        "ice-rough.webp"
+      ]
     },
     "cave-rock": {
       "source": "https://ambientcg.com/view?id=Rock035",
       "assetId": "Rock035",
       "license": "CC0-1.0",
-      "files": ["cave-rock-color.webp", "cave-rock-normal.webp", "cave-rock-rough.webp"]
+      "files": [
+        "cave-rock-color.webp",
+        "cave-rock-normal.webp",
+        "cave-rock-rough.webp"
+      ]
+    },
+    "planks": {
+      "source": "https://polyhaven.com/a/weathered_planks",
+      "assetId": "weathered_planks",
+      "license": "CC0-1.0",
+      "files": [
+        "planks-color.webp",
+        "planks-normal.webp",
+        "planks-rough.webp"
+      ]
+    },
+    "ice-cracks": {
+      "source": "https://ambientcg.com/view?id=Ice001",
+      "assetId": "Ice001",
+      "license": "CC0-1.0",
+      "files": [
+        "ice-cracks-color.webp",
+        "ice-cracks-normal.webp",
+        "ice-cracks-rough.webp"
+      ]
     }
   }
 }

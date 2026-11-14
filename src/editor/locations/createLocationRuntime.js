@@ -1,5 +1,7 @@
 import locationsSource from '../../../config/instanced-locations.yaml?compiled';
+import mineTimberSource from '../../../config/mine-timber.yaml?compiled';
 import { TownInteractionPrompt } from '../towns/TownInteractionPrompt.js';
+import { setDefaultMineTimberConfig } from './gen/mineTimberConfig.js';
 import { LOCATION_GENERATORS } from './generators/index.js';
 import { resolveLocationCatalog } from './LocationCatalog.js';
 import { LocationRuntime } from './LocationRuntime.js';
@@ -16,6 +18,7 @@ export function createLocationRuntime({
   renderer, loading, playerController, viewModeController, cameraCutCoordinator, floatingOrigin, walkMode, baseUrl,
   search = window.location.search, storage = window.localStorage,
 }) {
+  setDefaultMineTimberConfig(mineTimberSource);
   const catalog = resolveLocationCatalog(structuredClone(locationsSource), {
     generatorKeys: Object.keys(LOCATION_GENERATORS),
     quality: new URLSearchParams(search).get('locationQuality'),

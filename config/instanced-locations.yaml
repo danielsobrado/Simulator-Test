@@ -35,6 +35,15 @@ instancedLocations:
       color: assets/textures/locations/ice-color.webp
       normal: assets/textures/locations/ice-normal.webp
       rough: assets/textures/locations/ice-rough.webp
+    # A photographed crack network; the ice shader reads cracks from its normal map.
+    ice-cracks:
+      color: assets/textures/locations/ice-cracks-color.webp
+      normal: assets/textures/locations/ice-cracks-normal.webp
+      rough: assets/textures/locations/ice-cracks-rough.webp
+    planks:
+      color: assets/textures/locations/planks-color.webp
+      normal: assets/textures/locations/planks-normal.webp
+      rough: assets/textures/locations/planks-rough.webp
     snow:
       color: assets/textures/snow/snow007c_color_1k.jpg
       normal: assets/textures/snow/snow007c_normal_gl_1k.jpg
@@ -71,41 +80,101 @@ instancedLocations:
       color: assets/textures/settlement/flag-slate-color.webp
       normal: assets/textures/settlement/flag-slate-normal.webp
       rough: assets/textures/settlement/flag-slate-arm.webp
+    earth-dry:
+      color: assets/textures/settlement/earth-dry-color.webp
+      normal: assets/textures/settlement/earth-dry-normal.webp
+      rough: assets/textures/settlement/earth-dry-arm.webp
 
   # Stone-family surfaces (rock, masonry, timber, metal). See materials/StoneSurface.js.
   # scale: texture repeats per metre.  vein/strata/masonry are optional features.
   materialProfiles:
     mine_rock:
       surface: cave-rock
+      altSurface: basalt
+      altScale: 0.24
+      altTint: '#e4d4c2'
+      floorSurface: earth-dry
+      floorScale: 0.85
       scale: 0.26
-      tint: '#ebe3d6'
-      normalStrength: 1.18
+      tint: '#f5efe6'
+      normalStrength: 1.16
       roughness: 0.94
-      cavityShade: 0.72
-      strata: { frequency: 1.35, warp: 2.4, dip: 0.18, dark: '#7c756c', light: '#cfc8be', relief: 1.25 }
-      # Crisp fractured pyrite/copper seams anchored to rock crevices without continuous loops.
-      vein: { color: '#8f6534', scale: 4.4, sharpness: 12.0, roughness: 0.34, f0: 0.36, glow: 0 }
+      cavityShade: 0.70
+      strata: { frequency: 1.28, warp: 2.3, dip: 0.18, dark: '#9a9288', light: '#e6dfd5', relief: 1.15 }
+      # Restrained mineral seams anchored to crevices and geological bedding.
+      vein: { color: '#8c6943', scale: 3.6, sharpness: 16.0, roughness: 0.48, f0: 0.12, glow: 0, gain: 1.22, strength: 0.34 }
+      geology:
+        baseGain: 5.2
+        macroScale: 0.046
+        macroContrast: 0.22
+        warmTint: '#ede0cf'
+        coolTint: '#dfdcd6'
+        darkTint: '#aaa49a'
+        lightTint: '#f0ebe2'
+        altRockBlend: 0.36
+        altLuminanceScale: 0.74
+        fractureStain: 0.30
+        fractureColor: '#6b645b'
+        mineralTint: '#8a6d4e'
+        paleMineralTint: '#c7c3b8'
+        verticalSeep: 0.24
+        strataVariation: 0.52
+      ground:
+        compactedTint: '#aa9786'
+        compactedValue: 1.06
+        compactedRoughness: 0.94
+        wearTint: '#c2b6a8'
+        wearRoughness: 0.84
+        gravelTint: '#9e978e'
+        gravelValue: 1.00
+        gravelRoughness: 0.94
+        gravelScale: 6.4
+        gravelRelief: 1.32
+        trackWeatherTint: '#625851'
+        bedrockRoughness: 0.94
+        dampTint: '#59514a'
+        dampRoughness: 0.56
+        dampF0: 0.036
+      wetness:
+        darken: 0.72
+        roughness: 0.54
+        specularBoost: 0.008
+        mineralRim: 0.09
+        rimTint: '#73624d'
+      excavation:
+        freshLighten: 1.08
+        freshClean: 0.34
+        weatheredDust: 0.22
+        dustTint: '#7a736b'
+    mine_debris:
+      surface: cave-rock
+      scale: 0.52
+      tint: '#b8b0a5'
+      normalStrength: 1.0
+      roughness: 0.95
+      cavityShade: 0.56
     ore_rubble:
       surface: rubble
       scale: 0.72
       tint: '#b59978'
-      roughness: 0.56
-      f0: 0.28
-      vein: { color: '#a8783a', scale: 5.2, sharpness: 10.5, roughness: 0.28, f0: 0.42, glow: 0 }
+      roughness: 0.68
+      f0: 0.22
+      vein: { color: '#a8783a', scale: 5.2, sharpness: 10.5, roughness: 0.36, f0: 0.32, glow: 0 }
     still_water:
       surface: iron
       scale: 0.42
       tint: '#03080b'
-      normalStrength: 0.12
-      roughness: 0.56
-      f0: 0.025
+      normalStrength: 0.14
+      roughness: 0.24
+      f0: 0.032
       water: true
     timber:
       surface: timber
       scale: 0.55
-      tint: '#ffffff'
-      normalStrength: 1.0
-      roughness: 0.88
+      tint: '#dfd4c6'
+      normalStrength: 0.92
+      roughness: 0.94
+      woodGrain: true
     sod_roof:
       surface: timber
       scale: 0.5
@@ -114,11 +183,11 @@ instancedLocations:
     iron:
       surface: iron
       scale: 0.9
-      tint: '#9a9ea8'
-      normalStrength: 1.1
-      roughness: 0.48
-      metalness: 0.82
-      f0: 0.56
+      tint: '#9aa0ab'
+      normalStrength: 1.05
+      roughness: 0.52
+      metalness: 0.7
+      f0: 0.44
     rubble_masonry:
       surface: rubble
       scale: 0.42
@@ -129,6 +198,39 @@ instancedLocations:
       scale: 0.22
       tint: '#8d9299'
       normalStrength: 1.1
+    # Frostgard under the sky. `snow` lies on faces at least `from` upright (the normal's Y)
+    # that the sky can see; nothing under a roof or inside a hall takes any.
+    frost_timber:
+      surface: timber
+      scale: 0.55
+      tint: '#ffffff'
+      roughness: 0.88
+      snow: { amount: 1, from: 0.45, color: '#eef4fa' }
+    snow_roof:
+      surface: timber
+      scale: 0.5
+      tint: '#5d5a4c'
+      normalStrength: 1.1
+      snow: { amount: 1, from: -0.1, color: '#f2f6fb' }
+    snowy_rubble:
+      surface: rubble
+      scale: 0.42
+      tint: '#ffffff'
+      normalStrength: 1.1
+      snow: { amount: 0.9, from: 0.5, color: '#eef4fa' }
+    moraine_boulder:
+      surface: cave-rock
+      scale: 0.3
+      tint: '#9a9ea6'
+      normalStrength: 1.2
+      roughness: 0.95
+      snow: { amount: 1, from: 0.3, color: '#eef4fa' }
+    plank_floor:
+      surface: planks
+      scale: 0.42
+      tint: '#b79f84'
+      normalStrength: 1.1
+      roughness: 0.8
     umbra_basalt:
       surface: basalt
       scale: 0.16
@@ -189,50 +291,67 @@ instancedLocations:
       roughness: 0.35
       f0: 0.08
 
-  # Ice families: one shader (materials/GlacierIceMaterial.js), seven presets.
-  # absorption: per-metre rgb extinction. Amounts are 0..1 and add to the vertex masks.
+  # Ice families: one shader (materials/GlacierIceMaterial.js), a preset each. A vertex mask
+  # can push part of a wall toward another family, so one cave shows several.
+  #   absorption  per-metre rgb extinction of light inside the ice
+  #   depthRate   metres of light path per metre of ice behind the surface: how fast it goes blue
+  #   gloss       strength of the broad wet highlight
+  #   crust       white weathering on faces open to the sky; snowfall: snow lying where the sky can see
+  #   wind        plan direction the snow ridges run along
+  #   detailRange metres over which cracks, bubbles and sparkle fade out with distance
+  #   banding     layers per metre, tilt, fold amplitude (metres of layer offset), strength
+  # Amounts are 0..1 and add to the vertex masks.
   iceProfiles:
     deep_blue_glacier: &ice
-      deepColor: '#124f8a'
-      thinColor: '#8fd8ee'
-      milkColor: '#b9dcea'
-      scatterColor: '#bfeaff'
+      textures: { ice: ice, cracks: ice-cracks, snow: snow }
+      thinColor: '#dff3f8'
+      deepColor: '#0b3f7a'
+      milkColor: '#c4e2ee'
+      scatterColor: '#cfefff'
       sedimentColor: '#3d3a33'
       frostColor: '#e9f4fa'
       snowColor: '#f4f8fb'
-      absorption: [0.55, 0.085, 0.03]
-      depthRate: 0.55
-      roughness: 0.16
+      snowShade: '#b9cfe8'
+      absorption: [0.5, 0.12, 0.035]
+      depthRate: 1.1
+      roughness: 0.14
+      gloss: 0.3
       microNormal: 0.16
-      crackGain: 0.45
-      fracture: 0.12
+      crackGain: 0.5
+      fracture: 0.1
       bubbles: 0.08
-      cloud: 0.35
+      cloud: 0.4
       sediment: 0
       frost: 0
       snow: 0
-      banding: { frequency: 1.7, dip: 0.28, strength: 0.5 }
+      polish: 0
+      crust: 0
+      snowfall: 0
+      wind: [0.6, 0.8]
+      detailRange: [16, 48]
+      banding: { frequency: 0.9, dip: 0.22, fold: 5, strength: 0.6 }
       scallop: { scale: 0.6, depth: 0.26 }
     white_bubbly:
       <<: *ice
       deepColor: '#5f9fc4'
-      thinColor: '#d6eef6'
       roughness: 0.3
+      gloss: 0.12
       bubbles: 0.9
-      cloud: 0.9
+      cloud: 0.95
       crackGain: 0.3
-      depthRate: 0.3
+      depthRate: 0.35
     clear_polished:
       <<: *ice
-      deepColor: '#0a4b86'
-      thinColor: '#a9e6f5'
       roughness: 0.06
-      microNormal: 0.12
-      bubbles: 0.02
+      gloss: 0.45
+      microNormal: 0.1
+      bubbles: 0.03
       cloud: 0.05
+      polish: 0.6
       crackGain: 0.35
-      banding: { frequency: 2.6, dip: 0.28, strength: 0.1 }
-      scallop: { scale: 0.75, depth: 0.02 }
+      depthRate: 1.6
+      banding: { frequency: 0.9, dip: 0.22, fold: 5, strength: 0.12 }
+      scallop: { scale: 0.75, depth: 0.03 }
     fractured:
       <<: *ice
       fracture: 0.9
@@ -244,6 +363,7 @@ instancedLocations:
       sediment: 0.8
       cloud: 0.5
       roughness: 0.34
+      gloss: 0.15
     frost_covered:
       <<: *ice
       frost: 0.75
@@ -252,19 +372,39 @@ instancedLocations:
       <<: *ice
       snow: 0.9
       frost: 0.3
+    # A glacier under the sky: sun-cupped, crusted white where exposed, blue in its breaks, snow on what faces up.
+    weathered_glacier:
+      <<: *ice
+      crust: 0.85
+      snowfall: 1
+      depthRate: 0.9
+      cloud: 0.5
+      roughness: 0.2
+      detailRange: [22, 70]
+      scallop: { scale: 0.35, depth: 0.2 }
+    # Fresh-fallen blocks: broken faces, a cap of new snow.
+    calved_block:
+      <<: *ice
+      fracture: 0.8
+      crackGain: 1
+      crust: 0.4
+      snowfall: 0.8
 
   # bakeGain scales every baked lamp in the profile (default 1).
   # Colours are linear-light ambient for up- and down-facing surfaces, the walker's
   # carried lamp, and fog. absorption: how the bake dims light crossing solid.
   lightingProfiles:
     mine_lanterns:
-      background: '#050403'
-      fog: { color: '#0d0a08', density: 0.0115 }
-      ambientUp: '#42382f'
-      ambientDown: '#201b16'
-      carried: { color: '#ffd9ad', intensity: 1.65, range: 13 }
-      exposure: 1.35
-      bakeGain: 3.4
+      background: '#040507'
+      fog: { color: '#080a0d', density: 0.0155 }
+      ambientUp: '#2d333f'
+      ambientDown: '#1b1f27'
+      carried: { color: '#ecd9c3', intensity: 0.44, range: 10.0 }
+      exposure: 1.28
+      bakeGain: 2.70
+      dynamicGain: 0.28
+      indirectBounce: { strength: 0.86, cellSize: 1.25, radius: 14.0, wrap: 0.64, maxEnergy: 2.6 }
+      propShadows: { resolution: 0.16, minTransmit: 0.12, contactStrength: 0.76 }
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     umbra_pale:
       background: '#020308'
@@ -286,18 +426,62 @@ instancedLocations:
     frostgard_ice:
       background: '#061423'
       fog: { color: '#0d2740', density: 0.011 }
-      ambientUp: '#33607c'
-      ambientDown: '#173d5a'
+      ambientUp: '#2c536e'
+      ambientDown: '#14344f'
       carried: { color: '#e4f1ff', intensity: 0.7, range: 9 }
       exposure: 1.15
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
+    # Open-air profiles add `sky`: the dome that is drawn, and the sun and skylight that are baked.
+    #   sun.direction points toward the sun; disc and glow shape it on the dome.
+    #   skylight is the dome's own light, shadowed like the sun's: keep the ambient colours low
+    #   beside it or caves and overhangs will not go dark.
+    #   peaks: a far ridge at `radius` metres, `haze` 0..1 of it lost to the air.
+    frostgard_daylight:
+      background: '#bcd3e8'
+      fog: { color: '#bcd3e8', density: 0.0042 }
+      ambientUp: '#4a5d7c'
+      ambientDown: '#43536f'
+      carried: { color: '#ffffff', intensity: 0, range: 1 }
+      exposure: 1.0
+      absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
+      sky:
+        zenith: '#2f6fb5'
+        horizon: '#c4dbee'
+        ground: '#bcd3e8'
+        sun: { direction: [-0.75, 0.42, 0.5], color: '#fff0d8', intensity: 1.5, disc: 6, glow: 1 }
+        skylight: { color: '#a9cbf2', intensity: 0.9 }
+        clouds: 0.55
+        cloudColor: '#f3f7fb'
+        stars: 0
+        peaks: { radius: 460, height: 300, seed: 5, rock: '#5d6f8a', snow: '#f6f3ee', shade: '#9db6d6', haze: 0.35 }
+    frostgard_dusk:
+      background: '#16233f'
+      fog: { color: '#16233f', density: 0.006 }
+      ambientUp: '#1d2b47'
+      ambientDown: '#141d33'
+      carried: { color: '#ffe2bd', intensity: 0.45, range: 8 }
+      exposure: 1.5
+      absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
+      sky:
+        zenith: '#060d24'
+        horizon: '#35507c'
+        ground: '#16233f'
+        # The afterglow in the west, long after the sun itself has gone.
+        sun: { direction: [-0.9, 0.12, -0.3], color: '#ff9a6a', intensity: 0.22, disc: 0, glow: 0.5 }
+        skylight: { color: '#5f86c8', intensity: 0.42 }
+        clouds: 0.25
+        cloudColor: '#27365a'
+        stars: 0.9
+        aurora: { color: '#49f0a0', crown: '#8f6bff', strength: 0.55 }
+        peaks: { radius: 420, height: 280, seed: 12, rock: '#0f1830', snow: '#5f7fae', shade: '#27406a', haze: 0.3 }
 
   # One instanced sprite field per entry, in a box that follows the camera.
   # velocity m/s; size metres [min, max]; anchor: a generator point the field gathers around.
   atmosphereProfiles:
     mine_dust:
       particles:
-        - { count: 700, box: 16, velocity: [0.02, -0.015, 0.03], sway: 0.012, size: [0.012, 0.035], color: '#e8d2b0', opacity: 0.55, additive: true, ambientGain: 2, lampGain: 0.5 }
+        - { count: 520, box: 18, velocity: [0.018, -0.012, 0.025], sway: 0.014, size: [0.012, 0.032], color: '#e6cfb2', opacity: 0.32, additive: true, ambientGain: 0.10, lampGain: 1.05 }
+        - { count: 42, box: 28, velocity: [0.02, 0.004, 0.018], sway: 0.22, size: [4.2, 7.2], color: '#2b251f', opacity: 0.022, additive: false, ambientGain: 0.16, lampGain: 0.50 }
     umbra_depth:
       particles:
         - { count: 500, box: 30, velocity: [0.03, 0.02, 0.01], sway: 0.02, size: [0.02, 0.06], color: '#a9dcff', opacity: 0.5, additive: true, ambientGain: 3, lampGain: 0.3, glow: 0.05, twinkle: 2 }
@@ -309,6 +493,25 @@ instancedLocations:
       particles:
         - { count: 600, box: 18, velocity: [0.02, -0.03, 0.02], sway: 0.012, size: [0.012, 0.03], color: '#eaf6ff', opacity: 0.8, additive: true, ambientGain: 2.5, lampGain: 0.6, twinkle: 5 }
         - { count: 900, box: 26, velocity: [0.6, -0.5, -2.6], sway: 0.05, size: [0.03, 0.08], color: '#f2f8ff', opacity: 0.7, additive: false, ambientGain: 9, lampGain: 0.4, anchor: mouth, anchorRadius: 22 }
+        # Cold haze: a few very large, very faint sprites, so depth reads in still air.
+        - { count: 70, box: 34, velocity: [0.05, 0, 0.04], sway: 0.4, size: [5, 9], color: '#bcd9ee', opacity: 0.045, additive: false, ambientGain: 1.6, lampGain: 0.15 }
+      # Shed from points a generator marks with `emit(kind, at)`.
+      emitters: &frostgard_emitters
+        drip: { perPoint: 3, life: 1.6, velocity: [0, -0.2, 0], gravity: 5, spread: 0.04, size: [0.035, 0.03], color: '#dff2ff', opacity: 0.9, additive: true, ambientGain: 3, glow: 0.15 }
+        smoke: { perPoint: 26, life: 7, velocity: [0.12, 0.75, 0.05], gravity: -0.02, spread: 1.6, size: [0.5, 2.6], color: '#8b93a0', opacity: 0.22, additive: false, ambientGain: 1.2, glow: 0.02 }
+        sift: { perPoint: 60, life: 6, velocity: [1.2, -1.2, 2.2], gravity: 0.6, spread: 5, size: [0.25, 2.2], color: '#ffffff', opacity: 0.16, additive: false, ambientGain: 6, glow: 0 }
+    # `outdoor` fields fade out while the walker stands under a roof.
+    frostgard_glacier_wind:
+      particles:
+        - { count: 1400, box: 30, velocity: [1.8, -0.25, 2.4], sway: 0.25, size: [0.03, 0.09], color: '#ffffff', opacity: 0.55, additive: false, ambientGain: 9, lampGain: 0, outdoor: true }
+        - { count: 500, box: 20, velocity: [0.15, -0.05, 0.1], sway: 0.05, size: [0.012, 0.03], color: '#ffffff', opacity: 0.9, additive: true, ambientGain: 1.5, lampGain: 0, glow: 0.5, twinkle: 6, outdoor: true }
+      emitters: *frostgard_emitters
+    frostgard_dusk_snow:
+      particles:
+        - { count: 1100, box: 26, velocity: [0.5, -1.1, 0.35], sway: 0.18, size: [0.02, 0.05], color: '#eaf2ff', opacity: 0.75, additive: false, ambientGain: 7, lampGain: 0.9, outdoor: true }
+        - { count: 600, box: 26, velocity: [2.2, -0.2, 1.4], sway: 0.2, size: [0.03, 0.08], color: '#f2f8ff', opacity: 0.6, additive: false, ambientGain: 8, lampGain: 0.5, anchor: gate, anchorRadius: 26, outdoor: true }
+        - { count: 60, box: 34, velocity: [0.08, 0, 0.05], sway: 0.4, size: [5, 9], color: '#8fa9cc', opacity: 0.04, additive: false, ambientGain: 2, lampGain: 0.2 }
+      emitters: *frostgard_emitters
 
   loadingThemes:
     neutral: { title: Entering a location, color: '#1a1e26', accent: '#cfd6e0' }
@@ -340,6 +543,20 @@ instancedLocations:
       tips:
         - Thin ice glows. Deep ice is dark. Trust the dark.
         - The Norths build on bedrock; a hearth and a glacier do not share a floor.
+    frostgard_glacier_front:
+      title: Frostgard — The Glacier's Edge
+      color: '#1d3247'
+      accent: '#bfe6ff'
+      tips:
+        - White ice has stood in the sun. Blue ice has only just been opened.
+        - The stakes mark where the Norths have walked and come back.
+    frostgard_hold:
+      title: Frostgard — The Hold Under the Ice
+      color: '#1c2233'
+      accent: '#ffb469'
+      tips:
+        - Rock keeps a fire. Ice only keeps what is already cold.
+        - When the beacon is lit, every hold down the valley bars its gate.
     surface_return: { title: Returning to the surface, color: '#1a1e26', accent: '#cfd6e0' }
 
   # generatorKey must be registered in src/editor/locations/generators/index.js.
@@ -357,10 +574,52 @@ instancedLocations:
         timber: { kind: stone, profile: timber, masked: false }
         iron: { kind: stone, profile: iron, masked: false }
         ore: { kind: stone, profile: ore_rubble, masked: false }
+        rock_debris: { kind: stone, profile: mine_debris, masked: false }
         water: { kind: stone, profile: still_water, masked: false }
         glow: { kind: glow }
       params:
         drift: { width: 3.6, height: 3.2, setSpacing: 3.6 }
+        # Geological zoning, floor material distribution & transition controls (see gen/mineGeologyConfig.js).
+        geology:
+          zoneScale: 0.042
+          zoneContrast: 1.05
+          beddingDipX: 0.18
+          beddingDipZ: 0.09
+          wallBlendWidth: 1.05
+          sedimentAccumulation: 0.72
+          gravelDensity: 0.68
+          bedrockExposure: 0.36
+          wetnessGain: 1.0
+          drainageLevel: -3.8
+          mineralIntensity: 0.42
+          excavationContrast: 0.75
+        # Procedural excavated tunnel profile & geological variation (see gen/mineTunnelConfig.js).
+        tunnelGeometry:
+          macroWidthVariation: 0.82
+          macroHeightVariation: 0.88
+          wallAsymmetry: 1.05
+          ceilingFlattening: 0.68
+          ceilingOffset: 0.62
+          geologicalDisplacement: 0.54
+          fractureFrequency: 0.42
+          fractureStrength: 0.56
+          featureScale: 0.28
+          maxProtrusion: 0.45
+          minNavigationClearance: 1.05
+          minHeadClearance: 2.3
+          junctionBlendDistance: 3.4
+          samplingQuality: 0.75
+          cornerRadius: 4.5
+          beddingDipX: 0.18
+          beddingDipZ: 0.09
+        # Section lighting mood, deterministic lantern rhythm, and portal/cavern transitions (see generators/mineLightingLayout.js).
+        lightingSections:
+          adit: { daylightTint: '#b8d4f4', daylightIntensity: 5.8, daylightRange: 21.0, thresholdTint: '#8faed4', thresholdIntensity: 2.45, thresholdRange: 19.5 }
+          haulage: { tint: '#ffbe7a', warmAltTint: '#ffc88a', intensity: 4.9, range: 15.0, spacingFrames: 3, unlitRate: 0.14, flickerAmount: 0.085 }
+          hub: { tint: '#ffc07c', shaftAbyssTint: '#6c859c', shaftAbyssIntensity: 2.1, hoistIntensity: 6.4, hoistRange: 19.5 }
+          stope: { tint: '#ffc482', workTint: '#ffb870', primaryIntensity: 6.2, primaryRange: 17.5, flickerAmount: 0.105 }
+          abandoned: { tint: '#eb9e56', dimTint: '#df8d46', intensity: 3.4, range: 13.5, flickerAmount: 0.21 }
+          flooded: { tint: '#ffba72', pierIntensity: 4.8, pierRange: 16.0, farIntensity: 4.2, farRange: 16.5 }
     drow_cavern_city:
       generatorKey: vertical-cavern-city
       lightingProfile: umbra_pale
@@ -409,6 +668,7 @@ instancedLocations:
       materials:
         terrain: { kind: ice, profile: deep_blue_glacier, bedrock: glacier_bedrock }
         clearIce: { kind: ice, profile: clear_polished, masked: false }
+        iceBlock: { kind: ice, profile: fractured, masked: false }
         timber: { kind: stone, profile: timber, masked: false }
         iron: { kind: stone, profile: iron, masked: false }
         masonry: { kind: stone, profile: rubble_masonry, masked: false }
@@ -416,8 +676,70 @@ instancedLocations:
         seal: { kind: stone, profile: obsidian_seal, masked: false }
         glow: { kind: glow }
       params:
-        icicles: 260
+        # Attempts; a cluster hangs wherever one finds a roof low enough.
+        icicles: 420
         longhall: { length: 13, width: 6, wallHeight: 2.6, roofRise: 3.4 }
+        # Ledges melted along the layers: metres of relief, layers per metre, tilt, waviness.
+        strata: { amp: 0.35, frequency: 0.45, dip: 0.12, warp: 2.5 }
+        # The sun above the glacier, reaching the cave only through the ice: [x, z, strength].
+        surfaceLight: [[-22, -52, 1.1], [14, -38, 1.1], [-4, -62, 1.1], [-16, -40, 1.5], [12, -56, 1.4], [-2, -22, 1.1], [3, -8, 1], [10, -86, 1.3], [-18, -62, 1], [-40, -74, 1.3], [-30, -90, 1]]
+    frostgard_glacier_front:
+      generatorKey: glacier-front
+      lightingProfile: frostgard_daylight
+      atmosphereProfile: frostgard_glacier_wind
+      loadingTheme: frostgard_glacier_front
+      loreRealmKey: frostgard
+      voxel: 0.8
+      materials:
+        terrain: { kind: ice, profile: weathered_glacier, bedrock: glacier_bedrock }
+        clearIce: { kind: ice, profile: clear_polished, masked: false }
+        iceBlock: { kind: ice, profile: calved_block, masked: false }
+        rock: { kind: stone, profile: moraine_boulder, masked: false }
+        timber: { kind: stone, profile: frost_timber, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        glow: { kind: glow }
+      params:
+        # The ice cliff: where it stands (z), how high, how far its middle bows forward, its backward lean
+        # per metre of height; crevasses cut back from the lip; spires and bergs by x ([x, metres out, size]).
+        front: { z: -34, height: 38, bow: 14, lean: 0.12, crevasses: 8, spires: [-38, -15, 6, 31, 48], caveX: 10, bergs: [[-18, 7, 2.6], [27, 6, 2.2], [-2, 9, 1.6]] }
+        wall: { x: 58, lean: 0.26 }
+        moraine: { z: 37, height: 9, width: 7 }
+        pool: { x: -8, z: -22, rx: 22, rz: 9, y: -0.3 }
+        arch: { x: 4, z: -6, width: 8.4, height: 9.5, wallHeight: 13 }
+        strata: { amp: 0.5, frequency: 0.3, dip: 0.08, warp: 3 }
+        icicles: 240
+        stakes: [[2.5, 14], [5.5, 4], [7, -14], [9.5, -24]]
+    frostgard_hold:
+      generatorKey: frostgard-hold
+      lightingProfile: frostgard_dusk
+      atmosphereProfile: frostgard_dusk_snow
+      loadingTheme: frostgard_hold
+      loreRealmKey: frostgard
+      voxel: 0.6
+      materials:
+        terrain: { kind: ice, profile: weathered_glacier, bedrock: glacier_bedrock }
+        clearIce: { kind: ice, profile: clear_polished, masked: false }
+        rock: { kind: stone, profile: moraine_boulder, masked: false }
+        timber: { kind: stone, profile: frost_timber, masked: false }
+        masonry: { kind: stone, profile: snowy_rubble, masked: false }
+        roof: { kind: stone, profile: snow_roof, masked: false }
+        planks: { kind: stone, profile: plank_floor, masked: false }
+        iron: { kind: stone, profile: iron, masked: false }
+        glow: { kind: glow }
+      params:
+        # The great hall cut into the bluff: floor height, half spans, wall height, rise of the vault above it.
+        hall: { floor: 1.3, halfWidth: 5, halfLength: 12, wallHeight: 3.2, vaultRise: 3.4 }
+        # The bedrock bluff: its south face (z), half width at the foot, height.
+        knoll: { front: -11.5, halfWidth: 19, height: 13 }
+        # `swing` brings the front south along the west side; crevasses are [fromX, toX, metres back from the lip].
+        glacier: { z: -46, height: 40, lean: 0.1, swing: 34, crevasses: [[-40, -8, 7], [4, 40, 9]] }
+        wall: { x: 44, lean: 0.3 }
+        rise: { z: 42, height: 8, width: 5 }
+        store: { x: -18, z: -58, floor: 0.4, radius: 7.5 }
+        yard: { gateZ: 15 }
+        cottage: { length: 7, width: 4.4, wallHeight: 2.2, roofRise: 2.6 }
+        strata: { amp: 0.4, frequency: 0.3, dip: 0.08, warp: 3 }
+        icicles: 60
 
   # Showcase sites are development access only: they have no Azgaar source and are
   # not lore locations. World-anchored sites add `source` and `entrances` here.
@@ -440,9 +762,30 @@ instancedLocations:
       subtitle: Dwarven hold — showcase
       seed: 2231
       showcase: true
+    # `links` sends an exit (by the id its generator gave it) to another site's spawn
+    # instead of back to the surface.
+    showcase-frostgard-glacier:
+      archetype: frostgard_glacier_front
+      title: Frostgard Glacier Front
+      subtitle: Glacier terminus under open sky — showcase
+      seed: 6113
+      showcase: true
+      links:
+        cave: { site: showcase-frostgard-refuge, spawn: entry }
+        hold: { site: showcase-frostgard-hold, spawn: entry }
     showcase-frostgard-refuge:
       archetype: frostgard_glacier
-      title: Frostgard Glacier Refuge
+      title: Frostgard Ice Cave
       subtitle: Glacier cave and Norths refuge — showcase
       seed: 9053
       showcase: true
+      links:
+        mouth: { site: showcase-frostgard-glacier, spawn: cave }
+    showcase-frostgard-hold:
+      archetype: frostgard_hold
+      title: Frostgard Glacier-Foot Hold
+      subtitle: Norths hall, yard and ice store — showcase
+      seed: 3391
+      showcase: true
+      links:
+        road: { site: showcase-frostgard-glacier, spawn: hold }

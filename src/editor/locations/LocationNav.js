@@ -47,6 +47,14 @@ export class LocationNav {
     });
   }
 
+  /**
+   * Open ground that follows a height function: `heightAt(x, z)` wherever `contains(x, z)`.
+   * For terrain under the sky, where no plane describes the floor.
+   */
+  addSurface(heightAt, contains) {
+    this.areas.push((x, z) => (contains(x, z) ? heightAt(x, z) : NaN));
+  }
+
   /** A standing obstacle: a disc the walker cannot enter while within its height band. */
   block(center, radius, height = 3) {
     this.blockers.push({ x: center.x, z: center.z, radius, bottom: center.y - 0.5, top: center.y + height });

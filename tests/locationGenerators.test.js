@@ -4,7 +4,7 @@ import test from 'node:test';
 import yaml from 'js-yaml';
 import * as THREE from 'three/webgpu';
 import { LOCATION_GENERATORS } from '../src/editor/locations/generators/index.js';
-import { LocationBuilder } from '../src/editor/locations/LocationBuilder.js';
+import { generateLocation } from '../src/editor/locations/LocationBuilder.js';
 import { resolveLocationCatalog } from '../src/editor/locations/LocationCatalog.js';
 
 const source = yaml.load(fs.readFileSync(new URL('../config/instanced-locations.yaml', import.meta.url), 'utf8'));
@@ -19,8 +19,7 @@ test('the catalog rejects a reference to something that does not exist', () => {
 for (const site of catalog.showcaseSites()) {
   test(`${site.id} generates a walkable, lit place with a way out`, () => {
     const generator = LOCATION_GENERATORS[site.generatorKey];
-    const builder = new LocationBuilder({ seed: site.seed, bounds: generator.bounds, voxel: site.voxel });
-    generator.generate(builder, site.params);
+    const builder = generateLocation(site, generator);
     const material = new THREE.MeshBasicMaterial();
     const materials = Object.fromEntries(Object.keys(site.materials).map((key) => [key, { material, ice: 0 }]));
     const group = builder.build({ materials, absorption: site.lighting.absorption });

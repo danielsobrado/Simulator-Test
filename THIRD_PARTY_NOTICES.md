@@ -415,3 +415,21 @@ Sources: https://ambientcg.com/view?id=Ice004 and https://ambientcg.com/view?id=
 `public/assets/textures/locations/` as `ice-{color,normal,rough}.webp` and
 `cave-rock-{color,normal,rough}.webp`. Provenance in
 `public/assets/textures/locations/manifest.json`.
+
+Added for the Frostgard ice environments, converted the same way (1024 px WebP):
+
+- Ice001 by ambientCG, CC0 1.0 Universal — https://ambientcg.com/view?id=Ice001 —
+  as `ice-cracks-{color,normal,rough}.webp`. The ice shader reads its crack
+  network from the normal map.
+- weathered_planks by Poly Haven (Dimitrios Savva, Dario Barresi), CC0 1.0
+  Universal — https://polyhaven.com/a/weathered_planks — as
+  `planks-{color,normal,rough}.webp`; `rough` is the packed AO/roughness/metal
+  map, read from its green channel.
+
+Neither site publishes a per-asset licence field; both state CC0 for every
+asset (https://ambientcg.com/license, https://polyhaven.com/license).
+
+No third-party shader code is used by the location materials. The ice shader's
+techniques — Beer-Lambert absorption, interior detail sampled along the
+refracted view ray, cell-noise melt scallops — are standard and written for
+this project; the noise functions are three.js's MaterialX nodes (MIT).

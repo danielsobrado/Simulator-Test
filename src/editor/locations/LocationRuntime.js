@@ -238,7 +238,13 @@ export class LocationRuntime {
   handleKey(event) {
     if (!this.active || event.code !== this.catalog.policy.interactCode) return;
     event.stopImmediatePropagation();
-    if (!event.repeat && this.state === INSIDE && this.nearExit) void this.exit();
+    if (!event.repeat && this.state === INSIDE && this.nearExit) void this.useExit(this.nearExit);
+  }
+
+  /** Takes a way out: on to the site it is linked to in the catalog, or back to the surface. */
+  useExit(exit) {
+    const link = this.current.site.links[exit.id];
+    return link ? this.enter(link.site, { spawnId: link.spawn }) : this.exit();
   }
 
   /**

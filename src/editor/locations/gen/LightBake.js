@@ -13,7 +13,9 @@
  *  - `light`  rgb irradiance, already shaped by the surface normal
  *  - `dir`    the dominant light direction scaled by how directional it is (0..1),
  *             so the shader can re-shade detail normals and place a highlight
- *  - `shade`  x: ambient occlusion, y: thickness of solid behind the surface in metres
+ *  - `shade`  x: ambient occlusion, y: thickness of solid behind the surface in metres,
+ *             z: 1 where nothing stands between the surface and the sky (always 0 in a closed volume) —
+ *             where snow can fall and weather can reach
  */
 
 /**
@@ -23,27 +25,53 @@
  * @property {number} range metres at which it reaches zero
  * @property {number} [radius] source size in metres; softens the inverse square
  * @property {boolean} [flat] daylight through an opening or a roof: no inverse-square falloff
+ * @property {[number, number, number]} [direction] unit vector toward a sun or a patch of sky: the light is
+ *   parallel, does not fall off, and is shadowed by whatever stands within `range` metres along it
  */
 
 const AO_REACH = [1.3, 2.6, 5.2];
+/** Components of the `shade` attribute. */
+export const SHADE_SIZE = 3;
 
 /**
  * @param {object} options
  * @param {import('./DensityGrid.js').DensityGrid} options.grid
+ * @param {import('./PropOcclusionGrid.js').PropOcclusionGrid|null} [options.propGrid]
+ * @param {{ minTransmit?: number, contactStrength?: number, isProp?: boolean }|null} [options.propShadows]
  * @param {Float32Array} options.positions
  * @param {Float32Array} options.normals
  * @param {BakedLight[]} options.lights
- * @param {(vertex: number) => number} options.iceAt 0 rock .. 1 ice, per vertex
+ * @param {(vertex: number) => number} options.iceAt 0 rock .. 1 ice: what the ground around the vertex is made of,
+ *   and so what light reaching it has had to cross
+ * @param {(vertex: number) => number} [options.wrapAt] 0 .. 1: how far light wraps round the surface itself;
+ *   defaults to `iceAt`, which is right for the volume's own surface
  * @param {{ rock: number[], ice: number[] }} options.absorption per-metre rgb extinction
  * @param {number} [options.wrapIce] how far light wraps around an ice surface
  */
-export function bakeLighting({ grid, positions, normals, lights, iceAt, absorption, wrapIce = 0.9 }) {
+export function bakeLighting({
+  grid,
+  propGrid = null,
+  propShadows = null,
+  positions,
+  normals,
+  lights,
+  iceAt,
+  wrapAt = iceAt,
+  absorption,
+  wrapIce = 0.9,
+}) {
   const count = positions.length / 3;
   const light = new Float32Array(count * 3);
   const dir = new Float32Array(count * 3);
-  const shade = new Float32Array(count * 2);
+  const shade = new Float32Array(count * SHADE_SIZE);
   const step = grid.voxel;
   const sigma = [0, 0, 0];
+  const top = grid.min.y + grid.ny * grid.voxel;
+  const isProp = Boolean(propShadows?.isProp);
+  const startOffset = propShadows?.startOffset ?? (isProp ? 0.20 : 0.14);
+  const endMargin = propShadows?.endMargin ?? 0.28;
+  const minTransmit = propShadows?.minTransmit ?? 0.14;
+  const contactStrength = propShadows?.contactStrength ?? 0.72;
 
   for (let v = 0; v < count; v += 1) {
     const px = positions[v * 3], py = positions[v * 3 + 1], pz = positions[v * 3 + 2];
@@ -51,22 +79,38 @@ export function bakeLighting({ grid, positions, normals, lights, iceAt, absorpti
     const ice = iceAt(v);
     for (let c = 0; c < 3; c += 1) sigma[c] = absorption.rock[c] + (absorption.ice[c] - absorption.rock[c]) * ice;
     const thinnest = Math.min(sigma[0], sigma[1], sigma[2]);
-    const wrap = 0.12 + (wrapIce - 0.12) * ice;
-    // Start clear of the surface so the vertex's own wall only counts when the light is behind it.
+    const wrap = 0.12 + (wrapIce - 0.12) * wrapAt(v);
+    // Start clear of the surface so the vertex's own terrain voxel only counts when the light is behind it.
     const sx = px + nx * step * 0.8, sy = py + ny * step * 0.8, sz = pz + nz * step * 0.8;
+    const rx = isProp ? px + nx * 0.02 : sx;
+    const ry = isProp ? py + ny * 0.02 : sy;
+    const rz = isProp ? pz + nz * 0.02 : sz;
+    const pox = px + nx * (isProp ? 0.09 : 0.04);
+    const poy = py + ny * (isProp ? 0.09 : 0.04);
+    const poz = pz + nz * (isProp ? 0.09 : 0.04);
     const jitter = ((v * 0.61803398875) % 1) * step;
     let r = 0, g = 0, b = 0, dx = 0, dy = 0, dz = 0, weight = 0;
 
     for (const source of lights) {
-      const lx = source.x - sx, ly = source.y - sy, lz = source.z - sz;
-      const distance = Math.hypot(lx, ly, lz);
-      if (distance >= source.range) continue;
-      const ux = lx / distance, uy = ly / distance, uz = lz / distance;
-      const facing = (nx * ux + ny * uy + nz * uz + wrap) / (1 + wrap);
+      let ux, uy, uz, distance = source.range, falloff = 1;
+      if (source.direction) {
+        [ux, uy, uz] = source.direction;
+      } else {
+        const lx = source.x - rx, ly = source.y - ry, lz = source.z - rz;
+        distance = Math.hypot(lx, ly, lz);
+        if (distance >= source.range) continue;
+        const safeDist = Math.max(distance, 1e-4);
+        ux = lx / safeDist; uy = ly / safeDist; uz = lz / safeDist;
+        const fade = 1 - (distance / source.range) ** 2;
+        const effDist = Math.max(distance, isProp ? 0.46 : 0.28);
+        const effRadius = Math.max(source.radius ?? 1, isProp ? 0.85 : 0.4);
+        falloff = source.flat ? fade * fade : (fade * fade) / (1 + (effDist / effRadius) ** 2);
+      }
+      const nearWrap = isProp && !source.flat && !source.direction && distance < 0.75
+        ? Math.min(0.65, wrap + (1 - distance / 0.75) * 0.32)
+        : wrap;
+      const facing = (nx * ux + ny * uy + nz * uz + nearWrap) / (1 + nearWrap);
       if (facing <= 0) continue;
-      const fade = 1 - (distance / source.range) ** 2;
-      const radius = source.radius ?? 1;
-      const falloff = source.flat ? fade * fade : (fade * fade) / (1 + (distance / radius) ** 2);
       let solid = 0;
       for (let t = jitter; t < distance; t += step) {
         if (grid.solidAt(sx + ux * t, sy + uy * t, sz + uz * t)) {
@@ -75,28 +119,64 @@ export function bakeLighting({ grid, positions, normals, lights, iceAt, absorpti
         }
       }
       const reach = falloff * facing;
-      const cr = source.color[0] * reach * Math.exp(-sigma[0] * solid);
-      const cg = source.color[1] * reach * Math.exp(-sigma[1] * solid);
-      const cb = source.color[2] * reach * Math.exp(-sigma[2] * solid);
+      let propTransmit = 1;
+      if (propGrid && !source.flat && !source.direction) {
+        propTransmit = propGrid.transmittanceRay(pox, poy, poz, ux, uy, uz, distance, {
+          startOffset,
+          endMargin,
+          minTransmit,
+        });
+      }
+      const transmit = reach * propTransmit;
+      const cr = source.color[0] * transmit * Math.exp(-sigma[0] * solid);
+      const cg = source.color[1] * transmit * Math.exp(-sigma[1] * solid);
+      const cb = source.color[2] * transmit * Math.exp(-sigma[2] * solid);
       const luma = cr * 0.3 + cg * 0.5 + cb * 0.2;
       r += cr; g += cg; b += cb;
       dx += ux * luma; dy += uy * luma; dz += uz * luma; weight += luma;
     }
     light[v * 3] = r; light[v * 3 + 1] = g; light[v * 3 + 2] = b;
-    if (weight > 1e-6) { dir[v * 3] = dx / weight; dir[v * 3 + 1] = dy / weight; dir[v * 3 + 2] = dz / weight; }
+    if (weight > 1e-6) {
+      // Scale directionality by irradiance confidence so dark recesses stay calm without specular speckles.
+      const confidence = Math.min(1, weight / 0.16);
+      const inv = confidence / weight;
+      dir[v * 3] = dx * inv;
+      dir[v * 3 + 1] = dy * inv;
+      dir[v * 3 + 2] = dz * inv;
+    }
 
     let occlusion = 0;
     for (const reach of AO_REACH) {
       const d = reach * step;
       occlusion += Math.min(1, Math.max(0, 1 - grid.sample(px + nx * d, py + ny * d, pz + nz * d) / d));
     }
-    shade[v * 2] = 1 - 0.8 * (occlusion / AO_REACH.length);
+    const terrainOccScale = isProp ? 0.45 : 0.76;
+    const terrainAO = 1 - terrainOccScale * (occlusion / AO_REACH.length);
+    const contactAO = propGrid
+      ? propGrid.contactAO(px, py, pz, nx, ny, nz, {
+        grid,
+        selfClearance: isProp ? Math.max(0.28, propGrid.resolution * 1.75) : 0.16,
+        strength: contactStrength,
+        minAO: isProp ? 0.38 : 0.26,
+      })
+      : 1;
+    shade[v * SHADE_SIZE] = isProp
+      ? terrainAO * (0.44 + 0.56 * contactAO)
+      : terrainAO * (0.34 + 0.66 * contactAO);
 
     let thickness = 0;
     while (thickness < 8 && grid.solidAt(px - nx * (thickness + step), py - ny * (thickness + step), pz - nz * (thickness + step))) {
       thickness += step;
     }
-    shade[v * 2 + 1] = thickness;
+    shade[v * SHADE_SIZE + 1] = thickness;
+
+    if (grid.open) {
+      let open = 1;
+      for (let y = sy + step; y < top; y += step) {
+        if (grid.solidAt(sx, y, sz)) { open = 0; break; }
+      }
+      shade[v * SHADE_SIZE + 2] = open;
+    }
   }
   return { light, dir, shade };
 }

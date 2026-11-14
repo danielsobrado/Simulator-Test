@@ -65,6 +65,32 @@ export function hall(center, { halfLength, halfWidth, height, vaultRise = 0, yaw
   };
 }
 
+/**
+ * A crevasse from `a` to `b`: a slot floored at their lower `y` and open up to
+ * `topY`, `topWidth` wide at the lip and closing to `bottomWidth`, pinching out
+ * at both ends. `wander` (metres) bends its line so it does not read as a saw cut.
+ */
+export function crevasse(a, b, { topY, topWidth, bottomWidth = 0.5, wander = 0, seed = 0 }) {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const length = Math.hypot(dx, dz) || 1e-6;
+  const ux = dx / length, uz = dz / length;
+  const floorY = Math.min(a.y, b.y);
+  const pad = topWidth / 2 + wander * 1.6 + 1;
+  return {
+    box: box(Math.min(a.x, b.x) - pad, floorY - 1, Math.min(a.z, b.z) - pad,
+      Math.max(a.x, b.x) + pad, topY + 1, Math.max(a.z, b.z) + pad),
+    air(x, y, z) {
+      const along = (x - a.x) * ux + (z - a.z) * uz;
+      const t = Math.min(1, Math.max(0, along / length));
+      const line = (Math.sin(along * 0.19 + seed) + Math.sin(along * 0.07 + seed * 1.7) * 0.6) * wander;
+      const across = (z - a.z) * ux - (x - a.x) * uz - line;
+      const rise = Math.min(1, Math.max(0, (y - floorY) / (topY - floorY)));
+      const half = (bottomWidth + (topWidth - bottomWidth) * rise) * 0.5 * Math.sqrt(Math.sin(Math.PI * t));
+      return Math.min(half - Math.abs(across), y - floorY, topY - y, along + 0.5, length - along + 0.5);
+    },
+  };
+}
+
 /** A vertical shaft of `radius` from `bottomY` to `topY`. */
 export function shaft(center, { radius, bottomY, topY }) {
   return {

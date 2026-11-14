@@ -34,7 +34,8 @@ export function resolveLocationCatalog(source, { generatorKeys, quality = null }
     if (entry.kind === 'ice') {
       const profile = need(root.iceProfiles, entry.profile, 'ice profile', owner);
       const bedrock = entry.bedrock ? need(root.materialProfiles, entry.bedrock, 'material profile', owner) : null;
-      const surfaces = { ice: need(root.textureSets, 'ice', 'texture set', owner), snow: need(root.textureSets, 'snow', 'texture set', owner) };
+      const surfaces = Object.fromEntries(['ice', 'cracks', 'snow']
+        .map((role) => [role, need(root.textureSets, profile.textures[role], 'texture set', `ice profile ${entry.profile}`)]));
       if (bedrock) surfaces.rock = need(root.textureSets, bedrock.surface, 'texture set', owner);
       return { kind: 'ice', profile, bedrock, surfaces, masked: entry.masked !== false };
     }
@@ -45,6 +46,9 @@ export function resolveLocationCatalog(source, { generatorKeys, quality = null }
       };
       if (profile.floorSurface) {
         surfaces.floor = need(root.textureSets, profile.floorSurface, 'texture set', `material profile ${entry.profile}`);
+      }
+      if (profile.altSurface) {
+        surfaces.alt = need(root.textureSets, profile.altSurface, 'texture set', `material profile ${entry.profile}`);
       }
       return { kind: 'stone', profile, masked: entry.masked !== false, surfaces };
     }
@@ -58,11 +62,18 @@ export function resolveLocationCatalog(source, { generatorKeys, quality = null }
       throw new Error(`Instanced locations: ${owner} names unregistered generator "${archetype.generatorKey}".`);
     }
     if (!archetype.materials?.terrain) throw new Error(`Instanced locations: ${owner} has no terrain material.`);
+    const lighting = need(root.lightingProfiles, archetype.lightingProfile, 'lighting profile', owner);
+    if (lighting.indirectBounce && !(lighting.indirectBounce.strength >= 0 && lighting.indirectBounce.cellSize > 0 && lighting.indirectBounce.radius > 0)) {
+      throw new Error(`Instanced locations: lighting profile "${archetype.lightingProfile}" has invalid indirectBounce settings.`);
+    }
+    if (lighting.propShadows && !(lighting.propShadows.resolution > 0 && lighting.propShadows.contactStrength >= 0)) {
+      throw new Error(`Instanced locations: lighting profile "${archetype.lightingProfile}" has invalid propShadows settings.`);
+    }
     archetypes[key] = {
       key,
       generatorKey: archetype.generatorKey,
       voxel: archetype.voxel * qualityTier.voxelScale,
-      lighting: need(root.lightingProfiles, archetype.lightingProfile, 'lighting profile', owner),
+      lighting,
       atmosphere: need(root.atmosphereProfiles, archetype.atmosphereProfile, 'atmosphere profile', owner),
       themeKey: archetype.loadingTheme,
       theme: need(root.loadingThemes, archetype.loadingTheme, 'loading theme', owner),
@@ -85,7 +96,13 @@ export function resolveLocationCatalog(source, { generatorKeys, quality = null }
       seed: site.seed,
       showcase: site.showcase === true,
       params: merge(archetype.params, site.params),
+      links: site.links ?? {},
     }));
+  }
+  for (const [id, site] of sites) {
+    for (const [exitId, link] of Object.entries(site.links)) {
+      if (!sites.has(link.site)) throw new Error(`Instanced locations: site ${id} exit "${exitId}" leads to unknown site "${link.site}".`);
+    }
   }
 
   return Object.freeze({

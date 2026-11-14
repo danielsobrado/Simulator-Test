@@ -1,9 +1,13 @@
 import {
-  abs, attribute, clamp, color, float, floor, fract, hash, min, mix, mod, mx_noise_float, normalize, positionWorld,
-  pow, sin, smoothstep, vec3,
+  abs, attribute, clamp, color, float, floor, fract, hash, length, max, min, mix, mod, mx_noise_float, normalize,
+  positionWorld, pow, sin, smoothstep, texture, uv, vec2, vec3,
 } from 'three/tsl';
 import {
-  bumpNormal, createLocationMaterial, geometryNormal, shadeSurface, triplanarNormal, triplanarSample, triplanarWeights,
+  applyGeologicalVariation, applyLocalizedWetness, applyMineGround, evaluateGeologicalStrataMask, safePow,
+} from './GeologicalSurface.js';
+import {
+  bakedShade, bumpNormal, createLocationMaterial, geometryNormal, shadeSurface, triplanarNormal, triplanarSample,
+  triplanarWeights,
 } from './LocationShading.js';
 
 /**
@@ -61,8 +65,9 @@ function masonry(point, weights, { courseHeight, blockLength, jointWidth }) {
  * @param {object} profile a resolved `materialProfiles` entry
  * @param {{ color: Texture, normal: Texture, rough: Texture }} maps
  * @param {Node|null} mask the `surfMask` vertex attribute, or null for meshes without one
+ * @param {Node|null} mask2 optional `surfMask2` vertex attribute for geological/floor variation
  */
-export function stoneSurface(profile, maps, mask = null) {
+export function stoneSurface(profile, maps, mask = null, mask2 = null) {
   const point = positionWorld;
   const weights = triplanarWeights(geometryNormal);
   const scale = profile.scale;
@@ -79,9 +84,13 @@ export function stoneSurface(profile, maps, mask = null) {
   let normal = triplanarNormal(maps.normal, samplePoint, geometryNormal, weights, scale, profile.normalStrength ?? 1);
   let roughness = triplanarSample(maps.rough, samplePoint, weights, scale).g.mul(profile.roughness ?? 1);
   roughness = roughness.mul(mix(float(0.86), float(1.16), detailAlbedo.g));
+  if (!profile.water && !(profile.metalness > 0.2) && (profile.roughness ?? 1) >= 0.75) {
+    roughness = max(roughness, float(Math.max(0.72, (profile.roughness ?? 1) * 0.78)));
+  }
   let f0 = float(profile.f0 ?? 0.04);
-  const metalness = float(profile.metalness ?? 0);
+  let metalness = float(profile.metalness ?? 0);
   let emissive = vec3(0);
+  let wrap = float(profile.wrap ?? 0.12);
 
   // Multi-scale mineral variation so no stone wall repeats or reads as uniform gray.
   const macro = mx_noise_float(point.mul(0.085)).mul(0.5).add(0.5);
@@ -95,11 +104,35 @@ export function stoneSurface(profile, maps, mask = null) {
     const warp = mx_noise_float(point.mul(0.13)).mul(profile.strata.warp ?? 4);
     const band = sin(point.y.mul(profile.strata.frequency).add(warp).add(point.x.mul(profile.strata.dip ?? 0.15)));
     const bed = smoothstep(-0.2, 0.9, band);
-    albedo = albedo.mul(mix(color(profile.strata.dark), color(profile.strata.light), bed));
-    normal = bumpNormal(normal, bed.mul(0.03), profile.strata.relief ?? 1);
+    const strataScale = profile.geology
+      ? evaluateGeologicalStrataMask(point, mask2 ? mask2.x : macro, profile.geology)
+      : float(1);
+    const strataTint = mix(color(profile.strata.dark), color(profile.strata.light), bed);
+    albedo = albedo.mul(mix(vec3(1), strataTint, clamp(strataScale, 0.15, 1)));
+    normal = bumpNormal(normal, bed.mul(0.03).mul(strataScale), profile.strata.relief ?? 1);
   }
 
-  if (maps.floor) {
+  if (profile.geology) {
+    const varied = applyGeologicalVariation({
+      point, albedo, normal, roughness, f0, detailAlbedo, macro, midPatch, grainMix,
+      mask, mask2, profile, maps, weights,
+    });
+    albedo = varied.albedo;
+    normal = varied.normal;
+    roughness = varied.roughness;
+    f0 = varied.f0;
+  }
+
+  if (profile.ground) {
+    const ground = applyMineGround({
+      point, albedo, normal, roughness, f0, detailAlbedo, macro, midPatch, grainMix,
+      mask, mask2, profile, maps, weights,
+    });
+    albedo = ground.albedo;
+    normal = ground.normal;
+    roughness = ground.roughness;
+    f0 = ground.f0;
+  } else if (maps.floor) {
     const floorScale = float(profile.floorScale ?? 0.34);
     const floorMask = smoothstep(0.68, 0.92, geometryNormal.y).mul(smoothstep(-1.2, -0.2, point.y)).mul(dressed);
     const flColor = triplanarSample(maps.floor.color, point, weights, floorScale).rgb.mul(color(profile.floorTint ?? profile.tint));
@@ -167,27 +200,99 @@ export function stoneSurface(profile, maps, mask = null) {
   if (mask) {
     if (profile.vein) {
       const warp = mx_noise_float(point.mul(profile.vein.scale * 0.35)).mul(1.25);
-      const line = pow(abs(mx_noise_float(point.mul(profile.vein.scale).add(warp))).oneMinus(), profile.vein.sharpness ?? 12);
+      const line = safePow(abs(mx_noise_float(point.mul(profile.vein.scale).add(warp))).oneMinus(), profile.vein.sharpness ?? 12);
       const pocket = smoothstep(0.38, 0.78, detailAlbedo.g.mul(0.6).add(grainMix.mul(0.4))).mul(smoothstep(0.28, 0.72, midPatch));
       const vein = smoothstep(0.28, 0.75, line.mul(mask.x.mul(1.4)).mul(pocket));
-      albedo = mix(albedo, albedo.mul(color(profile.vein.color)).mul(1.85), vein.mul(0.75));
+      const veinGain = float(profile.vein.gain ?? 1.85);
+      const veinStrength = float(profile.vein.strength ?? 0.75);
+      albedo = mix(albedo, albedo.mul(color(profile.vein.color)).mul(veinGain), vein.mul(veinStrength));
       roughness = mix(roughness, float(profile.vein.roughness ?? 0.3), vein);
       f0 = mix(f0, float(profile.vein.f0 ?? 0.5), vein);
       emissive = color(profile.vein.color).mul(vein).mul(profile.vein.glow ?? 0);
     }
-    const damp = mask.y.mul(smoothstep(0.25, 0.75, macro.add(mask.y.mul(0.45))));
-    albedo = albedo.mul(mix(float(1), float(0.68), damp));
-    roughness = mix(roughness, float(0.42), damp);
-    albedo = albedo.mul(mix(vec3(1), color(profile.sootColor ?? '#1a1512'), mask.z.mul(0.85)));
-    roughness = mix(roughness, roughness.mul(profile.dressedRoughness ?? 0.8), dressed);
+    if (profile.geology || profile.wetness) {
+      const wet = applyLocalizedWetness({
+        albedo, roughness, f0, macro, midPatch, mask, profile,
+      });
+      albedo = wet.albedo;
+      roughness = wet.roughness;
+      f0 = wet.f0;
+    } else {
+      const damp = mask.y.mul(smoothstep(0.25, 0.75, macro.add(mask.y.mul(0.45))));
+      albedo = albedo.mul(mix(float(1), float(0.68), damp));
+      roughness = mix(roughness, float(0.42), damp);
+    }
+    if (!profile.geology) {
+      albedo = albedo.mul(mix(vec3(1), color(profile.sootColor ?? '#1a1512'), mask.z.mul(0.85)));
+      roughness = mix(roughness, roughness.mul(profile.dressedRoughness ?? 0.8), dressed);
+    }
+  }
+  if (profile.woodGrain) {
+    // Directional timber grain along member UVs (V = longitudinal axis) with end-grain rings and damp/edge wear.
+    const woodMask = attribute('woodMask', 'vec4');
+    const woodUv = uv();
+    const hasWoodUv = woodMask.w;
+    const endMask = clamp(woodMask.x, 0, 1);
+    const dampMask = clamp(woodMask.y, 0, 1);
+    const edgeWear = clamp(woodMask.z, 0, 1);
+
+    const sideAlbedo = texture(maps.color, woodUv).rgb.mul(color(profile.tint));
+    const sideDetail = texture(maps.color, woodUv.mul(2.35).add(vec2(0.31, 0.73))).rgb;
+    const sideRough = clamp(texture(maps.rough, woodUv).g.mul(profile.roughness ?? 0.88), 0.76, 0.98);
+    const sideNorm = texture(maps.normal, woodUv).xy.mul(2).sub(1);
+    const sideHeight = sideAlbedo.g.mul(0.55).add(sideDetail.g.mul(0.25)).add(sideNorm.x.mul(0.22)).mul(0.024);
+
+    // Saw-cut end-grain: concentric growth rings + radial checking from cross-section UV centered at (0.5, 0.5).
+    const ringCoord = woodUv.sub(0.5);
+    const radialDist = length(ringCoord);
+    const ringDir = ringCoord.div(max(radialDist, float(1e-4)));
+    const ringWarp = mx_noise_float(vec3(woodUv.mul(5.2), 1.7)).mul(1.4);
+    const growthRings = sin(radialDist.mul(28.0).add(ringWarp)).mul(0.5).add(0.5);
+    const radialCheck = pow(abs(mx_noise_float(vec3(ringDir.mul(5.8), radialDist.mul(1.8)))).oneMinus(), 5.0);
+    const endTone = color(profile.tint).mul(mix(float(0.54), float(0.84), growthRings))
+      .mul(mix(float(1.0), float(0.45), radialCheck.mul(0.75)));
+    const endHeight = growthRings.mul(0.014).sub(radialCheck.mul(0.022));
+
+    let woodAlbedo = mix(sideAlbedo.mul(mix(float(0.88), float(1.12), sideDetail.g)), endTone, endMask);
+    woodAlbedo = woodAlbedo.mul(mix(float(0.9), float(1.08), macro));
+    woodAlbedo = woodAlbedo.mul(mix(float(1.0), float(1.14), edgeWear.mul(0.7)));
+    woodAlbedo = woodAlbedo.mul(mix(float(1.0), float(0.56), dampMask));
+
+    const woodHeight = mix(sideHeight, endHeight, endMask);
+    const woodNormal = bumpNormal(geometryNormal, woodHeight, float(profile.normalStrength ?? 1).mul(1.45));
+    let woodRough = mix(sideRough, float(0.94), endMask);
+    woodRough = mix(woodRough, float(0.62), dampMask.mul(0.68));
+    woodRough = woodRough.mul(mix(float(1.0), float(0.92), edgeWear.mul(0.6)));
+
+    albedo = mix(albedo, woodAlbedo, hasWoodUv);
+    normal = normalize(mix(normal, woodNormal, hasWoodUv));
+    roughness = mix(roughness, woodRough, hasWoodUv);
   }
   if (profile.vertexTint) albedo = albedo.mul(attribute('tint', 'vec3'));
 
-  return { albedo, normal, roughness, f0, metalness, emissive };
+  if (profile.snow) {
+    // Snow lies on what faces a sky it can fall from: ledges, roof pitches, the tops of logs and stones.
+    const settle = mx_noise_float(point.mul(1.3)).mul(0.22);
+    const lying = smoothstep(profile.snow.from, profile.snow.from + 0.35, geometryNormal.y.add(settle))
+      .mul(bakedShade.z).mul(profile.snow.amount);
+    albedo = mix(albedo, color(profile.snow.color).mul(mx_noise_float(point.mul(9)).mul(0.04).add(1)), lying);
+    normal = normalize(mix(normal, geometryNormal, lying.mul(0.8)));
+    roughness = mix(roughness, float(0.9), lying);
+    f0 = mix(f0, float(0.02), lying);
+    metalness = metalness.mul(lying.oneMinus());
+    wrap = mix(wrap, float(0.6), lying);
+  }
+
+  return { albedo, normal, roughness, f0, metalness, emissive, wrap };
 }
 
 /** @returns {MeshBasicNodeMaterial} a stone-family material for a location mesh */
 export function createStoneMaterial(name, profile, maps, { masked = true } = {}) {
-  const surface = stoneSurface(profile, maps, masked ? attribute('surfMask', 'vec4') : null);
-  return createLocationMaterial(name, shadeSurface({ ...surface, wrap: profile.wrap ?? 0.12 }));
+  const surface = stoneSurface(
+    profile,
+    maps,
+    masked ? attribute('surfMask', 'vec4') : null,
+    masked ? attribute('surfMask2', 'vec4') : null,
+  );
+  return createLocationMaterial(name, shadeSurface(surface));
 }

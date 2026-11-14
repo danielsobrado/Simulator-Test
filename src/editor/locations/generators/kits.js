@@ -1,4 +1,6 @@
-import { arch, beam, block, box, coursedWall, extrudedProfile, hewnBeam, rod, roughTimber, stoneBlock, stoneBox } from '../gen/propKit.js';
+import * as THREE from 'three/webgpu';
+import { arch, box, coursedWall, extrudedProfile, hewnBeam, rod, roughTimber, stoneBlock, stoneBox } from '../gen/propKit.js';
+import { buildStandaloneTimberSet } from '../gen/timberSupportBuilder.js';
 
 /**
  * Built assemblies shared by the generators. Each takes the builder first and
@@ -16,80 +18,97 @@ const frame = (a, c) => {
 };
 const side = (p, f, offset) => ({ x: p.x + f.nx * offset, y: p.y, z: p.z + f.nz * offset });
 
-/** A caged oil lantern: tapered iron hood, base saucer, guard rods, live flame, and baked light. */
-export function lantern(b, at, { tint = '#ffb061', intensity = 5, range = 13, halo = 1.5, hung = 0 } = {}) {
-  b.prop('iron', rod(up(at, 0.16), up(at, 0.27), 0.2, 0.05, 8), 0x6c717a);
-  b.prop('iron', rod(up(at, -0.22), up(at, -0.14), 0.16, 0.19, 8), 0x6c717a);
-  b.prop('iron', rod(up(at, -0.15), up(at, -0.07), 0.068, 0.058, 8), 0x705d44);
-  for (const [dx, dz] of [[-0.1, -0.1], [0.1, -0.1], [-0.1, 0.1], [0.1, 0.1]]) {
-    b.prop('iron', rod({ x: at.x + dx, y: at.y - 0.15, z: at.z + dz }, { x: at.x + dx, y: at.y + 0.17, z: at.z + dz }, 0.015, 0.015, 5), 0x666b74);
-  }
-  if (hung > 0) b.prop('iron', rod(up(at, 0.26), up(at, 0.26 + hung), 0.016, 0.016, 5), 0x626670);
-  b.prop('glow', rod(up(at, -0.08), up(at, 0.02), 0.036, 0.024, 8), '#e67822', 0.92);
-  b.flame(up(at, -0.05), { width: 0.19, height: 0.27, core: '#fff3c4', outer: '#ff5c10', speed: 1.15 });
-  b.light(at, tint, intensity, range, { radius: 1.2, halo: halo * 0.55 });
+const LANTERN_GLOBE_PROFILE = [
+  [0.066, -0.118],
+  [0.09, -0.072],
+  [0.098, -0.008],
+  [0.088, 0.068],
+  [0.064, 0.118],
+];
+
+function createLanternGlobeGeometry(at) {
+  const pts = LANTERN_GLOBE_PROFILE.map(([r, y]) => new THREE.Vector2(r, y));
+  const geometry = new THREE.LatheGeometry(pts, 10);
+  return geometry.translate(at.x, at.y, at.z);
 }
 
 /**
- * A hand-hewn mine timber set across a drift: tapered organic octagonal posts seated
- * deep into a rock-socketed eared cap beam, embedded knee braces, and shoulder lagging
- * wedges that transition cleanly into the arched cave walls.
+ * A caged oil lantern: tarnished-iron base pan and brass burner collar, corner guard
+ * rods with horizontal retaining wires, stepped storm hood with flue cap and bail,
+ * barrelled amber-lit glass globe, and baked + dynamic practical light.
+ * Preserves `at.y - 0.22` base seating and `at.y + 0.26 + hung` hanging stem coordinates.
  */
-export function timberSet(b, at, yaw, width, height, tint = 0x7d6044) {
-  const c = Math.cos(yaw), s = Math.sin(yaw);
-  // `yaw` 0 spans a drift that runs along Z; trapezoidal inward batter keeps upper joints clear of the arch roof.
-  const left = { x: at.x - c * width / 2, y: at.y, z: at.z + s * width / 2 };
-  const right = { x: at.x + c * width / 2, y: at.y, z: at.z - s * width / 2 };
-  const batterIn = Math.min(0.28, width * 0.08);
-  const leanL = b.range(-0.04, 0.04), leanR = b.range(-0.04, 0.04);
-  const leftTop = { x: left.x + c * batterIn + leanL, y: at.y + height, z: left.z - s * batterIn };
-  const rightTop = { x: right.x - c * batterIn + leanR, y: at.y + height, z: right.z + s * batterIn };
+export function lantern(b, at, {
+  tint = '#ffb061',
+  intensity = 5,
+  range = 13,
+  halo = 1.15,
+  haloGain = 0.22,
+  hung = 0,
+  importance = 1,
+  flicker = 0.09,
+  section = 'default',
+  dynamic = true,
+} = {}) {
+  // Base oil fount pan + tarnished brass gallery collar + inner burner cup.
+  b.prop('iron', rod(up(at, -0.22), up(at, -0.16), 0.126, 0.14, 8), 0x32363e);
+  b.prop('iron', rod(up(at, -0.16), up(at, -0.125), 0.116, 0.104, 8), 0x7d5d38);
+  b.prop('iron', rod(up(at, -0.125), up(at, -0.09), 0.056, 0.036, 8), 0x8e6b40);
 
-  // Flared sill foot blocks anchored into the rock floor.
-  b.prop('timber', stoneBlock(0.42, 0.16, 0.42, left, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
-  b.prop('timber', stoneBlock(0.42, 0.16, 0.42, right, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
+  // Upper retaining collar, stepped storm hood, vented chimney flue, and top bail.
+  b.prop('iron', rod(up(at, 0.112), up(at, 0.14), 0.098, 0.118, 8), 0x5c4a35);
+  b.prop('iron', rod(up(at, 0.14), up(at, 0.198), 0.156, 0.082, 8), 0x343840);
+  b.prop('iron', rod(up(at, 0.198), up(at, 0.244), 0.068, 0.042, 8), 0x3c4048);
+  b.prop('iron', rod(up(at, 0.244), up(at, 0.27), 0.03, 0.022, 6), 0x464a52);
+  if (hung > 0) b.prop('iron', rod(up(at, 0.26), up(at, 0.26 + hung), 0.015, 0.015, 5), 0x42464e);
 
-  // Hand-hewn battered posts seated solidly up into the cap beam.
-  b.prop('timber', roughTimber(left, up(leftTop, 0.14), 0.28, 0.28, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
-  b.prop('timber', roughTimber(right, up(rightTop, 0.14), 0.28, 0.28, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
-
-  // Heavy cap beam socketed deep into the arched side walls with lagging cribbing at the shoulders.
-  const capLeft = { x: leftTop.x - c * 0.48, y: leftTop.y + 0.08, z: leftTop.z + s * 0.48 };
-  const capRight = { x: rightTop.x + c * 0.48, y: rightTop.y + 0.08, z: rightTop.z - s * 0.48 };
-  b.prop('timber', roughTimber(capLeft, capRight, 0.32, 0.28, { taper: 0.05, bow: 0.026, irregular: 0.38 }), tint);
-
-  // Timber blocking wedges & longitudinal shoulder lagging packing the frame neatly against curved cave stone.
-  for (const [sign, shoulder] of [[-1, leftTop], [1, rightTop]]) {
-    const wallPt = { x: shoulder.x + sign * c * 0.22, y: shoulder.y - 0.02, z: shoulder.z - sign * s * 0.22 };
-    b.prop('timber', roughTimber(
-      { x: wallPt.x - s * 0.45, y: wallPt.y, z: wallPt.z - c * 0.45 },
-      { x: wallPt.x + s * 0.45, y: wallPt.y, z: wallPt.z + c * 0.45 },
-      0.16, 0.14, { bow: 0.015, irregular: 0.45 },
-    ), 0x674e36);
-    b.prop('timber', stoneBox(0.36, 0.2, 0.42, { x: wallPt.x, y: wallPt.y + 0.18, z: wallPt.z }, {
-      yaw, bevel: 0.04, irregular: 0.55,
-    }), 0x5c452f);
-  }
-
-  // Adze-hewn knee braces mortised cleanly inside post and cap beam centerlines.
-  for (const [post, top, otherTop, chance] of [[left, leftTop, rightTop, 0.75], [right, rightTop, leftTop, 0.55]]) {
-    if (b.random() < chance) {
-      const braceBot = lerp(post, top, 0.56);
-      const braceTop = lerp(top, otherTop, 0.26);
-      b.prop('timber', roughTimber(braceBot, up(braceTop, 0.14), 0.15, 0.15, { taper: 0.06, bow: 0.02, irregular: 0.4 }), tint);
+  // Protective corner guard bars + upper/lower wire retaining cage.
+  const corners = [[-0.095, -0.095], [0.095, -0.095], [0.095, 0.095], [-0.095, 0.095]];
+  for (let i = 0; i < corners.length; i += 1) {
+    const [dx, dz] = corners[i];
+    const [nx, nz] = corners[(i + 1) % corners.length];
+    b.prop('iron', rod(
+      { x: at.x + dx, y: at.y - 0.162, z: at.z + dz },
+      { x: at.x + dx, y: at.y + 0.145, z: at.z + dz },
+      0.012, 0.012, 5,
+    ), 0x2f333b);
+    for (const wireY of [-0.105, 0.095]) {
+      b.prop('iron', rod(
+        { x: at.x + dx, y: at.y + wireY, z: at.z + dz },
+        { x: at.x + nx, y: at.y + wireY, z: at.z + nz },
+        0.008, 0.008, 4,
+      ), 0x363a42);
     }
   }
-  // Overhead lagging poles on ~50% of sets to break up the roof silhouette.
-  if (b.random() < 0.5) {
-    for (const t of [0.22, 0.5, 0.78]) {
-      const p = lerp(leftTop, rightTop, t);
-      b.prop('timber', roughTimber(
-        { x: p.x - s * 0.65, y: p.y + 0.25, z: p.z - c * 0.65 },
-        { x: p.x + s * 0.65, y: p.y + 0.25, z: p.z + c * 0.65 },
-        0.11, 0.09, { taper: 0.08, bow: 0.02, irregular: 0.45 },
-      ), tint);
-    }
-  }
+
+  // Barrelled glass enclosure shaded in TSL from hot pale-gold core to rich amber/copper edges.
+  const globeTint = new THREE.Color(tint);
+  globeTint.setRGB(globeTint.r, globeTint.g * 0.88, globeTint.b * 0.65);
+  const globeGain = Math.max(0.58, Math.min(0.92, 0.7 + (intensity - 3) * 0.055));
+  b.prop('glow', createLanternGlobeGeometry(at), globeTint, globeGain);
+
+  const importanceScale = Math.max(0.7, Math.min(1.35, 0.78 + (importance - 1) * 0.38));
+  const intensityScale = Math.max(0.45, Math.min(1.3, intensity / 4.2));
+  const effectiveHalo = halo * (0.44 + 0.1 * (importanceScale - 1));
+  const effectiveHaloGain = haloGain * 0.72 * intensityScale * importanceScale;
+
+  b.light(at, tint, intensity, range, {
+    radius: 1.25,
+    halo: effectiveHalo,
+    haloGain: effectiveHaloGain,
+    importance,
+    flicker,
+    section,
+    dynamic,
+  });
+}
+
+/**
+ * Builds a single framed mine timber support set across a drift at `at`,
+ * using the procedural chamfered-beam, joint, wedge, and grain-aligned system.
+ */
+export function timberSet(b, at, yaw, width, height, tint = 0x7d6044, options = {}) {
+  return buildStandaloneTimberSet(b, at, yaw, width, height, { tint, ...options });
 }
 
 /** Cart rails with irregular hand-hewn sleepers from `a` to `c`. */
