@@ -11,7 +11,7 @@ import { lantern } from './kits.js';
 
 const P = (x, y, z) => ({ x, y, z });
 export const LOG = 0x7f6243, DARK = 0x4d3a29, PALE = 0x9c8a6a, STONE = 0xa8a39b;
-export const HEARTH = '#ff9a45';
+export const HEARTH = '#ffac62';
 const LOG_RADIUS = 0.19, LOG_COURSE = 0.36;
 
 /**
@@ -203,6 +203,7 @@ export function beacon(b, at, { height = 8 } = {}) {
   b.prop('glow', rod(L(0, height + 0.5, 0), L(0, height + 0.72, 0), 0.5, 0.42, 8), '#d2460f', 1.8);
   b.flame(L(0, height + 0.7, 0), { width: 1.2, height: 1.9, core: '#fff2bc', outer: '#ff520e' });
   b.light(L(0, height + 1.4, 0), '#ffb066', 12, 38, { radius: 2.4, halo: 4.5 });
+  b.emit('ember', L(0, height + 0.9, 0));
   b.prop('iron', rod(L(0, height - 0.95, 0), L(0, height - 0.35, 0), 0.3, 0.08, 8), 0x7d7362);
   b.nav.block(at, 2.4, 4);
 }

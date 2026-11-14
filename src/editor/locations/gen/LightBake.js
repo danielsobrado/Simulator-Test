@@ -30,6 +30,8 @@
  */
 
 const AO_REACH = [1.3, 2.6, 5.2];
+/** Optical depth past which light through a solid is not worth tracing further. */
+const OPAQUE = 7;
 /** Components of the `shade` attribute. */
 export const SHADE_SIZE = 3;
 
@@ -45,6 +47,9 @@ export const SHADE_SIZE = 3;
  *   and so what light reaching it has had to cross
  * @param {(vertex: number) => number} [options.wrapAt] 0 .. 1: how far light wraps round the surface itself;
  *   defaults to `iceAt`, which is right for the volume's own surface
+ * @param {(x: number, y: number, z: number) => number} [options.mediumAt] 0 rock .. 1 ice at a point inside the
+ *   volume. When given, light is dimmed by what it actually passed through (rock under an ice roof is lit
+ *   blue through the ice, not blacked out as if the roof were rock); without it, `iceAt` stands in.
  * @param {{ rock: number[], ice: number[] }} options.absorption per-metre rgb extinction
  * @param {number} [options.wrapIce] how far light wraps around an ice surface
  */
@@ -57,6 +62,7 @@ export function bakeLighting({
   lights,
   iceAt,
   wrapAt = iceAt,
+  mediumAt = null,
   absorption,
   wrapIce = 0.9,
 }) {
@@ -65,7 +71,7 @@ export function bakeLighting({
   const dir = new Float32Array(count * 3);
   const shade = new Float32Array(count * SHADE_SIZE);
   const step = grid.voxel;
-  const sigma = [0, 0, 0];
+  const sigma = [0, 0, 0], crossed = [0, 0, 0];
   const top = grid.min.y + grid.ny * grid.voxel;
   const isProp = Boolean(propShadows?.isProp);
   const startOffset = propShadows?.startOffset ?? (isProp ? 0.20 : 0.14);
@@ -111,11 +117,19 @@ export function bakeLighting({
         : wrap;
       const facing = (nx * ux + ny * uy + nz * uz + nearWrap) / (1 + nearWrap);
       if (facing <= 0) continue;
-      let solid = 0;
+      // Light is dimmed by what it crosses. Where it first meets solid decides what that is: the
+      // ray stops being worth following once that medium has swallowed it.
+      crossed[0] = sigma[0]; crossed[1] = sigma[1]; crossed[2] = sigma[2];
+      let solid = 0, limit = OPAQUE / thinnest;
       for (let t = jitter; t < distance; t += step) {
         if (grid.solidAt(sx + ux * t, sy + uy * t, sz + uz * t)) {
+          if (solid === 0 && mediumAt) {
+            const share = mediumAt(sx + ux * t, sy + uy * t, sz + uz * t);
+            for (let c = 0; c < 3; c += 1) crossed[c] = absorption.rock[c] + (absorption.ice[c] - absorption.rock[c]) * share;
+            limit = OPAQUE / Math.min(crossed[0], crossed[1], crossed[2]);
+          }
           solid += step;
-          if (solid * thinnest > 7) break;
+          if (solid > limit) break;
         }
       }
       const reach = falloff * facing;
@@ -128,9 +142,9 @@ export function bakeLighting({
         });
       }
       const transmit = reach * propTransmit;
-      const cr = source.color[0] * transmit * Math.exp(-sigma[0] * solid);
-      const cg = source.color[1] * transmit * Math.exp(-sigma[1] * solid);
-      const cb = source.color[2] * transmit * Math.exp(-sigma[2] * solid);
+      const cr = source.color[0] * transmit * Math.exp(-crossed[0] * solid);
+      const cg = source.color[1] * transmit * Math.exp(-crossed[1] * solid);
+      const cb = source.color[2] * transmit * Math.exp(-crossed[2] * solid);
       const luma = cr * 0.3 + cg * 0.5 + cb * 0.2;
       r += cr; g += cg; b += cb;
       dx += ux * luma; dy += uy * luma; dz += uz * luma; weight += luma;

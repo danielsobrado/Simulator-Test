@@ -403,6 +403,12 @@ export class LocationBuilder {
       ice[v] = this.classify(p, n, m, m2);
       mask.set(m, v * 4); mask2.set(m2, v * 4);
     }
+    // What the place is made of at any point, for light that has to pass through it.
+    const level = { x: 0, y: 0, z: 0 };
+    const mediumAt = (x, y, z) => {
+      p.x = x; p.y = y; p.z = z;
+      return this.classify(p, level, m, m2);
+    };
     const baked = bakeLighting({
       grid: this.grid,
       propGrid,
@@ -411,6 +417,7 @@ export class LocationBuilder {
       normals: surface.normals,
       lights: this.lights,
       iceAt: (v) => ice[v],
+      mediumAt,
       absorption,
     });
     for (let i = 0; i < baked.light.length; i += 1) baked.light[i] *= bakeGain;
@@ -470,12 +477,6 @@ export class LocationBuilder {
 
     for (const { key, entry, geometry } of preparedProps) {
       const at = geometry.attributes.position.array, facing = geometry.attributes.normal.array;
-      // A prop stands in whatever the place is made of there: a barrel in an ice store is lit through ice.
-      const medium = (v) => {
-        p.x = at[v * 3]; p.y = at[v * 3 + 1]; p.z = at[v * 3 + 2];
-        n.x = facing[v * 3]; n.y = facing[v * 3 + 1]; n.z = facing[v * 3 + 2];
-        return this.classify(p, n, m, m2);
-      };
       const lit = bakeLighting({
         grid: this.grid,
         propGrid: key === 'glow' ? null : propGrid,
@@ -483,8 +484,8 @@ export class LocationBuilder {
         positions: at,
         normals: facing,
         lights: this.lights,
-        iceAt: medium,
-        wrapAt: () => entry.ice ?? 0,
+        iceAt: () => entry.ice ?? 0,
+        mediumAt,
         absorption,
       });
       for (let i = 0; i < lit.light.length; i += 1) lit.light[i] *= bakeGain;

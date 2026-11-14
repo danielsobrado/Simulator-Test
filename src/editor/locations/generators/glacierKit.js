@@ -9,6 +9,8 @@ import { column, mound } from '../gen/shapes.js';
  */
 
 const P = (x, y, z) => ({ x, y, z });
+/** How far an icicle's root is sunk into the roof it hangs from, metres. */
+const ROOT_DEPTH = 0.5;
 
 /**
  * A cluster of icicles under the roof above `at` (a point in open air): one
@@ -27,9 +29,9 @@ export function icicleCluster(b, at, { count = 4, length = [0.5, 2.2], spread = 
     if (top === null) continue;
     // The first is the cluster's long one; it cannot reach lower than the roof is high.
     const long = Math.min(b.range(length[0], length[1]) * (index === 0 ? 1 : 0.6), (top - at.y) * 0.8 + 0.4);
-    b.prop('clearIce', icicle(P(x, top + 0.3, z), long, 0.05 + long * 0.045,
+    b.prop('clearIce', icicle(P(x, top + ROOT_DEPTH, z), long, 0.05 + long * 0.045,
       { lean: { x: b.range(-0.07, 0.07), z: b.range(-0.07, 0.07) }, phase: index * 2.1 }), 0xffffff);
-    if (drip && index === 0) b.emit('drip', P(x, top + 0.25 - long, z));
+    if (drip && index === 0) b.emit('drip', P(x, top + ROOT_DEPTH - long, z));
   }
   return true;
 }

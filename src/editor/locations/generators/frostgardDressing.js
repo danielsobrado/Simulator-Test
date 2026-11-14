@@ -1,11 +1,13 @@
 import { beam, block, box, hewnBeam, panel, rod, stoneBlock } from '../gen/propKit.js';
-import { DARK, HEARTH, LOG, PALE, STONE, logWall } from './frostgardKit.js';
+import { DARK, HEARTH, PALE, STONE, logWall } from './frostgardKit.js';
 import { barrel, crate, lantern } from './kits.js';
 
 /** What a Norths household leaves about a yard, and what stands inside its hall. */
 
 const P = (x, y, z) => ({ x, y, z });
 const FUR = [0x8b8378, 0x5f5246, 0xb4aa9a];
+/** Timber kept indoors: dry and smoke-greyed, paler than what stands in the weather. */
+const HALL_LOG = 0xa3947e, HALL_BEAM = 0x65574a;
 /** Metres between the frames that carry a hall's roof. */
 const BAY = 4;
 
@@ -59,14 +61,19 @@ export function longHearth(b, at, length) {
     b.nav.block(L(0, 0, dz), 0.85, 2);
   }
   for (const dz of [-length / 2 - 0.3, length / 2 + 0.3]) b.prop('masonry', stoneBlock(1.5, 0.26, 0.3, L(0, 0, dz), { irregular: 0.5 }), STONE);
-  b.prop('glow', box(0.95, 0.12, length, L(0, 0.1, 0)), '#b8340c', 1.5);
-  for (let dz = -length / 2 + 0.5; dz < length / 2; dz += 0.9) {
-    b.prop('iron', rod(L(-0.4, 0.16, dz), L(0.4, 0.2, dz + b.range(-0.3, 0.3)), 0.07, 0.06, 6), 0x2a1f18);
+  // A bed of ash with the fire showing through it, not a slab of orange.
+  b.prop('glow', box(0.95, 0.1, length, L(0, 0.09, 0)), '#3a1206', 1);
+  for (let dz = -length / 2 + 0.3; dz < length / 2; dz += 0.45) {
+    b.prop('glow', stoneBlock(b.range(0.16, 0.34), 0.07, b.range(0.14, 0.3), L(b.range(-0.3, 0.3), 0.11, dz),
+      { irregular: 0.8, yaw: b.range(0, 3) }), '#ff6a1e', b.range(0.7, 1.7));
+    b.prop('iron', rod(L(-0.4, 0.17, dz), L(0.4, 0.21, dz + b.range(-0.3, 0.3)), 0.07, 0.06, 6), 0x2a1f18);
   }
-  for (const t of [-0.34, 0, 0.34]) {
-    b.flame(L(0, 0.15, t * length), { width: 0.9, height: 1.25, core: '#fff1b4', outer: '#ff5810' });
-    b.light(L(0, 1.1, t * length), HEARTH, 6.5, 16, { radius: 1.5, halo: 1.6 });
+  for (const t of [-0.4, -0.2, 0, 0.2, 0.4]) {
+    const at = L(b.range(-0.15, 0.15), 0.15, t * length);
+    b.flame(at, { width: b.range(0.45, 0.7), height: b.range(0.6, 1), core: '#fff1b4', outer: '#ff5810', speed: b.range(0.9, 1.3) });
+    b.emit('ember', P(at.x, at.y + 0.3, at.z));
   }
+  for (const t of [-0.34, 0, 0.34]) b.light(L(0, 1.1, t * length), HEARTH, 7.5, 17, { radius: 1.5, halo: 0.7 });
 }
 
 /**
@@ -83,13 +90,13 @@ export function hallInterior(b, at, { halfWidth, halfLength, wallHeight, ridge }
   const wall = halfWidth - 0.2, aisle = halfWidth * 0.52, door = { from: halfWidth - 1.1, to: halfWidth + 1.1, height: 2.5 };
   b.prop('planks', panel(L(0, 0.02, -halfLength), L(0, 0.02, halfLength), P(1, 0, 0), halfWidth * 2, 0.06), 0xffffff);
   for (const sx of [-1, 1]) {
-    logWall(b, L(sx * wall, 0, -halfLength), L(sx * wall, 0, halfLength), wallHeight, { overrun: 0 });
+    logWall(b, L(sx * wall, 0, -halfLength), L(sx * wall, 0, halfLength), wallHeight, { overrun: 0, tint: HALL_LOG });
     // Roof boards on the rafters, so the vault above is timber and not bare rock.
     const rise = ridge - wallHeight;
     b.prop('timber', panel(L(sx * wall / 2, wallHeight + rise / 2 + 0.16, -halfLength), L(sx * wall / 2, wallHeight + rise / 2 + 0.16, halfLength),
-      P(-sx * wall, rise, 0), Math.hypot(wall, rise) + 0.3, 0.08), 0x4a3a2b);
+      P(-sx * wall, rise, 0), Math.hypot(wall, rise) + 0.3, 0.08), 0x5c5046);
     for (const share of [0.36, 0.7]) {
-      b.prop('timber', hewnBeam(L(sx * wall * (1 - share), wallHeight + rise * share, -halfLength), L(sx * wall * (1 - share), wallHeight + rise * share, halfLength), 0.2, 0.22), DARK);
+      b.prop('timber', hewnBeam(L(sx * wall * (1 - share), wallHeight + rise * share, -halfLength), L(sx * wall * (1 - share), wallHeight + rise * share, halfLength), 0.2, 0.22), HALL_BEAM);
     }
     // Sleeping bench: a raised platform the length of the hall, furs thrown over it.
     const benchWidth = wall - aisle - 0.5;
@@ -100,21 +107,21 @@ export function hallInterior(b, at, { halfWidth, halfLength, wallHeight, ridge }
     }
   }
   for (const sz of [-1, 1]) {
-    logWall(b, L(-halfWidth, 0, sz * (halfLength - 0.2)), L(halfWidth, 0, sz * (halfLength - 0.2)), ridge, { overrun: 0, gap: door });
-    for (const dx of [-1.2, 1.2]) b.prop('timber', hewnBeam(L(dx, 0, sz * (halfLength - 0.25)), L(dx, 2.6, sz * (halfLength - 0.25)), 0.26, 0.3), DARK);
-    b.prop('timber', hewnBeam(L(-1.5, 2.65, sz * (halfLength - 0.25)), L(1.5, 2.65, sz * (halfLength - 0.25)), 0.3, 0.3), DARK);
+    logWall(b, L(-halfWidth, 0, sz * (halfLength - 0.2)), L(halfWidth, 0, sz * (halfLength - 0.2)), ridge, { overrun: 0, gap: door, tint: HALL_LOG });
+    for (const dx of [-1.2, 1.2]) b.prop('timber', hewnBeam(L(dx, 0, sz * (halfLength - 0.25)), L(dx, 2.6, sz * (halfLength - 0.25)), 0.26, 0.3), HALL_BEAM);
+    b.prop('timber', hewnBeam(L(-1.5, 2.65, sz * (halfLength - 0.25)), L(1.5, 2.65, sz * (halfLength - 0.25)), 0.3, 0.3), HALL_BEAM);
   }
-  b.prop('timber', hewnBeam(L(0, ridge - 0.1, -halfLength), L(0, ridge - 0.1, halfLength), 0.3, 0.34), DARK);
+  b.prop('timber', hewnBeam(L(0, ridge - 0.1, -halfLength), L(0, ridge - 0.1, halfLength), 0.3, 0.34), HALL_BEAM);
 
   for (let dz = -halfLength + 2; dz <= halfLength - 2 + 0.01; dz += BAY) {
     for (const sx of [-1, 1]) {
-      b.prop('timber', hewnBeam(L(sx * aisle, 0, dz), L(sx * aisle, wallHeight + 0.3, dz), 0.32, 0.32, { taper: 0.04 }), LOG);
-      b.prop('timber', hewnBeam(L(sx * aisle, wallHeight - 0.7, dz), L(sx * (aisle - 0.9), wallHeight + 0.2, dz), 0.16, 0.18), DARK);
-      b.prop('timber', hewnBeam(L(sx * wall, wallHeight, dz), L(0, ridge - 0.15, dz), 0.2, 0.26), DARK);
+      b.prop('timber', hewnBeam(L(sx * aisle, 0, dz), L(sx * aisle, wallHeight + 0.3, dz), 0.32, 0.32, { taper: 0.04 }), HALL_LOG);
+      b.prop('timber', hewnBeam(L(sx * aisle, wallHeight - 0.7, dz), L(sx * (aisle - 0.9), wallHeight + 0.2, dz), 0.16, 0.18), HALL_BEAM);
+      b.prop('timber', hewnBeam(L(sx * wall, wallHeight, dz), L(0, ridge - 0.15, dz), 0.2, 0.26), HALL_BEAM);
       b.nav.block(L(sx * aisle, 0, dz), 0.42, 3);
     }
-    b.prop('timber', hewnBeam(L(-wall, wallHeight + 0.3, dz), L(wall, wallHeight + 0.3, dz), 0.28, 0.32), DARK);
-    b.prop('timber', hewnBeam(L(0, wallHeight + 0.45, dz), L(0, ridge - 0.25, dz), 0.2, 0.2), DARK);
+    b.prop('timber', hewnBeam(L(-wall, wallHeight + 0.3, dz), L(wall, wallHeight + 0.3, dz), 0.28, 0.32), HALL_BEAM);
+    b.prop('timber', hewnBeam(L(0, wallHeight + 0.45, dz), L(0, ridge - 0.25, dz), 0.2, 0.2), HALL_BEAM);
   }
   for (const dz of [-halfLength + 2 + BAY / 2, halfLength - 2 - BAY / 2]) {
     for (const sx of [-1, 1]) lantern(b, L(sx * aisle * 0.6, wallHeight - 0.35, dz), { intensity: 2.6, range: 9, halo: 1, hung: 0.5 });
@@ -125,18 +132,18 @@ export function hallInterior(b, at, { halfWidth, halfLength, wallHeight, ridge }
   // The high seat on its dais, with a board for the household before it.
   const head = -halfLength + 1.7;
   b.prop('masonry', stoneBlock(4.4, 0.28, 2.2, L(0, 0, head), { irregular: 0.3 }), STONE);
-  b.prop('timber', block(1, 0.5, 0.8, L(0, 0.28, head - 0.2)), LOG);
-  b.prop('timber', hewnBeam(L(0, 0.78, head - 0.6), L(0, 2.5, head - 0.66), 0.14, 1.1), DARK);
-  for (const dx of [-0.6, 0.6]) b.prop('timber', hewnBeam(L(dx, 0.28, head - 0.6), L(dx, 2.8, head - 0.6), 0.16, 0.16, { taper: 0.2 }), DARK);
+  b.prop('timber', block(1, 0.5, 0.8, L(0, 0.28, head - 0.2)), HALL_LOG);
+  b.prop('timber', hewnBeam(L(0, 0.78, head - 0.6), L(0, 2.5, head - 0.66), 0.14, 1.1), HALL_BEAM);
+  for (const dx of [-0.6, 0.6]) b.prop('timber', hewnBeam(L(dx, 0.28, head - 0.6), L(dx, 2.8, head - 0.6), 0.16, 0.16, { taper: 0.2 }), HALL_BEAM);
   b.prop('timber', stoneBlock(1.1, 0.1, 0.9, L(0, 0.78, head - 0.15), { bevel: 0.04, irregular: 0.6 }), FUR[2]);
   for (const dx of [-1.7, 1.7]) {
-    b.prop('timber', rod(L(dx, 0.28, head + 0.5), L(dx, 1.5, head + 0.5), 0.06, 0.05, 6), DARK);
+    b.prop('timber', rod(L(dx, 0.28, head + 0.5), L(dx, 1.5, head + 0.5), 0.06, 0.05, 6), HALL_BEAM);
     lantern(b, L(dx, 1.7, head + 0.5), { intensity: 2.4, range: 8, halo: 1 });
   }
   b.nav.block(L(0, 0, head), 2.4, 3);
   const table = head + 3.2;
   b.prop('planks', block(3.2, 0.08, 0.9, L(0, 0.78, table)), 0xbfae98);
-  for (const dx of [-1.2, 1.2]) b.prop('timber', hewnBeam(L(dx, 0, table), L(dx, 0.78, table), 0.14, 0.7), DARK);
+  for (const dx of [-1.2, 1.2]) b.prop('timber', hewnBeam(L(dx, 0, table), L(dx, 0.78, table), 0.14, 0.7), HALL_BEAM);
   for (const dz of [-0.75, 0.75]) b.prop('planks', block(3, 0.08, 0.32, L(0, 0.44, table + dz)), 0xa89680);
   b.nav.block(L(-0.9, 0, table), 1.1, 2);
   b.nav.block(L(0.9, 0, table), 1.1, 2);

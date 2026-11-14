@@ -42,9 +42,16 @@ ice layers. `gen/LightBake.js` takes parallel light, so a lighting profile's
 skylight that are baked. It also bakes, per vertex, whether the sky can see the
 surface; snow and weathering use that, which is why there is none under a roof.
 
-**Weather** — `atmosphereProfiles` particles marked `outdoor` fade while the
-walker is under a roof. `emitters` are shed from points a generator marks with
-`b.emit(kind, at)`: hearth smoke, icicle drips, snow sifting off a cliff lip.
+**Weather and air** — `atmosphereProfiles` particles marked `outdoor` fade while
+the walker is under a roof. `emitters` are shed from points a generator marks
+with `b.emit(kind, at)`: hearth smoke, embers, icicle drips, snow sifting off a
+cliff lip. `breath` is the walker's own, in puffs (`LocationEmitters.js`). Under
+an open sky loose snow snakes across the surface down the profile's `wind`, and
+the sky draws the 22 degree halo and sundogs round the sun (`sky.sun.halo`).
+`b.sunShaft(through, width, strength)` stands a shaft of that sun in an opening.
+
+**Trails** — a generator's `classify` writes `surfMask2.w` from the lines people
+walk (`gen/plan.js`, `onTrail`); snow there is packed, greyer and rutted.
 
 **Building** — `generators/frostgardKit.js` (log walls, pitched roofs, longhall,
 storehouse, palisade, watch gate, beacon, gable front) and
@@ -63,8 +70,8 @@ the sky and the kits for free.
 
 ## Not done
 
-- No character body inside locations (they are first person), so no breath vapour.
-- Props do not cast baked shadows; only the volume does.
+- Props cast baked shadows from lamps but not from the sun or sky; only the volume shadows those.
+- Breath is drawn for the first-person walker only; nobody else in a location breathes yet.
 - Sites are showcase-only: none is anchored to an Azgaar entrance yet.
 - Textures and provenance: `public/assets/textures/locations/manifest.json` and
   `THIRD_PARTY_NOTICES.md`.

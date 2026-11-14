@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import {
-  attribute, clamp, color, dot, exp, float, floor, hash, mix, mx_fractal_noise_float, mx_noise_float, normalize,
+  acos, attribute, clamp, color, dot, exp, float, floor, hash, mix, mx_fractal_noise_float, mx_noise_float, normalize,
   positionLocal, pow, sin, smoothstep, time, vec2, vec3,
 } from 'three/tsl';
 import { fbm3 } from './gen/noise.js';
@@ -13,6 +13,10 @@ import { fbm3 } from './gen/noise.js';
  */
 
 const PEAK_COLUMNS = 180;
+/** Radius and width of the halo ice crystals in the air draw round the sun, radians: the 22 degree halo. */
+const HALO_RADIUS = 0.384, HALO_WIDTH = 0.024;
+/** How far above or below the sun's own height its sundogs reach, as a share of the dome. */
+const SUNDOG_HEIGHT = 0.05;
 
 const unit = (direction) => {
   const length = Math.hypot(...direction);
@@ -28,6 +32,15 @@ function skyColor(sky) {
   tone = tone.add(color(sky.sun.color).mul(
     pow(toSun, 1400).mul(sky.sun.disc).add(pow(toSun, 28).mul(0.4).add(pow(toSun, 5).mul(0.14)).mul(sky.sun.glow)),
   ));
+
+  if (sky.sun.halo > 0) {
+    // Diamond dust rings the sun, and flares into sundogs where the ring is level with it.
+    const away = acos(clamp(dot(toSky, unit(sky.sun.direction)), -1, 1)).sub(HALO_RADIUS).div(HALO_WIDTH);
+    const level = height.sub(sky.sun.direction[1] / Math.hypot(...sky.sun.direction)).div(SUNDOG_HEIGHT);
+    const dogs = exp(level.mul(level).negate());
+    tone = tone.add(color(sky.sun.color).mul(exp(away.mul(away).negate())).mul(dogs.mul(1.6).add(0.3))
+      .mul(smoothstep(0, 0.08, height)).mul(sky.sun.halo));
+  }
 
   // The dome flattened to a plane overhead, so cloud and aurora foreshorten toward the horizon.
   const overhead = toSky.xz.div(height.add(0.22));
@@ -86,10 +99,11 @@ function createPeaks(sky) {
   geometry.setIndex(indices);
   const material = new THREE.MeshBasicNodeMaterial({ name: 'location-peaks', side: THREE.DoubleSide, fog: false, depthWrite: false });
   const peak = attribute('peak', 'vec2');
-  const gully = mx_noise_float(vec3(positionLocal.x.mul(0.05), positionLocal.y.mul(0.012), positionLocal.z.mul(0.05)));
-  const snow = mix(color(sky.peaks.shade), color(sky.peaks.snow), peak.y);
-  const body = mix(color(sky.peaks.rock), snow, smoothstep(0.25, 0.6, peak.x.add(gully.mul(0.3))));
-  material.colorNode = mix(color(sky.ground), body, smoothstep(0.05, 0.75, peak.x).mul(float(1).sub(sky.peaks.haze)));
+  // Spurs and gullies: without them a ridge is a paper cut-out lit one column at a time.
+  const spur = mx_fractal_noise_float(vec3(positionLocal.x.mul(0.012), positionLocal.y.mul(0.02), positionLocal.z.mul(0.012)), 3, 2, 0.5);
+  const snow = mix(color(sky.peaks.shade), color(sky.peaks.snow), smoothstep(0.3, 0.7, peak.y.add(spur.mul(0.9))));
+  const body = mix(color(sky.peaks.rock), snow, smoothstep(0.15, 0.55, peak.x.add(spur.mul(0.35))));
+  material.colorNode = mix(color(sky.ground), body, smoothstep(0, 0.5, peak.x).mul(float(1).sub(sky.peaks.haze)));
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1;

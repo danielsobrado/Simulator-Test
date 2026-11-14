@@ -6,8 +6,8 @@ import { iceCover } from './ice/IceCover.js';
 import { iceInterior } from './ice/IceInterior.js';
 import { iceStrata } from './ice/IceStrata.js';
 import {
-  bakedShade, bumpNormal, createLocationMaterial, geometryNormal, shadeSurface, triplanarNormal, triplanarSample,
-  triplanarWeights, viewDirection,
+  bakedShade, bumpNormal, createLocationMaterial, geometryNormal, locationLight, shadeSurface, triplanarNormal,
+  triplanarSample, triplanarWeights, viewDirection,
 } from './LocationShading.js';
 import { stoneSurface } from './StoneSurface.js';
 
@@ -37,7 +37,7 @@ import { stoneSurface } from './StoneSurface.js';
  * push a region of a wall toward another family.
  *
  *   surfMask   x rock   y snow   z frost   w fracture
- *   surfMask2  x sediment   y bubbles   z polish (melt-smoothed, wet)
+ *   surfMask2  x sediment   y bubbles   z polish (melt-smoothed, wet)   w trail (snow packed by feet and runners)
  */
 
 const ICE_IOR = 1.31;
@@ -47,6 +47,10 @@ const STRATA_DEPTH = 0.5;
 const MIN_PATH = 0.35;
 /** Dirt layers every glacier carries even where it looks clean. */
 const ASH_TRACE = 0.1;
+/** How much longer light's path is in a crevice than on an open face: recesses go a deeper blue. */
+const CREVICE_DEPTH = 1.5;
+/** Per-metre rate at which ice stops glowing with the light behind it. */
+const THIN_FALLOFF = 1.4;
 
 /**
  * @param {string} name
@@ -81,16 +85,18 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
   const strata = iceStrata(deepPoint, profile.banding);
   // Cloud lies along the layers: wide and shallow, never a round blot.
   const cloud = smoothstep(-0.15, 0.45, mx_fractal_noise_float(deepPoint.mul(vec3(0.3, 0.8, 0.3)), 3, 2, 0.5)).mul(profile.cloud);
-  const banded = strata.white.add(strata.laminae.mul(near).mul(0.3)).mul(profile.banding.strength);
+  const banded = strata.white.add(strata.laminae.mul(near).mul(0.2)).mul(profile.banding.strength);
   const whiteness = clamp(cloud.mul(0.6).add(banded).add(bubbles.mul(0.3)), 0, 1);
 
   const rim = pow(float(1).sub(clamp(dot(normal, viewDirection), 0, 1)), 3);
-  const path = thickness.mul(profile.depthRate).mul(whiteness.mul(0.8).oneMinus()).mul(rim.mul(0.6).oneMinus()).add(MIN_PATH);
+  const path = thickness.mul(profile.depthRate).mul(whiteness.mul(0.8).oneMinus()).mul(rim.mul(0.6).oneMinus())
+    .mul(occlusion.oneMinus().mul(CREVICE_DEPTH).add(1)).add(MIN_PATH);
   const transmit = exp(absorption.mul(path).negate());
   let albedo = mix(color(profile.thinColor).mul(transmit), color(profile.deepColor), transmit.g.oneMinus().mul(0.6));
   albedo = mix(albedo, color(profile.milkColor), whiteness.mul(0.6));
-  const dirt = clamp(strata.ash.mul(sediment.mul(1.6).add(ASH_TRACE))
-    .add(smoothstep(0.25, 0.5, mx_noise_float(deepPoint.mul(7))).mul(sediment).mul(0.55)), 0, 1);
+  // Grit rides in the dirt layers, fine enough to read as silt and not as spots.
+  const grit = smoothstep(0.3, 0.55, mx_noise_float(deepPoint.mul(23))).mul(strata.ash.mul(0.7).add(0.3)).mul(near);
+  const dirt = clamp(strata.ash.mul(sediment.mul(1.6).add(ASH_TRACE)).add(grit.mul(sediment).mul(0.32)), 0, 1);
   albedo = mix(albedo, color(profile.sedimentColor), dirt);
   const interior = iceInterior({
     point, into, weights, cracks: maps.cracks, absorption, layers, crackGain: profile.crackGain, fracture, bubbles,
@@ -119,10 +125,15 @@ export function createGlacierIceMaterial(name, { profile, maps, stoneProfile = n
   const covered = iceCover({ albedo, normal, roughness, wrap, gloss }, {
     point, profile, snowMaps: maps.snow, frost: amount(mask.z, profile.frost),
     // Snow drifts where a generator put it, and falls wherever the sky can see.
-    snow: amount(mask.y.add(sky.mul(profile.snowfall)), profile.snow), occlusion, sky, near,
+    snow: amount(mask.y.add(sky.mul(profile.snowfall)), profile.snow), trail: mask2.w, occlusion, sky, near,
   });
+  // Thin ice is lit from all round: an icicle or a fin glows against the wall behind it.
+  // `gloss` has been cut wherever rock, frost or snow covers the ice, so its ratio is the share left bare.
+  const bare = covered.gloss.div(Math.max(profile.gloss, 0.01));
+  const through = covered.albedo.mul(locationLight.ambientUp.add(locationLight.ambientDown))
+    .mul(exp(thickness.mul(-THIN_FALLOFF))).mul(bare).mul(profile.translucency);
   return createLocationMaterial(name, shadeSurface({
     albedo: covered.albedo, normal: covered.normal, roughness: clamp(covered.roughness, 0.04, 1), f0,
-    wrap: covered.wrap, sheen: covered.gloss,
+    wrap: covered.wrap, sheen: covered.gloss, emissive: through,
   }));
 }

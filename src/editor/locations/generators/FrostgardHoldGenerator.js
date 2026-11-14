@@ -1,5 +1,6 @@
 import { boulder } from '../gen/iceKit.js';
 import { fbm3 } from '../gen/noise.js';
+import { onTrail } from '../gen/plan.js';
 import { block, box, hewnBeam, rod, stoneBlock } from '../gen/propKit.js';
 import { crevasse, hall as hallShape, mound, shaft, tunnel } from '../gen/shapes.js';
 import { DARK, LOG, STONE, beacon, gableFront, longhall, palisade, storehouse, torch, watchGate } from './frostgardKit.js';
@@ -27,6 +28,8 @@ const clamp01 = (value) => Math.min(1, Math.max(0, value));
 const smooth01 = (value) => { const t = clamp01(value); return t * t * (3 - 2 * t); };
 const HEADROOM = 2.2;
 const MEAT = [0x7a4a3e, 0x8d6654, 0x9c9082];
+/** Half the width of the sled road and the yard's paths, metres. */
+const TRAIL_HALF_WIDTH = 1.6;
 
 export function generate(b, params) {
   const seed = b.seed;
@@ -95,6 +98,13 @@ export function generate(b, params) {
   b.nav.addSegment(P(0, floor, knoll.front + 1), P(0, floor, south - 0.4), 1.7);
   b.nav.addSegment(P(0, floor, north + 0.6), passage[0], 1.6);
 
+  // The sled road in through the gate to the door, and the paths the household has worn off it.
+  const trails = [
+    [P(0, 0, rise.z - 6), P(0, 0, gateZ), P(0, 0, stoopZ + 1)],
+    [P(0, 0, 5), P(-10, 0, 6), P(-17, 0, 4.5)],
+    [P(0, 0, 3), P(9, 0, 3), P(15, 0, 1.5)],
+  ];
+
   // --- What the surface is made of ---------------------------------------------
   const near = (p, q, radius) => Math.max(0, 1 - Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) / radius);
   const storeAt = P(store.x, store.floor + 2, store.z);
@@ -107,12 +117,13 @@ export function generate(b, params) {
     const cold = near(p, storeAt, store.radius + 6);
     mask[0] = rock;
     mask[1] = 0;
-    mask[2] = clamp01(cold * 0.75 + clamp01((p.y - glacier.height + 8) / 10) * 0.4);
-    mask[3] = clamp01(cold * 0.35 + Math.max(0, grain - 0.5) * 2.2);
+    mask[2] = clamp01(cold * 0.3 + clamp01((p.y - glacier.height + 8) / 10) * 0.4);
+    mask[3] = clamp01(cold * 0.5 + Math.max(0, grain - 0.5) * 2.2);
     // The glacier's sole is dirty with what it rode over: it shows wherever the passage cuts it.
     mask2[0] = clamp01(Math.max(0, 1 - (p.y - ground(p.x, p.z)) / 6) * (0.5 + grain));
     mask2[1] = clamp01((p.y - 22) / 14);
     mask2[2] = clamp01(cold * up * 0.9);
+    mask2[3] = onTrail(p, trails, TRAIL_HALF_WIDTH) * up;
     return 1 - rock;
   };
 
@@ -148,6 +159,8 @@ export function generate(b, params) {
   const mid = P((passage[1].x + passage[2].x) / 2, (passage[1].y + passage[2].y) / 2, (passage[1].z + passage[2].z) / 2);
   timberSet(b, mid, Math.atan2(passage[2].x - passage[1].x, passage[2].z - passage[1].z), 2.3, 2.45);
   lantern(b, P(passage[1].x, passage[1].y + 2.05, passage[1].z), { intensity: 2.4, range: 9, halo: 1 });
+  // The stretch still in rock, between the two door hides.
+  lantern(b, P(0.7, floor + 2.1, north - 2.4), { intensity: 2.2, range: 8, halo: 0.8, hung: 0.3 });
   // Lamps set in niches behind the ice: a wall a metre thick glows, and lights the store without warming it.
   for (const [dx, dz] of [[-store.radius - 1.2, 1], [1.5, -store.radius - 0.7], [store.radius + 1, -2.5]]) {
     b.light(P(store.x + dx, store.floor + 2, store.z + dz), '#fff0d0', 6, 10, { radius: 1.4 });
@@ -157,11 +170,15 @@ export function generate(b, params) {
   for (const dx of [-3.2, 3.2]) {
     b.prop('timber', hewnBeam(S(dx, 0, -2), S(dx, 2.9, -2), 0.2, 0.2), LOG);
     b.nav.block(S(dx, 0, -2), 0.4, 3);
+    // A working lamp on each post: the one warm thing in the room.
+    lantern(b, S(dx * 0.86, 2.2, -1.75), { intensity: 2.6, range: 10, halo: 0.9, hung: 0.45 });
   }
   b.prop('timber', hewnBeam(S(-3.6, 2.8, -2), S(3.6, 2.8, -2), 0.18, 0.2), DARK);
-  for (let dx = -2.6; dx <= 2.6; dx += 0.75) {
-    const long = b.range(0.7, 1.5);
-    b.prop('timber', rod(S(dx, 2.7, -2), S(dx, 2.55 - long, -2), 0.05, b.range(0.14, 0.24), 7), MEAT[Math.floor(b.range(0, 3))]);
+  for (let dx = -2.2; dx <= 2.2; dx += 0.88) {
+    const long = b.range(0.8, 1.4);
+    b.prop('timber', rod(S(dx, 2.72, -2), S(dx, 2.5, -2), 0.02, 0.02, 4), 0x9c8a6a);
+    b.prop('timber', boulder(S(dx, 2.5 - long, -2), b.range(0.17, 0.24), long * 0.72, b.range(0.13, 0.18),
+      { seed: Math.round(dx * 31 + 77), blocky: 0.15 }), MEAT[Math.floor(b.range(0, 3))]);
   }
   // Cut ice stacked for the summer, stores on sleepers, the sled they came on.
   for (let row = 0; row < 3; row += 1) {

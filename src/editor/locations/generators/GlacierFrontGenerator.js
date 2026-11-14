@@ -1,4 +1,5 @@
 import { fbm3 } from '../gen/noise.js';
+import { onTrail } from '../gen/plan.js';
 import { panel, rod } from '../gen/propKit.js';
 import { chamber, column, crevasse, mound, tunnel } from '../gen/shapes.js';
 import { DARK, torch } from './frostgardKit.js';
@@ -23,6 +24,8 @@ const P = (x, y, z) => ({ x, y, z });
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 /** Clear headroom the walker's path is probed from, above the rough ground height. */
 const HEADROOM = 2.2;
+/** Half the width of the trodden line through the snow, metres. */
+const TRAIL_HALF_WIDTH = 1.5;
 
 export function generate(b, params) {
   const seed = b.seed;
@@ -96,7 +99,9 @@ export function generate(b, params) {
   }
 
   const ice = (x, y, z) => (z < faceZ(x, y) + 6 || Math.abs(z - ridgeZ(x)) < 9 ? 1 : 0);
-  b.grid.roughen({ amp: 0.9, scale: 0.09, seed, octaves: 3, floorAmp: 0.08 });
+  // The valley walls are broken rock: craggier than anything the ice does.
+  const crag = (x, y, z) => (Math.abs(x) > wallX(y, z) - 6 ? wall.crag : 1);
+  b.grid.roughen({ amp: 0.9, scale: 0.09, seed, octaves: 3, floorAmp: 0.08, ampAt: crag });
   b.grid.striate({ ...params.strata, seed: seed + 9, ampAt: ice });
   b.grid.roughen({ amp: 0.22, scale: 0.5, seed: seed + 5, octaves: 2, floorAmp: 0.12 });
 
@@ -104,6 +109,12 @@ export function generate(b, params) {
   const footing = (x, z) => b.terrainAt(x, ground(x, z) + HEADROOM, z);
   const stand = (x, z) => P(x, footing(x, z) ?? ground(x, z), z);
   b.nav.addSurface((x, z) => footing(x, z) ?? NaN, (x, z) => z < moraine.z - 6 && Math.abs(x) < wall.x - 6);
+
+  // The line the Norths walk and sledge: in by the stakes to the cave, and off east to the hold.
+  const trails = [
+    [P(0, 0, moraine.z - 8), ...params.stakes.map(([x, z]) => P(x - 1.6, 0, z)), cave[0], cave[1], cave[3]],
+    [P(params.stakes[0][0] - 1.6, 0, params.stakes[0][1]), P(wall.x - 24, 0, 15), P(wall.x - 11, 0, 16)],
+  ];
 
   // --- What the surface is made of ------------------------------------------
   const near = (p, q, radius) => Math.max(0, 1 - Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) / radius);
@@ -122,11 +133,13 @@ export function generate(b, params) {
     // Negative snow: where the wind scours it off — the pool, and bare patches of the forefield.
     mask[1] = -Math.max(lake * (1.25 - grain), clamp01((grain - 0.56) * 6) * 0.9);
     mask[2] = clamp01((p.y - front.height + 8) / 10) * 0.5;
-    mask[3] = clamp01(near(p, archAt, 13) * 0.8 + near(p, mouthAt, 15) * 0.7 + (glacier ? Math.max(0, grain - 0.5) * 2.5 : 0));
+    // The pool froze from the top down: clear, cracked right through, bubbles caught under the surface.
+    mask[3] = clamp01(near(p, archAt, 13) * 0.8 + near(p, mouthAt, 15) * 0.7 + lake * 0.7 + (glacier ? Math.max(0, grain - 0.5) * 2.5 : 0));
     // Basal ice carries what the glacier scraped up; the high ice is young, white and full of air.
     mask2[0] = glacier ? clamp01(Math.max(0, 1 - height / 7) * (0.4 + grain) + clamp01((margin + 9) / 6) * 0.7) : 0;
-    mask2[1] = clamp01(Math.max(0, (p.y - 24) / 14) + frozen);
+    mask2[1] = clamp01(Math.max(0, (p.y - 24) / 14) + frozen + lake * 0.45);
     mask2[2] = clamp01(lake + near(p, mouthAt, 9) * 0.6 + frozen * 0.5);
+    mask2[3] = onTrail(p, trails, TRAIL_HALF_WIDTH) * up;
     return 1 - rock;
   };
 
@@ -136,9 +149,9 @@ export function generate(b, params) {
   }
   scatter(b, P(arch.x + 9, 0, arch.z + 5), 5, 7, footing, { material: 'iceBlock', size: [0.3, 1.2], blocky: 0.8 });
   for (const x of [-34, -8, 22, 44]) {
-    scatter(b, P(x, 0, moraine.z - 5), 9, 9, footing, { material: 'rock', size: [0.4, 2.4], tint: 0xb9bcc2 });
+    scatter(b, P(x, 0, moraine.z - 5), 9, 9, footing, { material: 'rock', size: [0.4, 2.4] });
   }
-  scatter(b, P(0, 0, 12), 30, 22, footing, { material: 'rock', size: [0.3, 1.5], tint: 0xb9bcc2 });
+  scatter(b, P(0, 0, 12), 30, 22, footing, { material: 'rock', size: [0.3, 1.5] });
 
   // Icicles under every overhang: the undercut, the arch, the cave mouth.
   const hang = (minX, maxX, minZ, maxZ, attempts, options) => {
@@ -150,6 +163,10 @@ export function generate(b, params) {
   hang(-52, -17, front.z - 22, front.z + 6, params.icicles, { length: [0.8, 3.4], reach: 9 });
   hang(arch.x - 5, arch.x + 5, arch.z - 5, arch.z + 5, params.icicles / 4, { length: [0.6, 2.2], reach: 12 });
   hang(front.caveX - 8, front.caveX + 8, caveZ - 12, caveZ + 4, params.icicles / 2, { length: [0.8, 3], reach: 9 });
+
+  // Sun through the wall's two openings, standing in the cold air of the hollow behind it.
+  b.sunShaft(P(arch.x - 16, 8.5, ridgeZ(arch.x - 16)), 3.4, params.shafts);
+  b.sunShaft(P(arch.x, archFloor + arch.height * 0.6, arch.z), arch.width * 0.6, params.shafts * 0.7);
 
   // Snow sifting off the lip, and the stakes the Norths set to mark the safe line to the cave.
   for (let x = -40; x <= 40; x += 16) b.emit('sift', P(x, top(x, faceZ(x, 36)) + 0.5, faceZ(x, 36) + 1));

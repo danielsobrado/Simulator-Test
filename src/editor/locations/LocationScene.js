@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { generateLocation } from './LocationBuilder.js';
 import { createFlames, createHalos, createLightShaft, createParticles } from './LocationEffects.js';
-import { createEmitters } from './LocationEmitters.js';
+import { createBreath, createEmitters } from './LocationEmitters.js';
 import { createSky } from './LocationSky.js';
 import { locationLight } from './materials/LocationShading.js';
 import { LocationMaterials } from './materials/LocationMaterials.js';
@@ -67,6 +67,10 @@ export class LocationScene {
         if (!profile) throw new Error(`Location "${site.id}" sheds "${kind}" but its atmosphere profile has no such emitter.`);
         location.scene.add(createEmitters(profile, points, quality.particleScale));
       }
+      if (site.atmosphere.breath) {
+        location.breath = createBreath(site.atmosphere.breath);
+        location.scene.add(location.breath.sprite);
+      }
       if (site.lighting.sky) {
         location.sky = createSky(site.lighting.sky);
         location.scene.add(location.sky.group);
@@ -96,6 +100,7 @@ export class LocationScene {
     this.materials = null;
     this.lightPool = null;
     this.sky = null;
+    this.breath = null;
     this.clockStartMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
     this.skyAbove = () => false;
     this.nav = null;
@@ -120,7 +125,9 @@ export class LocationScene {
     locationLight.carriedPosition.value.copy(camera.position);
     locationLight.carriedPosition.value.y -= 0.35;
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    this.lightPool?.update(camera.position, (nowMs - this.clockStartMs) * 0.001);
+    const seconds = (nowMs - this.clockStartMs) * 0.001;
+    this.lightPool?.update(camera.position, seconds);
+    this.breath?.update(camera, seconds);
     this.sky?.follow(camera);
     // Eased, so snowfall thins out over a few steps through a doorway instead of switching off.
     const outdoors = locationLight.outdoors;

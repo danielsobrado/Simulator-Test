@@ -271,6 +271,8 @@ export function stoneSurface(profile, maps, mask = null, mask2 = null) {
   if (profile.vertexTint) albedo = albedo.mul(attribute('tint', 'vec3'));
 
   if (profile.snow) {
+    // Rime: whatever stands in the weather is greyed with frost before any snow settles on it.
+    albedo = mix(albedo, color(profile.snow.color).mul(0.55), bakedShade.z.mul(profile.snow.rime ?? 0));
     // Snow lies on what faces a sky it can fall from: ledges, roof pitches, the tops of logs and stones.
     const settle = mx_noise_float(point.mul(1.3)).mul(0.22);
     const lying = smoothstep(profile.snow.from, profile.snow.from + 0.35, geometryNormal.y.add(settle))

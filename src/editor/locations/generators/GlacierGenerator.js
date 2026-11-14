@@ -1,5 +1,6 @@
 import { beam, block, box, rod } from '../gen/propKit.js';
 import { fbm3 } from '../gen/noise.js';
+import { planDistance } from '../gen/plan.js';
 import { column, crevasse, mound } from '../gen/shapes.js';
 import { DARK, LOG, PALE, longhall, storehouse, torch } from './frostgardKit.js';
 import { woodpile } from './frostgardDressing.js';
@@ -22,18 +23,6 @@ const P = (x, y, z) => ({ x, y, z });
 const SKY = '#d6e8ff';
 const CREVASSE_YAW = 0.5;
 
-/** Distance in plan from `p` to the polyline through `points`. */
-function planDistance(p, points) {
-  let best = Infinity;
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const a = points[index], c = points[index + 1];
-    const dx = c.x - a.x, dz = c.z - a.z;
-    const t = Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz)));
-    best = Math.min(best, Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t));
-  }
-  return best;
-}
-
 export function generate(b, params) {
   const mouth = P(0, 5, 22);
   const stream = [P(0.5, 2.6, 10), P(1.5, 0, 0), P(-4, -0.6, -11)];
@@ -45,7 +34,7 @@ export function generate(b, params) {
   // The mouth, the meltwater tube, and the squeeze where the stream cut down through clear ice.
   b.passage(mouth, stream[0], { width: 8, height: 6.5, arch: 0.85, smooth: 1 });
   b.tube(stream, { width: 5.4, height: 5, arch: 0.9, smooth: 1, pinch: 0.3 });
-  b.tube(squeeze, { width: 2.7, height: 3.3, arch: 0.95, smooth: 0.8, pinch: 0.15 });
+  b.tube(squeeze, { width: 2.7, height: 3.3, arch: 0.95, smooth: 1.2, pinch: 0.08 });
 
   // The hall, and the crevasse split through its roof and floor.
   b.room(P(hallAt.x, 9, hallAt.z), { rx: 21, ry: 16, rz: 20, floorY: hallAt.y, smooth: 2, walkRadius: 0 });

@@ -27,7 +27,7 @@ export function iceStrata(point, banding) {
   const along = mx_noise_float(vec3(point.x.mul(0.19), across.mul(0.6), point.z.mul(0.19))).mul(0.5).add(0.5);
   return {
     white: smoothstep(-0.05, 0.4, layer(BROAD, 1.7).add(fine.mul(0.4))).mul(mix(float(0.45), float(1), along)),
-    laminae: smoothstep(0.2, 0.55, layer(HAIR, 2.9).add(fine.mul(0.5))),
+    laminae: smoothstep(0.2, 0.55, layer(HAIR, 2.9).add(fine.mul(0.5))).mul(along),
     ash: smoothstep(0.36, 0.5, layer(1.15, 11.1)).mul(smoothstep(0.25, 0.7, along)),
   };
 }
