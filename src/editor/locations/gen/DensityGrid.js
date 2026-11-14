@@ -1,4 +1,4 @@
-import { fbm3 } from './noise.js';
+import { cellNoise3, fbm3 } from './noise.js';
 
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
 
@@ -102,6 +102,39 @@ export class DensityGrid {
       // Ledges come and go along a wall; ruled from end to end they read as stripes.
       const run = clamp((fbm3(x * 0.04, y * 0.15, z * 0.04, seed + 3, 2) - 0.34) * 3.2, 0, 1.2);
       return ledge * amp * run * (ampAt ? ampAt(x, y, z) : 1);
+    });
+  }
+
+  /**
+   * Breaks faces into angular blocks. Space is split into cells `cell` metres
+   * across (`stretchY` times that tall, for columns and seracs), and each cell
+   * stands proud of the face or back from it by its own amount up to `amp`, so
+   * the borders between cells become clefts and steps. Ice and jointed rock
+   * fail along planes; fractal noise only ever makes lumps. Floors keep
+   * `floorAmp` of it, and `ampAt(x, y, z)` may scale it locally.
+   */
+  fracture({ amp, cell, stretchY = 1, seed = 0, floorAmp = 0, ampAt = null }) {
+    this.#displace(amp, (x, y, z, up) => {
+      const strength = amp * (up > 0.75 ? floorAmp : 1) * (ampAt ? ampAt(x, y, z) : 1);
+      if (strength === 0) return 0;
+      return (cellNoise3(x / cell, y / (cell * stretchY), z / cell, seed) - 0.5) * 2 * strength;
+    });
+  }
+
+  /**
+   * Lays snow on what faces up. The surface rises by up to `depth` metres on
+   * ledges and tops (anything whose normal's Y exceeds `minUp`) and not at all
+   * on steep faces, so caps, drifts and cornices are real thickness lying over
+   * the ice with their own soft outline, not a colour on it. `depthAt(x, y, z)`
+   * scales it locally: zero on ground the walker's navigation treats as flat,
+   * more in the lee of things, less on wind-scoured crests.
+   */
+  deposit({ depth, minUp = 0.6, seed = 0, depthAt = null }) {
+    this.#displace(depth, (x, y, z, up) => {
+      if (up <= minUp) return 0;
+      const lie = (up - minUp) / (1 - minUp);
+      const drift = 0.55 + 0.9 * fbm3(x * 0.12, y * 0.12, z * 0.12, seed, 2);
+      return -depth * lie * lie * drift * (depthAt ? depthAt(x, y, z) : 1);
     });
   }
 

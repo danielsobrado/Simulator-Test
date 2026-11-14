@@ -48,6 +48,12 @@ instancedLocations:
       color: assets/textures/snow/snow007c_color_1k.jpg
       normal: assets/textures/snow/snow007c_normal_gl_1k.jpg
       rough: assets/textures/snow/snow007c_ao_rough_height_1k.jpg
+    # Neutral grey rock, tinted by its material profile. Used wherever rock stands beside snow:
+    # `cave-rock` below is almost black and reads there as a hole in the terrain.
+    frost-rock:
+      color: assets/textures/settlement/stone-rock-color.webp
+      normal: assets/textures/settlement/stone-rock-normal.webp
+      rough: assets/textures/settlement/stone-rock-arm.webp
     cave-rock:
       color: assets/textures/locations/cave-rock-color.webp
       normal: assets/textures/locations/cave-rock-normal.webp
@@ -196,10 +202,11 @@ instancedLocations:
       tint: '#ffffff'
       normalStrength: 1.1
     glacier_bedrock:
-      surface: cave-rock
+      surface: frost-rock
       scale: 0.22
-      tint: '#8d9299'
-      normalStrength: 1.1
+      tint: '#8f9299'
+      normalStrength: 1.2
+      strata: { frequency: 0.7, warp: 4, dip: 0.15, dark: '#8c8c92', light: '#e6e2dc', relief: 1.2 }
     # Frostgard under the sky. `snow` lies on faces at least `from` upright (the normal's Y)
     # that the sky can see; nothing under a roof or inside a hall takes any. `rime` is the
     # frost that greys whatever stands in the weather, 0..1.
@@ -223,15 +230,15 @@ instancedLocations:
       snow: { amount: 0.9, from: 0.5, color: '#eef4fa', rime: 0.15 }
     # The valley's own rock, where the glacier and the snow leave it bare.
     valley_rock:
-      surface: cave-rock
+      surface: frost-rock
       scale: 0.18
-      tint: '#f2f0ec'
+      tint: '#b5aea6'
       normalStrength: 1.3
-      strata: { frequency: 0.5, warp: 5, dip: 0.2, dark: '#a8a8ac', light: '#ffffff', relief: 1.4 }
+      strata: { frequency: 0.5, warp: 5, dip: 0.2, dark: '#8f8f95', light: '#f0ece6', relief: 1.4 }
     moraine_boulder:
-      surface: cave-rock
+      surface: frost-rock
       scale: 0.3
-      tint: '#f2f0ec'
+      tint: '#bdb7af'
       normalStrength: 1.2
       roughness: 0.95
       snow: { amount: 1, from: 0.3, color: '#eef4fa', rime: 0.2 }
@@ -467,15 +474,15 @@ instancedLocations:
       ambientUp: '#4a5d7c'
       ambientDown: '#43536f'
       carried: { color: '#ffffff', intensity: 0, range: 1 }
-      exposure: 1.0
-      indirectBounce: { strength: 0.55, cellSize: 1.5, radius: 10, wrap: 0.6, maxEnergy: 2.2 }
+      exposure: 0.92
+      indirectBounce: { strength: 0.45, cellSize: 1.5, radius: 10, wrap: 0.6, maxEnergy: 2.2 }
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
       sky:
         zenith: '#2f6fb5'
         horizon: '#c4dbee'
         ground: '#bcd3e8'
-        sun: { direction: [-0.75, 0.42, 0.5], color: '#fff0d8', intensity: 1.8, disc: 6, glow: 1, halo: 0.55 }
-        skylight: { color: '#a9cbf2', intensity: 0.75 }
+        sun: { direction: [-0.75, 0.42, 0.5], color: '#fff0d8', intensity: 1.35, disc: 6, glow: 1, halo: 0.55 }
+        skylight: { color: '#a9cbf2', intensity: 0.6 }
         clouds: 0.55
         cloudColor: '#f3f7fb'
         stars: 0

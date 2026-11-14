@@ -38,6 +38,29 @@ export function valueNoise3(x, y, z, seed = 0) {
   return near + (far - near) * w;
 }
 
+/**
+ * Cell noise in [0, 1): space is split into irregular cells about one unit
+ * across, and every point of a cell gets that cell's value. Unlike smooth
+ * noise it has edges, which is what broken ice and jointed rock have.
+ */
+export function cellNoise3(x, y, z, seed = 0) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  let nearest = Infinity, value = 0;
+  for (let k = iz - 1; k <= iz + 1; k += 1) {
+    for (let j = iy - 1; j <= iy + 1; j += 1) {
+      for (let i = ix - 1; i <= ix + 1; i += 1) {
+        // Each lattice cell holds one site, jittered inside it.
+        const dx = i + lattice(i, j, k, seed + 1) - x;
+        const dy = j + lattice(i, j, k, seed + 2) - y;
+        const dz = k + lattice(i, j, k, seed + 3) - z;
+        const distance = dx * dx + dy * dy + dz * dz;
+        if (distance < nearest) { nearest = distance; value = lattice(i, j, k, seed); }
+      }
+    }
+  }
+  return value;
+}
+
 /** Fractal value noise in roughly [0, 1]. */
 export function fbm3(x, y, z, seed = 0, octaves = 3) {
   let sum = 0, amplitude = 0.5, norm = 0;
