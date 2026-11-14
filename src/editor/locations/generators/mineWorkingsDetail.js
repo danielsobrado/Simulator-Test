@@ -3,7 +3,60 @@ import { barrel, crate, lantern, rails, timberSet } from './kits.js';
 
 const P = (x, y, z) => ({ x, y, z });
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const lerpP = (a, c, t) => P(a.x + (c.x - a.x) * t, a.y + (c.y - a.y) * t, a.z + (c.z - a.z) * t);
+
+function probeWallDistance(b, origin, dx, dz, maxReach) {
+  const step = Math.max(0.12, b.grid.voxel * 0.4);
+  let minWall = maxReach;
+  for (const h of [1.25, 2.0]) {
+    const y = origin.y + h;
+    for (let d = 0.4; d <= maxReach; d += step) {
+      if (b.grid.sample(origin.x + dx * d, y, origin.z + dz * d) < 0) {
+        if (d < minWall) minWall = d;
+        break;
+      }
+    }
+  }
+  return minWall;
+}
+
+/**
+ * Places a `timberSet` aligned to the actual excavated rock walls and ceiling at `at`,
+ * preserving required rail/walker clearance while preventing floating or buried frames.
+ */
+export function fitTimberSet(b, at, yaw, {
+  width,
+  height,
+  minLeft = width * 0.44,
+  minRight = width * 0.44,
+  maxLeft = width * 0.5 + 0.55,
+  maxRight = width * 0.5 + 0.55,
+  minHeight = Math.max(2.05, height - 0.35),
+  maxHeight = height + 0.85,
+  postInset = 0.22,
+  capInset = 0.34,
+} = {}) {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const wallLeft = probeWallDistance(b, at, -c, s, maxLeft + 0.6);
+  const wallRight = probeWallDistance(b, at, c, -s, maxRight + 0.6);
+
+  const leftSpan = clamp(wallLeft - postInset, minLeft, maxLeft);
+  const rightSpan = clamp(wallRight - postInset, minRight, maxRight);
+  const shift = (rightSpan - leftSpan) * 0.5;
+  const shiftedAt = P(at.x + c * shift, at.y, at.z - s * shift);
+  const spanWidth = leftSpan + rightSpan;
+
+  let minRoofY = at.y + maxHeight + capInset;
+  for (const frac of [-0.62, 0, 0.62]) {
+    const offset = frac < 0 ? frac * leftSpan : frac * rightSpan;
+    const hitY = b.probe(shiftedAt.x + c * offset, at.y + 1.1, shiftedAt.z - s * offset, 1, maxHeight + 1.8);
+    if (hitY !== null && hitY < minRoofY) minRoofY = hitY;
+  }
+  const capHeight = clamp(minRoofY - at.y - capInset, minHeight, maxHeight);
+  timberSet(b, shiftedAt, yaw, spanWidth, capHeight);
+  return { at: shiftedAt, leftSpan, rightSpan, width: spanWidth, height: capHeight };
+}
 
 /** Builds a miner's pickaxe or heavy sledge leaning against a support or rock wall. */
 function buildMiningTool(b, foot, tip, { head = 'pick', yaw = 0 } = {}) {
@@ -32,11 +85,12 @@ export function buildAditPortal(b, drift) {
   }
   for (const side of [-1, 1]) {
     const jx = side * (drift.width / 2 + 0.12);
-    b.prop('timber', stoneBlock(0.36, 0.22, 0.42, P(jx, 0, 7.05), { bevel: 0.04, batter: 0.16, irregular: 0.4 }), 0x6a5038);
-    b.prop('timber', roughTimber(P(jx, 0.22, 7.05), P(jx, drift.height + 0.22, 7.05), 0.3, 0.28, { taper: 0.08, bow: 0.02, irregular: 0.36 }), 0x6a5038);
-    b.prop('timber', roughTimber(P(jx, drift.height - 0.55, 7.05), P(jx - side * 0.6, drift.height + 0.15, 7.05), 0.16, 0.16, { bow: 0.02, irregular: 0.38 }), 0x6a5038);
+    const jTopX = side * (drift.width / 2 - 0.14);
+    b.prop('timber', stoneBlock(0.38, 0.22, 0.42, P(jx, 0, 7.05), { bevel: 0.04, batter: 0.16, irregular: 0.4 }), 0x6a5038);
+    b.prop('timber', roughTimber(P(jx, 0.22, 7.05), P(jTopX, drift.height + 0.34, 7.05), 0.3, 0.28, { taper: 0.08, bow: 0.02, irregular: 0.36 }), 0x6a5038);
+    b.prop('timber', roughTimber(P((jx + jTopX) * 0.5, drift.height - 0.55, 7.05), P(jTopX - side * 0.55, drift.height + 0.3, 7.05), 0.16, 0.16, { bow: 0.02, irregular: 0.38 }), 0x6a5038);
   }
-  b.prop('timber', roughTimber(P(-drift.width / 2 - 0.4, drift.height + 0.25, 7.05), P(drift.width / 2 + 0.4, drift.height + 0.25, 7.05), 0.34, 0.3, { bow: 0.025, irregular: 0.36 }), 0x6a5038);
+  b.prop('timber', roughTimber(P(-drift.width / 2 - 0.55, drift.height + 0.25, 7.05), P(drift.width / 2 + 0.55, drift.height + 0.25, 7.05), 0.34, 0.3, { bow: 0.025, irregular: 0.36 }), 0x6a5038);
   for (const x of [-0.9, 0, 0.9]) {
     b.prop('glow', box(0.05, drift.height * 0.72, 0.05, P(x, drift.height * 0.5, 7.02)), '#cfe2ff', 2.4);
   }
@@ -117,11 +171,11 @@ export function buildSortingStation(b, shaftAt, hub) {
   b.light(P(shaftAt.x, -15, shaftAt.z), '#ff9a4d', 3, 12, { halo: 1.5 });
 
   // Framed timber portal sets marking each gallery branching off the sorting hub.
-  timberSet(b, P(-8.8, -1, -48), Math.PI / 2 - 0.2, 2.7, 2.55);
+  fitTimberSet(b, P(-8.8, -1, -48), Math.PI / 2 - 0.2, { width: 2.7, height: 2.55, minLeft: 1.15, minRight: 1.15 });
   lantern(b, P(-8.8, 1.35, -46.8), { intensity: 3.4, range: 12, hung: 0.2 });
-  timberSet(b, P(7.5, -1, -45.5), Math.PI / 2 + 0.35, 2.25, 2.25);
+  fitTimberSet(b, P(7.5, -1, -45.5), Math.PI / 2 + 0.35, { width: 2.25, height: 2.25, minLeft: 1.0, minRight: 1.0 });
   lantern(b, P(7.5, 1.05, -44.4), { intensity: 3.0, range: 11, hung: 0.2 });
-  timberSet(b, P(0, -1, -58.5), 0, 2.85, 2.6);
+  fitTimberSet(b, P(0, -1, -58.5), 0, { width: 2.85, height: 2.6, minLeft: 1.25, minRight: 1.25 });
 
   // Rail terminus timber bumper block + parked empty secondary ore tub near sorting switch.
   b.prop('timber', stoneBox(1.5, 0.42, 0.35, P(-2.6, -0.82, -52.2), { yaw: -0.2, bevel: 0.03 }), 0x6a5038);
@@ -178,8 +232,8 @@ export function buildStopeWorkings(b, stope) {
   lantern(b, P(stope.x + 1.5, stope.y + 1.1, stope.z + 1), { intensity: 6.5, range: 16 });
   b.prop('timber', stoneBlock(0.38, 1.1, 0.38, P(stope.x + 1.5, stope.y, stope.z + 1), { bevel: 0.03, batter: 0.1, irregular: 0.25 }), 0x6a5038);
   b.light(P(stope.x - 2.2, stope.y + 3.2, stope.z), '#ffd29e', 2.4, 15, { flat: true });
-  timberSet(b, P(-14, -1.5, -50), Math.PI / 2 - 0.32, 2.3, 2.2);
-  timberSet(b, P(-25, -2.5, -56), Math.PI / 2 - 0.65, 2.3, 2.2);
+  fitTimberSet(b, P(-14, -1.5, -50), Math.PI / 2 - 0.32, { width: 2.3, height: 2.2, minLeft: 1.05, minRight: 1.05 });
+  fitTimberSet(b, P(-25, -2.5, -56), Math.PI / 2 - 0.65, { width: 2.3, height: 2.2, minLeft: 1.05, minRight: 1.05 });
   lantern(b, P(-20, 0.1, -51.6), { intensity: 3.8, range: 13, hung: 0.25 });
 }
 
@@ -187,8 +241,8 @@ export function buildStopeWorkings(b, stope) {
 export function buildCollapsedHeading(b, eastTurn, fall) {
   const yawToFall = Math.atan2(-(fall.z - eastTurn.z), fall.x - eastTurn.x);
   const barrier = lerpP(eastTurn, fall, 0.68);
-  timberSet(b, P(20, -0.1, -40.3), Math.PI / 2 + 0.4, 1.9, 2);
-  timberSet(b, barrier, yawToFall + Math.PI / 2, 2.05, 2.1);
+  fitTimberSet(b, P(20, -0.1, -40.3), Math.PI / 2 + 0.4, { width: 1.9, height: 2, minLeft: 0.9, minRight: 0.9 });
+  fitTimberSet(b, barrier, yawToFall + Math.PI / 2, { width: 2.05, height: 2.1, minLeft: 0.95, minRight: 0.95 });
 
   // Diagonal timber X-barricade slats nailed across the drift frame.
   const rx = -Math.sin(yawToFall), rz = Math.cos(yawToFall);
@@ -219,8 +273,8 @@ export function buildCollapsedHeading(b, eastTurn, fall) {
 
 /** Drowned lower level: submerged rails, walkable duckboard pier, floating timbers & pool lighting. */
 export function buildFloodedLevel(b, inclineTop, flooded, waterY) {
-  timberSet(b, P(0, -3.2, -65), 0, 2.5, 2.5);
-  timberSet(b, P(0, -6.2, -73), 0, 2.5, 2.5);
+  fitTimberSet(b, P(0, -3.2, -65), 0, { width: 2.5, height: 2.5, minLeft: 1.15, minRight: 1.15 });
+  fitTimberSet(b, P(0, -6.2, -73), 0, { width: 2.5, height: 2.5, minLeft: 1.15, minRight: 1.15 });
   lantern(b, P(1, -4.6, -70), { intensity: 3.6, range: 13, hung: 0.3 });
   rails(b, inclineTop, P(0, -9.2, -83), 0.9);
 

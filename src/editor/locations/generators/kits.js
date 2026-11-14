@@ -31,46 +31,61 @@ export function lantern(b, at, { tint = '#ffb061', intensity = 5, range = 13, ha
 }
 
 /**
- * A hand-hewn mine timber set across a drift: tapered organic octagonal posts,
- * slightly bowed eared cap beam, adze-split knee braces, and roof lagging poles.
+ * A hand-hewn mine timber set across a drift: tapered organic octagonal posts seated
+ * deep into a rock-socketed eared cap beam, embedded knee braces, and shoulder lagging
+ * wedges that transition cleanly into the arched cave walls.
  */
 export function timberSet(b, at, yaw, width, height, tint = 0x7d6044) {
   const c = Math.cos(yaw), s = Math.sin(yaw);
-  // `yaw` 0 spans a drift that runs along Z.
+  // `yaw` 0 spans a drift that runs along Z; trapezoidal inward batter keeps upper joints clear of the arch roof.
   const left = { x: at.x - c * width / 2, y: at.y, z: at.z + s * width / 2 };
   const right = { x: at.x + c * width / 2, y: at.y, z: at.z - s * width / 2 };
-  const leanL = b.range(-0.07, 0.07), leanR = b.range(-0.07, 0.07);
-  const leftTop = { x: left.x + c * 0.08 + leanL, y: at.y + height, z: left.z - s * 0.08 };
-  const rightTop = { x: right.x - c * 0.08 + leanR, y: at.y + height, z: right.z + s * 0.08 };
+  const batterIn = Math.min(0.28, width * 0.08);
+  const leanL = b.range(-0.04, 0.04), leanR = b.range(-0.04, 0.04);
+  const leftTop = { x: left.x + c * batterIn + leanL, y: at.y + height, z: left.z - s * batterIn };
+  const rightTop = { x: right.x - c * batterIn + leanR, y: at.y + height, z: right.z + s * batterIn };
 
-  // Flared sill foot blocks under each post.
-  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, left, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
-  b.prop('timber', stoneBlock(0.38, 0.14, 0.38, right, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
+  // Flared sill foot blocks anchored into the rock floor.
+  b.prop('timber', stoneBlock(0.42, 0.16, 0.42, left, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
+  b.prop('timber', stoneBlock(0.42, 0.16, 0.42, right, { yaw, bevel: 0.04, batter: 0.2, irregular: 0.55 }), tint);
 
-  // Hand-hewn organic octagonal posts with natural slight bow.
-  b.prop('timber', roughTimber(left, leftTop, 0.27, 0.27, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
-  b.prop('timber', roughTimber(right, rightTop, 0.27, 0.27, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
+  // Hand-hewn battered posts seated solidly up into the cap beam.
+  b.prop('timber', roughTimber(left, up(leftTop, 0.14), 0.28, 0.28, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
+  b.prop('timber', roughTimber(right, up(rightTop, 0.14), 0.28, 0.28, { taper: 0.1, bow: 0.022, irregular: 0.4 }), tint);
 
-  // Overhanging eared cap beam with natural rock-load bow.
-  const capLeft = { x: leftTop.x - c * 0.24, y: leftTop.y + 0.13, z: leftTop.z + s * 0.24 };
-  const capRight = { x: rightTop.x + c * 0.24, y: rightTop.y + 0.13, z: rightTop.z - s * 0.24 };
-  b.prop('timber', roughTimber(capLeft, capRight, 0.3, 0.26, { taper: 0.05, bow: 0.028, irregular: 0.38 }), tint);
+  // Heavy cap beam socketed deep into the arched side walls with lagging cribbing at the shoulders.
+  const capLeft = { x: leftTop.x - c * 0.48, y: leftTop.y + 0.08, z: leftTop.z + s * 0.48 };
+  const capRight = { x: rightTop.x + c * 0.48, y: rightTop.y + 0.08, z: rightTop.z - s * 0.48 };
+  b.prop('timber', roughTimber(capLeft, capRight, 0.32, 0.28, { taper: 0.05, bow: 0.026, irregular: 0.38 }), tint);
 
-  // Adze-hewn knee braces on one or both sides.
+  // Timber blocking wedges & longitudinal shoulder lagging packing the frame neatly against curved cave stone.
+  for (const [sign, shoulder] of [[-1, leftTop], [1, rightTop]]) {
+    const wallPt = { x: shoulder.x + sign * c * 0.22, y: shoulder.y - 0.02, z: shoulder.z - sign * s * 0.22 };
+    b.prop('timber', roughTimber(
+      { x: wallPt.x - s * 0.45, y: wallPt.y, z: wallPt.z - c * 0.45 },
+      { x: wallPt.x + s * 0.45, y: wallPt.y, z: wallPt.z + c * 0.45 },
+      0.16, 0.14, { bow: 0.015, irregular: 0.45 },
+    ), 0x674e36);
+    b.prop('timber', stoneBox(0.36, 0.2, 0.42, { x: wallPt.x, y: wallPt.y + 0.18, z: wallPt.z }, {
+      yaw, bevel: 0.04, irregular: 0.55,
+    }), 0x5c452f);
+  }
+
+  // Adze-hewn knee braces mortised cleanly inside post and cap beam centerlines.
   for (const [post, top, otherTop, chance] of [[left, leftTop, rightTop, 0.75], [right, rightTop, leftTop, 0.55]]) {
     if (b.random() < chance) {
-      const braceBot = lerp(post, top, 0.62);
+      const braceBot = lerp(post, top, 0.56);
       const braceTop = lerp(top, otherTop, 0.26);
-      b.prop('timber', roughTimber(braceBot, up(braceTop, 0.08), 0.15, 0.15, { taper: 0.06, bow: 0.024, irregular: 0.4 }), tint);
+      b.prop('timber', roughTimber(braceBot, up(braceTop, 0.14), 0.15, 0.15, { taper: 0.06, bow: 0.02, irregular: 0.4 }), tint);
     }
   }
-  // Overhead lagging poles on ~50% of sets to break up the flat cap silhouette.
+  // Overhead lagging poles on ~50% of sets to break up the roof silhouette.
   if (b.random() < 0.5) {
     for (const t of [0.22, 0.5, 0.78]) {
       const p = lerp(leftTop, rightTop, t);
       b.prop('timber', roughTimber(
-        { x: p.x - s * 0.6, y: p.y + 0.28, z: p.z - c * 0.6 },
-        { x: p.x + s * 0.6, y: p.y + 0.28, z: p.z + c * 0.6 },
+        { x: p.x - s * 0.65, y: p.y + 0.25, z: p.z - c * 0.65 },
+        { x: p.x + s * 0.65, y: p.y + 0.25, z: p.z + c * 0.65 },
         0.11, 0.09, { taper: 0.08, bow: 0.02, irregular: 0.45 },
       ), tint);
     }
