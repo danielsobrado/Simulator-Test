@@ -72,7 +72,18 @@ export function applyGeologicalVariation({
   const lightMass = smoothstep(0.58, 0.94, macroZone);
   const warmCool = mx_noise_float(point.mul(0.075).add(vec3(2.9, 8.4, 1.3))).mul(0.5).add(0.5);
 
-  let outAlbedo = albedo.mul(float(geo.baseGain ?? 1.35));
+  const baseGain = float(geo.baseGain ?? 1.35);
+  const rawLuma = max(albedo.r.mul(0.2126).add(albedo.g.mul(0.7152)).add(albedo.b.mul(0.0722)), 1e-4);
+  const rawChroma = albedo.div(rawLuma);
+  const rockChroma = mix(
+    rawChroma,
+    normalizeTint(color(profile.tint ?? '#ebe3d6')),
+    float(geo.chromaNeutralize ?? 0.68),
+  );
+  const scaledLuma = rawLuma.mul(baseGain);
+  const liftedLuma = scaledLuma.div(scaledLuma.mul(float(geo.highlightKnee ?? 9.5)).add(1.0));
+
+  let outAlbedo = rockChroma.mul(liftedLuma);
   let outNormal = normal;
   let outRoughness = roughness;
   let outF0 = f0;
@@ -145,6 +156,14 @@ export function applyGeologicalVariation({
     outAlbedo.mul(normalizeTint(color(geo.paleMineralTint ?? '#c7c3b8'))).mul(1.16),
     clamp(paleTrace.mul(0.24), 0, 1),
   );
+
+  // Localized geological inclusions (nodular clasts in coarser beds, Section 4.3).
+  const clastCell = clamp(float(1).sub(mx_worley_noise_float(point.mul(2.15).add(vec3(6.4, 2.3, 9.1)))), 0, 1);
+  const clastMask = smoothstep(0.62, 0.88, clastCell)
+    .mul(smoothstep(0.35, 0.78, macroZone))
+    .mul(float(1).sub(crevice.mul(0.7)));
+  outAlbedo = outAlbedo.mul(mix(float(1), mix(float(0.86), float(1.16), grainMix), clastMask.mul(0.38)));
+  outNormal = bumpNormal(outNormal, clastMask.mul(0.012), float(0.65));
 
   // 4. Gravity-aligned vertical seepage streaks on walls and recesses.
   const seepBand = mx_noise_float(vec3(point.x.mul(1.35), point.y.mul(0.22), point.z.mul(1.35)).add(vec3(3.1, 0.7, 8.2)))
@@ -301,11 +320,11 @@ export function applyMineGround({
   const wFine = mx_worley_noise_float(point.mul(gScale.mul(2.35)).add(vec3(3.1, 1.7, 5.4)));
   const pebbleCrown = clamp(float(1).sub(wCoarse), 0, 1).mul(0.62)
     .add(clamp(float(1).sub(wFine), 0, 1).mul(0.38));
-  const chipTone = mix(float(0.54), float(1.32), clamp(wFine.mul(0.58).add(grainMix.mul(0.42)), 0, 1));
+  const chipTone = mix(float(0.48), float(1.42), clamp(wFine.mul(0.58).add(grainMix.mul(0.42)), 0, 1));
 
-  let gravelColor = mix(earthColor, albedo, float(0.55))
-    .mul(normalizeTint(color(ground.gravelTint ?? '#b8b2a8')))
-    .mul(float(ground.gravelValue ?? 1.06))
+  let gravelColor = mix(earthColor, albedo, float(0.62))
+    .mul(normalizeTint(color(ground.gravelTint ?? '#b2b4b8')))
+    .mul(float(ground.gravelValue ?? 1.12))
     .mul(chipTone);
   const trackWeather = smoothstep(0.45, 0.85, gravelWeight)
     .mul(smoothstep(0.28, 0.78, midPatch.mul(0.55).add(grainMix.mul(0.45))));

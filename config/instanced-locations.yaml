@@ -104,15 +104,17 @@ instancedLocations:
       # Restrained mineral seams anchored to crevices and geological bedding.
       vein: { color: '#8c6943', scale: 3.6, sharpness: 16.0, roughness: 0.48, f0: 0.12, glow: 0, gain: 1.22, strength: 0.34 }
       geology:
-        baseGain: 5.2
+        baseGain: 6.0
+        chromaNeutralize: 0.68
+        highlightKnee: 9.5
         macroScale: 0.046
         macroContrast: 0.22
         warmTint: '#ede0cf'
         coolTint: '#dfdcd6'
         darkTint: '#aaa49a'
         lightTint: '#f0ebe2'
-        altRockBlend: 0.36
-        altLuminanceScale: 0.74
+        altRockBlend: 0.38
+        altLuminanceScale: 0.68
         fractureStain: 0.30
         fractureColor: '#6b645b'
         mineralTint: '#8a6d4e'
@@ -120,13 +122,13 @@ instancedLocations:
         verticalSeep: 0.24
         strataVariation: 0.52
       ground:
-        compactedTint: '#aa9786'
-        compactedValue: 1.06
+        compactedTint: '#b89f86'
+        compactedValue: 1.08
         compactedRoughness: 0.94
-        wearTint: '#c2b6a8'
-        wearRoughness: 0.84
-        gravelTint: '#9e978e'
-        gravelValue: 1.00
+        wearTint: '#cdbda9'
+        wearRoughness: 0.80
+        gravelTint: '#b2b4b8'
+        gravelValue: 1.12
         gravelRoughness: 0.94
         gravelScale: 6.4
         gravelRelief: 1.32
@@ -199,13 +201,14 @@ instancedLocations:
       tint: '#8d9299'
       normalStrength: 1.1
     # Frostgard under the sky. `snow` lies on faces at least `from` upright (the normal's Y)
-    # that the sky can see; nothing under a roof or inside a hall takes any.
+    # that the sky can see; nothing under a roof or inside a hall takes any. `rime` is the
+    # frost that greys whatever stands in the weather, 0..1.
     frost_timber:
       surface: timber
       scale: 0.55
       tint: '#ffffff'
       roughness: 0.88
-      snow: { amount: 1, from: 0.45, color: '#eef4fa' }
+      snow: { amount: 1, from: 0.45, color: '#eef4fa', rime: 0.3 }
     snow_roof:
       surface: timber
       scale: 0.5
@@ -217,14 +220,21 @@ instancedLocations:
       scale: 0.42
       tint: '#ffffff'
       normalStrength: 1.1
-      snow: { amount: 0.9, from: 0.5, color: '#eef4fa' }
+      snow: { amount: 0.9, from: 0.5, color: '#eef4fa', rime: 0.15 }
+    # The valley's own rock, where the glacier and the snow leave it bare.
+    valley_rock:
+      surface: cave-rock
+      scale: 0.18
+      tint: '#f2f0ec'
+      normalStrength: 1.3
+      strata: { frequency: 0.5, warp: 5, dip: 0.2, dark: '#a8a8ac', light: '#ffffff', relief: 1.4 }
     moraine_boulder:
       surface: cave-rock
       scale: 0.3
-      tint: '#9a9ea6'
+      tint: '#f2f0ec'
       normalStrength: 1.2
       roughness: 0.95
-      snow: { amount: 1, from: 0.3, color: '#eef4fa' }
+      snow: { amount: 1, from: 0.3, color: '#eef4fa', rime: 0.2 }
     plank_floor:
       surface: planks
       scale: 0.42
@@ -297,7 +307,10 @@ instancedLocations:
   #   depthRate   metres of light path per metre of ice behind the surface: how fast it goes blue
   #   gloss       strength of the broad wet highlight
   #   crust       white weathering on faces open to the sky; snowfall: snow lying where the sky can see
-  #   wind        plan direction the snow ridges run along
+  #   snowSlope   how upright a face must be (its normal's Y, from..to) before snow lies on it
+  #   wind        plan direction the snow ridges run along; drift: loose snow snaking down it under open sky
+  #   translucency how strongly thin ice (icicles, fins) glows with the light around it
+  #   trailColor  what trodden snow is multiplied by
   #   detailRange metres over which cracks, bubbles and sparkle fade out with distance
   #   banding     layers per metre, tilt, fold amplitude (metres of layer offset), strength
   # Amounts are 0..1 and add to the vertex masks.
@@ -327,7 +340,12 @@ instancedLocations:
       polish: 0
       crust: 0
       snowfall: 0
+      snowSlope: [0.25, 0.65]
       wind: [0.6, 0.8]
+      drift: 0
+      driftSpeed: 3
+      translucency: 1.2
+      trailColor: '#a9bcd6'
       detailRange: [16, 48]
       banding: { frequency: 0.9, dip: 0.22, fold: 5, strength: 0.6 }
       scallop: { scale: 0.6, depth: 0.26 }
@@ -350,6 +368,7 @@ instancedLocations:
       polish: 0.6
       crackGain: 0.35
       depthRate: 1.6
+      translucency: 1.9
       banding: { frequency: 0.9, dip: 0.22, fold: 5, strength: 0.12 }
       scallop: { scale: 0.75, depth: 0.03 }
     fractured:
@@ -377,10 +396,14 @@ instancedLocations:
       <<: *ice
       crust: 0.85
       snowfall: 1
-      depthRate: 0.9
+      # Ledges on a cliff hold little: snow wants a nearly level place to lie.
+      snowSlope: [0.5, 0.85]
+      drift: 0.7
+      depthRate: 1.25
       cloud: 0.5
       roughness: 0.2
       detailRange: [22, 70]
+      banding: { frequency: 0.9, dip: 0.22, fold: 7, strength: 0.45 }
       scallop: { scale: 0.35, depth: 0.2 }
     # Fresh-fallen blocks: broken faces, a cap of new snow.
     calved_block:
@@ -430,26 +453,29 @@ instancedLocations:
       ambientDown: '#14344f'
       carried: { color: '#e4f1ff', intensity: 0.7, range: 9 }
       exposure: 1.15
+      indirectBounce: { strength: 0.55, cellSize: 1.5, radius: 10, wrap: 0.6, maxEnergy: 2.2 }
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
     # Open-air profiles add `sky`: the dome that is drawn, and the sun and skylight that are baked.
-    #   sun.direction points toward the sun; disc and glow shape it on the dome.
+    #   sun.direction points toward the sun; disc and glow shape it on the dome, halo is the
+    #   ring and sundogs ice crystals in the air draw round it.
     #   skylight is the dome's own light, shadowed like the sun's: keep the ambient colours low
     #   beside it or caves and overhangs will not go dark.
     #   peaks: a far ridge at `radius` metres, `haze` 0..1 of it lost to the air.
     frostgard_daylight:
       background: '#bcd3e8'
-      fog: { color: '#bcd3e8', density: 0.0042 }
+      fog: { color: '#bcd3e8', density: 0.005 }
       ambientUp: '#4a5d7c'
       ambientDown: '#43536f'
       carried: { color: '#ffffff', intensity: 0, range: 1 }
       exposure: 1.0
+      indirectBounce: { strength: 0.55, cellSize: 1.5, radius: 10, wrap: 0.6, maxEnergy: 2.2 }
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
       sky:
         zenith: '#2f6fb5'
         horizon: '#c4dbee'
         ground: '#bcd3e8'
-        sun: { direction: [-0.75, 0.42, 0.5], color: '#fff0d8', intensity: 1.5, disc: 6, glow: 1 }
-        skylight: { color: '#a9cbf2', intensity: 0.9 }
+        sun: { direction: [-0.75, 0.42, 0.5], color: '#fff0d8', intensity: 1.8, disc: 6, glow: 1, halo: 0.55 }
+        skylight: { color: '#a9cbf2', intensity: 0.75 }
         clouds: 0.55
         cloudColor: '#f3f7fb'
         stars: 0
@@ -461,13 +487,14 @@ instancedLocations:
       ambientDown: '#141d33'
       carried: { color: '#ffe2bd', intensity: 0.45, range: 8 }
       exposure: 1.5
+      indirectBounce: { strength: 0.55, cellSize: 1.5, radius: 10, wrap: 0.6, maxEnergy: 2.2 }
       absorption: { rock: [6, 6, 6], ice: [0.55, 0.085, 0.03] }
       sky:
         zenith: '#060d24'
         horizon: '#35507c'
         ground: '#16233f'
         # The afterglow in the west, long after the sun itself has gone.
-        sun: { direction: [-0.9, 0.12, -0.3], color: '#ff9a6a', intensity: 0.22, disc: 0, glow: 0.5 }
+        sun: { direction: [-0.9, 0.12, -0.3], color: '#ff9a6a', intensity: 0.22, disc: 0, glow: 0.5, halo: 0 }
         skylight: { color: '#5f86c8', intensity: 0.42 }
         clouds: 0.25
         cloudColor: '#27365a'
@@ -494,24 +521,29 @@ instancedLocations:
         - { count: 600, box: 18, velocity: [0.02, -0.03, 0.02], sway: 0.012, size: [0.012, 0.03], color: '#eaf6ff', opacity: 0.8, additive: true, ambientGain: 2.5, lampGain: 0.6, twinkle: 5 }
         - { count: 900, box: 26, velocity: [0.6, -0.5, -2.6], sway: 0.05, size: [0.03, 0.08], color: '#f2f8ff', opacity: 0.7, additive: false, ambientGain: 9, lampGain: 0.4, anchor: mouth, anchorRadius: 22 }
         # Cold haze: a few very large, very faint sprites, so depth reads in still air.
-        - { count: 70, box: 34, velocity: [0.05, 0, 0.04], sway: 0.4, size: [5, 9], color: '#bcd9ee', opacity: 0.045, additive: false, ambientGain: 1.6, lampGain: 0.15 }
+        - { count: 70, box: 34, velocity: [0.05, 0, 0.04], sway: 0.4, size: [5, 9], color: '#bcd9ee', opacity: 0.03, additive: false, ambientGain: 1.6, lampGain: 0.15 }
       # Shed from points a generator marks with `emit(kind, at)`.
       emitters: &frostgard_emitters
         drip: { perPoint: 3, life: 1.6, velocity: [0, -0.2, 0], gravity: 5, spread: 0.04, size: [0.035, 0.03], color: '#dff2ff', opacity: 0.9, additive: true, ambientGain: 3, glow: 0.15 }
-        smoke: { perPoint: 26, life: 7, velocity: [0.12, 0.75, 0.05], gravity: -0.02, spread: 1.6, size: [0.5, 2.6], color: '#8b93a0', opacity: 0.22, additive: false, ambientGain: 1.2, glow: 0.02 }
+        smoke: { perPoint: 26, life: 7, velocity: [0.12, 0.75, 0.05], gravity: -0.02, spread: 1.6, size: [0.5, 2.6], color: '#aab0ba', opacity: 0.13, additive: false, ambientGain: 4, glow: 0.04 }
+        ember: { perPoint: 12, life: 2.6, velocity: [0.05, 1.1, 0.03], gravity: -0.15, spread: 0.9, size: [0.04, 0.012], color: '#ff9a3c', opacity: 0.95, additive: true, ambientGain: 0, glow: 2.2 }
         sift: { perPoint: 60, life: 6, velocity: [1.2, -1.2, 2.2], gravity: 0.6, spread: 5, size: [0.25, 2.2], color: '#ffffff', opacity: 0.16, additive: false, ambientGain: 6, glow: 0 }
+      # The walker's own breath: a few puffs every `interval` seconds.
+      breath: &frostgard_breath { interval: 3.4, puffs: 3, life: 2.4, speed: 0.55, rise: 0.12, size: [0.12, 0.7], color: '#dfeaf6', opacity: 0.2, ambientGain: 3, glow: 0.06 }
     # `outdoor` fields fade out while the walker stands under a roof.
     frostgard_glacier_wind:
       particles:
         - { count: 1400, box: 30, velocity: [1.8, -0.25, 2.4], sway: 0.25, size: [0.03, 0.09], color: '#ffffff', opacity: 0.55, additive: false, ambientGain: 9, lampGain: 0, outdoor: true }
         - { count: 500, box: 20, velocity: [0.15, -0.05, 0.1], sway: 0.05, size: [0.012, 0.03], color: '#ffffff', opacity: 0.9, additive: true, ambientGain: 1.5, lampGain: 0, glow: 0.5, twinkle: 6, outdoor: true }
       emitters: *frostgard_emitters
+      breath: { <<: *frostgard_breath, ambientGain: 6 }
     frostgard_dusk_snow:
       particles:
         - { count: 1100, box: 26, velocity: [0.5, -1.1, 0.35], sway: 0.18, size: [0.02, 0.05], color: '#eaf2ff', opacity: 0.75, additive: false, ambientGain: 7, lampGain: 0.9, outdoor: true }
         - { count: 600, box: 26, velocity: [2.2, -0.2, 1.4], sway: 0.2, size: [0.03, 0.08], color: '#f2f8ff', opacity: 0.6, additive: false, ambientGain: 8, lampGain: 0.5, anchor: gate, anchorRadius: 26, outdoor: true }
         - { count: 60, box: 34, velocity: [0.08, 0, 0.05], sway: 0.4, size: [5, 9], color: '#8fa9cc', opacity: 0.04, additive: false, ambientGain: 2, lampGain: 0.2 }
       emitters: *frostgard_emitters
+      breath: { <<: *frostgard_breath, ambientGain: 5, outdoor: true }
 
   loadingThemes:
     neutral: { title: Entering a location, color: '#1a1e26', accent: '#cfd6e0' }
@@ -680,7 +712,7 @@ instancedLocations:
         icicles: 420
         longhall: { length: 13, width: 6, wallHeight: 2.6, roofRise: 3.4 }
         # Ledges melted along the layers: metres of relief, layers per metre, tilt, waviness.
-        strata: { amp: 0.35, frequency: 0.45, dip: 0.12, warp: 2.5 }
+        strata: { amp: 0.24, frequency: 0.45, dip: 0.12, warp: 4 }
         # The sun above the glacier, reaching the cave only through the ice: [x, z, strength].
         surfaceLight: [[-22, -52, 1.1], [14, -38, 1.1], [-4, -62, 1.1], [-16, -40, 1.5], [12, -56, 1.4], [-2, -22, 1.1], [3, -8, 1], [10, -86, 1.3], [-18, -62, 1], [-40, -74, 1.3], [-30, -90, 1]]
     frostgard_glacier_front:
@@ -691,7 +723,7 @@ instancedLocations:
       loreRealmKey: frostgard
       voxel: 0.8
       materials:
-        terrain: { kind: ice, profile: weathered_glacier, bedrock: glacier_bedrock }
+        terrain: { kind: ice, profile: weathered_glacier, bedrock: valley_rock }
         clearIce: { kind: ice, profile: clear_polished, masked: false }
         iceBlock: { kind: ice, profile: calved_block, masked: false }
         rock: { kind: stone, profile: moraine_boulder, masked: false }
@@ -702,11 +734,14 @@ instancedLocations:
         # The ice cliff: where it stands (z), how high, how far its middle bows forward, its backward lean
         # per metre of height; crevasses cut back from the lip; spires and bergs by x ([x, metres out, size]).
         front: { z: -34, height: 38, bow: 14, lean: 0.12, crevasses: 8, spires: [-38, -15, 6, 31, 48], caveX: 10, bergs: [[-18, 7, 2.6], [27, 6, 2.2], [-2, 9, 1.6]] }
-        wall: { x: 58, lean: 0.26 }
+        # The rock walls: where they stand, how far they lean back per metre, how much craggier than ice.
+        wall: { x: 58, lean: 0.14, crag: 1.7 }
         moraine: { z: 37, height: 9, width: 7 }
         pool: { x: -8, z: -22, rx: 22, rz: 9, y: -0.3 }
         arch: { x: 4, z: -6, width: 8.4, height: 9.5, wallHeight: 13 }
-        strata: { amp: 0.5, frequency: 0.3, dip: 0.08, warp: 3 }
+        strata: { amp: 0.32, frequency: 0.3, dip: 0.08, warp: 6 }
+        # Strength of the sun shafts through the old wall's openings.
+        shafts: 0.08
         icicles: 240
         stakes: [[2.5, 14], [5.5, 4], [7, -14], [9.5, -24]]
     frostgard_hold:
@@ -717,7 +752,7 @@ instancedLocations:
       loreRealmKey: frostgard
       voxel: 0.6
       materials:
-        terrain: { kind: ice, profile: weathered_glacier, bedrock: glacier_bedrock }
+        terrain: { kind: ice, profile: weathered_glacier, bedrock: valley_rock }
         clearIce: { kind: ice, profile: clear_polished, masked: false }
         rock: { kind: stone, profile: moraine_boulder, masked: false }
         timber: { kind: stone, profile: frost_timber, masked: false }
@@ -738,7 +773,7 @@ instancedLocations:
         store: { x: -18, z: -58, floor: 0.4, radius: 7.5 }
         yard: { gateZ: 15 }
         cottage: { length: 7, width: 4.4, wallHeight: 2.2, roofRise: 2.6 }
-        strata: { amp: 0.4, frequency: 0.3, dip: 0.08, warp: 3 }
+        strata: { amp: 0.3, frequency: 0.3, dip: 0.08, warp: 6 }
         icicles: 60
 
   # Showcase sites are development access only: they have no Azgaar source and are
